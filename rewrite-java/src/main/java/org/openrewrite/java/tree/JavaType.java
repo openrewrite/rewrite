@@ -19,17 +19,16 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.AccessLevel;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.joining;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -62,7 +61,9 @@ public interface JavaType {
         }
     }
 
-    @Value
+    @Getter
+    @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
+    @AllArgsConstructor
     @With
     class MultiCatch implements JavaType {
         List<JavaType> throwableTypes;
@@ -72,24 +73,13 @@ public interface JavaType {
 
         public abstract String getFullyQualifiedName();
 
-        public abstract FullyQualified withFullyQualifiedName(String fullyQualifiedName);
-
         public abstract List<FullyQualified> getAnnotations();
 
-        public abstract boolean hasFlags(Flag... test);
-
-        public abstract Set<Flag> getFlags();
-
         public abstract List<FullyQualified> getInterfaces();
-
-        public abstract Class.Kind getKind();
 
         public abstract List<Variable> getMembers();
 
         public abstract List<Method> getMethods();
-
-        @Nullable
-        public abstract FullyQualified getOwningClass();
 
         @Nullable
         public abstract FullyQualified getSupertype();
@@ -131,7 +121,9 @@ public interface JavaType {
         }
     }
 
-    @Value
+    @Getter
+    @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
+    @AllArgsConstructor
     class Class extends FullyQualified {
         public static final Class CLASS = new Class(null, Flag.Public.getBitMask(), "java.lang.Class", Kind.Class,
                 null, null, null, null, null, null);
@@ -312,19 +304,6 @@ public interface JavaType {
             return "Class{" + fullyQualifiedName + '}';
         }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Class aClass = (Class) o;
-            return Objects.equals(fullyQualifiedName, aClass.fullyQualifiedName);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(fullyQualifiedName);
-        }
-
         public enum Kind {
             Class,
             Enum,
@@ -333,7 +312,9 @@ public interface JavaType {
         }
     }
 
-    @Value
+    @Getter
+    @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
+    @AllArgsConstructor
     @With
     class Parameterized extends FullyQualified {
         @Nullable
@@ -360,42 +341,15 @@ public interface JavaType {
         }
 
         @Override
-        public Parameterized withFullyQualifiedName(String fullyQualifiedName) {
-            assert type != null;
-            if (type.getFullyQualifiedName().equals(fullyQualifiedName)) {
-                return this;
-            }
-            return new Parameterized(null, type.withFullyQualifiedName(fullyQualifiedName), typeParameters);
-        }
-
-        @Override
         public List<FullyQualified> getAnnotations() {
             assert type != null;
             return type.getAnnotations();
         }
 
         @Override
-        public boolean hasFlags(Flag... test) {
-            assert type != null;
-            return type.hasFlags();
-        }
-
-        @Override
-        public Set<Flag> getFlags() {
-            assert type != null;
-            return type.getFlags();
-        }
-
-        @Override
         public List<FullyQualified> getInterfaces() {
             assert type != null;
             return type.getInterfaces();
-        }
-
-        @Override
-        public JavaType.Class.Kind getKind() {
-            assert type != null;
-            return type.getKind();
         }
 
         @Override
@@ -411,12 +365,6 @@ public interface JavaType {
         }
 
         @Override
-        public FullyQualified getOwningClass() {
-            assert type != null;
-            return type.getOwningClass();
-        }
-
-        @Override
         public FullyQualified getSupertype() {
             assert type != null;
             return type.getSupertype();
@@ -429,27 +377,14 @@ public interface JavaType {
         }
 
         @Override
-        public boolean equals(Object o) {
-            assert type != null;
-            assert typeParameters != null;
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Parameterized that = (Parameterized) o;
-            return type.equals(that.type) && typeParameters.equals(that.typeParameters);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(type, typeParameters);
-        }
-
-        @Override
         public String toString() {
             return "Parameterized{" + getFullyQualifiedName() + "}";
         }
     }
 
-    @Value
+    @Getter
+    @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
+    @AllArgsConstructor
     @With
     class GenericTypeVariable extends FullyQualified {
         @Nullable
@@ -459,85 +394,63 @@ public interface JavaType {
 
         @NonFinal
         @Nullable
-        FullyQualified bound;
+        List<FullyQualified> bounds;
 
         @Override
         public String getFullyQualifiedName() {
-            return bound == null ? "java.lang.Object" : bound.getFullyQualifiedName();
+            return bounds == null || bounds.size() > 1 ? "java.lang.Object" : bounds.get(0).getFullyQualifiedName();
         }
 
-        public GenericTypeVariable withFullyQualifiedName(String fullyQualifiedName) {
-            return bound == null || bound.getFullyQualifiedName().equals(fullyQualifiedName) ?
-                    this :
-                    withBound(JavaType.Class.build(fullyQualifiedName));
-        }
-
-        public void unsafeSet(@Nullable FullyQualified bound) {
-            this.bound = bound;
+        public void unsafeSet(@Nullable List<FullyQualified> bounds) {
+            this.bounds = bounds;
         }
 
         @Override
         public List<FullyQualified> getAnnotations() {
-            return bound == null ? emptyList() : bound.getAnnotations();
-        }
-
-        @Override
-        public Class.Kind getKind() {
-            return Class.Kind.Class;
-        }
-
-        @Override
-        public boolean hasFlags(Flag... test) {
-            return bound != null && bound.hasFlags(test);
-        }
-
-        @Override
-        public Set<Flag> getFlags() {
-            return bound == null ? emptySet() : bound.getFlags();
+            return emptyList();
         }
 
         @Override
         public List<FullyQualified> getInterfaces() {
-            return bound == null ? emptyList() : bound.getInterfaces();
+            return bounds == null ?
+                    emptyList() :
+                    bounds.stream().flatMap(bound -> bound.getInterfaces().stream()).collect(Collectors.toList());
         }
 
         @Override
         public List<Variable> getMembers() {
-            return bound == null ? emptyList() : bound.getMembers();
+            return bounds == null ?
+                    emptyList() :
+                    bounds.stream().flatMap(bound -> bound.getMembers().stream()).collect(Collectors.toList());
         }
 
         @Override
         public List<Method> getMethods() {
-            return bound == null ? emptyList() : bound.getMethods();
-        }
-
-        @Override
-        public FullyQualified getOwningClass() {
-            return bound == null ? null : bound.getOwningClass();
+            return bounds == null ?
+                    emptyList() :
+                    bounds.stream().flatMap(bound -> bound.getMethods().stream()).collect(Collectors.toList());
         }
 
         @Override
         public FullyQualified getSupertype() {
-            return bound == null ? null : bound.getSupertype();
+            // only classes can have supertypes, and generic type variables can only contain one class bound.
+            if(bounds == null) {
+                return null;
+            }
+            for (FullyQualified bound : bounds) {
+                FullyQualified supertype = bound.getSupertype();
+                if(supertype != null) {
+                    return supertype;
+                }
+            }
+            return null;
         }
 
         @Override
         public List<Variable> getVisibleSupertypeMembers() {
-            return bound == null ? emptyList() : bound.getVisibleSupertypeMembers();
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            GenericTypeVariable that = (GenericTypeVariable) o;
-            return name.equals(that.name) && Objects.equals(bound == null ? null : bound.getFullyQualifiedName(),
-                    that.bound == null ? null : that.bound.getFullyQualifiedName());
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(name, bound == null ? null : bound.getFullyQualifiedName());
+            return bounds == null ?
+                    emptyList() :
+                    bounds.stream().flatMap(bound -> bound.getVisibleSupertypeMembers().stream()).collect(Collectors.toList());
         }
 
         @Override
@@ -546,7 +459,9 @@ public interface JavaType {
         }
     }
 
-    @Value
+    @Getter
+    @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
+    @AllArgsConstructor
     @With
     class Array implements JavaType {
         JavaType elemType;
@@ -638,7 +553,9 @@ public interface JavaType {
         }
     }
 
-    @Value
+    @Getter
+    @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
+    @AllArgsConstructor
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     class Method implements JavaType {
         @With(AccessLevel.PRIVATE)
@@ -754,22 +671,11 @@ public interface JavaType {
         public String toString() {
             return "Method{" + (declaringType == null ? "<unknown>" : declaringType) + "#" + name + "(" + String.join(", ", (paramNames == null ? emptyList() : paramNames)) + ")}";
         }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Method method = (Method) o;
-            return declaringType.equals(method.declaringType) && name.equals(method.name) && Objects.equals(genericSignature, method.genericSignature);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(declaringType, name, genericSignature);
-        }
     }
 
-    @Value
+    @Getter
+    @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
+    @AllArgsConstructor
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     class Variable implements JavaType {
         @With(AccessLevel.NONE)
@@ -818,19 +724,6 @@ public interface JavaType {
             this.owner = owner;
             this.type = type;
             this.annotations = annotations;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Variable variable = (Variable) o;
-            return owner.equals(variable.owner) && name.equals(variable.name);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(owner, name);
         }
 
         @Override

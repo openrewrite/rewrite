@@ -37,9 +37,9 @@ import java.util.function.Consumer;
 @EqualsAndHashCode(callSuper = true)
 public class FixSerializableFields extends Recipe {
 
-    private static final JavaType.Class SERIALIZABLE_FQ =  JavaType.Class.build("java.io.Serializable");
-    private static final JavaType.Class COLLECTION_FQ =  JavaType.Class.build("java.util.Collection");
-    private static final JavaType.Class MAP_FQ =  JavaType.Class.build("java.util.Map");
+    private static final JavaType.Class SERIALIZABLE_FQ = JavaType.Class.build("java.io.Serializable");
+    private static final JavaType.Class COLLECTION_FQ = JavaType.Class.build("java.util.Collection");
+    private static final JavaType.Class MAP_FQ = JavaType.Class.build("java.util.Map");
     private static final SerializedMarker SERIALIZED_MARKER = new SerializedMarker(Tree.randomId());
 
     @Option(displayName = "Mark fields as transient",
@@ -107,7 +107,7 @@ public class FixSerializableFields extends Recipe {
 
                         String fqn = classDecl.getType() == null ? "" : classDecl.getType().getFullyQualifiedName();
                         if ((fullyQualifiedExclusions == null || !fullyQualifiedExclusions.contains(fqn))
-                            &&  serializableCandidates.contains(fqn)) {
+                                && serializableCandidates.contains(fqn)) {
                             targets.add(fqn);
                         }
                         return super.visitClassDeclaration(classDecl, targets);
@@ -170,13 +170,13 @@ public class FixSerializableFields extends Recipe {
             JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(c.getType());
             boolean isClassSerializable = implementsSerializable(c.getType());
             if (!isClassSerializable && fullyQualified != null && targets.contains(fullyQualified.getFullyQualifiedName())) {
-                    //If the class is one of the serializable targets, and it does not already implement Serializable, add it.
-                    maybeAddImport("java.io.Serializable");
-                    return c.withTemplate(
-                            JavaTemplate.builder(this::getCursor, "Serializable").imports("java.io.Serializable").build(),
-                            c.getCoordinates().addImplementsClause()
-                    );
-            }  else if (isClassSerializable) {
+                //If the class is one of the serializable targets, and it does not already implement Serializable, add it.
+                maybeAddImport("java.io.Serializable");
+                return c.withTemplate(
+                        JavaTemplate.builder(this::getCursor, "Serializable").imports("java.io.Serializable").build(),
+                        c.getCoordinates().addImplementsClause()
+                );
+            } else if (isClassSerializable) {
                 //If the class implements serializable, mark any fields that are not serializable as transient.
                 J.ClassDeclaration after = c.withBody(c.getBody().withStatements(
                         ListUtils.map(classDecl.getBody().getStatements(), s -> {
@@ -219,6 +219,7 @@ public class FixSerializableFields extends Recipe {
     private static class SerializedMarker implements Marker {
         UUID id;
     }
+
     private static boolean implementsSerializable(@Nullable JavaType type) {
         return implementsSerializable(type, null);
     }
@@ -228,7 +229,7 @@ public class FixSerializableFields extends Recipe {
      * of a parameterized types, this method will recurse into those types when the Parameterized type is assignable
      * to a Collection or Map.
      *
-     * @param type The type that will be checked if it implements serializable.
+     * @param type                  The type that will be checked if it implements serializable.
      * @param notSerializableAction An optional callback that for each FQN that is determined to be not serializable.
      * @return true if the class implement serializable.
      */
@@ -257,8 +258,13 @@ public class FixSerializableFields extends Recipe {
         boolean serializable = SERIALIZABLE_FQ.isAssignableFrom(TypeUtils.asFullyQualified(type));
         if (!serializable && fq instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) fq;
-            if (generic.getBound() != null) {
-                serializable = TypeUtils.isOfClassType(SERIALIZABLE_FQ, generic.getBound().getFullyQualifiedName());
+            if (generic.getBounds() != null) {
+                for (JavaType.FullyQualified bound : generic.getBounds()) {
+                    serializable = TypeUtils.isOfClassType(SERIALIZABLE_FQ, bound.getFullyQualifiedName());
+                    if (serializable) {
+                        break;
+                    }
+                }
             }
         }
         if (fq != null && notSerializableAction != null && !serializable) {

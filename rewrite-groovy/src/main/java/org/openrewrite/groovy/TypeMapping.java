@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
 class TypeMapping {
@@ -152,7 +153,9 @@ class TypeMapping {
                                     return new JavaType.GenericTypeVariable(
                                             null,
                                             g.getName(),
-                                            TypeUtils.asFullyQualified(type(g.getUpperBounds()[0], stack)));
+                                            // FIXME there can be multiple type bounds here
+                                            // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
+                                            singletonList(TypeUtils.asFullyQualified(type(g.getUpperBounds()[0], stack))));
                                 }
                                 return type(g.getType(), stack);
                             })

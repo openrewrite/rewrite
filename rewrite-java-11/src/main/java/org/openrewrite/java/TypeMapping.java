@@ -33,8 +33,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.joining;
 
 @RequiredArgsConstructor
@@ -202,11 +201,39 @@ public class TypeMapping {
                 }
             }
         } else if (type instanceof Type.TypeVar) {
+            StringJoiner boundSigs = new StringJoiner(" & ");
+            if (type.getUpperBound() instanceof Type.IntersectionClassType) {
+                Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
+                if(intersectionBound.supertype_field != null) {
+                    boundSigs.add(signature(intersectionBound.supertype_field));
+                }
+                for (Type bound : intersectionBound.interfaces_field) {
+                    boundSigs.add(signature(bound));
+                }
+            } else {
+                boundSigs.add(signature(type.getUpperBound()));
+            }
+
             return typeCache.computeGeneric(
                     type.tsym.name.toString(),
-                    signature(type.getUpperBound()),
-                    () -> new JavaType.GenericTypeVariable(null, type.tsym.name.toString(),
-                            TypeUtils.asFullyQualified(type(type.getUpperBound(), stack)))
+                    boundSigs.toString(),
+                    () -> {
+                        List<JavaType.FullyQualified> bounds;
+                        if (type.getUpperBound() instanceof Type.IntersectionClassType) {
+                            bounds = new ArrayList<>();
+                            Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
+                            if(intersectionBound.supertype_field != null) {
+                                bounds.add((JavaType.FullyQualified) type(intersectionBound.supertype_field, stack));
+                            }
+                            for (Type bound : intersectionBound.interfaces_field) {
+                                bounds.add((JavaType.FullyQualified) type(bound, stack));
+                            }
+                        } else {
+                            bounds = singletonList((JavaType.FullyQualified) type(type.getUpperBound(), stack));
+                        }
+
+                        return new JavaType.GenericTypeVariable(null, type.tsym.name.toString(), bounds);
+                    }
             );
         } else if (type instanceof Type.JCPrimitiveType) {
             return primitiveType(type.getTag());
@@ -464,12 +491,11 @@ public class TypeMapping {
         return null;
     }
 
-    @Nullable
     private String signature(@Nullable com.sun.tools.javac.code.Type type) {
         return signature(type, new HashSet<>());
     }
 
-    @Nullable
+    @SuppressWarnings("ConstantConditions")
     private String signature(@Nullable com.sun.tools.javac.code.Type type, Set<com.sun.tools.javac.code.Type> boundedTypes) {
         if (type == null) {
             return null;
