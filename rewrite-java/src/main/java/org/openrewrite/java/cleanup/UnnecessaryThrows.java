@@ -40,8 +40,8 @@ public class UnnecessaryThrows extends Recipe {
     public String getDescription() {
         return "Remove unnecessary `throws` declarations. This recipe will only remove unused, checked exception if:\n" +
                 "\n" +
-                "- The declaring class or the method declaration is `final`\n" +
-                "- The method declaration is `static` or `private`\n" +
+                "- The declaring class or the method declaration is `final`.\n" +
+                "- The method declaration is `static` or `private`.\n" +
                 "- If the method overriding a method declaration in a super class and the super does not throw the exception.\n" +
                 "- If the method is `public` or `protected` and the exception is not documented via a JavaDoc as a `@throws` tag.";
     }
@@ -142,8 +142,7 @@ public class UnnecessaryThrows extends Recipe {
 
     private Set<JavaType.FullyQualified> findExceptionCandidates(@Nullable J.MethodDeclaration method) {
 
-        if (method == null || method.getMethodType() == null
-                || method.getMethodType().getThrownExceptions() == null || method.isAbstract()) {
+        if (method == null || method.getMethodType() == null || method.isAbstract()) {
             return Collections.emptySet();
         }
 
@@ -171,10 +170,9 @@ public class UnnecessaryThrows extends Recipe {
         Optional<JavaType.Method> superMethod = TypeUtils.findOverriddenMethod(method.getMethodType());
         if (superMethod.isPresent()) {
             JavaType.Method baseMethod = superMethod.get();
-            if (baseMethod.getThrownExceptions() != null) {
-                for (JavaType.FullyQualified baseException : baseMethod.getThrownExceptions()) {
-                    candidates.remove(baseException);
-                }
+            baseMethod.getThrownExceptions();
+            for (JavaType.FullyQualified baseException : baseMethod.getThrownExceptions()) {
+                candidates.remove(baseException);
             }
         }
         if (!candidates.isEmpty()) {

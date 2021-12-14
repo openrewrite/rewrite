@@ -82,8 +82,8 @@ interface MethodInvocationTest {
             assertTrue(effectiveParams[1].hasElementType("java.lang.Integer"))
 
             val methType = test.methodType!!.genericSignature!!
-            assertEquals("java.lang.Object", methType.returnType.asGeneric()?.fullyQualifiedName)
-            assertEquals("java.lang.Object", methType.paramTypes[0].asGeneric()?.fullyQualifiedName)
+            assertEquals("java.lang.Object", methType.returnType.asGeneric()?.bounds?.get(0)?.fullyQualifiedName)
+            assertEquals("java.lang.Object", methType.paramTypes[0].asGeneric()?.bounds?.get(0)?.fullyQualifiedName)
             assertTrue(methType.paramTypes[1].hasElementType("java.lang.Object"))
         }
 

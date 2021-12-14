@@ -144,14 +144,7 @@ public class ChangePackage extends Recipe {
             if (changingTo != null && classDecl.getType() != null) {
                 JavaType.FullyQualified type = c.getType();
                 if (type != null) {
-                    if(type instanceof JavaType.Class) {
-                        c = c.withType(((JavaType.Class) type).withFullyQualifiedName(changingTo + "." + c.getType().getClassName()));
-                    } else if(type instanceof JavaType.Parameterized) {
-                        JavaType.Parameterized pt = (JavaType.Parameterized) type;
-                        if(pt.getType() instanceof JavaType.Class) {
-                            c = c.withType(pt.withType(((JavaType.Class) pt.getType()).withFullyQualifiedName(changingTo + "." + c.getType().getClassName())));
-                        }
-                    }
+                    c = c.withType(type.withFullyQualifiedName(changingTo + "." + c.getType().getClassName()));
                 }
             }
             return c;

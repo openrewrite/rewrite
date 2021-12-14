@@ -142,13 +142,13 @@ public class ChangeType extends Recipe {
             }
 
             if (tree instanceof TypedTree) {
-                if(tree instanceof J.MethodDeclaration) {
+                if (tree instanceof J.MethodDeclaration) {
                     J.MethodDeclaration m = (J.MethodDeclaration) tree;
                     return m.withMethodType(updateType(m.getMethodType()));
-                } else if(tree instanceof J.MethodInvocation) {
+                } else if (tree instanceof J.MethodInvocation) {
                     J.MethodInvocation m = (J.MethodInvocation) tree;
                     return m.withMethodType(updateType(m.getMethodType()));
-                } else if(tree instanceof J.NewClass) {
+                } else if (tree instanceof J.NewClass) {
                     J.NewClass n = (J.NewClass) tree;
                     return n.withConstructorType(updateType(n.getConstructorType()));
                 }
@@ -316,10 +316,13 @@ public class ChangeType extends Recipe {
 
         private JavaType updateType(@Nullable JavaType type) {
             JavaType.GenericTypeVariable gtv = TypeUtils.asGeneric(type);
-            if (gtv != null && gtv.getBound() != null
-                    && gtv.getBound().getFullyQualifiedName().equals(oldFullyQualifiedTypeName)
-                    && targetType instanceof JavaType.FullyQualified) {
-                return gtv.withBound((JavaType.FullyQualified) targetType);
+            if (gtv != null) {
+                return gtv.withBounds(ListUtils.map(gtv.getBounds(), bound -> {
+                    if (bound.getFullyQualifiedName().equals(oldFullyQualifiedTypeName) && targetType instanceof JavaType.FullyQualified) {
+                        return (JavaType.FullyQualified) targetType;
+                    }
+                    return bound;
+                }));
             }
 
             JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(type);

@@ -430,8 +430,6 @@ public class TypeMapping {
                         if (declaringType == null) {
                             if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
                                 resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type, stack));
-                            } else if (methodSymbol.owner instanceof Symbol.VarSymbol) {
-                                resolvedDeclaringType = new JavaType.GenericTypeVariable(null, methodSymbol.owner.name.toString(), null);
                             }
                         }
 

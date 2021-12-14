@@ -598,16 +598,17 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     for (JCTree param : ref.paramTypes) {
                         for (JavaType testParamType : method.getResolvedSignature().getParamTypes()) {
                             Type paramType = attr.attribType(param, symbol);
-                            while (testParamType instanceof JavaType.GenericTypeVariable) {
-                                testParamType = ((JavaType.GenericTypeVariable) testParamType).getBound();
+                            if (testParamType instanceof JavaType.GenericTypeVariable) {
+                                for (JavaType.FullyQualified bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
+                                    if (paramTypeMatches(bound, paramType)) {
+                                        return method;
+                                    }
+                                }
+                                continue nextMethod;
                             }
 
-                            if (paramType instanceof Type.ClassType) {
-                                JavaType.FullyQualified fqTestParamType = TypeUtils.asFullyQualified(testParamType);
-                                if (fqTestParamType == null || !fqTestParamType.getFullyQualifiedName().equals(((Symbol.ClassSymbol) paramType.tsym)
-                                        .fullname.toString())) {
-                                    continue nextMethod;
-                                }
+                            if (paramTypeMatches(testParamType, paramType)) {
+                                continue nextMethod;
                             }
                         }
                     }
@@ -619,6 +620,15 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
         // a member reference, but not matching anything on type attribution
         return null;
+    }
+
+    private boolean paramTypeMatches(JavaType testParamType, Type paramType) {
+        if (paramType instanceof Type.ClassType) {
+            JavaType.FullyQualified fqTestParamType = TypeUtils.asFullyQualified(testParamType);
+            return fqTestParamType == null || !fqTestParamType.getFullyQualifiedName().equals(((Symbol.ClassSymbol) paramType.tsym)
+                    .fullname.toString());
+        }
+        return false;
     }
 
     @Nullable

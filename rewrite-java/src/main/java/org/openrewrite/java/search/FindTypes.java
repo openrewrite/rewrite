@@ -157,11 +157,11 @@ public class FindTypes extends Recipe {
         return ts;
     }
 
-    private static boolean typeMatches(boolean checkAssignability, JavaType.FullyQualified match,
+    private static boolean typeMatches(boolean checkAssignability, @Nullable JavaType.FullyQualified match,
                                        @Nullable JavaType.FullyQualified test) {
-        return test != null && (checkAssignability ?
+        return test != null && match != null && (checkAssignability ?
                 match.isAssignableFrom(test) :
-                !(test instanceof JavaType.GenericTypeVariable) && match.getFullyQualifiedName().equals(test.getFullyQualifiedName())
+                match.getFullyQualifiedName().equals(test.getFullyQualifiedName())
         );
     }
 }

@@ -631,8 +631,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .matches({
                     it is JavaType.Parameterized
                             && it.type!!.fullyQualifiedName == "java.util.List"
-                            && it.typeParameters!!.size == 1
-                            && it.typeParameters!!.first().asFullyQualified()!!.fullyQualifiedName == "java.lang.String"
+                            && it.typeParameters.size == 1
+                            && it.typeParameters.first().asFullyQualified()!!.fullyQualifiedName == "java.lang.String"
                 }, "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
         }
     )
@@ -1645,7 +1645,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .matches { uType ->
                     uType is JavaType.GenericTypeVariable &&
                             uType.name == "U" &&
-                            uType.bound!!.fullyQualifiedName == "java.lang.Object"
+                            uType.bounds[0]!!.fullyQualifiedName == "java.lang.Object"
                 }
         }
     )
