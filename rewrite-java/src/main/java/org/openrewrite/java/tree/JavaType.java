@@ -81,6 +81,8 @@ public interface JavaType {
 
         public abstract List<Method> getMethods();
 
+        public abstract FullyQualified getOwningClass();
+
         @Nullable
         public abstract FullyQualified getSupertype();
 

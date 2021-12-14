@@ -35,6 +35,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.Location.*;
@@ -332,10 +333,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                                 } else {
                                                     bound = (JavaType.FullyQualified) bounds.get(0);
                                                 }
+
                                                 JavaType.GenericTypeVariable genericType = new JavaType.GenericTypeVariable(
-                                                        null,
-                                                        typeParamIdent.getSimpleName(),
-                                                        bound);
+                                                        null, typeParamIdent.getSimpleName(), singletonList(bound));
 
                                                 paramTypes.add(genericType);
                                             }

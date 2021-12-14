@@ -20,7 +20,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.Iterator;
 import java.util.List;
 
 public class JavaTypeVisitor<P> {
@@ -55,7 +54,7 @@ public class JavaTypeVisitor<P> {
      * for having to assert the non-nullability of the returned tree.
      *
      * @param javaType A non-null type.
-     * @param p    A state object that passes through the visitor.
+     * @param p        A state object that passes through the visitor.
      * @return A non-null type.
      */
     public JavaType visitNonNull(JavaType javaType, P p) {
@@ -82,13 +81,13 @@ public class JavaTypeVisitor<P> {
                 javaType = visitParameterized((JavaType.Parameterized) javaType, p);
             } else if (javaType instanceof JavaType.Primitive) {
                 javaType = visitPrimitive((JavaType.Primitive) javaType, p);
-            } else if(javaType instanceof JavaType.Method) {
+            } else if (javaType instanceof JavaType.Method) {
                 javaType = visitMethod((JavaType.Method) javaType, p);
-            } else if(javaType instanceof JavaType.Variable) {
+            } else if (javaType instanceof JavaType.Variable) {
                 javaType = visitVariable((JavaType.Variable) javaType, p);
             }
 
-            if(javaType != null) {
+            if (javaType != null) {
                 javaType = postVisit(javaType, p);
             }
 
@@ -125,14 +124,15 @@ public class JavaTypeVisitor<P> {
 
     public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, P p) {
         JavaType.GenericTypeVariable g = generic;
-        g = g.withBounds(ListUtils.map(g.getBounds(), b -> (JavaType.FullyQualified) visit(b, p)));
+        g = g.withBounds(ListUtils.map(g.getBounds(), bound -> (JavaType.FullyQualified) visit(bound, p)));
         return g;
     }
 
     /**
      * This does not visit the declaring type to avoid a visitor cycle.
+     *
      * @param method The method to visit
-     * @param p Visit context
+     * @param p      Visit context
      * @return A method
      */
     public JavaType visitMethod(JavaType.Method method, P p) {
@@ -173,8 +173,9 @@ public class JavaTypeVisitor<P> {
 
     /**
      * This does not visit the owner to avoid a visitor cycle.
+     *
      * @param variable The variable to visit
-     * @param p Visit context
+     * @param p        Visit context
      * @return A variable
      */
     public JavaType visitVariable(JavaType.Variable variable, P p) {
