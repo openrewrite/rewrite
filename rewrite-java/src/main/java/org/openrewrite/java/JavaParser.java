@@ -21,7 +21,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.cache.DelegatingJavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
@@ -40,6 +39,11 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.*;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
+    /**
+     * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to skip inclusion of
+     * a {@link JavaSourceSet} marker with type attribution from the classpath.
+     */
+    String SKIP_SOURCE_SET_MARKER = "org.openrewrite.java.skipSourceSetMarker";
 
     /**
      * @deprecated Won't work in isolated classloaders.
@@ -150,7 +154,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     @Override
     default List<J.CompilationUnit> parse(@Language("java") String... sources) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        return parse(new JavaExecutionContextView(ctx).setTypeCache(new DelegatingJavaTypeCache()), sources);
+        return parse(ctx, sources);
     }
 
     @Override

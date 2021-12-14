@@ -21,23 +21,22 @@ import org.junit.jupiter.api.BeforeEach
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.java.cache.DelegatingJavaTypeCache
-import org.openrewrite.java.cache.JavaTypeCache
+import org.openrewrite.java.internal.JavaTypeCache
 import org.openrewrite.java.tree.J
 import java.io.File
 import java.nio.file.Path
 
 interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     val typeCache: JavaTypeCache
-        get() = DelegatingJavaTypeCache()
+        get() = JavaTypeCache()
 
     override val parser: JavaParser
         get() = JavaParser.fromJavaVersion().build()
 
     override val executionContext: ExecutionContext
         get() {
-            val ctx = JavaExecutionContextView(super.executionContext)
-            ctx.typeCache = typeCache
+            val ctx = super.executionContext
+            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_MARKER, true)
             return ctx
         }
 

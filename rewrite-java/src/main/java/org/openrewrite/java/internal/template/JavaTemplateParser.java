@@ -17,13 +17,12 @@ package org.openrewrite.java.internal.template;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.java.JavaExecutionContextView;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.RandomizeIdVisitor;
-import org.openrewrite.java.cache.DelegatingJavaTypeCache;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -240,12 +239,11 @@ public class JavaTemplateParser {
     }
 
     private JavaSourceFile compileTemplate(@Language("java") String stub) {
-        JavaExecutionContextView ctxView = new JavaExecutionContextView(new InMemoryExecutionContext())
-                .setTypeCache(new DelegatingJavaTypeCache())
-                .setSkipSourceSetMarker(true);
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(JavaParser.SKIP_SOURCE_SET_MARKER, true);
         return stub.contains("@SubAnnotation") ?
-                parser.get().reset().parse(ctxView, stub, SUBSTITUTED_ANNOTATION).get(0) :
-                parser.get().reset().parse(ctxView, stub).get(0);
+                parser.get().reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION).get(0) :
+                parser.get().reset().parse(ctx, stub).get(0);
     }
 
     @SuppressWarnings("unchecked")

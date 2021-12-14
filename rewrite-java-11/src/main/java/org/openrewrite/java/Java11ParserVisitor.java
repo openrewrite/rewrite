@@ -29,6 +29,7 @@ import com.sun.tools.javac.util.Context;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -85,6 +86,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public Java11ParserVisitor(Path sourcePath,
                                String source,
                                Collection<NamedStyles> styles,
+                               JavaTypeCache typeCache,
                                ExecutionContext ctx,
                                Context context) {
         this.sourcePath = sourcePath;
@@ -92,7 +94,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         this.styles = styles;
         this.ctx = ctx;
         this.context = context;
-        this.typeMapping = new TypeMapping(new JavaExecutionContextView(ctx).getTypeCache());
+        this.typeMapping = new TypeMapping(typeCache);
     }
 
     @Override

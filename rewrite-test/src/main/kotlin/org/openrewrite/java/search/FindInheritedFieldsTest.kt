@@ -16,24 +16,15 @@
 package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.fail
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.java.JavaExecutionContextView
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.cache.DelegatingJavaTypeCache
-import org.openrewrite.java.cache.JavaTypeCache
+import org.openrewrite.java.internal.JavaTypeCache
 
 interface FindInheritedFieldsTest {
     val typeCache: JavaTypeCache
-        get() = DelegatingJavaTypeCache()
-
-    val executionContext: ExecutionContext
-        get() {
-            val ctx = JavaExecutionContextView(InMemoryExecutionContext())
-            ctx.typeCache = typeCache
-            return ctx
-        }
+        get() = JavaTypeCache()
 
     @Test
     fun findInheritedField(jp: JavaParser) {
@@ -45,7 +36,9 @@ interface FindInheritedFieldsTest {
             }
         """
 
-        val b = jp.parse(executionContext,"public class B extends A { }", a)[0]
+        val b = jp.parse(InMemoryExecutionContext { t: Throwable ->
+            fail<Any>("Failed to run parse sources or recipe", t)
+        }, "public class B extends A { }", a)[0]
 
         assertThat(FindInheritedFields.find(b.classes[0], "java.util.List").firstOrNull()?.name)
             .isEqualTo("list")
@@ -65,7 +58,9 @@ interface FindInheritedFieldsTest {
             }
         """
 
-        val b = jp.parse(executionContext, "public class B extends A { }", a)[0]
+        val b = jp.parse(InMemoryExecutionContext { t: Throwable ->
+            fail<Any>("Failed to run parse sources or recipe", t)
+        }, "public class B extends A { }", a)[0]
 
         assertThat(FindInheritedFields.find(b.classes[0], "java.lang.String").firstOrNull()?.name)
             .isEqualTo("s")

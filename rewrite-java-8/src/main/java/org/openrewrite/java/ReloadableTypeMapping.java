@@ -21,7 +21,7 @@ import com.sun.tools.javac.tree.JCTree;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.cache.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -72,7 +72,7 @@ public class ReloadableTypeMapping {
                 return JavaType.Class.ENUM;
             } else if (sym.className().startsWith("com.sun.") ||
                     sym.className().startsWith("sun.") ||
-                    sym.className().startsWith("java.") ||
+                    sym.className().startsWith("java.awt.") ||
                     sym.className().startsWith("jdk.") ||
                     sym.className().startsWith("org.graalvm")) {
                 return typeCache.computeClass(sym.className(), () -> new JavaType.Class(

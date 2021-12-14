@@ -17,11 +17,12 @@ package org.openrewrite.java.marker;
 
 import io.github.classgraph.*;
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaExecutionContextView;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
@@ -47,8 +48,9 @@ public class JavaSourceSet implements Marker {
     String name;
     Set<JavaType.FullyQualified> classpath;
 
-    public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath, ExecutionContext ctx) {
-        Builder builder = new Builder(ctx);
+    public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath,
+                                      JavaTypeCache typeCache, ExecutionContext ctx) {
+        Builder builder = new Builder(typeCache, ctx);
 
         Set<JavaType.FullyQualified> fqns = new HashSet<>();
         if (classpath.iterator().hasNext()) {
@@ -69,11 +71,11 @@ public class JavaSourceSet implements Marker {
             }
         }
 
-        fqns.addAll(jvmClasses(ctx));
+        fqns.addAll(jvmClasses(typeCache, ctx));
         return new JavaSourceSet(randomId(), sourceSetName, fqns);
     }
 
-    private static Collection<JavaType.FullyQualified> jvmClasses(ExecutionContext ctx) {
+    private static Collection<JavaType.FullyQualified> jvmClasses(JavaTypeCache typeCache, ExecutionContext ctx) {
         boolean java8 = System.getProperty("java.version").startsWith("1.8");
 
         if (java8 && JAVA8_CLASSPATH != null) {
@@ -93,7 +95,7 @@ public class JavaSourceSet implements Marker {
                 .scan()
                 .getAllClasses();
 
-        Builder builder = new Builder(ctx);
+        Builder builder = new Builder(typeCache, ctx);
         Collection<JavaType.FullyQualified> fqns = new ArrayList<>(classInfos.size());
         for (ClassInfo classInfo : classInfos) {
             try {
@@ -112,13 +114,11 @@ public class JavaSourceSet implements Marker {
         return fqns;
     }
 
+    @RequiredArgsConstructor
     private static class Builder {
-        private final JavaExecutionContextView ctx;
-
-        private Builder(ExecutionContext ctx) {
-            this.ctx = new JavaExecutionContextView(ctx);
-        }
-
+        private final JavaTypeCache typeCache;
+        private final ExecutionContext ctx;
+        
         public JavaType.Class type(@Nullable ClassInfo aClass, Map<String, JavaType.Class> stack) {
             if (aClass == null) {
                 //noinspection ConstantConditions
@@ -132,7 +132,7 @@ public class JavaSourceSet implements Marker {
 
             AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
-            JavaType.Class clazz = ctx.getTypeCache().computeClass(
+            JavaType.Class clazz = typeCache.computeClass(
                     aClass.getName(),
                     () -> {
                         Set<Flag> flags = Flag.bitMapToFlags(aClass.getModifiers());
@@ -150,7 +150,7 @@ public class JavaSourceSet implements Marker {
 
                         if (aClass.getName().startsWith("com.sun.") ||
                                 aClass.getName().startsWith("sun.") ||
-                                aClass.getName().startsWith("java.") ||
+                                aClass.getName().startsWith("java.awt.") ||
                                 aClass.getName().startsWith("jdk.") ||
                                 aClass.getName().startsWith("org.graalvm")) {
                             return new JavaType.Class(
@@ -221,7 +221,7 @@ public class JavaSourceSet implements Marker {
         }
 
         private JavaType.Variable variableType(FieldInfo fieldInfo, Map<String, JavaType.Class> stack) {
-            return ctx.getTypeCache().computeVariable(
+            return typeCache.computeVariable(
                     fieldInfo.getClassName(),
                     fieldInfo.getName(),
                     () -> {

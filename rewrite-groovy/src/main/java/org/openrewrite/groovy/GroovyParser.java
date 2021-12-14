@@ -28,8 +28,8 @@ import org.openrewrite.Parser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaExecutionContextView;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
@@ -48,6 +48,8 @@ import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class GroovyParser implements Parser<G.CompilationUnit> {
+    private final JavaTypeCache typeCache = new JavaTypeCache();
+
     @Nullable
     private final Collection<Path> classpath;
 
@@ -87,8 +89,6 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
     @Override
     public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        JavaExecutionContextView ctxView = new JavaExecutionContextView(ctx);
-
         List<G.CompilationUnit> cus = new ArrayList<>();
 
         for (Input input : sources) {
@@ -118,7 +118,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                         input.getPath(),
                         StringUtils.readFully(input.getSource()),
-                        ctxView.getTypeCache(),
+                        typeCache,
                         ctx
                 );
                 cus.add(mappingVisitor.visit(unit, ast));
@@ -147,6 +147,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
     @Override
     public GroovyParser reset() {
+        typeCache.clear();
         return this;
     }
 

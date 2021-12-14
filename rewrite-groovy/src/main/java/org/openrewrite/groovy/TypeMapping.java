@@ -21,7 +21,7 @@ import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.cache.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -46,7 +46,7 @@ class TypeMapping {
     public JavaType.Method type(@Nullable MethodNode node) {
         if (node == null) {
             return null;
-        }
+            }
 
         StringJoiner argumentTypeSignatures = new StringJoiner(",");
         if (node.getParameters().length > 0) {

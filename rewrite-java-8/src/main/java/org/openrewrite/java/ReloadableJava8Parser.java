@@ -33,7 +33,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.cache.DelegatingJavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -57,6 +57,7 @@ import static java.util.stream.Collectors.toList;
 
 class ReloadableJava8Parser implements JavaParser {
     private String sourceSet = "main";
+    private final JavaTypeCache typeCache = new JavaTypeCache();
 
     @Nullable
     private transient JavaSourceSet sourceSetProvenance;
@@ -138,8 +139,6 @@ class ReloadableJava8Parser implements JavaParser {
 
     @Override
     public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
-        JavaExecutionContextView ctxView = new JavaExecutionContextView(ctx);
-
         if (classpath != null) { // override classpath
             if (context.get(JavaFileManager.class) != pfm) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
@@ -192,6 +191,7 @@ class ReloadableJava8Parser implements JavaParser {
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
                                 styles,
+                                typeCache,
                                 ctx,
                                 context);
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
@@ -217,7 +217,7 @@ class ReloadableJava8Parser implements JavaParser {
                 .filter(Objects::nonNull)
                 .collect(toList());
 
-        if (!ctxView.isSkipSourceSetMarker()) {
+        if (!ctx.getMessage(SKIP_SOURCE_SET_MARKER, false)) {
             JavaSourceSet sourceSet = getSourceSet(ctx);
             Set<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
             for (J.CompilationUnit cu : mappedCus) {
@@ -228,6 +228,7 @@ class ReloadableJava8Parser implements JavaParser {
                 }
             }
             sourceSetProvenance = sourceSet.withClasspath(classpath);
+            assert sourceSetProvenance != null;
             return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
         }
 
@@ -236,6 +237,7 @@ class ReloadableJava8Parser implements JavaParser {
 
     @Override
     public ReloadableJava8Parser reset() {
+        typeCache.clear();
         compilerLog.reset();
         pfm.flush();
         Check.instance(context).compiled.clear();
@@ -256,7 +258,8 @@ class ReloadableJava8Parser implements JavaParser {
     @Override
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
         if (sourceSetProvenance == null) {
-            sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath, ctx);
+            sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
+                    typeCache, ctx);
         }
         return sourceSetProvenance;
     }
@@ -264,9 +267,8 @@ class ReloadableJava8Parser implements JavaParser {
     private void compileDependencies() {
         if (dependsOn != null) {
             InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-            parseInputs(dependsOn, null, new JavaExecutionContextView(ctx)
-                    .setTypeCache(new DelegatingJavaTypeCache())
-                    .setSkipSourceSetMarker(true));
+            ctx.putMessage("org.openrewrite.java.skipSourceSetMarker", true);
+            parseInputs(dependsOn, null, ctx);
         }
         Check.instance(context).compiled.clear();
     }

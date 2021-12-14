@@ -816,7 +816,7 @@ interface AddImportTest : JavaRecipeTest {
         jp,
         recipe = addImports({ AddImport("java.util.List", null, false) }),
         before = """
-            import java.awt.*; // contains a List class
+            import com.acme.*; // contains a List class
             import java.util.Collection;
             import java.util.Collections;
             import java.util.Map;
@@ -827,7 +827,7 @@ interface AddImportTest : JavaRecipeTest {
             }
         """,
         after = """
-            import java.awt.*; // contains a List class
+            import com.acme.*; // contains a List class
             import java.util.Collection;
             import java.util.Collections;
             import java.util.List;
@@ -837,7 +837,11 @@ interface AddImportTest : JavaRecipeTest {
             class Test {
                 List list;
             }
-        """
+        """,
+        dependsOn = arrayOf("""
+            package com.acme;
+            public class List {}
+        """)
     )
 
     @Test
