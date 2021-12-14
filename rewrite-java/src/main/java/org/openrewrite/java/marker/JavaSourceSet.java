@@ -381,7 +381,7 @@ public class JavaSourceSet implements Marker {
                 }
                 return type;
             } else if (typeSignature instanceof TypeVariableSignature) {
-                throw new UnsupportedOperationException("what to do?");
+                return new JavaType.GenericTypeVariable(null, ((TypeVariableSignature) typeSignature).getName(), emptyList());
             } else if (typeSignature instanceof BaseTypeSignature) {
                 //noinspection ConstantConditions
                 return JavaType.Primitive.fromKeyword(((BaseTypeSignature) typeSignature).getTypeStr());
@@ -417,7 +417,7 @@ public class JavaSourceSet implements Marker {
                 }
                 return signature.toString();
             } else if (typeSignature instanceof TypeVariableSignature) {
-                throw new UnsupportedOperationException("what to do?");
+                return ((TypeVariableSignature) typeSignature).getName();
             } else if (typeSignature instanceof BaseTypeSignature) {
                 return ((BaseTypeSignature) typeSignature).getTypeStr();
             }
