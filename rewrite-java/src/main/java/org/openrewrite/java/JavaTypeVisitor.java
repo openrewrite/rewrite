@@ -68,7 +68,6 @@ public class JavaTypeVisitor<P> {
     public JavaType visit(@Nullable JavaType javaType, P p) {
         if (javaType != null) {
             cursor = new Cursor(cursor, javaType);
-
             javaType = preVisit(javaType, p);
 
             if (javaType instanceof JavaType.Array) {

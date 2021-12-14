@@ -135,8 +135,6 @@ public class JavaSourceSet implements Marker {
             JavaType.Class clazz = ctx.getTypeCache().computeClass(
                     aClass.getName(),
                     () -> {
-                        newlyCreated.set(true);
-
                         Set<Flag> flags = Flag.bitMapToFlags(aClass.getModifiers());
 
                         JavaType.Class.Kind kind;
@@ -150,12 +148,24 @@ public class JavaSourceSet implements Marker {
                             kind = JavaType.Class.Kind.Class;
                         }
 
+                        if (aClass.getName().startsWith("com.sun.") ||
+                                aClass.getName().startsWith("sun.") ||
+                                aClass.getName().startsWith("java.") ||
+                                aClass.getName().startsWith("jdk.") ||
+                                aClass.getName().startsWith("org.graalvm")) {
+                            return new JavaType.Class(
+                                    null, Flag.flagsToBitMap(flags), aClass.getName(), kind,
+                                    null, null, null, null, null, null);
+                        }
+
+                        newlyCreated.set(true);
+
                         return new JavaType.Class(
                                 null,
                                 Flag.flagsToBitMap(flags),
                                 aClass.getName(),
                                 kind,
-                                null,null, null, null, null, null
+                                null, null, null, null, null, null
                         );
                     }
             );
@@ -169,7 +179,7 @@ public class JavaSourceSet implements Marker {
                         type(aClass.getOuterClasses().get(0), stackWithSym);
 
                 List<JavaType.FullyQualified> annotations = null;
-                if(!aClass.getAnnotationInfo().isEmpty()) {
+                if (!aClass.getAnnotationInfo().isEmpty()) {
                     annotations = new ArrayList<>(aClass.getAnnotationInfo().size());
                     for (AnnotationInfo annotationInfo : aClass.getAnnotationInfo()) {
                         annotations.add(type(annotationInfo.getClassInfo(), stackWithSym));
@@ -177,7 +187,7 @@ public class JavaSourceSet implements Marker {
                 }
 
                 List<JavaType.FullyQualified> interfaces = null;
-                if(!aClass.getInterfaces().isEmpty()) {
+                if (!aClass.getInterfaces().isEmpty()) {
                     interfaces = new ArrayList<>(aClass.getInterfaces().size());
                     for (ClassInfo anInterface : aClass.getInterfaces()) {
                         interfaces.add(type(anInterface, stackWithSym));
@@ -249,7 +259,7 @@ public class JavaSourceSet implements Marker {
                 JavaType.Method.Signature signature = new JavaType.Method.Signature(JavaType.buildType(methodInfo.getTypeDescriptor().getResultType().toString()), parameterTypes);
 
                 List<String> paramNames = null;
-                if(methodInfo.getParameterInfo().length > 0) {
+                if (methodInfo.getParameterInfo().length > 0) {
                     paramNames = new ArrayList<>(methodInfo.getParameterInfo().length);
                     for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
                         paramNames.add(methodParameterInfo.getName());
@@ -257,7 +267,7 @@ public class JavaSourceSet implements Marker {
                 }
 
                 List<JavaType.FullyQualified> thrownExceptions = null;
-                if(!methodInfo.getTypeDescriptor().getThrowsSignatures().isEmpty()) {
+                if (!methodInfo.getTypeDescriptor().getThrowsSignatures().isEmpty()) {
                     thrownExceptions = new ArrayList<>(methodInfo.getTypeDescriptor().getThrowsSignatures().size());
                     for (ClassRefOrTypeVariableSignature throwsSignature : methodInfo.getTypeDescriptor().getThrowsSignatures()) {
                         if (throwsSignature instanceof ClassRefTypeSignature) {
@@ -267,7 +277,7 @@ public class JavaSourceSet implements Marker {
                 }
 
                 List<JavaType.FullyQualified> annotations = null;
-                if(!methodInfo.getAnnotationInfo().isEmpty()) {
+                if (!methodInfo.getAnnotationInfo().isEmpty()) {
                     annotations = new ArrayList<>(methodInfo.getAnnotationInfo().size());
                     for (AnnotationInfo annotationInfo : methodInfo.getAnnotationInfo()) {
                         annotations.add(type(annotationInfo.getClassInfo(), stack));
