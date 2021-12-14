@@ -218,18 +218,18 @@ public class TypeMapping {
                     type.tsym.name.toString(),
                     boundSigs.toString(),
                     () -> {
-                        List<JavaType.FullyQualified> bounds;
+                        List<JavaType> bounds;
                         if (type.getUpperBound() instanceof Type.IntersectionClassType) {
                             bounds = new ArrayList<>();
                             Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
                             if(intersectionBound.supertype_field != null) {
-                                bounds.add((JavaType.FullyQualified) type(intersectionBound.supertype_field, stack));
+                                bounds.add(type(intersectionBound.supertype_field, stack));
                             }
                             for (Type bound : intersectionBound.interfaces_field) {
-                                bounds.add((JavaType.FullyQualified) type(bound, stack));
+                                bounds.add(type(bound, stack));
                             }
                         } else {
-                            bounds = singletonList((JavaType.FullyQualified) type(type.getUpperBound(), stack));
+                            bounds = singletonList(type(type.getUpperBound(), stack));
                         }
 
                         return new JavaType.GenericTypeVariable(null, type.tsym.name.toString(), bounds);
@@ -489,11 +489,13 @@ public class TypeMapping {
         return null;
     }
 
+    @Nullable
     private String signature(@Nullable com.sun.tools.javac.code.Type type) {
         return signature(type, new HashSet<>());
     }
 
     @SuppressWarnings("ConstantConditions")
+    @Nullable
     private String signature(@Nullable com.sun.tools.javac.code.Type type, Set<com.sun.tools.javac.code.Type> boundedTypes) {
         if (type == null) {
             return null;

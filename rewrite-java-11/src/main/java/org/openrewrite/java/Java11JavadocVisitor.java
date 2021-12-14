@@ -626,38 +626,46 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
 
     @Nullable
     private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
-        JavaType.Class classType = TypeUtils.asClass(type);
-        if (classType == null) {
-            return null;
-        }
+        if (type instanceof  JavaType.Class) {
+            JavaType.Class classType = (JavaType.Class) type;
 
-        nextMethod:
-        for (JavaType.Method method : classType.getMethods()) {
-            if (method.getName().equals(ref.memberName.toString()) && method.getResolvedSignature() != null) {
-                if (ref.paramTypes != null) {
-                    for (JCTree param : ref.paramTypes) {
-                        for (JavaType testParamType : method.getResolvedSignature().getParamTypes()) {
-                            Type paramType = attr.attribType(param, symbol);
-                            if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                for (JavaType.FullyQualified bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
-                                    if (paramTypeMatches(bound, paramType)) {
-                                        return method;
+            nextMethod:
+            for (JavaType.Method method : classType.getMethods()) {
+                if (method.getName().equals(ref.memberName.toString()) && method.getResolvedSignature() != null) {
+                    if (ref.paramTypes != null) {
+                        for (JCTree param : ref.paramTypes) {
+                            for (JavaType testParamType : method.getResolvedSignature().getParamTypes()) {
+                                Type paramType = attr.attribType(param, symbol);
+                                if (testParamType instanceof JavaType.GenericTypeVariable) {
+                                    for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
+                                        if (paramTypeMatches(bound, paramType)) {
+                                            return method;
+                                        }
                                     }
+                                    continue nextMethod;
                                 }
-                                continue nextMethod;
-                            }
 
-                            if (paramTypeMatches(testParamType, paramType)) {
-                                continue nextMethod;
+                                if (paramTypeMatches(testParamType, paramType)) {
+                                    continue nextMethod;
+                                }
                             }
                         }
                     }
-                }
 
-                return method;
+                    return method;
+                }
+            }
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
+            if (generic.getBounds() != null) {
+                for (JavaType bound : generic.getBounds()) {
+                    JavaType.Method method = methodReferenceType(ref, bound);
+                    if (method != null) {
+                        return method;
+                    }
+                }
             }
         }
-
         // a member reference, but not matching anything on type attribution
         return null;
     }

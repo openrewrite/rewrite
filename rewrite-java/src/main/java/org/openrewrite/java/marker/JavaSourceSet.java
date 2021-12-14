@@ -356,13 +356,13 @@ public class JavaSourceSet implements Marker {
                     typeParameter.getName(),
                     signature,
                     () -> {
-                        List<JavaType.FullyQualified> bounds = new ArrayList<>();
+                        List<JavaType> bounds = new ArrayList<>();
                         if(typeParameter.getClassBound() != null) {
-                            bounds.add(TypeUtils.asFullyQualified(type(typeParameter.getClassBound())));
+                            bounds.add(type(typeParameter.getClassBound()));
                         }
                         if(typeParameter.getInterfaceBounds() != null) {
                             for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
-                                bounds.add(TypeUtils.asFullyQualified(type(interfaceBound)));
+                                bounds.add(type(interfaceBound));
                             }
                         }
                         return new JavaType.GenericTypeVariable(null, typeParameter.getName(), bounds);

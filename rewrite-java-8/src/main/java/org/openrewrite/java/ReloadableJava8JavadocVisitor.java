@@ -599,7 +599,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         for (JavaType testParamType : method.getResolvedSignature().getParamTypes()) {
                             Type paramType = attr.attribType(param, symbol);
                             if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                for (JavaType.FullyQualified bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
+                                for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
                                     if (paramTypeMatches(bound, paramType)) {
                                         return method;
                                     }

@@ -1645,7 +1645,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .matches { uType ->
                     uType is JavaType.GenericTypeVariable &&
                             uType.name == "U" &&
-                            uType.bounds[0]!!.fullyQualifiedName == "java.lang.Object"
+                            uType.bounds[0]!!.asFullyQualified()!!.fullyQualifiedName == "java.lang.Object"
                 }
         }
     )

@@ -122,12 +122,22 @@ public interface JavaType {
                     || (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
         }
 
-        public boolean isAssignableFrom(@Nullable FullyQualified clazz) {
+        public boolean isAssignableFrom(@Nullable JavaType type) {
             // TODO This does not take into account type parameters.
-            return clazz != null && (
-                    getFullyQualifiedName().equals(clazz.getFullyQualifiedName()) ||
-                            isAssignableFrom(clazz.getSupertype()) ||
-                            clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom));
+            if (type instanceof FullyQualified) {
+                FullyQualified clazz = (FullyQualified) type;
+                return getFullyQualifiedName().equals(clazz.getFullyQualifiedName()) ||
+                        isAssignableFrom(clazz.getSupertype()) ||
+                        clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
+            } else if (type instanceof GenericTypeVariable) {
+                GenericTypeVariable generic = (GenericTypeVariable) type;
+                for (JavaType bound : generic.getBounds()) {
+                    if (isAssignableFrom(bound)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         public enum Kind {
@@ -436,31 +446,41 @@ public interface JavaType {
 
         @NonFinal
         @Nullable
-        List<FullyQualified> bounds;
+        List<JavaType> bounds;
 
-        public List<FullyQualified> getBounds() {
+        public List<JavaType> getBounds() {
             assert bounds != null;
             return bounds;
         }
 
-        public void unsafeSet(@Nullable List<FullyQualified> bounds) {
+        public void unsafeSet(@Nullable List<JavaType> bounds) {
             this.bounds = bounds;
         }
 
         @Override
         public String toString() {
-            StringBuilder s = new StringBuilder("GenericTypeVariable{" + name + " extends ");
-            if (bounds == null) {
-                s.append("<no bounds>");
-            } else {
-                StringJoiner b = new StringJoiner(" & ");
-                for (FullyQualified bound : bounds) {
-                    b.add(bound.getFullyQualifiedName());
+            return typeToString(this);
+        }
+
+        private static String typeToString(JavaType type) {
+            if (type instanceof GenericTypeVariable){
+                GenericTypeVariable generic = (GenericTypeVariable) type;
+                StringBuilder s = new StringBuilder("GenericTypeVariable{" + generic.name + " extends ");
+                if (generic.bounds == null) {
+                    s.append("<no bounds>");
+                } else {
+                    StringJoiner b = new StringJoiner(" & ");
+                    for (JavaType bound : generic.bounds) {
+                        b.add(typeToString(bound));
+                    }
+                    s.append(b);
                 }
-                s.append(b);
+                s.append('}');
+                return s.toString();
+            } else if (type instanceof FullyQualified) {
+                return ((FullyQualified) type).getFullyQualifiedName();
             }
-            s.append('}');
-            return s.toString();
+            return "";
         }
     }
 

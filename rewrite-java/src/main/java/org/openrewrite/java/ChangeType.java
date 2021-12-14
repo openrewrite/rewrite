@@ -318,8 +318,11 @@ public class ChangeType extends Recipe {
             JavaType.GenericTypeVariable gtv = TypeUtils.asGeneric(type);
             if (gtv != null) {
                 return gtv.withBounds(ListUtils.map(gtv.getBounds(), bound -> {
-                    if (bound.getFullyQualifiedName().equals(oldFullyQualifiedTypeName) && targetType instanceof JavaType.FullyQualified) {
-                        return (JavaType.FullyQualified) targetType;
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(bound);
+                    if (fq != null) {
+                        if (fq.getFullyQualifiedName().equals(oldFullyQualifiedTypeName) && targetType instanceof JavaType.FullyQualified) {
+                            return targetType;
+                        }
                     }
                     return bound;
                 }));
