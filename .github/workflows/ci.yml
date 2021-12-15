@@ -27,6 +27,3 @@ jobs:
       ossrh_token: ${{ secrets.OSSRH_TOKEN }}
       ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
       ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
-    with:
-      build_on_graal: true
-      install_graal_languages: nodejs python ruby R llvm-toolchain
