@@ -227,7 +227,7 @@ public class JavaSourceSet implements Marker {
             }
 
             ClassTypeSignature typeSignature = aClass.getTypeSignature();
-            if (typeSignature == null) {
+            if (typeSignature == null || typeSignature.getTypeParameters() == null || typeSignature.getTypeParameters().isEmpty()) {
                 return clazz;
             }
 
