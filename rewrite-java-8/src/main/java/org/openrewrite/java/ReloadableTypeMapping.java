@@ -248,8 +248,10 @@ public class ReloadableTypeMapping {
             // <? super Number>   --> Number
             // <? super T>        --> GenericTypeVariable
             Type.WildcardType wildcard = (Type.WildcardType) type;
-            if (wildcard.kind == BoundKind.UNBOUND) {
-                return typeCache.computeClass("java.lang.Class", () -> JavaType.Class.build("java.lang.Object"));
+            if (wildcard.isUnbound()) {
+                return typeCache.computeGeneric("?", "?",
+                        () -> new JavaType.GenericTypeVariable(null, "?", emptyList())
+                );
             } else {
                 return type(wildcard.type, stack);
             }
@@ -521,7 +523,7 @@ public class ReloadableTypeMapping {
             return signature(((Type.ArrayType) type).elemtype, boundedTypes) + "[]";
         } else if (type instanceof Type.WildcardType) {
             if (type.isUnbound()) {
-                return "java.lang.Object";
+                return "?";
             } else {
                 return "? extends " + signature(((Type.WildcardType) type).type, boundedTypes);
             }
