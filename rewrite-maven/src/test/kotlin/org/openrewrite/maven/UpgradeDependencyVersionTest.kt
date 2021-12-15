@@ -23,6 +23,105 @@ import org.openrewrite.Issue
 import java.nio.file.Path
 
 class UpgradeDependencyVersionTest : MavenRecipeTest {
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1280")
+    fun upgradeVersionExample() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "ch.qos.logback",
+            "logback-core",
+            "latest.release",
+            null,
+            null
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+
+              <properties>
+                <maven.compiler.source>11</maven.compiler.source>
+                <maven.compiler.target>11</maven.compiler.target>
+                <slf4j.version>1.7.30</slf4j.version>
+                <logback.version>1.2.3</logback.version>
+              </properties>
+
+              <dependencies>
+                <dependency>
+                  <groupId>ch.qos.logback</groupId>
+                  <artifactId>logback-core</artifactId>
+                  <version>${"$"}{logback.version}</version>
+                </dependency>
+
+                <dependency>
+                  <groupId>org.slf4j</groupId>
+                  <artifactId>slf4j-api</artifactId>
+                  <version>${"$"}{slf4j.version}</version>
+                </dependency>
+
+                <dependency>
+                  <groupId>ch.qos.logback</groupId>
+                  <artifactId>logback-classic</artifactId>
+                  <version>${"$"}{logback.version}</version>
+                </dependency>
+
+                <dependency>
+                  <groupId>org.junit.jupiter</groupId>
+                  <artifactId>junit-jupiter-engine</artifactId>
+                  <version>5.6.0</version>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+
+              <properties>
+                <maven.compiler.source>11</maven.compiler.source>
+                <maven.compiler.target>11</maven.compiler.target>
+                <slf4j.version>1.7.30</slf4j.version>
+                <logback.version>1.2.8</logback.version>
+              </properties>
+
+              <dependencies>
+                <dependency>
+                  <groupId>ch.qos.logback</groupId>
+                  <artifactId>logback-core</artifactId>
+                  <version>${"$"}{logback.version}</version>
+                </dependency>
+
+                <dependency>
+                  <groupId>org.slf4j</groupId>
+                  <artifactId>slf4j-api</artifactId>
+                  <version>${"$"}{slf4j.version}</version>
+                </dependency>
+
+                <dependency>
+                  <groupId>ch.qos.logback</groupId>
+                  <artifactId>logback-classic</artifactId>
+                  <version>${"$"}{logback.version}</version>
+                </dependency>
+
+                <dependency>
+                  <groupId>org.junit.jupiter</groupId>
+                  <artifactId>junit-jupiter-engine</artifactId>
+                  <version>5.6.0</version>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """
+    )
+
     @ParameterizedTest
     @CsvSource(value = ["com.google.guava:guava", "*:*"], delimiter = ':')
     fun upgradeVersion(groupId: String, artifactId: String) = assertChanged(
