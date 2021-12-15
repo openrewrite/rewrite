@@ -54,7 +54,10 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             .collect(toList()));
 
     static List<Path> runtimeClasspath() {
-        return new ClassGraph().getClasspathURIs().stream().map(Paths::get).collect(toList());
+        return new ClassGraph()
+                .disableNestedJarScanning()
+                .getClasspathURIs().stream()
+                .map(Paths::get).collect(toList());
     }
 
     /**

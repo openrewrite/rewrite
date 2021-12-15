@@ -72,6 +72,7 @@ public class TypeMapping {
             } else if (sym.className().startsWith("com.sun.") ||
                     sym.className().startsWith("sun.") ||
                     sym.className().startsWith("java.awt.") ||
+                    sym.className().startsWith("java.applet.") ||
                     sym.className().startsWith("jdk.") ||
                     sym.className().startsWith("org.graalvm")) {
                 return typeCache.computeClass(sym.className(), () -> new JavaType.Class(

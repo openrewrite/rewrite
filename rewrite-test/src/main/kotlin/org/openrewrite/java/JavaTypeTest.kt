@@ -33,20 +33,25 @@ interface JavaTypeTest {
         }
 
     @Test
-    fun multipleTypeParameterBounds(jp: JavaParser) {
+    fun resolvedSignatureOfGenericMethodDeclarations(jp: JavaParser) {
         val cu = jp.parse(
             executionContext,
             """
-                class C<Multiple extends I1 & I2> {
+                import java.util.ListIterator;
+                import java.util.Collections.singletonList;
+                
+                interface MyList<E> {
+                    ListIterator<E> listIterator();
                 }
                 
-                interface I1 {}
-                interface I2 {}
+                class Test {
+                    ListIterator<Integer> s = singletonList(1).listIterator();
+                }
             """.trimIndent()
         )[0]
 
-        val type = cu.classes[0].type
-        println(type)
+        val declaredMethod = cu.classes[0].type!!.methods[0]
+        assertThat(declaredMethod.genericSignature!!.returnType).isInstanceOf(JavaType.Parameterized::class.java)
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/762")

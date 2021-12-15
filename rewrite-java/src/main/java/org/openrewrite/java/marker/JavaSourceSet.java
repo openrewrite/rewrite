@@ -34,14 +34,15 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
 public class JavaSourceSet implements Marker {
-    private static Collection<JavaType.FullyQualified> JAVA8_CLASSPATH;
-    private static Collection<JavaType.FullyQualified> JAVA11_CLASSPATH;
+    private static Map<String, JavaType.FullyQualified> JAVA8_CLASSPATH;
+    private static Map<String, JavaType.FullyQualified> JAVA11_CLASSPATH;
 
     @EqualsAndHashCode.Include
     UUID id;
@@ -51,9 +52,13 @@ public class JavaSourceSet implements Marker {
 
     public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath,
                                       JavaTypeCache typeCache, ExecutionContext ctx) {
-        Builder builder = new Builder(typeCache, ctx);
 
         Set<JavaType.FullyQualified> fqns = Collections.newSetFromMap(new IdentityHashMap<>());
+        Map<String, JavaType.FullyQualified> jvmClasses = jvmClasses(typeCache, ctx);
+        fqns.addAll(jvmClasses.values());
+
+        Builder builder = new Builder(typeCache, ctx, jvmClasses);
+
         if (classpath.iterator().hasNext()) {
             for (ClassInfo classInfo : new ClassGraph()
                     .overrideClasspath(classpath)
@@ -72,11 +77,10 @@ public class JavaSourceSet implements Marker {
             }
         }
 
-        fqns.addAll(jvmClasses(typeCache, ctx));
         return new JavaSourceSet(randomId(), sourceSetName, fqns);
     }
 
-    private static Collection<JavaType.FullyQualified> jvmClasses(JavaTypeCache typeCache, ExecutionContext ctx) {
+    private static Map<String, JavaType.FullyQualified> jvmClasses(JavaTypeCache typeCache, ExecutionContext ctx) {
         boolean java8 = System.getProperty("java.version").startsWith("1.8");
 
         if (java8 && JAVA8_CLASSPATH != null) {
@@ -94,14 +98,15 @@ public class JavaSourceSet implements Marker {
                 .enableSystemJarsAndModules()
                 .acceptPackages("java")
                 .rejectPackages("java.awt")
+                .rejectPackages("java.applet")
                 .scan()
                 .getAllClasses();
 
-        Builder builder = new Builder(typeCache, ctx);
-        Collection<JavaType.FullyQualified> fqns = new ArrayList<>(classInfos.size());
+        Builder builder = new Builder(typeCache, ctx, emptyMap());
+        Map<String, JavaType.FullyQualified> fqns = new HashMap<>(classInfos.size());
         for (ClassInfo classInfo : classInfos) {
             try {
-                fqns.add(builder.type(classInfo));
+                fqns.put(classInfo.getName(), builder.type(classInfo));
             } catch (Exception e) {
                 ctx.getOnError().accept(e);
             }
@@ -120,6 +125,7 @@ public class JavaSourceSet implements Marker {
     private static class Builder {
         private final JavaTypeCache typeCache;
         private final ExecutionContext ctx;
+        private final Map<String, JavaType.FullyQualified> jvmTypes;
         private final Map<String, JavaType.FullyQualified> stack = new HashMap<>();
 
         public JavaType.FullyQualified type(@Nullable ClassInfo aClass) {
@@ -268,7 +274,7 @@ public class JavaSourceSet implements Marker {
                         }
 
                         return new JavaType.Variable(fieldInfo.getModifiers(), fieldInfo.getName(), owner,
-                                JavaType.buildType(fieldInfo.getTypeDescriptor().toString()), annotations);
+                                type(fieldInfo.getTypeDescriptor()), annotations);
                     });
         }
 
@@ -283,12 +289,24 @@ public class JavaSourceSet implements Marker {
                     return null;
                 }
 
-                List<JavaType> parameterTypes = new ArrayList<>(methodInfo.getParameterInfo().length);
+                List<JavaType> genericParameterTypes = new ArrayList<>(methodInfo.getParameterInfo().length);
                 for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
-                    parameterTypes.add(JavaType.buildType(methodParameterInfo.getTypeDescriptor().toString()));
+                    genericParameterTypes.add(methodParameterInfo.getTypeSignature() == null ?
+                            type(methodParameterInfo.getTypeDescriptor()) :
+                            type(methodParameterInfo.getTypeSignature()));
                 }
+                JavaType.Method.Signature genericSignature = new JavaType.Method.Signature(
+                        methodInfo.getTypeSignature() == null ?
+                                type(methodInfo.getTypeDescriptor().getResultType()) :
+                                type(methodInfo.getTypeSignature().getResultType()),
+                        genericParameterTypes
+                );
 
-                JavaType.Method.Signature signature = new JavaType.Method.Signature(JavaType.buildType(methodInfo.getTypeDescriptor().getResultType().toString()), parameterTypes);
+                List<JavaType> resolvedParameterTypes = new ArrayList<>(methodInfo.getParameterInfo().length);
+                for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
+                    resolvedParameterTypes.add(type(methodParameterInfo.getTypeDescriptor()));
+                }
+                JavaType.Method.Signature resolvedSignature = new JavaType.Method.Signature(type(methodInfo.getTypeDescriptor().getResultType()), resolvedParameterTypes);
 
                 List<String> paramNames = null;
                 if (methodInfo.getParameterInfo().length > 0) {
@@ -321,8 +339,8 @@ public class JavaSourceSet implements Marker {
                         type(methodInfo.getClassInfo()),
                         methodInfo.getName(),
                         paramNames,
-                        null,
-                        signature,
+                        genericSignature,
+                        resolvedSignature,
                         thrownExceptions,
                         annotations
                 );
@@ -388,7 +406,17 @@ public class JavaSourceSet implements Marker {
 
         private JavaType type(TypeSignature typeSignature) {
             if (typeSignature instanceof ClassRefTypeSignature) {
-                return type(((ClassRefTypeSignature) typeSignature).getClassInfo());
+                ClassRefTypeSignature classRefSig = (ClassRefTypeSignature) typeSignature;
+                ClassInfo classInfo = classRefSig.getClassInfo();
+                if (classInfo == null) {
+                    JavaType.FullyQualified jvmType = jvmTypes.get(classRefSig.getBaseClassName());
+                    if (jvmType != null) {
+                        return jvmType;
+                    } else {
+                        // FIXME more of these
+                    }
+                }
+                return type(classInfo);
             } else if (typeSignature instanceof ArrayTypeSignature) {
                 ArrayClassInfo arrClassInfo = ((ArrayTypeSignature) typeSignature).getArrayClassInfo();
                 JavaType type = type(arrClassInfo.getElementClassInfo());
