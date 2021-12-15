@@ -17,10 +17,7 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asFullyQualified
-import org.openrewrite.java.asGeneric
-import org.openrewrite.java.hasElementType
+import org.openrewrite.java.*
 
 interface MethodInvocationTest {
     private fun J.CompilationUnit.allInvs() = classes[0].body
@@ -48,7 +45,7 @@ interface MethodInvocationTest {
 
         val effectParams = inv.methodType!!.resolvedSignature!!.paramTypes
         assertEquals("java.lang.Integer", effectParams[0].asFullyQualified()?.fullyQualifiedName)
-        assertTrue(effectParams[1].hasElementType("java.lang.Integer"))
+        assertTrue(effectParams[1].asArray()?.elemType.hasFullyQualifiedName("java.lang.Integer"))
 
         // for non-generic method signatures, resolvedSignature and genericSignature match
         assertEquals(inv.methodType!!.resolvedSignature, inv.methodType!!.genericSignature)
@@ -79,12 +76,12 @@ interface MethodInvocationTest {
 
             val effectiveParams = test.methodType!!.resolvedSignature!!.paramTypes
             assertEquals("java.lang.Integer", effectiveParams[0].asFullyQualified()?.fullyQualifiedName)
-            assertTrue(effectiveParams[1].hasElementType("java.lang.Integer"))
+            assertTrue((effectiveParams[1] as JavaType.Array).elemType.hasFullyQualifiedName("java.lang.Integer"))
 
             val methType = test.methodType!!.genericSignature!!
             assertEquals("java.lang.Object", methType.returnType.asGeneric()?.bounds?.get(0)?.asFullyQualified()?.fullyQualifiedName)
             assertEquals("java.lang.Object", methType.paramTypes[0].asGeneric()?.bounds?.get(0)?.asFullyQualified()?.fullyQualifiedName)
-            assertTrue(methType.paramTypes[1].hasElementType("java.lang.Object"))
+            assertTrue((methType.paramTypes[1] as JavaType.Array).elemType.asGeneric()?.bounds?.get(0).hasFullyQualifiedName("java.lang.Object"))
         }
 
         assertEquals("this . < Integer > generic ( 0, 1, 2 )", explicitGenericInv.printTrimmed())

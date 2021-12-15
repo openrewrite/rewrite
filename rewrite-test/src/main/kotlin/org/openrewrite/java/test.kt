@@ -18,10 +18,10 @@ package org.openrewrite.java
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.TypeUtils
 
-fun JavaType?.hasElementType(clazz: String) = TypeUtils.hasElementType(this, clazz)
-
 fun JavaType?.asFullyQualified(): JavaType.FullyQualified? = TypeUtils.asFullyQualified(this)
 
 fun JavaType?.asArray(): JavaType.Array? = TypeUtils.asArray(this)
+
+fun JavaType?.hasFullyQualifiedName(clazz: String) = TypeUtils.asFullyQualified(this)?.fullyQualifiedName == clazz
 
 fun JavaType?.asGeneric(): JavaType.GenericTypeVariable? = TypeUtils.asGeneric(this)

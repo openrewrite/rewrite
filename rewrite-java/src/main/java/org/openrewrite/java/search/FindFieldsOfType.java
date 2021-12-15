@@ -21,8 +21,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
@@ -58,7 +60,7 @@ public class FindFieldsOfType extends Recipe {
                 if (multiVariable.getTypeExpression() instanceof J.MultiCatch) {
                     return multiVariable;
                 }
-                if (multiVariable.getTypeExpression() != null && TypeUtils.hasElementType(multiVariable.getTypeExpression()
+                if (multiVariable.getTypeExpression() != null && hasElementType(multiVariable.getTypeExpression()
                         .getType(), fullyQualifiedTypeName)) {
                     return multiVariable.withMarkers(multiVariable.getMarkers().searchResult());
                 }
@@ -74,7 +76,7 @@ public class FindFieldsOfType extends Recipe {
                 if (multiVariable.getTypeExpression() instanceof J.MultiCatch) {
                     return multiVariable;
                 }
-                if (multiVariable.getTypeExpression() != null && TypeUtils.hasElementType(multiVariable.getTypeExpression()
+                if (multiVariable.getTypeExpression() != null && hasElementType(multiVariable.getTypeExpression()
                         .getType(), fullyQualifiedTypeName)) {
                     vs.add(multiVariable);
                 }
@@ -86,4 +88,21 @@ public class FindFieldsOfType extends Recipe {
         findVisitor.visit(j, vs);
         return vs;
     }
+
+    private static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName) {
+        if (type instanceof JavaType.Array) {
+            return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName);
+        } else if (type instanceof JavaType.Class) {
+            return fullyQualifiedName.equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
+            for (JavaType bound : generic.getBounds()) {
+                if (hasElementType(bound, fullyQualifiedName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 }

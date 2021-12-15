@@ -50,7 +50,7 @@ public class FindInheritedFields {
             }
             Set<JavaType.Variable> types = new HashSet<>();
             for (JavaType.Variable m : type.getMembers()) {
-                if (!m.hasFlags(Flag.Private) && TypeUtils.hasElementTypeAssignable(m.getType(), fullyQualifiedName)) {
+                if (!m.hasFlags(Flag.Private) && hasElementTypeAssignable(m.getType(), fullyQualifiedName)) {
                     types.add(m);
                 }
             }
@@ -63,5 +63,21 @@ public class FindInheritedFields {
             ctx.addAll(superFields(classDecl.getType() == null ? null : classDecl.getType().getSupertype()));
             return super.visitClassDeclaration(classDecl, ctx);
         }
+    }
+
+    private static boolean hasElementTypeAssignable(@Nullable JavaType type, String fullyQualifiedName) {
+        if (type instanceof JavaType.Array) {
+            return hasElementTypeAssignable(((JavaType.Array) type).getElemType(), fullyQualifiedName);
+        } else if (type instanceof JavaType.Class) {
+            return TypeUtils.isAssignableTo(JavaType.Class.build(fullyQualifiedName), type);
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
+            for (JavaType bound : generic.getBounds()) {
+                if (hasElementTypeAssignable(bound, fullyQualifiedName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

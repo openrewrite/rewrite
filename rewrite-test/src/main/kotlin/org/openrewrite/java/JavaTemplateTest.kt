@@ -688,10 +688,11 @@ interface JavaTemplateTest : JavaRecipeTest {
             assertThat(type.paramNames)
                 .`as`("Changing the method's parameters should have also updated its type's parameter names")
                 .containsExactly("values")
-            assertThat(type.resolvedSignature!!.paramTypes[0])
+            val param = type.resolvedSignature!!.paramTypes[0]
+            assertThat(param.asArray()!!.elemType)
                 .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'Object[]'")
                 .matches {
-                    it is JavaType.Array && it.elemType.hasElementType("java.lang.Object")
+                    it is JavaType.Array && it.elemType.hasFullyQualifiedName("java.lang.Object")
                 }
         }
     )
