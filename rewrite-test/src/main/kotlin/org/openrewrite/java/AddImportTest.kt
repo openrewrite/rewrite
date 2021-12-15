@@ -830,6 +830,7 @@ interface AddImportTest : JavaRecipeTest {
             import java.util.Map;
             import java.util.Set;
             
+            @SuppressWarnings("ALL")
             class Test {
                 List list;
             }
