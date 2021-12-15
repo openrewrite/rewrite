@@ -23,6 +23,7 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
+import org.openrewrite.java.tree.TypeUtils
 
 interface JavaTypeTest {
     val executionContext: ExecutionContext
@@ -33,25 +34,34 @@ interface JavaTypeTest {
         }
 
     @Test
-    fun resolvedSignatureOfGenericMethodDeclarations(jp: JavaParser) {
-        val cu = jp.parse(
-            executionContext,
-            """
-                import java.util.ListIterator;
-                import java.util.Collections.singletonList;
-                
-                interface MyList<E> {
-                    ListIterator<E> listIterator();
-                }
-                
-                class Test {
-                    ListIterator<Integer> s = singletonList(1).listIterator();
-                }
-            """.trimIndent()
-        )[0]
+    fun resolvedSignatureOfGenericMethodDeclarations(jp: JavaParser.Builder<*, *>) {
+        val cu = jp
+            .logCompilationWarningsAndErrors(true)
+            .build()
+            .parse(
+                executionContext,
+                """
+                    import java.util.ListIterator;
+                    import static java.util.Collections.singletonList;
+                    
+                    interface MyList<E> {
+                        ListIterator<E> listIterator();
+                    }
+                    
+                    class Test {
+                        ListIterator<Integer> s = singletonList(1).listIterator();
+                    }
+                """.trimIndent()
+            )[0]
 
         val declaredMethod = cu.classes[0].type!!.methods[0]
         assertThat(declaredMethod.genericSignature!!.returnType).isInstanceOf(JavaType.Parameterized::class.java)
+
+        val inv =
+            ((cu.classes[1].body.statements[0] as J.VariableDeclarations).variables[0].initializer as J.MethodInvocation)
+        val rt = inv.methodType!!.resolvedSignature!!.returnType
+        assertThat(TypeUtils.asParameterized(rt)!!.typeParameters[0].asFullyQualified()!!.fullyQualifiedName)
+            .isEqualTo("java.lang.Integer")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/762")
