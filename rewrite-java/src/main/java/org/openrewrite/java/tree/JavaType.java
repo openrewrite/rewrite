@@ -466,7 +466,7 @@ public interface JavaType {
             if (type instanceof GenericTypeVariable){
                 GenericTypeVariable generic = (GenericTypeVariable) type;
                 StringBuilder s = new StringBuilder("GenericTypeVariable{" + generic.name + " extends ");
-                if (generic.bounds == null) {
+                if (generic.bounds == null || generic.bounds.isEmpty()) {
                     s.append("<no bounds>");
                 } else {
                     StringJoiner b = new StringJoiner(" & ");
