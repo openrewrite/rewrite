@@ -29,10 +29,9 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
+
+import static java.util.Collections.emptyList;
 
 /**
  * This recipe will group and order the imports for a compilation unit using the rules defined by an {@link ImportLayoutStyle}.
@@ -80,7 +79,7 @@ public class OrderImports extends Recipe {
                     .orElse(IntelliJ.importLayout());
 
             Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
-            Set<JavaType.FullyQualified> classpath = new HashSet<>();
+            List<JavaType.FullyQualified> classpath = emptyList();
             if (sourceSet.isPresent()) {
                 classpath = sourceSet.get().getClasspath();
             }

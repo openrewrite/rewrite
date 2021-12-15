@@ -137,11 +137,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                 .orElse(IntelliJ.importLayout());
 
-        Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
-        Set<JavaType.FullyQualified> classpath = new HashSet<>();
-        if (sourceSet.isPresent()) {
-            classpath = sourceSet.get().getClasspath();
-        }
+        List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
+                .map(JavaSourceSet::getClasspath)
+                .orElse(Collections.emptyList());
 
         cu = cu.getPadding().withImports(layoutStyle.addImport(cu.getPadding().getImports(), importToAdd,
                 cu.getPackageDeclaration(), classpath));

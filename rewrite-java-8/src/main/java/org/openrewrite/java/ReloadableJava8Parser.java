@@ -219,7 +219,7 @@ class ReloadableJava8Parser implements JavaParser {
 
         if (!ctx.getMessage(SKIP_SOURCE_SET_MARKER, false)) {
             JavaSourceSet sourceSet = getSourceSet(ctx);
-            Set<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
+            List<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
             for (J.CompilationUnit cu : mappedCus) {
                 for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
                     if (type instanceof JavaType.FullyQualified) {

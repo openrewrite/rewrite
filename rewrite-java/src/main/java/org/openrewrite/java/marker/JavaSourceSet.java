@@ -47,14 +47,13 @@ public class JavaSourceSet implements Marker {
     UUID id;
 
     String name;
-    Set<JavaType.FullyQualified> classpath;
+    List<JavaType.FullyQualified> classpath;
 
     public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath,
                                       JavaTypeCache typeCache, ExecutionContext ctx) {
 
-        Set<JavaType.FullyQualified> fqns = Collections.newSetFromMap(new IdentityHashMap<>());
         Map<String, JavaType.FullyQualified> jvmClasses = jvmClasses(typeCache, ctx);
-        fqns.addAll(jvmClasses.values());
+        List<JavaType.FullyQualified> fqns = new ArrayList<>(jvmClasses.values());
 
         Builder builder = new Builder(typeCache, ctx, jvmClasses);
 

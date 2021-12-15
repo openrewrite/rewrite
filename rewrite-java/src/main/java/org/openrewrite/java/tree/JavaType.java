@@ -39,11 +39,11 @@ public interface JavaType {
     }
 
     @Nullable
-    default UUID getManagedReference() {
+    default Integer getManagedReference() {
         return null;
     }
 
-    default JavaType withManagedReference(UUID id) {
+    default JavaType withManagedReference(Integer id) {
         return this;
     }
 
@@ -159,7 +159,7 @@ public interface JavaType {
 
         @With
         @Nullable
-        UUID managedReference;
+        Integer managedReference;
 
         @With(AccessLevel.NONE)
         long flagsBitMap;
@@ -340,7 +340,7 @@ public interface JavaType {
     @With
     class Parameterized extends FullyQualified {
         @Nullable
-        UUID managedReference;
+        Integer managedReference;
 
         @NonFinal
         @Nullable
@@ -439,7 +439,7 @@ public interface JavaType {
     class GenericTypeVariable implements JavaType {
         @Getter
         @Nullable
-        UUID managedReference;
+        Integer managedReference;
 
         @Getter
         String name;

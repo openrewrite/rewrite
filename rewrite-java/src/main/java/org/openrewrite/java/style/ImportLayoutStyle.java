@@ -106,7 +106,7 @@ public class ImportLayoutStyle implements JavaStyle {
      */
     public List<JRightPadded<J.Import>> addImport(List<JRightPadded<J.Import>> originalImports,
                                                   J.Import toAdd, @Nullable J.Package pkg,
-                                                  Set<JavaType.FullyQualified> classpath) {
+                                                  Collection<JavaType.FullyQualified> classpath) {
         JRightPadded<J.Import> paddedToAdd = new JRightPadded<>(toAdd, Space.EMPTY, Markers.EMPTY);
 
         if (originalImports.isEmpty()) {
@@ -310,7 +310,7 @@ public class ImportLayoutStyle implements JavaStyle {
      * @param originalImports A list of potentially unordered imports.
      * @return A list of imports that are grouped and ordered.
      */
-    public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Set<JavaType.FullyQualified> classpath) {
+    public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Collection<JavaType.FullyQualified> classpath) {
         LayoutState layoutState = new LayoutState();
         ImportLayoutConflictDetection importLayoutConflictDetection = new ImportLayoutConflictDetection(classpath, originalImports);
         List<JRightPadded<J.Import>> orderedImports = new ArrayList<>();
@@ -506,12 +506,12 @@ public class ImportLayoutStyle implements JavaStyle {
     }
 
     private static class ImportLayoutConflictDetection {
-        private final Set<JavaType.FullyQualified> classpath;
+        private final Collection<JavaType.FullyQualified> classpath;
         private final List<JRightPadded<J.Import>> originalImports;
         private final Set<String> jvmClasspathNames = new HashSet<>();
         private @Nullable Set<String> containsClassNameConflict = null;
 
-        ImportLayoutConflictDetection(Set<JavaType.FullyQualified> classpath, List<JRightPadded<J.Import>> originalImports) {
+        ImportLayoutConflictDetection(Collection<JavaType.FullyQualified> classpath, List<JRightPadded<J.Import>> originalImports) {
             this.classpath = classpath;
             this.originalImports = originalImports;
         }
