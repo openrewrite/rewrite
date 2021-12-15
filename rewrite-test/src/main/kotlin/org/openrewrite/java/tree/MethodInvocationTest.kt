@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("DEPRECATION")
+
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Assertions.*
@@ -46,9 +48,6 @@ interface MethodInvocationTest {
         val effectParams = inv.methodType!!.resolvedSignature!!.paramTypes
         assertEquals("java.lang.Integer", effectParams[0].asFullyQualified()?.fullyQualifiedName)
         assertTrue(effectParams[1].asArray()?.elemType.hasFullyQualifiedName("java.lang.Integer"))
-
-        // for non-generic method signatures, resolvedSignature and genericSignature match
-        assertEquals(inv.methodType!!.resolvedSignature, inv.methodType!!.genericSignature)
 
         assertEquals("A", inv.methodType?.declaringType?.fullyQualifiedName)
 
