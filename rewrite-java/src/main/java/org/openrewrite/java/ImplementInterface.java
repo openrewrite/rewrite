@@ -39,7 +39,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
         if (c.isScope(scope) && (c.getImplements() == null || c.getImplements().stream()
-                .noneMatch(f -> interfaceType.equals(f.getType())))) {
+                .noneMatch(f -> TypeUtils.isAssignableTo(f.getType(), interfaceType)))) {
             maybeAddImport(interfaceType);
 
             c = c.withImplements(ListUtils.concat(c.getImplements(), new J.Identifier(

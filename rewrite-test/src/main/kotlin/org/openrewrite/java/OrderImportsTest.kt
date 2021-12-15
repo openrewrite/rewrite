@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.style.ImportLayoutStyle
@@ -25,6 +26,13 @@ import org.openrewrite.style.Style
 interface OrderImportsTest : JavaRecipeTest {
     override val recipe: OrderImports
         get() = OrderImports(false)
+
+    override val executionContext: ExecutionContext
+        get() {
+            val ctx = super.executionContext
+            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_MARKER, false)
+            return ctx
+        }
 
     @Test
     fun sortInnerAndOuterClassesInTheSamePackage(jp: JavaParser) = assertUnchanged(

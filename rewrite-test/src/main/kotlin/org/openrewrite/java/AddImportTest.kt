@@ -22,6 +22,14 @@ import org.openrewrite.java.tree.J
 import org.openrewrite.style.NamedStyles
 
 interface AddImportTest : JavaRecipeTest {
+
+    override val executionContext: ExecutionContext
+        get() {
+            val ctx = super.executionContext
+            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_MARKER, false)
+            return ctx
+        }
+
     fun addImports(vararg adds: () -> TreeVisitor<*, ExecutionContext>): Recipe = adds
         .map { add -> toRecipe(add) }
         .reduce { r1, r2 -> return r1.doNext(r2) }
@@ -834,6 +842,7 @@ interface AddImportTest : JavaRecipeTest {
             import java.util.Map;
             import java.util.Set;
             
+            @SuppressWarnings("ALL")
             class Test {
                 List list;
             }

@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
@@ -82,7 +83,7 @@ interface JavaTypeTest {
 
         assertThat(annotations)
             .hasSize(1)
-            .contains(JavaType.Class.build("java.lang.FunctionalInterface"))
+        assertTrue(annotations!![0].hasFullyQualifiedName("java.lang.FunctionalInterface"))
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1267")
