@@ -101,6 +101,13 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         return cacheMap.computeIfAbsent(pomCacheDir, RocksCache::new);
     }
 
+    //This is a two-layer cache, The first layer stores cache entries in memory, the second layer stores cache entries
+    //on disk using rocksdb. Without the in-memory cache, each cache entry would be deserialized into a separate instance
+    //which can quickly consume all memory when there are a lot of duplicate maven depenencies.
+    private final Map<String, Optional<RawMaven>> l1PomCache = new HashMap<>();
+    private final Map<GroupArtifactRepository, Optional<MavenMetadata>> l1MavenMetadataCache = new HashMap<>();
+    private final Map<MavenRepository, Optional<MavenRepository>> l1RepositoryCache = new HashMap<>();
+
     private final RocksCache cache;
     private final Set<String> unresolvablePoms = new HashSet<>();
 
@@ -130,20 +137,27 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
     @Override
     public CacheResult<MavenMetadata> computeMavenMetadata(URI repo, String groupId, String artifactId, Callable<MavenMetadata> orElseGet) throws Exception {
-        byte[] key = serialize(new GroupArtifactRepository(repo, new GroupArtifact(groupId, artifactId)));
-        Optional<MavenMetadata> rawMavenMetadata = deserializeMavenMetadata(cache.get(key));
-
-        //noinspection OptionalAssignedToNull
+        GroupArtifactRepository gar = new GroupArtifactRepository(repo, new GroupArtifact(groupId, artifactId));
+        Optional<MavenMetadata> rawMavenMetadata = l1MavenMetadataCache.get(gar);
         if (rawMavenMetadata == null) {
-            //a null is a cache miss.
-            try {
-                MavenMetadata metadata = orElseGet.call();
-                //Note: we store an empty optional in the cache if not resolved.
-                cache.put(key, serialize(Optional.ofNullable(metadata)));
-                return new CacheResult<>(CacheResult.State.Updated, metadata);
-            } catch (Exception e) {
-                cache.put(key, serialize(Optional.empty()));
-                throw e;
+
+            byte[] key = serialize(gar);
+            rawMavenMetadata = deserializeMavenMetadata(cache.get(key));
+
+            //noinspection OptionalAssignedToNull
+            if (rawMavenMetadata == null) {
+                //a null is a cache miss.
+                try {
+                    MavenMetadata metadata = orElseGet.call();
+                    //Note: we store an empty optional in the cache if not resolved.
+                    cache.put(key, serialize(Optional.ofNullable(metadata)));
+                    l1MavenMetadataCache.put(gar, Optional.ofNullable(metadata));
+                    return new CacheResult<>(CacheResult.State.Updated, metadata);
+                } catch (Exception e) {
+                    cache.put(key, serialize(Optional.empty()));
+                    l1MavenMetadataCache.put(gar, Optional.empty());
+                    throw e;
+                }
             }
         }
 
@@ -161,25 +175,28 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         if (unresolvablePoms.contains(artifactCoordinates)) {
             return UNAVAILABLE_POM;
         }
-
-        byte[] key = serialize(repo.toString() + ":" + artifactCoordinates);
-        Optional<RawMaven> rawMavenEntry;
-        rawMavenEntry = deserializeRawMaven(cache.get(key));
-
-        //noinspection OptionalAssignedToNull
+        String cacheKey = repo.toString() + ":" + artifactCoordinates;
+        Optional<RawMaven> rawMavenEntry = l1PomCache.get(cacheKey);
         if (rawMavenEntry == null) {
-            //a null is a cache miss
-            try {
-                RawMaven rawMaven = orElseGet.call();
-                //Note: we store an empty optional in the cache if not resolved.
-                cache.put(key, serialize(Optional.ofNullable(rawMaven)));
-                return new CacheResult<>(CacheResult.State.Updated, rawMaven);
-            } catch (Exception e) {
-                cache.put(key, serialize(Optional.empty()));
-                throw e;
+            byte[] key = serialize(cacheKey);
+            rawMavenEntry = deserializeRawMaven(cache.get(key));
+
+            //noinspection OptionalAssignedToNull
+            if (rawMavenEntry == null) {
+                //a null is a cache miss
+                try {
+                    RawMaven rawMaven = orElseGet.call();
+                    //Note: we store an empty optional in the cache if not resolved.
+                    cache.put(key, serialize(Optional.ofNullable(rawMaven)));
+                    l1PomCache.put(cacheKey, Optional.ofNullable(rawMaven));
+                    return new CacheResult<>(CacheResult.State.Updated, rawMaven);
+                } catch (Exception e) {
+                    cache.put(key, serialize(Optional.empty()));
+                    l1PomCache.put(cacheKey, Optional.empty());
+                    throw e;
+                }
             }
         }
-
         return rawMavenEntry
                 .map(rawMaven -> new CacheResult<>(CacheResult.State.Cached, rawMaven))
                 .orElse(UNAVAILABLE_POM);
@@ -187,20 +204,29 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
     @Override
     public CacheResult<MavenRepository> computeRepository(MavenRepository repository, Callable<MavenRepository> orElseGet) throws Exception {
-        byte[] key = serialize(repository);
-        Optional<MavenRepository> cacheEntry = deserializeMavenRepository(cache.get(key));
+
+        Optional<MavenRepository> cacheEntry = l1RepositoryCache.get(repository);
 
         //noinspection OptionalAssignedToNull
         if (cacheEntry == null) {
-            //a null is a cache miss
-            try {
-                MavenRepository mavenRepository = orElseGet.call();
-                //Note: we store an empty optional in the cache if not resolved
-                cache.put(key, serialize(Optional.ofNullable(mavenRepository)));
-                return new CacheResult<>(CacheResult.State.Updated, mavenRepository);
-            } catch (Exception e) {
-                cache.put(key, serialize(Optional.empty()));
-                throw e;
+
+            byte[] key = serialize(repository);
+            cacheEntry = deserializeMavenRepository(cache.get(key));
+
+            //noinspection OptionalAssignedToNull
+            if (cacheEntry == null) {
+                //a null is a cache miss
+                try {
+                    MavenRepository mavenRepository = orElseGet.call();
+                    //Note: we store an empty optional in the cache if not resolved
+                    cache.put(key, serialize(Optional.ofNullable(mavenRepository)));
+                    l1RepositoryCache.put(repository, Optional.ofNullable(mavenRepository));
+                    return new CacheResult<>(CacheResult.State.Updated, mavenRepository);
+                } catch (Exception e) {
+                    cache.put(key, serialize(Optional.empty()));
+                    l1RepositoryCache.put(repository, Optional.empty());
+                    throw e;
+                }
             }
         }
 
@@ -211,7 +237,9 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
     @Override
     public void clear() {
-        throw new UnsupportedOperationException("RocksDB POM cache does not support clear.");
+        l1PomCache.clear();
+        l1MavenMetadataCache.clear();
+        l1RepositoryCache.clear();
     }
 
     private void fillUnresolvablePoms() {
