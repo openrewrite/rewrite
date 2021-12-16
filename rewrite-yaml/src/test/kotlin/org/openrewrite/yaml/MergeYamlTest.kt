@@ -327,6 +327,50 @@ class MergeYamlTest : YamlRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1275")
+    @Test
+    fun maintainCorrectSequenceIndent() = assertChanged(
+        recipe = MergeYaml(
+            "$",
+            """
+                darwin:
+                  logging:
+                    - 1
+                    - 2
+                  finches:
+                    species:
+                      Geospiza:
+                        - Sharp-beaked
+                        - Common cactus
+                      Camarhynchus:
+                        - Woodpecker
+                        - Mangrove
+            """.trimIndent(),
+            true,
+            null
+        ),
+        before = """
+            com:
+              key1: value1
+        """,
+        after = """
+            com:
+              key1: value1
+            darwin:
+              logging:
+                - 1
+                - 2
+              finches:
+                species:
+                  Geospiza:
+                    - Sharp-beaked
+                    - Common cactus
+                  Camarhynchus:
+                    - Woodpecker
+                    - Mangrove
+        """
+    )
+
     @Test
     fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
         val matchingFile = tempDir.resolve("a.yml").toFile().apply {
