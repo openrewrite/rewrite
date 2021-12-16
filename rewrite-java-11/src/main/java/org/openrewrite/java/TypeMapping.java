@@ -91,7 +91,7 @@ public class TypeMapping {
 
                             return new JavaType.Class(
                                     null,
-                                    sym.flags_field,
+                                    sym.flags_field & Flag.VALID_FLAGS,
                                     sym.className(),
                                     getKind(sym),
                                     null, null, null, null, null, null
@@ -350,7 +350,7 @@ public class TypeMapping {
                     }
 
                     return new JavaType.Variable(
-                            symbol.flags_field,
+                            symbol.flags_field  & Flag.VALID_FLAGS,
                             symbol.name.toString(),
                             resolvedOwner,
                             type(symbol.type, stack),
@@ -452,7 +452,7 @@ public class TypeMapping {
                         }
 
                         return new JavaType.Method(
-                                methodSymbol.flags_field,
+                                methodSymbol.flags_field  & Flag.VALID_FLAGS,
                                 resolvedDeclaringType,
                                 methodName,
                                 paramNames,

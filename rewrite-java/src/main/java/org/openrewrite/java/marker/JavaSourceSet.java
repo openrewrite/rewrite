@@ -142,8 +142,6 @@ public class JavaSourceSet implements Marker {
             JavaType.Class clazz = typeCache.computeClass(
                     aClass.getName(),
                     () -> {
-                        Set<Flag> flags = Flag.bitMapToFlags(aClass.getModifiers());
-
                         JavaType.Class.Kind kind;
                         if (aClass.isInterface()) {
                             kind = JavaType.Class.Kind.Interface;
@@ -161,7 +159,7 @@ public class JavaSourceSet implements Marker {
                                 aClass.getName().startsWith("jdk.") ||
                                 aClass.getName().startsWith("org.graalvm")) {
                             return new JavaType.Class(
-                                    null, Flag.flagsToBitMap(flags), aClass.getName(), kind,
+                                    null, aClass.getModifiers() & Flag.VALID_FLAGS, aClass.getName(), kind,
                                     null, null, null, null, null, null);
                         }
 
@@ -169,7 +167,7 @@ public class JavaSourceSet implements Marker {
 
                         return new JavaType.Class(
                                 null,
-                                Flag.flagsToBitMap(flags),
+                                aClass.getModifiers() & Flag.VALID_FLAGS,
                                 aClass.getName(),
                                 kind,
                                 null, null, null, null, null, null
@@ -271,7 +269,7 @@ public class JavaSourceSet implements Marker {
                             }
                         }
 
-                        return new JavaType.Variable(fieldInfo.getModifiers(), fieldInfo.getName(), owner,
+                        return new JavaType.Variable(fieldInfo.getModifiers() & Flag.VALID_FLAGS, fieldInfo.getName(), owner,
                                 type(fieldInfo.getTypeDescriptor()), annotations);
                     });
         }
@@ -279,11 +277,12 @@ public class JavaSourceSet implements Marker {
         @Nullable
         private JavaType.Method methodType(MethodInfo methodInfo) {
             try {
-                Set<Flag> flags = Flag.bitMapToFlags(methodInfo.getModifiers());
+                long flags = methodInfo.getModifiers() & Flag.VALID_FLAGS;
+
                 // The field access modifier "volatile" corresponds to the "bridge" modifier on methods.
                 // We don't represent "bridge" because it is a compiler internal that cannot appear in source code.
                 // See https://github.com/openrewrite/rewrite/issues/995
-                if (flags.contains(Flag.Volatile)) {
+                if ((flags & Flag.Volatile.getBitMask()) != 0) {
                     return null;
                 }
 
@@ -333,7 +332,7 @@ public class JavaSourceSet implements Marker {
                 }
 
                 return new JavaType.Method(
-                        methodInfo.getModifiers(),
+                        methodInfo.getModifiers() & Flag.VALID_FLAGS,
                         type(methodInfo.getClassInfo()),
                         methodInfo.getName(),
                         paramNames,

@@ -17,10 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public enum Flag {
     Public(1L),
@@ -48,6 +45,10 @@ public enum Flag {
 
     private final long bitMask;
 
+    public static final long VALID_FLAGS = Arrays.stream(Flag.values())
+            .map(Flag::getBitMask)
+            .reduce(0L, (m1, m2) -> m1 | m2);
+
     Flag(long bitMask) {
         this.bitMask = bitMask;
     }
@@ -69,7 +70,7 @@ public enum Flag {
         if (flags == null) {
             flags = java.util.EnumSet.noneOf(Flag.class);
             for (Flag flag : values()) {
-                if((flagsBitMap & flag.bitMask) != 0) {
+                if ((flagsBitMap & flag.bitMask) != 0) {
                     flags.add(flag);
                 }
             }
