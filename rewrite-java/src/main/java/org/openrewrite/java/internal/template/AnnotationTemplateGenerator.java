@@ -38,6 +38,26 @@ public class AnnotationTemplateGenerator {
 
     private final Set<String> imports;
 
+    public String cacheKey(Cursor cursor, String template) {
+        StringBuilder after = new StringBuilder();
+
+        J j = cursor.getValue();
+        if (j instanceof J.MethodDeclaration) {
+            after.insert(0, " void $method() {}");
+        } else if (j instanceof J.VariableDeclarations) {
+            after.insert(0, " int $variable;");
+        } else if (j instanceof J.ClassDeclaration) {
+            after.insert(0, "static class $Clazz {}");
+        }
+
+        if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
+                cursor.getParentOrThrow().getParentOrThrow().getValue() instanceof JavaSourceFile) {
+            after.append("class $Template {}");
+        }
+
+        return "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
+    }
+
     public String template(Cursor cursor, String template) {
         //noinspection ConstantConditions
         return Timer.builder("rewrite.template.generate.statement")
