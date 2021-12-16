@@ -322,10 +322,10 @@ public interface JavaType {
                               @Nullable List<Variable> members, @Nullable List<Method> methods) {
             this.supertype = supertype;
             this.owningClass = owningClass;
-            this.annotations = annotations;
-            this.interfaces = interfaces;
-            this.members = members;
-            this.methods = methods;
+            this.annotations = annotations != null && annotations.isEmpty() ? null : annotations;
+            this.interfaces = interfaces != null && interfaces.isEmpty() ? null : interfaces;
+            this.members = members != null && members.isEmpty() ? null : members;
+            this.methods = methods != null && methods.isEmpty() ? null : methods;
         }
 
         @Override
@@ -453,7 +453,7 @@ public interface JavaType {
             return bounds;
         }
 
-        public void unsafeSet(@Nullable List<JavaType> bounds) {
+        public void unsafeSet(List<JavaType> bounds) {
             this.bounds = bounds;
         }
 
@@ -748,7 +748,7 @@ public interface JavaType {
                               @Nullable List<FullyQualified> annotations) {
             this.owner = owner;
             this.type = type;
-            this.annotations = annotations;
+            this.annotations = annotations != null && annotations.isEmpty() ? null : annotations;
         }
 
         @Override
