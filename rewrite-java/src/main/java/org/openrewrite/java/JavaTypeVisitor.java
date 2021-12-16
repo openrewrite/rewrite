@@ -124,7 +124,7 @@ public class JavaTypeVisitor<P> {
 
     public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, P p) {
         JavaType.GenericTypeVariable g = generic;
-        g = g.withBounds(ListUtils.map(g.getBounds(), bound -> (JavaType.FullyQualified) visit(bound, p)));
+        g = g.withBounds(ListUtils.map(g.getBounds(), bound -> visit(bound, p)));
         return g;
     }
 
