@@ -17,7 +17,7 @@ plugins {
     id("com.github.hierynomus.license") version "0.16.1" apply false
     id("org.jetbrains.kotlin.jvm") version "1.5.21" apply false
     id("org.gradle.test-retry") version "1.2.1" apply false
-    id("com.github.jk1.dependency-license-report") version "1.16" apply false
+    id("com.github.jk1.dependency-license-report") version "2.0" apply false
 
     id("nebula.maven-publish") version "17.3.2" apply false
     id("nebula.contacts") version "5.1.0" apply false
