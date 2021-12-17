@@ -36,6 +36,8 @@ public class JavaTypeCache {
         classCache.clear();
         methodCache.clear();
         variableCache.clear();
+        genericCache.clear();
+        parameterizedCache.clear();
     }
 
     public JavaType.Class computeClass(String fullyQualifiedName, Supplier<JavaType.Class> fq) {
