@@ -76,7 +76,7 @@ public class ReloadableTypeMapping {
                     sym.className().startsWith("jdk.") ||
                     sym.className().startsWith("org.graalvm")) {
                 return typeCache.computeClass(sym.className(), () -> new JavaType.Class(
-                        null, sym.flags_field & Flag.VALID_FLAGS, sym.className(), getKind(sym),
+                        null, sym.flags_field, sym.className(), getKind(sym),
                         null, null, null, null, null, null));
             } else {
                 AtomicBoolean newlyCreated = new AtomicBoolean(false);
