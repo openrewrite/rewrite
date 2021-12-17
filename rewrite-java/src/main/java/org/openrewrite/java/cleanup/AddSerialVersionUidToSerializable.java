@@ -19,13 +19,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
@@ -60,48 +58,71 @@ public class AddSerialVersionUidToSerializable extends Recipe {
             final JavaTemplate template = JavaTemplate.builder(this::getCursor, "private static final long serialVersionUID = 1;").build();
 
             @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+                // only interested in class declaration variables
+                return super.visitMethodDeclaration(method, executionContext);
+            }
+
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+                J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
+                boolean serializedFound = false;
+                for (J.VariableDeclarations.NamedVariable v : varDecls.getVariables()) {
+                    if ("serialVersionUID".equals((v.getSimpleName()))) {
+                        serializedFound = true;
+                        doAfterVisit(new MaybeFixSerialVersionUidVar(varDecls));
+                        break;
+                    }
+                }
+                if (serializedFound) {
+                    getCursor().dropParentUntil(J.ClassDeclaration.class::isInstance).putMessage("has-serial-version-id", Boolean.TRUE);
+                }
+                return varDecls;
+            }
+
+            @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
-                if (implementsSerializable(c.getType())) {
-                    AtomicBoolean serializedFound = new AtomicBoolean(false);
-                    c = c.withBody(c.getBody().withStatements(
-                            ListUtils.map(c.getBody().getStatements(), (i, s) -> {
-                                if (s instanceof J.VariableDeclarations) {
-                                    J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) s;
-                                    for (J.VariableDeclarations.NamedVariable v : variableDeclarations.getVariables()) {
-                                        if (v.getSimpleName().equals("serialVersionUID")) {
-                                            serializedFound.set(true);
-                                            List<J.Modifier> modifiers = variableDeclarations.getModifiers();
-
-                                            if (!J.Modifier.hasModifier(modifiers, J.Modifier.Type.Private)
-                                              || !J.Modifier.hasModifier(modifiers, J.Modifier.Type.Static)
-                                              || !J.Modifier.hasModifier(modifiers, J.Modifier.Type.Final)) {
-                                                variableDeclarations = variableDeclarations.withModifiers(Arrays.asList(
-                                                        new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Private, Collections.emptyList()),
-                                                        new J.Modifier(Tree.randomId(), Space.format(" "), Markers.EMPTY, J.Modifier.Type.Static, Collections.emptyList()),
-                                                        new J.Modifier(Tree.randomId(), Space.format(" "), Markers.EMPTY, J.Modifier.Type.Final, Collections.emptyList())
-                                                ));
-                                            }
-                                            JavaType.Primitive variableType = TypeUtils.asPrimitive(variableDeclarations.getType());
-                                            if (variableType != JavaType.Primitive.Long) {
-                                                variableDeclarations = variableDeclarations.withTypeExpression(new J.Primitive(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JavaType.Primitive.Long));
-                                            }
-                                            if (s != variableDeclarations) {
-                                                return autoFormat(variableDeclarations, ctx).withPrefix(s.getPrefix());
-                                            }
-                                        }
-                                    }
-                                }
-                                return s;
-                            })
-                    ));
-                    if (!serializedFound.get()) {
-                        c = c.withTemplate(template, c.getBody().getCoordinates().firstStatement());
-                    }
+                Boolean needsSerialVersionId = getCursor().pollMessage("has-serial-version-id");
+                if (needsSerialVersionId == null && implementsSerializable(c.getType())) {
+                    c = c.withTemplate(template, c.getBody().getCoordinates().firstStatement());
                 }
                 return c;
             }
         };
+    }
+
+    private static final class MaybeFixSerialVersionUidVar extends JavaIsoVisitor<ExecutionContext> {
+        private final J.VariableDeclarations searialVersionUidVar;
+
+        public MaybeFixSerialVersionUidVar(J.VariableDeclarations searialVersionUidVar) {
+            this.searialVersionUidVar = searialVersionUidVar;
+        }
+
+        @Override
+        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+            J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, ctx);
+            if (varDecls.equals(searialVersionUidVar)){
+                List<J.Modifier> modifiers = varDecls.getModifiers();
+                if (!J.Modifier.hasModifier(modifiers, J.Modifier.Type.Private)
+                        || !J.Modifier.hasModifier(modifiers, J.Modifier.Type.Static)
+                        || !J.Modifier.hasModifier(modifiers, J.Modifier.Type.Final)) {
+                    varDecls = varDecls.withModifiers(Arrays.asList(
+                            new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Private, Collections.emptyList()),
+                            new J.Modifier(Tree.randomId(), Space.format(" "), Markers.EMPTY, J.Modifier.Type.Static, Collections.emptyList()),
+                            new J.Modifier(Tree.randomId(), Space.format(" "), Markers.EMPTY, J.Modifier.Type.Final, Collections.emptyList())
+                    ));
+                }
+                JavaType.Primitive variableType = TypeUtils.asPrimitive(varDecls.getType());
+                if (variableType != JavaType.Primitive.Long) {
+                    varDecls = varDecls.withTypeExpression(new J.Primitive(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JavaType.Primitive.Long));
+                }
+                if (multiVariable != varDecls) {
+                    return autoFormat(varDecls, ctx).withPrefix(varDecls.getPrefix());
+                }
+            }
+            return varDecls;
+        }
     }
 
     public static boolean implementsSerializable(@Nullable JavaType type) {
