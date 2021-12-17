@@ -159,7 +159,7 @@ public class JavaSourceSet implements Marker {
                                 aClass.getName().startsWith("jdk.") ||
                                 aClass.getName().startsWith("org.graalvm")) {
                             return new JavaType.Class(
-                                    null, aClass.getModifiers() & Flag.VALID_FLAGS, aClass.getName(), kind,
+                                    null, aClass.getModifiers(), aClass.getName(), kind,
                                     null, null, null, null, null, null);
                         }
 
@@ -167,7 +167,7 @@ public class JavaSourceSet implements Marker {
 
                         return new JavaType.Class(
                                 null,
-                                aClass.getModifiers() & Flag.VALID_FLAGS,
+                                aClass.getModifiers(),
                                 aClass.getName(),
                                 kind,
                                 null, null, null, null, null, null
@@ -269,7 +269,7 @@ public class JavaSourceSet implements Marker {
                             }
                         }
 
-                        return new JavaType.Variable(fieldInfo.getModifiers() & Flag.VALID_FLAGS, fieldInfo.getName(), owner,
+                        return new JavaType.Variable(fieldInfo.getModifiers(), fieldInfo.getName(), owner,
                                 type(fieldInfo.getTypeDescriptor()), annotations);
                     });
         }
@@ -277,7 +277,7 @@ public class JavaSourceSet implements Marker {
         @Nullable
         private JavaType.Method methodType(MethodInfo methodInfo) {
             try {
-                long flags = methodInfo.getModifiers() & Flag.VALID_FLAGS;
+                long flags = methodInfo.getModifiers();
 
                 // The field access modifier "volatile" corresponds to the "bridge" modifier on methods.
                 // We don't represent "bridge" because it is a compiler internal that cannot appear in source code.
@@ -332,7 +332,7 @@ public class JavaSourceSet implements Marker {
                 }
 
                 return new JavaType.Method(
-                        methodInfo.getModifiers() & Flag.VALID_FLAGS,
+                        methodInfo.getModifiers(),
                         type(methodInfo.getClassInfo()),
                         methodInfo.getName(),
                         paramNames,

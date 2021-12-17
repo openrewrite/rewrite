@@ -200,7 +200,7 @@ class TypeMapping {
 
             return new JavaType.Class(
                     null,
-                    clazz.getModifiers() & Flag.VALID_FLAGS,
+                    clazz.getModifiers(),
                     clazz.getName(),
                     kind,
                     null, null, null, null, null, null
@@ -249,7 +249,7 @@ class TypeMapping {
                 field.getDeclaringClass().getName(),
                 field.getName(),
                 () -> new JavaType.Variable(
-                        field.getModifiers() & Flag.VALID_FLAGS,
+                        field.getModifiers(),
                         field.getName(),
                         type(field.getDeclaringClass(), stack),
                         type(field.getType(), stack),
@@ -287,7 +287,7 @@ class TypeMapping {
                             .collect(Collectors.toList());
 
                     return new JavaType.Method(
-                            method.getModifiers() & Flag.VALID_FLAGS,
+                            method.getModifiers(),
                             type(method.getDeclaringClass(), stack),
                             method.getName(),
                             paramNames.isEmpty() ? null : paramNames,

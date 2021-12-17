@@ -89,7 +89,7 @@ public class ReloadableTypeMapping {
 
                             return new JavaType.Class(
                                     null,
-                                    sym.flags_field  & Flag.VALID_FLAGS,
+                                    sym.flags_field ,
                                     sym.className(),
                                     getKind(sym),
                                     null, null, null, null, null, null
@@ -348,7 +348,7 @@ public class ReloadableTypeMapping {
                     }
 
                     return new JavaType.Variable(
-                            symbol.flags_field & Flag.VALID_FLAGS,
+                            symbol.flags_field,
                             symbol.name.toString(),
                             resolvedOwner,
                             type(symbol.type, stack),
@@ -450,7 +450,7 @@ public class ReloadableTypeMapping {
                         }
 
                         return new JavaType.Method(
-                                methodSymbol.flags_field & Flag.VALID_FLAGS,
+                                methodSymbol.flags_field,
                                 resolvedDeclaringType,
                                 methodName,
                                 paramNames,
