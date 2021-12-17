@@ -31,6 +31,7 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 
+@SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface JavaType {
@@ -151,13 +152,7 @@ public interface JavaType {
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @With
     class Class extends FullyQualified {
-        public static final Class CLASS = new Class(null, Flag.Public.getBitMask(), "java.lang.Class", Kind.Class,
-                null, null, null, null, null, null);
-        public static final Class ENUM = new Class(null, Flag.Public.getBitMask(), "java.lang.Enum", Kind.Class,
-                null, null, null, null, null, null);
-
         @With
         @Nullable
         Integer managedReference;
@@ -165,13 +160,18 @@ public interface JavaType {
         @With(AccessLevel.NONE)
         long flagsBitMap;
 
+        @With
         String fullyQualifiedName;
+
+        @With
         Kind kind;
 
+        @With
         @Nullable
         @NonFinal
         FullyQualified supertype;
 
+        @With
         @Nullable
         @NonFinal
         FullyQualified owningClass;
@@ -200,12 +200,34 @@ public interface JavaType {
             return annotations == null ? emptyList() : annotations;
         }
 
+        public JavaType.Class withAnnotations(@Nullable List<FullyQualified> annotations) {
+            if (annotations != null && annotations.isEmpty()) {
+                annotations = null;
+            }
+            if (annotations == this.annotations) {
+                return this;
+            }
+            return new JavaType.Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
+                    this.owningClass, annotations, this.interfaces, this.members, this.methods);
+        }
+
         @Nullable
         @NonFinal
         List<FullyQualified> interfaces;
 
         public List<FullyQualified> getInterfaces() {
             return interfaces == null ? emptyList() : interfaces;
+        }
+
+        public JavaType.Class withInterfaces(@Nullable List<FullyQualified> interfaces) {
+            if (interfaces != null && interfaces.isEmpty()) {
+                interfaces = null;
+            }
+            if (interfaces == this.interfaces) {
+                return this;
+            }
+            return new JavaType.Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
+                    this.owningClass, this.annotations, interfaces, this.members, this.methods);
         }
 
         @Nullable
@@ -216,12 +238,34 @@ public interface JavaType {
             return members == null ? emptyList() : members;
         }
 
+        public JavaType.Class withMembers(@Nullable List<Variable> members) {
+            if (members != null && members.isEmpty()) {
+                members = null;
+            }
+            if (members == this.members) {
+                return this;
+            }
+            return new JavaType.Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
+                    this.owningClass, this.annotations, this.interfaces, members, this.methods);
+        }
+
         @Nullable
         @NonFinal
         List<Method> methods;
 
         public List<Method> getMethods() {
             return methods == null ? emptyList() : methods;
+        }
+
+        public JavaType.Class withMethods(@Nullable List<Method> methods) {
+            if (methods != null && methods.isEmpty()) {
+                methods = null;
+            }
+            if (methods == this.methods) {
+                return this;
+            }
+            return new JavaType.Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
+                    this.owningClass, this.annotations, this.interfaces, this.members, methods);
         }
 
         @Override
@@ -290,10 +334,10 @@ public interface JavaType {
                               @Nullable List<Variable> members, @Nullable List<Method> methods) {
             this.supertype = supertype;
             this.owningClass = owningClass;
-            this.annotations = annotations != null && annotations.isEmpty() ? null : annotations;
-            this.interfaces = interfaces != null && interfaces.isEmpty() ? null : interfaces;
-            this.members = members != null && members.isEmpty() ? null : members;
-            this.methods = methods != null && methods.isEmpty() ? null : methods;
+            this.annotations = nullIfEmpty(annotations);
+            this.interfaces = nullIfEmpty(interfaces);
+            this.members = nullIfEmpty(members);
+            this.methods = nullIfEmpty(methods);
         }
 
         @Override
@@ -549,23 +593,26 @@ public interface JavaType {
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    @With
     class Method implements JavaType {
         @With(AccessLevel.PRIVATE)
         long flagsBitMap;
 
+        @With
         @NonFinal
         FullyQualified declaringType;
 
+        @With
         String name;
 
         @Nullable
         List<String> paramNames;
 
+        @With
         @NonFinal
         @Nullable
         JavaType.Method.Signature genericSignature;
 
+        @With
         @NonFinal
         @Nullable
         JavaType.Method.Signature resolvedSignature;
@@ -608,12 +655,45 @@ public interface JavaType {
             return paramNames == null ? emptyList() : paramNames;
         }
 
+        public JavaType.Method withParamNames(@Nullable List<String> paramNames) {
+            if (paramNames != null && paramNames.isEmpty()) {
+                paramNames = null;
+            }
+            if (paramNames == this.paramNames) {
+                return this;
+            }
+            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, paramNames,
+                    this.genericSignature, this.resolvedSignature, this.thrownExceptions, this.annotations);
+        }
+
         public List<FullyQualified> getThrownExceptions() {
             return thrownExceptions == null ? emptyList() : thrownExceptions;
         }
 
+        public JavaType.Method withThrownExceptions(@Nullable List<FullyQualified> exceptions) {
+            if (exceptions != null && exceptions.isEmpty()) {
+                exceptions = null;
+            }
+            if (exceptions == this.thrownExceptions) {
+                return this;
+            }
+            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.paramNames, this.genericSignature,
+                    this.resolvedSignature, exceptions, this.annotations);
+        }
+
         public List<FullyQualified> getAnnotations() {
             return annotations == null ? emptyList() : annotations;
+        }
+
+        public JavaType.Method withAnnotations(@Nullable List<FullyQualified> annotations) {
+            if (annotations != null && annotations.isEmpty()) {
+                annotations = null;
+            }
+            if (annotations == this.annotations) {
+                return this;
+            }
+            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.paramNames, this.genericSignature,
+                    this.resolvedSignature, this.thrownExceptions, annotations);
         }
 
         @Value
@@ -646,16 +726,18 @@ public interface JavaType {
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    @With
     class Variable implements JavaType {
         @With(AccessLevel.NONE)
         long flagsBitMap;
 
+        @With
         String name;
 
+        @With
         @NonFinal
         FullyQualified owner;
 
+        @With
         @NonFinal
         @Nullable
         JavaType type;
@@ -677,6 +759,16 @@ public interface JavaType {
             return annotations == null ? emptyList() : annotations;
         }
 
+        public JavaType.Variable withAnnotations(@Nullable List<FullyQualified> annotations) {
+            if (annotations != null && annotations.isEmpty()) {
+                annotations = null;
+            }
+            if (this.annotations == annotations) {
+                return this;
+            }
+            return new JavaType.Variable(this.flagsBitMap, this.name, this.owner, this.type, annotations);
+        }
+
         public boolean hasFlags(Flag... test) {
             return Flag.hasFlags(flagsBitMap, test);
         }
@@ -689,7 +781,7 @@ public interface JavaType {
                               @Nullable List<FullyQualified> annotations) {
             this.owner = owner;
             this.type = type;
-            this.annotations = annotations != null && annotations.isEmpty() ? null : annotations;
+            this.annotations = nullIfEmpty(annotations);
         }
 
         @Override

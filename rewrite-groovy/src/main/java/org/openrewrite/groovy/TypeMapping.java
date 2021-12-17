@@ -173,12 +173,6 @@ class TypeMapping {
             return null;
         }
 
-        if ("java.lang.Class".equals(clazz.getName())) {
-            return (T) JavaType.Class.CLASS;
-        } else if ("java.lang.Enum".equals(clazz.getName())) {
-            return (T) JavaType.Class.ENUM;
-        }
-
         JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(clazz.getName());
         if (primitiveType != null) {
             return (T) primitiveType;

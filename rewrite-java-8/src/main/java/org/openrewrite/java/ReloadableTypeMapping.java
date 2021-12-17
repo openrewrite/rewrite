@@ -65,11 +65,7 @@ public class ReloadableTypeMapping {
                 return existingClass;
             }
 
-            if (sym.className().equals("java.lang.Class")) {
-                return JavaType.Class.CLASS;
-            } else if (sym.className().equals("java.lang.Enum")) {
-                return JavaType.Class.ENUM;
-            } else if (sym.className().startsWith("com.sun.") ||
+            if (sym.className().startsWith("com.sun.") ||
                     sym.className().startsWith("sun.") ||
                     sym.className().startsWith("java.awt.") ||
                     sym.className().startsWith("java.applet.") ||
