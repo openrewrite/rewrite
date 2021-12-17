@@ -22,8 +22,9 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
@@ -31,7 +32,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AddSerialVersionUidToSerializable extends Recipe {
 
@@ -66,16 +66,12 @@ public class AddSerialVersionUidToSerializable extends Recipe {
             @Override
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
                 J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
-                boolean serializedFound = false;
                 for (J.VariableDeclarations.NamedVariable v : varDecls.getVariables()) {
                     if ("serialVersionUID".equals((v.getSimpleName()))) {
-                        serializedFound = true;
+                        getCursor().dropParentUntil(J.ClassDeclaration.class::isInstance).putMessage("has-serial-version-id", Boolean.TRUE);
                         doAfterVisit(new MaybeFixSerialVersionUidVar(varDecls));
                         break;
                     }
-                }
-                if (serializedFound) {
-                    getCursor().dropParentUntil(J.ClassDeclaration.class::isInstance).putMessage("has-serial-version-id", Boolean.TRUE);
                 }
                 return varDecls;
             }
@@ -102,7 +98,7 @@ public class AddSerialVersionUidToSerializable extends Recipe {
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
             J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, ctx);
-            if (varDecls.equals(searialVersionUidVar)){
+            if (varDecls.equals(searialVersionUidVar)) {
                 List<J.Modifier> modifiers = varDecls.getModifiers();
                 if (!J.Modifier.hasModifier(modifiers, J.Modifier.Type.Private)
                         || !J.Modifier.hasModifier(modifiers, J.Modifier.Type.Static)
