@@ -1313,10 +1313,10 @@ interface JavaTemplateTest : JavaRecipeTest {
         },
         before = """
             class Test {
+                @SuppressWarnings("ALL") private final int m, a;
                 void test() {
                     @SuppressWarnings("ALL") /* hello */
                     Boolean z;
-                    @SuppressWarnings("ALL") private final int m, a;
                     // comment n
                     @SuppressWarnings("ALL")
                     int n;
@@ -1329,13 +1329,13 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         after = """
             class Test {
+                @SuppressWarnings("ALL")
+                @Deprecated
+                private final int m, a;
                 void test() {
                     @SuppressWarnings("ALL")
                     @Deprecated /* hello */
                     Boolean z;
-                    @SuppressWarnings("ALL")
-                    @Deprecated
-                    private final int m, a;
                     // comment n
                     @SuppressWarnings("ALL")
                     @Deprecated
