@@ -39,11 +39,11 @@ public class TypeUtils {
     }
 
     public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2) {
-        if(type1 == null || type2 == null) {
-            return false;
-        }
         if (type1 == type2) {
             return true;
+        }
+        if(type1 == null || type2 == null) {
+            return false;
         }
 
         // Strings, uniquely amongst all other types, can be either primitives or classes depending on the context
