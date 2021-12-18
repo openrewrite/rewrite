@@ -415,6 +415,7 @@ public class JavaSourceSet implements Marker {
                 }
                 return type(classInfo);
             } else if (typeSignature instanceof ArrayTypeSignature) {
+                //TODO: Use typeCache for these array objects
                 ArrayClassInfo arrClassInfo = ((ArrayTypeSignature) typeSignature).getArrayClassInfo();
                 JavaType type = type(arrClassInfo.getElementClassInfo());
                 for (int i = 0; i < arrClassInfo.getNumDimensions(); i++) {

@@ -235,7 +235,11 @@ public class ReloadableTypeMapping {
         } else if (type instanceof Type.JCVoidType) {
             return JavaType.Primitive.Void;
         } else if (type instanceof Type.ArrayType) {
-            return new JavaType.Array(type(((Type.ArrayType) type).elemtype, stack));
+            String sig = signature(type);
+            JavaType elemType = type(((Type.ArrayType) type).elemtype, stack);
+            assert sig != null;
+            assert elemType != null;
+            return typeCache.computeArray(sig, () -> new JavaType.Array(elemType));
         } else if (type instanceof Type.WildcardType) {
             // TODO: For now we are just mapping wildcards into their bound types and we are not accounting for the
             //       "bound kind"

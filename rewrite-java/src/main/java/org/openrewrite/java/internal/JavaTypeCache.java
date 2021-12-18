@@ -26,6 +26,7 @@ import java.util.function.Supplier;
  * because there is presumed to only be one type definition per fully-qualified class name.
  */
 public class JavaTypeCache {
+    private final Map<String, JavaType.Array> arrayCache = new HashMap<>();
     private final Map<String, JavaType.Class> classCache = new HashMap<>();
     private final Map<String, Map<String, JavaType.GenericTypeVariable>> genericCache = new HashMap<>();
     private final Map<String, Map<String, Map<String, Map<String, JavaType.Method>>>> methodCache = new HashMap<>();
@@ -33,11 +34,16 @@ public class JavaTypeCache {
     private final Map<String, Map<String, JavaType.Parameterized>> parameterizedCache = new HashMap<>();
 
     public void clear() {
+        arrayCache.clear();
         classCache.clear();
         methodCache.clear();
         variableCache.clear();
         genericCache.clear();
         parameterizedCache.clear();
+    }
+
+    public JavaType.Array computeArray(String fullyQualifiedName, Supplier<JavaType.Array> fq) {
+        return arrayCache.computeIfAbsent(fullyQualifiedName, n -> fq.get());
     }
 
     public JavaType.Class computeClass(String fullyQualifiedName, Supplier<JavaType.Class> fq) {
