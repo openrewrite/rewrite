@@ -34,7 +34,6 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -63,7 +62,7 @@ import static java.util.stream.Collectors.toList;
 @NonNullApi
 public class Java11Parser implements JavaParser {
     private String sourceSet = "main";
-    private final JavaTypeCache typeCache = new JavaTypeCache();
+    private final Map<String, Object> typeBySignature = new HashMap<>();
 
     @Nullable
     private transient JavaSourceSet sourceSetProvenance;
@@ -112,7 +111,7 @@ public class Java11Parser implements JavaParser {
         // MUST be created (registered with the context) after pfm and compilerLog
         compiler = new JavaCompiler(context);
 
-        // otherwise the JavacParser will use EmptyEndPosTable, effectively setting -1 as the end position
+        // otherwise, the JavacParser will use EmptyEndPosTable, effectively setting -1 as the end position
         // for every tree element
         compiler.genEndPos = true;
 
@@ -210,7 +209,7 @@ public class Java11Parser implements JavaParser {
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
                                 styles,
-                                typeCache,
+                                typeBySignature,
                                 ctx,
                                 context
                         );
@@ -258,7 +257,7 @@ public class Java11Parser implements JavaParser {
 
     @Override
     public Java11Parser reset() {
-        typeCache.clear();
+        typeBySignature.clear();
         compilerLog.reset();
         pfm.flush();
         Check.instance(context).newRound();
@@ -283,7 +282,7 @@ public class Java11Parser implements JavaParser {
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
         if (sourceSetProvenance == null) {
             sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                    typeCache, ctx);
+                    typeBySignature, ctx);
         }
         return sourceSetProvenance;
     }

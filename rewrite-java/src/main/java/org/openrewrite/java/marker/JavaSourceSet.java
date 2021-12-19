@@ -22,13 +22,14 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.ClassgraphJavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -50,12 +51,12 @@ public class JavaSourceSet implements Marker {
     List<JavaType.FullyQualified> classpath;
 
     public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath,
-                                      JavaTypeCache typeCache, ExecutionContext ctx) {
+                                      Map<String, Object> typeBySignature, ExecutionContext ctx) {
 
-        Map<String, JavaType.FullyQualified> jvmClasses = jvmClasses(typeCache, ctx);
+        Map<String, JavaType.FullyQualified> jvmClasses = jvmClasses(typeBySignature, ctx);
         List<JavaType.FullyQualified> fqns = new ArrayList<>(jvmClasses.values());
 
-        Builder builder = new Builder(typeCache, ctx, jvmClasses);
+        Builder builder = new Builder(typeBySignature, ctx, jvmClasses);
 
         if (classpath.iterator().hasNext()) {
             for (ClassInfo classInfo : new ClassGraph()
@@ -65,6 +66,9 @@ public class JavaSourceSet implements Marker {
                     .enableClassInfo()
                     .enableMethodInfo()
                     .enableFieldInfo()
+                    .ignoreClassVisibility()
+                    .ignoreFieldVisibility()
+                    .ignoreMethodVisibility()
                     .scan()
                     .getAllClasses()) {
                 try {
@@ -78,7 +82,7 @@ public class JavaSourceSet implements Marker {
         return new JavaSourceSet(randomId(), sourceSetName, fqns);
     }
 
-    private static Map<String, JavaType.FullyQualified> jvmClasses(JavaTypeCache typeCache, ExecutionContext ctx) {
+    private static Map<String, JavaType.FullyQualified> jvmClasses(Map<String, Object> typeBySignature, ExecutionContext ctx) {
         boolean java8 = System.getProperty("java.version").startsWith("1.8");
 
         if (java8 && JAVA8_CLASSPATH != null) {
@@ -97,10 +101,13 @@ public class JavaSourceSet implements Marker {
                 .acceptPackages("java")
                 .rejectPackages("java.awt")
                 .rejectPackages("java.applet")
+                .ignoreClassVisibility()
+                .ignoreFieldVisibility()
+                .ignoreMethodVisibility()
                 .scan()
                 .getAllClasses();
 
-        Builder builder = new Builder(typeCache, ctx, emptyMap());
+        Builder builder = new Builder(typeBySignature, ctx, emptyMap());
         Map<String, JavaType.FullyQualified> fqns = new HashMap<>(classInfos.size());
         for (ClassInfo classInfo : classInfos) {
             try {
@@ -121,10 +128,12 @@ public class JavaSourceSet implements Marker {
 
     @RequiredArgsConstructor
     private static class Builder {
-        private final JavaTypeCache typeCache;
+        private final ClassgraphJavaTypeSignatureBuilder signatureBuilder = new ClassgraphJavaTypeSignatureBuilder();
+        private final Map<ClassInfo, JavaType.FullyQualified> stack = new IdentityHashMap<>();
+
+        private final Map<String, Object> typeBySignature;
         private final ExecutionContext ctx;
         private final Map<String, JavaType.FullyQualified> jvmTypes;
-        private final Map<String, JavaType.FullyQualified> stack = new HashMap<>();
 
         public JavaType.FullyQualified type(@Nullable ClassInfo aClass) {
             if (aClass == null) {
@@ -132,51 +141,49 @@ public class JavaSourceSet implements Marker {
                 return null;
             }
 
-            JavaType.FullyQualified existingClass = stack.get(aClass.getName());
+            JavaType.FullyQualified existingClass = stack.get(aClass);
             if (existingClass != null) {
                 return existingClass;
             }
 
             AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
-            JavaType.Class clazz = typeCache.computeClass(
-                    aClass.getName(),
-                    () -> {
-                        JavaType.Class.Kind kind;
-                        if (aClass.isInterface()) {
-                            kind = JavaType.Class.Kind.Interface;
-                        } else if (aClass.isEnum()) {
-                            kind = JavaType.Class.Kind.Enum;
-                        } else if (aClass.isAnnotation()) {
-                            kind = JavaType.Class.Kind.Annotation;
-                        } else {
-                            kind = JavaType.Class.Kind.Class;
-                        }
+            JavaType.Class clazz = (JavaType.Class) typeBySignature.get(aClass.getName());
+            if (clazz == null) {
+                JavaType.Class.Kind kind;
+                if (aClass.isInterface()) {
+                    kind = JavaType.Class.Kind.Interface;
+                } else if (aClass.isEnum()) {
+                    kind = JavaType.Class.Kind.Enum;
+                } else if (aClass.isAnnotation()) {
+                    kind = JavaType.Class.Kind.Annotation;
+                } else {
+                    kind = JavaType.Class.Kind.Class;
+                }
 
-                        if (aClass.getName().startsWith("com.sun.") ||
-                                aClass.getName().startsWith("sun.") ||
-                                aClass.getName().startsWith("java.awt.") ||
-                                aClass.getName().startsWith("jdk.") ||
-                                aClass.getName().startsWith("org.graalvm")) {
-                            return new JavaType.Class(
-                                    null, aClass.getModifiers(), aClass.getName(), kind,
-                                    null, null, null, null, null, null);
-                        }
+                if (aClass.getName().startsWith("com.sun.") ||
+                        aClass.getName().startsWith("sun.") ||
+                        aClass.getName().startsWith("java.awt.") ||
+                        aClass.getName().startsWith("jdk.") ||
+                        aClass.getName().startsWith("org.graalvm")) {
+                    return new JavaType.Class(
+                            null, aClass.getModifiers(), aClass.getName(), kind,
+                            null, null, null, null, null, null);
+                }
 
-                        newlyCreated.set(true);
+                newlyCreated.set(true);
 
-                        return new JavaType.Class(
-                                null,
-                                aClass.getModifiers(),
-                                aClass.getName(),
-                                kind,
-                                null, null, null, null, null, null
-                        );
-                    }
-            );
+                clazz = new JavaType.Class(
+                        null,
+                        aClass.getModifiers(),
+                        aClass.getName(),
+                        kind,
+                        null, null, null, null, null, null
+                );
+            }
 
             if (newlyCreated.get()) {
-                stack.put(aClass.getName(), clazz);
+                stack.put(aClass, clazz);
 
                 JavaType.FullyQualified supertype = type(aClass.getSuperclass());
                 JavaType.FullyQualified owner = aClass.getOuterClasses().isEmpty() ? null :
@@ -220,7 +227,7 @@ public class JavaSourceSet implements Marker {
 
                 clazz.unsafeSet(supertype, owner, annotations, interfaces, variables, methods);
 
-                stack.remove(aClass.getName());
+                stack.remove(aClass);
             }
 
             ClassTypeSignature typeSignature = aClass.getTypeSignature();
@@ -228,18 +235,13 @@ public class JavaSourceSet implements Marker {
                 return clazz;
             }
 
-            StringJoiner shallowGenericTypeVariables = new StringJoiner(",");
-            for (TypeParameter typeParameter : typeSignature.getTypeParameters()) {
-                shallowGenericTypeVariables.add(signature(typeParameter));
-            }
-
             newlyCreated.set(false);
 
-            JavaType.Parameterized parameterized = typeCache.computeParameterized(aClass.getName(),
-                    shallowGenericTypeVariables.toString(), () -> {
-                        newlyCreated.set(true);
-                        return new JavaType.Parameterized(null, null, null);
-                    });
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) typeBySignature.computeIfAbsent(signatureBuilder.signature(aClass.getTypeSignature()), ignored -> {
+                newlyCreated.set(true);
+                //noinspection ConstantConditions
+                return new JavaType.Parameterized(null, null, null);
+            });
 
             if (newlyCreated.get()) {
                 List<JavaType> typeParameters = new ArrayList<>(typeSignature.getTypeParameters().size());
@@ -255,27 +257,32 @@ public class JavaSourceSet implements Marker {
         }
 
         private JavaType.Variable variableType(FieldInfo fieldInfo) {
-            return typeCache.computeVariable(
-                    fieldInfo.getClassName(),
-                    fieldInfo.getName(),
-                    () -> {
-                        JavaType.FullyQualified owner = type(fieldInfo.getClassInfo());
+            JavaType.Variable existing = (JavaType.Variable) typeBySignature.get(signatureBuilder.variableSignature(fieldInfo));
+            if (existing != null) {
+                return existing;
+            }
 
-                        List<JavaType.FullyQualified> annotations = emptyList();
-                        if (!fieldInfo.getAnnotationInfo().isEmpty()) {
-                            annotations = new ArrayList<>(fieldInfo.getAnnotationInfo().size());
-                            for (AnnotationInfo annotationInfo : fieldInfo.getAnnotationInfo()) {
-                                annotations.add(type(annotationInfo.getClassInfo()));
-                            }
-                        }
+            JavaType.FullyQualified owner = type(fieldInfo.getClassInfo());
 
-                        return new JavaType.Variable(fieldInfo.getModifiers(), fieldInfo.getName(), owner,
-                                type(fieldInfo.getTypeDescriptor()), annotations);
-                    });
+            List<JavaType.FullyQualified> annotations = emptyList();
+            if (!fieldInfo.getAnnotationInfo().isEmpty()) {
+                annotations = new ArrayList<>(fieldInfo.getAnnotationInfo().size());
+                for (AnnotationInfo annotationInfo : fieldInfo.getAnnotationInfo()) {
+                    annotations.add(type(annotationInfo.getClassInfo()));
+                }
+            }
+
+            return new JavaType.Variable(fieldInfo.getModifiers(), fieldInfo.getName(), owner,
+                    type(fieldInfo.getTypeDescriptor()), annotations);
         }
 
         @Nullable
         private JavaType.Method methodType(MethodInfo methodInfo) {
+            JavaType.Method existing = (JavaType.Method) typeBySignature.get(signatureBuilder.methodSignature(methodInfo));
+            if (existing != null) {
+                return existing;
+            }
+
             try {
                 long flags = methodInfo.getModifiers();
 
@@ -347,61 +354,49 @@ public class JavaSourceSet implements Marker {
             }
         }
 
-        private Path getClasspathElement(ClassInfo classInfo) {
-            if (classInfo.getModuleInfo() != null) {
-                return Paths.get(classInfo.getModuleInfo().getLocation());
-            } else {
-                return Paths.get("__source_set__");
-            }
-        }
-
         private JavaType.GenericTypeVariable type(TypeParameter typeParameter) {
-            String signature = "";
-            if (typeParameter.getClassBound() != null) {
-                signature(typeParameter.getClassBound());
-            } else if (typeParameter.getInterfaceBounds() != null) {
-                StringJoiner interfaceBounds = new StringJoiner(" & ");
-                for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
-                    interfaceBounds.add(signature(interfaceBound));
-                }
-                signature = interfaceBounds.toString();
+            JavaType.GenericTypeVariable existing = (JavaType.GenericTypeVariable) typeBySignature.get(signatureBuilder.signature(typeParameter));
+            if (existing != null) {
+                return existing;
             }
 
-            return typeCache.computeGeneric(
-                    typeParameter.getName(),
-                    signature,
-                    () -> {
-                        List<JavaType> bounds = null;
-                        if(typeParameter.getClassBound() != null) {
-                            if(typeParameter.getClassBound() instanceof ClassRefTypeSignature) {
-                                ReferenceTypeSignature bound = typeParameter.getClassBound();
-                                ClassRefTypeSignature classBound = (ClassRefTypeSignature) bound;
-                                if (classBound.getClassInfo() != null && !"java.lang.Object".equals(classBound.getFullyQualifiedClassName())) {
-                                    bounds = new ArrayList<>();
-                                    bounds.add(type(typeParameter.getClassBound()));
-                                }
-                            } else {
-                                bounds = new ArrayList<>();
-                                bounds.add(type(typeParameter.getClassBound()));
-                            }
-                        }
-                        if(typeParameter.getInterfaceBounds() != null && !typeParameter.getInterfaceBounds().isEmpty()) {
-                            if(bounds == null) {
-                                bounds = new ArrayList<>();
-                            }
-                            for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
-                                bounds.add(type(interfaceBound));
-                            }
-                        }
-                        if(bounds == null) {
-                            bounds = emptyList();
-                        }
-                        return new JavaType.GenericTypeVariable(null, typeParameter.getName(), bounds);
+            List<JavaType> bounds = null;
+            if (typeParameter.getClassBound() != null) {
+                if (typeParameter.getClassBound() instanceof ClassRefTypeSignature) {
+                    ReferenceTypeSignature bound = typeParameter.getClassBound();
+                    ClassRefTypeSignature classBound = (ClassRefTypeSignature) bound;
+                    if (classBound.getClassInfo() != null && !"java.lang.Object".equals(classBound.getFullyQualifiedClassName())) {
+                        bounds = new ArrayList<>();
+                        bounds.add(type(typeParameter.getClassBound()));
                     }
-            );
+                } else {
+                    bounds = new ArrayList<>();
+                    bounds.add(type(typeParameter.getClassBound()));
+                }
+            }
+            if (typeParameter.getInterfaceBounds() != null && !typeParameter.getInterfaceBounds().isEmpty()) {
+                if (bounds == null) {
+                    bounds = new ArrayList<>();
+                }
+                for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
+                    bounds.add(type(interfaceBound));
+                }
+            }
+            if (bounds == null) {
+                bounds = emptyList();
+            }
+
+            // TODO how to determine variance?
+            return new JavaType.GenericTypeVariable(null, typeParameter.getName(),
+                    JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
         }
 
-        private JavaType type(TypeSignature typeSignature) {
+        private JavaType type(HierarchicalTypeSignature typeSignature) {
+            JavaType existing = (JavaType) typeBySignature.get(signatureBuilder.signature(typeSignature));
+            if (existing != null) {
+                return existing;
+            }
+
             if (typeSignature instanceof ClassRefTypeSignature) {
                 ClassRefTypeSignature classRefSig = (ClassRefTypeSignature) typeSignature;
                 ClassInfo classInfo = classRefSig.getClassInfo();
@@ -413,7 +408,42 @@ public class JavaSourceSet implements Marker {
                         // FIXME more of these
                     }
                 }
-                return type(classInfo);
+
+                JavaType.FullyQualified type = type(classInfo);
+                if(!(type instanceof JavaType.Class)) {
+                    System.out.println("here");
+                }
+
+                JavaType.Class clazz = (JavaType.Class) type;
+
+                if (!classRefSig.getTypeArguments().isEmpty()) {
+                    List<JavaType> typeParameters = new ArrayList<>(classRefSig.getTypeArguments().size());
+                    for (TypeArgument typeArgument : classRefSig.getTypeArguments()) {
+                        typeParameters.add(type(typeArgument));
+                    }
+
+                    return new JavaType.Parameterized(null, clazz, typeParameters);
+                }
+
+                return clazz;
+            } else if (typeSignature instanceof ClassTypeSignature) {
+                ClassTypeSignature classSig = (ClassTypeSignature) typeSignature;
+
+                try {
+                    Method getClassInfo = classSig.getClass().getDeclaredMethod("getClassInfo");
+                    getClassInfo.setAccessible(true);
+
+                    JavaType.Class clazz = (JavaType.Class) type((ClassInfo) getClassInfo.invoke(classSig));
+
+                    List<JavaType> typeParameters = new ArrayList<>(classSig.getTypeParameters().size());
+                    for (TypeParameter typeParameter : classSig.getTypeParameters()) {
+                        typeParameters.add(type(typeParameter));
+                    }
+
+                    return new JavaType.Parameterized(null, clazz, typeParameters);
+                } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                    throw new RuntimeException(e);
+                }
             } else if (typeSignature instanceof ArrayTypeSignature) {
                 //TODO: Use typeCache for these array objects
                 ArrayClassInfo arrClassInfo = ((ArrayTypeSignature) typeSignature).getArrayClassInfo();
@@ -423,46 +453,23 @@ public class JavaSourceSet implements Marker {
                 }
                 return type;
             } else if (typeSignature instanceof TypeVariableSignature) {
-                return new JavaType.GenericTypeVariable(null, ((TypeVariableSignature) typeSignature).getName(), emptyList());
+                TypeVariableSignature typeVariableSignature = (TypeVariableSignature) typeSignature;
+                try {
+                    return type(typeVariableSignature.resolve());
+                } catch (IllegalArgumentException ignored) {
+                    return new JavaType.GenericTypeVariable(null, typeVariableSignature.getName(),
+                            JavaType.GenericTypeVariable.Variance.INVARIANT, null);
+                }
             } else if (typeSignature instanceof BaseTypeSignature) {
-                //noinspection ConstantConditions
                 return JavaType.Primitive.fromKeyword(((BaseTypeSignature) typeSignature).getTypeStr());
-            }
-            throw new UnsupportedOperationException("Unexpected signature type " + typeSignature.getClass().getName());
-        }
-
-        private String signature(TypeParameter typeParameter) {
-            StringBuilder s = new StringBuilder(typeParameter.getName());
-            s.append(" extends ");
-
-            if (typeParameter.getClassBound() != null) {
-                s.append(signature(typeParameter.getClassBound()));
-            } else if (typeParameter.getInterfaceBounds() != null) {
-                StringJoiner interfaceBounds = new StringJoiner(" & ");
-                for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
-                    interfaceBounds.add(signature(interfaceBound));
+            } else if (typeSignature instanceof TypeArgument) {
+                TypeArgument typeArgument = (TypeArgument) typeSignature;
+                if (typeArgument.getWildcard().equals(TypeArgument.Wildcard.ANY)) {
+                    return new JavaType.GenericTypeVariable(null, "?", JavaType.GenericTypeVariable.Variance.INVARIANT, null);
                 }
-                s.append(interfaceBounds);
+                return type(typeArgument.getTypeSignature());
             }
 
-            return s.toString();
-        }
-
-        private String signature(TypeSignature typeSignature) {
-            if (typeSignature instanceof ClassRefTypeSignature) {
-                return ((ClassRefTypeSignature) typeSignature).getBaseClassName();
-            } else if (typeSignature instanceof ArrayTypeSignature) {
-                ArrayTypeSignature arrSignature = (ArrayTypeSignature) typeSignature;
-                StringBuilder signature = new StringBuilder(signature(arrSignature.getElementTypeSignature()));
-                for (int i = 0; i < arrSignature.getNumDimensions(); i++) {
-                    signature.append("[]");
-                }
-                return signature.toString();
-            } else if (typeSignature instanceof TypeVariableSignature) {
-                return ((TypeVariableSignature) typeSignature).getName();
-            } else if (typeSignature instanceof BaseTypeSignature) {
-                return ((BaseTypeSignature) typeSignature).getTypeStr();
-            }
             throw new UnsupportedOperationException("Unexpected signature type " + typeSignature.getClass().getName());
         }
     }

@@ -348,7 +348,6 @@ public interface JavaType {
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @AllArgsConstructor
     @With
     class Parameterized extends FullyQualified {
         @Nullable
@@ -360,6 +359,12 @@ public interface JavaType {
 
         @NonFinal
         List<JavaType> typeParameters;
+
+        public Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type, List<JavaType> typeParameters) {
+            this.managedReference = managedReference;
+            this.type = type;
+            this.typeParameters = typeParameters;
+        }
 
         /**
          * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
@@ -446,7 +451,6 @@ public interface JavaType {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @AllArgsConstructor
     @With
     class GenericTypeVariable implements JavaType {
         @Getter
@@ -456,6 +460,9 @@ public interface JavaType {
         @Getter
         String name;
 
+        @Getter
+        Variance variance;
+
         @NonFinal
         @Nullable
         List<JavaType> bounds;
@@ -463,6 +470,13 @@ public interface JavaType {
         public List<JavaType> getBounds() {
             assert bounds != null;
             return bounds;
+        }
+
+        public GenericTypeVariable(@Nullable Integer managedReference, String name, Variance variance, @Nullable List<JavaType> bounds) {
+            this.managedReference = managedReference;
+            this.name = name;
+            this.variance = variance;
+            this.bounds = bounds;
         }
 
         public void unsafeSet(List<JavaType> bounds) {
@@ -475,18 +489,24 @@ public interface JavaType {
         }
 
         private static String typeToString(JavaType type) {
-            if (type instanceof GenericTypeVariable){
+            if (type instanceof GenericTypeVariable) {
                 GenericTypeVariable generic = (GenericTypeVariable) type;
-                StringBuilder s = new StringBuilder("GenericTypeVariable{" + generic.name + " extends ");
-                if (generic.bounds == null || generic.bounds.isEmpty()) {
-                    s.append("<no bounds>");
-                } else {
+                StringBuilder s = new StringBuilder("GenericTypeVariable{" + generic.name);
+                if(generic.variance.equals(Variance.COVARIANT)) {
+                    s.append(" extends");
+                } else if(generic.variance.equals(Variance.CONTRAVARIANT)) {
+                    s.append(" super");
+                }
+
+                if (generic.bounds != null && !generic.bounds.isEmpty()) {
+                    s.append(' ');
                     StringJoiner b = new StringJoiner(" & ");
                     for (JavaType bound : generic.bounds) {
                         b.add(typeToString(bound));
                     }
                     s.append(b);
                 }
+
                 s.append('}');
                 return s.toString();
             } else if (type instanceof FullyQualified) {
@@ -494,14 +514,23 @@ public interface JavaType {
             }
             return "";
         }
+
+        public enum Variance {
+            INVARIANT,
+            COVARIANT,
+            CONTRAVARIANT;
+        }
     }
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @AllArgsConstructor
     @With
     class Array implements JavaType {
         JavaType elemType;
+
+        public Array(JavaType elemType) {
+            this.elemType = elemType;
+        }
 
         @Override
         public String toString() {
@@ -521,10 +550,8 @@ public interface JavaType {
         Void,
         String,
         None,
-        Wildcard,
         Null;
 
-        @Nullable
         public static Primitive fromKeyword(String keyword) {
             switch (keyword) {
                 case "boolean":
@@ -547,14 +574,12 @@ public interface JavaType {
                     return Void;
                 case "String":
                     return String;
-                case "*":
-                    return Wildcard;
                 case "null":
                     return Null;
                 case "":
                     return None;
             }
-            return null;
+            throw new IllegalArgumentException("Unknown primitive keyword " + keyword);
         }
 
         public String getKeyword() {
@@ -579,8 +604,6 @@ public interface JavaType {
                     return "void";
                 case String:
                     return "String";
-                case Wildcard:
-                    return "*";
                 case Null:
                     return "null";
                 case None:
@@ -703,6 +726,11 @@ public interface JavaType {
             JavaType returnType;
 
             List<JavaType> paramTypes;
+
+            public Signature(@Nullable JavaType returnType, List<JavaType> paramTypes) {
+                this.returnType = returnType;
+                this.paramTypes = paramTypes;
+            }
         }
 
         public boolean hasFlags(Flag... test) {

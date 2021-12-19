@@ -52,7 +52,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     @Nullable
     private final Type enclosingClassType;
 
-    private final TypeMapping typeMapping;
+    private final Java11TypeMapping typeMapping;
     private final TreeScanner<J, Space> javaVisitor = new JavaVisitor();
     private final Map<Integer, Javadoc.LineBreak> lineBreaks = new HashMap<>();
 
@@ -64,7 +64,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private String source;
     private int cursor = 0;
 
-    public Java11JavadocVisitor(Context context, TreePath scope, TypeMapping typeMapping, String source, JCTree tree) {
+    public Java11JavadocVisitor(Context context, TreePath scope, Java11TypeMapping typeMapping, String source, JCTree tree) {
         this.attr = Attr.instance(context);
         this.typeMapping = typeMapping;
         this.source = source;

@@ -52,7 +52,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     @Nullable
     private final Type enclosingClassType;
 
-    private final ReloadableTypeMapping typeMapping;
+    private final ReloadableJava8TypeMapping typeMapping;
     private final TreeScanner<J, Space> javaVisitor = new JavaVisitor();
     private final Map<Integer, Javadoc.LineBreak> lineBreaks = new HashMap<>();
 
@@ -64,7 +64,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     private String source;
     private int cursor = 0;
 
-    public ReloadableJava8JavadocVisitor(Context context, TreePath scope, ReloadableTypeMapping typeMapping, String source, JCTree tree) {
+    public ReloadableJava8JavadocVisitor(Context context, TreePath scope, ReloadableJava8TypeMapping typeMapping, String source, JCTree tree) {
         this.attr = Attr.instance(context);
         this.typeMapping = typeMapping;
         this.source = source;

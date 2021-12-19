@@ -19,14 +19,13 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.internal.JavaTypeCache
 
 class JavaSourceSetTest {
 
     @Test
     fun typesFromClasspath() {
         val ctx = InMemoryExecutionContext { e -> throw e }
-        val javaVersion = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), JavaTypeCache(), ctx)
+        val javaVersion = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), mutableMapOf(), ctx)
         assertThat(javaVersion.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")
     }

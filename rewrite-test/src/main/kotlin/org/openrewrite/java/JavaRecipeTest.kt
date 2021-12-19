@@ -21,15 +21,11 @@ import org.junit.jupiter.api.BeforeEach
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.java.internal.JavaTypeCache
 import org.openrewrite.java.tree.J
 import java.io.File
 import java.nio.file.Path
 
 interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
-    val typeCache: JavaTypeCache
-        get() = JavaTypeCache()
-
     override val parser: JavaParser
         get() = JavaParser.fromJavaVersion().build()
 
@@ -42,7 +38,6 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
 
     @BeforeEach
     fun beforeRecipe() {
-        typeCache.clear()
         J.clearCaches()
     }
 

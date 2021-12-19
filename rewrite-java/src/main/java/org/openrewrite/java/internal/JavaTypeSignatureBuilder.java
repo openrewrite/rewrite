@@ -1,0 +1,54 @@
+package org.openrewrite.java.internal;
+
+import org.openrewrite.internal.lang.Nullable;
+
+/**
+ * In addition to the signature formats described below, implementations should provide a way of retrieving method
+ * and variable signatures, but they may have different numbers of input arguments depending on the implementation.
+ * <p/>
+ * Method signatures should be formatted like {@code com.MyThing{name=add,resolved=Thing(Integer),generic=Thing<?>(Integer)}},
+ * where <code>MyThing</code> is the declaring type, <code>void</code> is the return type, and <code>Integer</code> is a parameter.
+ * <p/>
+ * Variable signatures should be formatted like <code>com.MyThing{name=MY_FIELD}</code>.
+ */
+public interface JavaTypeSignatureBuilder {
+    /**
+     * @param t A type object.
+     * @return The type signature. If <code>t</code> is null, the signature is <code>{undefined}</code>.
+     */
+    String signature(@Nullable Object t);
+    
+    /**
+     * @param type An array type.
+     * @return Formatted like <code>Integer[]</code>.
+     */
+    String arraySignature(Object type);
+
+    /**
+     * @param type A class type.
+     * @return Formatted like <code>java.util.List</code>.
+     */
+    String classSignature(Object type);
+
+    /**
+     * When generic type variables are cyclic, like {@code U extends Cyclic<? extends U>}, represent the cycle with a (*), like
+     * {@code U extends Cyclic<? extends (*)>}.
+     *
+     * @param type A generic type.
+     * @return Formatted like <code>U extends java.lang.Comparable</code> (covariant) or
+     * <code>U super java.lang.Comparable</code> (contravariant).
+     */
+    String genericSignature(Object type);
+
+    /**
+     * @param type A parameterized type.
+     * @return Formatted like {@code java.util.List<java.util.List<Integer>>}.
+     */
+    String parameterizedSignature(Object type);
+
+    /**
+     * @param type A primitive type.
+     * @return Formatted like <code>Integer</code>.
+     */
+    String primitiveSignature(Object type);
+}

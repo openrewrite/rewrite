@@ -33,6 +33,8 @@ dependencies {
     testImplementation("com.puppycrawl.tools:checkstyle:latest.release") {
         isTransitive = false
     }
+
+    testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
 }
 
 tasks.withType<Javadoc> {

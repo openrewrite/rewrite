@@ -335,7 +335,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                                 }
 
                                                 JavaType.GenericTypeVariable genericType = new JavaType.GenericTypeVariable(
-                                                        null, typeParamIdent.getSimpleName(), singletonList(bound));
+                                                        null, typeParamIdent.getSimpleName(),
+                                                        JavaType.GenericTypeVariable.Variance.COVARIANT,
+                                                        singletonList(bound));
 
                                                 paramTypes.add(genericType);
                                             }

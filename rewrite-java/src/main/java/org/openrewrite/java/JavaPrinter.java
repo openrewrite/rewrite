@@ -822,9 +822,6 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             case String:
                 keyword = "String";
                 break;
-            case Wildcard:
-                keyword = "*";
-                break;
             case None:
                 throw new IllegalStateException("Unable to print None primitive");
             case Null:

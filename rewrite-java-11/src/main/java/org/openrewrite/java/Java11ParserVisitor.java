@@ -29,7 +29,6 @@ import com.sun.tools.javac.util.Context;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -70,7 +69,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private final Collection<NamedStyles> styles;
     private final ExecutionContext ctx;
     private final Context context;
-    private final TypeMapping typeMapping;
+    private final Java11TypeMapping typeMapping;
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     private EndPosTable endPosTable;
@@ -86,7 +85,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public Java11ParserVisitor(Path sourcePath,
                                String source,
                                Collection<NamedStyles> styles,
-                               JavaTypeCache typeCache,
+                               Map<String, Object> typeBySignature,
                                ExecutionContext ctx,
                                Context context) {
         this.sourcePath = sourcePath;
@@ -94,7 +93,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         this.styles = styles;
         this.ctx = ctx;
         this.context = context;
-        this.typeMapping = new TypeMapping(typeCache);
+        this.typeMapping = new Java11TypeMapping(typeBySignature);
     }
 
     @Override
@@ -663,7 +662,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         JCIdent ident = (JCIdent) node;
         JavaType type = typeMapping.type(node);
-        return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, type, typeMapping.variableType(ident.sym, emptyMap()));
+        return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, type, typeMapping.variableType(ident.sym));
     }
 
     @Override
@@ -796,13 +795,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         JavaType.Method methodReferenceType = null;
         if (ref.sym instanceof Symbol.MethodSymbol) {
             Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) ref.sym;
-            methodReferenceType = typeMapping.methodType(methodSymbol.owner.type, methodSymbol, referenceName, emptyMap());
+            methodReferenceType = typeMapping.methodType(methodSymbol.owner.type, methodSymbol);
         }
 
         JavaType.Variable fieldReferenceType = null;
         if (ref.sym instanceof Symbol.VarSymbol) {
             Symbol.VarSymbol varSymbol = (Symbol.VarSymbol) ref.sym;
-            fieldReferenceType = typeMapping.variableType(varSymbol, emptyMap());
+            fieldReferenceType = typeMapping.variableType(varSymbol);
         }
 
         return new J.MemberReference(randomId(),
@@ -829,7 +828,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 convert(fieldAccess.selected),
                 padLeft(sourceBefore("."), new J.Identifier(randomId(),
                         sourceBefore(fieldAccess.name.toString()), Markers.EMPTY,
-                        fieldAccess.name.toString(), type, typeMapping.variableType(fieldAccess.sym, emptyMap()))),
+                        fieldAccess.name.toString(), type, typeMapping.variableType(fieldAccess.sym))),
                 type);
     }
 
@@ -866,7 +865,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         Symbol genericSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
 
         return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                typeMapping.methodType(jcSelect.type, genericSymbol, name.getSimpleName(), emptyMap()));
+                typeMapping.methodType(jcSelect.type, genericSymbol));
     }
 
     @Override
@@ -944,7 +943,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 modifierResults.getLeadingAnnotations(),
                 modifierResults.getModifiers(), typeParams,
                 returnType, name, params, throwss, body, defaultValue,
-                typeMapping.methodType(jcMethod.type, jcMethod.sym, name.getIdentifier().getSimpleName(), emptyMap()));
+                typeMapping.methodType(jcMethod.type, jcMethod.sym));
     }
 
     @Override
@@ -1034,8 +1033,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;
-        JavaType.Method constructorType = typeMapping.methodType(jcNewClass.constructorType, jcNewClass.constructor, "<constructor>",
-                emptyMap());
+        JavaType.Method constructorType = typeMapping.methodType(jcNewClass.constructorType, jcNewClass.constructor);
 
         return new J.NewClass(randomId(), fmt, Markers.EMPTY, encl, whitespaceBeforeNew,
                 clazz, args, body, constructorType);

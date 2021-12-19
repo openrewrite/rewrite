@@ -137,7 +137,6 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                         case Null:
                             return "null";
                         case None:
-                        case Wildcard:
                         case Void:
                         default:
                             return "";
