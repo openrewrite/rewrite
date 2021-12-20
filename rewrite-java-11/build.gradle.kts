@@ -42,6 +42,7 @@ tasks.withType<Javadoc> {
     exclude(
         "**/Java11Parser**",
         "**/Java11JavadocVisitor**",
-        "**/TypeMapping**"
+        "**/Java11TypeMapping**",
+        "**/Java11TypeSignatureBuilder**"
     )
 }
