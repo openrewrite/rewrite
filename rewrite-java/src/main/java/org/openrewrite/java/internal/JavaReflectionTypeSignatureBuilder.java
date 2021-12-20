@@ -13,18 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy;
+package org.openrewrite.java.internal;
 
-import org.codehaus.groovy.ast.MethodNode;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.JavaTypeSignatureBuilder;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.StringJoiner;
 
-public class GroovyReflectionTypeSignatureBuilder implements JavaTypeSignatureBuilder {
+public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     @Override
     public String signature(@Nullable Object t) {
