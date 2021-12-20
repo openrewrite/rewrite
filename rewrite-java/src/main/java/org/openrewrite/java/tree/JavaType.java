@@ -451,15 +451,17 @@ public interface JavaType {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @With
     class GenericTypeVariable implements JavaType {
+        @With
         @Getter
         @Nullable
         Integer managedReference;
 
+        @With
         @Getter
         String name;
 
+        @With
         @Getter
         Variance variance;
 
@@ -467,16 +469,25 @@ public interface JavaType {
         @Nullable
         List<JavaType> bounds;
 
-        public List<JavaType> getBounds() {
-            assert bounds != null;
-            return bounds;
-        }
-
         public GenericTypeVariable(@Nullable Integer managedReference, String name, Variance variance, @Nullable List<JavaType> bounds) {
             this.managedReference = managedReference;
             this.name = name;
             this.variance = variance;
-            this.bounds = bounds;
+            this.bounds = nullIfEmpty(bounds);
+        }
+
+        public List<JavaType> getBounds() {
+            return bounds == null ? emptyList() : bounds;
+        }
+
+        public JavaType.GenericTypeVariable withBounds(@Nullable List<JavaType> bounds) {
+            if (bounds != null && bounds.isEmpty()) {
+                bounds = null;
+            }
+            if (bounds == this.bounds) {
+                return this;
+            }
+            return new JavaType.GenericTypeVariable(managedReference, name, variance, bounds);
         }
 
         public void unsafeSet(List<JavaType> bounds) {

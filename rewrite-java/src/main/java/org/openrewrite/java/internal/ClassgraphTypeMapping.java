@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
 
 public class ClassgraphTypeMapping {
     private final ClassgraphJavaTypeSignatureBuilder signatureBuilder = new ClassgraphJavaTypeSignatureBuilder();
@@ -279,13 +281,10 @@ public class ClassgraphTypeMapping {
                 bounds.add(type(interfaceBound));
             }
         }
-        if (bounds == null) {
-            bounds = emptyList();
-        }
 
-        // TODO how to determine variance?
+        // TODO how to determine contravariance?
         return new JavaType.GenericTypeVariable(null, typeParameter.getName(),
-                JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
+                bounds == null ? INVARIANT : COVARIANT, bounds);
     }
 
     private JavaType type(HierarchicalTypeSignature typeSignature) {
@@ -307,23 +306,7 @@ public class ClassgraphTypeMapping {
                 throw new IllegalStateException("Unable to resolve class reference");
             }
 
-            JavaType.FullyQualified type = type(classInfo);
-            if(!(type instanceof JavaType.Class)) {
-                System.out.println("here");
-            }
-
-            JavaType.Class clazz = (JavaType.Class) type;
-
-            if (!classRefSig.getTypeArguments().isEmpty()) {
-                List<JavaType> typeParameters = new ArrayList<>(classRefSig.getTypeArguments().size());
-                for (TypeArgument typeArgument : classRefSig.getTypeArguments()) {
-                    typeParameters.add(type(typeArgument));
-                }
-
-                return new JavaType.Parameterized(null, clazz, typeParameters);
-            }
-
-            return clazz;
+            return type(classInfo);
         } else if (typeSignature instanceof ClassTypeSignature) {
             ClassTypeSignature classSig = (ClassTypeSignature) typeSignature;
 
@@ -355,14 +338,14 @@ public class ClassgraphTypeMapping {
                 return type(typeVariableSignature.resolve());
             } catch (IllegalArgumentException ignored) {
                 return new JavaType.GenericTypeVariable(null, typeVariableSignature.getName(),
-                        JavaType.GenericTypeVariable.Variance.INVARIANT, null);
+                        INVARIANT, null);
             }
         } else if (typeSignature instanceof BaseTypeSignature) {
             return JavaType.Primitive.fromKeyword(((BaseTypeSignature) typeSignature).getTypeStr());
         } else if (typeSignature instanceof TypeArgument) {
             TypeArgument typeArgument = (TypeArgument) typeSignature;
             if (typeArgument.getWildcard().equals(TypeArgument.Wildcard.ANY)) {
-                return new JavaType.GenericTypeVariable(null, "?", JavaType.GenericTypeVariable.Variance.INVARIANT, null);
+                return new JavaType.GenericTypeVariable(null, "?", INVARIANT, null);
             }
             return type(typeArgument.getTypeSignature());
         }
