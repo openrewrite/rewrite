@@ -307,7 +307,12 @@ public class ClassgraphTypeMapping {
                 throw new IllegalStateException("Unable to resolve class reference");
             }
 
-            JavaType.Class clazz = (JavaType.Class) type(classInfo);
+            JavaType.FullyQualified type = type(classInfo);
+            if(!(type instanceof JavaType.Class)) {
+                System.out.println("here");
+            }
+
+            JavaType.Class clazz = (JavaType.Class) type;
 
             if (!classRefSig.getTypeArguments().isEmpty()) {
                 List<JavaType> typeParameters = new ArrayList<>(classRefSig.getTypeArguments().size());
