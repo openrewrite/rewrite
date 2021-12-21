@@ -101,7 +101,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
             typeStack.add(generic);
         } else if(typeStack.contains(generic)) {
-            return "(*)";
+            return generic.tsym.name.toString();
         }
         StringBuilder s = new StringBuilder(generic.tsym.name.toString());
 
