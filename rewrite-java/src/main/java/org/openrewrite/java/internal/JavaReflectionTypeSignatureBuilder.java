@@ -17,26 +17,39 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
+import java.lang.reflect.*;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 import java.util.StringJoiner;
 
 public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuilder {
+    @Nullable
+    private Set<Object> typeStack;
 
     @Override
     public String signature(@Nullable Object t) {
-        if(t == null) {
+        if (t == null) {
             return "{undefined}";
         }
 
-        Class<?> clazz = (Class<?>) t;
-        if (clazz.isArray()) {
-            return arraySignature(clazz);
-        } else if (clazz.isPrimitive()) {
-            return primitiveSignature(clazz);
+        if (t instanceof Class) {
+            Class<?> clazz = (Class<?>) t;
+            if (clazz.isArray()) {
+                return arraySignature(clazz);
+            } else if (clazz.isPrimitive()) {
+                return primitiveSignature(clazz);
+            }
+            return classSignature(clazz);
+        } else if (t instanceof ParameterizedType) {
+            return parameterizedSignature(t);
+        } else if (t instanceof WildcardType) {
+            return genericSignature(t);
+        } else if (t instanceof TypeVariable) {
+            return genericSignature(t);
         }
-        return classSignature(clazz);
+
+        throw new UnsupportedOperationException("Unknown type " + t.getClass().getName());
     }
 
     @Override
@@ -53,13 +66,90 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
 
     @Override
     public String genericSignature(Object type) {
-        // FIXME implement me
-        throw new UnsupportedOperationException("Implement me.");
+        if(typeStack == null) {
+            typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
+        }
+
+        boolean unique = typeStack.add(type);
+
+        if (type instanceof TypeVariable) {
+            TypeVariable<?> typeVar = (TypeVariable<?>) type;
+
+            if(!unique) {
+                return typeVar.getName();
+            }
+
+            StringBuilder s = new StringBuilder(typeVar.getName());
+
+            if (typeVar.getBounds().length > 0) {
+                StringJoiner bounds = new StringJoiner(" & ");
+                for (Type bound : typeVar.getBounds()) {
+                    String boundStr = signature(bound);
+                    if (!boundStr.equals("java.lang.Object")) {
+                        bounds.add(boundStr);
+                    }
+                }
+
+                String boundsStr = bounds.toString();
+                if (!boundsStr.isEmpty()) {
+                    s.append(" extends ").append(boundsStr);
+                }
+            }
+            return s.toString();
+        } else if(type instanceof WildcardType) {
+            WildcardType wildcard = (WildcardType) type;
+
+            StringBuilder s = new StringBuilder("?");
+            if (wildcard.getLowerBounds().length > 0) {
+                StringJoiner bounds = new StringJoiner(" & ");
+                for (Type bound : wildcard.getLowerBounds()) {
+                    String boundStr = signature(bound);
+                    if (!boundStr.equals("java.lang.Object")) {
+                        bounds.add(boundStr);
+                    }
+                }
+
+                String boundsStr = bounds.toString();
+                if (!boundsStr.isEmpty()) {
+                    s.append(" super ").append(boundsStr);
+                }
+            } else if (wildcard.getUpperBounds().length > 0) {
+                StringJoiner bounds = new StringJoiner(" & ");
+                for (Type bound : wildcard.getUpperBounds()) {
+                    String boundStr = signature(bound);
+                    if (!boundStr.equals("java.lang.Object")) {
+                        bounds.add(boundStr);
+                    }
+                }
+
+                String boundsStr = bounds.toString();
+                if (!boundsStr.isEmpty()) {
+                    s.append(" extends ").append(boundsStr);
+                }
+            }
+
+            return s.toString();
+        }
+
+        typeStack.remove(type);
+
+        throw new UnsupportedOperationException("Unexpected generic type " + type.getClass().getName());
     }
 
     @Override
     public String parameterizedSignature(Object type) {
-        return null;
+        ParameterizedType pt = (ParameterizedType) type;
+
+        StringBuilder s = new StringBuilder(signature(pt.getRawType()));
+
+        StringJoiner typeParameters = new StringJoiner(",", "<", ">");
+        for (Type typeArgument : pt.getActualTypeArguments()) {
+            typeParameters.add(signature(typeArgument));
+        }
+
+        s.append(typeParameters);
+
+        return s.toString();
     }
 
     @Override

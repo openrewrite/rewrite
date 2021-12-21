@@ -1,3 +1,18 @@
+/*
+ * Copyright 2021 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.java.internal;
 
 import lombok.RequiredArgsConstructor;
@@ -13,8 +28,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 /**
  * Type mapping from type attribution given from {@link java.lang.reflect} types.
@@ -42,18 +56,35 @@ public class JavaReflectionTypeMapping {
     }
 
     public JavaType _type(Type type) {
+        String signature = signatureBuilder.signature(type);
+        JavaType existing = (JavaType) typeBySignature.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+
+        JavaType mapped;
         if (type instanceof Class) {
-            return classType((Class<?>) type);
+            Class<?> clazz = (Class<?>) type;
+            if (clazz.isArray()) {
+                return new JavaType.Array(classType(clazz.getComponentType()));
+            } else if (clazz.isPrimitive()) {
+                return JavaType.Primitive.fromKeyword(clazz.getName());
+            }
+            mapped = classType((Class<?>) type);
         } else if (type instanceof GenericArrayType) {
             throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
         } else if (type instanceof TypeVariable) {
-            throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+            mapped = typeVariable((TypeVariable<?>) type);
         } else if (type instanceof WildcardType) {
-            throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+            mapped = wildcard((WildcardType) type);
         } else if (type instanceof ParameterizedType) {
+            mapped = parameterized((ParameterizedType) type);
+        } else {
             throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
         }
-        throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+
+        typeBySignature.put(signature, mapped);
+        return mapped;
     }
 
     private JavaType classType(Class<?> clazz) {
@@ -64,44 +95,36 @@ public class JavaReflectionTypeMapping {
 
         AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
-        JavaType mappedClazz = (JavaType) typeBySignature.computeIfAbsent(clazz.getName(), ignored -> {
-            if (clazz.isArray()) {
-                return new JavaType.Array(classType(clazz.getComponentType()));
-            } else if (clazz.isPrimitive()) {
-                return JavaType.Primitive.fromKeyword(clazz.getName());
-            }
+        JavaType.Class.Kind kind;
+        if ((clazz.getModifiers() & KIND_BITMASK_ENUM) != 0) {
+            kind = JavaType.Class.Kind.Enum;
+        } else if ((clazz.getModifiers() & KIND_BITMASK_ANNOTATION) != 0) {
+            kind = JavaType.Class.Kind.Annotation;
+        } else if ((clazz.getModifiers() & KIND_BITMASK_INTERFACE) != 0) {
+            kind = JavaType.Class.Kind.Interface;
+        } else {
+            kind = JavaType.Class.Kind.Class;
+        }
 
-            JavaType.Class.Kind kind;
-            if ((clazz.getModifiers() & KIND_BITMASK_ENUM) != 0) {
-                kind = JavaType.Class.Kind.Enum;
-            } else if ((clazz.getModifiers() & KIND_BITMASK_ANNOTATION) != 0) {
-                kind = JavaType.Class.Kind.Annotation;
-            } else if ((clazz.getModifiers() & KIND_BITMASK_INTERFACE) != 0) {
-                kind = JavaType.Class.Kind.Interface;
-            } else {
-                kind = JavaType.Class.Kind.Class;
-            }
+        JavaType.Class mappedClazz = new JavaType.Class(
+                null,
+                clazz.getModifiers(),
+                clazz.getName(),
+                kind,
+                null, null, null, null, null, null
+        );
 
-            return new JavaType.Class(
-                    null,
-                    clazz.getModifiers(),
-                    clazz.getName(),
-                    kind,
-                    null, null, null, null, null, null
-            );
-        });
+        if (newlyCreated.get()) {
+            classStack.put(clazz, mappedClazz);
 
-        if (mappedClazz instanceof JavaType.Class && newlyCreated.get()) {
-            classStack.put(clazz, (JavaType.Class) mappedClazz);
-
-            JavaType.FullyQualified supertype = (JavaType.FullyQualified) classType(clazz.getSuperclass());
-            JavaType.FullyQualified owner = (JavaType.FullyQualified) classType(clazz.getDeclaringClass());
+            JavaType.FullyQualified supertype = (JavaType.FullyQualified) _type(clazz.getSuperclass());
+            JavaType.FullyQualified owner = (JavaType.FullyQualified) _type(clazz.getDeclaringClass());
 
             List<JavaType.FullyQualified> annotations = null;
             if (clazz.getDeclaredAnnotations().length > 0) {
                 annotations = new ArrayList<>(clazz.getDeclaredAnnotations().length);
                 for (Annotation a : clazz.getDeclaredAnnotations()) {
-                    JavaType.FullyQualified type = (JavaType.FullyQualified) classType(a.annotationType());
+                    JavaType.FullyQualified type = (JavaType.FullyQualified) _type(a.annotationType());
                     annotations.add(type);
                 }
             }
@@ -110,7 +133,7 @@ public class JavaReflectionTypeMapping {
             if (clazz.getInterfaces().length > 0) {
                 interfaces = new ArrayList<>(clazz.getInterfaces().length);
                 for (Class<?> i : clazz.getInterfaces()) {
-                    JavaType.FullyQualified type = (JavaType.FullyQualified) classType(i);
+                    JavaType.FullyQualified type = (JavaType.FullyQualified) _type(i);
                     interfaces.add(type);
                 }
             }
@@ -135,51 +158,76 @@ public class JavaReflectionTypeMapping {
                 }
             }
 
-            ((JavaType.Class) mappedClazz).unsafeSet(supertype, owner, annotations, interfaces, members, methods);
+            mappedClazz.unsafeSet(supertype, owner, annotations, interfaces, members, methods);
 
             classStack.remove(clazz);
-        }
-
-        if (mappedClazz instanceof JavaType.Class && clazz.getTypeParameters().length > 0) {
-            newlyCreated.set(false);
-
-            JavaType.Parameterized parameterized = (JavaType.Parameterized) typeBySignature.computeIfAbsent(signatureBuilder.signature(clazz), ignored -> {
-                newlyCreated.set(true);
-                //noinspection ConstantConditions
-                return new JavaType.Parameterized(null, null, null);
-            });
-
-            if (newlyCreated.get()) {
-                List<JavaType> typeParameters = new ArrayList<>(clazz.getTypeParameters().length);
-                for (TypeVariable<? extends Class<?>> typeParameter : clazz.getTypeParameters()) {
-                    typeParameters.add(typeParameter(typeParameter));
-                }
-                parameterized.unsafeSet((JavaType.FullyQualified) mappedClazz, typeParameters);
-            }
-
-            return parameterized;
         }
 
         return mappedClazz;
     }
 
-    private JavaType typeParameter(TypeVariable<?> typeParameter) {
-        return (JavaType) typeBySignature.computeIfAbsent(signatureBuilder.signature(typeParameter), ignored -> {
-            List<JavaType> bounds = null;
-            for (Type bound : typeParameter.getBounds()) {
-                if(bound instanceof JavaType.Class && ((JavaType.Class) bound).getFullyQualifiedName().equals("java.lang.Object")) {
-                    continue;
+    private JavaType wildcard(WildcardType wildcard) {
+        JavaType.GenericTypeVariable.Variance variance = INVARIANT;
+        List<JavaType> bounds = null;
+
+        if (wildcard.getLowerBounds().length > 0) {
+            for (Type bound : wildcard.getLowerBounds()) {
+                JavaType mappedBound = _type(bound);
+                if (!((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
+                    if (bounds == null) {
+                        bounds = new ArrayList<>(wildcard.getLowerBounds().length);
+                    }
+                    bounds.add(mappedBound);
                 }
-                if(bounds == null) {
-                    bounds = new ArrayList<>(typeParameter.getBounds().length);
-                }
-                bounds.add(_type(bound));
             }
 
-            // FIXME how to determine contravariance?
-            return new JavaType.GenericTypeVariable(null, typeParameter.getName(),
-                    bounds == null ? INVARIANT : COVARIANT, bounds);
-        });
+            if (bounds != null) {
+                variance = CONTRAVARIANT;
+            }
+        } else if (wildcard.getUpperBounds().length > 0) {
+            for (Type bound : wildcard.getUpperBounds()) {
+                JavaType mappedBound = _type(bound);
+                if (!((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
+                    if (bounds == null) {
+                        bounds = new ArrayList<>(wildcard.getLowerBounds().length);
+                    }
+                    bounds.add(mappedBound);
+                }
+            }
+
+            if (bounds != null) {
+                variance = COVARIANT;
+            }
+        }
+
+        return new JavaType.GenericTypeVariable(null, "?", variance, bounds);
+    }
+
+    private JavaType parameterized(ParameterizedType type) {
+        JavaType mapped;
+        List<JavaType> typeParameters = new ArrayList<>(type.getActualTypeArguments().length);
+        for (Type actualTypeArgument : type.getActualTypeArguments()) {
+            typeParameters.add(_type(actualTypeArgument));
+        }
+        mapped = new JavaType.Parameterized(null, (JavaType.FullyQualified) _type(type.getRawType()), typeParameters);
+        return mapped;
+    }
+
+    private JavaType typeVariable(TypeVariable<?> typeParameter) {
+        List<JavaType> bounds = null;
+        for (Type bound : typeParameter.getBounds()) {
+            if (bound instanceof JavaType.Class && ((JavaType.Class) bound).getFullyQualifiedName().equals("java.lang.Object")) {
+                continue;
+            }
+            if (bounds == null) {
+                bounds = new ArrayList<>(typeParameter.getBounds().length);
+            }
+            bounds.add(_type(bound));
+        }
+
+        // FIXME how to determine contravariance?
+        return new JavaType.GenericTypeVariable(null, typeParameter.getName(),
+                bounds == null ? INVARIANT : COVARIANT, bounds);
     }
 
     private JavaType.Variable field(Field field) {
@@ -188,24 +236,22 @@ public class JavaReflectionTypeMapping {
     }
 
     private JavaType.Variable _field(Field field) {
-        return (JavaType.Variable) typeBySignature.computeIfAbsent(signatureBuilder.variableSignature(field), ignored -> {
-            List<JavaType.FullyQualified> annotations = null;
-            if (field.getDeclaredAnnotations().length > 0) {
-                annotations = new ArrayList<>(field.getDeclaredAnnotations().length);
-                for (Annotation a : field.getDeclaredAnnotations()) {
-                    JavaType.FullyQualified type = (JavaType.FullyQualified) classType(a.annotationType());
-                    annotations.add(type);
-                }
+        List<JavaType.FullyQualified> annotations = null;
+        if (field.getDeclaredAnnotations().length > 0) {
+            annotations = new ArrayList<>(field.getDeclaredAnnotations().length);
+            for (Annotation a : field.getDeclaredAnnotations()) {
+                JavaType.FullyQualified type = (JavaType.FullyQualified) _type(a.annotationType());
+                annotations.add(type);
             }
+        }
 
-            return new JavaType.Variable(
-                    field.getModifiers(),
-                    field.getName(),
-                    (JavaType.FullyQualified) classType(field.getDeclaringClass()),
-                    classType(field.getType()),
-                    annotations
-            );
-        });
+        return new JavaType.Variable(
+                field.getModifiers(),
+                field.getName(),
+                (JavaType.FullyQualified) _type(field.getDeclaringClass()),
+                _type(field.getType()),
+                annotations
+        );
     }
 
     public JavaType.Method method(Method method) {
@@ -227,7 +273,7 @@ public class JavaReflectionTypeMapping {
             if (method.getExceptionTypes().length > 0) {
                 thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
                 for (Class<?> e : method.getExceptionTypes()) {
-                    JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) classType(e);
+                    JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) _type(e);
                     thrownExceptions.add(fullyQualified);
                 }
             }
@@ -236,7 +282,7 @@ public class JavaReflectionTypeMapping {
             if (method.getDeclaredAnnotations().length > 0) {
                 annotations = new ArrayList<>(method.getDeclaredAnnotations().length);
                 for (Annotation a : method.getDeclaredAnnotations()) {
-                    JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) classType(a.annotationType());
+                    JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) _type(a.annotationType());
                     annotations.add(fullyQualified);
                 }
             }
@@ -245,18 +291,18 @@ public class JavaReflectionTypeMapping {
             if (method.getParameters().length > 0) {
                 resolvedArgumentTypes = new ArrayList<>(method.getParameters().length);
                 for (Parameter parameter : method.getParameters()) {
-                    resolvedArgumentTypes.add(classType(method.getDeclaringClass()));
+                    resolvedArgumentTypes.add(_type(method.getDeclaringClass()));
                 }
             }
 
             JavaType.Method.Signature signature = new JavaType.Method.Signature(
-                    classType(method.getReturnType()),
+                    _type(method.getReturnType()),
                     resolvedArgumentTypes
             );
 
             return new JavaType.Method(
                     method.getModifiers(),
-                    (JavaType.FullyQualified) classType(method.getDeclaringClass()),
+                    (JavaType.FullyQualified) _type(method.getDeclaringClass()),
                     method.getName(),
                     paramNames,
                     signature,
