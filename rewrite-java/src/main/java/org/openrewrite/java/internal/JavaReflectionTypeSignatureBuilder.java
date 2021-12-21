@@ -152,7 +152,7 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
     public String parameterizedSignature(Object type) {
         ParameterizedType pt = (ParameterizedType) type;
 
-        StringBuilder s = new StringBuilder(signature(pt.getRawType()));
+        StringBuilder s = new StringBuilder(((Class<?>) pt.getRawType()).getName());
 
         StringJoiner typeParameters = new StringJoiner(",", "<", ">");
         for (Type typeArgument : pt.getActualTypeArguments()) {
