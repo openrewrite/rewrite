@@ -18,7 +18,7 @@ import java.nio.file.Paths;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
-public abstract class Java11TypeSignatureBuilderTestBase implements JavaTypeSignatureBuilderTest {
+public abstract class Java11TypeSignatureBuilderTestBase {
     protected final Java11Parser javaParser = Java11Parser.builder()
             .logCompilationWarningsAndErrors(true)
             .build();

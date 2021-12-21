@@ -2,7 +2,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 
-class Java11TypeSignatureBuilderTest : Java11TypeSignatureBuilderTestBase() {
+class Java11TypeSignatureBuilderTest : JavaTypeSignatureBuilderTest, Java11TypeSignatureBuilderTestBase() {
 
     @Test
     override fun arraySignature() = methodFirstParameterSignatureEquals(
