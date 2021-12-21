@@ -18,6 +18,7 @@ class ClassgraphTypeMappingTest : JavaTypeMappingTest {
                 .enableClassInfo()
                 .enableFieldInfo()
                 .enableMethodInfo()
+                .ignoreClassVisibility()
                 .acceptClasses("org.openrewrite.java.*")
                 .scan()
                 .getClassInfo("org.openrewrite.java.JavaTypeGoat")

@@ -53,7 +53,7 @@ interface JavaTypeMappingTest {
 
     @Test
     fun genericTypeVariable() {
-        val generic = firstMethodParameter("generic") as JavaType.GenericTypeVariable
+        val generic = firstMethodParameter("generic").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
         assertThat(generic.name).isEqualTo("?")
         assertThat(generic.variance).isEqualTo(COVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
@@ -61,7 +61,7 @@ interface JavaTypeMappingTest {
 
     @Test
     fun genericVariableContravariant() {
-        val generic = firstMethodParameter("genericContravariant") as JavaType.GenericTypeVariable
+        val generic = firstMethodParameter("genericContravariant").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
         assertThat(generic.name).isEqualTo("?")
         assertThat(generic.variance).isEqualTo(CONTRAVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
@@ -73,14 +73,14 @@ interface JavaTypeMappingTest {
         assertThat(generic.name).isEqualTo("T")
         assertThat(generic.variance).isEqualTo(COVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.JavaTypeGoat")
-        assertThat(generic.bounds[1].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.PT")
+        assertThat(generic.bounds[1].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 
     @Test
     fun genericTypeVariableUnbounded() {
-        val generic = firstMethodParameter("genericUnbounded") as JavaType.GenericTypeVariable
-        assertThat(generic.name).isEqualTo("?")
+        val generic = firstMethodParameter("genericUnbounded").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
+        assertThat(generic.name).isEqualTo("U")
         assertThat(generic.variance).isEqualTo(INVARIANT)
-        assertThat(generic.bounds).isNull()
+        assertThat(generic.bounds).isEmpty()
     }
 }

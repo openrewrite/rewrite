@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import io.github.classgraph.*;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.tree.Flag;
@@ -31,8 +32,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
+import static java.util.Collections.singletonList;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
     private final ClassgraphJavaTypeSignatureBuilder signatureBuilder = new ClassgraphJavaTypeSignatureBuilder();
@@ -198,10 +199,6 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             return existing;
         }
 
-        if(methodInfo.getName().equals("parameterized")) {
-            System.out.println("here");
-        }
-
         try {
             long flags = methodInfo.getModifiers();
 
@@ -255,6 +252,10 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 for (AnnotationInfo annotationInfo : methodInfo.getAnnotationInfo()) {
                     annotations.add(type(annotationInfo.getClassInfo()));
                 }
+            }
+
+            if (methodInfo.getName().equals("generic")) {
+                System.out.println("here");
             }
 
             //noinspection ConstantConditions
@@ -321,14 +322,26 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 if (jvmType != null) {
                     return jvmType;
                 } else if (classRefSig.getBaseClassName().equals("java.lang.Object")) {
+                    //noinspection ConstantConditions
                     return reflectionTypeMapping.type(Object.class);
                 } else {
                     return JavaType.Unknown.getInstance();
                 }
             }
 
+            JavaType.FullyQualified type = type(classInfo);
+            if (type instanceof JavaType.Parameterized) {
+                JavaType.Parameterized pt = (JavaType.Parameterized) type;
+                type = pt.withTypeParameters(ListUtils.map(pt.getTypeParameters(), (i, tp) -> {
+                    if (classRefSig.getTypeArguments().size() > i) {
+                        return type(classRefSig.getTypeArguments().get(i));
+                    }
+                    return null;
+                }));
+            }
+
             //noinspection ConstantConditions
-            return type(classInfo);
+            return type;
         } else if (typeSignature instanceof ClassTypeSignature) {
             ClassTypeSignature classSig = (ClassTypeSignature) typeSignature;
 
@@ -367,10 +380,34 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             return JavaType.Primitive.fromKeyword(((BaseTypeSignature) typeSignature).getTypeStr());
         } else if (typeSignature instanceof TypeArgument) {
             TypeArgument typeArgument = (TypeArgument) typeSignature;
-            if (typeArgument.getWildcard().equals(TypeArgument.Wildcard.ANY)) {
-                return new JavaType.GenericTypeVariable(null, "?", INVARIANT, null);
+
+            JavaType.GenericTypeVariable.Variance variance;
+            List<JavaType> bounds = null;
+
+            switch (typeArgument.getWildcard()) {
+                case NONE:
+                    return type(typeArgument.getTypeSignature());
+                case EXTENDS:
+                    variance = COVARIANT;
+                    bounds = singletonList(type(typeArgument.getTypeSignature()));
+                    break;
+                case SUPER:
+                    variance = CONTRAVARIANT;
+                    bounds = singletonList(type(typeArgument.getTypeSignature()));
+                    break;
+                case ANY:
+                default:
+                    variance = INVARIANT;
+                    break;
             }
-            return type(typeArgument.getTypeSignature());
+
+            if (bounds != null && bounds.get(0) instanceof JavaType.FullyQualified &&
+                    ((JavaType.FullyQualified) bounds.get(0)).getFullyQualifiedName().equals("java.lang.Object")) {
+                bounds = null;
+                variance = INVARIANT;
+            }
+
+            return new JavaType.GenericTypeVariable(null, "?", variance, bounds);
         }
 
         throw new UnsupportedOperationException("Unexpected signature type " + typeSignature.getClass().getName());
