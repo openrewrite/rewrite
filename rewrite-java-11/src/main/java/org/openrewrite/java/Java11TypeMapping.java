@@ -28,7 +28,9 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
 class Java11TypeMapping {
@@ -106,7 +108,7 @@ class Java11TypeMapping {
                 }
 
                 return new JavaType.GenericTypeVariable(null, type.tsym.name.toString(),
-                        JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
+                        COVARIANT, bounds);
             });
         } else if (type instanceof Type.JCPrimitiveType) {
             return primitiveType(type.getTag());
@@ -118,8 +120,31 @@ class Java11TypeMapping {
                     new JavaType.Array(type(((Type.ArrayType) type).elemtype)));
         } else if (type instanceof Type.WildcardType) {
             Type.WildcardType wildcard = (Type.WildcardType) type;
-            // FIXME produce a GenericTypeVariable, looking at BoundKind to determine variance
-            throw new UnsupportedOperationException("Implement me. Should we look at type or bound or both?");
+            JavaType.GenericTypeVariable.Variance variance;
+            List<JavaType> bounds;
+
+            switch (wildcard.kind) {
+                case SUPER:
+                    variance = CONTRAVARIANT;
+                    bounds = singletonList(type(wildcard.getSuperBound()));
+                    break;
+                case EXTENDS:
+                    variance = COVARIANT;
+                    bounds = singletonList(type(wildcard.getExtendsBound()));
+                    break;
+                case UNBOUND:
+                default:
+                    variance = INVARIANT;
+                    bounds = null;
+                    break;
+            }
+
+            if (bounds != null && bounds.get(0) instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) bounds.get(0))
+                    .getFullyQualifiedName().equals("java.lang.Object")) {
+                bounds = null;
+            }
+
+            return new JavaType.GenericTypeVariable(null, "?", variance, bounds);
         } else if (com.sun.tools.javac.code.Type.noType.equals(type)) {
             return null;
         } else {
@@ -347,76 +372,76 @@ class Java11TypeMapping {
             }
 
             return (JavaType.Method) typeBySignature.computeIfAbsent(signatureBuilder.methodSignature(selectType, methodSymbol), ignored -> {
-                        List<String> paramNames = null;
-                        if (!methodSymbol.params().isEmpty()) {
-                            paramNames = new ArrayList<>(methodSymbol.params().size());
-                            for (Symbol.VarSymbol p : methodSymbol.params()) {
-                                String s = p.name.toString();
-                                paramNames.add(s);
-                            }
-                        }
+                List<String> paramNames = null;
+                if (!methodSymbol.params().isEmpty()) {
+                    paramNames = new ArrayList<>(methodSymbol.params().size());
+                    for (Symbol.VarSymbol p : methodSymbol.params()) {
+                        String s = p.name.toString();
+                        paramNames.add(s);
+                    }
+                }
 
-                        Type genericSignatureType = methodSymbol.type instanceof Type.ForAll ?
-                                ((Type.ForAll) methodSymbol.type).qtype :
-                                methodSymbol.type;
+                Type genericSignatureType = methodSymbol.type instanceof Type.ForAll ?
+                        ((Type.ForAll) methodSymbol.type).qtype :
+                        methodSymbol.type;
 
-                        List<JavaType.FullyQualified> exceptionTypes = null;
-                        if (selectType instanceof Type.MethodType) {
-                            Type.MethodType methodType = (Type.MethodType) selectType;
-                            if (!methodType.thrown.isEmpty()) {
-                                exceptionTypes = new ArrayList<>(methodType.thrown.size());
-                                for (Type exceptionType : methodType.thrown) {
-                                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                                    if (javaType == null) {
-                                        // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
-                                        // been mapped to cyclic)
-                                        if (exceptionType instanceof Type.ClassType) {
-                                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                                            javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.className(), JavaType.Class.Kind.Class,
-                                                    null, null, null, null, null, null);
-                                        }
-                                    }
-                                    if (javaType != null) {
-                                        // if the exception type is not resolved, it is not added to the list of exceptions
-                                        exceptionTypes.add(javaType);
-                                    }
+                List<JavaType.FullyQualified> exceptionTypes = null;
+                if (selectType instanceof Type.MethodType) {
+                    Type.MethodType methodType = (Type.MethodType) selectType;
+                    if (!methodType.thrown.isEmpty()) {
+                        exceptionTypes = new ArrayList<>(methodType.thrown.size());
+                        for (Type exceptionType : methodType.thrown) {
+                            JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
+                            if (javaType == null) {
+                                // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
+                                // been mapped to cyclic)
+                                if (exceptionType instanceof Type.ClassType) {
+                                    Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
+                                    javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.className(), JavaType.Class.Kind.Class,
+                                            null, null, null, null, null, null);
                                 }
                             }
-                        }
-
-                        JavaType.FullyQualified resolvedDeclaringType = declaringType;
-                        if (declaringType == null) {
-                            if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
-                                resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+                            if (javaType != null) {
+                                // if the exception type is not resolved, it is not added to the list of exceptions
+                                exceptionTypes.add(javaType);
                             }
                         }
+                    }
+                }
 
-                        if (resolvedDeclaringType == null) {
-                            return null;
+                JavaType.FullyQualified resolvedDeclaringType = declaringType;
+                if (declaringType == null) {
+                    if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
+                        resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+                    }
+                }
+
+                if (resolvedDeclaringType == null) {
+                    return null;
+                }
+
+                List<JavaType.FullyQualified> annotations = null;
+                if (!methodSymbol.getDeclarationAttributes().isEmpty()) {
+                    annotations = new ArrayList<>(methodSymbol.getDeclarationAttributes().size());
+                    for (Attribute.Compound a : methodSymbol.getDeclarationAttributes()) {
+                        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type));
+                        if (fq != null) {
+                            annotations.add(fq);
                         }
+                    }
+                }
 
-                        List<JavaType.FullyQualified> annotations = null;
-                        if (!methodSymbol.getDeclarationAttributes().isEmpty()) {
-                            annotations = new ArrayList<>(methodSymbol.getDeclarationAttributes().size());
-                            for (Attribute.Compound a : methodSymbol.getDeclarationAttributes()) {
-                                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type));
-                                if (fq != null) {
-                                    annotations.add(fq);
-                                }
-                            }
-                        }
-
-                        return new JavaType.Method(
-                                methodSymbol.flags_field,
-                                resolvedDeclaringType,
-                                methodSymbol.getSimpleName().toString(),
-                                paramNames,
-                                methodSignature(genericSignatureType),
-                                methodSignature(selectType),
-                                exceptionTypes,
-                                annotations
-                        );
-                    });
+                return new JavaType.Method(
+                        methodSymbol.flags_field,
+                        resolvedDeclaringType,
+                        methodSymbol.getSimpleName().toString(),
+                        paramNames,
+                        methodSignature(genericSignatureType),
+                        methodSignature(selectType),
+                        exceptionTypes,
+                        annotations
+                );
+            });
         }
 
         return null;

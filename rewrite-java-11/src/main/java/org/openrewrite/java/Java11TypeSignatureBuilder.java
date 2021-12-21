@@ -51,12 +51,12 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof Type.ArrayType) {
             return arraySignature(type);
         } else if (type instanceof Type.WildcardType) {
-            if (type.isUnbound()) {
-                return "?";
-            } else {
-                // FIXME how to find contravariant wildcards?
-                return "? extends " + signature(((Type.WildcardType) type).type);
+            Type.WildcardType wildcard = (Type.WildcardType) type;
+            StringBuilder s = new StringBuilder(wildcard.kind.toString());
+            if(!type.isUnbound()) {
+                s.append(signature(wildcard.type));
             }
+            return s.toString();
         } else if (Type.noType.equals(type)) {
             return "{none}";
         }
