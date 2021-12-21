@@ -15,23 +15,75 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Test;
+import org.openrewrite.java.internal.JavaTypeSignatureBuilder;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
 public interface JavaTypeSignatureBuilderTest {
 
-    void arraySignature();
+    /**
+     * @param methodName The type of the first parameter of the method with this name.
+     */
+    Object firstMethodParameter(String methodName);
 
-    void classSignature();
+    /**
+     * The type of the type variable of the first type parameter of {@link JavaTypeGoat}.
+     */
+    Object classTypeParameter();
 
-    void primitiveSignature();
+    JavaTypeSignatureBuilder signatureBuilder();
 
-    void parameterizedSignature();
+    @Test
+    default void arraySignature() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("array")))
+                .isEqualTo("org.openrewrite.java.C[]");
+    }
 
-    void genericTypeVariable();
+    @Test
+    default void classSignature() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("clazz")))
+                .isEqualTo("org.openrewrite.java.C");
+    }
 
-    void genericVariableContravariant();
+    @Test
+    default void primitiveSignature() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("primitive")))
+                .isEqualTo("int");
+    }
 
-    void traceySpecial();
+    @Test
+    default void parameterizedSignature() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("parameterized")))
+                .isEqualTo("org.openrewrite.java.PT<org.openrewrite.java.C>");
+    }
 
-    void genericVariableMultipleBounds();
+    @Test
+    default void generic() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("generic")))
+                .isEqualTo("org.openrewrite.java.PT<? extends org.openrewrite.java.C>");
+    }
 
-    void genericTypeVariableUnbounded();
+    @Test
+    default void genericContravariant() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("genericContravariant")))
+            .isEqualTo("org.openrewrite.java.PT<? super org.openrewrite.java.C>");
+    }
+
+    @Test
+    default void genericRecursive() {
+        assertThat(signatureBuilder().signature(classTypeParameter()))
+                .isEqualTo("T extends org.openrewrite.java.JavaTypeGoat<? extends T> & org.openrewrite.java.C");
+    }
+
+    @Test
+    default void genericBounds() {
+        genericRecursive();
+    }
+
+    @Test
+    default void genericUnbounded() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("genericUnbounded")))
+            .isEqualTo("org.openrewrite.java.PT<U>");
+    }
 }

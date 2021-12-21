@@ -16,8 +16,9 @@
 package org.openrewrite.java.internal
 
 import io.github.classgraph.ClassGraph
-import org.assertj.core.api.Assertions
-import org.junit.jupiter.api.Test
+import io.github.classgraph.ClassTypeSignature
+import io.github.classgraph.TypeParameter
+import io.github.classgraph.TypeSignature
 import org.openrewrite.java.JavaTypeSignatureBuilderTest
 
 class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
@@ -32,86 +33,10 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
             .getClassInfo("org.openrewrite.java.JavaTypeGoat")
     }
 
-    private val signatureBuilder = ClassgraphJavaTypeSignatureBuilder()
+    override fun firstMethodParameter(methodName: String): TypeSignature = goat.getMethodInfo(methodName)[0]
+        .parameterInfo[0].typeDescriptor
 
-    @Test
-    override fun arraySignature() {
-        Assertions.assertThat(
-            signatureBuilder.signature(
-                (goat.getMethodInfo("array")[0]
-                    .parameterInfo[0].typeDescriptor)
-            )
-        ).isEqualTo("org.openrewrite.java.C[]")
-    }
+    override fun classTypeParameter(): TypeParameter = (goat.typeSignature as ClassTypeSignature).typeParameters[0]
 
-    @Test
-    override fun classSignature() {
-        Assertions.assertThat(
-            signatureBuilder.signature(
-                (goat.getMethodInfo("clazz")[0]
-                    .parameterInfo[0].typeDescriptor)
-            )
-        ).isEqualTo("org.openrewrite.java.C")
-    }
-
-    @Test
-    override fun primitiveSignature() {
-        Assertions.assertThat(
-            signatureBuilder.signature(
-                (goat.getMethodInfo("primitive")[0]
-                    .parameterInfo[0].typeDescriptor)
-            )
-        ).isEqualTo("int")
-    }
-
-    @Test
-    override fun parameterizedSignature() {
-        Assertions.assertThat(
-            signatureBuilder.signature(
-                (goat.getMethodInfo("parameterized")[0]
-                    .parameterInfo[0].typeSignature)
-            )
-        ).isEqualTo("org.openrewrite.java.PT<org.openrewrite.java.C>")
-    }
-
-    @Test
-    override fun genericTypeVariable() {
-        Assertions.assertThat(
-            signatureBuilder.signature(
-                (goat.getMethodInfo("generic")[0]
-                    .parameterInfo[0].typeSignature)
-            )
-        ).isEqualTo("org.openrewrite.java.PT<? extends org.openrewrite.java.C>")
-    }
-
-    @Test
-    override fun genericVariableContravariant() {
-        Assertions.assertThat(
-            signatureBuilder.signature(
-                (goat.getMethodInfo("genericContravariant")[0]
-                    .parameterInfo[0].typeSignature)
-            )
-        ).isEqualTo("org.openrewrite.java.PT<? super org.openrewrite.java.C>")
-    }
-
-    @Test
-    override fun traceySpecial() {
-        Assertions.assertThat(signatureBuilder.signature(goat.typeSignature))
-            .isEqualTo("org.openrewrite.java.JavaTypeGoat<T extends org.openrewrite.java.JavaTypeGoat<? extends T> & org.openrewrite.java.C>")
-    }
-
-    @Test
-    override fun genericVariableMultipleBounds() {
-        traceySpecial()
-    }
-
-    @Test
-    override fun genericTypeVariableUnbounded() {
-        Assertions.assertThat(
-            signatureBuilder.signature(
-                (goat.getMethodInfo("genericUnbounded")[0]
-                    .parameterInfo[0].typeSignature)
-            )
-        ).isEqualTo("org.openrewrite.java.PT<U>")
-    }
+    override fun signatureBuilder(): JavaTypeSignatureBuilder = ClassgraphJavaTypeSignatureBuilder()
 }
