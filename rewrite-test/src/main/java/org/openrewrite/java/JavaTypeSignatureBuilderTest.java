@@ -1,7 +1,5 @@
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Test;
-
 public interface JavaTypeSignatureBuilderTest {
 
     void arraySignature();

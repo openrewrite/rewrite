@@ -33,6 +33,7 @@ dependencies {
     testImplementation("com.puppycrawl.tools:checkstyle:latest.release") {
         isTransitive = false
     }
+    testImplementation(project(":rewrite-test"))
 
     testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
 }
