@@ -40,31 +40,35 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     @Test
     override fun parameterizedSignature() {
         assertThat(signatureBuilder.signature((goat.getMethodInfo("parameterized")[0]
-            .parameterInfo[0].typeDescriptor))).isEqualTo("java.util.List<java.lang.String>")
+            .parameterInfo[0].typeSignature))).isEqualTo("java.util.List<java.lang.String>")
     }
 
     @Test
     override fun genericTypeVariable() {
-        TODO("Not yet implemented")
+        assertThat(signatureBuilder.signature((goat.getMethodInfo("generic")[0]
+            .parameterInfo[0].typeSignature))).isEqualTo("java.util.List<? extends java.lang.String>")
     }
 
     @Test
     override fun genericVariableContravariant() {
-        TODO("Not yet implemented")
+        assertThat(signatureBuilder.signature((goat.getMethodInfo("genericContravariant")[0]
+            .parameterInfo[0].typeSignature))).isEqualTo("java.util.List<? super java.lang.String>")
     }
 
     @Test
     override fun traceySpecial() {
-        TODO("Not yet implemented")
+        assertThat(signatureBuilder.signature(goat.typeSignature))
+            .isEqualTo("org.openrewrite.java.JavaTypeGoat<T extends org.openrewrite.java.JavaTypeGoat<? extends (*)> & java.util.List<?>>")
     }
 
     @Test
     override fun genericVariableMultipleBounds() {
-        TODO("Not yet implemented")
+        traceySpecial()
     }
 
     @Test
     override fun genericTypeVariableUnbounded() {
-        TODO("Not yet implemented")
+        assertThat(signatureBuilder.signature((goat.getMethodInfo("genericUnbounded")[0]
+            .parameterInfo[0].typeSignature))).isEqualTo("java.util.List<U>")
     }
 }

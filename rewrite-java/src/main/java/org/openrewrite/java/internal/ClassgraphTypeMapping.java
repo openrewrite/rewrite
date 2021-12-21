@@ -282,7 +282,6 @@ public class ClassgraphTypeMapping {
             }
         }
 
-        // TODO how to determine contravariance?
         return new JavaType.GenericTypeVariable(null, typeParameter.getName(),
                 bounds == null ? INVARIANT : COVARIANT, bounds);
     }

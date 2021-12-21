@@ -27,7 +27,7 @@ import java.util.StringJoiner;
 
 public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
-    private Set<TypeSignature> typeStack;
+    private Set<Object> typeStack;
 
     @Override
     public String signature(@Nullable Object type) {
@@ -61,11 +61,23 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             return primitiveSignature(typeSignature);
         } else if (typeSignature instanceof TypeArgument) {
             TypeArgument typeArgument = (TypeArgument) typeSignature;
-            if (typeArgument.getWildcard().equals(TypeArgument.Wildcard.ANY)) {
-                return "?";
-            } else {
-                return signature(typeArgument.getTypeSignature());
+            StringBuilder s = new StringBuilder();
+
+            switch(typeArgument.getWildcard()) {
+                case NONE:
+                    s.append(genericBound(typeArgument.getTypeSignature()));
+                    break;
+                case EXTENDS:
+                    s.append("? extends ").append(genericBound(typeArgument.getTypeSignature()));
+                    break;
+                case SUPER:
+                    s.append("? super ").append(genericBound(typeArgument.getTypeSignature()));
+                    break;
+                case ANY:
+                    s.append("?");
             }
+
+            return s.toString();
         }
 
         throw new UnsupportedOperationException("Unexpected signature type " + type.getClass().getName());
@@ -91,25 +103,26 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     public String genericSignature(Object type) {
         TypeParameter generic = (TypeParameter) type;
 
-        StringBuilder s = new StringBuilder(generic.getName());
-
-        // TODO how to determine variance?
-        s.append(" extends ");
+        StringBuilder bounds = new StringBuilder();
 
         if (generic.getClassBound() != null) {
-            s.append(genericBound(generic.getClassBound()));
+            String bound = genericBound(generic.getClassBound());
+            if(!bound.equals("java.lang.Object")) {
+                bounds.append(bound);
+            }
         } else if (generic.getInterfaceBounds() != null) {
             StringJoiner interfaceBounds = new StringJoiner(" & ");
             for (ReferenceTypeSignature interfaceBound : generic.getInterfaceBounds()) {
                 interfaceBounds.add(genericBound(interfaceBound));
             }
-            s.append(interfaceBounds);
+            bounds.append(interfaceBounds);
         }
 
-        return s.toString();
+        String boundsStr = bounds.toString();
+        return generic.getName() + (boundsStr.isEmpty() ? "" : " extends " + boundsStr);
     }
 
-    private String genericBound(TypeSignature bound) {
+    private String genericBound(Object bound) {
         if (typeStack != null && typeStack.contains(bound)) {
             return "(*)";
         }
@@ -118,7 +131,9 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
         }
         typeStack.add(bound);
-        return signature(bound);
+        String sig = signature(bound);
+        typeStack.remove(bound);
+        return sig;
     }
 
     @Override
