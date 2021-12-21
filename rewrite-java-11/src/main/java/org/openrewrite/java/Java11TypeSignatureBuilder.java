@@ -97,23 +97,31 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
-
+        if(typeStack == null) {
+            typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
+            typeStack.add(generic);
+        } else if(typeStack.contains(generic)) {
+            return "(*)";
+        }
         StringBuilder s = new StringBuilder(generic.tsym.name.toString());
 
         StringJoiner boundSigs = new StringJoiner(" & ");
         if (generic.getUpperBound() instanceof Type.IntersectionClassType) {
             Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) generic.getUpperBound();
             if (intersectionBound.supertype_field != null) {
-                String bound = genericBound(intersectionBound.supertype_field);
+                typeStack.add(intersectionBound.supertype_field);
+                String bound = signature(intersectionBound.supertype_field);
                 if (!bound.equals("java.lang.Object")) {
                     boundSigs.add(bound);
                 }
             }
             for (Type bound : intersectionBound.interfaces_field) {
-                boundSigs.add(genericBound(bound));
+                typeStack.add(bound);
+                boundSigs.add(signature(bound));
             }
         } else {
-            String bound = genericBound(generic.getUpperBound());
+            typeStack.add(generic.getUpperBound());
+            String bound = signature(generic.getUpperBound());
             if (!bound.equals("java.lang.Object")) {
                 boundSigs.add(bound);
             }
@@ -125,18 +133,6 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         return s.toString();
-    }
-
-    private String genericBound(Type bound) {
-        if (typeStack != null && typeStack.contains(bound)) {
-            return "(*)";
-        }
-
-        if (typeStack == null) {
-            typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
-        }
-        typeStack.add(bound);
-        return signature(bound);
     }
 
     @Override
