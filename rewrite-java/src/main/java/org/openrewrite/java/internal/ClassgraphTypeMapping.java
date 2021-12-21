@@ -100,7 +100,14 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         if (newlyCreated.get()) {
             stack.put(aClass, clazz);
 
-            JavaType.FullyQualified supertype = type(aClass.getSuperclass());
+            ClassInfo superclassInfo = aClass.getSuperclass();
+            JavaType.FullyQualified supertype;
+            if(superclassInfo == null) {
+                // Classgraph reports null for the supertype of interfaces, for consistency with other TypeMappings we report Object
+                supertype = jvmTypes.get("java.lang.Object");
+            } else {
+                supertype = type(superclassInfo);
+            }
             JavaType.FullyQualified owner = aClass.getOuterClasses().isEmpty() ? null :
                     type(aClass.getOuterClasses().get(0));
 

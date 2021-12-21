@@ -38,7 +38,7 @@ interface JavaTypeMappingTest {
     @Test
     fun extendsJavaLangObject() {
         // even though it is implicit in the source code...
-        assertThat(goatType().supertype).isEqualTo("java.lang.Object")
+        assertThat(goatType().supertype.fullyQualifiedName).isEqualTo("java.lang.Object")
     }
 
     @Test

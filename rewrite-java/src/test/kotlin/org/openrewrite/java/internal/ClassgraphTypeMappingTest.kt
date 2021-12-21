@@ -23,7 +23,11 @@ import org.openrewrite.java.tree.JavaType
 
 class ClassgraphTypeMappingTest : JavaTypeMappingTest {
     companion object {
-        private val typeMapping = ClassgraphTypeMapping(mutableMapOf(), emptyMap(), InMemoryExecutionContext())
+        private val typeMapping = ClassgraphTypeMapping(
+            mutableMapOf(),
+            // outside of tests this would be supplied by JavaSourceSet
+            mapOf("java.lang.Object" to JavaType.Class.build("java.lang.Object")),
+            InMemoryExecutionContext())
 
         private val goat = typeMapping.type(
             ClassGraph()
