@@ -104,7 +104,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             JavaType.FullyQualified supertype;
             if(superclassInfo == null) {
                 // Classgraph reports null for the supertype of interfaces, for consistency with other TypeMappings we report Object
-                supertype = jvmTypes.get("java.lang.Object");
+                supertype = (JavaType.FullyQualified) reflectionTypeMapping.type(Object.class);
             } else {
                 supertype = type(superclassInfo);
             }
