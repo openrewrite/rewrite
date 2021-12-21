@@ -49,6 +49,42 @@ class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
         );
     }
 
+    @Override
+    @Test
+    public void parameterizedSignature() {
+        methodReturnTypeSignatureEquals("" +
+                        "import java.util.List;\n" +
+                        "interface Test {\n" +
+                        "    List<String> test();\n" +
+                        "}",
+                "java.util.List<java.lang.String>"
+        );
+    }
+
+    @Override
+    @Test
+    public void genericTypeVariable() {
+        methodReturnTypeSignatureEquals("" +
+                        "import java.util.List;\n" +
+                        "interface Test {\n" +
+                        "    List<? extends String> test();\n" +
+                        "}",
+                "java.util.List<? extends java.lang.String>"
+        );
+    }
+
+    @Override
+    @Test
+    public void unboundedGenericTypeVariable() {
+        methodReturnTypeSignatureEquals("" +
+                        "import java.util.List;\n" +
+                        "interface Test {\n" +
+                        "    <T> List<T> test();\n" +
+                        "}",
+                "java.util.List<T>"
+        );
+    }
+
     private void methodReturnTypeSignatureEquals(@Language("java") String source, String signature) {
         assertThat(signatureBuilder.signature(methodReturnType(source))).isEqualTo(signature);
     }
