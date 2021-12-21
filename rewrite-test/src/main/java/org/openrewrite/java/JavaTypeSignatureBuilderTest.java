@@ -53,6 +53,12 @@ public interface JavaTypeSignatureBuilderTest {
     }
 
     @Test
+    default void objectArray() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("objectArray")))
+                .isEqualTo("java.lang.Object[]");
+    }
+
+    @Test
     default void primitiveArray() {
         assertThat(signatureBuilder().signature(firstMethodParameter("primitiveArray")))
                 .isEqualTo("int[]");
