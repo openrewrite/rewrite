@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java;
 
-import java.util.stream.BaseStream;
-
 // Whenever this class is changed, make a corresponding change in JavaTypeGoat in the main resources folder.
 public interface JavaTypeGoat<T, S extends JavaTypeGoat<T, ? extends T> & C> {
     void clazz(C n);

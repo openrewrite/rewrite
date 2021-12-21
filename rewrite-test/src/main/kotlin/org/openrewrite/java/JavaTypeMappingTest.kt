@@ -84,8 +84,8 @@ interface JavaTypeMappingTest {
 
     @Test
     fun genericMultipleBounds() {
-        val generic = goatType().typeParameters[0].asGeneric()!!
-        assertThat(generic.name).isEqualTo("T")
+        val generic = goatType().typeParameters.last().asGeneric()!!
+        assertThat(generic.name).isEqualTo("S")
         assertThat(generic.variance).isEqualTo(COVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.JavaTypeGoat")
         assertThat(generic.bounds[1].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
