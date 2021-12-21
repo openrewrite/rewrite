@@ -53,6 +53,12 @@ public interface JavaTypeSignatureBuilderTest {
     }
 
     @Test
+    default void primitiveArray() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("primitiveArray")))
+                .isEqualTo("int[]");
+    }
+
+    @Test
     default void parameterizedSignature() {
         assertThat(signatureBuilder().signature(firstMethodParameter("parameterized")))
                 .isEqualTo("org.openrewrite.java.PT<org.openrewrite.java.C>");
