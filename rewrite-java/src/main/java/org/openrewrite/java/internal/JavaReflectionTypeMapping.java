@@ -52,7 +52,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
         classStack.clear();
 
-        return  _type(type);
+        return _type(type);
     }
 
     public JavaType _type(Type type) {
@@ -70,7 +70,16 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             } else if (clazz.isPrimitive()) {
                 return JavaType.Primitive.fromKeyword(clazz.getName());
             }
-            mapped = classType((Class<?>) type);
+            mapped = classType(clazz);
+
+            if (clazz.getTypeParameters().length > 0) {
+                List<JavaType> typeParameters = new ArrayList<>(clazz.getTypeParameters().length);
+                for (TypeVariable<?> typeParameter : clazz.getTypeParameters()) {
+                    typeParameters.add(_type(typeParameter));
+                }
+                mapped = new JavaType.Parameterized(null, (JavaType.FullyQualified) mapped,
+                        typeParameters);
+            }
         } else if (type instanceof GenericArrayType) {
             throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
         } else if (type instanceof TypeVariable) {

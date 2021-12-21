@@ -40,7 +40,18 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
             } else if (clazz.isPrimitive()) {
                 return primitiveSignature(clazz);
             }
-            return classSignature(clazz);
+
+            StringBuilder s = new StringBuilder(classSignature(clazz));
+
+            if (clazz.getTypeParameters().length > 0) {
+                StringJoiner typeParams = new StringJoiner(",", "<", ">");
+                for (TypeVariable<?> typeParameter : clazz.getTypeParameters()) {
+                    typeParams.add(signature(typeParameter));
+                }
+                s.append(typeParams);
+            }
+
+            return s.toString();
         } else if (t instanceof ParameterizedType) {
             return parameterizedSignature(t);
         } else if (t instanceof WildcardType) {
@@ -66,7 +77,7 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
 
     @Override
     public String genericSignature(Object type) {
-        if(typeStack == null) {
+        if (typeStack == null) {
             typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
         }
 
@@ -75,8 +86,8 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
         if (type instanceof TypeVariable) {
             TypeVariable<?> typeVar = (TypeVariable<?>) type;
 
-            if(!unique) {
-                return typeVar.getName();
+            if (!unique) {
+                return typeVar.getTypeName();
             }
 
             StringBuilder s = new StringBuilder(typeVar.getName());
@@ -95,8 +106,10 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
                     s.append(" extends ").append(boundsStr);
                 }
             }
+
+            typeStack.remove(type);
             return s.toString();
-        } else if(type instanceof WildcardType) {
+        } else if (type instanceof WildcardType) {
             WildcardType wildcard = (WildcardType) type;
 
             StringBuilder s = new StringBuilder("?");
@@ -128,10 +141,9 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
                 }
             }
 
+            typeStack.remove(type);
             return s.toString();
         }
-
-        typeStack.remove(type);
 
         throw new UnsupportedOperationException("Unexpected generic type " + type.getClass().getName());
     }
