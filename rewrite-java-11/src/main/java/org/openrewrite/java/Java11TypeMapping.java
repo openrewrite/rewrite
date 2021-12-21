@@ -33,7 +33,7 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
-class Java11TypeMapping {
+class Java11TypeMapping implements JavaTypeMapping<Type> {
     private static final int KIND_BITMASK_INTERFACE = 1 << 9;
     private static final int KIND_BITMASK_ANNOTATION = 1 << 13;
     private static final int KIND_BITMASK_ENUM = 1 << 14;

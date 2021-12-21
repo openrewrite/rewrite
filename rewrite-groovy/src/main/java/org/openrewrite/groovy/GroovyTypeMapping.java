@@ -18,6 +18,7 @@ package org.openrewrite.groovy;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
@@ -28,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 
-class GroovyTypeMapping {
+class GroovyTypeMapping implements JavaTypeMapping<ClassNode> {
     private final GroovyAstTypeSignatureBuilder signatureBuilder = new GroovyAstTypeSignatureBuilder();
 
     private final Map<String, Object> typeBySignature;
@@ -37,6 +38,60 @@ class GroovyTypeMapping {
     GroovyTypeMapping(Map<String, Object> typeBySignature) {
         this.typeBySignature = typeBySignature;
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeBySignature);
+    }
+
+    @Nullable
+    public JavaType type(@Nullable ClassNode node) {
+        return _type(node);
+    }
+
+    @Nullable
+    private JavaType _type(@Nullable ClassNode node) {
+        if (node == null) {
+            return null;
+        }
+
+        if(node.isArray()) {
+            return arrayType(node);
+        } else if(ClassHelper.isPrimitiveType(node)) {
+            return JavaType.Primitive.fromKeyword(node.getName());
+        }
+
+        JavaType.Class clazz = (JavaType.Class) typeBySignature.computeIfAbsent(signatureBuilder.signature(node.getTypeClass()), ignored -> {
+            try {
+                return reflectionTypeMapping.type(node.getTypeClass());
+            } catch (GroovyBugError | NoClassDefFoundError ignored1) {
+                return new JavaType.Class(null, Flag.Public.getBitMask(), node.getName(), JavaType.Class.Kind.Class,
+                        null, null, null, null, null, null);
+            }
+        });
+
+        if(node.isUsingGenerics()) {
+            AtomicBoolean newlyCreated = new AtomicBoolean(false);
+
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) typeBySignature.computeIfAbsent(signatureBuilder.signature(node), ignored -> {
+                newlyCreated.set(true);
+                //noinspection ConstantConditions
+                return new JavaType.Parameterized(null, null, null);
+            });
+
+            if (newlyCreated.get()) {
+                List<JavaType> typeParameters = emptyList();
+                if (node.getGenericsTypes().length > 0) {
+                    typeParameters = new ArrayList<>(node.getGenericsTypes().length);
+                    for (GenericsType g : node.getGenericsTypes()) {
+                        typeParameters.add(genericType(g));
+                    }
+                }
+
+                assert clazz != null;
+                parameterized.unsafeSet(clazz, typeParameters);
+            }
+
+            return parameterized;
+        }
+
+        return clazz;
     }
 
     @Nullable
@@ -105,59 +160,6 @@ class GroovyTypeMapping {
                     annotations
             );
         });
-    }
-
-    @Nullable
-    public JavaType type(@Nullable ClassNode node) {
-        return _type(node);
-    }
-
-    @Nullable
-    private JavaType _type(@Nullable ClassNode node) {
-        if (node == null) {
-            return null;
-        }
-
-        if(node.isArray()) {
-            return arrayType(node);
-        } else if(ClassHelper.isPrimitiveType(node)) {
-            return JavaType.Primitive.fromKeyword(node.getName());
-        }
-
-        JavaType.Class clazz = (JavaType.Class) typeBySignature.computeIfAbsent(signatureBuilder.signature(node.getTypeClass()), ignored -> {
-            try {
-                return reflectionTypeMapping.type(node.getTypeClass());
-            } catch (GroovyBugError | NoClassDefFoundError ignored1) {
-                return new JavaType.Class(null, Flag.Public.getBitMask(), node.getName(), JavaType.Class.Kind.Class,
-                        null, null, null, null, null, null);
-            }
-        });
-
-        if(node.isUsingGenerics()) {
-            AtomicBoolean newlyCreated = new AtomicBoolean(false);
-
-            JavaType.Parameterized parameterized = (JavaType.Parameterized) typeBySignature.computeIfAbsent(signatureBuilder.signature(node), ignored -> {
-                newlyCreated.set(true);
-                //noinspection ConstantConditions
-                return new JavaType.Parameterized(null, null, null);
-            });
-
-            if (newlyCreated.get()) {
-                List<JavaType> typeParameters = emptyList();
-                if (node.getGenericsTypes().length > 0) {
-                    typeParameters = new ArrayList<>(node.getGenericsTypes().length);
-                    for (GenericsType g : node.getGenericsTypes()) {
-                        typeParameters.add(genericType(g));
-                    }
-                }
-
-                parameterized.unsafeSet(clazz, typeParameters);
-            }
-
-            return parameterized;
-        }
-
-        return clazz;
     }
 
     @SuppressWarnings("ConstantConditions")

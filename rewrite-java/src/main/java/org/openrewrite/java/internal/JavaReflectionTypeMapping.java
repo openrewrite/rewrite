@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.tree.JavaType;
 
 import java.lang.annotation.Annotation;
@@ -34,7 +35,7 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
  * Type mapping from type attribution given from {@link java.lang.reflect} types.
  */
 @RequiredArgsConstructor
-public class JavaReflectionTypeMapping {
+public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     private static final int KIND_BITMASK_INTERFACE = 1 << 9;
     private static final int KIND_BITMASK_ANNOTATION = 1 << 13;
     private static final int KIND_BITMASK_ENUM = 1 << 14;
@@ -44,15 +45,14 @@ public class JavaReflectionTypeMapping {
 
     private final Map<String, Object> typeBySignature;
 
-    public <T extends JavaType> T type(@Nullable Type type) {
+    @Override
+    public JavaType type(@Nullable Type type) {
         if (type == null) {
-            //noinspection ConstantConditions
             return null;
         }
         classStack.clear();
 
-        //noinspection unchecked
-        return (T) _type(type);
+        return  _type(type);
     }
 
     public JavaType _type(Type type) {

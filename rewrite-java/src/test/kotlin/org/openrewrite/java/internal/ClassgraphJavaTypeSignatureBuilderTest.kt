@@ -27,7 +27,6 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
             .enableClassInfo()
             .enableMethodInfo()
             .acceptClasses("org.openrewrite.java.*")
-            .acceptClasses("java.lang.*")
             .scan()
             .getClassInfo("org.openrewrite.java.JavaTypeGoat")
     }

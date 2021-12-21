@@ -18,6 +18,7 @@ package org.openrewrite.java.internal;
 import io.github.classgraph.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 
@@ -33,7 +34,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
 
-public class ClassgraphTypeMapping {
+public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
     private final ClassgraphJavaTypeSignatureBuilder signatureBuilder = new ClassgraphJavaTypeSignatureBuilder();
     private final Map<ClassInfo, JavaType.FullyQualified> stack = new IdentityHashMap<>();
 
@@ -51,8 +52,7 @@ public class ClassgraphTypeMapping {
 
     public JavaType.FullyQualified type(@Nullable ClassInfo aClass) {
         if (aClass == null) {
-            //noinspection ConstantConditions
-            return null;
+            return JavaType.Class.Unknown.getInstance();
         }
 
         JavaType.FullyQualified existingClass = stack.get(aClass);
@@ -186,6 +186,7 @@ public class ClassgraphTypeMapping {
             }
         }
 
+        assert owner != null;
         return new JavaType.Variable(fieldInfo.getModifiers(), fieldInfo.getName(), owner,
                 type(fieldInfo.getTypeDescriptor()), annotations);
     }
@@ -252,6 +253,7 @@ public class ClassgraphTypeMapping {
                 }
             }
 
+            //noinspection ConstantConditions
             return new JavaType.Method(
                     methodInfo.getModifiers(),
                     type(methodInfo.getClassInfo()),
@@ -316,10 +318,12 @@ public class ClassgraphTypeMapping {
                     return jvmType;
                 } else if (classRefSig.getBaseClassName().equals("java.lang.Object")) {
                     return reflectionTypeMapping.type(Object.class);
+                } else {
+                    return JavaType.Unknown.getInstance();
                 }
-                throw new IllegalStateException("Unable to resolve class reference");
             }
 
+            //noinspection ConstantConditions
             return type(classInfo);
         } else if (typeSignature instanceof ClassTypeSignature) {
             ClassTypeSignature classSig = (ClassTypeSignature) typeSignature;
@@ -342,6 +346,7 @@ public class ClassgraphTypeMapping {
         } else if (typeSignature instanceof ArrayTypeSignature) {
             ArrayClassInfo arrClassInfo = ((ArrayTypeSignature) typeSignature).getArrayClassInfo();
             JavaType type = type(arrClassInfo.getElementClassInfo());
+            assert type != null;
             for (int i = 0; i < arrClassInfo.getNumDimensions(); i++) {
                 type = new JavaType.Array(type);
             }

@@ -25,3 +25,5 @@ fun JavaType?.asArray(): JavaType.Array? = TypeUtils.asArray(this)
 fun JavaType?.hasFullyQualifiedName(clazz: String) = TypeUtils.asFullyQualified(this)?.fullyQualifiedName == clazz
 
 fun JavaType?.asGeneric(): JavaType.GenericTypeVariable? = TypeUtils.asGeneric(this)
+
+fun JavaType?.asParameterized(): JavaType.Parameterized? = TypeUtils.asParameterized(this)

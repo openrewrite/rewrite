@@ -13,5 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java
+package org.openrewrite.java;
 
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.JavaType;
+
+public interface JavaTypeMapping<T> {
+    @Nullable
+    JavaType type(T t);
+}

@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.annotation.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -28,6 +25,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 
@@ -54,10 +52,9 @@ public interface JavaType {
      * The string is expected to be either a primitive type like "int" or a fully-qualified-class name like "java.lang.String"
      */
     static JavaType buildType(String typeName) {
-        Primitive primitive = Primitive.fromKeyword(typeName);
-        if (primitive != null) {
-            return primitive;
-        } else {
+        try {
+            return Primitive.fromKeyword(typeName);
+        } catch (IllegalArgumentException ignored) {
             return Class.build(typeName);
         }
     }
@@ -503,9 +500,9 @@ public interface JavaType {
             if (type instanceof GenericTypeVariable) {
                 GenericTypeVariable generic = (GenericTypeVariable) type;
                 StringBuilder s = new StringBuilder("GenericTypeVariable{" + generic.name);
-                if(generic.variance.equals(Variance.COVARIANT)) {
+                if (generic.variance.equals(Variance.COVARIANT)) {
                     s.append(" extends");
-                } else if(generic.variance.equals(Variance.CONTRAVARIANT)) {
+                } else if (generic.variance.equals(Variance.CONTRAVARIANT)) {
                     s.append(" super");
                 }
 
@@ -529,7 +526,7 @@ public interface JavaType {
         public enum Variance {
             INVARIANT,
             COVARIANT,
-            CONTRAVARIANT;
+            CONTRAVARIANT
         }
     }
 
@@ -826,6 +823,85 @@ public interface JavaType {
         @Override
         public String toString() {
             return "Variable{" + (owner == null ? "<unknown>" : owner) + "#" + name + "}";
+        }
+    }
+
+    final class Unknown extends FullyQualified {
+        private static final Unknown INSTANCE = new Unknown();
+
+        private Unknown() {
+        }
+
+        @JsonCreator
+        public static Unknown getInstance() {
+            return INSTANCE;
+        }
+
+        @Override
+        public String getFullyQualifiedName() {
+            return "<unknown>";
+        }
+
+        @Override
+        public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
+            return this;
+        }
+
+        @Override
+        public List<FullyQualified> getAnnotations() {
+            return emptyList();
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return false;
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return emptySet();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return emptyList();
+        }
+
+        @Override
+        public Kind getKind() {
+            return Kind.Class;
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return emptyList();
+        }
+
+        @Override
+        public List<Method> getMethods() {
+            return emptyList();
+        }
+
+        @Nullable
+        @Override
+        public FullyQualified getOwningClass() {
+            return null;
+        }
+
+        @Nullable
+        @Override
+        public FullyQualified getSupertype() {
+            return null;
+        }
+
+        @Override
+        public List<Variable> getVisibleSupertypeMembers() {
+            return emptyList();
+        }
+
+        @Override
+        public String toString() {
+            return "Unknown";
         }
     }
 }

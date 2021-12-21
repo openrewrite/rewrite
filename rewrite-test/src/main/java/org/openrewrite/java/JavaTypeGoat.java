@@ -22,7 +22,7 @@ public interface JavaTypeGoat<T extends JavaTypeGoat<? extends T> & List<?>> {
     void primitive(int n);
     void array(Integer[] n);
     void parameterized(List<String> n);
-    void generic(List<? extends java.lang.String> n);
-    void genericContravariant(List<? super java.lang.String> n);
+    void generic(List<? extends String> n);
+    void genericContravariant(List<? super String> n);
     <U> void genericUnbounded(List<U> n);
 }
