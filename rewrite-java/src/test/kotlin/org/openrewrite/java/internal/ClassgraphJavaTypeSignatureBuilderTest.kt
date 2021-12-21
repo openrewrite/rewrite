@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaTypeSignatureBuilderTest
 class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     companion object {
         private val goat = ClassGraph()
+            .filterClasspathElements { e -> !e.endsWith(".jar") }
             .enableMemoryMapping()
             .enableClassInfo()
             .enableMethodInfo()
@@ -40,7 +41,7 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
                 (goat.getMethodInfo("array")[0]
                     .parameterInfo[0].typeDescriptor)
             )
-        ).isEqualTo("java.lang.Integer[]")
+        ).isEqualTo("org.openrewrite.java.C[]")
     }
 
     @Test
@@ -50,7 +51,7 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
                 (goat.getMethodInfo("clazz")[0]
                     .parameterInfo[0].typeDescriptor)
             )
-        ).isEqualTo("java.lang.Integer")
+        ).isEqualTo("org.openrewrite.java.C")
     }
 
     @Test
@@ -70,7 +71,7 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
                 (goat.getMethodInfo("parameterized")[0]
                     .parameterInfo[0].typeSignature)
             )
-        ).isEqualTo("java.util.List<java.lang.String>")
+        ).isEqualTo("org.openrewrite.java.PT<org.openrewrite.java.C>")
     }
 
     @Test
@@ -80,7 +81,7 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
                 (goat.getMethodInfo("generic")[0]
                     .parameterInfo[0].typeSignature)
             )
-        ).isEqualTo("java.util.List<? extends java.lang.String>")
+        ).isEqualTo("org.openrewrite.java.PT<? extends org.openrewrite.java.C>")
     }
 
     @Test
@@ -90,13 +91,13 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
                 (goat.getMethodInfo("genericContravariant")[0]
                     .parameterInfo[0].typeSignature)
             )
-        ).isEqualTo("java.util.List<? super java.lang.String>")
+        ).isEqualTo("org.openrewrite.java.PT<? super org.openrewrite.java.C>")
     }
 
     @Test
     override fun traceySpecial() {
         Assertions.assertThat(signatureBuilder.signature(goat.typeSignature))
-            .isEqualTo("org.openrewrite.java.JavaTypeGoat<T extends org.openrewrite.java.JavaTypeGoat<? extends T> & java.util.List<?>>")
+            .isEqualTo("org.openrewrite.java.JavaTypeGoat<T extends org.openrewrite.java.JavaTypeGoat<? extends T> & org.openrewrite.java.C>")
     }
 
     @Test
@@ -111,6 +112,6 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
                 (goat.getMethodInfo("genericUnbounded")[0]
                     .parameterInfo[0].typeSignature)
             )
-        ).isEqualTo("java.util.List<U>")
+        ).isEqualTo("org.openrewrite.java.PT<U>")
     }
 }

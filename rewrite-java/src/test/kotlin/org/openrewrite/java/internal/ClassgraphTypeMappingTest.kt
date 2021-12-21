@@ -12,14 +12,13 @@ class ClassgraphTypeMappingTest : JavaTypeMappingTest {
 
         private val goat = typeMapping.type(
             ClassGraph()
-                .enableExternalClasses()
+                .filterClasspathElements { e -> !e.endsWith(".jar") }
                 .enableAnnotationInfo()
                 .enableMemoryMapping()
                 .enableClassInfo()
                 .enableFieldInfo()
                 .enableMethodInfo()
-                .enableSystemJarsAndModules()
-                .acceptClasses("org.openrewrite.java.*", "java.lang.Integer", "java.lang.String")
+                .acceptClasses("org.openrewrite.java.*")
                 .scan()
                 .getClassInfo("org.openrewrite.java.JavaTypeGoat")
         ).asParameterized()!!

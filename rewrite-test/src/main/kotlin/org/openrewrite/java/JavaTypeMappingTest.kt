@@ -29,13 +29,13 @@ interface JavaTypeMappingTest {
     @Test
     fun arraySignature() {
         val arr = firstMethodParameter("array") as JavaType.Array
-        assertThat(arr.elemType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("java.lang.Integer")
+        assertThat(arr.elemType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 
     @Test
     fun classSignature() {
         val clazz = firstMethodParameter("clazz") as JavaType.Class
-        assertThat(clazz.asFullyQualified()!!.fullyQualifiedName).isEqualTo("java.lang.Integer")
+        assertThat(clazz.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 
     @Test
@@ -47,8 +47,8 @@ interface JavaTypeMappingTest {
     @Test
     fun parameterizedSignature() {
         val parameterized = firstMethodParameter("parameterized") as JavaType.Parameterized
-        assertThat(parameterized.type!!.fullyQualifiedName).isEqualTo("java.util.List")
-        assertThat(parameterized.typeParameters[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("java.lang.String")
+        assertThat(parameterized.type!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.PT")
+        assertThat(parameterized.typeParameters[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 
     @Test
@@ -56,7 +56,7 @@ interface JavaTypeMappingTest {
         val generic = firstMethodParameter("generic") as JavaType.GenericTypeVariable
         assertThat(generic.name).isEqualTo("?")
         assertThat(generic.variance).isEqualTo(COVARIANT)
-        assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("java.lang.String")
+        assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 
     @Test
@@ -64,7 +64,7 @@ interface JavaTypeMappingTest {
         val generic = firstMethodParameter("genericContravariant") as JavaType.GenericTypeVariable
         assertThat(generic.name).isEqualTo("?")
         assertThat(generic.variance).isEqualTo(CONTRAVARIANT)
-        assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("java.lang.String")
+        assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 
     @Test
@@ -73,7 +73,7 @@ interface JavaTypeMappingTest {
         assertThat(generic.name).isEqualTo("T")
         assertThat(generic.variance).isEqualTo(COVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.JavaTypeGoat")
-        assertThat(generic.bounds[1].asFullyQualified()!!.fullyQualifiedName).isEqualTo("java.util.List")
+        assertThat(generic.bounds[1].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.PT")
     }
 
     @Test

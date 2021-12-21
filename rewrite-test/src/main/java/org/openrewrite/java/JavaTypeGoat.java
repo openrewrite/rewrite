@@ -15,14 +15,18 @@
  */
 package org.openrewrite.java;
 
-import java.util.List;
-
-public interface JavaTypeGoat<T extends JavaTypeGoat<? extends T> & List<?>> {
-    void clazz(Integer n);
+public interface JavaTypeGoat<T extends JavaTypeGoat<? extends T> & C> {
+    void clazz(C n);
     void primitive(int n);
-    void array(Integer[] n);
-    void parameterized(List<String> n);
-    void generic(List<? extends String> n);
-    void genericContravariant(List<? super String> n);
-    <U> void genericUnbounded(List<U> n);
+    void array(C[] n);
+    void parameterized(PT<C> n);
+    void generic(PT<? extends C> n);
+    void genericContravariant(PT<? super C> n);
+    <U> void genericUnbounded(PT<U> n);
+}
+
+interface C {
+}
+
+interface PT<T> {
 }

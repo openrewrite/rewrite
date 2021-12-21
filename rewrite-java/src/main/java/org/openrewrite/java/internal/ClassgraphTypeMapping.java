@@ -198,6 +198,10 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             return existing;
         }
 
+        if(methodInfo.getName().equals("parameterized")) {
+            System.out.println("here");
+        }
+
         try {
             long flags = methodInfo.getModifiers();
 

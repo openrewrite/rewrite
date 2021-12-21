@@ -26,13 +26,13 @@ class JavaReflectionTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     @Test
     override fun arraySignature() {
         assertThat(signatureBuilder.signature((methodNamed("array"))))
-            .isEqualTo("java.lang.Integer[]")
+            .isEqualTo("org.openrewrite.java.C[]")
     }
 
     @Test
     override fun classSignature() {
         assertThat(signatureBuilder.signature((methodNamed("clazz"))))
-            .isEqualTo("java.lang.Integer")
+            .isEqualTo("org.openrewrite.java.C")
     }
 
     @Test
@@ -44,25 +44,25 @@ class JavaReflectionTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     @Test
     override fun parameterizedSignature() {
         assertThat(signatureBuilder.signature((methodNamed("parameterized"))))
-            .isEqualTo("java.util.List<java.lang.String>")
+            .isEqualTo("org.openrewrite.java.PT<org.openrewrite.java.C>")
     }
 
     @Test
     override fun genericTypeVariable() {
         assertThat(signatureBuilder.signature((methodNamed("generic"))))
-            .isEqualTo("java.util.List<? extends java.lang.String>")
+            .isEqualTo("org.openrewrite.java.PT<? extends org.openrewrite.java.C>")
     }
 
     @Test
     override fun genericVariableContravariant() {
         assertThat(signatureBuilder.signature((methodNamed("genericContravariant"))))
-            .isEqualTo("java.util.List<? super java.lang.String>")
+            .isEqualTo("org.openrewrite.java.PT<? super org.openrewrite.java.C>")
     }
 
     @Test
     override fun traceySpecial() {
         assertThat(signatureBuilder.signature((JavaTypeGoat::class.java.typeParameters[0])))
-            .isEqualTo("T extends org.openrewrite.java.JavaTypeGoat<? extends T> & java.util.List<?>")
+            .isEqualTo("T extends org.openrewrite.java.JavaTypeGoat<? extends T> & org.openrewrite.java.C")
     }
 
     @Test
@@ -73,7 +73,7 @@ class JavaReflectionTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     @Test
     override fun genericTypeVariableUnbounded() {
         assertThat(signatureBuilder.signature((methodNamed("genericUnbounded"))))
-            .isEqualTo("java.util.List<U>")
+            .isEqualTo("org.openrewrite.java.PT<U>")
     }
 
     private fun methodNamed(name: String) = JavaTypeGoat::class.java.declaredMethods
