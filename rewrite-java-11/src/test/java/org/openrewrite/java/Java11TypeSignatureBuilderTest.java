@@ -34,7 +34,7 @@ class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     @Override
     @Test
     public void arraySignature() {
-        methodReturnTypeSignatureEquals("" +
+        methodFirstParameterSignatureEquals("" +
                         "interface Test {" +
                         "  void test(Integer[] n);" +
                         "}",
@@ -45,7 +45,7 @@ class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     @Override
     @Test
     public void classSignature() {
-        methodReturnTypeSignatureEquals("" +
+        methodFirstParameterSignatureEquals("" +
                         "import java.io.File;" +
                         "interface Test {" +
                         "    void test(File f);" +
@@ -57,7 +57,7 @@ class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     @Override
     @Test
     public void primitiveSignature() {
-        methodReturnTypeSignatureEquals("" +
+        methodFirstParameterSignatureEquals("" +
                         "import java.io.File;" +
                         "interface Test {" +
                         "    void test(int n);" +
@@ -69,7 +69,7 @@ class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     @Override
     @Test
     public void parameterizedSignature() {
-        methodReturnTypeSignatureEquals("" +
+        methodFirstParameterSignatureEquals("" +
                         "import java.util.List;" +
                         "interface Test {" +
                         "    void test(List<String> l);" +
@@ -81,7 +81,7 @@ class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     @Override
     @Test
     public void genericTypeVariable() {
-        methodReturnTypeSignatureEquals("" +
+        methodFirstParameterSignatureEquals("" +
                         "import java.util.List;" +
                         "interface Test {" +
                         "    void test(List<? extends String> l);" +
@@ -93,7 +93,7 @@ class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     @Override
     @Test
     public void genericVariableContravariant() {
-        methodReturnTypeSignatureEquals("" +
+        methodFirstParameterSignatureEquals("" +
                         "import java.util.List;" +
                         "interface Test {" +
                         "    void test(List<? super Test> l);" +
@@ -126,7 +126,7 @@ class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     @Override
     @Test
     public void genericTypeVariableUnbounded() {
-        methodReturnTypeSignatureEquals("" +
+        methodFirstParameterSignatureEquals("" +
                         "import java.util.List;" +
                         "interface Test {" +
                         "    <T> void test(List<T> l);" +
@@ -150,11 +150,11 @@ class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
         }.scan(cu, 0);
     }
 
-    private void methodReturnTypeSignatureEquals(@Language("java") String source, String signature) {
-        assertThat(signatureBuilder.signature(methodReturnType(source))).isEqualTo(signature);
+    private void methodFirstParameterSignatureEquals(@Language("java") String source, String signature) {
+        assertThat(signatureBuilder.signature(methodFirstParameterType(source))).isEqualTo(signature);
     }
 
-    private Type methodReturnType(@Language("java") String source) {
+    private Type methodFirstParameterType(@Language("java") String source) {
         JCTree.JCCompilationUnit cu = compilationUnit(source);
         return new TreeScanner<Type, Integer>() {
             @Override
