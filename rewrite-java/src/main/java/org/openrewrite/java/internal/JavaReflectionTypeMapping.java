@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
 
 /**
  * Type mapping from type attribution given from {@link java.lang.reflect} types.
@@ -162,16 +164,21 @@ public class JavaReflectionTypeMapping {
     }
 
     private JavaType typeParameter(TypeVariable<?> typeParameter) {
-        // FIXME what if it isn't a named generic variable, but rather just a (un)qualified name?
         return (JavaType) typeBySignature.computeIfAbsent(signatureBuilder.signature(typeParameter), ignored -> {
-            List<JavaType> bounds = new ArrayList<>(typeParameter.getBounds().length);
+            List<JavaType> bounds = null;
             for (Type bound : typeParameter.getBounds()) {
+                if(bound instanceof JavaType.Class && ((JavaType.Class) bound).getFullyQualifiedName().equals("java.lang.Object")) {
+                    continue;
+                }
+                if(bounds == null) {
+                    bounds = new ArrayList<>(typeParameter.getBounds().length);
+                }
                 bounds.add(_type(bound));
             }
 
-            // FIXME how to determine variance?
+            // FIXME how to determine contravariance?
             return new JavaType.GenericTypeVariable(null, typeParameter.getName(),
-                    JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
+                    bounds == null ? INVARIANT : COVARIANT, bounds);
         });
     }
 

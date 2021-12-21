@@ -149,56 +149,7 @@ public class Java11Parser implements JavaParser {
 
     @Override
     public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
-        if (classpath != null) { // override classpath
-            if (context.get(JavaFileManager.class) != pfm) {
-                throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
-            }
-
-            try {
-                pfm.setLocationFromPaths(StandardLocation.CLASS_PATH, new ArrayList<>(classpath));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-
-        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
-        for (Input input1 : acceptedInputs(sourceFiles)) {
-            cus.put(input1, MetricsHelper.successTags(
-                            Timer.builder("rewrite.parse")
-                                    .description("The time spent by the JDK in parsing and tokenizing the source file")
-                                    .tag("file.type", "Java")
-                                    .tag("step", "(1) JDK parsing"))
-                    .register(Metrics.globalRegistry)
-                    .record(() -> {
-                        try {
-                            return compiler.parse(new Java11ParserInputFileObject(input1));
-                        } catch (IllegalStateException e) {
-                            if (e.getMessage().equals("endPosTable already set")) {
-                                throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
-                                        "set of source files that have some of the same fully qualified names", e);
-                            }
-                            throw e;
-                        }
-                    }));
-        }
-
-        try {
-            initModules(cus.values());
-            enterAll(cus.values());
-
-            // For some reason this is necessary in JDK 9+, where the internal block counter that
-            // annotationsBlocked() tests against remains >0 after attribution.
-            Annotate annotate = Annotate.instance(context);
-            while (annotate.annotationsBlocked()) {
-                annotate.unblockAnnotations(); // also flushes once unblocked
-            }
-
-            compiler.attribute(compiler.todo);
-        } catch (Throwable t) {
-            // when symbol entering fails on problems like missing types, attribution can often times proceed
-            // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
-            ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
-        }
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
 
         List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
                 .map(cuByPath -> {
@@ -253,6 +204,60 @@ public class Java11Parser implements JavaParser {
         }
 
         return mappedCus;
+    }
+
+    LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
+        if (classpath != null) { // override classpath
+            if (context.get(JavaFileManager.class) != pfm) {
+                throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
+            }
+
+            try {
+                pfm.setLocationFromPaths(StandardLocation.CLASS_PATH, new ArrayList<>(classpath));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
+        for (Input input1 : acceptedInputs(sourceFiles)) {
+            cus.put(input1, MetricsHelper.successTags(
+                            Timer.builder("rewrite.parse")
+                                    .description("The time spent by the JDK in parsing and tokenizing the source file")
+                                    .tag("file.type", "Java")
+                                    .tag("step", "(1) JDK parsing"))
+                    .register(Metrics.globalRegistry)
+                    .record(() -> {
+                        try {
+                            return compiler.parse(new Java11ParserInputFileObject(input1));
+                        } catch (IllegalStateException e) {
+                            if (e.getMessage().equals("endPosTable already set")) {
+                                throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
+                                        "set of source files that have some of the same fully qualified names", e);
+                            }
+                            throw e;
+                        }
+                    }));
+        }
+
+        try {
+            initModules(cus.values());
+            enterAll(cus.values());
+
+            // For some reason this is necessary in JDK 9+, where the internal block counter that
+            // annotationsBlocked() tests against remains >0 after attribution.
+            Annotate annotate = Annotate.instance(context);
+            while (annotate.annotationsBlocked()) {
+                annotate.unblockAnnotations(); // also flushes once unblocked
+            }
+
+            compiler.attribute(compiler.todo);
+        } catch (Throwable t) {
+            // when symbol entering fails on problems like missing types, attribution can often times proceed
+            // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
+            ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
+        }
+        return cus;
     }
 
     @Override
