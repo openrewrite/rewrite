@@ -109,7 +109,7 @@ class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
                         "import java.util.*;" +
                         "interface Test<T extends A<? extends T>> {}" +
                         "interface A<U> {}",
-                "T extends A<? extends (*)>");
+                "T extends A<? extends T>");
     }
 
     @Override

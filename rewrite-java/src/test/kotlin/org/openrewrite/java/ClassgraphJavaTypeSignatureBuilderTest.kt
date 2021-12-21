@@ -58,7 +58,7 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     @Test
     override fun traceySpecial() {
         assertThat(signatureBuilder.signature(goat.typeSignature))
-            .isEqualTo("org.openrewrite.java.JavaTypeGoat<T extends org.openrewrite.java.JavaTypeGoat<? extends (*)> & java.util.List<?>>")
+            .isEqualTo("org.openrewrite.java.JavaTypeGoat<T extends org.openrewrite.java.JavaTypeGoat<? extends T> & java.util.List<?>>")
     }
 
     @Test

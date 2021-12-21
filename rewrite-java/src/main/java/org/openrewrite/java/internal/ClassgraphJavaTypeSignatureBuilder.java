@@ -65,13 +65,13 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
 
             switch(typeArgument.getWildcard()) {
                 case NONE:
-                    s.append(genericBound(typeArgument.getTypeSignature()));
+                    s.append(signature(typeArgument.getTypeSignature()));
                     break;
                 case EXTENDS:
-                    s.append("? extends ").append(genericBound(typeArgument.getTypeSignature()));
+                    s.append("? extends ").append(signature(typeArgument.getTypeSignature()));
                     break;
                 case SUPER:
-                    s.append("? super ").append(genericBound(typeArgument.getTypeSignature()));
+                    s.append("? super ").append(signature(typeArgument.getTypeSignature()));
                     break;
                 case ANY:
                     s.append("?");
