@@ -138,7 +138,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String parameterizedSignature(Object type) {
         StringBuilder s = new StringBuilder(classSignature(type));
-        StringJoiner joiner = new StringJoiner(",", "<", ">");
+        StringJoiner joiner = new StringJoiner(", ", "<", ">");
         for (Type tp : ((Type.ClassType) type).typarams_field) {
             String signature = signature(tp);
             joiner.add(signature);

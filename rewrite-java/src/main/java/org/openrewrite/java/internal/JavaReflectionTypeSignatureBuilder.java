@@ -44,7 +44,7 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
             StringBuilder s = new StringBuilder(classSignature(clazz));
 
             if (clazz.getTypeParameters().length > 0) {
-                StringJoiner typeParams = new StringJoiner(",", "<", ">");
+                StringJoiner typeParams = new StringJoiner(", ", "<", ">");
                 for (TypeVariable<?> typeParameter : clazz.getTypeParameters()) {
                     typeParams.add(signature(typeParameter));
                 }
@@ -154,7 +154,11 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
 
         StringBuilder s = new StringBuilder(((Class<?>) pt.getRawType()).getName());
 
-        StringJoiner typeParameters = new StringJoiner(",", "<", ">");
+        if(s.toString().equals("java.util.stream.BaseStream")) {
+            System.out.println("here");
+        }
+
+        StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
         for (Type typeArgument : pt.getActualTypeArguments()) {
             typeParameters.add(signature(typeArgument));
         }

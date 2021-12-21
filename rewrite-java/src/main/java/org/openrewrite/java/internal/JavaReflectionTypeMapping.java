@@ -244,7 +244,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         return new JavaType.GenericTypeVariable(null, typeParameter.getName(),
                 bounds == null ? INVARIANT : COVARIANT, bounds);
     }
-
     private JavaType.Variable field(Field field) {
         classStack.clear();
         return _field(field);

@@ -139,7 +139,7 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     @Override
     public String parameterizedSignature(Object type) {
         StringBuilder s = new StringBuilder();
-        StringJoiner typeParameters = new StringJoiner(",", "<", ">");
+        StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
 
         if (type instanceof ClassTypeSignature) {
             ClassTypeSignature clazz = (ClassTypeSignature) type;

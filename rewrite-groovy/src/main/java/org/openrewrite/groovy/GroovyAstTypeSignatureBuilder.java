@@ -97,7 +97,7 @@ public class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         ClassNode classNode = (ClassNode) type;
 
         StringBuilder s = new StringBuilder(classSignature(type));
-        StringJoiner typeParameters = new StringJoiner(",", "<", ">");
+        StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
         for (GenericsType genericsType : classNode.getGenericsTypes()) {
             typeParameters.add(signature(genericsType));
         }

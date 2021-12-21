@@ -23,6 +23,7 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeSignatureBuilder;
 
@@ -32,19 +33,8 @@ import java.nio.file.Paths;
 import static java.util.Collections.singletonList;
 
 public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
-    private static final String goat = "" +
-            "package org.openrewrite.java;" +
-            "public interface JavaTypeGoat<T extends JavaTypeGoat<? extends T> & C> {" +
-            "    void clazz(C n);" +
-            "    void primitive(int n);" +
-            "    void array(C[] n);" +
-            "    void parameterized(PT<C> n);" +
-            "    void generic(PT<? extends C> n);" +
-            "    void genericContravariant(PT<? super C> n);" +
-            "    <U> void genericUnbounded(PT<U> n);" +
-            "}" +
-            "interface C {}" +
-            "interface PT<T> {}";
+    private static final String goat = StringUtils.readFully(
+            Java11TypeSignatureBuilderTest.class.getResourceAsStream("/JavaTypeGoat.java"));
 
     private static final JCTree.JCCompilationUnit cu = Java11Parser.builder()
             .logCompilationWarningsAndErrors(true)
@@ -80,11 +70,11 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
     }
 
     @Override
-    public Object classTypeParameter() {
+    public Object lastClassTypeParameter() {
         return new TreeScanner<Type, Integer>() {
             @Override
             public Type visitCompilationUnit(CompilationUnitTree node, Integer integer) {
-                JCTree.JCClassDecl classDecl = (JCTree.JCClassDecl) ((JCTree.JCCompilationUnit) node).getTypeDecls().get(0);
+                JCTree.JCClassDecl classDecl = (JCTree.JCClassDecl) ((JCTree.JCCompilationUnit) node).getTypeDecls().get(1);
                 return classDecl.getTypeParameters().get(0).type;
             }
         }.scan(cu, 0);

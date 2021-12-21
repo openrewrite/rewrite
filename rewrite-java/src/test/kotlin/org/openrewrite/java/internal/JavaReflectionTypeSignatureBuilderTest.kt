@@ -26,7 +26,7 @@ class JavaReflectionTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
         .first { it.name == methodName }
         .genericParameterTypes[0]
 
-    override fun classTypeParameter(): TypeVariable<Class<JavaTypeGoat<*>>> = JavaTypeGoat::class.java.typeParameters[0]
+    override fun lastClassTypeParameter(): TypeVariable<Class<JavaTypeGoat<*, *>>> = JavaTypeGoat::class.java.typeParameters.last()
 
     override fun signatureBuilder() = JavaReflectionTypeSignatureBuilder()
 }

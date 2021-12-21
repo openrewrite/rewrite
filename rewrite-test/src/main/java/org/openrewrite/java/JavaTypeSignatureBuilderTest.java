@@ -28,9 +28,9 @@ public interface JavaTypeSignatureBuilderTest {
     Object firstMethodParameter(String methodName);
 
     /**
-     * The type of the type variable of the first type parameter of {@link JavaTypeGoat}.
+     * The type of the type variable of the last type parameter of {@link JavaTypeGoat}.
      */
-    Object classTypeParameter();
+    Object lastClassTypeParameter();
 
     JavaTypeSignatureBuilder signatureBuilder();
 
@@ -72,8 +72,8 @@ public interface JavaTypeSignatureBuilderTest {
 
     @Test
     default void genericRecursive() {
-        assertThat(signatureBuilder().signature(classTypeParameter()))
-                .isEqualTo("T extends org.openrewrite.java.JavaTypeGoat<? extends T> & org.openrewrite.java.C");
+        assertThat(signatureBuilder().signature(lastClassTypeParameter()))
+                .isEqualTo("S extends org.openrewrite.java.JavaTypeGoat<T, ? extends T> & org.openrewrite.java.C");
     }
 
     @Test
