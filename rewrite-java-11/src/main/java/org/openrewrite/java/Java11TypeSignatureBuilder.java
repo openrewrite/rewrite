@@ -43,7 +43,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof Type.ClassType) {
             return type.isParameterized() ? parameterizedSignature(type) : classSignature(type);
         } else if (type instanceof Type.TypeVar) {
-            genericSignature(type);
+            return genericSignature(type);
         } else if (type instanceof Type.JCPrimitiveType) {
             return primitiveSignature(type);
         } else if (type instanceof Type.JCVoidType) {
@@ -100,22 +100,29 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
         StringBuilder s = new StringBuilder(generic.tsym.name.toString());
 
-        // FIXME if COVARIANT only, how to determine if contravariant or invariant?
-        s.append(" extends ");
-
         StringJoiner boundSigs = new StringJoiner(" & ");
         if (generic.getUpperBound() instanceof Type.IntersectionClassType) {
             Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) generic.getUpperBound();
             if (intersectionBound.supertype_field != null) {
-                boundSigs.add(genericBound(intersectionBound.supertype_field));
+                String bound = genericBound(intersectionBound.supertype_field);
+                if (!bound.equals("java.lang.Object")) {
+                    boundSigs.add(bound);
+                }
             }
             for (Type bound : intersectionBound.interfaces_field) {
                 boundSigs.add(genericBound(bound));
             }
         } else {
-            boundSigs.add(genericBound(generic.getUpperBound()));
+            String bound = genericBound(generic.getUpperBound());
+            if (!bound.equals("java.lang.Object")) {
+                boundSigs.add(bound);
+            }
         }
-        s.append(boundSigs);
+
+        String boundSigStr = boundSigs.toString();
+        if(!boundSigStr.isEmpty()) {
+            s.append(" extends ").append(boundSigStr);
+        }
 
         return s.toString();
     }
