@@ -77,75 +77,58 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
 
     @Override
     public String genericSignature(Object type) {
-        if (typeStack == null) {
-            typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
-        }
-
-        boolean unique = typeStack.add(type);
-
         if (type instanceof TypeVariable) {
             TypeVariable<?> typeVar = (TypeVariable<?>) type;
-
-            if (!unique) {
-                return typeVar.getTypeName();
-            }
-
             StringBuilder s = new StringBuilder(typeVar.getName());
 
             if (typeVar.getBounds().length > 0) {
-                StringJoiner bounds = new StringJoiner(" & ");
-                for (Type bound : typeVar.getBounds()) {
-                    String boundStr = signature(bound);
-                    if (!boundStr.equals("java.lang.Object")) {
-                        bounds.add(boundStr);
-                    }
-                }
-
-                String boundsStr = bounds.toString();
+                String boundsStr = genericBounds(typeVar.getBounds());
                 if (!boundsStr.isEmpty()) {
                     s.append(" extends ").append(boundsStr);
                 }
             }
 
-            typeStack.remove(type);
             return s.toString();
         } else if (type instanceof WildcardType) {
             WildcardType wildcard = (WildcardType) type;
-
             StringBuilder s = new StringBuilder("?");
-            if (wildcard.getLowerBounds().length > 0) {
-                StringJoiner bounds = new StringJoiner(" & ");
-                for (Type bound : wildcard.getLowerBounds()) {
-                    String boundStr = signature(bound);
-                    if (!boundStr.equals("java.lang.Object")) {
-                        bounds.add(boundStr);
-                    }
-                }
 
-                String boundsStr = bounds.toString();
+            if (wildcard.getLowerBounds().length > 0) {
+                String boundsStr = genericBounds(wildcard.getLowerBounds());
                 if (!boundsStr.isEmpty()) {
                     s.append(" super ").append(boundsStr);
                 }
             } else if (wildcard.getUpperBounds().length > 0) {
-                StringJoiner bounds = new StringJoiner(" & ");
-                for (Type bound : wildcard.getUpperBounds()) {
-                    String boundStr = signature(bound);
-                    if (!boundStr.equals("java.lang.Object")) {
-                        bounds.add(boundStr);
-                    }
-                }
-
-                String boundsStr = bounds.toString();
+                String boundsStr = genericBounds(wildcard.getUpperBounds());
                 if (!boundsStr.isEmpty()) {
                     s.append(" extends ").append(boundsStr);
                 }
             }
 
-            typeStack.remove(type);
             return s.toString();
         }
 
         throw new UnsupportedOperationException("Unexpected generic type " + type.getClass().getName());
+    }
+
+    private String genericBounds(Type[] bounds) {
+        StringJoiner boundJoiner = new StringJoiner(" & ");
+        for (Type bound : bounds) {
+            if (typeStack == null) {
+                typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
+            }
+            if (typeStack.add(bound)) {
+                String boundStr = signature(bound);
+                if (!boundStr.equals("java.lang.Object")) {
+                    boundJoiner.add(boundStr);
+                }
+                typeStack.remove(bound);
+            } else {
+                // if one of a multi-bound covariant variable matches a type on the stack, short-circuit both
+                return "";
+            }
+        }
+        return boundJoiner.toString();
     }
 
     @Override
@@ -154,7 +137,12 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
 
         StringBuilder s = new StringBuilder(((Class<?>) pt.getRawType()).getName());
 
-        if(s.toString().equals("java.util.stream.BaseStream")) {
+        if (typeStack == null) {
+            typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
+        }
+        typeStack.add(pt.getRawType());
+
+        if (s.toString().equals("java.util.stream.BaseStream")) {
             System.out.println("here");
         }
 
@@ -162,6 +150,8 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
         for (Type typeArgument : pt.getActualTypeArguments()) {
             typeParameters.add(signature(typeArgument));
         }
+
+        typeStack.remove(pt.getRawType());
 
         s.append(typeParameters);
 

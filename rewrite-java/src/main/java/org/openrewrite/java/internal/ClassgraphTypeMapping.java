@@ -261,10 +261,6 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 }
             }
 
-            if (methodInfo.getName().equals("generic")) {
-                System.out.println("here");
-            }
-
             //noinspection ConstantConditions
             return new JavaType.Method(
                     methodInfo.getModifiers(),
