@@ -55,7 +55,12 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         return _type(type);
     }
 
-    public JavaType _type(Type type) {
+    public JavaType _type(@Nullable Type type) {
+        if (type == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
         String signature = signatureBuilder.signature(type);
         JavaType existing = (JavaType) typeBySignature.get(signature);
         if (existing != null) {
@@ -123,54 +128,55 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 null, null, null, null, null, null
         );
 
-        if (newlyCreated.get()) {
-            classStack.put(clazz, mappedClazz);
+        classStack.put(clazz, mappedClazz);
 
-            JavaType.FullyQualified supertype = (JavaType.FullyQualified) _type(clazz.getSuperclass());
-            JavaType.FullyQualified owner = (JavaType.FullyQualified) _type(clazz.getDeclaringClass());
+        JavaType.FullyQualified supertype = (JavaType.FullyQualified) (
+                clazz.getName().equals("java.lang.Object") ?
+                        null :
+                        (clazz.getSuperclass() == null ? _type(Object.class) : _type(clazz.getSuperclass())));
+        JavaType.FullyQualified owner = (JavaType.FullyQualified) _type(clazz.getDeclaringClass());
 
-            List<JavaType.FullyQualified> annotations = null;
-            if (clazz.getDeclaredAnnotations().length > 0) {
-                annotations = new ArrayList<>(clazz.getDeclaredAnnotations().length);
-                for (Annotation a : clazz.getDeclaredAnnotations()) {
-                    JavaType.FullyQualified type = (JavaType.FullyQualified) _type(a.annotationType());
-                    annotations.add(type);
-                }
+        List<JavaType.FullyQualified> annotations = null;
+        if (clazz.getDeclaredAnnotations().length > 0) {
+            annotations = new ArrayList<>(clazz.getDeclaredAnnotations().length);
+            for (Annotation a : clazz.getDeclaredAnnotations()) {
+                JavaType.FullyQualified type = (JavaType.FullyQualified) _type(a.annotationType());
+                annotations.add(type);
             }
-
-            List<JavaType.FullyQualified> interfaces = null;
-            if (clazz.getInterfaces().length > 0) {
-                interfaces = new ArrayList<>(clazz.getInterfaces().length);
-                for (Class<?> i : clazz.getInterfaces()) {
-                    JavaType.FullyQualified type = (JavaType.FullyQualified) _type(i);
-                    interfaces.add(type);
-                }
-            }
-
-            List<JavaType.Variable> members = null;
-            if (clazz.getDeclaredFields().length > 0) {
-                members = new ArrayList<>(clazz.getDeclaredFields().length);
-                for (Field f : clazz.getDeclaredFields()) {
-                    if (!clazz.getName().equals("java.lang.String") || !f.getName().equals("serialPersistentFields")) {
-                        JavaType.Variable field = _field(f);
-                        members.add(field);
-                    }
-                }
-            }
-
-            List<JavaType.Method> methods = null;
-            if (clazz.getDeclaredMethods().length > 0) {
-                methods = new ArrayList<>(clazz.getDeclaredMethods().length);
-                for (Method method : clazz.getDeclaredMethods()) {
-                    JavaType.Method javaType = _method(method);
-                    methods.add(javaType);
-                }
-            }
-
-            mappedClazz.unsafeSet(supertype, owner, annotations, interfaces, members, methods);
-
-            classStack.remove(clazz);
         }
+
+        List<JavaType.FullyQualified> interfaces = null;
+        if (clazz.getInterfaces().length > 0) {
+            interfaces = new ArrayList<>(clazz.getInterfaces().length);
+            for (Class<?> i : clazz.getInterfaces()) {
+                JavaType.FullyQualified type = (JavaType.FullyQualified) _type(i);
+                interfaces.add(type);
+            }
+        }
+
+        List<JavaType.Variable> members = null;
+        if (clazz.getDeclaredFields().length > 0) {
+            members = new ArrayList<>(clazz.getDeclaredFields().length);
+            for (Field f : clazz.getDeclaredFields()) {
+                if (!clazz.getName().equals("java.lang.String") || !f.getName().equals("serialPersistentFields")) {
+                    JavaType.Variable field = _field(f);
+                    members.add(field);
+                }
+            }
+        }
+
+        List<JavaType.Method> methods = null;
+        if (clazz.getDeclaredMethods().length > 0) {
+            methods = new ArrayList<>(clazz.getDeclaredMethods().length);
+            for (Method method : clazz.getDeclaredMethods()) {
+                JavaType.Method javaType = _method(method);
+                methods.add(javaType);
+            }
+        }
+
+        mappedClazz.unsafeSet(supertype, owner, annotations, interfaces, members, methods);
+
+        classStack.remove(clazz);
 
         return mappedClazz;
     }
@@ -245,6 +251,12 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType.Variable _field(Field field) {
+        String signature = signatureBuilder.variableSignature(field);
+        JavaType.Variable existing = (JavaType.Variable) typeBySignature.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+
         List<JavaType.FullyQualified> annotations = null;
         if (field.getDeclaredAnnotations().length > 0) {
             annotations = new ArrayList<>(field.getDeclaredAnnotations().length);
@@ -254,13 +266,17 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        return new JavaType.Variable(
+        JavaType.Variable mappedVariable = new JavaType.Variable(
                 field.getModifiers(),
                 field.getName(),
                 (JavaType.FullyQualified) _type(field.getDeclaringClass()),
                 _type(field.getType()),
                 annotations
         );
+
+        typeBySignature.put(signature, mappedVariable);
+
+        return mappedVariable;
     }
 
     public JavaType.Method method(Method method) {
@@ -269,56 +285,64 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType.Method _method(Method method) {
-        return (JavaType.Method) typeBySignature.computeIfAbsent(signatureBuilder.methodSignature(method), ignored -> {
-            List<String> paramNames = null;
-            if (method.getParameters().length > 0) {
-                paramNames = new ArrayList<>(method.getParameters().length);
-                for (Parameter p : method.getParameters()) {
-                    paramNames.add(p.getName());
-                }
+        String signature = signatureBuilder.methodSignature(method);
+        JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+
+        List<String> paramNames = null;
+        if (method.getParameters().length > 0) {
+            paramNames = new ArrayList<>(method.getParameters().length);
+            for (Parameter p : method.getParameters()) {
+                paramNames.add(p.getName());
             }
+        }
 
-            List<JavaType.FullyQualified> thrownExceptions = null;
-            if (method.getExceptionTypes().length > 0) {
-                thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
-                for (Class<?> e : method.getExceptionTypes()) {
-                    JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) _type(e);
-                    thrownExceptions.add(fullyQualified);
-                }
+        List<JavaType.FullyQualified> thrownExceptions = null;
+        if (method.getExceptionTypes().length > 0) {
+            thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
+            for (Class<?> e : method.getExceptionTypes()) {
+                JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) _type(e);
+                thrownExceptions.add(fullyQualified);
             }
+        }
 
-            List<JavaType.FullyQualified> annotations = new ArrayList<>();
-            if (method.getDeclaredAnnotations().length > 0) {
-                annotations = new ArrayList<>(method.getDeclaredAnnotations().length);
-                for (Annotation a : method.getDeclaredAnnotations()) {
-                    JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) _type(a.annotationType());
-                    annotations.add(fullyQualified);
-                }
+        List<JavaType.FullyQualified> annotations = new ArrayList<>();
+        if (method.getDeclaredAnnotations().length > 0) {
+            annotations = new ArrayList<>(method.getDeclaredAnnotations().length);
+            for (Annotation a : method.getDeclaredAnnotations()) {
+                JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) _type(a.annotationType());
+                annotations.add(fullyQualified);
             }
+        }
 
-            List<JavaType> resolvedArgumentTypes = emptyList();
-            if (method.getParameters().length > 0) {
-                resolvedArgumentTypes = new ArrayList<>(method.getParameters().length);
-                for (Parameter parameter : method.getParameters()) {
-                    resolvedArgumentTypes.add(_type(method.getDeclaringClass()));
-                }
+        List<JavaType> resolvedArgumentTypes = emptyList();
+        if (method.getParameters().length > 0) {
+            resolvedArgumentTypes = new ArrayList<>(method.getParameters().length);
+            for (Parameter parameter : method.getParameters()) {
+                resolvedArgumentTypes.add(_type(method.getDeclaringClass()));
             }
+        }
 
-            JavaType.Method.Signature signature = new JavaType.Method.Signature(
-                    _type(method.getReturnType()),
-                    resolvedArgumentTypes
-            );
+        JavaType.Method.Signature resolvedSignature = new JavaType.Method.Signature(
+                _type(method.getReturnType()),
+                resolvedArgumentTypes
+        );
 
-            return new JavaType.Method(
-                    method.getModifiers(),
-                    (JavaType.FullyQualified) _type(method.getDeclaringClass()),
-                    method.getName(),
-                    paramNames,
-                    signature,
-                    signature,
-                    thrownExceptions,
-                    annotations
-            );
-        });
+        JavaType.Method mappedMethod = new JavaType.Method(
+                method.getModifiers(),
+                (JavaType.FullyQualified) _type(method.getDeclaringClass()),
+                method.getName(),
+                paramNames,
+                resolvedSignature,
+                resolvedSignature,
+                thrownExceptions,
+                annotations
+        );
+
+        typeBySignature.put(signature, mappedMethod);
+
+        return mappedMethod;
     }
 }

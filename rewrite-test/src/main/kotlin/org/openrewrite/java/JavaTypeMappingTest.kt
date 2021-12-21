@@ -35,11 +35,11 @@ interface JavaTypeMappingTest {
     fun firstMethodParameter(methodName: String): JavaType =
         goatType().methods.find { it.name == methodName }!!.genericSignature!!.paramTypes[0]
 
-    /**
-     * The type of the first type parameter of [JavaTypeGoat].
-     */
-    fun classTypeParameter(): JavaType.GenericTypeVariable =
-        goatType().typeParameters[0].asGeneric()!!
+    @Test
+    fun extendsJavaLangObject() {
+        // even though it is implicit in the source code...
+        assertThat(goatType().supertype).isEqualTo("java.lang.Object")
+    }
 
     @Test
     fun arraySignature() {
@@ -84,7 +84,7 @@ interface JavaTypeMappingTest {
 
     @Test
     fun genericMultipleBounds() {
-        val generic = classTypeParameter()
+        val generic = goatType().typeParameters[0].asGeneric()!!
         assertThat(generic.name).isEqualTo("T")
         assertThat(generic.variance).isEqualTo(COVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.JavaTypeGoat")
