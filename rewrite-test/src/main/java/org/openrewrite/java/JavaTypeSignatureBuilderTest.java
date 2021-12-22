@@ -71,12 +71,6 @@ public interface JavaTypeSignatureBuilderTest {
     }
 
     @Test
-    default void parameterizedObject() {
-        assertThat(signatureBuilder().signature(firstMethodParameter("parameterizedObject")))
-                .isEqualTo("org.openrewrite.java.PT<java.lang.Object>");
-    }
-
-    @Test
     default void generic() {
         assertThat(signatureBuilder().signature(firstMethodParameter("generic")))
                 .isEqualTo("org.openrewrite.java.PT<? extends org.openrewrite.java.C>");
