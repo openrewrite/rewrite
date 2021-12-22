@@ -20,14 +20,11 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.Set;
-import java.util.StringJoiner;
+import java.util.*;
 
 public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
-    @Nullable
-    private Set<Object> typeStack;
+    // fully qualified names of base type of a class or interface bound (minus further parameterization)
+    private Set<String> genericStack;
 
     @Override
     public String signature(@Nullable Object type) {
@@ -63,7 +60,7 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             TypeArgument typeArgument = (TypeArgument) typeSignature;
             StringBuilder s = new StringBuilder();
 
-            switch(typeArgument.getWildcard()) {
+            switch (typeArgument.getWildcard()) {
                 case NONE:
                     s.append(signature(typeArgument.getTypeSignature()));
                     break;
@@ -106,14 +103,18 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
         StringBuilder bounds = new StringBuilder();
 
         if (generic.getClassBound() != null) {
-            String bound = genericBound(generic.getClassBound());
-            if(!bound.equals("java.lang.Object")) {
-                bounds.append(bound);
+            if (!isRecursiveGenericBound(generic.getClassBound())) {
+                String bound = signature(generic.getClassBound());
+                if (!bound.equals("java.lang.Object")) {
+                    bounds.append(bound);
+                }
             }
         } else if (generic.getInterfaceBounds() != null) {
             StringJoiner interfaceBounds = new StringJoiner(" & ");
             for (ReferenceTypeSignature interfaceBound : generic.getInterfaceBounds()) {
-                interfaceBounds.add(genericBound(interfaceBound));
+                if (!isRecursiveGenericBound(interfaceBound)) {
+                    interfaceBounds.add(signature(interfaceBound));
+                }
             }
             bounds.append(interfaceBounds);
         }
@@ -122,18 +123,22 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
         return generic.getName() + (boundsStr.isEmpty() ? "" : " extends " + boundsStr);
     }
 
-    private String genericBound(Object bound) {
-        if (typeStack != null && typeStack.contains(bound)) {
-            return "(*)";
+    private boolean isRecursiveGenericBound(Object bound) {
+        String className;
+        if (bound instanceof ClassTypeSignature) {
+            className = className((ClassTypeSignature) bound);
+        } else if (bound instanceof ClassRefTypeSignature) {
+            className = ((ClassRefTypeSignature) bound).getBaseClassName();
+        } else if (bound instanceof ArrayTypeSignature) {
+            return isRecursiveGenericBound(((ArrayTypeSignature) bound).getElementTypeSignature());
+        } else {
+            return false;
         }
 
-        if (typeStack == null) {
-            typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
+        if (genericStack == null) {
+            genericStack = new HashSet<>();
         }
-        typeStack.add(bound);
-        String sig = signature(bound);
-        typeStack.remove(bound);
-        return sig;
+        return !genericStack.add(className);
     }
 
     @Override
@@ -143,22 +148,30 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
 
         if (type instanceof ClassTypeSignature) {
             ClassTypeSignature clazz = (ClassTypeSignature) type;
-            try {
-                Method getClassName = type.getClass().getDeclaredMethod("getClassName");
-                getClassName.setAccessible(true);
-                s.append(getClassName.invoke(clazz));
-            } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-                throw new RuntimeException(e);
-            }
-
-            for (TypeParameter typeParameter : clazz.getTypeParameters()) {
-                typeParameters.add(signature(typeParameter));
+            String className = className(clazz);
+            s.append(className);
+            if (!clazz.getTypeParameters().isEmpty()) {
+                if (genericStack == null) {
+                    genericStack = new HashSet<>();
+                }
+                genericStack.add(className);
+                for (TypeParameter typeParameter : clazz.getTypeParameters()) {
+                    typeParameters.add(signature(typeParameter));
+                }
+                genericStack.remove(className);
             }
         } else if (type instanceof ClassRefTypeSignature) {
             ClassRefTypeSignature clazz = (ClassRefTypeSignature) type;
             s.append(clazz.getBaseClassName());
-            for (TypeArgument typeArgument : clazz.getTypeArguments()) {
-                typeParameters.add(signature(typeArgument));
+            if (!clazz.getTypeArguments().isEmpty()) {
+                if (genericStack == null) {
+                    genericStack = new HashSet<>();
+                }
+                genericStack.add(clazz.getBaseClassName());
+                for (TypeArgument typeArgument : clazz.getTypeArguments()) {
+                    typeParameters.add(signature(typeArgument));
+                }
+                genericStack.remove(clazz.getBaseClassName());
             }
         } else {
             throw new UnsupportedOperationException("Unexpected parameterized type " + type.getClass().getName());
@@ -167,6 +180,16 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
         s.append(typeParameters);
 
         return s.toString();
+    }
+
+    private String className(ClassTypeSignature clazz) {
+        try {
+            Method getClassName = ClassTypeSignature.class.getDeclaredMethod("getClassName");
+            getClassName.setAccessible(true);
+            return (String) getClassName.invoke(clazz);
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
