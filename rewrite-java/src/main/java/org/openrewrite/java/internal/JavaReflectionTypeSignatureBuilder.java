@@ -142,10 +142,6 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
         }
         typeStack.add(pt.getRawType());
 
-        if (s.toString().equals("java.util.stream.BaseStream")) {
-            System.out.println("here");
-        }
-
         StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
         for (Type typeArgument : pt.getActualTypeArguments()) {
             typeParameters.add(signature(typeArgument));
@@ -171,7 +167,7 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
         StringJoiner argumentTypeSignatures = new StringJoiner(",");
         if (method.getParameters().length > 0) {
             for (Parameter parameter : method.getParameters()) {
-                argumentTypeSignatures.add(method.getDeclaringClass().getName());
+                argumentTypeSignatures.add(signature(parameter.getType()));
             }
         }
         s.append(",resolved=").append(method.getReturnType().getName()).append('(').append(argumentTypeSignatures).append(')');

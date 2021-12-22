@@ -22,10 +22,7 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
-import java.util.ArrayList;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
@@ -42,6 +39,8 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
     private final JavaReflectionTypeSignatureBuilder signatureBuilder = new JavaReflectionTypeSignatureBuilder();
     private final Map<Class<?>, JavaType.Class> classStack = new IdentityHashMap<>();
+
+    private final Set<Type> genericStack = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private final Map<String, Object> typeBySignature;
 
@@ -175,10 +174,15 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         mappedClazz.unsafeSet(supertype, owner, annotations, interfaces, members, methods);
-
         classStack.remove(clazz);
 
         return mappedClazz;
+    }
+
+    private JavaType typeVariable(TypeVariable<?> typeParameter) {
+        List<JavaType> bounds = genericBounds(typeParameter.getBounds());
+        return new JavaType.GenericTypeVariable(null, typeParameter.getName(),
+                bounds == null ? INVARIANT : COVARIANT, bounds);
     }
 
     private JavaType wildcard(WildcardType wildcard) {
@@ -186,36 +190,42 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         List<JavaType> bounds = null;
 
         if (wildcard.getLowerBounds().length > 0) {
-            for (Type bound : wildcard.getLowerBounds()) {
-                JavaType mappedBound = _type(bound);
-                if (!((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
-                    if (bounds == null) {
-                        bounds = new ArrayList<>(wildcard.getLowerBounds().length);
-                    }
-                    bounds.add(mappedBound);
-                }
-            }
-
+            bounds = genericBounds(wildcard.getLowerBounds());
             if (bounds != null) {
                 variance = CONTRAVARIANT;
             }
         } else if (wildcard.getUpperBounds().length > 0) {
-            for (Type bound : wildcard.getUpperBounds()) {
-                JavaType mappedBound = _type(bound);
-                if (!((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
-                    if (bounds == null) {
-                        bounds = new ArrayList<>(wildcard.getLowerBounds().length);
-                    }
-                    bounds.add(mappedBound);
-                }
-            }
-
+            bounds = genericBounds(wildcard.getUpperBounds());
             if (bounds != null) {
                 variance = COVARIANT;
             }
         }
 
         return new JavaType.GenericTypeVariable(null, "?", variance, bounds);
+    }
+
+    @Nullable
+    private List<JavaType> genericBounds(Type[] bounds) {
+        List<JavaType> mappedBounds = null;
+
+        for (Type bound : bounds) {
+            if(genericStack.contains(bound)) {
+                return null;
+            }
+        }
+
+        for (Type bound : bounds) {
+            genericStack.add(bound);
+            if (!(bound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) bound).getFullyQualifiedName().equals("java.lang.Object")) {
+                if (mappedBounds == null) {
+                    mappedBounds = new ArrayList<>(bounds.length);
+                }
+                mappedBounds.add(_type(bound));
+            }
+            genericStack.remove(bound);
+        }
+
+        return mappedBounds;
     }
 
     private JavaType parameterized(ParameterizedType type) {
@@ -228,22 +238,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         return mapped;
     }
 
-    private JavaType typeVariable(TypeVariable<?> typeParameter) {
-        List<JavaType> bounds = null;
-        for (Type bound : typeParameter.getBounds()) {
-            if (bound instanceof JavaType.Class && ((JavaType.Class) bound).getFullyQualifiedName().equals("java.lang.Object")) {
-                continue;
-            }
-            if (bounds == null) {
-                bounds = new ArrayList<>(typeParameter.getBounds().length);
-            }
-            bounds.add(_type(bound));
-        }
-
-        // FIXME how to determine contravariance?
-        return new JavaType.GenericTypeVariable(null, typeParameter.getName(),
-                bounds == null ? INVARIANT : COVARIANT, bounds);
-    }
     private JavaType.Variable field(Field field) {
         classStack.clear();
         return _field(field);
@@ -320,7 +314,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (method.getParameters().length > 0) {
             resolvedArgumentTypes = new ArrayList<>(method.getParameters().length);
             for (Parameter parameter : method.getParameters()) {
-                resolvedArgumentTypes.add(_type(method.getDeclaringClass()));
+                resolvedArgumentTypes.add(_type(parameter.getType()));
             }
         }
 
