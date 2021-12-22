@@ -15,18 +15,36 @@
  */
 package org.openrewrite.java.marker
 
+import io.micrometer.core.instrument.util.DoubleFormat.decimalOrNan
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openjdk.jol.info.GraphStats
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaParser
+import kotlin.math.ln
+import kotlin.math.pow
 
 class JavaSourceSetTest {
 
     @Test
     fun typesFromClasspath() {
         val ctx = InMemoryExecutionContext { e -> throw e }
-        val javaVersion = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), mutableMapOf(), ctx)
-        assertThat(javaVersion.classpath.map { it.fullyQualifiedName })
+        val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), mutableMapOf(), ctx)
+
+        println(humanReadableByteCount(GraphStats.parseInstance(javaSourceSet).totalSize().toDouble()))
+
+        assertThat(javaSourceSet.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")
+    }
+
+    private fun humanReadableByteCount(bytes: Double): String {
+        val unit = 1024
+        return if (bytes >= unit.toDouble() && !bytes.isNaN()) {
+            val exp = (ln(bytes) / ln(unit.toDouble())).toInt()
+            val pre = "${"KMGTPE"[exp - 1]}i"
+            "${decimalOrNan(bytes / unit.toDouble().pow(exp.toDouble()))} ${pre}B"
+        } else {
+            "${decimalOrNan(bytes)} B"
+        }
     }
 }
