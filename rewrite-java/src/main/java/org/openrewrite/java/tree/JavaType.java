@@ -343,24 +343,47 @@ public interface JavaType {
         }
     }
 
-    @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @With
     class Parameterized extends FullyQualified {
+        @Getter
+        @With
         @Nullable
         Integer managedReference;
 
+        @Getter
+        @With
         @NonFinal
         @Nullable
         FullyQualified type;
 
         @NonFinal
+        @Nullable
         List<JavaType> typeParameters;
 
-        public Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type, List<JavaType> typeParameters) {
+        public Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type,
+                             @Nullable List<JavaType> typeParameters) {
             this.managedReference = managedReference;
             this.type = type;
-            this.typeParameters = typeParameters;
+            this.typeParameters = nullIfEmpty(typeParameters);
+        }
+
+        public FullyQualified getType() {
+            assert type != null;
+            return type;
+        }
+
+        public List<JavaType> getTypeParameters() {
+            return typeParameters == null ? emptyList() : typeParameters;
+        }
+
+        public JavaType.Parameterized withTypeParameters(@Nullable List<JavaType> typeParameters) {
+            if (typeParameters != null && typeParameters.isEmpty()) {
+                typeParameters = null;
+            }
+            if (typeParameters == this.typeParameters) {
+                return this;
+            }
+            return new JavaType.Parameterized(managedReference, type, typeParameters);
         }
 
         /**
@@ -459,6 +482,7 @@ public interface JavaType {
         String name;
 
         @With
+        @NonFinal
         @Getter
         Variance variance;
 
@@ -487,7 +511,8 @@ public interface JavaType {
             return new JavaType.GenericTypeVariable(managedReference, name, variance, bounds);
         }
 
-        public void unsafeSet(List<JavaType> bounds) {
+        public void unsafeSet(Variance variance, @Nullable List<JavaType> bounds) {
+            this.variance = variance;
             this.bounds = bounds;
         }
 
@@ -630,6 +655,7 @@ public interface JavaType {
 
         @With
         @NonFinal
+        @Nullable
         FullyQualified declaringType;
 
         @With
@@ -656,7 +682,7 @@ public interface JavaType {
         @Nullable
         List<FullyQualified> annotations;
 
-        public Method(long flagsBitMap, FullyQualified declaringType, String name,
+        public Method(long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable List<String> paramNames, @Nullable JavaType.Method.Signature genericSignature,
                       @Nullable JavaType.Method.Signature resolvedSignature,
                       @Nullable List<FullyQualified> thrownExceptions, @Nullable List<FullyQualified> annotations) {
@@ -680,6 +706,21 @@ public interface JavaType {
             this.resolvedSignature = resolvedSignature;
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
             this.annotations = nullIfEmpty(annotations);
+        }
+
+        public FullyQualified getDeclaringType() {
+            assert declaringType != null;
+            return declaringType;
+        }
+
+        public Signature getResolvedSignature() {
+            assert resolvedSignature != null;
+            return resolvedSignature;
+        }
+
+        public Signature getGenericSignature() {
+            assert genericSignature != null;
+            return genericSignature;
         }
 
         public List<String> getParamNames() {
@@ -771,6 +812,7 @@ public interface JavaType {
 
         @With
         @NonFinal
+        @Nullable
         FullyQualified owner;
 
         @With
@@ -782,13 +824,18 @@ public interface JavaType {
         @Nullable
         List<FullyQualified> annotations;
 
-        public Variable(long flagsBitMap, String name, FullyQualified owner,
+        public Variable(long flagsBitMap, String name, @Nullable FullyQualified owner,
                         @Nullable JavaType type, @Nullable List<FullyQualified> annotations) {
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.name = name;
             this.owner = owner;
             this.type = type;
             this.annotations = nullIfEmpty(annotations);
+        }
+
+        public FullyQualified getOwner() {
+            assert owner != null;
+            return owner;
         }
 
         public List<FullyQualified> getAnnotations() {

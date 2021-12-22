@@ -45,15 +45,18 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
 
     @Nullable
     public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
+        if(type == null) {
+            return JavaType.Class.Unknown.getInstance();
+        }
+
         classStack.clear();
         return _type(type);
     }
 
-    @Nullable
-    private JavaType _type(@Nullable com.sun.tools.javac.code.Type type) {
+    private JavaType _type(com.sun.tools.javac.code.Type type) {
         if (type instanceof Type.ClassType) {
             if (type instanceof com.sun.tools.javac.code.Type.ErrorType) {
-                return null;
+                return JavaType.Class.Unknown.getInstance();
             }
 
             Type.ClassType classType = (Type.ClassType) type;
@@ -73,7 +76,6 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
 
                 JavaType.Parameterized parameterized = (JavaType.Parameterized) typeBySignature.computeIfAbsent(signatureBuilder.signature(type), ignored -> {
                     newlyCreated.set(true);
-                    //noinspection ConstantConditions
                     return new JavaType.Parameterized(null, null, null);
                 });
 
@@ -146,10 +148,10 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
 
             return new JavaType.GenericTypeVariable(null, "?", variance, bounds);
         } else if (com.sun.tools.javac.code.Type.noType.equals(type)) {
-            return null;
-        } else {
-            return null;
+            return JavaType.Class.Unknown.getInstance();
         }
+
+        throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
     }
 
     private JavaType.Class classType(Type.ClassType type) {

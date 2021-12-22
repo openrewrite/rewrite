@@ -33,7 +33,7 @@ interface JavaTypeMappingTest {
      * The type of the first parameter of the method named [methodName].
      */
     fun firstMethodParameter(methodName: String): JavaType =
-        goatType().methods.find { it.name == methodName }!!.genericSignature!!.paramTypes[0]
+        goatType().methods.find { it.name == methodName }!!.genericSignature.paramTypes[0]
 
     @Test
     fun extendsJavaLangObject() {
@@ -62,7 +62,7 @@ interface JavaTypeMappingTest {
     @Test
     fun parameterized() {
         val parameterized = firstMethodParameter("parameterized") as JavaType.Parameterized
-        assertThat(parameterized.type!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.PT")
+        assertThat(parameterized.type.fullyQualifiedName).isEqualTo("org.openrewrite.java.PT")
         assertThat(parameterized.typeParameters[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 

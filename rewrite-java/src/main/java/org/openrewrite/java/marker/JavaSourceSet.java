@@ -51,7 +51,7 @@ public class JavaSourceSet implements Marker {
         Map<String, JavaType.FullyQualified> jvmClasses = jvmClasses(typeBySignature, ctx);
         List<JavaType.FullyQualified> fqns = new ArrayList<>(jvmClasses.values());
 
-        ClassgraphTypeMapping typeMapping = new ClassgraphTypeMapping(typeBySignature, jvmClasses, ctx);
+        ClassgraphTypeMapping typeMapping = new ClassgraphTypeMapping(typeBySignature, jvmClasses);
 
         if (classpath.iterator().hasNext()) {
             for (ClassInfo classInfo : new ClassGraph()
@@ -102,7 +102,7 @@ public class JavaSourceSet implements Marker {
                 .scan()
                 .getAllClasses();
 
-        ClassgraphTypeMapping builder = new ClassgraphTypeMapping(typeBySignature, emptyMap(), ctx);
+        ClassgraphTypeMapping builder = new ClassgraphTypeMapping(typeBySignature, emptyMap());
         Map<String, JavaType.FullyQualified> fqns = new HashMap<>(classInfos.size());
         for (ClassInfo classInfo : classInfos) {
             try {

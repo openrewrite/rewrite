@@ -16,14 +16,13 @@
 package org.openrewrite.java.internal
 
 import io.github.classgraph.ClassGraph
-import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaTypeMappingTest
 import org.openrewrite.java.asParameterized
 import org.openrewrite.java.tree.JavaType
 
 class ClassgraphTypeMappingTest : JavaTypeMappingTest {
     companion object {
-        private val typeMapping = ClassgraphTypeMapping(mutableMapOf(), mapOf(), InMemoryExecutionContext())
+        private val typeMapping = ClassgraphTypeMapping(mutableMapOf(), mapOf())
 
         private val goat = typeMapping.type(
             ClassGraph()
