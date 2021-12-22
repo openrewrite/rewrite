@@ -42,25 +42,25 @@ interface JavaTypeMappingTest {
     }
 
     @Test
-    fun arraySignature() {
+    fun array() {
         val arr = firstMethodParameter("array") as JavaType.Array
         assertThat(arr.elemType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 
     @Test
-    fun classSignature() {
+    fun className() {
         val clazz = firstMethodParameter("clazz") as JavaType.Class
         assertThat(clazz.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 
     @Test
-    fun primitiveSignature() {
+    fun primitive() {
         val primitive = firstMethodParameter("primitive") as JavaType.Primitive
         assertThat(primitive).isSameAs(JavaType.Primitive.Int)
     }
 
     @Test
-    fun parameterizedSignature() {
+    fun parameterized() {
         val parameterized = firstMethodParameter("parameterized") as JavaType.Parameterized
         assertThat(parameterized.type!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.PT")
         assertThat(parameterized.typeParameters[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
@@ -97,5 +97,15 @@ interface JavaTypeMappingTest {
         assertThat(generic.name).isEqualTo("U")
         assertThat(generic.variance).isEqualTo(INVARIANT)
         assertThat(generic.bounds).isEmpty()
+    }
+
+    @Test
+    fun genericRecursive() {
+        val param = firstMethodParameter("genericRecursive")
+        val typeParam = param.asParameterized()!!.typeParameters[0]
+        val generic = typeParam as JavaType.GenericTypeVariable
+        assertThat(generic.name).isEqualTo("?")
+        assertThat(generic.variance).isEqualTo(COVARIANT)
+        assertThat(generic.bounds[0]).isInstanceOf(JavaType.Array::class.java)
     }
 }

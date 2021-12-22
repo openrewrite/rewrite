@@ -91,7 +91,7 @@ public interface JavaTypeSignatureBuilderTest {
     @Test
     default void genericRecursiveInMethodDeclaration() {
         assertThat(signatureBuilder().signature(firstMethodParameter("genericRecursive")))
-                .isEqualTo("org.openrewrite.java.JavaTypeGoat<? super U[], ?>");
+                .isEqualTo("org.openrewrite.java.JavaTypeGoat<? extends U[], ?>");
     }
 
     @Test
