@@ -76,17 +76,18 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     @Override
     public String genericSignature(Object type) {
         if (type instanceof TypeVariableSignature) {
-            if (genericStack == null) {
-                genericStack = new HashSet<>();
+            TypeVariableSignature typeVariableSignature = (TypeVariableSignature) type;
+            try {
+                return signature(typeVariableSignature.resolve()); // resolves to a TypeParameter
+            } catch (IllegalArgumentException ignored) {
+                return typeVariableSignature.getName();
             }
-            String name = ((TypeVariableSignature) type).getName();
-            if (genericStack.add(name)) {
-                return generic((TypeVariableSignature) type);
-            }
-            return name;
         } else if (type instanceof TypeArgument) {
             return generic((TypeArgument) type);
         } else if (type instanceof TypeParameter) {
+            if (genericStack == null) {
+                genericStack = new HashSet<>();
+            }
             String name = ((TypeParameter) type).getName();
             if (genericStack.add(name)) {
                 return generic((TypeParameter) type);
@@ -95,15 +96,6 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
         }
 
         throw new UnsupportedOperationException("Unexpected generic type " + type.getClass().getName());
-    }
-
-    private String generic(TypeVariableSignature typeVariableSignature) {
-        try {
-            // resolves to a TypeParameter
-            return signature(typeVariableSignature.resolve());
-        } catch (IllegalArgumentException ignored) {
-            return typeVariableSignature.getName();
-        }
     }
 
     private String generic(TypeArgument typeArgument) {
