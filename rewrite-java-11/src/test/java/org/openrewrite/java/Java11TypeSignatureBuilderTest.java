@@ -74,8 +74,8 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
         return new TreeScanner<Type, Integer>() {
             @Override
             public Type visitCompilationUnit(CompilationUnitTree node, Integer integer) {
-                JCTree.JCClassDecl classDecl = (JCTree.JCClassDecl) ((JCTree.JCCompilationUnit) node).getTypeDecls().get(1);
-                return classDecl.getTypeParameters().get(0).type;
+                JCTree.JCClassDecl classDecl = (JCTree.JCClassDecl) ((JCTree.JCCompilationUnit) node).getTypeDecls().get(0);
+                return classDecl.getTypeParameters().get(1).type;
             }
         }.scan(cu, 0);
     }
