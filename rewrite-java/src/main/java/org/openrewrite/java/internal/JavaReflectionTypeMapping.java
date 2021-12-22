@@ -62,115 +62,129 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             } else if (clazz.isPrimitive()) {
                 return JavaType.Primitive.fromKeyword(clazz.getName());
             }
-            mapped = classType(clazz);
-
-            if (clazz.getTypeParameters().length > 0) {
-                List<JavaType> typeParameters = new ArrayList<>(clazz.getTypeParameters().length);
-                for (TypeVariable<?> typeParameter : clazz.getTypeParameters()) {
-                    typeParameters.add(type(typeParameter));
-                }
-                mapped = new JavaType.Parameterized(null, (JavaType.FullyQualified) mapped,
-                        typeParameters);
-            }
+            return classType((Class<?>) type, signature);
         } else if (type instanceof GenericArrayType) {
-            mapped = new JavaType.Array(type(((GenericArrayType) type).getGenericComponentType()));
+            return array((GenericArrayType) type, signature);
         } else if (type instanceof TypeVariable) {
-            mapped = typeVariable((TypeVariable<?>) type);
+            return generic((TypeVariable<?>) type, signature);
         } else if (type instanceof WildcardType) {
-            mapped = wildcard((WildcardType) type);
+            return generic((WildcardType) type, signature);
         } else if (type instanceof ParameterizedType) {
-            mapped = parameterized((ParameterizedType) type);
-        } else {
-            throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+            return parameterized((ParameterizedType) type, signature);
         }
 
-        typeBySignature.put(signature, mapped);
-        return mapped;
+        throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
     }
 
-    private JavaType classType(Class<?> clazz) {
-        String signature = clazz.getName();
-        JavaType existing = (JavaType) typeBySignature.get(signature);
-        if (existing != null) {
-            return existing;
-        }
+    private JavaType.Array array(GenericArrayType type, String signature) {
+        JavaType.Array arr = new JavaType.Array(type(type.getGenericComponentType()));
+        typeBySignature.put(signature, arr);
+        return arr;
+    }
 
-        JavaType.Class.Kind kind;
-        if ((clazz.getModifiers() & KIND_BITMASK_ENUM) != 0) {
-            kind = JavaType.Class.Kind.Enum;
-        } else if ((clazz.getModifiers() & KIND_BITMASK_ANNOTATION) != 0) {
-            kind = JavaType.Class.Kind.Annotation;
-        } else if ((clazz.getModifiers() & KIND_BITMASK_INTERFACE) != 0) {
-            kind = JavaType.Class.Kind.Interface;
-        } else {
-            kind = JavaType.Class.Kind.Class;
-        }
+    private JavaType classType(Class<?> clazz, String signature) {
+        JavaType.Class mappedClazz = (JavaType.Class) typeBySignature.get(clazz.getName());
 
-        JavaType.Class mappedClazz = new JavaType.Class(
-                null,
-                clazz.getModifiers(),
-                clazz.getName(),
-                kind,
-                null, null, null, null, null, null
-        );
-
-        typeBySignature.put(signature, mappedClazz);
-
-        JavaType.FullyQualified supertype = (JavaType.FullyQualified) (
-                clazz.getName().equals("java.lang.Object") ?
-                        null :
-                        (clazz.getSuperclass() == null ? type(Object.class) : type(clazz.getSuperclass())));
-        JavaType.FullyQualified owner = (JavaType.FullyQualified) type(clazz.getDeclaringClass());
-
-        List<JavaType.FullyQualified> annotations = null;
-        if (clazz.getDeclaredAnnotations().length > 0) {
-            annotations = new ArrayList<>(clazz.getDeclaredAnnotations().length);
-            for (Annotation a : clazz.getDeclaredAnnotations()) {
-                JavaType.FullyQualified type = (JavaType.FullyQualified) type(a.annotationType());
-                annotations.add(type);
+        if (mappedClazz == null) {
+            JavaType.Class.Kind kind;
+            if ((clazz.getModifiers() & KIND_BITMASK_ENUM) != 0) {
+                kind = JavaType.Class.Kind.Enum;
+            } else if ((clazz.getModifiers() & KIND_BITMASK_ANNOTATION) != 0) {
+                kind = JavaType.Class.Kind.Annotation;
+            } else if ((clazz.getModifiers() & KIND_BITMASK_INTERFACE) != 0) {
+                kind = JavaType.Class.Kind.Interface;
+            } else {
+                kind = JavaType.Class.Kind.Class;
             }
-        }
 
-        List<JavaType.FullyQualified> interfaces = null;
-        if (clazz.getInterfaces().length > 0) {
-            interfaces = new ArrayList<>(clazz.getInterfaces().length);
-            for (Class<?> i : clazz.getInterfaces()) {
-                JavaType.FullyQualified type = (JavaType.FullyQualified) type(i);
-                interfaces.add(type);
-            }
-        }
+            mappedClazz = new JavaType.Class(
+                    null,
+                    clazz.getModifiers(),
+                    clazz.getName(),
+                    kind,
+                    null, null, null, null, null, null
+            );
 
-        List<JavaType.Variable> members = null;
-        if (clazz.getDeclaredFields().length > 0) {
-            members = new ArrayList<>(clazz.getDeclaredFields().length);
-            for (Field f : clazz.getDeclaredFields()) {
-                if (!clazz.getName().equals("java.lang.String") || !f.getName().equals("serialPersistentFields")) {
-                    JavaType.Variable field = _field(f);
-                    members.add(field);
+            typeBySignature.put(clazz.getName(), mappedClazz);
+
+            JavaType.FullyQualified supertype = (JavaType.FullyQualified) (
+                    clazz.getName().equals("java.lang.Object") ?
+                            null :
+                            (clazz.getSuperclass() == null ? type(Object.class) : type(clazz.getSuperclass())));
+            JavaType.FullyQualified owner = (JavaType.FullyQualified) type(clazz.getDeclaringClass());
+
+            List<JavaType.FullyQualified> annotations = null;
+            if (clazz.getDeclaredAnnotations().length > 0) {
+                annotations = new ArrayList<>(clazz.getDeclaredAnnotations().length);
+                for (Annotation a : clazz.getDeclaredAnnotations()) {
+                    JavaType.FullyQualified type = (JavaType.FullyQualified) type(a.annotationType());
+                    annotations.add(type);
                 }
             }
-        }
 
-        List<JavaType.Method> methods = null;
-        if (clazz.getDeclaredMethods().length > 0) {
-            methods = new ArrayList<>(clazz.getDeclaredMethods().length);
-            for (Method method : clazz.getDeclaredMethods()) {
-                JavaType.Method javaType = _method(method);
-                methods.add(javaType);
+            List<JavaType.FullyQualified> interfaces = null;
+            if (clazz.getInterfaces().length > 0) {
+                interfaces = new ArrayList<>(clazz.getInterfaces().length);
+                for (Class<?> i : clazz.getInterfaces()) {
+                    JavaType.FullyQualified type = (JavaType.FullyQualified) type(i);
+                    interfaces.add(type);
+                }
             }
+
+            List<JavaType.Variable> members = null;
+            if (clazz.getDeclaredFields().length > 0) {
+                members = new ArrayList<>(clazz.getDeclaredFields().length);
+                for (Field f : clazz.getDeclaredFields()) {
+                    if (!clazz.getName().equals("java.lang.String") || !f.getName().equals("serialPersistentFields")) {
+                        JavaType.Variable field = field(f);
+                        members.add(field);
+                    }
+                }
+            }
+
+            List<JavaType.Method> methods = null;
+            if (clazz.getDeclaredMethods().length > 0) {
+                methods = new ArrayList<>(clazz.getDeclaredMethods().length);
+                for (Method method : clazz.getDeclaredMethods()) {
+                    JavaType.Method javaType = method(method);
+                    methods.add(javaType);
+                }
+            }
+
+            mappedClazz.unsafeSet(supertype, owner, annotations, interfaces, members, methods);
         }
 
-        mappedClazz.unsafeSet(supertype, owner, annotations, interfaces, members, methods);
+        if (clazz.getTypeParameters().length > 0) {
+            JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
+            typeBySignature.put(signature, pt);
+
+            List<JavaType> typeParameters = new ArrayList<>(clazz.getTypeParameters().length);
+            for (TypeVariable<?> typeParameter : clazz.getTypeParameters()) {
+                typeParameters.add(type(typeParameter));
+            }
+
+            pt.unsafeSet(mappedClazz, typeParameters);
+            return pt;
+        }
+
         return mappedClazz;
     }
 
-    private JavaType typeVariable(TypeVariable<?> typeParameter) {
+    private JavaType generic(TypeVariable<?> typeParameter, String signature) {
+        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, typeParameter.getName(),
+                INVARIANT, null);
+        typeBySignature.put(signature, gtv);
+
         List<JavaType> bounds = genericBounds(typeParameter.getBounds());
-        return new JavaType.GenericTypeVariable(null, typeParameter.getName(),
-                bounds == null ? INVARIANT : COVARIANT, bounds);
+        gtv.unsafeSet(bounds == null ? INVARIANT : COVARIANT, bounds);
+        return gtv;
     }
 
-    private JavaType wildcard(WildcardType wildcard) {
+    private JavaType.GenericTypeVariable generic(WildcardType wildcard, String signature) {
+        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, "?",
+                INVARIANT, null);
+        typeBySignature.put(signature, gtv);
+
         JavaType.GenericTypeVariable.Variance variance = INVARIANT;
         List<JavaType> bounds = null;
 
@@ -186,19 +200,14 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        return new JavaType.GenericTypeVariable(null, "?", variance, bounds);
+        gtv.unsafeSet(variance, bounds);
+        return gtv;
     }
 
     @Nullable
     private List<JavaType> genericBounds(Type[] bounds) {
         List<JavaType> mappedBounds = null;
 
-//        for (Type bound : bounds) {
-//            if (genericStack.contains(bound)) {
-//                return null;
-//            }
-//        }
-//
         for (Type bound : bounds) {
             JavaType mappedBound = type(bound);
             if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
@@ -212,21 +221,20 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         return mappedBounds;
     }
 
-    private JavaType parameterized(ParameterizedType type) {
-        JavaType mapped;
+    private JavaType parameterized(ParameterizedType type, String signature) {
+        JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
+        typeBySignature.put(signature, pt);
+
         List<JavaType> typeParameters = new ArrayList<>(type.getActualTypeArguments().length);
         for (Type actualTypeArgument : type.getActualTypeArguments()) {
             typeParameters.add(type(actualTypeArgument));
         }
-        mapped = new JavaType.Parameterized(null, (JavaType.FullyQualified) type(type.getRawType()), typeParameters);
-        return mapped;
+
+        pt.unsafeSet((JavaType.FullyQualified) type(type.getRawType()), typeParameters);
+        return pt;
     }
 
     private JavaType.Variable field(Field field) {
-        return _field(field);
-    }
-
-    private JavaType.Variable _field(Field field) {
         String signature = signatureBuilder.variableSignature(field);
         JavaType.Variable existing = (JavaType.Variable) typeBySignature.get(signature);
         if (existing != null) {
@@ -256,10 +264,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     public JavaType.Method method(Method method) {
-        return _method(method);
-    }
-
-    private JavaType.Method _method(Method method) {
         String signature = signatureBuilder.methodSignature(method);
         JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
         if (existing != null) {
