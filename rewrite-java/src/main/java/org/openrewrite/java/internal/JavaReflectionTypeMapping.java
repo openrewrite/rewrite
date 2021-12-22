@@ -22,8 +22,9 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
@@ -38,26 +39,13 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     private static final int KIND_BITMASK_ENUM = 1 << 14;
 
     private final JavaReflectionTypeSignatureBuilder signatureBuilder = new JavaReflectionTypeSignatureBuilder();
-    private final Map<Class<?>, JavaType.Class> classStack = new IdentityHashMap<>();
-
-    private final Set<Type> genericStack = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private final Map<String, Object> typeBySignature;
 
     @Override
     public JavaType type(@Nullable Type type) {
         if (type == null) {
-            return null;
-        }
-        classStack.clear();
-
-        return _type(type);
-    }
-
-    public JavaType _type(@Nullable Type type) {
-        if (type == null) {
-            //noinspection ConstantConditions
-            return null;
+            return JavaType.Unknown.getInstance();
         }
 
         String signature = signatureBuilder.signature(type);
@@ -70,7 +58,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (type instanceof Class) {
             Class<?> clazz = (Class<?>) type;
             if (clazz.isArray()) {
-                return new JavaType.Array(_type(clazz.getComponentType()));
+                return new JavaType.Array(type(clazz.getComponentType()));
             } else if (clazz.isPrimitive()) {
                 return JavaType.Primitive.fromKeyword(clazz.getName());
             }
@@ -79,13 +67,13 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             if (clazz.getTypeParameters().length > 0) {
                 List<JavaType> typeParameters = new ArrayList<>(clazz.getTypeParameters().length);
                 for (TypeVariable<?> typeParameter : clazz.getTypeParameters()) {
-                    typeParameters.add(_type(typeParameter));
+                    typeParameters.add(type(typeParameter));
                 }
                 mapped = new JavaType.Parameterized(null, (JavaType.FullyQualified) mapped,
                         typeParameters);
             }
         } else if (type instanceof GenericArrayType) {
-            mapped = new JavaType.Array(_type(((GenericArrayType) type).getGenericComponentType()));
+            mapped = new JavaType.Array(type(((GenericArrayType) type).getGenericComponentType()));
         } else if (type instanceof TypeVariable) {
             mapped = typeVariable((TypeVariable<?>) type);
         } else if (type instanceof WildcardType) {
@@ -101,12 +89,11 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType classType(Class<?> clazz) {
-        JavaType.Class existingClass = classStack.get(clazz);
-        if (existingClass != null) {
-            return existingClass;
+        String signature = clazz.getName();
+        JavaType existing = (JavaType) typeBySignature.get(signature);
+        if (existing != null) {
+            return existing;
         }
-
-        AtomicBoolean newlyCreated = new AtomicBoolean(false);
 
         JavaType.Class.Kind kind;
         if ((clazz.getModifiers() & KIND_BITMASK_ENUM) != 0) {
@@ -127,19 +114,19 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 null, null, null, null, null, null
         );
 
-        classStack.put(clazz, mappedClazz);
+        typeBySignature.put(signature, mappedClazz);
 
         JavaType.FullyQualified supertype = (JavaType.FullyQualified) (
                 clazz.getName().equals("java.lang.Object") ?
                         null :
-                        (clazz.getSuperclass() == null ? _type(Object.class) : _type(clazz.getSuperclass())));
-        JavaType.FullyQualified owner = (JavaType.FullyQualified) _type(clazz.getDeclaringClass());
+                        (clazz.getSuperclass() == null ? type(Object.class) : type(clazz.getSuperclass())));
+        JavaType.FullyQualified owner = (JavaType.FullyQualified) type(clazz.getDeclaringClass());
 
         List<JavaType.FullyQualified> annotations = null;
         if (clazz.getDeclaredAnnotations().length > 0) {
             annotations = new ArrayList<>(clazz.getDeclaredAnnotations().length);
             for (Annotation a : clazz.getDeclaredAnnotations()) {
-                JavaType.FullyQualified type = (JavaType.FullyQualified) _type(a.annotationType());
+                JavaType.FullyQualified type = (JavaType.FullyQualified) type(a.annotationType());
                 annotations.add(type);
             }
         }
@@ -148,7 +135,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (clazz.getInterfaces().length > 0) {
             interfaces = new ArrayList<>(clazz.getInterfaces().length);
             for (Class<?> i : clazz.getInterfaces()) {
-                JavaType.FullyQualified type = (JavaType.FullyQualified) _type(i);
+                JavaType.FullyQualified type = (JavaType.FullyQualified) type(i);
                 interfaces.add(type);
             }
         }
@@ -174,8 +161,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         mappedClazz.unsafeSet(supertype, owner, annotations, interfaces, members, methods);
-        classStack.remove(clazz);
-
         return mappedClazz;
     }
 
@@ -208,23 +193,23 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     private List<JavaType> genericBounds(Type[] bounds) {
         List<JavaType> mappedBounds = null;
 
-        for (Type bound : bounds) {
-            if (genericStack.contains(bound)) {
-                return null;
-            }
-        }
-
-        for (Type bound : bounds) {
-            genericStack.add(bound);
-            JavaType mappedBound = _type(bound);
-            if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
-                if (mappedBounds == null) {
-                    mappedBounds = new ArrayList<>(bounds.length);
-                }
-                mappedBounds.add(mappedBound);
-            }
-            genericStack.remove(bound);
-        }
+//        for (Type bound : bounds) {
+//            if (genericStack.contains(bound)) {
+//                return null;
+//            }
+//        }
+//
+//        for (Type bound : bounds) {
+//            genericStack.add(bound);
+//            JavaType mappedBound = type(bound);
+//            if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
+//                if (mappedBounds == null) {
+//                    mappedBounds = new ArrayList<>(bounds.length);
+//                }
+//                mappedBounds.add(mappedBound);
+//            }
+//            genericStack.remove(bound);
+//        }
 
         return mappedBounds;
     }
@@ -233,14 +218,13 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         JavaType mapped;
         List<JavaType> typeParameters = new ArrayList<>(type.getActualTypeArguments().length);
         for (Type actualTypeArgument : type.getActualTypeArguments()) {
-            typeParameters.add(_type(actualTypeArgument));
+            typeParameters.add(type(actualTypeArgument));
         }
-        mapped = new JavaType.Parameterized(null, (JavaType.FullyQualified) _type(type.getRawType()), typeParameters);
+        mapped = new JavaType.Parameterized(null, (JavaType.FullyQualified) type(type.getRawType()), typeParameters);
         return mapped;
     }
 
     private JavaType.Variable field(Field field) {
-        classStack.clear();
         return _field(field);
     }
 
@@ -255,7 +239,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (field.getDeclaredAnnotations().length > 0) {
             annotations = new ArrayList<>(field.getDeclaredAnnotations().length);
             for (Annotation a : field.getDeclaredAnnotations()) {
-                JavaType.FullyQualified type = (JavaType.FullyQualified) _type(a.annotationType());
+                JavaType.FullyQualified type = (JavaType.FullyQualified) type(a.annotationType());
                 annotations.add(type);
             }
         }
@@ -263,8 +247,8 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         JavaType.Variable mappedVariable = new JavaType.Variable(
                 field.getModifiers(),
                 field.getName(),
-                (JavaType.FullyQualified) _type(field.getDeclaringClass()),
-                _type(field.getType()),
+                (JavaType.FullyQualified) type(field.getDeclaringClass()),
+                type(field.getType()),
                 annotations
         );
 
@@ -274,7 +258,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     public JavaType.Method method(Method method) {
-        classStack.clear();
         return _method(method);
     }
 
@@ -297,7 +280,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (method.getExceptionTypes().length > 0) {
             thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
             for (Class<?> e : method.getExceptionTypes()) {
-                JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) _type(e);
+                JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(e);
                 thrownExceptions.add(fullyQualified);
             }
         }
@@ -306,7 +289,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (method.getDeclaredAnnotations().length > 0) {
             annotations = new ArrayList<>(method.getDeclaredAnnotations().length);
             for (Annotation a : method.getDeclaredAnnotations()) {
-                JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) _type(a.annotationType());
+                JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(a.annotationType());
                 annotations.add(fullyQualified);
             }
         }
@@ -316,18 +299,18 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             resolvedArgumentTypes = new ArrayList<>(method.getParameters().length);
             for (Parameter parameter : method.getParameters()) {
                 Type parameterizedType = parameter.getParameterizedType();
-                resolvedArgumentTypes.add(_type(parameterizedType == null ? parameter.getType() : parameterizedType));
+                resolvedArgumentTypes.add(type(parameterizedType == null ? parameter.getType() : parameterizedType));
             }
         }
 
         JavaType.Method.Signature resolvedSignature = new JavaType.Method.Signature(
-                _type(method.getReturnType()),
+                type(method.getReturnType()),
                 resolvedArgumentTypes
         );
 
         JavaType.Method mappedMethod = new JavaType.Method(
                 method.getModifiers(),
-                (JavaType.FullyQualified) _type(method.getDeclaringClass()),
+                (JavaType.FullyQualified) type(method.getDeclaringClass()),
                 method.getName(),
                 paramNames,
                 resolvedSignature,

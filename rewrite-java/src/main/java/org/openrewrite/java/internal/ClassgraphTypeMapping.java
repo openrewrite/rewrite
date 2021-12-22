@@ -16,7 +16,7 @@
 package org.openrewrite.java.internal;
 
 import io.github.classgraph.*;
-import org.jetbrains.annotations.NotNull;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.tree.Flag;
@@ -151,12 +151,37 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
         List<JavaType> typeParameters = new ArrayList<>(typeSignature.getTypeParameters().size());
         for (TypeParameter tParam : typeSignature.getTypeParameters()) {
-            JavaType javaType = type(tParam);
-            typeParameters.add(javaType);
+            typeParameters.add(type(tParam));
         }
 
         parameterized.unsafeSet(clazz, typeParameters);
         return parameterized;
+    }
+
+    private JavaType type(HierarchicalTypeSignature typeSignature) {
+        String signature = signatureBuilder.signature(typeSignature);
+        JavaType existing = (JavaType) typeBySignature.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+
+        if (typeSignature instanceof ClassRefTypeSignature) {
+            return classType((ClassRefTypeSignature) typeSignature, signature);
+        } else if (typeSignature instanceof ClassTypeSignature) {
+            return classType((ClassTypeSignature) typeSignature, signature);
+        } else if (typeSignature instanceof ArrayTypeSignature) {
+            return array((ArrayTypeSignature) typeSignature, signature);
+        } else if (typeSignature instanceof BaseTypeSignature) {
+            return JavaType.Primitive.fromKeyword(((BaseTypeSignature) typeSignature).getTypeStr());
+        } else if (typeSignature instanceof TypeVariableSignature) {
+            return generic((TypeVariableSignature) typeSignature, signature);
+        } else if (typeSignature instanceof TypeArgument) {
+            return generic((TypeArgument) typeSignature, signature);
+        } else if (typeSignature instanceof TypeParameter) {
+            return generic((TypeParameter) typeSignature, signature);
+        }
+
+        throw new UnsupportedOperationException("Unexpected signature type " + typeSignature.getClass().getName());
     }
 
     private JavaType.Variable variableType(FieldInfo fieldInfo) {
@@ -259,13 +284,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         return method;
     }
 
-    private JavaType.GenericTypeVariable type(TypeParameter typeParameter) {
-        String signature = signatureBuilder.signature(typeParameter);
-        JavaType.GenericTypeVariable existing = (JavaType.GenericTypeVariable) typeBySignature.get(signature);
-        if (existing != null) {
-            return existing;
-        }
-
+    private JavaType.GenericTypeVariable generic(TypeParameter typeParameter, String signature) {
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, typeParameter.getName(),
                 INVARIANT, null);
         typeBySignature.put(signature, gtv);
@@ -297,40 +316,49 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         return gtv;
     }
 
-    private JavaType type(HierarchicalTypeSignature typeSignature) {
-        if (typeSignature instanceof ClassRefTypeSignature) {
-            return classType((ClassRefTypeSignature) typeSignature);
-        } else if (typeSignature instanceof ClassTypeSignature) {
-            return classType((ClassTypeSignature) typeSignature);
-        } else if (typeSignature instanceof ArrayTypeSignature) {
-            return array((ArrayTypeSignature) typeSignature);
-        } else if (typeSignature instanceof TypeVariableSignature) {
-            return typeVariable((TypeVariableSignature) typeSignature);
-        } else if (typeSignature instanceof BaseTypeSignature) {
-            return JavaType.Primitive.fromKeyword(((BaseTypeSignature) typeSignature).getTypeStr());
-        } else if (typeSignature instanceof TypeArgument) {
-            return generic((TypeArgument) typeSignature);
-        }
-
-        throw new UnsupportedOperationException("Unexpected signature type " + typeSignature.getClass().getName());
-    }
-
-    private JavaType.GenericTypeVariable typeVariable(TypeVariableSignature typeVariableSignature) {
+    private JavaType.GenericTypeVariable generic(TypeVariableSignature typeVariableSignature, String signature) {
         try {
-            return type(typeVariableSignature.resolve());
+            return (JavaType.GenericTypeVariable) type(typeVariableSignature.resolve());
         } catch (IllegalArgumentException ignored) {
-            return new JavaType.GenericTypeVariable(null, typeVariableSignature.getName(),
+            JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, typeVariableSignature.getName(),
                     INVARIANT, null);
+            typeBySignature.put(signature, gtv);
+            return gtv;
         }
     }
 
-    private JavaType classType(ClassRefTypeSignature classRefSignature) {
-        String signature = signatureBuilder.signature(classRefSignature);
-        JavaType existing = (JavaType) typeBySignature.get(signature);
-        if (existing != null) {
-            return existing;
+    private JavaType generic(TypeArgument typeArgument, String signature) {
+        List<JavaType> bounds = null;
+
+        JavaType.GenericTypeVariable gtv;
+
+        switch (typeArgument.getWildcard()) {
+            case NONE:
+                return type(typeArgument.getTypeSignature());
+            case EXTENDS:
+                gtv = new JavaType.GenericTypeVariable(null, "?", COVARIANT, null);
+                typeBySignature.put(signature, gtv);
+                bounds = singletonList(type(typeArgument.getTypeSignature()));
+                break;
+            case SUPER:
+                gtv = new JavaType.GenericTypeVariable(null, "?", CONTRAVARIANT, null);
+                typeBySignature.put(signature, gtv);
+                bounds = singletonList(type(typeArgument.getTypeSignature()));
+                break;
+            case ANY:
+            default:
+                gtv = new JavaType.GenericTypeVariable(null, "?", INVARIANT, null);
+                typeBySignature.put(signature, gtv);
+                break;
         }
 
+        bounds = ListUtils.map(bounds, b -> b instanceof JavaType.FullyQualified &&
+                ((JavaType.FullyQualified) b).getFullyQualifiedName().equals("java.lang.Object") ? null : b);
+        gtv.unsafeSet(bounds == null || bounds.isEmpty() ? INVARIANT : gtv.getVariance(), bounds);
+        return gtv;
+    }
+
+    private JavaType classType(ClassRefTypeSignature classRefSignature, String signature) {
         ClassInfo classInfo = classRefSignature.getClassInfo();
         if (classInfo == null) {
             JavaType.FullyQualified jvmType = jvmTypes.get(classRefSignature.getBaseClassName());
@@ -364,13 +392,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         return type;
     }
 
-    private JavaType.FullyQualified classType(ClassTypeSignature classSignature) {
-        String signature = signatureBuilder.signature(classSignature);
-        JavaType.FullyQualified existing = (JavaType.FullyQualified) typeBySignature.get(signature);
-        if (existing != null) {
-            return existing;
-        }
-
+    private JavaType.FullyQualified classType(ClassTypeSignature classSignature, String signature) {
         try {
             Method getClassInfo = classSignature.getClass().getDeclaredMethod("getClassInfo");
             getClassInfo.setAccessible(true);
@@ -412,42 +434,12 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         }
     }
 
-    @NotNull
-    private JavaType generic(TypeArgument typeArgument) {
-        JavaType.GenericTypeVariable.Variance variance;
-        List<JavaType> bounds = null;
-
-        switch (typeArgument.getWildcard()) {
-            case NONE:
-                return type(typeArgument.getTypeSignature());
-            case EXTENDS:
-                variance = COVARIANT;
-                bounds = singletonList(type(typeArgument.getTypeSignature()));
-                break;
-            case SUPER:
-                variance = CONTRAVARIANT;
-                bounds = singletonList(type(typeArgument.getTypeSignature()));
-                break;
-            case ANY:
-            default:
-                variance = INVARIANT;
-                break;
-        }
-
-        if (bounds != null && bounds.get(0) instanceof JavaType.FullyQualified &&
-                ((JavaType.FullyQualified) bounds.get(0)).getFullyQualifiedName().equals("java.lang.Object")) {
-            bounds = null;
-            variance = INVARIANT;
-        }
-
-        return new JavaType.GenericTypeVariable(null, "?", variance, bounds);
-    }
-
-    private JavaType array(ArrayTypeSignature typeSignature) {
+    private JavaType array(ArrayTypeSignature typeSignature, String signature) {
         JavaType type = type(typeSignature.getNestedType());
         for (int i = 0; i < typeSignature.getNumDimensions(); i++) {
             type = new JavaType.Array(type);
         }
+        typeBySignature.put(signature, type);
         return type;
     }
 }
