@@ -113,4 +113,15 @@ interface JavaTypeMappingTest {
         assertThat(elemType.variance).isEqualTo(COVARIANT)
         assertThat(elemType.bounds).hasSize(1)
     }
+
+    @Test
+    fun genericArray() {
+        val param = firstMethodParameter("genericArray")
+        val arr = param as JavaType.Array
+        val parameterized = arr.elemType.asParameterized()
+
+        assertThat(parameterized).isNotNull
+        assertThat(parameterized!!.type.fullyQualifiedName).isEqualTo("org.openrewrite.java.PT")
+        assertThat(parameterized.typeParameters[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
+    }
 }

@@ -27,6 +27,7 @@ public interface JavaTypeGoat<T, S extends JavaTypeGoat<S, ? extends T> & C> {
     void genericContravariant(PT<? super C> n);
     <U extends JavaTypeGoat<U, ?>> void genericRecursive(JavaTypeGoat<? extends U[], ?> n);
     <U> void genericUnbounded(PT<U> n);
+    void genericArray(PT<C>[] n);
 }
 
 interface C {
