@@ -181,8 +181,6 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
             }
         }
         s.append(",resolved=").append(method.getReturnType().getName()).append('(').append(argumentTypeSignatures).append(')');
-
-        // TODO how do we calculate the generic signature?
         s.append(",generic=").append(method.getReturnType().getName()).append('(').append(argumentTypeSignatures).append(')');
         s.append('}');
 
