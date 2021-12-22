@@ -390,6 +390,7 @@ public interface JavaType {
          * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
          */
         public void unsafeSet(FullyQualified type, List<JavaType> typeParameters) {
+            assert type != this;
             this.type = type;
             this.typeParameters = typeParameters;
         }

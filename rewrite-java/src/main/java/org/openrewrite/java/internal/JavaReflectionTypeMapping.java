@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.tree.JavaType;
@@ -83,6 +84,25 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType classType(Class<?> clazz, String signature) {
+        JavaType.Class mappedClazz = classTypeWithoutParameters(clazz);
+
+        if (clazz.getTypeParameters().length > 0) {
+            JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
+            typeBySignature.put(signature, pt);
+
+            List<JavaType> typeParameters = new ArrayList<>(clazz.getTypeParameters().length);
+            for (TypeVariable<?> typeParameter : clazz.getTypeParameters()) {
+                typeParameters.add(type(typeParameter));
+            }
+
+            pt.unsafeSet(mappedClazz, typeParameters);
+            return pt;
+        }
+
+        return mappedClazz;
+    }
+
+    private JavaType.Class classTypeWithoutParameters(Class<?> clazz) {
         JavaType.Class mappedClazz = (JavaType.Class) typeBySignature.get(clazz.getName());
 
         if (mappedClazz == null) {
@@ -154,19 +174,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             mappedClazz.unsafeSet(supertype, owner, annotations, interfaces, members, methods);
         }
 
-        if (clazz.getTypeParameters().length > 0) {
-            JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
-            typeBySignature.put(signature, pt);
-
-            List<JavaType> typeParameters = new ArrayList<>(clazz.getTypeParameters().length);
-            for (TypeVariable<?> typeParameter : clazz.getTypeParameters()) {
-                typeParameters.add(type(typeParameter));
-            }
-
-            pt.unsafeSet(mappedClazz, typeParameters);
-            return pt;
-        }
-
         return mappedClazz;
     }
 
@@ -230,7 +237,8 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             typeParameters.add(type(actualTypeArgument));
         }
 
-        pt.unsafeSet((JavaType.FullyQualified) type(type.getRawType()), typeParameters);
+        JavaType.FullyQualified baseType = classTypeWithoutParameters((Class<?>) type.getRawType());
+        pt.unsafeSet(baseType, typeParameters);
         return pt;
     }
 
