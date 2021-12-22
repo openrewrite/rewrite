@@ -332,7 +332,6 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         }
 
         ClassInfo classInfo = classRefSignature.getClassInfo();
-
         if (classInfo == null) {
             JavaType.FullyQualified jvmType = jvmTypes.get(classRefSignature.getBaseClassName());
             if (jvmType != null) {
@@ -348,7 +347,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
         if (!classRefSignature.getTypeArguments().isEmpty()) {
             JavaType.Parameterized parameterized = type instanceof JavaType.Parameterized ?
-                    (JavaType.Parameterized) type :
+                    ((JavaType.Parameterized) type).withTypeParameters(emptyList()) :
                     new JavaType.Parameterized(null, type, null);
 
             typeBySignature.put(signature, parameterized);
@@ -375,8 +374,8 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         try {
             Method getClassInfo = classSignature.getClass().getDeclaredMethod("getClassInfo");
             getClassInfo.setAccessible(true);
-            ClassInfo classInfo = (ClassInfo) getClassInfo.invoke(classSignature);
 
+            ClassInfo classInfo = (ClassInfo) getClassInfo.invoke(classSignature);
             if (classInfo == null) {
                 Method getClassName = classSignature.getClass().getDeclaredMethod("getClassName");
                 getClassName.setAccessible(true);
