@@ -60,7 +60,7 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     @Override
     public String arraySignature(Object type) {
         ArrayTypeSignature arrSignature = (ArrayTypeSignature) type;
-        StringBuilder s = new StringBuilder(signature(arrSignature.getElementTypeSignature()));
+        StringBuilder s = new StringBuilder(signature(arrSignature.getNestedType()));
         for (int i = 0; i < arrSignature.getNumDimensions(); i++) {
             s.append("[]");
         }
@@ -90,7 +90,9 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             }
             String name = ((TypeParameter) type).getName();
             if (genericStack.add(name)) {
-                return generic((TypeParameter) type);
+                String s = generic((TypeParameter) type);
+                genericStack.remove(name);
+                return s;
             }
             return name;
         }
