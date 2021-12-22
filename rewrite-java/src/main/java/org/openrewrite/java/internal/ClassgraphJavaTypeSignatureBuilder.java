@@ -20,7 +20,9 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.StringJoiner;
 
 public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     // fully qualified names of base type of a class or interface bound (minus further parameterization)
@@ -44,37 +46,12 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             return parameterizedSignature(typeSignature);
         } else if (typeSignature instanceof ArrayTypeSignature) {
             return arraySignature(typeSignature);
-        } else if (typeSignature instanceof TypeVariableSignature) {
-            TypeVariableSignature typeVariableSignature = (TypeVariableSignature) typeSignature;
-            try {
-                // resolves to a TypeParameter
-                return signature(typeVariableSignature.resolve());
-            } catch (IllegalArgumentException ignored) {
-                return typeVariableSignature.getName();
-            }
-        } else if (typeSignature instanceof TypeParameter) {
+        } else if (typeSignature instanceof TypeVariableSignature ||
+                typeSignature instanceof TypeParameter ||
+                typeSignature instanceof TypeArgument) {
             return genericSignature(typeSignature);
         } else if (typeSignature instanceof BaseTypeSignature) {
             return primitiveSignature(typeSignature);
-        } else if (typeSignature instanceof TypeArgument) {
-            TypeArgument typeArgument = (TypeArgument) typeSignature;
-            StringBuilder s = new StringBuilder();
-
-            switch (typeArgument.getWildcard()) {
-                case NONE:
-                    s.append(signature(typeArgument.getTypeSignature()));
-                    break;
-                case EXTENDS:
-                    s.append("? extends ").append(signature(typeArgument.getTypeSignature()));
-                    break;
-                case SUPER:
-                    s.append("? super ").append(signature(typeArgument.getTypeSignature()));
-                    break;
-                case ANY:
-                    s.append("?");
-            }
-
-            return s.toString();
         }
 
         throw new UnsupportedOperationException("Unexpected signature type " + type.getClass().getName());
@@ -83,11 +60,11 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     @Override
     public String arraySignature(Object type) {
         ArrayTypeSignature arrSignature = (ArrayTypeSignature) type;
-        StringBuilder signature = new StringBuilder(signature(arrSignature.getElementTypeSignature()));
+        StringBuilder s = new StringBuilder(signature(arrSignature.getElementTypeSignature()));
         for (int i = 0; i < arrSignature.getNumDimensions(); i++) {
-            signature.append("[]");
+            s.append("[]");
         }
-        return signature.toString();
+        return s.toString();
     }
 
     @Override
@@ -98,47 +75,74 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
 
     @Override
     public String genericSignature(Object type) {
-        TypeParameter generic = (TypeParameter) type;
+        if (type instanceof TypeVariableSignature) {
+            if (genericStack == null) {
+                genericStack = new HashSet<>();
+            }
+            String name = ((TypeVariableSignature) type).getName();
+            if (genericStack.add(name)) {
+                return generic((TypeVariableSignature) type);
+            }
+            return name;
+        } else if (type instanceof TypeArgument) {
+            return generic((TypeArgument) type);
+        } else if (type instanceof TypeParameter) {
+            String name = ((TypeParameter) type).getName();
+            if (genericStack.add(name)) {
+                return generic((TypeParameter) type);
+            }
+            return name;
+        }
 
+        throw new UnsupportedOperationException("Unexpected generic type " + type.getClass().getName());
+    }
+
+    private String generic(TypeVariableSignature typeVariableSignature) {
+        try {
+            // resolves to a TypeParameter
+            return signature(typeVariableSignature.resolve());
+        } catch (IllegalArgumentException ignored) {
+            return typeVariableSignature.getName();
+        }
+    }
+
+    private String generic(TypeArgument typeArgument) {
+        StringBuilder s = new StringBuilder();
+        switch (typeArgument.getWildcard()) {
+            case NONE:
+                s.append(signature(typeArgument.getTypeSignature()));
+                break;
+            case EXTENDS:
+                s.append("? extends ").append(signature(typeArgument.getTypeSignature()));
+                break;
+            case SUPER:
+                s.append("? super ").append(signature(typeArgument.getTypeSignature()));
+                break;
+            case ANY:
+                s.append("?");
+        }
+
+        return s.toString();
+    }
+
+    public String generic(TypeParameter typeParameter) {
         StringBuilder bounds = new StringBuilder();
 
-        if (generic.getClassBound() != null) {
-            if (!isRecursiveGenericBound(generic.getClassBound())) {
-                String bound = signature(generic.getClassBound());
-                if (!bound.equals("java.lang.Object")) {
-                    bounds.append(bound);
-                }
+        if (typeParameter.getClassBound() != null) {
+            String bound = signature(typeParameter.getClassBound());
+            if (!bound.equals("java.lang.Object")) {
+                bounds.append(bound);
             }
-        } else if (generic.getInterfaceBounds() != null) {
+        } else if (typeParameter.getInterfaceBounds() != null) {
             StringJoiner interfaceBounds = new StringJoiner(" & ");
-            for (ReferenceTypeSignature interfaceBound : generic.getInterfaceBounds()) {
-                if (!isRecursiveGenericBound(interfaceBound)) {
-                    interfaceBounds.add(signature(interfaceBound));
-                }
+            for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
+                interfaceBounds.add(signature(interfaceBound));
             }
             bounds.append(interfaceBounds);
         }
 
         String boundsStr = bounds.toString();
-        return generic.getName() + (boundsStr.isEmpty() ? "" : " extends " + boundsStr);
-    }
-
-    private boolean isRecursiveGenericBound(Object bound) {
-        String className;
-        if (bound instanceof ClassTypeSignature) {
-            className = className((ClassTypeSignature) bound);
-        } else if (bound instanceof ClassRefTypeSignature) {
-            className = ((ClassRefTypeSignature) bound).getBaseClassName();
-        } else if (bound instanceof ArrayTypeSignature) {
-            return isRecursiveGenericBound(((ArrayTypeSignature) bound).getElementTypeSignature());
-        } else {
-            return false;
-        }
-
-        if (genericStack == null) {
-            genericStack = new HashSet<>();
-        }
-        return !genericStack.add(className);
+        return typeParameter.getName() + (boundsStr.isEmpty() ? "" : " extends " + boundsStr);
     }
 
     @Override
@@ -151,27 +155,17 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             String className = className(clazz);
             s.append(className);
             if (!clazz.getTypeParameters().isEmpty()) {
-                if (genericStack == null) {
-                    genericStack = new HashSet<>();
-                }
-                genericStack.add(className);
                 for (TypeParameter typeParameter : clazz.getTypeParameters()) {
                     typeParameters.add(signature(typeParameter));
                 }
-                genericStack.remove(className);
             }
         } else if (type instanceof ClassRefTypeSignature) {
             ClassRefTypeSignature clazz = (ClassRefTypeSignature) type;
             s.append(clazz.getBaseClassName());
             if (!clazz.getTypeArguments().isEmpty()) {
-                if (genericStack == null) {
-                    genericStack = new HashSet<>();
-                }
-                genericStack.add(clazz.getBaseClassName());
                 for (TypeArgument typeArgument : clazz.getTypeArguments()) {
                     typeParameters.add(signature(typeArgument));
                 }
-                genericStack.remove(clazz.getBaseClassName());
             }
         } else {
             throw new UnsupportedOperationException("Unexpected parameterized type " + type.getClass().getName());
