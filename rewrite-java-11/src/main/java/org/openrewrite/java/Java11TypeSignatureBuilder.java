@@ -22,18 +22,14 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.Set;
-import java.util.StringJoiner;
+import java.util.*;
 
 class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
-    private Set<Type> typeStack;
+    private Set<String> typeVariableNameStack;
 
     @Override
     public String signature(@Nullable Object t) {
-        typeStack = null;
         return signature((Type) t);
     }
 
@@ -97,30 +93,32 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
-        if(typeStack == null) {
-            typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
-            typeStack.add(generic);
-        } else if(typeStack.contains(generic)) {
-            return generic.tsym.name.toString();
+        String name = generic.tsym.name.toString();
+
+        if(typeVariableNameStack == null) {
+            typeVariableNameStack = new HashSet<>();
         }
-        StringBuilder s = new StringBuilder(generic.tsym.name.toString());
+
+        if(!typeVariableNameStack.add(name)) {
+            typeVariableNameStack.remove(name);
+            return name;
+        }
+
+        StringBuilder s = new StringBuilder(name);
 
         StringJoiner boundSigs = new StringJoiner(" & ");
         if (generic.getUpperBound() instanceof Type.IntersectionClassType) {
             Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) generic.getUpperBound();
             if (intersectionBound.supertype_field != null) {
-                typeStack.add(intersectionBound.supertype_field);
                 String bound = signature(intersectionBound.supertype_field);
                 if (!bound.equals("java.lang.Object")) {
                     boundSigs.add(bound);
                 }
             }
             for (Type bound : intersectionBound.interfaces_field) {
-                typeStack.add(bound);
                 boundSigs.add(signature(bound));
             }
         } else {
-            typeStack.add(generic.getUpperBound());
             String bound = signature(generic.getUpperBound());
             if (!bound.equals("java.lang.Object")) {
                 boundSigs.add(bound);
@@ -131,6 +129,8 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if(!boundSigStr.isEmpty()) {
             s.append(" extends ").append(boundSigStr);
         }
+
+        typeVariableNameStack.remove(name);
 
         return s.toString();
     }
