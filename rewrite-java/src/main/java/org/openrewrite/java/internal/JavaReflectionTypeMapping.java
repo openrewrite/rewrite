@@ -265,6 +265,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
     public JavaType.Method method(Method method) {
         String signature = signatureBuilder.methodSignature(method);
+
         JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
         if (existing != null) {
             return existing;

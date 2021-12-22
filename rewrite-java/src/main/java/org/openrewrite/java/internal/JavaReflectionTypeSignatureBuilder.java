@@ -126,12 +126,26 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
                 if (!boundStr.equals("java.lang.Object")) {
                     boundJoiner.add(boundStr);
                 }
+                removeFromGenericStack(bound);
             } else {
+                removeFromGenericStack(bound);
                 // if one of a multi-bound covariant variable matches a type on the stack, short-circuit both
                 return "";
             }
         }
         return boundJoiner.toString();
+    }
+
+    private void removeFromGenericStack(Type bound) {
+        if (bound instanceof ParameterizedType) {
+            genericStack.remove(((Class<?>) ((ParameterizedType) bound).getRawType()).getName());
+        } else if (bound instanceof Class) {
+            Class<?> clazz = (Class<?>) bound;
+            if (clazz.isArray()) {
+                removeFromGenericStack(clazz.getComponentType());
+            }
+            genericStack.remove(clazz.getName());
+        }
     }
 
     private boolean isRecursiveGenericBound(Type bound) {
