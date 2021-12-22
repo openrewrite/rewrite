@@ -43,7 +43,6 @@ interface JavaTypeMappingTest {
 
     @Test
     fun arraySignature() {
-        val goatType = goatType()
         val arr = firstMethodParameter("array") as JavaType.Array
         assertThat(arr.elemType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }

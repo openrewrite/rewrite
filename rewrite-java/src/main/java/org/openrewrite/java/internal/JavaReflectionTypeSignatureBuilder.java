@@ -58,6 +58,8 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
             return genericSignature(t);
         } else if (t instanceof TypeVariable) {
             return genericSignature(t);
+        } else if(t instanceof GenericArrayType) {
+            return arraySignature(t);
         }
 
         throw new UnsupportedOperationException("Unknown type " + t.getClass().getName());
@@ -65,8 +67,15 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
 
     @Override
     public String arraySignature(Object type) {
-        Class<?> array = (Class<?>) type;
-        return signature(array.getComponentType()) + "[]";
+        if(type instanceof GenericArrayType) {
+            return signature(((GenericArrayType) type).getGenericComponentType()) + "[]";
+        }
+        else if(type instanceof Class) {
+            Class<?> array = (Class<?>) type;
+            return signature(array.getComponentType()) + "[]";
+        }
+
+        throw new UnsupportedOperationException("Unknown array type " + type.getClass().getName());
     }
 
     @Override
@@ -167,7 +176,8 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
         StringJoiner argumentTypeSignatures = new StringJoiner(",");
         if (method.getParameters().length > 0) {
             for (Parameter parameter : method.getParameters()) {
-                argumentTypeSignatures.add(signature(parameter.getType()));
+                Type parameterizedType = parameter.getParameterizedType();
+                argumentTypeSignatures.add(signature(parameterizedType == null ? parameter.getType() : parameterizedType));
             }
         }
         s.append(",resolved=").append(method.getReturnType().getName()).append('(').append(argumentTypeSignatures).append(')');

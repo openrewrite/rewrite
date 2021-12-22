@@ -70,7 +70,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (type instanceof Class) {
             Class<?> clazz = (Class<?>) type;
             if (clazz.isArray()) {
-                return new JavaType.Array(classType(clazz.getComponentType()));
+                return new JavaType.Array(_type(clazz.getComponentType()));
             } else if (clazz.isPrimitive()) {
                 return JavaType.Primitive.fromKeyword(clazz.getName());
             }
@@ -85,7 +85,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                         typeParameters);
             }
         } else if (type instanceof GenericArrayType) {
-            throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+            mapped = new JavaType.Array(_type(((GenericArrayType) type).getGenericComponentType()));
         } else if (type instanceof TypeVariable) {
             mapped = typeVariable((TypeVariable<?>) type);
         } else if (type instanceof WildcardType) {
@@ -209,18 +209,19 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         List<JavaType> mappedBounds = null;
 
         for (Type bound : bounds) {
-            if(genericStack.contains(bound)) {
+            if (genericStack.contains(bound)) {
                 return null;
             }
         }
 
         for (Type bound : bounds) {
             genericStack.add(bound);
-            if (!(bound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) bound).getFullyQualifiedName().equals("java.lang.Object")) {
+            JavaType mappedBound = _type(bound);
+            if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
                 if (mappedBounds == null) {
                     mappedBounds = new ArrayList<>(bounds.length);
                 }
-                mappedBounds.add(_type(bound));
+                mappedBounds.add(mappedBound);
             }
             genericStack.remove(bound);
         }
@@ -314,7 +315,8 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (method.getParameters().length > 0) {
             resolvedArgumentTypes = new ArrayList<>(method.getParameters().length);
             for (Parameter parameter : method.getParameters()) {
-                resolvedArgumentTypes.add(_type(parameter.getType()));
+                Type parameterizedType = parameter.getParameterizedType();
+                resolvedArgumentTypes.add(_type(parameterizedType == null ? parameter.getType() : parameterizedType));
             }
         }
 
