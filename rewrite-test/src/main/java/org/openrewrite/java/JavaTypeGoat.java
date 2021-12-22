@@ -23,6 +23,7 @@ public interface JavaTypeGoat<T, S extends JavaTypeGoat<S, ? extends T> & C> {
     void objectArray(Object[] n);
     void primitiveArray(int[] n);
     void parameterized(PT<C> n);
+    void parameterizedObject(PT<Object> n);
     void generic(PT<? extends C> n);
     void genericContravariant(PT<? super C> n);
     <U extends JavaTypeGoat<U, ?>> void genericRecursive(JavaTypeGoat<? extends U[], ?> n);
