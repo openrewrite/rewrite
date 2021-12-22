@@ -83,14 +83,20 @@ public interface JavaTypeSignatureBuilderTest {
     }
 
     @Test
-    default void genericRecursive() {
+    default void genericRecursiveInClassDefinition() {
         assertThat(signatureBuilder().signature(lastClassTypeParameter()))
                 .isEqualTo("S extends org.openrewrite.java.JavaTypeGoat<S, ? extends T> & org.openrewrite.java.C");
     }
 
     @Test
+    default void genericRecursiveInMethodDeclaration() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("genericRecursive")))
+                .isEqualTo("org.openrewrite.java.JavaTypeGoat<? super U, ?>");
+    }
+
+    @Test
     default void genericBounds() {
-        genericRecursive();
+        genericRecursiveInClassDefinition();
     }
 
     @Test
