@@ -295,18 +295,13 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 ReferenceTypeSignature bound = typeParameter.getClassBound();
                 ClassRefTypeSignature classBound = (ClassRefTypeSignature) bound;
                 if (classBound.getClassInfo() != null && !"java.lang.Object".equals(classBound.getFullyQualifiedClassName())) {
-                    bounds = new ArrayList<>();
-                    bounds.add(type(typeParameter.getClassBound()));
+                    bounds = singletonList(type(typeParameter.getClassBound()));
                 }
             } else {
-                bounds = new ArrayList<>();
-                bounds.add(type(typeParameter.getClassBound()));
+                bounds = singletonList(type(typeParameter.getClassBound()));
             }
-        }
-        if (typeParameter.getInterfaceBounds() != null && !typeParameter.getInterfaceBounds().isEmpty()) {
-            if (bounds == null) {
-                bounds = new ArrayList<>();
-            }
+        } else if (typeParameter.getInterfaceBounds() != null && !typeParameter.getInterfaceBounds().isEmpty()) {
+            bounds = new ArrayList<>(typeParameter.getInterfaceBounds().size());
             for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
                 bounds.add(type(interfaceBound));
             }

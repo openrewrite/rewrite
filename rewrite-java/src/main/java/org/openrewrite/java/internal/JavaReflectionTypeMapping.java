@@ -199,17 +199,15 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 //            }
 //        }
 //
-//        for (Type bound : bounds) {
-//            genericStack.add(bound);
-//            JavaType mappedBound = type(bound);
-//            if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
-//                if (mappedBounds == null) {
-//                    mappedBounds = new ArrayList<>(bounds.length);
-//                }
-//                mappedBounds.add(mappedBound);
-//            }
-//            genericStack.remove(bound);
-//        }
+        for (Type bound : bounds) {
+            JavaType mappedBound = type(bound);
+            if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
+                if (mappedBounds == null) {
+                    mappedBounds = new ArrayList<>(bounds.length);
+                }
+                mappedBounds.add(mappedBound);
+            }
+        }
 
         return mappedBounds;
     }
