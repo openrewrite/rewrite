@@ -23,8 +23,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 
 public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuilder {
-    // fully qualified names of base type of a class or interface bound (minus further parameterization)
-    private Set<String> genericStack;
+    private Set<String> typeVariableNameStack;
 
     @Override
     public String signature(@Nullable Object t) {
@@ -86,15 +85,23 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
     public String genericSignature(Object type) {
         if (type instanceof TypeVariable) {
             TypeVariable<?> typeVar = (TypeVariable<?>) type;
-            StringBuilder s = new StringBuilder(typeVar.getName());
+            String name = typeVar.getName();
 
-            if (typeVar.getBounds().length > 0) {
-                String boundsStr = genericBounds(typeVar.getBounds());
-                if (!boundsStr.isEmpty()) {
-                    s.append(" extends ").append(boundsStr);
+            if (typeVariableNameStack == null) {
+                typeVariableNameStack = new HashSet<>();
+            }
+
+            StringBuilder s = new StringBuilder(name);
+            if (typeVariableNameStack.add(name)) {
+                if (typeVar.getBounds().length > 0) {
+                    String boundsStr = genericBounds(typeVar.getBounds());
+                    if (!boundsStr.isEmpty()) {
+                        s.append(" extends ").append(boundsStr);
+                    }
                 }
             }
 
+            typeVariableNameStack.remove(name);
             return s.toString();
         } else if (type instanceof WildcardType) {
             WildcardType wildcard = (WildcardType) type;
@@ -121,51 +128,12 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
     private String genericBounds(Type[] bounds) {
         StringJoiner boundJoiner = new StringJoiner(" & ");
         for (Type bound : bounds) {
-            if (!isRecursiveGenericBound(bound)) {
-                String boundStr = signature(bound);
-                if (!boundStr.equals("java.lang.Object")) {
-                    boundJoiner.add(boundStr);
-                }
-                removeFromGenericStack(bound);
-            } else {
-                removeFromGenericStack(bound);
-                // if one of a multi-bound covariant variable matches a type on the stack, short-circuit both
-                return "";
+            String boundStr = signature(bound);
+            if (!boundStr.equals("java.lang.Object")) {
+                boundJoiner.add(boundStr);
             }
         }
         return boundJoiner.toString();
-    }
-
-    private void removeFromGenericStack(Type bound) {
-        if (bound instanceof ParameterizedType) {
-            genericStack.remove(((Class<?>) ((ParameterizedType) bound).getRawType()).getName());
-        } else if (bound instanceof Class) {
-            Class<?> clazz = (Class<?>) bound;
-            if (clazz.isArray()) {
-                removeFromGenericStack(clazz.getComponentType());
-            }
-            genericStack.remove(clazz.getName());
-        }
-    }
-
-    private boolean isRecursiveGenericBound(Type bound) {
-        String className;
-        if (bound instanceof ParameterizedType) {
-            className = ((Class<?>) ((ParameterizedType) bound).getRawType()).getName();
-        } else if (bound instanceof Class) {
-            Class<?> clazz = (Class<?>) bound;
-            if (clazz.isArray()) {
-                return isRecursiveGenericBound(clazz.getComponentType());
-            }
-            className = clazz.getName();
-        } else {
-            return false;
-        }
-
-        if (genericStack == null) {
-            genericStack = new HashSet<>();
-        }
-        return !genericStack.add(className);
     }
 
     @Override
@@ -175,16 +143,10 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
         String className = ((Class<?>) pt.getRawType()).getName();
         StringBuilder s = new StringBuilder(className);
 
-        if (genericStack == null) {
-            genericStack = new HashSet<>();
-        }
-
-        genericStack.add(className);
         StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
         for (Type typeArgument : pt.getActualTypeArguments()) {
             typeParameters.add(signature(typeArgument));
         }
-        genericStack.remove(className);
 
         s.append(typeParameters);
 

@@ -25,8 +25,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 
 public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
-    // fully qualified names of base type of a class or interface bound (minus further parameterization)
-    private Set<String> genericStack;
+    private Set<String> typeVariableNameStack;
 
     @Override
     public String signature(@Nullable Object type) {
@@ -85,13 +84,13 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
         } else if (type instanceof TypeArgument) {
             return generic((TypeArgument) type);
         } else if (type instanceof TypeParameter) {
-            if (genericStack == null) {
-                genericStack = new HashSet<>();
+            if (typeVariableNameStack == null) {
+                typeVariableNameStack = new HashSet<>();
             }
             String name = ((TypeParameter) type).getName();
-            if (genericStack.add(name)) {
+            if (typeVariableNameStack.add(name)) {
                 String s = generic((TypeParameter) type);
-                genericStack.remove(name);
+                typeVariableNameStack.remove(name);
                 return s;
             }
             return name;
