@@ -21,6 +21,9 @@ import org.junit.jupiter.api.Test
 import org.openjdk.jol.info.GraphStats
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaTypeVisitor
+import org.openrewrite.java.tree.JavaType
+import java.util.*
 import kotlin.math.ln
 import kotlin.math.pow
 
@@ -29,9 +32,29 @@ class JavaSourceSetTest {
     @Test
     fun typesFromClasspath() {
         val ctx = InMemoryExecutionContext { e -> throw e }
-        val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), mutableMapOf(), ctx)
+        val typeBySignature = mutableMapOf<String, Any>()
+        val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeBySignature, ctx)
 
-        println(humanReadableByteCount(GraphStats.parseInstance(javaSourceSet).totalSize().toDouble()))
+        println("Heap size: ${humanReadableByteCount(GraphStats.parseInstance(javaSourceSet).totalSize().toDouble())}")
+        println("Unique signatures: ${typeBySignature.size}")
+        println("Shallow type count: ${javaSourceSet.classpath.size}")
+
+        val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
+
+        javaSourceSet.classpath.forEach {
+            object : JavaTypeVisitor<Int>() {
+                override fun visit(javaType: JavaType?, p: Int): JavaType? {
+                    if(javaType is JavaType) {
+                        if(uniqueTypes.add(javaType)) {
+                            return super.visit(javaType, p)
+                        }
+                    }
+                    return null
+                }
+            }.visit(it, 0)
+        }
+
+        println("Deep type count: ${uniqueTypes.size}")
 
         assertThat(javaSourceSet.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")
