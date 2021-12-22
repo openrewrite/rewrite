@@ -17,7 +17,6 @@ package org.openrewrite.java.internal;
 
 import io.github.classgraph.*;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.tree.Flag;
@@ -102,7 +101,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
             ClassInfo superclassInfo = aClass.getSuperclass();
             JavaType.FullyQualified supertype;
-            if(superclassInfo == null) {
+            if (superclassInfo == null) {
                 // Classgraph reports null for the supertype of interfaces, for consistency with other TypeMappings we report Object
                 supertype = (JavaType.FullyQualified) reflectionTypeMapping.type(Object.class);
             } else {
@@ -332,15 +331,19 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 }
             }
 
+            List<JavaType> typeParameters = null;
+            if (!classRefSig.getTypeArguments().isEmpty()) {
+                typeParameters = new ArrayList<>(classRefSig.getTypeArguments().size());
+                for (TypeArgument typeArgument : classRefSig.getTypeArguments()) {
+                    typeParameters.add(type(typeArgument));
+                }
+            }
+
             JavaType.FullyQualified type = type(classInfo);
             if (type instanceof JavaType.Parameterized) {
-                JavaType.Parameterized pt = (JavaType.Parameterized) type;
-                type = pt.withTypeParameters(ListUtils.map(pt.getTypeParameters(), (i, tp) -> {
-                    if (classRefSig.getTypeArguments().size() > i) {
-                        return type(classRefSig.getTypeArguments().get(i));
-                    }
-                    return null;
-                }));
+                type = ((JavaType.Parameterized) type).withTypeParameters(typeParameters);
+            } else if (typeParameters != null) {
+                type = new JavaType.Parameterized(null, type, typeParameters);
             }
 
             //noinspection ConstantConditions

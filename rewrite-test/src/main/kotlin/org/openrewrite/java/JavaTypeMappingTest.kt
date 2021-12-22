@@ -106,6 +106,11 @@ interface JavaTypeMappingTest {
         val generic = typeParam as JavaType.GenericTypeVariable
         assertThat(generic.name).isEqualTo("?")
         assertThat(generic.variance).isEqualTo(COVARIANT)
-        assertThat(generic.bounds[0]).isInstanceOf(JavaType.Array::class.java)
+        assertThat(generic.bounds[0].asArray()).isNotNull
+
+        val elemType = generic.bounds[0].asArray()!!.elemType.asGeneric()!!
+        assertThat(elemType.name).isEqualTo("U")
+        assertThat(elemType.variance).isEqualTo(COVARIANT)
+        assertThat(elemType.bounds).hasSize(1)
     }
 }
