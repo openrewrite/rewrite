@@ -77,14 +77,14 @@ class JavaSourceSetTest {
         methodsByType.values.forEach { methodHistogram.recordValue(it.size.toLong()) }
 
         println("Methods per class:\n")
-        methodHistogram.outputPercentileDistribution(System.out, 1.0)
+        methodHistogram.outputPercentileDistribution(System.out, 1, 1.0)
         println("\n\n")
 
         val fieldHistogram = ShortCountsHistogram(1)
         fieldsByType.values.forEach { fieldHistogram.recordValue(it.size.toLong()) }
 
         println("Fields per class:\n")
-        fieldHistogram.outputPercentileDistribution(System.out, 1.0)
+        fieldHistogram.outputPercentileDistribution(System.out, 1, 1.0)
         println("\n\n")
 
         println("Heap size: ${humanReadableByteCount(GraphStats.parseInstance(javaSourceSet).totalSize().toDouble())}")
