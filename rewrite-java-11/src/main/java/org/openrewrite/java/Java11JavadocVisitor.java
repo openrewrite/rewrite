@@ -1048,7 +1048,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             JCTree.JCPrimitiveTypeTree primitiveType = (JCTree.JCPrimitiveTypeTree) node;
             String name = primitiveType.toString();
             cursor += name.length();
-            return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitiveType(primitiveType.typetag), null);
+            return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitive(primitiveType.typetag), null);
         }
     }
 }
