@@ -69,7 +69,7 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     @Override
     public String classSignature(Object type) {
         ClassRefTypeSignature classRefTypeSignature = (ClassRefTypeSignature) type;
-        return classRefTypeSignature.getBaseClassName();
+        return classRefTypeSignature.getFullyQualifiedClassName();
     }
 
     @Override
