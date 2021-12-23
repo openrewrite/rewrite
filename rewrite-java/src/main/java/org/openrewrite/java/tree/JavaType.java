@@ -350,7 +350,6 @@ public interface JavaType {
         @Nullable
         Integer managedReference;
 
-        @Getter
         @With
         @NonFinal
         @Nullable
@@ -364,6 +363,9 @@ public interface JavaType {
                              @Nullable List<JavaType> typeParameters) {
             this.managedReference = managedReference;
             this.type = type;
+            if(type != null && type.getFullyQualifiedName().equals("ch.qos.logback.core.helpers.CyclicBuffer")) {
+                System.out.println("here");
+            }
             this.typeParameters = nullIfEmpty(typeParameters);
         }
 

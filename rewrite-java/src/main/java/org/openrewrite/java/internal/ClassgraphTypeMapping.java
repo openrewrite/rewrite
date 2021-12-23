@@ -126,7 +126,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             if (!aClass.getMethodInfo().isEmpty()) {
                 methods = new ArrayList<>(aClass.getMethodInfo().size());
                 for (MethodInfo methodInfo : aClass.getMethodInfo()) {
-                    if(!(methodInfo.isBridge() || methodInfo.isSynthetic())) {
+                    if (!(methodInfo.isBridge() || methodInfo.isSynthetic())) {
                         methods.add(methodType(methodInfo));
                     }
                 }
@@ -361,9 +361,8 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         JavaType.FullyQualified type = type(classInfo);
 
         if (!classRefSignature.getTypeArguments().isEmpty()) {
-            JavaType.Parameterized parameterized = type instanceof JavaType.Parameterized ?
-                    ((JavaType.Parameterized) type).withTypeParameters(emptyList()) :
-                    new JavaType.Parameterized(null, type, null);
+            JavaType.Parameterized parameterized = new JavaType.Parameterized(null,
+                    type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type, null);
 
             typeBySignature.put(signature, parameterized);
 

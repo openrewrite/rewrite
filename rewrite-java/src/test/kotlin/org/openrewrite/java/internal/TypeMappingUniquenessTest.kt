@@ -62,7 +62,7 @@ class TypeMappingUniquenessTest {
                         return super.visit(javaType, p)
                     }
                 }
-                return null
+                return javaType
             }
         }.visit(root, 0)
 

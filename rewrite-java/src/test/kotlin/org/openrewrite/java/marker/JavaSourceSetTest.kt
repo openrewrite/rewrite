@@ -49,7 +49,7 @@ class JavaSourceSetTest {
                             return super.visit(javaType, p)
                         }
                     }
-                    return null
+                    return javaType
                 }
             }.visit(it, 0)
         }
