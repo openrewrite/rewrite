@@ -112,22 +112,23 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType generic(Type.TypeVar type, String signature) {
+        String name = type.tsym.name.toString();
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
-                type.tsym.name.toString(), INVARIANT, null);
+                name, INVARIANT, null);
         typeBySignature.put(signature, gtv);
 
         List<JavaType> bounds = null;
         if (type.getUpperBound() instanceof Type.IntersectionClassType) {
             Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
-            if (intersectionBound.supertype_field != null) {
-                JavaType mappedBound = type(intersectionBound.supertype_field);
-                if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
-                    bounds = singletonList(mappedBound);
-                }
-            } else if (intersectionBound.interfaces_field.length() > 0) {
+            if (intersectionBound.interfaces_field.length() > 0) {
                 bounds = new ArrayList<>(intersectionBound.interfaces_field.length());
                 for (Type bound : intersectionBound.interfaces_field) {
                     bounds.add(type(bound));
+                }
+            } else if (intersectionBound.supertype_field != null) {
+                JavaType mappedBound = type(intersectionBound.supertype_field);
+                if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
+                    bounds = singletonList(mappedBound);
                 }
             }
         } else if (type.getUpperBound() != null) {
