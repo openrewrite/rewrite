@@ -75,8 +75,12 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
 
     private JavaType array(Type type, String signature) {
         JavaType.Array arr = new JavaType.Array(type(((Type.ArrayType) type).elemtype));
-        typeBySignature.put(signature, arr);
-        return arr;
+        if (typeBySignature.containsKey(signature)) {
+            return (JavaType.Array) typeBySignature.get(signature);
+        } else {
+            typeBySignature.put(signature, arr);
+            return arr;
+        }
     }
 
     private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature) {
