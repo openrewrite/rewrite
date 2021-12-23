@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import io.github.classgraph.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaTypeSignatureBuilder;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;

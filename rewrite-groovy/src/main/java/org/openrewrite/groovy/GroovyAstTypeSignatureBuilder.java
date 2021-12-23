@@ -17,7 +17,7 @@ package org.openrewrite.groovy;
 
 import org.codehaus.groovy.ast.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.JavaTypeSignatureBuilder;
+import org.openrewrite.java.JavaTypeSignatureBuilder;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;

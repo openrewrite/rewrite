@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.java.internal.JavaTypeSignatureBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

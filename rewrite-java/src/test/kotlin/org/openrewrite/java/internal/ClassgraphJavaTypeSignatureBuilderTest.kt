@@ -19,6 +19,7 @@ import io.github.classgraph.ClassGraph
 import io.github.classgraph.ClassTypeSignature
 import io.github.classgraph.TypeParameter
 import io.github.classgraph.TypeSignature
+import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.JavaTypeSignatureBuilderTest
 
 class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {

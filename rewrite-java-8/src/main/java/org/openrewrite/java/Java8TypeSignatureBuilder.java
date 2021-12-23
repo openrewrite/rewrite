@@ -19,7 +19,6 @@ import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.Collections;

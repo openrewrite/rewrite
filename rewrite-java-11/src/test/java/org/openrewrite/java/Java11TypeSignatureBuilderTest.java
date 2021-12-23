@@ -25,7 +25,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.JavaTypeSignatureBuilder;
 
 import java.io.ByteArrayInputStream;
 import java.nio.file.Paths;

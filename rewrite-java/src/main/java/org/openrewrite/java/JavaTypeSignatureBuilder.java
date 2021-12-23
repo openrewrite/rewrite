@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.internal;
+package org.openrewrite.java;
 
 import org.openrewrite.internal.lang.Nullable;
 
@@ -31,7 +31,7 @@ public interface JavaTypeSignatureBuilder {
      * @param t A type object.
      * @return The type signature. If <code>t</code> is null, the signature is <code>{undefined}</code>.
      */
-    String signature(@Nullable Object t);
+    String signature(@Nullable Object type);
     
     /**
      * @param type An array type.

@@ -28,6 +28,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
+import static org.openrewrite.java.tree.DefaultJavaTypeSignatureBuilder.TO_STRING;
 
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -339,7 +340,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return "Class{" + fullyQualifiedName + '}';
+            return TO_STRING.signature(this);
         }
     }
 
@@ -466,7 +467,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return "Parameterized{" + getFullyQualifiedName() + "}";
+            return TO_STRING.signature(this);
         }
     }
 
@@ -518,34 +519,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return typeToString(this);
-        }
-
-        private static String typeToString(JavaType type) {
-            if (type instanceof GenericTypeVariable) {
-                GenericTypeVariable generic = (GenericTypeVariable) type;
-                StringBuilder s = new StringBuilder("GenericTypeVariable{" + generic.name);
-                if (generic.variance.equals(Variance.COVARIANT)) {
-                    s.append(" extends");
-                } else if (generic.variance.equals(Variance.CONTRAVARIANT)) {
-                    s.append(" super");
-                }
-
-                if (generic.bounds != null && !generic.bounds.isEmpty()) {
-                    s.append(' ');
-                    StringJoiner b = new StringJoiner(" & ");
-                    for (JavaType bound : generic.bounds) {
-                        b.add(typeToString(bound));
-                    }
-                    s.append(b);
-                }
-
-                s.append('}');
-                return s.toString();
-            } else if (type instanceof FullyQualified) {
-                return ((FullyQualified) type).getFullyQualifiedName();
-            }
-            return "";
+            return TO_STRING.signature(this);
         }
 
         public enum Variance {
@@ -567,7 +541,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return "Array{" + elemType + "}";
+            return TO_STRING.signature(this);
         }
     }
 
@@ -643,6 +617,11 @@ public interface JavaType {
                 default:
                     return "";
             }
+        }
+
+        @Override
+        public String toString() {
+            return getKeyword();
         }
     }
 
@@ -768,20 +747,6 @@ public interface JavaType {
                     this.resolvedSignature, this.thrownExceptions, annotations);
         }
 
-        @Value
-        @With
-        public static class Signature {
-            @Nullable
-            JavaType returnType;
-
-            List<JavaType> paramTypes;
-
-            public Signature(@Nullable JavaType returnType, List<JavaType> paramTypes) {
-                this.returnType = returnType;
-                this.paramTypes = paramTypes;
-            }
-        }
-
         public boolean hasFlags(Flag... test) {
             return Flag.hasFlags(flagsBitMap, test);
         }
@@ -796,7 +761,21 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return "Method{" + (declaringType == null ? "<unknown>" : declaringType) + "#" + name + "(" + String.join(", ", (paramNames == null ? emptyList() : paramNames)) + ")}";
+            return TO_STRING.methodSignature(this);
+        }
+
+        @Value
+        @With
+        public static class Signature {
+            @Nullable
+            JavaType returnType;
+
+            List<JavaType> paramTypes;
+
+            public Signature(@Nullable JavaType returnType, List<JavaType> paramTypes) {
+                this.returnType = returnType;
+                this.paramTypes = paramTypes;
+            }
         }
     }
 
@@ -869,7 +848,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return "Variable{" + (owner == null ? "<unknown>" : owner) + "#" + name + "}";
+            return TO_STRING.variableSignature(this);
         }
     }
 
