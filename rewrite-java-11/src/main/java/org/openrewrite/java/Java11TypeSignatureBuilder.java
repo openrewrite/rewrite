@@ -48,11 +48,11 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return arraySignature(type);
         } else if (type instanceof Type.WildcardType) {
             Type.WildcardType wildcard = (Type.WildcardType) type;
-            StringBuilder s = new StringBuilder(wildcard.kind.toString());
+            StringBuilder s = new StringBuilder("Generic{" + wildcard.kind.toString());
             if(!type.isUnbound()) {
                 s.append(signature(wildcard.type));
             }
-            return s.toString();
+            return s.append("}").toString();
         } else if (Type.noType.equals(type)) {
             return "{none}";
         }
@@ -101,10 +101,10 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
         if(!typeVariableNameStack.add(name)) {
             typeVariableNameStack.remove(name);
-            return name;
+            return "Generic{" + name + "}";
         }
 
-        StringBuilder s = new StringBuilder(name);
+        StringBuilder s = new StringBuilder("Generic{").append(name);
 
         StringJoiner boundSigs = new StringJoiner(" & ");
         if (generic.getUpperBound() instanceof Type.IntersectionClassType) {
@@ -132,7 +132,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
         typeVariableNameStack.remove(name);
 
-        return s.toString();
+        return s.append("}").toString();
     }
 
     @Override
