@@ -83,7 +83,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType classType(Class<?> clazz, String signature) {
-        JavaType.Class mappedClazz = classTypeWithoutParameters(clazz);
+        JavaType.FullyQualified mappedClazz = classTypeWithoutParameters(clazz);
 
         if (clazz.getTypeParameters().length > 0) {
             JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
@@ -101,8 +101,17 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         return mappedClazz;
     }
 
-    private JavaType.Class classTypeWithoutParameters(Class<?> clazz) {
-        JavaType.Class mappedClazz = (JavaType.Class) typeBySignature.get(clazz.getName());
+    private JavaType.FullyQualified classTypeWithoutParameters(Class<?> clazz) {
+        String className = clazz.getName();
+        JavaType.Class mappedClazz = (JavaType.Class) typeBySignature.get(className);
+
+        if (className.startsWith("com.sun.") ||
+                className.startsWith("sun.") ||
+                className.startsWith("java.awt.") ||
+                className.startsWith("jdk.") ||
+                className.startsWith("org.graalvm")) {
+            return JavaType.Unknown.getInstance();
+        }
 
         if (mappedClazz == null) {
             JavaType.Class.Kind kind;
