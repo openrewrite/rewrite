@@ -32,7 +32,7 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
-    private final ClassgraphJavaTypeSignatureBuilder signatureBuilder = new ClassgraphJavaTypeSignatureBuilder();
+    private final ClassgraphJavaTypeSignatureBuilder signatureBuilder;
 
     private final Map<String, Object> typeBySignature;
     private final JavaReflectionTypeMapping reflectionTypeMapping;
@@ -42,6 +42,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         this.typeBySignature = typeBySignature;
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeBySignature);
         this.jvmTypes = jvmTypes;
+        this.signatureBuilder = new ClassgraphJavaTypeSignatureBuilder(jvmTypes);
     }
 
     public JavaType.FullyQualified type(@Nullable ClassInfo aClass) {

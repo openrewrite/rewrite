@@ -29,6 +29,7 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
             .enableMemoryMapping()
             .enableClassInfo()
             .enableMethodInfo()
+            .ignoreClassVisibility()
             .acceptClasses("org.openrewrite.java.*")
             .scan()
             .getClassInfo("org.openrewrite.java.JavaTypeGoat")
@@ -39,5 +40,5 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
 
     override fun lastClassTypeParameter(): TypeParameter = (goat.typeSignature as ClassTypeSignature).typeParameters.last()
 
-    override fun signatureBuilder(): JavaTypeSignatureBuilder = ClassgraphJavaTypeSignatureBuilder()
+    override fun signatureBuilder(): JavaTypeSignatureBuilder = ClassgraphJavaTypeSignatureBuilder(emptyMap())
 }
