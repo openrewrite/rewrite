@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.JavaType
 import java.util.*
 import kotlin.math.ln
 import kotlin.math.pow
+import kotlin.streams.toList
 
 class JavaSourceSetTest {
 
@@ -53,6 +54,13 @@ class JavaSourceSetTest {
                 }
             }.visit(it, 0)
         }
+
+        val arrWithInner = uniqueTypes.stream().filter { it.toString().contains("$") }.toList().filterIsInstance<JavaType.Array>().sortedBy { it.toString() }
+        val classWithInner = uniqueTypes.stream().filter { it.toString().contains("$") }.toList().filterIsInstance<JavaType.Class>().sortedBy { it.toString() }
+        val varWithInner = uniqueTypes.stream().filter { it.toString().contains("$") }.toList().filterIsInstance<JavaType.Variable>().sortedBy { it.toString() }
+        val arrWithoutInner = uniqueTypes.stream().filter { !it.toString().contains("$") }.toList().filterIsInstance<JavaType.Array>().sortedBy { it.toString() }
+        val classWithoutInner = uniqueTypes.stream().filter { !it.toString().contains("$") }.toList().filterIsInstance<JavaType.Class>().sortedBy { it.toString() }
+        val varWithoutInner = uniqueTypes.stream().filter { !it.toString().contains("$") }.toList().filterIsInstance<JavaType.Variable>().sortedBy { it.toString() }
 
         println("Deep type count: ${uniqueTypes.size}")
 

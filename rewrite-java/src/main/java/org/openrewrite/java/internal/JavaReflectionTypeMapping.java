@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.tree.JavaType;
@@ -58,7 +59,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (type instanceof Class) {
             Class<?> clazz = (Class<?>) type;
             if (clazz.isArray()) {
-                return new JavaType.Array(type(clazz.getComponentType()));
+                return array(clazz, signature);
             } else if (clazz.isPrimitive()) {
                 return JavaType.Primitive.fromKeyword(clazz.getName());
             }
@@ -74,6 +75,12 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+    }
+
+    private JavaType.Array array(Class<?> clazz, String signature) {
+        JavaType.Array arr = new JavaType.Array(type(clazz.getComponentType()));
+        typeBySignature.put(signature, arr);
+        return arr;
     }
 
     private JavaType.Array array(GenericArrayType type, String signature) {
