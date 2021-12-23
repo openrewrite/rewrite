@@ -74,8 +74,9 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType array(Type type, String signature) {
-        JavaType.Array arr = new JavaType.Array(type(((Type.ArrayType) type).elemtype));
+        JavaType.Array arr = new JavaType.Array(null);
         typeBySignature.put(signature, arr);
+        arr.unsafeSet(type(((Type.ArrayType) type).elemtype));
         return arr;
     }
 

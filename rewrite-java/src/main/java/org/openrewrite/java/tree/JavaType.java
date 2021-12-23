@@ -21,7 +21,10 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
@@ -529,13 +532,23 @@ public interface JavaType {
         }
     }
 
-    @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @With
     class Array implements JavaType {
+        @Nullable
+        @NonFinal
         JavaType elemType;
 
-        public Array(JavaType elemType) {
+        public Array(@Nullable JavaType elemType) {
+            this.elemType = elemType;
+        }
+
+        public JavaType getElemType() {
+            assert elemType != null;
+            return elemType;
+        }
+
+        public void unsafeSet(JavaType elemType) {
             this.elemType = elemType;
         }
 

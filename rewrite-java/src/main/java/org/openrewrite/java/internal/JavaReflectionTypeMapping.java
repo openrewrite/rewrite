@@ -77,14 +77,22 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType.Array array(Class<?> clazz, String signature) {
-        JavaType.Array arr = new JavaType.Array(type(clazz.getComponentType()));
+        if(signature.equals("kotlin.annotation.AnnotationTarget[]")) {
+            System.out.println("here array");
+        }
+        JavaType.Array arr = new JavaType.Array(null);
         typeBySignature.put(signature, arr);
+        arr.unsafeSet(type(clazz.getComponentType()));
         return arr;
     }
 
     private JavaType.Array array(GenericArrayType type, String signature) {
-        JavaType.Array arr = new JavaType.Array(type(type.getGenericComponentType()));
+        if(signature.equals("kotlin.annotation.AnnotationTarget[]")) {
+            System.out.println("here generic array");
+        }
+        JavaType.Array arr = new JavaType.Array(null);
         typeBySignature.put(signature, arr);
+        arr.unsafeSet(type(type.getGenericComponentType()));
         return arr;
     }
 
