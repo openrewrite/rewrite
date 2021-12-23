@@ -47,15 +47,15 @@ public interface JavaTypeSignatureBuilder {
 
     /**
      * When generic type variables are cyclic, like {@code U extends Cyclic<? extends U>}, represent the cycle with the
-     * bound name, like {@code U extends Cyclic<? extends U>}.
+     * bound name, like {@code Generic{U extends Cyclic<? extends U>}}.
      * <p/>
      * When the bound is {@link Object} (regardless of whether
      * that bound is implicit or explicit in the source code),the type variable is considered invariant and the
-     * bound is omitted. So {@code List<?>} is favored over {@code List<? extends java.lang.Object>}.
+     * bound is omitted. So {@code Generic{List<?>}} is favored over {@code Generic{List<? extends java.lang.Object>}}.
      *
      * @param type A generic type.
-     * @return Formatted like <code>U extends java.lang.Comparable</code> (covariant) or
-     * <code>U super java.lang.Comparable</code> (contravariant).
+     * @return Formatted like <code>Generic{U extends java.lang.Comparable}</code> (covariant) or
+     * <code>Generic{U super java.lang.Comparable}</code> (contravariant).
      */
     String genericSignature(Object type);
 
