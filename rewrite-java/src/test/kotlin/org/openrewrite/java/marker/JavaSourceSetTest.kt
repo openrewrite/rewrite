@@ -90,6 +90,7 @@ class JavaSourceSetTest {
         println("Unique signatures: ${typeBySignature.size}")
         println("Shallow type count: ${javaSourceSet.classpath.size}")
         println("Deep type count: ${uniqueTypes.size}")
+        println("Signature collisions: ${signatureCollisions.size}")
 
         assertThat(javaSourceSet.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")

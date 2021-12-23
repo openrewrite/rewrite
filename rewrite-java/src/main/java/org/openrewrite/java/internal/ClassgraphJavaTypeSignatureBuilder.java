@@ -214,7 +214,7 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     }
 
     public String methodSignature(MethodInfo methodInfo) {
-        StringBuilder s = new StringBuilder(signature(methodInfo.getClassInfo().getTypeSignature()));
+        StringBuilder s = new StringBuilder(methodInfo.getClassName());
         s.append("{name=").append(methodInfo.getName());
 
         StringJoiner resolvedArgumentTypes = new StringJoiner(",");
