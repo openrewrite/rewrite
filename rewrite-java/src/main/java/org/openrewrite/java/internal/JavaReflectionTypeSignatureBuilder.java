@@ -91,7 +91,7 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
                 typeVariableNameStack = new HashSet<>();
             }
 
-            StringBuilder s = new StringBuilder(name);
+            StringBuilder s = new StringBuilder("Generic{" + name);
             if (typeVariableNameStack.add(name)) {
                 if (typeVar.getBounds().length > 0) {
                     String boundsStr = genericBounds(typeVar.getBounds());
@@ -101,11 +101,13 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
                 }
             }
 
+            s.append('}');
+
             typeVariableNameStack.remove(name);
             return s.toString();
         } else if (type instanceof WildcardType) {
             WildcardType wildcard = (WildcardType) type;
-            StringBuilder s = new StringBuilder("?");
+            StringBuilder s = new StringBuilder("Generic{?");
 
             if (wildcard.getLowerBounds().length > 0) {
                 String boundsStr = genericBounds(wildcard.getLowerBounds());
@@ -118,6 +120,8 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
                     s.append(" extends ").append(boundsStr);
                 }
             }
+
+            s.append('}');
 
             return s.toString();
         }

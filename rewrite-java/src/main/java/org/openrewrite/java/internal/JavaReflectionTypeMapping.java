@@ -16,7 +16,6 @@
 package org.openrewrite.java.internal;
 
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.tree.JavaType;
