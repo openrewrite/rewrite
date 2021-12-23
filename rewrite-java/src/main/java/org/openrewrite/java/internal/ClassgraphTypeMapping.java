@@ -233,6 +233,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                     type(methodParameterInfo.getTypeDescriptor()) :
                     type(methodParameterInfo.getTypeSignature()));
         }
+
         JavaType.Method.Signature genericSignature = new JavaType.Method.Signature(
                 methodInfo.getTypeSignature() == null ?
                         type(methodInfo.getTypeDescriptor().getResultType()) :
@@ -340,14 +341,16 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
     private JavaType classType(ClassRefTypeSignature classRefSignature, String signature) {
         ClassInfo classInfo = classRefSignature.getClassInfo();
         if (classInfo == null) {
-            JavaType.FullyQualified jvmType = jvmTypes.get(classRefSignature.getBaseClassName());
-            if (jvmType != null) {
-                return jvmType;
-            } else if (classRefSignature.getBaseClassName().equals("java.lang.Object")) {
-                return reflectionTypeMapping.type(Object.class);
-            } else {
-                return JavaType.Unknown.getInstance();
+            JavaType fallback = jvmTypes.get(classRefSignature.getBaseClassName());
+            if (fallback == null) {
+                if (classRefSignature.getBaseClassName().equals("java.lang.Object")) {
+                    fallback = reflectionTypeMapping.type(Object.class);
+                } else {
+                    fallback = JavaType.Unknown.getInstance();
+                }
             }
+            typeBySignature.put(signature, fallback);
+            return fallback;
         }
 
         JavaType.FullyQualified type = type(classInfo);
@@ -370,7 +373,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         return type;
     }
 
-    private JavaType.FullyQualified classType(ClassTypeSignature classSignature, String signature) {
+    private JavaType classType(ClassTypeSignature classSignature, String signature) {
         try {
             Method getClassInfo = classSignature.getClass().getDeclaredMethod("getClassInfo");
             getClassInfo.setAccessible(true);
@@ -381,14 +384,16 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 getClassName.setAccessible(true);
                 String className = (String) getClassName.invoke(classSignature);
 
-                JavaType.FullyQualified jvmType = jvmTypes.get(className);
-                if (jvmType != null) {
-                    return jvmType;
-                } else if (className.equals("java.lang.Object")) {
-                    return (JavaType.FullyQualified) reflectionTypeMapping.type(Object.class);
-                } else {
-                    return JavaType.Unknown.getInstance();
+                JavaType fallback = jvmTypes.get(className);
+                if (fallback == null) {
+                    if (className.equals("java.lang.Object")) {
+                        fallback = reflectionTypeMapping.type(Object.class);
+                    } else {
+                        fallback = JavaType.Unknown.getInstance();
+                    }
                 }
+                typeBySignature.put(signature, fallback);
+                return fallback;
             }
 
             JavaType.Class clazz = (JavaType.Class) type(classInfo);
