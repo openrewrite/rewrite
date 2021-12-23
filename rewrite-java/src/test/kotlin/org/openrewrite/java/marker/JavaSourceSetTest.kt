@@ -37,8 +37,8 @@ class JavaSourceSetTest {
         val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeBySignature, ctx)
 
         val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
-        val typeBySignatureAfterMapping: MutableMap<String, JavaType> = mutableMapOf()
-        var signatureCollisions = 0
+        val typeBySignatureAfterMapping = mutableMapOf<String, JavaType>()
+        val signatureCollisions = hashSetOf<JavaType>()
 
         val methodsByType: MutableMap<String, MutableSet<String>> = mutableMapOf()
         val fieldsByType: MutableMap<String, MutableSet<String>> = mutableMapOf()
@@ -50,8 +50,7 @@ class JavaSourceSetTest {
                         if (uniqueTypes.add(javaType)) {
                             typeBySignatureAfterMapping.compute(javaType.toString()) { _, existing ->
                                 if (existing != null && javaType !== existing) {
-                                    println("multiple instances found for signature $javaType")
-                                    signatureCollisions++
+                                    signatureCollisions.add(javaType)
                                 }
                                 javaType
                             }
@@ -71,6 +70,10 @@ class JavaSourceSetTest {
                     return super.visitVariable(variable, p)
                 }
             }.visit(it, 0)
+        }
+
+        signatureCollisions.sortedBy { it.toString() }.forEach {
+            println("multiple instances found for signature $it")
         }
 
         val methodHistogram = ShortCountsHistogram(1)
@@ -95,7 +98,7 @@ class JavaSourceSetTest {
         assertThat(javaSourceSet.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")
 
-        assertThat(signatureCollisions)
+        assertThat(signatureCollisions.size)
             .`as`("More than one instance of a type collides on the same signature. See the sysout above for details.")
             .isEqualTo(0)
     }
