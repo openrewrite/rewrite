@@ -59,11 +59,7 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     @Override
     public String arraySignature(Object type) {
         ArrayTypeSignature arrSignature = (ArrayTypeSignature) type;
-        StringBuilder s = new StringBuilder(signature(arrSignature.getNestedType()));
-        for (int i = 0; i < arrSignature.getNumDimensions(); i++) {
-            s.append("[]");
-        }
-        return s.toString();
+        return signature(arrSignature.getNestedType()) + "[]";
     }
 
     @Override
