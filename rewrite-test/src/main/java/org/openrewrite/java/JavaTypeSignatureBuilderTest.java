@@ -35,7 +35,7 @@ public interface JavaTypeSignatureBuilderTest {
     JavaTypeSignatureBuilder signatureBuilder();
 
     @Test
-    default void arraySignature() {
+    default void array() {
         assertThat(signatureBuilder().signature(firstMethodParameter("array")))
                 .isEqualTo("org.openrewrite.java.C[]");
     }
@@ -47,7 +47,7 @@ public interface JavaTypeSignatureBuilderTest {
     }
 
     @Test
-    default void primitiveSignature() {
+    default void primitive() {
         assertThat(signatureBuilder().signature(firstMethodParameter("primitive")))
                 .isEqualTo("int");
     }
@@ -65,9 +65,15 @@ public interface JavaTypeSignatureBuilderTest {
     }
 
     @Test
-    default void parameterizedSignature() {
+    default void parameterized() {
         assertThat(signatureBuilder().signature(firstMethodParameter("parameterized")))
                 .isEqualTo("org.openrewrite.java.PT<org.openrewrite.java.C>");
+    }
+
+    @Test
+    default void parameterizedRecursive() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("parameterizedRecursive")))
+                .isEqualTo("org.openrewrite.java.PT<org.openrewrite.java.PT<org.openrewrite.java.C>>");
     }
 
     @Test
@@ -92,11 +98,6 @@ public interface JavaTypeSignatureBuilderTest {
     default void genericRecursiveInMethodDeclaration() {
         assertThat(signatureBuilder().signature(firstMethodParameter("genericRecursive")))
                 .isEqualTo("org.openrewrite.java.JavaTypeGoat<? extends U extends org.openrewrite.java.JavaTypeGoat<U, ?>[], ?>");
-    }
-
-    @Test
-    default void genericBounds() {
-        genericRecursiveInClassDefinition();
     }
 
     @Test
