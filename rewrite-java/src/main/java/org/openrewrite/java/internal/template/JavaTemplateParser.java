@@ -157,7 +157,7 @@ public class JavaTemplateParser {
     public <J2 extends J> List<J2> parseBlockStatements(Cursor cursor, Class<J2> expected,
                                                         String template,
                                                         Space.Location location) {
-        String cacheKey = addImports(statementTemplateGenerator.cacheKey(cursor, template, location));
+        String cacheKey = addImports(template);
         return cache(cacheKey, () -> {
             @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location);
             onBeforeParseTemplate.accept(stub);
@@ -175,7 +175,7 @@ public class JavaTemplateParser {
             methodWithReplacedNameAndArgs = method.getSelect().print(cursor) + "." + template + ";";
         }
 
-        String cacheKey = addImports(statementTemplateGenerator.cacheKey(cursor, methodWithReplacedNameAndArgs, location));
+        String cacheKey = addImports(template);
         List<J> invocations = cache(cacheKey, () -> {
             @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, location);
             onBeforeParseTemplate.accept(stub);
@@ -192,7 +192,7 @@ public class JavaTemplateParser {
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor)
                 .replaceAll("\\)$", template + ");");
 
-        String cacheKey = addImports(statementTemplateGenerator.cacheKey(cursor, methodWithReplacementArgs, location));
+        String cacheKey = addImports(template);
         List<J> invocations = cache(cacheKey, () -> {
             @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
             onBeforeParseTemplate.accept(stub);

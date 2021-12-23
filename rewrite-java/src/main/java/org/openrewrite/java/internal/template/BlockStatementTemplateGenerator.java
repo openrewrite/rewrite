@@ -57,22 +57,6 @@ public class BlockStatementTemplateGenerator {
 
     private final Set<String> imports;
 
-    public String cacheKey(Cursor cursor, String template, Space.Location location) {
-        StringBuilder before = new StringBuilder();
-        StringBuilder after = new StringBuilder();
-
-        // for replaceBody()
-        if (cursor.getValue() instanceof J.MethodDeclaration &&
-                location.equals(Space.Location.BLOCK_PREFIX)) {
-            J.MethodDeclaration method = cursor.getValue();
-            J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
-            before.insert(0, m.printTrimmed(cursor).trim() + '{');
-            after.append('}');
-        }
-
-        return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
-    }
-
     public String template(Cursor cursor, String template, Space.Location location) {
         //noinspection ConstantConditions
         return Timer.builder("rewrite.template.generate.statement")
