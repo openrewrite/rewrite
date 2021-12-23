@@ -87,7 +87,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if (!sym.completer.isTerminal()) {
             completeClassSymbol(sym);
         }
-        return sym.className();
+        return sym.flatName().toString();
     }
 
     @Override
