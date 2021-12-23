@@ -16,7 +16,6 @@
 package org.openrewrite.java.internal;
 
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.tree.JavaType;
@@ -249,6 +248,13 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             return existing;
         }
 
+        JavaType.Variable mappedVariable = new JavaType.Variable(
+                field.getModifiers(),
+                field.getName(),
+                null, null, null
+        );
+        typeBySignature.put(signature, mappedVariable);
+
         List<JavaType.FullyQualified> annotations = null;
         if (field.getDeclaredAnnotations().length > 0) {
             annotations = new ArrayList<>(field.getDeclaredAnnotations().length);
@@ -258,16 +264,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        JavaType.Variable mappedVariable = new JavaType.Variable(
-                field.getModifiers(),
-                field.getName(),
-                (JavaType.FullyQualified) type(field.getDeclaringClass()),
-                type(field.getType()),
-                annotations
-        );
-
-        typeBySignature.put(signature, mappedVariable);
-
+        mappedVariable.unsafeSet((JavaType.FullyQualified) type(field.getDeclaringClass()), type(field.getType()), annotations);
         return mappedVariable;
     }
 
@@ -286,6 +283,15 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 paramNames.add(p.getName());
             }
         }
+
+        JavaType.Method mappedMethod = new JavaType.Method(
+                method.getModifiers(),
+                null,
+                method.getName(),
+                paramNames,
+                null, null, null, null
+        );
+        typeBySignature.put(signature, mappedMethod);
 
         List<JavaType.FullyQualified> thrownExceptions = null;
         if (method.getExceptionTypes().length > 0) {
@@ -319,19 +325,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 resolvedArgumentTypes
         );
 
-        JavaType.Method mappedMethod = new JavaType.Method(
-                method.getModifiers(),
-                (JavaType.FullyQualified) type(method.getDeclaringClass()),
-                method.getName(),
-                paramNames,
-                resolvedSignature,
-                resolvedSignature,
-                thrownExceptions,
-                annotations
-        );
-
-        typeBySignature.put(signature, mappedMethod);
-
+        mappedMethod.unsafeSet((JavaType.FullyQualified) type(method.getDeclaringClass()), resolvedSignature, resolvedSignature, thrownExceptions, annotations);
         return mappedMethod;
     }
 }
