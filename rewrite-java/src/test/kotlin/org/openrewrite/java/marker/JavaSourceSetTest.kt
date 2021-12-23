@@ -72,10 +72,6 @@ class JavaSourceSetTest {
             }.visit(it, 0)
         }
 
-        signatureCollisions.sortedBy { it.toString() }.forEach {
-            println("multiple instances found for signature $it")
-        }
-
         val methodHistogram = ShortCountsHistogram(1)
         methodsByType.values.forEach { methodHistogram.recordValue(it.size.toLong()) }
 
@@ -98,9 +94,9 @@ class JavaSourceSetTest {
         assertThat(javaSourceSet.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")
 
-        assertThat(signatureCollisions.size)
+        assertThat(signatureCollisions.sortedBy { it.toString() })
             .`as`("More than one instance of a type collides on the same signature. See the sysout above for details.")
-            .isEqualTo(0)
+            .isEmpty()
     }
 
     private fun humanReadableByteCount(bytes: Double): String {
