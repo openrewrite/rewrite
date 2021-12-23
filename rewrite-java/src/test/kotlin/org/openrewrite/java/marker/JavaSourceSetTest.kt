@@ -38,7 +38,7 @@ class JavaSourceSetTest {
 
         val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
         val typeBySignatureAfterMapping = mutableMapOf<String, JavaType>()
-        val signatureCollisions = hashSetOf<JavaType>()
+        val signatureCollisions: MutableMap<JavaType, Int> = IdentityHashMap()
 
         val methodsByType: MutableMap<String, MutableSet<String>> = mutableMapOf()
         val fieldsByType: MutableMap<String, MutableSet<String>> = mutableMapOf()
@@ -50,7 +50,7 @@ class JavaSourceSetTest {
                         if (uniqueTypes.add(javaType)) {
                             typeBySignatureAfterMapping.compute(javaType.toString()) { _, existing ->
                                 if (existing != null && javaType !== existing) {
-                                    signatureCollisions.add(javaType)
+                                    signatureCollisions.compute(javaType) { _, acc -> (acc ?: 0) + 1 }
                                 }
                                 javaType
                             }
@@ -94,7 +94,7 @@ class JavaSourceSetTest {
         assertThat(javaSourceSet.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")
 
-        assertThat(signatureCollisions.sortedBy { it.toString() })
+        assertThat(signatureCollisions.entries.sortedBy { it.toString() }.map { "${it.key} ${if(it.value > 1) "(x${it.value})" else ""}" })
             .`as`("More than one instance of a type collides on the same signature. See the sysout above for details.")
             .isEmpty()
     }
