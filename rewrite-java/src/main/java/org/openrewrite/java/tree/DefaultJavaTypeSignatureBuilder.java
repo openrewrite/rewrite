@@ -64,10 +64,10 @@ class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) type;
         StringBuilder s = new StringBuilder("Generic{" + gtv.getName());
 
-        if(typeVariableNameStack == null) {
+        if (typeVariableNameStack == null) {
             typeVariableNameStack = new HashSet<>();
         }
-        if(!typeVariableNameStack.add(gtv.getName())) {
+        if (!typeVariableNameStack.add(gtv.getName())) {
             typeVariableNameStack.remove(gtv.getName());
             s.append('}');
             return s.toString();
@@ -116,10 +116,7 @@ class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String variableSignature(JavaType.Variable variable) {
-        String declaringType = variable.getType() instanceof JavaType.FullyQualified ?
-                ((JavaType.FullyQualified) variable.getType()).getFullyQualifiedName() :
-                signature(variable.getType());
-        return declaringType + "{name=" + variable.getName() + '}';
+        return variable.getOwner().getFullyQualifiedName() + "{name=" + variable.getName() + '}';
     }
 
     public String methodSignature(JavaType.Method method) {
