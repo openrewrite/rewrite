@@ -44,7 +44,8 @@ interface JavaTypeMappingTest {
     @Test
     fun array() {
         val arr = firstMethodParameter("array") as JavaType.Array
-        assertThat(arr.elemType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
+        assertThat(arr.elemType.asArray()).isNotNull
+        assertThat(arr.elemType.asArray()!!.elemType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 
     @Test

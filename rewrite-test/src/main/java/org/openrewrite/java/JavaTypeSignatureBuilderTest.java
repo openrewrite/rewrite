@@ -37,7 +37,7 @@ public interface JavaTypeSignatureBuilderTest {
     @Test
     default void array() {
         assertThat(signatureBuilder().signature(firstMethodParameter("array")))
-                .isEqualTo("org.openrewrite.java.C[]");
+                .isEqualTo("org.openrewrite.java.C[][]");
     }
 
     @Test
@@ -50,18 +50,6 @@ public interface JavaTypeSignatureBuilderTest {
     default void primitive() {
         assertThat(signatureBuilder().signature(firstMethodParameter("primitive")))
                 .isEqualTo("int");
-    }
-
-    @Test
-    default void objectArray() {
-        assertThat(signatureBuilder().signature(firstMethodParameter("objectArray")))
-                .isEqualTo("java.lang.Object[]");
-    }
-
-    @Test
-    default void primitiveArray() {
-        assertThat(signatureBuilder().signature(firstMethodParameter("primitiveArray")))
-                .isEqualTo("int[]");
     }
 
     @Test

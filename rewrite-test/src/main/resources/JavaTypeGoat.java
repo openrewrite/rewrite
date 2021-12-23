@@ -19,9 +19,7 @@ package org.openrewrite.java;
 public interface JavaTypeGoat<T, S extends JavaTypeGoat<S, ? extends T> & C> {
     void clazz(C n);
     void primitive(int n);
-    void array(C[] n);
-    void objectArray(Object[] n);
-    void primitiveArray(int[] n);
+    void array(C[][] n);
     void parameterized(PT<C> n);
     void parameterizedRecursive(PT<PT<C>> n);
     void generic(PT<? extends C> n);
