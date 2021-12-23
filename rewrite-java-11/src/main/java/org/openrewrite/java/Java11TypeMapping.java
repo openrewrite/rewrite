@@ -44,7 +44,7 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
     private final Map<String, Object> typeBySignature;
 
     public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
-        if (type == null || type instanceof Type.ErrorType) {
+        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
