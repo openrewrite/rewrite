@@ -64,14 +64,6 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 kind = JavaType.Class.Kind.Class;
             }
 
-            if (className.startsWith("com.sun.") ||
-                    className.startsWith("sun.") ||
-                    className.startsWith("java.awt.") ||
-                    className.startsWith("jdk.") ||
-                    className.startsWith("org.graalvm")) {
-                return JavaType.Unknown.getInstance();
-            }
-
             clazz = new JavaType.Class(
                     null,
                     aClass.getModifiers(),

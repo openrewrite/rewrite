@@ -146,17 +146,6 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) classType.tsym;
         Type.ClassType symType = (Type.ClassType) sym.type;
 
-        if (sym.className().startsWith("com.sun.") ||
-                sym.className().startsWith("sun.") ||
-                sym.className().startsWith("java.awt.") ||
-                sym.className().startsWith("java.applet.") ||
-                sym.className().startsWith("jdk.") ||
-                sym.className().startsWith("org.graalvm")) {
-            return (JavaType.Class) typeBySignature.computeIfAbsent(signatureBuilder.signature(classType), ignored -> new JavaType.Class(
-                    null, sym.flags_field, sym.flatName().toString(), getKind(sym),
-                    null, null, null, null, null, null));
-        }
-
         JavaType.Class clazz = (JavaType.Class) typeBySignature.get(sym.flatName().toString());
         if (clazz == null) {
             if (!sym.completer.isTerminal()) {

@@ -66,7 +66,8 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     @Override
     public String classSignature(Object type) {
         ClassRefTypeSignature classRefTypeSignature = (ClassRefTypeSignature) type;
-        return classRefTypeSignature.getFullyQualifiedClassName();
+        ClassInfo classInfo = classRefTypeSignature.getClassInfo();
+        return classInfo == null ? "{undefined}" : classRefTypeSignature.getFullyQualifiedClassName();
     }
 
     @Override
@@ -154,7 +155,8 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             }
         } else if (type instanceof ClassRefTypeSignature) {
             ClassRefTypeSignature clazz = (ClassRefTypeSignature) type;
-            s.append(clazz.getBaseClassName());
+            ClassInfo classInfo = clazz.getClassInfo();
+            s.append(classInfo == null ? "{undefined}" : clazz.getBaseClassName());
             if (!clazz.getTypeArguments().isEmpty()) {
                 for (TypeArgument typeArgument : clazz.getTypeArguments()) {
                     typeParameters.add(signature(typeArgument));

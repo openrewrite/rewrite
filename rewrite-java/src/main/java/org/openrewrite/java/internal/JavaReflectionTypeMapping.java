@@ -111,14 +111,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         String className = clazz.getName();
         JavaType.Class mappedClazz = (JavaType.Class) typeBySignature.get(className);
 
-        if (className.startsWith("com.sun.") ||
-                className.startsWith("sun.") ||
-                className.startsWith("java.awt.") ||
-                className.startsWith("jdk.") ||
-                className.startsWith("org.graalvm")) {
-            return JavaType.Unknown.getInstance();
-        }
-
         if (mappedClazz == null) {
             JavaType.Class.Kind kind;
             if ((clazz.getModifiers() & KIND_BITMASK_ENUM) != 0) {
