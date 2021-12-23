@@ -118,16 +118,23 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
 
         List<JavaType> bounds = null;
         if (type.getUpperBound() instanceof Type.IntersectionClassType) {
-            bounds = new ArrayList<>();
             Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
             if (intersectionBound.supertype_field != null) {
-                bounds.add(type(intersectionBound.supertype_field));
-            }
-            for (Type bound : intersectionBound.interfaces_field) {
-                bounds.add(type(bound));
+                JavaType mappedBound = type(intersectionBound.supertype_field);
+                if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
+                    bounds = singletonList(mappedBound);
+                }
+            } else if (intersectionBound.interfaces_field.length() > 0) {
+                bounds = new ArrayList<>(intersectionBound.interfaces_field.length());
+                for (Type bound : intersectionBound.interfaces_field) {
+                    bounds.add(type(bound));
+                }
             }
         } else if (type.getUpperBound() != null) {
-            bounds = singletonList(type(type.getUpperBound()));
+            JavaType mappedBound = type(type.getUpperBound());
+            if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
+                bounds = singletonList(mappedBound);
+            }
         }
 
         gtv.unsafeSet(bounds == null ? INVARIANT : COVARIANT, bounds);
