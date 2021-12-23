@@ -414,11 +414,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
     private JavaType array(ArrayTypeSignature typeSignature, String signature) {
         JavaType arr = new JavaType.Array(type(typeSignature.getNestedType()));
-        if (typeBySignature.containsKey(signature)) {
-            return (JavaType.Array) typeBySignature.get(signature);
-        } else {
-            typeBySignature.put(signature, arr);
-            return arr;
-        }
+        typeBySignature.put(signature, arr);
+        return arr;
     }
 }

@@ -78,22 +78,14 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
     private JavaType.Array array(Class<?> clazz, String signature) {
         JavaType.Array arr = new JavaType.Array(type(clazz.getComponentType()));
-        if (typeBySignature.containsKey(signature)) {
-            return (JavaType.Array) typeBySignature.get(signature);
-        } else {
-            typeBySignature.put(signature, arr);
-            return arr;
-        }
+        typeBySignature.put(signature, arr);
+        return arr;
     }
 
     private JavaType.Array array(GenericArrayType type, String signature) {
         JavaType.Array arr = new JavaType.Array(type(type.getGenericComponentType()));
-        if (typeBySignature.containsKey(signature)) {
-            return (JavaType.Array) typeBySignature.get(signature);
-        } else {
-            typeBySignature.put(signature, arr);
-            return arr;
-        }
+        typeBySignature.put(signature, arr);
+        return arr;
     }
 
     private JavaType classType(Class<?> clazz, String signature) {
