@@ -153,11 +153,11 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
                 sym.className().startsWith("jdk.") ||
                 sym.className().startsWith("org.graalvm")) {
             return (JavaType.Class) typeBySignature.computeIfAbsent(signatureBuilder.signature(classType), ignored -> new JavaType.Class(
-                    null, sym.flags_field, sym.className(), getKind(sym),
+                    null, sym.flags_field, sym.flatName().toString(), getKind(sym),
                     null, null, null, null, null, null));
         }
 
-        JavaType.Class clazz = (JavaType.Class) typeBySignature.get(sym.className());
+        JavaType.Class clazz = (JavaType.Class) typeBySignature.get(sym.flatName().toString());
         if (clazz == null) {
             if (!sym.completer.isTerminal()) {
                 completeClassSymbol(sym);
@@ -166,12 +166,12 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
             clazz = new JavaType.Class(
                     null,
                     sym.flags_field,
-                    sym.className(),
+                    sym.flatName().toString(),
                     getKind(sym),
                     null, null, null, null, null, null
             );
 
-            typeBySignature.put(sym.className(), clazz);
+            typeBySignature.put(sym.flatName().toString(), clazz);
 
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(classType.supertype_field == null ? symType.supertype_field :
                     classType.supertype_field));
@@ -189,7 +189,7 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
                     if (elem instanceof Symbol.VarSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                     Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                        if (sym.className().equals("java.lang.String") && sym.name.toString().equals("serialPersistentFields")) {
+                        if (sym.flatName().toString().equals("java.lang.String") && sym.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
                             // serialization and is intentionally filtered to prevent errors.
@@ -409,7 +409,7 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
                             // been mapped to cyclic)
                             if (exceptionType instanceof Type.ClassType) {
                                 Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                                javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.className(), JavaType.Class.Kind.Class,
+                                javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
                                         null, null, null, null, null, null);
                             }
                         }
