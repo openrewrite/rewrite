@@ -157,9 +157,10 @@ public class JavaTemplateParser {
     public <J2 extends J> List<J2> parseBlockStatements(Cursor cursor, Class<J2> expected,
                                                         String template,
                                                         Space.Location location) {
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location);
-        onBeforeParseTemplate.accept(stub);
-        return cache(stub, () -> {
+        String cacheKey = addImports(template);
+        return cache(cacheKey, () -> {
+            @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location);
+            onBeforeParseTemplate.accept(stub);
             JavaSourceFile cu = compileTemplate(stub);
             return statementTemplateGenerator.listTemplatedTrees(cu, expected);
         });
@@ -173,9 +174,11 @@ public class JavaTemplateParser {
         } else {
             methodWithReplacedNameAndArgs = method.getSelect().print(cursor) + "." + template + ";";
         }
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, location);
-        onBeforeParseTemplate.accept(stub);
-        List<J> invocations = cache(stub, () -> {
+
+        String cacheKey = addImports(template);
+        List<J> invocations = cache(cacheKey, () -> {
+            @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, location);
+            onBeforeParseTemplate.accept(stub);
             JavaSourceFile cu = compileTemplate(stub);
             J.MethodInvocation replaced = (J.MethodInvocation) statementTemplateGenerator
                     .listTemplatedTrees(cu, Statement.class).get(0);
@@ -188,9 +191,11 @@ public class JavaTemplateParser {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor)
                 .replaceAll("\\)$", template + ");");
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
-        onBeforeParseTemplate.accept(stub);
-        List<J> invocations = cache(stub, () -> {
+
+        String cacheKey = addImports(template);
+        List<J> invocations = cache(cacheKey, () -> {
+            @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
+            onBeforeParseTemplate.accept(stub);
             JavaSourceFile cu = compileTemplate(stub);
             J.MethodInvocation replaced = (J.MethodInvocation) statementTemplateGenerator
                     .listTemplatedTrees(cu, Statement.class).get(0);
@@ -200,9 +205,10 @@ public class JavaTemplateParser {
     }
 
     public List<J.Annotation> parseAnnotations(Cursor cursor, String template) {
-        @Language("java") String stub = annotationTemplateGenerator.template(cursor, template);
-        onBeforeParseTemplate.accept(stub);
-        return cache(stub, () -> {
+        String cacheKey = addImports(annotationTemplateGenerator.cacheKey(cursor, template));
+        return cache(cacheKey, () -> {
+            @Language("java") String stub = annotationTemplateGenerator.template(cursor, template);
+            onBeforeParseTemplate.accept(stub);
             JavaSourceFile cu = compileTemplate(stub);
             return annotationTemplateGenerator.listAnnotations(cu);
         });
