@@ -40,12 +40,21 @@ class JavaSourceSetTest {
         println("Shallow type count: ${javaSourceSet.classpath.size}")
 
         val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
+        val typeBySignatureAfterMapping: MutableMap<String, JavaType> = mutableMapOf()
+        var signatureCollisions = 0
 
         javaSourceSet.classpath.forEach {
             object : JavaTypeVisitor<Int>() {
                 override fun visit(javaType: JavaType?, p: Int): JavaType? {
-                    if(javaType is JavaType) {
-                        if(uniqueTypes.add(javaType)) {
+                    if (javaType is JavaType) {
+                        if (uniqueTypes.add(javaType)) {
+                            typeBySignatureAfterMapping.compute(javaType.toString()) { _, existing ->
+                                if(existing != null && javaType !== existing) {
+                                    println("multiple instances found for signature $javaType")
+                                    signatureCollisions++
+                                }
+                                javaType
+                            }
                             return super.visit(javaType, p)
                         }
                     }
@@ -58,6 +67,10 @@ class JavaSourceSetTest {
 
         assertThat(javaSourceSet.classpath.map { it.fullyQualifiedName })
             .contains("org.junit.jupiter.api.Test")
+
+        assertThat(signatureCollisions)
+            .`as`("More than one instance of a type collides on the same signature. See the sysout above for details.")
+            .isEqualTo(0)
     }
 
     private fun humanReadableByteCount(bytes: Double): String {
