@@ -124,4 +124,10 @@ interface JavaTypeMappingTest {
         assertThat(parameterized!!.type.fullyQualifiedName).isEqualTo("org.openrewrite.java.PT")
         assertThat(parameterized.typeParameters[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
+
+    @Test
+    fun innerClass() {
+        val clazz = firstMethodParameter("inner").asFullyQualified()!!
+        assertThat(clazz.fullyQualifiedName).isEqualTo("org.openrewrite.java.C${"$"}Inner")
+    }
 }
