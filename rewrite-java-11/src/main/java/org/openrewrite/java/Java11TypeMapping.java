@@ -443,7 +443,6 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
         return null;
     }
 
-    @Nullable
     private JavaType.Method.Signature methodSignature(Type signatureType) {
         if (signatureType instanceof Type.ForAll) {
             signatureType = ((Type.ForAll) signatureType).qtype;
@@ -465,7 +464,8 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
 
             return new JavaType.Method.Signature(type(mt.restype), paramTypes);
         }
-        return null;
+
+        throw new UnsupportedOperationException("Unexpected method signature type" + signatureType.getClass().getName());
     }
 
     private void completeClassSymbol(Symbol.ClassSymbol classSymbol) {

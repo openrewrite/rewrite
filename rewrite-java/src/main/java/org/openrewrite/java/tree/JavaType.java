@@ -392,7 +392,7 @@ public interface JavaType {
         public void unsafeSet(FullyQualified type, List<JavaType> typeParameters) {
             assert type != this;
             this.type = type;
-            this.typeParameters = typeParameters;
+            this.typeParameters = nullIfEmpty(typeParameters);
         }
 
         @Override
@@ -514,7 +514,7 @@ public interface JavaType {
 
         public void unsafeSet(Variance variance, @Nullable List<JavaType> bounds) {
             this.variance = variance;
-            this.bounds = bounds;
+            this.bounds = nullIfEmpty(bounds);
         }
 
         @Override
@@ -676,8 +676,8 @@ public interface JavaType {
         }
 
         public void unsafeSet(FullyQualified declaringType,
-                              @Nullable JavaType.Method.Signature genericSignature,
-                              @Nullable JavaType.Method.Signature resolvedSignature,
+                              JavaType.Method.Signature genericSignature,
+                              JavaType.Method.Signature resolvedSignature,
                               @Nullable List<FullyQualified> thrownExceptions,
                               @Nullable List<FullyQualified> annotations) {
             this.declaringType = declaringType;
