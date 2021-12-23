@@ -16,6 +16,7 @@
 package org.openrewrite.java.marker
 
 import io.micrometer.core.instrument.util.DoubleFormat.decimalOrNan
+import org.HdrHistogram.ShortCountsHistogram
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openjdk.jol.info.GraphStats
@@ -35,13 +36,12 @@ class JavaSourceSetTest {
         val typeBySignature = mutableMapOf<String, Any>()
         val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeBySignature, ctx)
 
-        println("Heap size: ${humanReadableByteCount(GraphStats.parseInstance(javaSourceSet).totalSize().toDouble())}")
-        println("Unique signatures: ${typeBySignature.size}")
-        println("Shallow type count: ${javaSourceSet.classpath.size}")
-
         val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
         val typeBySignatureAfterMapping: MutableMap<String, JavaType> = mutableMapOf()
         var signatureCollisions = 0
+
+        val methodsByType: MutableMap<String, MutableSet<String>> = mutableMapOf()
+        val fieldsByType: MutableMap<String, MutableSet<String>> = mutableMapOf()
 
         javaSourceSet.classpath.forEach {
             object : JavaTypeVisitor<Int>() {
@@ -49,7 +49,7 @@ class JavaSourceSetTest {
                     if (javaType is JavaType) {
                         if (uniqueTypes.add(javaType)) {
                             typeBySignatureAfterMapping.compute(javaType.toString()) { _, existing ->
-                                if(existing != null && javaType !== existing) {
+                                if (existing != null && javaType !== existing) {
                                     println("multiple instances found for signature $javaType")
                                     signatureCollisions++
                                 }
@@ -60,9 +60,36 @@ class JavaSourceSetTest {
                     }
                     return javaType
                 }
+
+                override fun visitMethod(method: JavaType.Method, p: Int): JavaType {
+                    methodsByType.getOrPut(method.declaringType.toString()) { mutableSetOf() }.add(method.toString())
+                    return super.visitMethod(method, p)
+                }
+
+                override fun visitVariable(variable: JavaType.Variable, p: Int): JavaType {
+                    fieldsByType.getOrPut(variable.owner.toString()) { mutableSetOf() }.add(variable.toString())
+                    return super.visitVariable(variable, p)
+                }
             }.visit(it, 0)
         }
 
+        val methodHistogram = ShortCountsHistogram(1)
+        methodsByType.values.forEach { methodHistogram.recordValue(it.size.toLong()) }
+
+        println("Methods per class:\n")
+        methodHistogram.outputPercentileDistribution(System.out, 1.0)
+        println("\n\n")
+
+        val fieldHistogram = ShortCountsHistogram(1)
+        fieldsByType.values.forEach { fieldHistogram.recordValue(it.size.toLong()) }
+
+        println("Fields per class:\n")
+        fieldHistogram.outputPercentileDistribution(System.out, 1.0)
+        println("\n\n")
+
+        println("Heap size: ${humanReadableByteCount(GraphStats.parseInstance(javaSourceSet).totalSize().toDouble())}")
+        println("Unique signatures: ${typeBySignature.size}")
+        println("Shallow type count: ${javaSourceSet.classpath.size}")
         println("Deep type count: ${uniqueTypes.size}")
 
         assertThat(javaSourceSet.classpath.map { it.fullyQualifiedName })
