@@ -110,9 +110,9 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             }
 
             List<JavaType.Variable> variables = null;
-            if (!aClass.getFieldInfo().isEmpty()) {
-                variables = new ArrayList<>(aClass.getFieldInfo().size());
-                for (FieldInfo fieldInfo : aClass.getFieldInfo()) {
+            if (!aClass.getDeclaredFieldInfo().isEmpty()) {
+                variables = new ArrayList<>(aClass.getDeclaredFieldInfo().size());
+                for (FieldInfo fieldInfo : aClass.getDeclaredFieldInfo()) {
                     if (!fieldInfo.isSynthetic()) {
                         if (!aClass.getName().equals("java.lang.String") || !fieldInfo.getName().equals("serialPersistentFields")) {
                             JavaType.Variable variable = variableType(fieldInfo);
@@ -123,9 +123,9 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             }
 
             List<JavaType.Method> methods = null;
-            if (!aClass.getMethodInfo().isEmpty()) {
-                methods = new ArrayList<>(aClass.getMethodInfo().size());
-                for (MethodInfo methodInfo : aClass.getMethodInfo()) {
+            if (!aClass.getDeclaredMethodInfo().isEmpty()) {
+                methods = new ArrayList<>(aClass.getDeclaredMethodInfo().size());
+                for (MethodInfo methodInfo : aClass.getDeclaredMethodInfo()) {
                     if (!(methodInfo.isBridge() || methodInfo.isSynthetic())) {
                         methods.add(methodType(methodInfo));
                     }

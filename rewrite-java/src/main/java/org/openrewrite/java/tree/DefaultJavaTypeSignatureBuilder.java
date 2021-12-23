@@ -133,7 +133,7 @@ class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
         StringJoiner genericArgumentTypes = new StringJoiner(",");
         for (JavaType paramType : method.getGenericSignature().getParamTypes()) {
-            resolvedArgumentTypes.add(signature(paramType));
+            genericArgumentTypes.add(signature(paramType));
         }
         s.append(",generic=");
         s.append(signature(method.getGenericSignature().getReturnType()));
