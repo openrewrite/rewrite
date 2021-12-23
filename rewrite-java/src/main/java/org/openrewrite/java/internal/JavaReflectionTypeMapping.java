@@ -154,9 +154,11 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             if (clazz.getDeclaredFields().length > 0) {
                 members = new ArrayList<>(clazz.getDeclaredFields().length);
                 for (Field f : clazz.getDeclaredFields()) {
-                    if (!clazz.getName().equals("java.lang.String") || !f.getName().equals("serialPersistentFields")) {
-                        JavaType.Variable field = field(f);
-                        members.add(field);
+                    if(!f.isSynthetic()) {
+                        if (!clazz.getName().equals("java.lang.String") || !f.getName().equals("serialPersistentFields")) {
+                            JavaType.Variable field = field(f);
+                            members.add(field);
+                        }
                     }
                 }
             }
@@ -165,8 +167,9 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             if (clazz.getDeclaredMethods().length > 0) {
                 methods = new ArrayList<>(clazz.getDeclaredMethods().length);
                 for (Method method : clazz.getDeclaredMethods()) {
-                    JavaType.Method javaType = method(method);
-                    methods.add(javaType);
+                    if(!(method.isBridge() || method.isSynthetic())) {
+                        methods.add(method(method));
+                    }
                 }
             }
 

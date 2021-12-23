@@ -19,7 +19,6 @@ import io.github.classgraph.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 
 import java.lang.reflect.InvocationTargetException;
@@ -116,8 +115,12 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             if (!aClass.getFieldInfo().isEmpty()) {
                 variables = new ArrayList<>(aClass.getFieldInfo().size());
                 for (FieldInfo fieldInfo : aClass.getFieldInfo()) {
-                    JavaType.Variable variable = variableType(fieldInfo);
-                    variables.add(variable);
+                    if (!fieldInfo.isSynthetic()) {
+                        if (!aClass.getName().equals("java.lang.String") || !fieldInfo.getName().equals("serialPersistentFields")) {
+                            JavaType.Variable variable = variableType(fieldInfo);
+                            variables.add(variable);
+                        }
+                    }
                 }
             }
 
@@ -125,9 +128,8 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             if (!aClass.getMethodInfo().isEmpty()) {
                 methods = new ArrayList<>(aClass.getMethodInfo().size());
                 for (MethodInfo methodInfo : aClass.getMethodInfo()) {
-                    JavaType.Method method = methodType(methodInfo);
-                    if (method != null) {
-                        methods.add(method);
+                    if(!(methodInfo.isBridge() || methodInfo.isSynthetic())) {
+                        methods.add(methodType(methodInfo));
                     }
                 }
             }
@@ -209,16 +211,8 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         return variable;
     }
 
-    @Nullable
     private JavaType.Method methodType(MethodInfo methodInfo) {
         long flags = methodInfo.getModifiers();
-
-        // The field access modifier "volatile" corresponds to the "bridge" modifier on methods.
-        // We don't represent "bridge" because it is a compiler internal that cannot appear in source code.
-        // See https://github.com/openrewrite/rewrite/issues/995
-        if ((flags & Flag.Volatile.getBitMask()) != 0) {
-            return null;
-        }
 
         String signature = signatureBuilder.methodSignature(methodInfo);
         JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);

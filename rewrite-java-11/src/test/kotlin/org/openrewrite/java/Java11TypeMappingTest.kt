@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.fail
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.tree.JavaType
 
 class Java11TypeMappingTest : JavaTypeMappingTest {
@@ -23,8 +25,10 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
             .bufferedReader().readText()
     }
 
-    override fun goatType(): JavaType.Parameterized = JavaParser.fromJavaVersion().build()
-        .parse(goat)[0]
+    override fun goatType(): JavaType.Parameterized = JavaParser.fromJavaVersion()
+        .logCompilationWarningsAndErrors(true)
+        .build()
+        .parse(InMemoryExecutionContext { t -> fail(t) }, goat)[0]
         .classes[0]
         .type
         .asParameterized()!!
