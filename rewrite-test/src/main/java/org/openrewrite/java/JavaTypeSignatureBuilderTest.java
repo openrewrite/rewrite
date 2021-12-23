@@ -104,4 +104,10 @@ public interface JavaTypeSignatureBuilderTest {
         assertThat(signatureBuilder().signature(firstMethodParameter("genericUnbounded")))
             .isEqualTo("org.openrewrite.java.PT<U>");
     }
+
+    @Test
+    default void innerClass() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("inner")))
+                .isEqualTo("org.openrewrite.java.C$Inner");
+    }
 }

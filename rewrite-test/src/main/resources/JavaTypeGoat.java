@@ -28,9 +28,12 @@ public interface JavaTypeGoat<T, S extends JavaTypeGoat<S, ? extends T> & C> {
     <U extends JavaTypeGoat<U, ?>> void genericRecursive(JavaTypeGoat<? extends U[], ?> n);
     <U> void genericUnbounded(PT<U> n);
     void genericArray(PT<C>[] n);
+    void inner(C.Inner n);
 }
 
 interface C {
+    class Inner {
+    }
 }
 
 interface PT<T> {
