@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.java.internal;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
+import org.openrewrite.java.tree.JavaType;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.StringJoiner;
 
-class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
-    static final DefaultJavaTypeSignatureBuilder TO_STRING = new DefaultJavaTypeSignatureBuilder();
+public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
+    public static final DefaultJavaTypeSignatureBuilder TO_STRING = new DefaultJavaTypeSignatureBuilder();
 
     @Nullable
     private Set<String> typeVariableNameStack;

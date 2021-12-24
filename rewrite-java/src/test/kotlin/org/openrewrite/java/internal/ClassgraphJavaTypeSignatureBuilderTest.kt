@@ -35,10 +35,13 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
             .getClassInfo("org.openrewrite.java.JavaTypeGoat")
     }
 
+    override fun methodSignature(methodName: String): String = signatureBuilder()
+        .methodSignature(goat.getMethodInfo(methodName)[0])
+
     override fun firstMethodParameter(methodName: String): TypeSignature = goat.getMethodInfo(methodName)[0]
         .parameterInfo[0].run { typeSignature ?: typeDescriptor }
 
     override fun lastClassTypeParameter(): TypeParameter = (goat.typeSignature as ClassTypeSignature).typeParameters.last()
 
-    override fun signatureBuilder(): JavaTypeSignatureBuilder = ClassgraphJavaTypeSignatureBuilder(emptyMap())
+    override fun signatureBuilder(): ClassgraphJavaTypeSignatureBuilder = ClassgraphJavaTypeSignatureBuilder(emptyMap())
 }

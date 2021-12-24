@@ -47,7 +47,28 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             .getValue();
 
     @Override
-    public Object firstMethodParameter(String methodName) {
+    public String methodSignature(String methodName) {
+        return new TreeScanner<String, Integer>() {
+            @Override
+            public String visitMethod(MethodTree node, Integer p) {
+                JCTree.JCMethodDecl method = (JCTree.JCMethodDecl) node;
+                if(method.getName().toString().equals(methodName)) {
+                    return signatureBuilder().methodSignature(method.type, method.sym);
+                }
+                //noinspection ConstantConditions
+                return null;
+            }
+
+            @Nullable
+            @Override
+            public String reduce(@Nullable String r1, @Nullable String r2) {
+                return r1 == null ? r2 : r1;
+            }
+        }.scan(cu, 0);
+    }
+
+    @Override
+    public Type firstMethodParameter(String methodName) {
         return new TreeScanner<Type, Integer>() {
             @Override
             public Type visitMethod(MethodTree node, Integer p) {
@@ -80,7 +101,7 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
     }
 
     @Override
-    public JavaTypeSignatureBuilder signatureBuilder() {
+    public Java11TypeSignatureBuilder signatureBuilder() {
         return new Java11TypeSignatureBuilder();
     }
 }

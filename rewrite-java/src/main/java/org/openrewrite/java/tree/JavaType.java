@@ -31,7 +31,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
-import static org.openrewrite.java.tree.DefaultJavaTypeSignatureBuilder.TO_STRING;
+import static org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder.TO_STRING;
 
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")

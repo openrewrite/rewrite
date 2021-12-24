@@ -17,9 +17,9 @@ package org.openrewrite.java.tree
 
 import org.openrewrite.internal.StringUtils
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.JavaTypeSignatureBuilderTest
 import org.openrewrite.java.asParameterized
+import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder
 
 class DefaultJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     companion object {
@@ -36,6 +36,9 @@ class DefaultJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
             .asParameterized()!!
     }
 
+    override fun methodSignature(methodName: String): String = signatureBuilder().methodSignature(goatCu.type.methods
+        .first { it.name == methodName })
+
     override fun firstMethodParameter(methodName: String): JavaType = goatCu.type.methods
         .first { it.name == methodName }
         .resolvedSignature
@@ -43,6 +46,5 @@ class DefaultJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
 
     override fun lastClassTypeParameter(): JavaType = goatCu.typeParameters.last()
 
-    override fun signatureBuilder() = DefaultJavaTypeSignatureBuilder()
-            as JavaTypeSignatureBuilder
+    override fun signatureBuilder(): DefaultJavaTypeSignatureBuilder = DefaultJavaTypeSignatureBuilder()
 }

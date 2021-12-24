@@ -21,12 +21,15 @@ import java.lang.reflect.Type
 import java.lang.reflect.TypeVariable
 
 class JavaReflectionTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
+    override fun methodSignature(methodName: String): String = signatureBuilder()
+        .methodSignature(JavaTypeGoat::class.java.declaredMethods.first { it.name == methodName })
 
     override fun firstMethodParameter(methodName: String): Type = JavaTypeGoat::class.java.declaredMethods
         .first { it.name == methodName }
         .genericParameterTypes[0]
 
-    override fun lastClassTypeParameter(): TypeVariable<Class<JavaTypeGoat<*, *>>> = JavaTypeGoat::class.java.typeParameters.last()
+    override fun lastClassTypeParameter(): TypeVariable<Class<JavaTypeGoat<*, *>>> =
+        JavaTypeGoat::class.java.typeParameters.last()
 
     override fun signatureBuilder() = JavaReflectionTypeSignatureBuilder()
 }
