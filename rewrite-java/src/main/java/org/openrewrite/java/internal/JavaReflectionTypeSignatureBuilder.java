@@ -168,15 +168,23 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
         StringBuilder s = new StringBuilder(method.getDeclaringClass().getName());
         s.append("{name=").append(method.getName());
 
-        StringJoiner argumentTypeSignatures = new StringJoiner(",");
+        StringJoiner genericArgumentTypeSignatures = new StringJoiner(",");
+        StringJoiner resolvedArgumentTypeSignatures = new StringJoiner(",");
         if (method.getParameters().length > 0) {
             for (Parameter parameter : method.getParameters()) {
                 Type parameterizedType = parameter.getParameterizedType();
-                argumentTypeSignatures.add(signature(parameterizedType == null ? parameter.getType() : parameterizedType));
+                if(parameterizedType == null) {
+                    genericArgumentTypeSignatures.add(signature(parameter.getType()));
+                    resolvedArgumentTypeSignatures.add(classSignature(parameter.getType()));
+                } else {
+                    genericArgumentTypeSignatures.add(signature(parameterizedType));
+                    resolvedArgumentTypeSignatures.add(parameterizedType instanceof ParameterizedType ?
+                            classSignature(((ParameterizedType) parameterizedType).getRawType()) : signature(parameterizedType));
+                }
             }
         }
-        s.append(",resolved=").append(method.getReturnType().getName()).append('(').append(argumentTypeSignatures).append(')');
-        s.append(",generic=").append(method.getReturnType().getName()).append('(').append(argumentTypeSignatures).append(')');
+        s.append(",resolved=").append(method.getReturnType().getName()).append('(').append(resolvedArgumentTypeSignatures).append(')');
+        s.append(",generic=").append(method.getReturnType().getName()).append('(').append(genericArgumentTypeSignatures).append(')');
         s.append('}');
 
         return s.toString();
