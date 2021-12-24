@@ -132,12 +132,24 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             case NONE:
                 s.append(signature(typeArgument.getTypeSignature()));
                 break;
-            case EXTENDS:
-                s.append("Generic{? extends ").append(signature(typeArgument.getTypeSignature())).append('}');
+            case EXTENDS: {
+                String bound = signature(typeArgument.getTypeSignature());
+                if (bound.equals("java.lang.Object")) {
+                    s.append("Generic{?}");
+                } else {
+                    s.append("Generic{? extends ").append(bound).append('}');
+                }
                 break;
-            case SUPER:
-                s.append("Generic{? super ").append(signature(typeArgument.getTypeSignature())).append('}');
+            }
+            case SUPER: {
+                String bound = signature(typeArgument.getTypeSignature());
+                if (bound.equals("java.lang.Object")) {
+                    s.append("Generic{?}");
+                } else {
+                    s.append("Generic{? super ").append(bound).append('}');
+                }
                 break;
+            }
             case ANY:
                 s.append("Generic{?}");
         }

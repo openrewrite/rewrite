@@ -317,16 +317,26 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         switch (typeArgument.getWildcard()) {
             case NONE:
                 return type(typeArgument.getTypeSignature());
-            case EXTENDS:
+            case EXTENDS: {
                 gtv = new JavaType.GenericTypeVariable(null, "?", COVARIANT, null);
                 typeBySignature.put(signature, gtv);
-                bounds = singletonList(type(typeArgument.getTypeSignature()));
+                JavaType mappedBound = type(typeArgument.getTypeSignature());
+                if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound)
+                        .getFullyQualifiedName().equals("java.lang.Object")) {
+                    bounds = singletonList(mappedBound);
+                }
                 break;
-            case SUPER:
+            }
+            case SUPER: {
                 gtv = new JavaType.GenericTypeVariable(null, "?", CONTRAVARIANT, null);
                 typeBySignature.put(signature, gtv);
-                bounds = singletonList(type(typeArgument.getTypeSignature()));
+                JavaType mappedBound = type(typeArgument.getTypeSignature());
+                if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound)
+                        .getFullyQualifiedName().equals("java.lang.Object")) {
+                    bounds = singletonList(mappedBound);
+                }
                 break;
+            }
             case ANY:
             default:
                 gtv = new JavaType.GenericTypeVariable(null, "?", INVARIANT, null);
