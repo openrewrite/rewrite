@@ -67,7 +67,7 @@ class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if (typeVariableNameStack == null) {
             typeVariableNameStack = new HashSet<>();
         }
-        if (!typeVariableNameStack.add(gtv.getName())) {
+        if (!gtv.getName().equals("?") && !typeVariableNameStack.add(gtv.getName())) {
             typeVariableNameStack.remove(gtv.getName());
             s.append('}');
             return s.toString();
