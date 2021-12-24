@@ -21,7 +21,9 @@ import com.sun.tools.javac.code.TypeTag;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.StringJoiner;
 
 class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
@@ -48,13 +50,16 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof Type.WildcardType) {
             Type.WildcardType wildcard = (Type.WildcardType) type;
             StringBuilder s = new StringBuilder("Generic{" + wildcard.kind.toString());
-            if(!type.isUnbound()) {
+            if (!type.isUnbound()) {
                 s.append(signature(wildcard.type));
             }
             return s.append("}").toString();
+        } else if (type instanceof Type.MethodType) {
+            return methodSignature(type, null);
         } else if (Type.noType.equals(type)) {
             return "{none}";
         }
+
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());
     }
 
@@ -94,11 +99,11 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         Type.TypeVar generic = (Type.TypeVar) type;
         String name = generic.tsym.name.toString();
 
-        if(typeVariableNameStack == null) {
+        if (typeVariableNameStack == null) {
             typeVariableNameStack = new HashSet<>();
         }
 
-        if(!typeVariableNameStack.add(name)) {
+        if (!typeVariableNameStack.add(name)) {
             typeVariableNameStack.remove(name);
             return "Generic{" + name + "}";
         }
@@ -125,7 +130,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         String boundSigStr = boundSigs.toString();
-        if(!boundSigStr.isEmpty()) {
+        if (!boundSigStr.isEmpty()) {
             s.append(" extends ").append(boundSigStr);
         }
 

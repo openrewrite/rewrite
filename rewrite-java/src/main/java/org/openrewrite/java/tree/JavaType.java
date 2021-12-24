@@ -56,11 +56,11 @@ public interface JavaType {
      * The string is expected to be either a primitive type like "int" or a fully-qualified-class name like "java.lang.String"
      */
     static JavaType buildType(String typeName) {
-        try {
-            return Primitive.fromKeyword(typeName);
-        } catch (IllegalArgumentException ignored) {
-            return Class.build(typeName);
+        Primitive primitive = Primitive.fromKeyword(typeName);
+        if (primitive != null) {
+            return primitive;
         }
+        return Class.build(typeName);
     }
 
     @Getter
@@ -572,6 +572,7 @@ public interface JavaType {
         None,
         Null;
 
+        @Nullable
         public static Primitive fromKeyword(String keyword) {
             switch (keyword) {
                 case "boolean":
@@ -599,7 +600,7 @@ public interface JavaType {
                 case "":
                     return None;
             }
-            throw new IllegalArgumentException("Unknown primitive keyword " + keyword);
+            return null;
         }
 
         public String getKeyword() {

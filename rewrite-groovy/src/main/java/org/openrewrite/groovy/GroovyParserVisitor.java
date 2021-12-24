@@ -1457,11 +1457,9 @@ public class GroovyParserVisitor {
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
-        try {
-            JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(classNode.getUnresolvedName());
+        JavaType.Primitive primitiveType = JavaType.Primitive.fromKeyword(classNode.getUnresolvedName());
+        if (primitiveType != null) {
             return new J.Primitive(randomId(), sourceBefore(classNode.getUnresolvedName()), Markers.EMPTY, primitiveType);
-        } catch (IllegalArgumentException ignored) {
-            // not a primitive
         }
 
         int saveCursor = cursor;

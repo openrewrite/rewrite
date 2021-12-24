@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,7 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
-class Java11TypeMapping implements JavaTypeMapping<Type> {
+class Java11TypeMapping implements JavaTypeMapping<Tree> {
     private static final int KIND_BITMASK_INTERFACE = 1 << 9;
     private static final int KIND_BITMASK_ANNOTATION = 1 << 13;
     private static final int KIND_BITMASK_ENUM = 1 << 14;
@@ -256,8 +257,30 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
         return kind;
     }
 
-    public JavaType type(Tree t) {
-        return type(((JCTree) t).type);
+    @SuppressWarnings("ConstantConditions")
+    public JavaType type(@Nullable Tree tree) {
+        if(tree == null) {
+            return null;
+        }
+
+        Symbol symbol = null;
+        if(tree instanceof JCTree.JCIdent) {
+            symbol = ((JCTree.JCIdent) tree).sym;
+        } else if(tree instanceof JCTree.JCMethodDecl) {
+            symbol = ((JCTree.JCMethodDecl) tree).sym;
+        } else if(tree instanceof JCTree.JCVariableDecl) {
+            return variableType(((JCTree.JCVariableDecl) tree).sym);
+        }
+
+        return type(((JCTree) tree).type, symbol);
+    }
+
+    @Nullable
+    private JavaType type(Type type, Symbol symbol) {
+        if(type instanceof Type.MethodType) {
+            return methodType(type, symbol);
+        }
+        return type(type);
     }
 
     public JavaType.Primitive primitive(TypeTag tag) {
@@ -363,7 +386,6 @@ class Java11TypeMapping implements JavaTypeMapping<Type> {
             if (existing != null) {
                 return existing;
             }
-
 
             List<String> paramNames = null;
             if (!methodSymbol.params().isEmpty()) {

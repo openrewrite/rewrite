@@ -60,6 +60,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             if (clazz.isArray()) {
                 return array(clazz, signature);
             } else if (clazz.isPrimitive()) {
+                //noinspection ConstantConditions
                 return JavaType.Primitive.fromKeyword(clazz.getName());
             }
             return classType((Class<?>) type, signature);

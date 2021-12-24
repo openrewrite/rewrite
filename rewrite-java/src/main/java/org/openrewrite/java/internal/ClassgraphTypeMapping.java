@@ -165,6 +165,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         } else if (typeSignature instanceof ArrayTypeSignature) {
             return array((ArrayTypeSignature) typeSignature, signature);
         } else if (typeSignature instanceof BaseTypeSignature) {
+            //noinspection ConstantConditions
             return JavaType.Primitive.fromKeyword(((BaseTypeSignature) typeSignature).getTypeStr());
         } else if (typeSignature instanceof TypeVariableSignature) {
             return generic((TypeVariableSignature) typeSignature, signature);
