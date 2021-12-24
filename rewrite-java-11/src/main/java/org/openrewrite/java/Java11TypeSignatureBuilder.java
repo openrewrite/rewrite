@@ -188,7 +188,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         Type genericType = symbol.type;
 
         // Formatted like com.MyThing{name=add,resolved=Thing(Integer),generic=Thing<?>(Integer)}
-        return signature(symbol.owner.type) + "{name=" + symbol.getSimpleName().toString() +
+        return classSignature(symbol.owner.type) + "{name=" + symbol.getSimpleName().toString() +
 
                 // resolved signature
                 ",resolved=" +
@@ -198,7 +198,8 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 // generic signature
                 ",generic=" +
                 signature(genericType.getReturnType()) + '(' +
-                methodArgumentSignature(genericType, new StringJoiner(",")) + ')';
+                methodArgumentSignature(genericType, new StringJoiner(",")) + ')' +
+                '}';
     }
 
     private StringJoiner methodArgumentSignature(Type selectType, StringJoiner resolvedArgumentTypes) {
