@@ -208,7 +208,6 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String variableSignature(Symbol symbol) {
-        // Formatted like com.MyThing{name=MY_FIELD,type=java.lang.String}
-        return signature(symbol.owner.type) + "{name=" + symbol.name.toString() + '}';
+        return classSignature(symbol.owner.type) + "{name=" + symbol.name.toString() + '}';
     }
 }

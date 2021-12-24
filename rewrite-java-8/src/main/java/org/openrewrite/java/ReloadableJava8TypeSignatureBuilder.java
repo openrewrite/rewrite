@@ -21,18 +21,16 @@ import com.sun.tools.javac.code.TypeTag;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.Collections;
-import java.util.IdentityHashMap;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.StringJoiner;
 
 class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
-    private Set<Type> typeStack;
+    private Set<String> typeVariableNameStack;
 
     @Override
     public String signature(@Nullable Object t) {
-        typeStack = null;
         return signature((Type) t);
     }
 
@@ -42,7 +40,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof Type.ClassType) {
             return type.isParameterized() ? parameterizedSignature(type) : classSignature(type);
         } else if (type instanceof Type.TypeVar) {
-            genericSignature(type);
+            return genericSignature(type);
         } else if (type instanceof Type.JCPrimitiveType) {
             return primitiveSignature(type);
         } else if (type instanceof Type.JCVoidType) {
@@ -50,15 +48,16 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof Type.ArrayType) {
             return arraySignature(type);
         } else if (type instanceof Type.WildcardType) {
-            if (type.isUnbound()) {
-                return "?";
-            } else {
-                // FIXME how to find contravariant wildcards?
-                return "? extends " + signature(((Type.WildcardType) type).type);
+            Type.WildcardType wildcard = (Type.WildcardType) type;
+            StringBuilder s = new StringBuilder("Generic{" + wildcard.kind.toString());
+            if (!type.isUnbound()) {
+                s.append(signature(wildcard.type));
             }
+            return s.append("}").toString();
         } else if (Type.noType.equals(type)) {
             return "{none}";
         }
+
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());
     }
 
@@ -88,45 +87,52 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String classSignature(Object type) {
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) ((Type.ClassType) type).tsym;
         completeClassSymbol(sym);
-        return sym.className();
+        return sym.flatName().toString();
     }
 
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
+        String name = generic.tsym.name.toString();
 
-        StringBuilder s = new StringBuilder(generic.tsym.name.toString());
+        if (typeVariableNameStack == null) {
+            typeVariableNameStack = new HashSet<>();
+        }
 
-        // FIXME if COVARIANT only, how to determine if contravariant or invariant?
-        s.append(" extends ");
+        if (!typeVariableNameStack.add(name)) {
+            typeVariableNameStack.remove(name);
+            return "Generic{" + name + "}";
+        }
+
+        StringBuilder s = new StringBuilder("Generic{").append(name);
 
         StringJoiner boundSigs = new StringJoiner(" & ");
         if (generic.getUpperBound() instanceof Type.IntersectionClassType) {
             Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) generic.getUpperBound();
             if (intersectionBound.supertype_field != null) {
-                boundSigs.add(genericBound(intersectionBound.supertype_field));
+                String bound = signature(intersectionBound.supertype_field);
+                if (!bound.equals("java.lang.Object")) {
+                    boundSigs.add(bound);
+                }
             }
             for (Type bound : intersectionBound.interfaces_field) {
-                boundSigs.add(genericBound(bound));
+                boundSigs.add(signature(bound));
             }
         } else {
-            boundSigs.add(genericBound(generic.getUpperBound()));
-        }
-        s.append(boundSigs);
-
-        return s.toString();
-    }
-
-    private String genericBound(Type bound) {
-        if (typeStack != null && typeStack.contains(bound)) {
-            return "(*)";
+            String bound = signature(generic.getUpperBound());
+            if (!bound.equals("java.lang.Object")) {
+                boundSigs.add(bound);
+            }
         }
 
-        if (typeStack == null) {
-            typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
+        String boundSigStr = boundSigs.toString();
+        if (!boundSigStr.isEmpty()) {
+            s.append(" extends ").append(boundSigStr);
         }
-        typeStack.add(bound);
-        return signature(bound);
+
+        typeVariableNameStack.remove(name);
+
+        return s.append("}").toString();
     }
 
     @Override
@@ -176,19 +182,11 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     public String methodSignature(Type selectType, Symbol.MethodSymbol symbol) {
         Type genericType = symbol.type;
-
-        // Formatted like com.MyThing{name=add,resolved=Thing(Integer),generic=Thing<?>(Integer)}
-        return signature(symbol.owner.type) + "{name=" + symbol.getSimpleName().toString() +
-
-                // resolved signature
-                ",resolved=" +
-                signature(selectType.getReturnType()) + '(' +
-                methodArgumentSignature(selectType, new StringJoiner(",")) + ')' +
-
-                // generic signature
-                ",generic=" +
-                signature(genericType.getReturnType()) + '(' +
-                methodArgumentSignature(genericType, new StringJoiner(",")) + ')';
+        return classSignature(symbol.owner.type) + '{' +
+                "name=" + symbol.getSimpleName().toString() +
+                ",return=" + signature(selectType.getReturnType()) +
+                ",parameters=" + methodArgumentSignature(selectType, new StringJoiner(",", "[", "]")) +
+                '}';
     }
 
     private StringJoiner methodArgumentSignature(Type selectType, StringJoiner resolvedArgumentTypes) {
@@ -208,8 +206,6 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String variableSignature(Symbol symbol) {
-        // Formatted like com.MyThing{name=MY_FIELD,type=java.lang.String}
-        return signature(symbol.owner.type) + "{name=" + symbol.name.toString() +
-                ",type=" + signature(symbol.type) + '}';
+        return classSignature(symbol.owner.type) + "{name=" + symbol.name.toString() + '}';
     }
 }
