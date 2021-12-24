@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
+import org.openrewrite.java.tree.JavaType;
 
 import java.lang.reflect.*;
 import java.util.HashSet;
@@ -163,8 +164,8 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
         return ((Class<?>) type).getName();
     }
 
-    public String methodSignature(Method method) {
-        StringBuilder s = new StringBuilder(method.getDeclaringClass().getName());
+    public String methodSignature(Method method, String declaringTypeName) {
+        StringBuilder s = new StringBuilder(declaringTypeName);
 
         s.append("{name=").append(method.getName());
         s.append(",return=").append(method.getReturnType().getName());

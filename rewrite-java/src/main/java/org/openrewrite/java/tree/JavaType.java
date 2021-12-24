@@ -734,6 +734,7 @@ public interface JavaType {
                               @Nullable List<FullyQualified> thrownExceptions,
                               @Nullable List<FullyQualified> annotations) {
             this.declaringType = declaringType;
+            this.returnType = returnType;
             this.parameterTypes = nullIfEmpty(parameterTypes);
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
             this.annotations = nullIfEmpty(annotations);

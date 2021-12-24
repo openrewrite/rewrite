@@ -183,7 +183,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 methods = new ArrayList<>(clazz.getDeclaredMethods().length);
                 for (Method method : clazz.getDeclaredMethods()) {
                     if (!(method.isBridge() || method.isSynthetic())) {
-                        methods.add(method(method));
+                        methods.add(method(method, mappedClazz));
                     }
                 }
             }
@@ -287,7 +287,15 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     public JavaType.Method method(Method method) {
-        String signature = signatureBuilder.methodSignature(method);
+        JavaType.FullyQualified type = (JavaType.FullyQualified) type(method.getDeclaringClass());
+        if(type instanceof JavaType.Parameterized) {
+            type = ((JavaType.Parameterized) type).getType();
+        }
+        return method(method, type);
+    }
+
+    private JavaType.Method method(Method method, JavaType.FullyQualified declaringType) {
+        String signature = signatureBuilder.methodSignature(method, declaringType.getFullyQualifiedName());
 
         JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
         if (existing != null) {
@@ -339,9 +347,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        JavaType.FullyQualified type = (JavaType.FullyQualified) type(method.getDeclaringClass());
-        mappedMethod.unsafeSet(type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type,
-                type(method.getReturnType()), parameterTypes, thrownExceptions, annotations);
+        mappedMethod.unsafeSet(declaringType, type(method.getReturnType()), parameterTypes, thrownExceptions, annotations);
         return mappedMethod;
     }
 }

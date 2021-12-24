@@ -25,7 +25,7 @@ class JavaReflectionTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
         .variableSignature(JavaTypeGoat::class.java.getDeclaredField(field))
 
     override fun methodSignature(methodName: String): String = signatureBuilder()
-        .methodSignature(JavaTypeGoat::class.java.declaredMethods.first { it.name == methodName })
+        .methodSignature(JavaTypeGoat::class.java.declaredMethods.first { it.name == methodName }, "org.openrewrite.java.JavaTypeGoat")
 
     override fun firstMethodParameter(methodName: String): Type = JavaTypeGoat::class.java.declaredMethods
         .first { it.name == methodName }
