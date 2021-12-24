@@ -47,7 +47,11 @@ public class AnnotationTemplateGenerator {
         } else if (j instanceof J.VariableDeclarations) {
             after.insert(0, " int $variable;");
         } else if (j instanceof J.ClassDeclaration) {
-            after.insert(0, "static class $Clazz {}");
+            if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
+                after.insert(0, "class $Clazz {}");
+            } else {
+                after.insert(0, "static class $Clazz {}");
+            }
         }
 
         if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
@@ -80,12 +84,6 @@ public class AnnotationTemplateGenerator {
                             after.insert(0, "static class $Clazz {}");
                         }
                     }
-
-                    if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
-                            cursor.getParentOrThrow().getParentOrThrow().getValue() instanceof JavaSourceFile) {
-                        after.append("class $Template {}");
-                    }
-
                     return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
     }

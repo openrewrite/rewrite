@@ -1835,7 +1835,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val matcher = MethodMatcher("Integer valueOf(..)")
-                val t = JavaTemplate.builder({ cursor }, "new Integer(#{any()})").doBeforeParseTemplate(System.out::println).build()
+                val t = JavaTemplate.builder({ cursor }, "new Integer(#{any()})").build()
                 override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                     if (matcher.matches(method)) {
                         return method.withTemplate(t, method.coordinates.replace(), method.arguments[0])

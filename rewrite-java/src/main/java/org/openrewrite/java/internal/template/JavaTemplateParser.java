@@ -39,7 +39,7 @@ public class JavaTemplateParser {
     private static final Map<String, List<? extends J>> templateCache = new LinkedHashMap<String, List<? extends J>>() {
         @Override
         protected boolean removeEldestEntry(Map.Entry eldest) {
-            return size() > 10_000;
+            return size() > 1_000;
         }
     };
 
@@ -157,13 +157,13 @@ public class JavaTemplateParser {
     public <J2 extends J> List<J2> parseBlockStatements(Cursor cursor, Class<J2> expected,
                                                         String template,
                                                         Space.Location location) {
-        String cacheKey = addImports(template);
-        return cache(cacheKey, () -> {
-            @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location);
-            onBeforeParseTemplate.accept(stub);
-            JavaSourceFile cu = compileTemplate(stub);
-            return statementTemplateGenerator.listTemplatedTrees(cu, expected);
-        });
+        // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
+        //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
+        //       a safe, reusable key, we can consider using the cache for block statements.
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location);
+        onBeforeParseTemplate.accept(stub);
+        JavaSourceFile cu = compileTemplate(stub);
+        return statementTemplateGenerator.listTemplatedTrees(cu, expected);
     }
 
     public J.MethodInvocation parseMethod(Cursor cursor, String template, Space.Location location) {
@@ -174,34 +174,28 @@ public class JavaTemplateParser {
         } else {
             methodWithReplacedNameAndArgs = method.getSelect().print(cursor) + "." + template + ";";
         }
-
-        String cacheKey = addImports(template);
-        List<J> invocations = cache(cacheKey, () -> {
-            @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, location);
-            onBeforeParseTemplate.accept(stub);
-            JavaSourceFile cu = compileTemplate(stub);
-            J.MethodInvocation replaced = (J.MethodInvocation) statementTemplateGenerator
-                    .listTemplatedTrees(cu, Statement.class).get(0);
-            return Collections.singletonList(replaced);
-        });
-        return (J.MethodInvocation) invocations.get(0);
+        // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
+        //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
+        //       a safe, reusable key, we can consider using the cache for block statements.
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, location);
+        onBeforeParseTemplate.accept(stub);
+        JavaSourceFile cu = compileTemplate(stub);
+        return (J.MethodInvocation) statementTemplateGenerator
+                .listTemplatedTrees(cu, Statement.class).get(0);
     }
 
     public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor)
                 .replaceAll("\\)$", template + ");");
-
-        String cacheKey = addImports(template);
-        List<J> invocations = cache(cacheKey, () -> {
-            @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
-            onBeforeParseTemplate.accept(stub);
-            JavaSourceFile cu = compileTemplate(stub);
-            J.MethodInvocation replaced = (J.MethodInvocation) statementTemplateGenerator
-                    .listTemplatedTrees(cu, Statement.class).get(0);
-            return Collections.singletonList(replaced);
-        });
-        return (J.MethodInvocation) invocations.get(0);
+        // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
+        //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
+        //       a safe, reusable key, we can consider using the cache for block statements.
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
+        onBeforeParseTemplate.accept(stub);
+        JavaSourceFile cu = compileTemplate(stub);
+        return (J.MethodInvocation) statementTemplateGenerator
+                .listTemplatedTrees(cu, Statement.class).get(0);
     }
 
     public List<J.Annotation> parseAnnotations(Cursor cursor, String template) {
