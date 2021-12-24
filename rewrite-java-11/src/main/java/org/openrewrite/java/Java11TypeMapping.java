@@ -24,7 +24,6 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -455,7 +454,9 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
 
-            method.unsafeSet(resolvedDeclaringType, methodSignature(genericSignatureType), methodSignature(selectType), exceptionTypes, annotations);
+            JavaType.Method.Signature genericSignature = methodSignature(genericSignatureType);
+            JavaType.Method.Signature resolvedSignature = methodSignature(selectType);
+            method.unsafeSet(resolvedDeclaringType, genericSignature, resolvedSignature, exceptionTypes, annotations);
             return method;
         }
 
