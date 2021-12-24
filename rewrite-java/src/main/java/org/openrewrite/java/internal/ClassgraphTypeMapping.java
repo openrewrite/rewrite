@@ -199,7 +199,8 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             }
         }
 
-        variable.unsafeSet(owner, type(fieldInfo.getTypeDescriptor()), annotations);
+        variable.unsafeSet(owner instanceof JavaType.Parameterized ? ((JavaType.Parameterized) owner).getType() : owner,
+                type(fieldInfo.getTypeDescriptor()), annotations);
         return variable;
     }
 
@@ -267,7 +268,9 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             }
         }
 
-        method.unsafeSet(type(methodInfo.getClassInfo()), genericSignature, resolvedSignature, thrownExceptions, annotations);
+        JavaType.FullyQualified type = type(methodInfo.getClassInfo());
+        method.unsafeSet(type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type,
+                genericSignature, resolvedSignature, thrownExceptions, annotations);
         return method;
     }
 

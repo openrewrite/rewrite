@@ -27,13 +27,15 @@ interface JavaTypeMappingTest {
     /**
      * Type attribution for the [JavaTypeGoat] class.
      */
-    fun goatType() : JavaType.Parameterized
+    fun goatType(): JavaType.Parameterized
 
-    /**
-     * The type of the first parameter of the method named [methodName].
-     */
-    fun firstMethodParameter(methodName: String): JavaType =
-        goatType().methods.find { it.name == methodName }!!.genericSignature.paramTypes[0]
+    fun methodType(methodName: String): JavaType.Method {
+        val type = goatType().methods.find { it.name == methodName }!!
+        assertThat(type.declaringType.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat")
+        return type
+    }
+
+    fun firstMethodParameter(methodName: String): JavaType = methodType(methodName).genericSignature.paramTypes[0]
 
     @Test
     fun extendsJavaLangObject() {
@@ -69,7 +71,8 @@ interface JavaTypeMappingTest {
 
     @Test
     fun generic() {
-        val generic = firstMethodParameter("generic").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
+        val generic =
+            firstMethodParameter("generic").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
         assertThat(generic.name).isEqualTo("?")
         assertThat(generic.variance).isEqualTo(COVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
@@ -77,7 +80,8 @@ interface JavaTypeMappingTest {
 
     @Test
     fun genericContravariant() {
-        val generic = firstMethodParameter("genericContravariant").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
+        val generic =
+            firstMethodParameter("genericContravariant").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
         assertThat(generic.name).isEqualTo("?")
         assertThat(generic.variance).isEqualTo(CONTRAVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
@@ -94,7 +98,8 @@ interface JavaTypeMappingTest {
 
     @Test
     fun genericUnbounded() {
-        val generic = firstMethodParameter("genericUnbounded").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
+        val generic =
+            firstMethodParameter("genericUnbounded").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
         assertThat(generic.name).isEqualTo("U")
         assertThat(generic.variance).isEqualTo(INVARIANT)
         assertThat(generic.bounds).isEmpty()

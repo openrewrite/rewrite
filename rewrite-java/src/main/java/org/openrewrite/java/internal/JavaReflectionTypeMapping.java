@@ -343,7 +343,12 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 resolvedArgumentTypes
         );
 
-        mappedMethod.unsafeSet((JavaType.FullyQualified) type(method.getDeclaringClass()), resolvedSignature, resolvedSignature, thrownExceptions, annotations);
+        JavaType.FullyQualified type = (JavaType.FullyQualified) type(method.getDeclaringClass());
+        if(type instanceof JavaType.Parameterized && ((JavaType.Parameterized) type).getType() == null) {
+            System.out.println("??");
+        }
+        mappedMethod.unsafeSet(type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type,
+                resolvedSignature, resolvedSignature, thrownExceptions, annotations);
         return mappedMethod;
     }
 }

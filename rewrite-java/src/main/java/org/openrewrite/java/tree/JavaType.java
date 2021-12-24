@@ -371,7 +371,7 @@ public interface JavaType {
         }
 
         public FullyQualified getType() {
-            assert type != null;
+//            assert type != null;
             return type;
         }
 
