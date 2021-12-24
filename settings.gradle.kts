@@ -30,11 +30,19 @@ plugins {
 gradleEnterprise {
     val isCiServer = System.getenv("CI")?.equals("true") ?: false
     server = "https://ge.openrewrite.org/"
+    val gradleCacheRemoteUsername: String? = System.getenv("GRADLE_ENTERPRISE_CACHE_USERNAME")
+    val gradleCacheRemotePassword: String? = System.getenv("GRADLE_ENTERPRISE_CACHE_PASSWORD")
 
     buildCache {
         remote(HttpBuildCache::class) {
             url = uri("https://ge.openrewrite.org/cache/")
             isPush = isCiServer
+            if (!gradleCacheRemoteUsername.isNullOrBlank() && !gradleCacheRemotePassword.isNullOrBlank()) {
+                credentials {
+                    username = gradleCacheRemoteUsername
+                    password = gradleCacheRemotePassword
+                }
+            }
         }
     }
 
