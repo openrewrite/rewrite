@@ -193,7 +193,12 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
 
     @Override
     public String parameterizedSignature(Object type) {
-        StringBuilder s = new StringBuilder(classSignature(type));
+        String baseClass = classSignature(type);
+        if(baseClass.equals("{undefined}")) {
+            return baseClass;
+        }
+
+        StringBuilder s = new StringBuilder(baseClass);
 
         StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
         if (type instanceof ClassTypeSignature) {
