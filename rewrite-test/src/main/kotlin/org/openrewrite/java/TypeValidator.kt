@@ -24,7 +24,7 @@ import org.openrewrite.java.tree.J
  * Produces a report about missing type attributions within a CompilationUnit.
  */
 class TypeValidator(
-    val options: ValidationOptions = defaultOptions
+    private val options: ValidationOptions = defaultOptions
 ) : JavaIsoVisitor<MutableList<InvalidTypeResult>>() {
 
     data class InvalidTypeResult(
@@ -84,7 +84,7 @@ class TypeValidator(
                              |  ${it.message}
                              |    At : ${it.cursor}
                              |    AST:
-                             ${it.cursor.getValue<J>().printTrimmed().prependIndent("|      ")}
+                             ${it.cursor.getValue<J>().printTrimmed(it.cursor).prependIndent("|      ")}
                              |
                         """.trimMargin() }
                         .joinToString("\n")
@@ -132,9 +132,6 @@ class TypeValidator(
             p.add(invalidTypeResult("J.MethodInvocation type is null"))
             return m
         }
-        if(mt.genericSignature == null) {
-            p.add(invalidTypeResult("J.MethodInvocation is missing a genericSignature"))
-        }
         if(!m.simpleName.equals(mt.name)) {
             p.add(invalidTypeResult("J.MethodInvocation name \"${m.simpleName}\" does not match the name in its type information \"${mt.name}\""))
         }
@@ -152,10 +149,7 @@ class TypeValidator(
             p.add(invalidTypeResult("J.MethodDeclaration type is null"))
             return m
         }
-        if(mt.genericSignature == null) {
-            p.add(invalidTypeResult("J.MethodDeclaration is missing a genericSignature"))
-        }
-        if(!m.simpleName.equals(mt.name)) {
+        if(!m.simpleName.equals(mt.name) && !m.isConstructor) {
             p.add(invalidTypeResult("J.MethodDeclaration name \"${m.simpleName}\" does not match the name in its type information \"${mt.name}\""))
         }
         return m
