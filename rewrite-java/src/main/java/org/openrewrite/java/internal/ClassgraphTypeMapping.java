@@ -51,7 +51,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         }
 
         String className = aClass.getName();
-        JavaType.Class clazz = (JavaType.Class) typeBySignature.get(className);
+        JavaType.FullyQualified clazz = (JavaType.FullyQualified) typeBySignature.get(className);
 
         if (clazz == null) {
             JavaType.Class.Kind kind;
@@ -125,7 +125,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 }
             }
 
-            clazz.unsafeSet(supertype, owner, annotations, interfaces, variables, methods);
+            ((JavaType.Class) clazz).unsafeSet(supertype, owner, annotations, interfaces, variables, methods);
         }
 
         ClassTypeSignature typeSignature = aClass.getTypeSignature();
@@ -353,15 +353,16 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
     private JavaType classType(ClassRefTypeSignature classRefSignature, String signature) {
         ClassInfo classInfo = classRefSignature.getClassInfo();
         if (classInfo == null) {
-            JavaType fallback = jvmTypes.get(classRefSignature.getBaseClassName());
+            String className = classRefSignature.getBaseClassName();
+            JavaType fallback = jvmTypes.get(className);
             if (fallback == null) {
-                if (classRefSignature.getBaseClassName().equals("java.lang.Object")) {
+                if (className.equals("java.lang.Object")) {
                     fallback = reflectionTypeMapping.type(Object.class);
                 } else {
                     fallback = JavaType.Unknown.getInstance();
+                    typeBySignature.put(className, fallback);
                 }
             }
-            typeBySignature.put(signature, fallback);
             return fallback;
         }
 
@@ -369,7 +370,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
         if (!classRefSignature.getTypeArguments().isEmpty()) {
             JavaType existing = (JavaType) typeBySignature.get(signature);
-            if(existing != null) {
+            if (existing != null) {
                 return existing;
             }
 

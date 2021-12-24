@@ -25,6 +25,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTypeVisitor
 import org.openrewrite.java.tree.JavaType
 import java.util.*
+import kotlin.collections.HashMap
 import kotlin.math.ln
 import kotlin.math.pow
 
@@ -33,7 +34,11 @@ class JavaSourceSetTest {
     @Test
     fun typesFromClasspath() {
         val ctx = InMemoryExecutionContext { e -> throw e }
-        val typeBySignature = mutableMapOf<String, Any>()
+        val typeBySignature = object: HashMap<String, Any>() {
+            override fun put(key: String, value: Any): Any? {
+                return super.put(key, value)
+            }
+        }
         val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeBySignature, ctx)
 
         val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
