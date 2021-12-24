@@ -26,8 +26,9 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.Collections;
-import java.util.Objects;
 import java.util.Set;
+
+import static java.util.Collections.singletonList;
 
 public class StringLiteralEquality extends Recipe {
     @Override
@@ -66,7 +67,6 @@ public class StringLiteralEquality extends Recipe {
     private static class StringLiteralEqualityVisitor extends JavaVisitor<ExecutionContext> {
         private static final JavaType.FullyQualified TYPE_STRING = TypeUtils.asFullyQualified(JavaType.buildType("java.lang.String"));
         private static final JavaType TYPE_OBJECT = JavaType.buildType("java.lang.Object");
-        private static final JavaType.Method.Signature INVOCATION_SIGNATURE = new JavaType.Method.Signature(JavaType.Primitive.Boolean, Collections.singletonList(TYPE_OBJECT));
 
         private static boolean isStringLiteral(Expression expression) {
             return expression instanceof J.Literal && TypeUtils.isString(((J.Literal) expression).getType());
@@ -85,16 +85,15 @@ public class StringLiteralEquality extends Recipe {
                     new JRightPadded<>(binary.getLeft().withPrefix(Space.EMPTY), Space.EMPTY, Markers.EMPTY),
                     null,
                     new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, "equals", JavaType.Primitive.Boolean, null),
-                    JContainer.build(Collections.singletonList(new JRightPadded<>(binary.getRight().withPrefix(Space.EMPTY), Space.EMPTY, Markers.EMPTY))),
+                    JContainer.build(singletonList(new JRightPadded<>(binary.getRight().withPrefix(Space.EMPTY), Space.EMPTY, Markers.EMPTY))),
                     new JavaType.Method(
                             Flag.Public.getBitMask(),
-                            Objects.requireNonNull(TYPE_STRING),
+                            TYPE_STRING,
                             "equals",
-                            Collections.singletonList("o"),
-                            INVOCATION_SIGNATURE,
-                            INVOCATION_SIGNATURE,
-                            Collections.emptyList(),
-                            Collections.emptyList()
+                            JavaType.Primitive.Boolean,
+                            singletonList("o"),
+                            singletonList(TYPE_OBJECT),
+                            null, null
                     )
             );
         }

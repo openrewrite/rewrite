@@ -631,10 +631,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
 
             nextMethod:
             for (JavaType.Method method : classType.getMethods()) {
-                if (method.getName().equals(ref.memberName.toString()) && method.getResolvedSignature() != null) {
+                if (method.getName().equals(ref.memberName.toString())) {
                     if (ref.paramTypes != null) {
                         for (JCTree param : ref.paramTypes) {
-                            for (JavaType testParamType : method.getResolvedSignature().getParamTypes()) {
+                            for (JavaType testParamType : method.getParameterTypes()) {
                                 Type paramType = attr.attribType(param, symbol);
                                 if (testParamType instanceof JavaType.GenericTypeVariable) {
                                     for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
@@ -657,12 +657,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             }
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
-            if (generic.getBounds() != null) {
-                for (JavaType bound : generic.getBounds()) {
-                    JavaType.Method method = methodReferenceType(ref, bound);
-                    if (method != null) {
-                        return method;
-                    }
+            for (JavaType bound : generic.getBounds()) {
+                JavaType.Method method = methodReferenceType(ref, bound);
+                if (method != null) {
+                    return method;
                 }
             }
         }

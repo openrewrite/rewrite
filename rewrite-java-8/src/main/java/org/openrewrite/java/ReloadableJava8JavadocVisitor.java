@@ -593,10 +593,10 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
         nextMethod:
         for (JavaType.Method method : classType.getMethods()) {
-            if (method.getName().equals(ref.memberName.toString()) && method.getResolvedSignature() != null) {
+            if (method.getName().equals(ref.memberName.toString())) {
                 if (ref.paramTypes != null) {
                     for (JCTree param : ref.paramTypes) {
-                        for (JavaType testParamType : method.getResolvedSignature().getParamTypes()) {
+                        for (JavaType testParamType : method.getParameterTypes()) {
                             Type paramType = attr.attribType(param, symbol);
                             if (testParamType instanceof JavaType.GenericTypeVariable) {
                                 for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
@@ -965,7 +965,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             JCTree.JCPrimitiveTypeTree primitiveType = (JCTree.JCPrimitiveTypeTree) node;
             String name = primitiveType.toString();
             cursor += name.length();
-            return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitiveType(primitiveType.typetag), null);
+            return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitive(primitiveType.typetag), null);
         }
     }
 }

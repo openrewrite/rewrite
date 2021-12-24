@@ -35,7 +35,7 @@ interface JavaTypeMappingTest {
         return type
     }
 
-    fun firstMethodParameter(methodName: String): JavaType = methodType(methodName).genericSignature.paramTypes[0]
+    fun firstMethodParameter(methodName: String): JavaType = methodType(methodName).parameterTypes[0]
 
     @Test
     fun extendsJavaLangObject() {

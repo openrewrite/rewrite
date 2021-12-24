@@ -131,13 +131,7 @@ public class DependencyUseMapNotation extends Recipe {
                 if (mtype == null) {
                     return m;
                 }
-                if(mtype.getResolvedSignature() != null) {
-                    mtype = mtype.withResolvedSignature(mtype.getResolvedSignature().withParamTypes(singletonList(JavaType.Class.build("java.util.Map"))));
-                }
-                if(mtype.getGenericSignature() != null) {
-                    mtype = mtype.withGenericSignature(mtype.getGenericSignature().withParamTypes(singletonList(JavaType.Class.build("java.util.Map"))));
-                }
-
+                mtype = mtype.withParameterTypes(singletonList(JavaType.Class.build("java.util.Map")));
                 return m.withMethodType(mtype);
             }
         };

@@ -121,11 +121,6 @@ class GroovyTypeMapping implements JavaTypeMapping<ClassNode> {
                 }
             }
 
-            JavaType.Method.Signature signature = new JavaType.Method.Signature(
-                    _type(node.getReturnType()),
-                    parameterTypes
-            );
-
             List<String> paramNames = null;
             if (node.getParameters().length > 0) {
                 paramNames = new ArrayList<>(node.getParameters().length);
@@ -153,9 +148,9 @@ class GroovyTypeMapping implements JavaTypeMapping<ClassNode> {
                     node.getModifiers(),
                     (JavaType.FullyQualified) _type(node.getDeclaringClass()),
                     node.getName(),
+                    _type(node.getReturnType()),
                     paramNames,
-                    signature,
-                    signature,
+                    parameterTypes,
                     thrownExceptions,
                     annotations
             );

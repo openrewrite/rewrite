@@ -164,34 +164,26 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
     }
 
     public String methodSignature(Method method) {
-        // Formatted like com.MyThing{name=add,resolved=Thing(Integer),generic=Thing<?>(Integer)}
         StringBuilder s = new StringBuilder(method.getDeclaringClass().getName());
-        s.append("{name=").append(method.getName());
 
-        StringJoiner genericArgumentTypeSignatures = new StringJoiner(",");
-        StringJoiner resolvedArgumentTypeSignatures = new StringJoiner(",");
+        s.append("{name=").append(method.getName());
+        s.append(",return=").append(method.getReturnType().getName());
+
+        StringJoiner parameterTypeSignatures = new StringJoiner(",", "[", "]");
         if (method.getParameters().length > 0) {
             for (Parameter parameter : method.getParameters()) {
                 Type parameterizedType = parameter.getParameterizedType();
-                if(parameterizedType == null) {
-                    genericArgumentTypeSignatures.add(signature(parameter.getType()));
-                    resolvedArgumentTypeSignatures.add(classSignature(parameter.getType()));
-                } else {
-                    genericArgumentTypeSignatures.add(signature(parameterizedType));
-                    resolvedArgumentTypeSignatures.add(parameterizedType instanceof ParameterizedType ?
-                            classSignature(((ParameterizedType) parameterizedType).getRawType()) : signature(parameterizedType));
-                }
+                parameterTypeSignatures.add(signature(parameterizedType == null ? parameter.getType() : parameterizedType));
             }
         }
-        s.append(",resolved=").append(method.getReturnType().getName()).append('(').append(resolvedArgumentTypeSignatures).append(')');
-        s.append(",generic=").append(method.getReturnType().getName()).append('(').append(genericArgumentTypeSignatures).append(')');
+        s.append(",parameters=").append(parameterTypeSignatures);
+
         s.append('}');
 
         return s.toString();
     }
 
     public String variableSignature(Field field) {
-        // Formatted like com.MyThing{name=MY_FIELD,type=java.lang.String}
         return field.getDeclaringClass().getName() + "{name=" + field.getName() + '}';
     }
 }

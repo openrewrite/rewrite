@@ -81,9 +81,7 @@ public class UnnecessaryExplicitTypeArguments extends Recipe {
                         }
                     }
 
-                    if (enclosingType != null &&
-                            m.getMethodType().getResolvedSignature() != null &&
-                            enclosingType.equals(m.getMethodType().getResolvedSignature().getReturnType())) {
+                    if (enclosingType != null && enclosingType.equals(m.getMethodType().getReturnType())) {
                         m = m.withTypeParameters(null);
                     }
                 }

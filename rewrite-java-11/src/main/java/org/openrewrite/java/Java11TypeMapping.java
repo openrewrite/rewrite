@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
@@ -258,16 +257,16 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
 
     @SuppressWarnings("ConstantConditions")
     public JavaType type(@Nullable Tree tree) {
-        if(tree == null) {
+        if (tree == null) {
             return null;
         }
 
         Symbol symbol = null;
-        if(tree instanceof JCTree.JCIdent) {
+        if (tree instanceof JCTree.JCIdent) {
             symbol = ((JCTree.JCIdent) tree).sym;
-        } else if(tree instanceof JCTree.JCMethodDecl) {
+        } else if (tree instanceof JCTree.JCMethodDecl) {
             symbol = ((JCTree.JCMethodDecl) tree).sym;
-        } else if(tree instanceof JCTree.JCVariableDecl) {
+        } else if (tree instanceof JCTree.JCVariableDecl) {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
         }
 
@@ -276,7 +275,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
 
     @Nullable
     private JavaType type(Type type, Symbol symbol) {
-        if(type instanceof Type.MethodType) {
+        if (type instanceof Type.MethodType) {
             return methodType(type, symbol);
         }
         return type(type);
@@ -399,12 +398,13 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                     methodSymbol.flags_field,
                     null,
                     methodSymbol.getSimpleName().toString(),
+                    null,
                     paramNames,
-                    null, null, null, null
+                    null, null, null
             );
             typeBySignature.put(signature, method);
 
-            Type genericSignatureType = methodSymbol.type instanceof Type.ForAll ?
+            Type signatureType = methodSymbol.type instanceof Type.ForAll ?
                     ((Type.ForAll) methodSymbol.type).qtype :
                     methodSymbol.type;
 
@@ -454,38 +454,35 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
 
-            JavaType.Method.Signature genericSignature = methodSignature(genericSignatureType);
-            JavaType.Method.Signature resolvedSignature = methodSignature(selectType);
-            method.unsafeSet(resolvedDeclaringType, genericSignature, resolvedSignature, exceptionTypes, annotations);
+            JavaType returnType;
+            List<JavaType> parameterTypes = null;
+
+            if (signatureType instanceof Type.ForAll) {
+                signatureType = ((Type.ForAll) signatureType).qtype;
+            }
+            if (signatureType instanceof Type.MethodType) {
+                Type.MethodType mt = (Type.MethodType) signatureType;
+
+                if (!mt.argtypes.isEmpty()) {
+                    parameterTypes = new ArrayList<>(mt.argtypes.size());
+                    for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
+                        if (argtype != null) {
+                            JavaType javaType = type(argtype);
+                            parameterTypes.add(javaType);
+                        }
+                    }
+                }
+
+                returnType = type(mt.restype);
+            } else {
+                throw new UnsupportedOperationException("Unexpected method signature type" + signatureType.getClass().getName());
+            }
+
+            method.unsafeSet(resolvedDeclaringType, returnType, parameterTypes, exceptionTypes, annotations);
             return method;
         }
 
         return null;
-    }
-
-    private JavaType.Method.Signature methodSignature(Type signatureType) {
-        if (signatureType instanceof Type.ForAll) {
-            signatureType = ((Type.ForAll) signatureType).qtype;
-        }
-
-        if (signatureType instanceof Type.MethodType) {
-            Type.MethodType mt = (Type.MethodType) signatureType;
-
-            List<JavaType> paramTypes = emptyList();
-            if (!mt.argtypes.isEmpty()) {
-                paramTypes = new ArrayList<>(mt.argtypes.size());
-                for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
-                    if (argtype != null) {
-                        JavaType javaType = type(argtype);
-                        paramTypes.add(javaType);
-                    }
-                }
-            }
-
-            return new JavaType.Method.Signature(type(mt.restype), paramTypes);
-        }
-
-        throw new UnsupportedOperationException("Unexpected method signature type" + signatureType.getClass().getName());
     }
 
     private void completeClassSymbol(Symbol.ClassSymbol classSymbol) {

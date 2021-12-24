@@ -44,8 +44,7 @@ class DefaultJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
 
     override fun firstMethodParameter(methodName: String): JavaType = goatCu.type.methods
         .first { it.name == methodName }
-        .resolvedSignature
-        .paramTypes[0]
+        .parameterTypes[0]
 
     override fun lastClassTypeParameter(): JavaType = goatCu.typeParameters.last()
 

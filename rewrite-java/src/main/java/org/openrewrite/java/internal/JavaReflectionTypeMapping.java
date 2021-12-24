@@ -96,7 +96,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
         if (clazz.getTypeParameters().length > 0) {
             JavaType existing = (JavaType) typeBySignature.get(signature);
-            if(existing != null) {
+            if (existing != null) {
                 return existing;
             }
 
@@ -169,7 +169,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             if (clazz.getDeclaredFields().length > 0) {
                 members = new ArrayList<>(clazz.getDeclaredFields().length);
                 for (Field f : clazz.getDeclaredFields()) {
-                    if(!f.isSynthetic()) {
+                    if (!f.isSynthetic()) {
                         if (!clazz.getName().equals("java.lang.String") || !f.getName().equals("serialPersistentFields")) {
                             JavaType.Variable field = field(f);
                             members.add(field);
@@ -182,7 +182,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             if (clazz.getDeclaredMethods().length > 0) {
                 methods = new ArrayList<>(clazz.getDeclaredMethods().length);
                 for (Method method : clazz.getDeclaredMethods()) {
-                    if(!(method.isBridge() || method.isSynthetic())) {
+                    if (!(method.isBridge() || method.isSynthetic())) {
                         methods.add(method(method));
                     }
                 }
@@ -306,8 +306,9 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 method.getModifiers(),
                 null,
                 method.getName(),
+                null,
                 paramNames,
-                null, null, null, null
+                null, null, null
         );
         typeBySignature.put(signature, mappedMethod);
 
@@ -329,26 +330,18 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        List<JavaType> resolvedArgumentTypes = emptyList();
+        List<JavaType> parameterTypes = emptyList();
         if (method.getParameters().length > 0) {
-            resolvedArgumentTypes = new ArrayList<>(method.getParameters().length);
+            parameterTypes = new ArrayList<>(method.getParameters().length);
             for (Parameter parameter : method.getParameters()) {
                 Type parameterizedType = parameter.getParameterizedType();
-                resolvedArgumentTypes.add(type(parameterizedType == null ? parameter.getType() : parameterizedType));
+                parameterTypes.add(type(parameterizedType == null ? parameter.getType() : parameterizedType));
             }
         }
 
-        JavaType.Method.Signature resolvedSignature = new JavaType.Method.Signature(
-                type(method.getReturnType()),
-                resolvedArgumentTypes
-        );
-
         JavaType.FullyQualified type = (JavaType.FullyQualified) type(method.getDeclaringClass());
-        if(type instanceof JavaType.Parameterized && ((JavaType.Parameterized) type).getType() == null) {
-            System.out.println("??");
-        }
         mappedMethod.unsafeSet(type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type,
-                resolvedSignature, resolvedSignature, thrownExceptions, annotations);
+                type(method.getReturnType()), parameterTypes, thrownExceptions, annotations);
         return mappedMethod;
     }
 }

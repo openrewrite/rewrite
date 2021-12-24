@@ -234,25 +234,17 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
         StringBuilder s = new StringBuilder(methodInfo.getClassName());
         s.append("{name=").append(methodInfo.getName());
 
-        StringJoiner resolvedArgumentTypes = new StringJoiner(",");
-        for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
-            resolvedArgumentTypes.add(signature(methodParameterInfo.getTypeDescriptor()));
-        }
-        s.append(",resolved=");
-        s.append(signature(methodInfo.getTypeDescriptor().getResultType()));
-        s.append('(').append(resolvedArgumentTypes).append(')');
+        s.append(",return=").append(methodInfo.getTypeSignature() == null ?
+                signature(methodInfo.getTypeDescriptor().getResultType()) :
+                signature(methodInfo.getTypeSignature().getResultType()));
 
-        StringJoiner genericArgumentTypes = new StringJoiner(",");
+        StringJoiner parameterTypes = new StringJoiner(",", "[", "]");
         for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
-            genericArgumentTypes.add(methodParameterInfo.getTypeSignature() == null ?
+            parameterTypes.add(methodParameterInfo.getTypeSignature() == null ?
                     signature(methodParameterInfo.getTypeDescriptor()) :
                     signature(methodParameterInfo.getTypeSignature()));
         }
-        s.append(",generic=");
-        s.append(methodInfo.getTypeSignature() == null ?
-                signature(methodInfo.getTypeDescriptor().getResultType()) :
-                signature(methodInfo.getTypeSignature().getResultType()));
-        s.append('(').append(genericArgumentTypes).append(')');
+        s.append(",parameters=").append(parameterTypes);
 
         s.append('}');
 
@@ -260,7 +252,6 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     }
 
     public String variableSignature(FieldInfo fieldInfo) {
-        // Formatted like com.MyThing{name=MY_FIELD}
         return fieldInfo.getClassName() + "{name=" + fieldInfo.getName() + '}';
     }
 }

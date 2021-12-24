@@ -165,11 +165,11 @@ public class TypeUtils {
      * @return An optional overridden method type declared in the parent.
      */
     public static Optional<JavaType.Method> findOverriddenMethod(@Nullable JavaType.Method method) {
-        if(method == null || method.getGenericSignature() == null || method.getDeclaringType() == null) {
+        if(method == null) {
             return Optional.empty();
         }
         JavaType.FullyQualified dt = method.getDeclaringType();
-        List<JavaType> argTypes = method.getGenericSignature().getParamTypes();
+        List<JavaType> argTypes = method.getParameterTypes();
         Optional<JavaType.Method> methodResult =  findDeclaredMethod(dt.getSupertype(), method.getName(), argTypes);
         if (!methodResult.isPresent()) {
             for (JavaType.FullyQualified i : dt.getInterfaces()) {
@@ -210,10 +210,7 @@ public class TypeUtils {
         if(!name.equals(m.getName())) {
             return false;
         }
-        if(m.getGenericSignature() == null) {
-            return false;
-        }
-        List<JavaType> mArgs = m.getGenericSignature().getParamTypes();
+        List<JavaType> mArgs = m.getParameterTypes();
         if(mArgs.size() != argTypes.size()) {
             return false;
         }

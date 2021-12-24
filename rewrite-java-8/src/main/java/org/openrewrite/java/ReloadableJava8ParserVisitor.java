@@ -733,7 +733,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         cursor(endPos(node));
         Object value = node.getValue();
         String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos(node));
-        JavaType.Primitive type = typeMapping.primitiveType(((JCTree.JCLiteral) node).typetag);
+        JavaType.Primitive type = typeMapping.primitive(((JCTree.JCLiteral) node).typetag);
 
         if (value instanceof Character) {
             char c = (Character) value;

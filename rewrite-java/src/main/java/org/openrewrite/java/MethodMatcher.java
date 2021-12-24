@@ -113,13 +113,19 @@ public class MethodMatcher {
             return false;
         }
 
-        return matchesTargetType(type.getDeclaringType()) &&
-                methodNamePattern.matcher(type.getName()).matches() &&
-                type.getGenericSignature() != null &&
-                argumentPattern.matcher(type.getGenericSignature().getParamTypes().stream()
-                        .map(MethodMatcher::typePattern)
-                        .filter(Objects::nonNull)
-                        .collect(joining(","))).matches();
+        if (!matchesTargetType(type.getDeclaringType()) || !methodNamePattern.matcher(type.getName()).matches()) {
+            return false;
+        }
+
+        StringJoiner joiner = new StringJoiner(",");
+        for (JavaType javaType : type.getParameterTypes()) {
+            String s = typePattern(javaType);
+            if (s != null) {
+                joiner.add(s);
+            }
+        }
+
+        return argumentPattern.matcher(joiner.toString()).matches();
     }
 
     public boolean matches(J.MethodDeclaration method, J.ClassDeclaration enclosing) {
@@ -155,37 +161,46 @@ public class MethodMatcher {
     }
 
     public boolean matches(J.MethodInvocation method) {
-        if (method.getMethodType() == null || method.getMethodType().getDeclaringType() == null) {
+        if (method.getMethodType() == null) {
+            return false;
+        } else {
+            method.getMethodType().getDeclaringType();
+        }
+
+        if (!matchesTargetType(method.getMethodType().getDeclaringType()) || !methodNamePattern.matcher(method.getSimpleName()).matches()) {
             return false;
         }
 
-        if (method.getMethodType().getResolvedSignature() == null) {
-            // no way to verify the parameter list
-            return false;
+        StringJoiner joiner = new StringJoiner(",");
+        for (JavaType javaType : method.getMethodType().getParameterTypes()) {
+            String s = typePattern(javaType);
+            if (s != null) {
+                joiner.add(s);
+            }
         }
 
-        return matchesTargetType(method.getMethodType().getDeclaringType()) &&
-                methodNamePattern.matcher(method.getSimpleName()).matches() &&
-                argumentPattern.matcher(method.getMethodType().getResolvedSignature().getParamTypes().stream()
-                        .map(MethodMatcher::typePattern)
-                        .filter(Objects::nonNull)
-                        .collect(joining(","))).matches();
+        return argumentPattern.matcher(joiner.toString()).matches();
     }
 
     public boolean matches(J.NewClass constructor) {
-        if (constructor.getType() == null || constructor.getConstructorType() == null) {
+        JavaType.FullyQualified type = TypeUtils.asFullyQualified(constructor.getType());
+        if (type == null || constructor.getConstructorType() == null) {
             return false;
         }
 
-        JavaType.FullyQualified type = TypeUtils.asFullyQualified(constructor.getType());
-        assert type != null;
-        return matchesTargetType(type) &&
-                methodNamePattern.matcher("<constructor>").matches() &&
-                constructor.getConstructorType().getResolvedSignature() != null &&
-                argumentPattern.matcher(constructor.getConstructorType().getResolvedSignature().getParamTypes().stream()
-                        .map(MethodMatcher::typePattern)
-                        .filter(Objects::nonNull)
-                        .collect(joining(","))).matches();
+        if (!matchesTargetType(type) || !methodNamePattern.matcher("<constructor>").matches()) {
+            return false;
+        }
+
+        StringJoiner joiner = new StringJoiner(",");
+        for (JavaType javaType : constructor.getConstructorType().getParameterTypes()) {
+            String s = typePattern(javaType);
+            if (s != null) {
+                joiner.add(s);
+            }
+        }
+
+        return argumentPattern.matcher(joiner.toString()).matches();
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
@@ -237,9 +252,7 @@ public class MethodMatcher {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Array) {
             JavaType elemType = ((JavaType.Array) type).getElemType();
-            if (elemType != null) {
-                return typePattern(elemType) + "[]";
-            }
+            return typePattern(elemType) + "[]";
         }
         return null;
     }
@@ -247,23 +260,16 @@ public class MethodMatcher {
     public static String methodPattern(J.MethodDeclaration method) {
         assert method.getMethodType() != null;
 
-        JavaType.Method.Signature signature = method.getMethodType().getResolvedSignature();
-        String signatureStr;
-        if (signature == null) {
-            signatureStr = "";
-        } else {
-            StringJoiner joiner = new StringJoiner(",");
-            for (JavaType javaType : signature.getParamTypes()) {
-                String s = typePattern(javaType);
-                if (s != null) {
-                    joiner.add(s);
-                }
+        StringJoiner parameters = new StringJoiner(",");
+        for (JavaType javaType : method.getMethodType().getParameterTypes()) {
+            String s = typePattern(javaType);
+            if (s != null) {
+                parameters.add(s);
             }
-            signatureStr = joiner.toString();
         }
 
         return method.getMethodType().getDeclaringType().getFullyQualifiedName() + " " +
-                method.getSimpleName() + "(" + signatureStr + ")";
+                method.getSimpleName() + "(" + parameters + ")";
     }
 }
 
@@ -281,7 +287,7 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
                 int arrInit = className.lastIndexOf("\\[");
                 String beforeArr = arrInit == -1 ? className : className.substring(0, arrInit);
                 if (JavaType.Primitive.fromKeyword(beforeArr) != null) {
-                    if(beforeArr.equals("String")) {
+                    if (beforeArr.equals("String")) {
                         return "java.lang." + className;
                     }
                     return className;

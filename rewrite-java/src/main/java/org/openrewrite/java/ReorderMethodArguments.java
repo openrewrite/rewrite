@@ -29,8 +29,9 @@ import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+
+import static java.util.Arrays.asList;
 
 /**
  * This recipe finds method invocations matching the given method pattern and reorders the arguments based on the ordered
@@ -106,18 +107,11 @@ public class ReorderMethodArguments extends Recipe {
             if (methodMatcher.matches(m) && m.getMethodType() != null) {
                 @SuppressWarnings("ConstantConditions") List<String> paramNames =
                         oldParameterNames == null || oldParameterNames.length == 0 ?
-                                m.getMethodType().getParamNames() :
-                                Arrays.asList(oldParameterNames);
-
-                if (paramNames == null) {
-                    throw new IllegalStateException("There is no source attachment for method " + m.getMethodType().getDeclaringType().getFullyQualifiedName() +
-                            "." + m.getSimpleName() + "(..). Provide a reference for original parameter names by calling setOriginalParamNames(..)");
-                }
+                                m.getMethodType().getParameterNames() :
+                                asList(oldParameterNames);
 
                 List<JRightPadded<Expression>> originalArgs = m.getPadding().getArguments().getPadding().getElements();
-
-                int resolvedParamCount = m.getMethodType().getResolvedSignature() == null ? originalArgs.size() :
-                        m.getMethodType().getResolvedSignature().getParamTypes().size();
+                int resolvedParamCount = m.getMethodType().getParameterTypes().size();
 
                 int i = 0;
                 List<JRightPadded<Expression>> reordered = new ArrayList<>(originalArgs.size());

@@ -225,30 +225,22 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 methodInfo.getModifiers(),
                 null,
                 methodInfo.getName(),
+                null,
                 paramNames,
-                null, null, null, null
+                null, null, null
         );
         typeBySignature.put(signature, method);
 
-        List<JavaType> genericParameterTypes = new ArrayList<>(methodInfo.getParameterInfo().length);
+        JavaType returnType = methodInfo.getTypeSignature() == null ?
+                type(methodInfo.getTypeDescriptor().getResultType()) :
+                type(methodInfo.getTypeSignature().getResultType());
+
+        List<JavaType> parameterTypes = new ArrayList<>(methodInfo.getParameterInfo().length);
         for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
-            genericParameterTypes.add(methodParameterInfo.getTypeSignature() == null ?
+            parameterTypes.add(methodParameterInfo.getTypeSignature() == null ?
                     type(methodParameterInfo.getTypeDescriptor()) :
                     type(methodParameterInfo.getTypeSignature()));
         }
-
-        JavaType.Method.Signature genericSignature = new JavaType.Method.Signature(
-                methodInfo.getTypeSignature() == null ?
-                        type(methodInfo.getTypeDescriptor().getResultType()) :
-                        type(methodInfo.getTypeSignature().getResultType()),
-                genericParameterTypes
-        );
-
-        List<JavaType> resolvedParameterTypes = new ArrayList<>(methodInfo.getParameterInfo().length);
-        for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
-            resolvedParameterTypes.add(type(methodParameterInfo.getTypeDescriptor()));
-        }
-        JavaType.Method.Signature resolvedSignature = new JavaType.Method.Signature(type(methodInfo.getTypeDescriptor().getResultType()), resolvedParameterTypes);
 
         List<JavaType.FullyQualified> thrownExceptions = null;
         if (!methodInfo.getTypeDescriptor().getThrowsSignatures().isEmpty()) {
@@ -270,7 +262,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
         JavaType.FullyQualified type = type(methodInfo.getClassInfo());
         method.unsafeSet(type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type,
-                genericSignature, resolvedSignature, thrownExceptions, annotations);
+                returnType, parameterTypes, thrownExceptions, annotations);
         return method;
     }
 

@@ -56,11 +56,10 @@ interface JavaTypeTest {
             )[0]
 
         val declaredMethod = cu.classes[0].type!!.methods[0]
-        assertThat(declaredMethod.genericSignature!!.returnType).isInstanceOf(JavaType.Parameterized::class.java)
+        assertThat(declaredMethod.returnType).isInstanceOf(JavaType.Parameterized::class.java)
 
-        val inv =
-            ((cu.classes[1].body.statements[0] as J.VariableDeclarations).variables[0].initializer as J.MethodInvocation)
-        val rt = inv.methodType!!.resolvedSignature!!.returnType
+        val inv = ((cu.classes[1].body.statements[0] as J.VariableDeclarations).variables[0].initializer as J.MethodInvocation)
+        val rt = inv.methodType!!.returnType
         assertThat(TypeUtils.asParameterized(rt)!!.typeParameters[0].asFullyQualified()!!.fullyQualifiedName)
             .isEqualTo("java.lang.Integer")
     }

@@ -198,20 +198,10 @@ public class ChangePackage extends Recipe {
         private JavaType.Method updateType(@Nullable JavaType.Method mt) {
             if (mt != null) {
                 return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
-                        .withResolvedSignature(updateSignature(mt.getResolvedSignature()))
-                        .withGenericSignature(updateSignature(mt.getGenericSignature()));
+                        .withReturnType(updateType(mt.getReturnType()))
+                        .withParameterTypes(ListUtils.map(mt.getParameterTypes(), this::updateType));
             }
             return null;
-        }
-
-        private JavaType.Method.Signature updateSignature(@Nullable JavaType.Method.Signature signature) {
-            if (signature == null) {
-                //noinspection ConstantConditions
-                return signature;
-            }
-
-            return signature.withReturnType(updateType(signature.getReturnType()))
-                    .withParamTypes(ListUtils.map(signature.getParamTypes(), this::updateType));
         }
     }
 }

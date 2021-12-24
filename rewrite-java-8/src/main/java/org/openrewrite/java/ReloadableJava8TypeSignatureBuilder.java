@@ -26,7 +26,7 @@ import java.util.IdentityHashMap;
 import java.util.Set;
 import java.util.StringJoiner;
 
-class Java8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
+class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     private Set<Type> typeStack;
 

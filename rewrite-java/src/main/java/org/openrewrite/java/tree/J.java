@@ -2863,9 +2863,7 @@ public interface J extends Tree {
         }
 
         public JavaType getType() {
-            return methodType == null ? null :
-                    methodType.getGenericSignature() == null ? null :
-                            methodType.getGenericSignature().getReturnType();
+            return methodType == null ? null : methodType.getReturnType();
         }
 
         @SuppressWarnings("unchecked")
@@ -3133,8 +3131,7 @@ public interface J extends Tree {
         @Override
         @Nullable
         public JavaType getType() {
-            return methodType == null ? null : methodType.getResolvedSignature() == null ? null :
-                    methodType.getResolvedSignature().getReturnType();
+            return methodType == null ? null : methodType.getReturnType();
         }
 
         public String getSimpleName() {

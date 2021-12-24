@@ -124,21 +124,13 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         StringBuilder s = new StringBuilder(signature(method.getDeclaringType()));
         s.append("{name=").append(method.getName());
 
-        StringJoiner resolvedArgumentTypes = new StringJoiner(",");
-        for (JavaType paramType : method.getResolvedSignature().getParamTypes()) {
-            resolvedArgumentTypes.add(signature(paramType));
-        }
-        s.append(",resolved=");
-        s.append(signature(method.getResolvedSignature().getReturnType()));
-        s.append('(').append(resolvedArgumentTypes).append(')');
+        s.append(",return=").append(method.getReturnType());
 
-        StringJoiner genericArgumentTypes = new StringJoiner(",");
-        for (JavaType paramType : method.getGenericSignature().getParamTypes()) {
-            genericArgumentTypes.add(signature(paramType));
+        StringJoiner parameterTypes = new StringJoiner(",", "[", "]");
+        for (JavaType paramType : method.getParameterTypes()) {
+            parameterTypes.add(signature(paramType));
         }
-        s.append(",generic=");
-        s.append(signature(method.getGenericSignature().getReturnType()));
-        s.append('(').append(genericArgumentTypes).append(')');
+        s.append(",parameters=").append(parameterTypes);
 
         s.append('}');
 

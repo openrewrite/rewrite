@@ -54,8 +54,6 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 s.append(signature(wildcard.type));
             }
             return s.append("}").toString();
-        } else if (type instanceof Type.MethodType) {
-            return methodSignature(type, null);
         } else if (Type.noType.equals(type)) {
             return "{none}";
         }
@@ -186,19 +184,10 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     public String methodSignature(Type selectType, Symbol.MethodSymbol symbol) {
         Type genericType = symbol.type;
-
-        // Formatted like com.MyThing{name=add,resolved=Thing(Integer),generic=Thing<?>(Integer)}
-        return classSignature(symbol.owner.type) + "{name=" + symbol.getSimpleName().toString() +
-
-                // resolved signature
-                ",resolved=" +
-                signature(selectType.getReturnType()) + '(' +
-                methodArgumentSignature(selectType, new StringJoiner(",")) + ')' +
-
-                // generic signature
-                ",generic=" +
-                signature(genericType.getReturnType()) + '(' +
-                methodArgumentSignature(genericType, new StringJoiner(",")) + ')' +
+        return classSignature(symbol.owner.type) + '{' +
+                "name=" + symbol.getSimpleName().toString() +
+                ",return=" + signature(selectType.getReturnType()) +
+                ",parameters=" + methodArgumentSignature(selectType, new StringJoiner(",", "[", "]")) +
                 '}';
     }
 

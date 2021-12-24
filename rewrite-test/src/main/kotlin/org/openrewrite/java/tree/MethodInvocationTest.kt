@@ -45,7 +45,7 @@ interface MethodInvocationTest {
         assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
             inv.arguments.filterIsInstance<J.Literal>().map { it.type })
 
-        val effectParams = inv.methodType!!.resolvedSignature!!.paramTypes
+        val effectParams = inv.methodType!!.parameterTypes
         assertEquals("java.lang.Integer", effectParams[0].asFullyQualified()?.fullyQualifiedName)
         assertTrue(effectParams[1].asArray()?.elemType.hasFullyQualifiedName("java.lang.Integer"))
 
@@ -54,6 +54,7 @@ interface MethodInvocationTest {
         assertEquals("foo ( 0, 1, 2 )", inv.printTrimmed())
     }
 
+    @Suppress("unchecked")
     @Test
     fun genericMethodInvocation(jp: JavaParser) {
         val a = jp.parse("""
@@ -73,14 +74,14 @@ interface MethodInvocationTest {
             assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
                 test.arguments.filterIsInstance<J.Literal>().map { it.type })
 
-            val effectiveParams = test.methodType!!.resolvedSignature!!.paramTypes
+            val effectiveParams = test.methodType!!.parameterTypes
             assertEquals("java.lang.Integer", effectiveParams[0].asFullyQualified()?.fullyQualifiedName)
             assertTrue((effectiveParams[1] as JavaType.Array).elemType.hasFullyQualifiedName("java.lang.Integer"))
 
-            val methType = test.methodType!!.genericSignature!!
+            val methType = test.methodType!!
             assertEquals("java.lang.Object", methType.returnType.asGeneric()?.bounds?.get(0)?.asFullyQualified()?.fullyQualifiedName)
-            assertEquals("java.lang.Object", methType.paramTypes[0].asGeneric()?.bounds?.get(0)?.asFullyQualified()?.fullyQualifiedName)
-            assertTrue((methType.paramTypes[1] as JavaType.Array).elemType.asGeneric()?.bounds?.get(0).hasFullyQualifiedName("java.lang.Object"))
+            assertEquals("java.lang.Object", methType.parameterTypes[0].asGeneric()?.bounds?.get(0)?.asFullyQualified()?.fullyQualifiedName)
+            assertTrue(methType.parameterTypes[1].asArray()!!.elemType.asGeneric()?.bounds?.get(0).hasFullyQualifiedName("java.lang.Object"))
         }
 
         assertEquals("this . < Integer > generic ( 0, 1, 2 )", explicitGenericInv.printTrimmed())

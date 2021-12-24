@@ -21,14 +21,14 @@ import org.openrewrite.internal.lang.Nullable;
  * In addition to the signature formats described below, implementations should provide a way of retrieving method
  * and variable signatures, but they may have different numbers of input arguments depending on the implementation.
  * <p/>
- * Method signatures should be formatted like {@code com.MyThing{name=add,resolved=Thing(Integer),generic=Thing<?>(Integer)}},
+ * Method signatures should be formatted like {@code com.MyThing{name=add,return=void,parameters=[Integer]}},
  * where <code>MyThing</code> is the declaring type, <code>void</code> is the return type, and <code>Integer</code> is a parameter.
  * <p/>
  * Variable signatures should be formatted like <code>com.MyThing{name=MY_FIELD}</code>.
  */
 public interface JavaTypeSignatureBuilder {
     /**
-     * @param t A type object.
+     * @param type A type object.
      * @return The type signature. If <code>t</code> is null, the signature is <code>{undefined}</code>.
      */
     String signature(@Nullable Object type);
