@@ -358,6 +358,11 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         JavaType.FullyQualified type = type(classInfo);
 
         if (!classRefSignature.getTypeArguments().isEmpty()) {
+            JavaType existing = (JavaType) typeBySignature.get(signature);
+            if(existing != null) {
+                return existing;
+            }
+
             JavaType.Parameterized parameterized = new JavaType.Parameterized(null,
                     type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type, null);
 
