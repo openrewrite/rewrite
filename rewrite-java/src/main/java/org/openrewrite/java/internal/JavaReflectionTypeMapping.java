@@ -94,6 +94,11 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         JavaType.FullyQualified mappedClazz = classTypeWithoutParameters(clazz);
 
         if (clazz.getTypeParameters().length > 0) {
+            JavaType existing = (JavaType) typeBySignature.get(signature);
+            if(existing != null) {
+                return existing;
+            }
+
             JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
             typeBySignature.put(signature, pt);
 
@@ -128,12 +133,12 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             mappedClazz = new JavaType.Class(
                     null,
                     clazz.getModifiers(),
-                    clazz.getName(),
+                    className,
                     kind,
                     null, null, null, null, null, null
             );
 
-            typeBySignature.put(clazz.getName(), mappedClazz);
+            typeBySignature.put(className, mappedClazz);
 
             JavaType.FullyQualified supertype = (JavaType.FullyQualified) (
                     clazz.getName().equals("java.lang.Object") ?
