@@ -352,21 +352,22 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
     private JavaType classType(ClassRefTypeSignature classRefSignature, String signature) {
         ClassInfo classInfo = classRefSignature.getClassInfo();
+
+        JavaType.FullyQualified type;
         if (classInfo == null) {
             String className = classRefSignature.getBaseClassName();
-            JavaType fallback = jvmTypes.get(className);
-            if (fallback == null) {
+            type = jvmTypes.get(className);
+            if (type == null) {
                 if (className.equals("java.lang.Object")) {
-                    fallback = reflectionTypeMapping.type(Object.class);
+                    type = (JavaType.FullyQualified) reflectionTypeMapping.type(Object.class);
                 } else {
-                    fallback = JavaType.Unknown.getInstance();
-                    typeBySignature.put(className, fallback);
+                    type = JavaType.Unknown.getInstance();
+                    typeBySignature.put(className, type);
                 }
             }
-            return fallback;
+        } else {
+            type = type(classInfo);
         }
-
-        JavaType.FullyQualified type = type(classInfo);
 
         if (!classRefSignature.getTypeArguments().isEmpty()) {
             JavaType existing = (JavaType) typeBySignature.get(signature);
