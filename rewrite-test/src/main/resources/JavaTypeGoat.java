@@ -17,6 +17,9 @@ package org.openrewrite.java;
 
 // Whenever this class is changed, make a corresponding change in JavaTypeGoat in the main java source set.
 public interface JavaTypeGoat<T, S extends JavaTypeGoat<S, ? extends T> & C> {
+    PT<String> parameterizedField = new PT<String>() {
+    };
+
     void clazz(C n);
     void primitive(int n);
     void array(C[][] n);

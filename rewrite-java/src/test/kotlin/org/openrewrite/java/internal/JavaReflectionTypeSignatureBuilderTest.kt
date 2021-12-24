@@ -21,6 +21,9 @@ import java.lang.reflect.Type
 import java.lang.reflect.TypeVariable
 
 class JavaReflectionTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
+    override fun fieldSignature(field: String): String = signatureBuilder()
+        .variableSignature(JavaTypeGoat::class.java.getDeclaredField(field))
+
     override fun methodSignature(methodName: String): String = signatureBuilder()
         .methodSignature(JavaTypeGoat::class.java.declaredMethods.first { it.name == methodName })
 

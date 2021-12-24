@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.MethodTree;
+import com.sun.source.tree.VariableTree;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.JCTree;
@@ -45,6 +46,26 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             .iterator()
             .next()
             .getValue();
+
+    @Override
+    public Object fieldSignature(String field) {
+        return new TreeScanner<String, Integer>() {
+            @Override
+            public String visitVariable(VariableTree node, Integer integer) {
+                if(node.getName().toString().equals(field)) {
+                    return signatureBuilder().variableSignature(((JCTree.JCVariableDecl) node).sym);
+                }
+                //noinspection ConstantConditions
+                return null;
+            }
+
+            @Nullable
+            @Override
+            public String reduce(@Nullable String r1, @Nullable String r2) {
+                return r1 == null ? r2 : r1;
+            }
+        }.scan(cu, 0);
+    }
 
     @Override
     public String methodSignature(String methodName) {

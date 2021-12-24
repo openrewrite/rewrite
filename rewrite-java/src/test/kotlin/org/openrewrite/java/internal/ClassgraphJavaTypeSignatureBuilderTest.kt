@@ -28,12 +28,16 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
             .filterClasspathElements { e -> !e.endsWith(".jar") }
             .enableMemoryMapping()
             .enableClassInfo()
+            .enableFieldInfo()
             .enableMethodInfo()
             .ignoreClassVisibility()
             .acceptClasses("org.openrewrite.java.*")
             .scan()
             .getClassInfo("org.openrewrite.java.JavaTypeGoat")
     }
+
+    override fun fieldSignature(field: String): String = signatureBuilder()
+        .variableSignature(goat.getFieldInfo(field))
 
     override fun methodSignature(methodName: String): String = signatureBuilder()
         .methodSignature(goat.getMethodInfo(methodName)[0])

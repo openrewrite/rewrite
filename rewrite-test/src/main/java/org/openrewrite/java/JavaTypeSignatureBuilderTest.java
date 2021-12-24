@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public interface JavaTypeSignatureBuilderTest {
+    Object fieldSignature(String field);
 
     Object methodSignature(String methodName);
 
@@ -34,6 +35,12 @@ public interface JavaTypeSignatureBuilderTest {
     Object lastClassTypeParameter();
 
     JavaTypeSignatureBuilder signatureBuilder();
+
+    @Test
+    default void parameterizedField() {
+        assertThat(fieldSignature("parameterizedField"))
+                .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=parameterizedField}");
+    }
 
     @Test
     default void array() {

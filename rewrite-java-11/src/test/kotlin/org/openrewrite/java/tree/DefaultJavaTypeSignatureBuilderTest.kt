@@ -36,6 +36,9 @@ class DefaultJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
             .asParameterized()!!
     }
 
+    override fun fieldSignature(field: String): String = signatureBuilder().variableSignature(goatCu.type.members
+        .first { it.name == field })
+
     override fun methodSignature(methodName: String): String = signatureBuilder().methodSignature(goatCu.type.methods
         .first { it.name == methodName })
 
