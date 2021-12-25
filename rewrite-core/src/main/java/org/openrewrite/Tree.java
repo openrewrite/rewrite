@@ -81,6 +81,12 @@ public interface Tree {
         return outputCapture.out.toString();
     }
 
+    default <P> String print(P p, TreeVisitor<?, PrintOutputCapture<P>> printer) {
+        PrintOutputCapture<P> outputCapture = new PrintOutputCapture<>(p);
+        printer.visit(this, outputCapture);
+        return outputCapture.out.toString();
+    }
+
     default String print(Cursor cursor) {
         return print(0, cursor);
     }
@@ -91,6 +97,10 @@ public interface Tree {
 
     default String printTrimmed(Cursor cursor) {
         return StringUtils.trimIndent(print(cursor));
+    }
+
+    default String printTrimmed(TreeVisitor<?, PrintOutputCapture<Integer>> printer) {
+        return print(0, printer);
     }
 
     default boolean isScope(@Nullable Tree tree) {

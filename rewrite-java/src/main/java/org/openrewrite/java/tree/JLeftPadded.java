@@ -103,7 +103,7 @@ public class JLeftPadded<T> {
 
     @Override
     public String toString() {
-        return "JLeftPadded(before=" + before + ", element=" + element.getClass().getSimpleName() + ')';
+        return "JLeftPadded(before=" + before + ", element=" + element + ')';
     }
 
     public static <T> JLeftPadded<T> build(T element) {

@@ -34,13 +34,11 @@ import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
@@ -1605,6 +1603,11 @@ public interface J extends Tree {
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
     @ToString
@@ -1975,6 +1978,11 @@ public interface J extends Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitIdentifier(this, p);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
     @ToString
@@ -2177,7 +2185,25 @@ public interface J extends Tree {
         }
 
         public String getTypeName() {
-            return isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed();
+            return getTypeName(isStatic() ? (FieldAccess) qualid.getTarget() : qualid);
+        }
+
+        private String getTypeName(J.FieldAccess type) {
+            StringBuilder typeName = new StringBuilder();
+
+            J.FieldAccess part = qualid;
+            while (true) {
+                if (part.getTarget() instanceof J.Identifier) {
+                    typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
+                            "." + part.getSimpleName());
+                    break;
+                } else {
+                    typeName.insert(0, "." + part.getSimpleName());
+                    part = (FieldAccess) part.getTarget();
+                }
+            }
+
+            return typeName.toString();
         }
 
         /**
@@ -2190,18 +2216,36 @@ public interface J extends Tree {
          * </code>
          */
         public String getPackageName() {
-            JavaType.FullyQualified importType = TypeUtils.asFullyQualified(qualid.getType());
-            if (importType != null) {
-                return importType.getPackageName();
+            boolean seenClassPart = false;
+            boolean packagePart = false;
+            StringBuilder packageName = new StringBuilder();
+
+            J.FieldAccess part = qualid;
+            while (true) {
+                String name = part.getSimpleName();
+                if(!seenClassPart && (name.equals("*") || Character.isUpperCase(name.charAt(0)))) {
+                    seenClassPart = true;
+                }
+
+                if (seenClassPart && !packagePart && Character.isLowerCase(name.charAt(0))) {
+                    packagePart = true;
+                }
+
+                if (part.getTarget() instanceof J.Identifier) {
+                    if (packagePart) {
+                        packageName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
+                                "." + name);
+                    }
+                    break;
+                } else {
+                    if (packagePart) {
+                        packageName.insert(0, "." + name);
+                    }
+                    part = (FieldAccess) part.getTarget();
+                }
             }
 
-            AtomicBoolean takeWhile = new AtomicBoolean(true);
-            return stream(qualid.getTarget().printTrimmed().split("\\."))
-                    .filter(pkg -> {
-                        takeWhile.set(takeWhile.get() && !pkg.isEmpty() && Character.isLowerCase(pkg.charAt(0)));
-                        return takeWhile.get();
-                    })
-                    .collect(joining("."));
+            return packageName.toString();
         }
 
         public String getClassName() {
@@ -2262,6 +2306,11 @@ public interface J extends Tree {
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 
@@ -2338,6 +2387,11 @@ public interface J extends Tree {
             public InstanceOf withExpr(JRightPadded<Expression> expression) {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.type);
             }
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 
