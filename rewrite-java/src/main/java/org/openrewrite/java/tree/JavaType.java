@@ -921,11 +921,6 @@ public interface JavaType {
         }
 
         @Override
-        public int hashCode() {
-            return Objects.hash(name, owner);
-        }
-
-        @Override
         public String toString() {
             return TO_STRING.variableSignature(this);
         }
