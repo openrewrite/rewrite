@@ -38,7 +38,11 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if (type == null) {
             return "{undefined}";
         } else if (type instanceof Type.ClassType) {
-            return type.isParameterized() ? parameterizedSignature(type) : classSignature(type);
+            try {
+                return type.isParameterized() ? parameterizedSignature(type) : classSignature(type);
+            } catch(Symbol.CompletionFailure ignored) {
+                return classSignature(type);
+            }
         } else if (type instanceof Type.TypeVar) {
             return genericSignature(type);
         } else if (type instanceof Type.JCPrimitiveType) {

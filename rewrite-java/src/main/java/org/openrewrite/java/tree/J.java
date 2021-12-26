@@ -2191,7 +2191,7 @@ public interface J extends Tree {
         private String getTypeName(J.FieldAccess type) {
             StringBuilder typeName = new StringBuilder();
 
-            J.FieldAccess part = qualid;
+            J.FieldAccess part = type;
             while (true) {
                 if (part.getTarget() instanceof J.Identifier) {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
