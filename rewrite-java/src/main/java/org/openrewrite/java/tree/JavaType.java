@@ -828,8 +828,8 @@ public interface JavaType {
             Method method = (Method) o;
             assert declaringType != null;
             assert returnType != null;
-            assert parameterTypes != null;
-            return declaringType.equals(method.declaringType) && name.equals(method.name) && returnType.equals(method.returnType) && parameterTypes.equals(method.parameterTypes);
+            return declaringType.equals(method.declaringType) && name.equals(method.name) &&
+                    returnType.equals(method.returnType) && Objects.equals(parameterTypes, method.parameterTypes);
         }
 
         @Override
