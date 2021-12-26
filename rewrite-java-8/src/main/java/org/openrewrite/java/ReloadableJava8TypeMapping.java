@@ -65,7 +65,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             return array(type, signature);
         } else if (type instanceof Type.WildcardType) {
             return generic((Type.WildcardType) type, signature);
-        } else if (com.sun.tools.javac.code.Type.noType.equals(type)) {
+        } else if (type instanceof Type.JCNoType) {
             return JavaType.Class.Unknown.getInstance();
         }
 

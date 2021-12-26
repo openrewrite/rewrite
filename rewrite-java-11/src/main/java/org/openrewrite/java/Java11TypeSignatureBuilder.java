@@ -58,7 +58,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 s.append(signature(wildcard.type));
             }
             return s.append("}").toString();
-        } else if (Type.noType.equals(type)) {
+        } else if (type instanceof Type.JCNoType) {
             return "{none}";
         }
 
@@ -89,6 +89,12 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     @Override
     public String classSignature(Object type) {
+        if(type instanceof Type.JCVoidType) {
+            return "void";
+        } else if(type instanceof Type.JCPrimitiveType) {
+            return primitiveSignature(type);
+        }
+
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) ((Type.ClassType) type).tsym;
         if (!sym.completer.isTerminal()) {
             completeClassSymbol(sym);

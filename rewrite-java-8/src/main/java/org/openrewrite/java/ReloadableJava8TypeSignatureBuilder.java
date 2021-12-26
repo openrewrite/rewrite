@@ -40,7 +40,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof Type.ClassType) {
             try {
                 return type.isParameterized() ? parameterizedSignature(type) : classSignature(type);
-            } catch(Symbol.CompletionFailure ignored) {
+            } catch (Symbol.CompletionFailure ignored) {
                 return classSignature(type);
             }
         } else if (type instanceof Type.TypeVar) {
@@ -58,7 +58,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 s.append(signature(wildcard.type));
             }
             return s.append("}").toString();
-        } else if (Type.noType.equals(type)) {
+        } else if (type instanceof Type.JCNoType) {
             return "{none}";
         }
 
@@ -89,6 +89,12 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     @Override
     public String classSignature(Object type) {
+        if (type instanceof Type.JCVoidType) {
+            return "void";
+        } else if (type instanceof Type.JCPrimitiveType) {
+            return primitiveSignature(type);
+        }
+
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) ((Type.ClassType) type).tsym;
         completeClassSymbol(sym);
         return sym.flatName().toString();
