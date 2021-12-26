@@ -42,6 +42,9 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     override fun methodSignature(methodName: String): String = signatureBuilder()
         .methodSignature(goat.getMethodInfo(methodName)[0])
 
+    override fun constructorSignature(): String = signatureBuilder()
+        .methodSignature(goat.declaredConstructorInfo[0])
+
     override fun firstMethodParameter(methodName: String): TypeSignature = goat.getMethodInfo(methodName)[0]
         .parameterInfo[0].run { typeSignature ?: typeDescriptor }
 

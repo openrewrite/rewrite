@@ -18,7 +18,6 @@ package org.openrewrite.java.internal
 import org.openrewrite.java.JavaTypeGoat
 import org.openrewrite.java.JavaTypeSignatureBuilderTest
 import java.lang.reflect.Type
-import java.lang.reflect.TypeVariable
 
 class JavaReflectionTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     override fun fieldSignature(field: String): String = signatureBuilder()
@@ -27,11 +26,14 @@ class JavaReflectionTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     override fun methodSignature(methodName: String): String = signatureBuilder()
         .methodSignature(JavaTypeGoat::class.java.declaredMethods.first { it.name == methodName }, "org.openrewrite.java.JavaTypeGoat")
 
+    override fun constructorSignature(): String = signatureBuilder()
+        .methodSignature(JavaTypeGoat::class.java.declaredConstructors.first(), "org.openrewrite.java.JavaTypeGoat")
+
     override fun firstMethodParameter(methodName: String): Type = JavaTypeGoat::class.java.declaredMethods
         .first { it.name == methodName }
         .genericParameterTypes[0]
 
-    override fun lastClassTypeParameter(): TypeVariable<Class<JavaTypeGoat<*, *>>> =
+    override fun lastClassTypeParameter(): Any =
         JavaTypeGoat::class.java.typeParameters.last()
 
     override fun signatureBuilder() = JavaReflectionTypeSignatureBuilder()

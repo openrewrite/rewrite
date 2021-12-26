@@ -42,6 +42,9 @@ class DefaultJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     override fun methodSignature(methodName: String): String = signatureBuilder().methodSignature(goatCu.type.methods
         .first { it.name == methodName })
 
+    override fun constructorSignature(): String = signatureBuilder().methodSignature(goatCu.type.methods
+        .first { it.name == "<constructor>" })
+
     override fun firstMethodParameter(methodName: String): JavaType = goatCu.type.methods
         .first { it.name == methodName }
         .parameterTypes[0]

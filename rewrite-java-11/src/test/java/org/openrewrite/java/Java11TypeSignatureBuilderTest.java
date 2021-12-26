@@ -48,7 +48,7 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             .getValue();
 
     @Override
-    public Object fieldSignature(String field) {
+    public String fieldSignature(String field) {
         return new TreeScanner<String, Integer>() {
             @Override
             public String visitVariable(VariableTree node, Integer integer) {
@@ -84,6 +84,27 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             @Override
             public String reduce(@Nullable String r1, @Nullable String r2) {
                 return r1 == null ? r2 : r1;
+            }
+        }.scan(cu, 0);
+    }
+
+    @Override
+    public String constructorSignature() {
+        return new TreeScanner<String, Integer>() {
+            @Override
+            public String visitMethod(MethodTree node, Integer p) {
+                JCTree.JCMethodDecl method = (JCTree.JCMethodDecl) node;
+                if(method.name.toString().equals("<init>")) {
+                    return signatureBuilder().methodSignature(method.type, method.sym);
+                }
+                //noinspection ConstantConditions
+                return null;
+            }
+
+            @Nullable
+            @Override
+            public String reduce(@Nullable String r1, @Nullable String r2) {
+                return r2 == null ? r1 : r2;
             }
         }.scan(cu, 0);
     }

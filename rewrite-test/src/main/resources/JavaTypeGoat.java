@@ -16,21 +16,30 @@
 package org.openrewrite.java;
 
 // Whenever this class is changed, make a corresponding change in JavaTypeGoat in the main java source set.
-public interface JavaTypeGoat<T, S extends JavaTypeGoat<S, ? extends T> & C> {
-    PT<String> parameterizedField = new PT<String>() {
+public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
+    public JavaTypeGoat() {
+    }
+
+    public static final PT<String> parameterizedField = new PT<String>() {
     };
 
-    void clazz(C n);
-    void primitive(int n);
-    void array(C[][] n);
-    void parameterized(PT<C> n);
-    void parameterizedRecursive(PT<PT<C>> n);
-    void generic(PT<? extends C> n);
-    void genericContravariant(PT<? super C> n);
-    <U extends JavaTypeGoat<U, ?>> void genericRecursive(JavaTypeGoat<? extends U[], ?> n);
-    <U> void genericUnbounded(PT<U> n);
-    void genericArray(PT<C>[] n);
-    void inner(C.Inner n);
+    public static abstract class InheritedJavaTypeGoat<T, U extends PT<U> & C> extends JavaTypeGoat<T, U> {
+        public InheritedJavaTypeGoat() {
+            super();
+        }
+    }
+
+    public abstract void clazz(C n);
+    public abstract void primitive(int n);
+    public abstract void array(C[][] n);
+    public abstract void parameterized(PT<C> n);
+    public abstract void parameterizedRecursive(PT<PT<C>> n);
+    public abstract void generic(PT<? extends C> n);
+    public abstract void genericContravariant(PT<? super C> n);
+    public abstract <U extends JavaTypeGoat<U, ?>> void genericRecursive(JavaTypeGoat<? extends U[], ?> n);
+    public abstract <U> void genericUnbounded(PT<U> n);
+    public abstract void genericArray(PT<C>[] n);
+    public abstract void inner(C.Inner n);
 }
 
 interface C {

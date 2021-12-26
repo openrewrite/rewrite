@@ -40,7 +40,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof Type.ClassType) {
             try {
                 return type.isParameterized() ? parameterizedSignature(type) : classSignature(type);
-            } catch(Symbol.CompletionFailure ignored) {
+            } catch (Symbol.CompletionFailure ignored) {
                 return classSignature(type);
             }
         } else if (type instanceof Type.TypeVar) {
@@ -89,9 +89,9 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     @Override
     public String classSignature(Object type) {
-        if(type instanceof Type.JCVoidType) {
+        if (type instanceof Type.JCVoidType) {
             return "void";
-        } else if(type instanceof Type.JCPrimitiveType) {
+        } else if (type instanceof Type.JCPrimitiveType) {
             return primitiveSignature(type);
         }
 
@@ -194,11 +194,15 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     public String methodSignature(Type selectType, Symbol.MethodSymbol symbol) {
         Type genericType = symbol.type;
-        return classSignature(symbol.owner.type) + '{' +
-                "name=" + symbol.getSimpleName().toString() +
-                ",return=" + signature(selectType.getReturnType()) +
-                ",parameters=" + methodArgumentSignature(selectType, new StringJoiner(",", "[", "]")) +
-                '}';
+        String s = classSignature(symbol.owner.type);
+        if (symbol.isConstructor()) {
+            s += "{name=<constructor>,return=" + s;
+        } else {
+            s += "{name=" + symbol.getSimpleName().toString() +
+                    ",return=" + signature(selectType.getReturnType());
+        }
+
+        return s + ",parameters=" + methodArgumentSignature(selectType, new StringJoiner(",", "[", "]")) + '}';
     }
 
     private StringJoiner methodArgumentSignature(Type selectType, StringJoiner resolvedArgumentTypes) {

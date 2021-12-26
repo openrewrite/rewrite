@@ -397,7 +397,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
             JavaType.Method method = new JavaType.Method(
                     methodSymbol.flags_field,
                     null,
-                    methodSymbol.getSimpleName().toString(),
+                    methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
                     null,
                     paramNames,
                     null, null, null
@@ -478,7 +478,9 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                 throw new UnsupportedOperationException("Unexpected method signature type" + signatureType.getClass().getName());
             }
 
-            method.unsafeSet(resolvedDeclaringType, returnType, parameterTypes, exceptionTypes, annotations);
+            method.unsafeSet(resolvedDeclaringType,
+                    methodSymbol.isConstructor() ? resolvedDeclaringType : returnType,
+                    parameterTypes, exceptionTypes, annotations);
             return method;
         }
 

@@ -20,9 +20,11 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public interface JavaTypeSignatureBuilderTest {
-    Object fieldSignature(String field);
+    String fieldSignature(String field);
 
-    Object methodSignature(String methodName);
+    String methodSignature(String methodName);
+
+    String constructorSignature();
 
     /**
      * @param methodName The type of the first parameter of the method with this name.
@@ -35,6 +37,12 @@ public interface JavaTypeSignatureBuilderTest {
     Object lastClassTypeParameter();
 
     JavaTypeSignatureBuilder signatureBuilder();
+
+    @Test
+    default void constructor() {
+        assertThat(constructorSignature())
+                .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=<constructor>,return=org.openrewrite.java.JavaTypeGoat,parameters=[]}");
+    }
 
     @Test
     default void parameterizedField() {
@@ -101,7 +109,7 @@ public interface JavaTypeSignatureBuilderTest {
     @Test
     default void genericRecursiveInClassDefinition() {
         assertThat(signatureBuilder().signature(lastClassTypeParameter()))
-                .isEqualTo("Generic{S extends org.openrewrite.java.JavaTypeGoat<Generic{S}, Generic{? extends Generic{T}}> & org.openrewrite.java.C}");
+                .isEqualTo("Generic{S extends org.openrewrite.java.PT<Generic{S}> & org.openrewrite.java.C}");
     }
 
     @Test

@@ -94,11 +94,11 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             throw new UnsupportedOperationException("Unknown class type " + type.getClass().getName());
         }
 
-        if(classInfo == null) {
+        if (classInfo == null) {
             JavaType.FullyQualified fallback = jvmTypes.get(className);
-            if(fallback != null) {
+            if (fallback != null) {
                 return fallback.getFullyQualifiedName();
-            } else if(className.equals("java.lang.Object")) {
+            } else if (className.equals("java.lang.Object")) {
                 return className;
             } else {
                 return "{undefined}";
@@ -194,7 +194,7 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
     @Override
     public String parameterizedSignature(Object type) {
         String baseClass = classSignature(type);
-        if(baseClass.equals("{undefined}")) {
+        if (baseClass.equals("{undefined}")) {
             return baseClass;
         }
 
@@ -232,11 +232,16 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
 
     public String methodSignature(MethodInfo methodInfo) {
         StringBuilder s = new StringBuilder(methodInfo.getClassName());
-        s.append("{name=").append(methodInfo.getName());
+        s.append("{name=").append(methodInfo.isConstructor() ? "<constructor>" : methodInfo.getName());
 
-        s.append(",return=").append(methodInfo.getTypeSignature() == null ?
-                signature(methodInfo.getTypeDescriptor().getResultType()) :
-                signature(methodInfo.getTypeSignature().getResultType()));
+        s.append(",return=");
+        if (methodInfo.isConstructor()) {
+            s.append(methodInfo.getClassName());
+        } else {
+            s.append(methodInfo.getTypeSignature() == null ?
+                    signature(methodInfo.getTypeDescriptor().getResultType()) :
+                    signature(methodInfo.getTypeSignature().getResultType()));
+        }
 
         StringJoiner parameterTypes = new StringJoiner(",", "[", "]");
         for (MethodParameterInfo methodParameterInfo : methodInfo.getParameterInfo()) {
