@@ -44,6 +44,12 @@ interface JavaTypeMappingTest {
     }
 
     @Test
+    fun constructor() {
+        val ctor = methodType("<constructor>")
+        assertThat(ctor.declaringType.fullyQualifiedName).isEqualTo("org.openrewrite.java.JavaTypeGoat")
+    }
+
+    @Test
     fun array() {
         val arr = firstMethodParameter("array") as JavaType.Array
         assertThat(arr.elemType.asArray()).isNotNull
@@ -92,7 +98,7 @@ interface JavaTypeMappingTest {
         val generic = goatType().typeParameters.last().asGeneric()!!
         assertThat(generic.name).isEqualTo("S")
         assertThat(generic.variance).isEqualTo(COVARIANT)
-        assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.JavaTypeGoat")
+        assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.PT")
         assertThat(generic.bounds[1].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
 

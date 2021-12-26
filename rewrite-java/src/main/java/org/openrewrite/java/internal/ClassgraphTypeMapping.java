@@ -117,10 +117,21 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
             List<JavaType.Method> methods = null;
             if (!aClass.getDeclaredMethodInfo().isEmpty()) {
-                methods = new ArrayList<>(aClass.getDeclaredMethodInfo().size());
+                methods = new ArrayList<>(aClass.getDeclaredMethodInfo().size() + aClass.getDeclaredConstructorInfo().size());
                 for (MethodInfo methodInfo : aClass.getDeclaredMethodInfo()) {
                     if (!(methodInfo.isBridge() || methodInfo.isSynthetic())) {
                         methods.add(methodType(methodInfo));
+                    }
+                }
+            }
+
+            if(!aClass.getDeclaredConstructorInfo().isEmpty()) {
+                if(methods == null) {
+                    methods = new ArrayList<>(aClass.getDeclaredConstructorInfo().size());
+                }
+                for (MethodInfo ctor : aClass.getDeclaredConstructorInfo()) {
+                    if(!(ctor.isBridge() || ctor.isSynthetic())) {
+                        methods.add(methodType(ctor));
                     }
                 }
             }
@@ -224,7 +235,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         JavaType.Method method = new JavaType.Method(
                 methodInfo.getModifiers(),
                 null,
-                methodInfo.getName(),
+                methodInfo.isConstructor() ? "<constructor>" : methodInfo.getName(),
                 null,
                 paramNames,
                 null, null, null
@@ -261,8 +272,8 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         }
 
         JavaType.FullyQualified type = type(methodInfo.getClassInfo());
-        method.unsafeSet(type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type,
-                returnType, parameterTypes, thrownExceptions, annotations);
+        JavaType.FullyQualified declaringType = type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type;
+        method.unsafeSet(declaringType, methodInfo.isConstructor() ? declaringType : returnType, parameterTypes, thrownExceptions, annotations);
         return method;
     }
 
