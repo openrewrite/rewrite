@@ -740,6 +740,10 @@ public interface JavaType {
             this.annotations = nullIfEmpty(annotations);
         }
 
+        public boolean isConstructor() {
+            return name.equals("<constructor>");
+        }
+
         public FullyQualified getDeclaringType() {
             assert declaringType != null;
             return declaringType;

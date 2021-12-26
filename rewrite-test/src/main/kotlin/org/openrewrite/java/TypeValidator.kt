@@ -132,7 +132,7 @@ class TypeValidator(
             p.add(invalidTypeResult("J.MethodInvocation type is null"))
             return m
         }
-        if(!m.simpleName.equals(mt.name)) {
+        if(!m.simpleName.equals(mt.name) && m.methodType?.isConstructor != true) {
             p.add(invalidTypeResult("J.MethodInvocation name \"${m.simpleName}\" does not match the name in its type information \"${mt.name}\""))
         }
 

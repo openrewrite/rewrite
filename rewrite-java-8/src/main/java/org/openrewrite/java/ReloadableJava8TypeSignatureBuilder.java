@@ -93,6 +93,8 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return "void";
         } else if (type instanceof Type.JCPrimitiveType) {
             return primitiveSignature(type);
+        } else if(type instanceof Type.JCNoType) {
+            return "{undefined}";
         }
 
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) ((Type.ClassType) type).tsym;
