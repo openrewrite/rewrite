@@ -24,12 +24,13 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
-import static java.util.stream.Collectors.joining;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 import static org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder.TO_STRING;
 
@@ -72,7 +73,6 @@ public interface JavaType {
     }
 
     abstract class FullyQualified implements JavaType {
-
         public abstract String getFullyQualifiedName();
 
         public abstract FullyQualified withFullyQualifiedName(String fullyQualifiedName);
@@ -99,24 +99,18 @@ public interface JavaType {
 
         public abstract List<Variable> getVisibleSupertypeMembers();
 
+        /**
+         * @return The class name without package qualification. If an inner class, outer/inner classes are separated by '.'.
+         */
         public String getClassName() {
-            AtomicBoolean dropWhile = new AtomicBoolean(false);
-            return Arrays.stream(getFullyQualifiedName().split("\\."))
-                    .filter(part -> {
-                        dropWhile.set(dropWhile.get() || !Character.isLowerCase(part.charAt(0)));
-                        return dropWhile.get();
-                    })
-                    .collect(joining("."));
+            String fqn = getFullyQualifiedName();
+            String className = fqn.substring(fqn.lastIndexOf('.') + 1);
+            return className.replace('$', '.');
         }
 
         public String getPackageName() {
-            AtomicBoolean takeWhile = new AtomicBoolean(true);
-            return Arrays.stream(getFullyQualifiedName().split("\\."))
-                    .filter(part -> {
-                        takeWhile.set(takeWhile.get() && !Character.isUpperCase(part.charAt(0)));
-                        return takeWhile.get();
-                    })
-                    .collect(joining("."));
+            String fqn = getFullyQualifiedName();
+            return fqn.substring(0, fqn.lastIndexOf('.') + 1);
         }
 
         public boolean isAssignableTo(String fullyQualifiedName) {
@@ -126,7 +120,6 @@ public interface JavaType {
         }
 
         public boolean isAssignableFrom(@Nullable JavaType type) {
-            // TODO This does not take into account type parameters.
             if (type instanceof FullyQualified) {
                 FullyQualified clazz = (FullyQualified) type;
                 return getFullyQualifiedName().equals(clazz.getFullyQualifiedName()) ||

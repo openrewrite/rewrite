@@ -2257,13 +2257,15 @@ public interface J extends Tree {
 
             J.FieldAccess part = type;
             while (true) {
+                String name = part.getSimpleName();
                 if (part.getTarget() instanceof J.Identifier) {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
-                            "." + part.getSimpleName());
+                            "." + name);
                     break;
                 } else {
-                    typeName.insert(0, "." + part.getSimpleName());
                     part = (FieldAccess) part.getTarget();
+                    String delim = Character.isUpperCase(part.getSimpleName().charAt(0)) ? "$" : ".";
+                    typeName.insert(0, delim + name);
                 }
             }
 
@@ -2287,7 +2289,7 @@ public interface J extends Tree {
             J.FieldAccess part = qualid;
             while (true) {
                 String name = part.getSimpleName();
-                if(!seenClassPart && (name.equals("*") || Character.isUpperCase(name.charAt(0)))) {
+                if (!seenClassPart && (name.equals("*") || Character.isUpperCase(name.charAt(0)))) {
                     seenClassPart = true;
                 }
 

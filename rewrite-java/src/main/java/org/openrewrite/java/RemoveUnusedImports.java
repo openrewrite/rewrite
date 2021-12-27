@@ -92,7 +92,7 @@ public class RemoveUnusedImports extends Recipe {
 
             for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
                 if (javaType instanceof JavaType.Parameterized) {
-                    JavaType.Parameterized parameterized = (JavaType.Parameterized)javaType;
+                    JavaType.Parameterized parameterized = (JavaType.Parameterized) javaType;
                     typesByPackage.computeIfAbsent(packageKey(parameterized.getType().getPackageName(), parameterized.getType().getClassName()), f -> new HashSet<>())
                             .add(parameterized.getType());
                     for (JavaType typeParameter : parameterized.getTypeParameters()) {

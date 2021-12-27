@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
@@ -22,6 +23,46 @@ import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
 interface ImportTest : JavaTreeTest {
+
+    @Test
+    fun typeName(jp: JavaParser) {
+        val cu = jp.parse("""
+            import java.util.List;
+            import java.util.*;
+            
+            import static java.nio.charset.StandardCharsets.UTF_8;
+            import static java.util.Collections.emptyList;
+            import java.util.Map.Entry;
+        """.trimIndent())[0]
+
+        assertThat(cu.imports.map { it.typeName }).containsExactly(
+            "java.util.List",
+            "java.util.*",
+            "java.nio.charset.StandardCharsets",
+            "java.util.Collections",
+            "java.util.Map${'$'}Entry"
+        )
+    }
+
+    @Test
+    fun packageName(jp: JavaParser) {
+        val cu = jp.parse("""
+            import java.util.List;
+            import java.util.*;
+            
+            import static java.nio.charset.StandardCharsets.UTF_8;
+            import static java.util.Collections.emptyList;
+            import java.util.Map.Entry;
+        """.trimIndent())[0]
+
+        assertThat(cu.imports.map { it.packageName }).containsExactly(
+            "java.util",
+            "java.util",
+            "java.nio.charset",
+            "java.util",
+            "java.util"
+        )
+    }
 
     @Test
     fun classImport(jp: JavaParser) = assertParsePrintAndProcess(
