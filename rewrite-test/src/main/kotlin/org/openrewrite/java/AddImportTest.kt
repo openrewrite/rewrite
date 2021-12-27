@@ -78,8 +78,8 @@ interface AddImportTest : JavaRecipeTest {
     )
 
     @Test
-    fun dontDuplicateImports3(jp: JavaParser) = assertChanged(
-        jp,
+    fun dontDuplicateImports3(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.classpath("junit-jupiter-api").build(),
         recipe = addImports(
             { AddImport("org.junit.jupiter.api.Assertions", "assertNull", false) }
         ),

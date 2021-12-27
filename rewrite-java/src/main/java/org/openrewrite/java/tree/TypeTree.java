@@ -79,7 +79,7 @@ public interface TypeTree extends NameTree {
                                 Markers.EMPTY
                         ),
                         (Character.isUpperCase(part.charAt(0))) ?
-                                JavaType.Class.build(fullName) :
+                                JavaType.ShallowClass.build(fullName) :
                                 null
                 );
             }

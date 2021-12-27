@@ -61,7 +61,7 @@ public interface JavaType {
         if (primitive != null) {
             return primitive;
         }
-        return Class.build(typeName);
+        return ShallowClass.build(typeName);
     }
 
     @Getter
@@ -288,6 +288,11 @@ public interface JavaType {
             this.methods = nullIfEmpty(methods);
         }
 
+        @Deprecated
+        public static ShallowClass build(String fullyQualifiedName) {
+            return ShallowClass.build(fullyQualifiedName);
+        }
+
         public List<FullyQualified> getAnnotations() {
             return annotations == null ? emptyList() : annotations;
         }
@@ -371,41 +376,6 @@ public interface JavaType {
         }
 
         /**
-         * Build a class type only from the class' fully qualified name. Since we are not providing any member, type parameter,
-         * interface, or supertype information, this fully qualified name could potentially match on more than one version of
-         * the class found in the type cache. This method will simply pick one of them, because there is no way of selecting
-         * between the versions of the class based solely on the fully qualified class name.
-         *
-         * @param fullyQualifiedName The fully qualified name of the class to build
-         * @return Any class found in the type cache
-         */
-        public static Class build(String fullyQualifiedName) {
-            Class owningClass = null;
-
-            int firstClassNameIndex = 0;
-            int lastDot = 0;
-            char[] fullyQualifiedNameChars = fullyQualifiedName.replace('$', '.').toCharArray();
-            char prev = ' ';
-            for (int i = 0; i < fullyQualifiedNameChars.length; i++) {
-                char c = fullyQualifiedNameChars[i];
-
-                if (firstClassNameIndex == 0 && prev == '.' && Character.isUpperCase(c)) {
-                    firstClassNameIndex = i;
-                } else if (c == '.') {
-                    lastDot = i;
-                }
-                prev = c;
-            }
-
-            if (lastDot > firstClassNameIndex) {
-                owningClass = build(fullyQualifiedName.substring(0, lastDot));
-            }
-
-            return new JavaType.Class(null, 1, fullyQualifiedName, Kind.Class, null, owningClass,
-                    emptyList(), emptyList(), emptyList(), emptyList());
-        }
-
-        /**
          * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
          */
         public void unsafeSet(@Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
@@ -430,6 +400,47 @@ public interface JavaType {
         @Override
         public String toString() {
             return TO_STRING.signature(this);
+        }
+    }
+
+    class ShallowClass extends Class {
+        public ShallowClass(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName, Kind kind, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass, @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces, @Nullable List<Variable> members, @Nullable List<Method> methods) {
+            super(managedReference, flagsBitMap, fullyQualifiedName, kind, supertype, owningClass, annotations, interfaces, members, methods);
+        }
+
+        /**
+         * Build a class type only from the class' fully qualified name. Since we are not providing any member, type parameter,
+         * interface, or supertype information, this fully qualified name could potentially match on more than one version of
+         * the class found in the type cache. This method will simply pick one of them, because there is no way of selecting
+         * between the versions of the class based solely on the fully qualified class name.
+         *
+         * @param fullyQualifiedName The fully qualified name of the class to build
+         * @return Any class found in the type cache
+         */
+        public static ShallowClass build(String fullyQualifiedName) {
+            ShallowClass owningClass = null;
+
+            int firstClassNameIndex = 0;
+            int lastDot = 0;
+            char[] fullyQualifiedNameChars = fullyQualifiedName.replace('$', '.').toCharArray();
+            char prev = ' ';
+            for (int i = 0; i < fullyQualifiedNameChars.length; i++) {
+                char c = fullyQualifiedNameChars[i];
+
+                if (firstClassNameIndex == 0 && prev == '.' && Character.isUpperCase(c)) {
+                    firstClassNameIndex = i;
+                } else if (c == '.') {
+                    lastDot = i;
+                }
+                prev = c;
+            }
+
+            if (lastDot > firstClassNameIndex) {
+                owningClass = build(fullyQualifiedName.substring(0, lastDot));
+            }
+
+            return new JavaType.ShallowClass(null, 1, fullyQualifiedName, Kind.Class, null, owningClass,
+                    emptyList(), emptyList(), emptyList(), emptyList());
         }
     }
 

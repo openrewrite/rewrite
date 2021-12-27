@@ -2255,7 +2255,7 @@ public interface J extends Tree {
                     }
 
                     JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
-                    if (owner != null) {
+                    if (owner != null && !(qualid.getTarget().getType() instanceof JavaType.ShallowClass)) {
                         Iterator<JavaType.Method> visibleMethods = owner.getVisibleMethods();
                         while(visibleMethods.hasNext()) {
                             JavaType.Method method = visibleMethods.next();
