@@ -70,8 +70,14 @@ public class TypeUtils {
     }
 
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
-        JavaType.FullyQualified classType = asFullyQualified(type);
-        return classType != null && classType.getFullyQualifiedName().equals(fqn);
+        if(type instanceof JavaType.FullyQualified) {
+            return ((JavaType.FullyQualified) type).getFullyQualifiedName().equals(fqn);
+        } else if(type instanceof JavaType.Variable) {
+            return isOfClassType(((JavaType.Variable) type).getType(), fqn);
+        } else if(type instanceof JavaType.Method) {
+            return isOfClassType(((JavaType.Method) type).getReturnType(), fqn);
+        }
+        return false;
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
@@ -85,12 +91,15 @@ public class TypeUtils {
                     return true;
                 }
             }
+        } else if(to instanceof JavaType.Variable) {
+            return isAssignableTo(((JavaType.Variable) to).getType(), from);
+        } else if(to instanceof JavaType.Method) {
+            return isAssignableTo(((JavaType.Method) to).getReturnType(), from);
         }
         return false;
     }
 
     public static boolean isAssignableTo(String to, @Nullable JavaType from) {
-
         if (from instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
 
@@ -104,6 +113,10 @@ public class TypeUtils {
                     return true;
                 }
             }
+        } else if(from instanceof JavaType.Variable) {
+            return isAssignableTo(to, ((JavaType.Variable) from).getType());
+        } else if(from instanceof JavaType.Method) {
+            return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
         }
         return false;
     }
