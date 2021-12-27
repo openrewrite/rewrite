@@ -1171,7 +1171,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             v = v.getPadding().withInitializer(visitLeftPadded(v.getPadding().getInitializer(),
                     JLeftPadded.Location.VARIABLE_INITIALIZER, p));
         }
-        v = v.withType(visitType(v.getType(), p));
+        v = v.withVariableType((JavaType.Variable) visitType(v.getVariableType(), p));
         return v;
     }
 
