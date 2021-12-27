@@ -803,9 +803,6 @@ public interface JavaType {
                       @Nullable List<FullyQualified> annotations) {
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = declaringType;
-            if(name.equals("<clinit>")) {
-                System.out.println("here");
-            }
             this.name = name;
             this.returnType = returnType;
             this.parameterNames = nullIfEmpty(parameterNames);

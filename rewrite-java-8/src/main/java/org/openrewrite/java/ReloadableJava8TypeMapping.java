@@ -24,7 +24,6 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import javax.lang.model.type.ErrorType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +65,8 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             return array(type, signature);
         } else if (type instanceof Type.WildcardType) {
             return generic((Type.WildcardType) type, signature);
+        } else if (type instanceof Type.AnnotatedType) {
+            return type(type.unannotatedType());
         } else if (type instanceof Type.JCNoType) {
             return JavaType.Class.Unknown.getInstance();
         }
@@ -147,7 +148,8 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) classType.tsym;
         Type.ClassType symType = (Type.ClassType) sym.type;
 
-        JavaType.Class clazz = (JavaType.Class) typeBySignature.get(sym.flatName().toString());
+        JavaType.FullyQualified fq = (JavaType.FullyQualified) typeBySignature.get(sym.flatName().toString());
+        JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
         if (clazz == null) {
             completeClassSymbol(sym);
             clazz = new JavaType.Class(
@@ -194,7 +196,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                             methods = new ArrayList<>();
                         }
                         Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) elem;
-                        if(!methodSymbol.isStaticOrInstanceInit()) {
+                        if (!methodSymbol.isStaticOrInstanceInit()) {
                             methods.add(methodDeclarationType(methodSymbol, clazz));
                         }
                     }
@@ -216,9 +218,9 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             if (!sym.getDeclarationAttributes().isEmpty()) {
                 annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
                 for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type));
-                    if (fq != null) {
-                        annotations.add(fq);
+                    JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
+                    if (annotType != null) {
+                        annotations.add(annotType);
                     }
                 }
             }
@@ -343,7 +345,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             Type type = symbol.owner.type;
             Symbol sym = symbol.owner;
 
-            if(sym.type instanceof Type.ForAll) {
+            if (sym.type instanceof Type.ForAll) {
                 type = ((Type.ForAll) type).qtype;
             }
 

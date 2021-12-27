@@ -60,6 +60,8 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return s.append("}").toString();
         } else if (type instanceof Type.JCNoType) {
             return "{none}";
+        } else if(type instanceof Type.AnnotatedType) {
+            return signature(type.unannotatedType());
         }
 
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());

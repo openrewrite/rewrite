@@ -279,7 +279,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
     @Nullable
     private JavaType type(Type type, Symbol symbol) {
         if (type instanceof Type.MethodType) {
-            return methodInvocationType(type, (Symbol.MethodSymbol) symbol);
+            return methodInvocationType(type, symbol);
         }
         return type(type);
     }
