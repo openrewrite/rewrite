@@ -119,8 +119,11 @@ public class AnnotationMatcher {
                 }
 
                 JavaType.Variable varType = fa.getName().getFieldType();
-                if (varType != null && matchText.equals(varType.getOwner().getFullyQualifiedName() + "." + varType.getName())) {
-                    return true;
+                if (varType != null) {
+                    JavaType.FullyQualified owner = TypeUtils.asFullyQualified(varType.getOwner());
+                    if (owner != null && matchText.equals(owner.getFullyQualifiedName() + "." + varType.getName())) {
+                        return true;
+                    }
                 }
             }
             if (arg instanceof J.NewArray) {
@@ -137,7 +140,7 @@ public class AnnotationMatcher {
         }
 
         J.Assignment assignment = (J.Assignment) arg;
-        if (!assignment.getVariable().printTrimmed().equals(matchOnArgumentName)) {
+        if (!assignment.getVariable().printTrimmed(new JavaPrinter<>()).equals(matchOnArgumentName)) {
             return false;
         }
 

@@ -318,7 +318,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     @Nullable
     private JavaType.Variable variableType(@Nullable Symbol symbol,
                                            @Nullable JavaType.FullyQualified owner) {
-        if (!(symbol instanceof Symbol.VarSymbol) || symbol.owner instanceof Symbol.MethodSymbol) {
+        if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
         }
 
@@ -335,13 +335,19 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
 
         typeBySignature.put(signature, variable);
 
-
-        JavaType.FullyQualified resolvedOwner = owner;
+        JavaType resolvedOwner = owner;
         if (owner == null) {
-            resolvedOwner = TypeUtils.asFullyQualified(type(symbol.owner.type));
-        }
-        if (resolvedOwner == null) {
-            return null;
+            Type type = symbol.owner.type;
+            Symbol sym = symbol.owner;
+
+            if(sym.type instanceof Type.ForAll) {
+                type = ((Type.ForAll) type).qtype;
+            }
+
+            resolvedOwner = type instanceof Type.MethodType ?
+                    methodInvocationType(type, sym) :
+                    type(type);
+            assert resolvedOwner != null;
         }
 
         List<JavaType.FullyQualified> annotations = null;

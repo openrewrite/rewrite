@@ -88,6 +88,8 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
                     }
                     typeAsString.append("[]");
                     return typeAsString.toString();
+                } else if(type instanceof JavaType.Variable) {
+                    return buildName(((JavaType.Variable) type).getType());
                 }
             }
             return null;

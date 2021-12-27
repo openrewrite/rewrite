@@ -240,7 +240,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return resolvedArgumentTypes.toString();
         } else if (selectType instanceof Type.ForAll) {
             return methodArgumentSignature(((Type.ForAll) selectType).qtype);
-        } else if(selectType instanceof Type.JCNoType) {
+        } else if (selectType instanceof Type.JCNoType) {
             return "{undefined}";
         }
 
@@ -248,6 +248,12 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String variableSignature(Symbol symbol) {
-        return classSignature(symbol.owner.type) + "{name=" + symbol.name.toString() + '}';
+        String owner;
+        if (symbol.owner instanceof Symbol.MethodSymbol) {
+            owner = methodSignature((Symbol.MethodSymbol) symbol.owner);
+        } else {
+            owner = signature(symbol.owner.type);
+        }
+        return owner + "{name=" + symbol.name.toString() + '}';
     }
 }

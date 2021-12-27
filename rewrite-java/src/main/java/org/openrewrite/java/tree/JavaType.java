@@ -857,7 +857,7 @@ public interface JavaType {
         @With
         @NonFinal
         @Nullable
-        FullyQualified owner;
+        JavaType owner;
 
         @With
         @NonFinal
@@ -868,7 +868,7 @@ public interface JavaType {
         @Nullable
         List<FullyQualified> annotations;
 
-        public Variable(long flagsBitMap, String name, @Nullable FullyQualified owner,
+        public Variable(long flagsBitMap, String name, @Nullable JavaType owner,
                         @Nullable JavaType type, @Nullable List<FullyQualified> annotations) {
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.name = name;
@@ -877,8 +877,8 @@ public interface JavaType {
             this.annotations = nullIfEmpty(annotations);
         }
 
-        public FullyQualified getOwner() {
-            assert owner != null;
+        @Nullable
+        public JavaType getOwner() {
             return owner;
         }
 
@@ -904,7 +904,7 @@ public interface JavaType {
             return Flag.bitMapToFlags(flagsBitMap);
         }
 
-        public void unsafeSet(FullyQualified owner, @Nullable JavaType type,
+        public void unsafeSet(JavaType owner, @Nullable JavaType type,
                               @Nullable List<FullyQualified> annotations) {
             this.owner = owner;
             this.type = type;

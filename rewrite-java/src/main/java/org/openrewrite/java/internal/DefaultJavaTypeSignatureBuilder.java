@@ -45,6 +45,10 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
             return genericSignature(type);
         } else if (type instanceof JavaType.Primitive) {
             return primitiveSignature(type);
+        } else if(type instanceof JavaType.Method) {
+            return methodSignature((JavaType.Method) type);
+        } else if(type instanceof JavaType.Variable) {
+            return variableSignature((JavaType.Variable) type);
         }
 
         throw new UnsupportedOperationException("Unexpected type " + type.getClass().getName());
@@ -117,7 +121,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
     }
 
     public String variableSignature(JavaType.Variable variable) {
-        return variable.getOwner().getFullyQualifiedName() + "{name=" + variable.getName() + '}';
+        return signature(variable.getOwner()) + "{name=" + variable.getName() + '}';
     }
 
     public String methodSignature(JavaType.Method method) {

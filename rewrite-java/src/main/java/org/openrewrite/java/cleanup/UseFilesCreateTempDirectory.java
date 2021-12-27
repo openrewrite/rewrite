@@ -36,7 +36,7 @@ public class UseFilesCreateTempDirectory extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Use `Files#createTempDirectory` when the sequence `File#createTempFile(..)`->`File#delete()`->`File#mkdir()` is used for creating a temp directory";
+        return "Use `Files#createTempDirectory` when the sequence `File#createTempFile(..)`->`File#delete()`->`File#mkdir()` is used for creating a temp directory.";
     }
 
     @Override

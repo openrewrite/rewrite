@@ -71,7 +71,7 @@ class JavaSourceSetTest {
                 }
 
                 override fun visitVariable(variable: JavaType.Variable, p: Int): JavaType {
-                    fieldsByType.getOrPut(variable.owner.toString()) { mutableSetOf() }.add(variable.toString())
+                    fieldsByType.getOrPut(variable.owner!!.toString()) { mutableSetOf() }.add(variable.toString())
                     return super.visitVariable(variable, p)
                 }
             }.visit(it, 0)

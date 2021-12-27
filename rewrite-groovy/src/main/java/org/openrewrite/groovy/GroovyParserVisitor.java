@@ -259,7 +259,8 @@ public class GroovyParserVisitor {
                     name.withPrefix(EMPTY),
                     emptyList(),
                     null,
-                    name.getType()
+                    // FIXME this is going to require a different mapping than just the type on the name
+                    (JavaType.Variable) name.getType()
             );
 
             if (field.getInitialExpression() != null) {
@@ -747,7 +748,8 @@ public class GroovyParserVisitor {
                                     JRightPadded.build(
                                             new J.VariableDeclarations.NamedVariable(randomId(), sourceBefore(p.getName()), Markers.EMPTY,
                                                     new J.Identifier(randomId(), EMPTY, Markers.EMPTY, p.getName(), type, null),
-                                                    emptyList(), null, type)
+                                                    emptyList(), null,
+                                                    (JavaType.Variable) type)
                                     )
                             ));
                     JRightPadded<J> param = JRightPadded.build(expr);
@@ -863,7 +865,7 @@ public class GroovyParserVisitor {
                         name.withPrefix(EMPTY),
                         emptyList(),
                         null,
-                        name.getType()
+                        (JavaType.Variable) name.getType()
                 );
             }
 

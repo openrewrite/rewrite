@@ -4905,6 +4905,11 @@ public interface J extends Tree {
                     withTypeExpression(typeExpression.withType(type));
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
@@ -4945,7 +4950,7 @@ public interface J extends Tree {
 
             public NamedVariable withInitializer(@Nullable Expression initializer) {
                 if (initializer == null) {
-                    return this.initializer == null ? this : new NamedVariable(id, prefix, markers, name, dimensionsAfterName, null, type);
+                    return this.initializer == null ? this : new NamedVariable(id, prefix, markers, name, dimensionsAfterName, null, variableType);
                 }
                 return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
             }
@@ -4953,7 +4958,17 @@ public interface J extends Tree {
             @With
             @Nullable
             @Getter
-            JavaType type;
+            JavaType.Variable variableType;
+
+            public JavaType getType() {
+                return variableType != null ? variableType.getType() : null;
+            }
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public NamedVariable withType(@Nullable JavaType type) {
+                return variableType != null ? withVariableType(variableType.withType(type)) : this;
+            }
 
             public String getSimpleName() {
                 return name.getSimpleName();
@@ -5004,7 +5019,7 @@ public interface J extends Tree {
                 }
 
                 public NamedVariable withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                    return t.initializer == initializer ? t : new NamedVariable(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.type);
+                    return t.initializer == initializer ? t : new NamedVariable(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.variableType);
                 }
             }
         }

@@ -1399,7 +1399,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                                     name,
                                     dimensionsAfterName,
                                     n.init != null ? padLeft(sourceBefore("="), convertOrNull(n.init)) : null,
-                                    typeMapping.type(n)
+                                    (JavaType.Variable) typeMapping.type(n)
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )
