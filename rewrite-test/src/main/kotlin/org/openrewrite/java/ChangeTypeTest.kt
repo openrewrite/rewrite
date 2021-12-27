@@ -108,7 +108,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun changeInnerClassToOuterClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("java.util.Map.Entry", "java.util.List"),
+        recipe = ChangeType("java.util.Map${'$'}Entry", "java.util.List"),
         before = """
             import java.util.Map;
             import java.util.Map.Entry;
@@ -160,7 +160,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun replaceWithNestedType(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("java.io.File", "java.util.Map.Entry"),
+        recipe = ChangeType("java.io.File", "java.util.Map${'$'}Entry"),
         before = """
             import java.io.File;
             
