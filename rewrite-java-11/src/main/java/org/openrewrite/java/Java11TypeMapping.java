@@ -24,7 +24,6 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import javax.lang.model.type.ErrorType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -381,7 +380,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
      */
     @Nullable
     public JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
-        if (selectType == null || selectType instanceof ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR) {
+        if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR) {
             return null;
         }
 

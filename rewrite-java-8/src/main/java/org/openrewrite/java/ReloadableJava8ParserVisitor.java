@@ -794,7 +794,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         JavaType.Method methodReferenceType = null;
         if (ref.sym instanceof Symbol.MethodSymbol) {
             Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) ref.sym;
-            methodReferenceType = typeMapping.methodInvocationType(methodSymbol.owner.type, methodSymbol);
+            methodReferenceType = typeMapping.methodInvocationType(methodSymbol.type, methodSymbol);
         }
 
         JavaType.Variable fieldReferenceType = null;
