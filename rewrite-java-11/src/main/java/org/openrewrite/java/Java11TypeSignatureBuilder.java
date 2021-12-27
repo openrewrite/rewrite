@@ -242,6 +242,8 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return resolvedArgumentTypes.toString();
         } else if (selectType instanceof Type.ForAll) {
             return methodArgumentSignature(((Type.ForAll) selectType).qtype);
+        } else if(selectType instanceof Type.JCNoType) {
+            return "{undefined}";
         }
 
         throw new UnsupportedOperationException("Unexpected method type " + selectType.getClass().getName());

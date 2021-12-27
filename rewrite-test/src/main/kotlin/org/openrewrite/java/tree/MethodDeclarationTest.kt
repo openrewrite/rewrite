@@ -123,7 +123,7 @@ interface MethodDeclarationTest : JavaTreeTest {
         val fullyQualifiedNames = inv.methodType!!.thrownExceptions.stream()
             .map(JavaType.FullyQualified::getFullyQualifiedName)
             .collect(Collectors.toList())
-        assertThat(fullyQualifiedNames).contains("java.io.IOException", "java.lang.ArithmeticException", "org.example.WhatTypeOfExceptionIsThis")
+        assertThat(fullyQualifiedNames).contains("java.io.IOException", "java.lang.ArithmeticException", "<unknown>")
     }
 
 }
