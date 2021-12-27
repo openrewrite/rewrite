@@ -17,6 +17,7 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -1577,6 +1578,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         }
     )
 
+    @Disabled
     @Test
     fun replaceMethodTypeParameters(jp: JavaParser) = assertChanged(
         jp,
@@ -1641,7 +1643,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .matches { uType ->
                     uType is JavaType.GenericTypeVariable &&
                             uType.name == "U" &&
-                            uType.bounds[0]!!.asFullyQualified()!!.fullyQualifiedName == "java.lang.Object"
+                            uType.bounds.isEmpty()
                 }
         }
     )
