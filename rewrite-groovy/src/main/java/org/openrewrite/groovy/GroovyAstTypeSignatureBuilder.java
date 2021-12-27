@@ -19,14 +19,13 @@ import org.codehaus.groovy.ast.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 
-import java.util.Collections;
-import java.util.IdentityHashMap;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.StringJoiner;
 
 class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
-    private Set<ClassNode> typeStack;
+    private Set<String> typeVariableNameStack;
 
     @Override
     public String signature(@Nullable Object t) {
@@ -35,21 +34,21 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         ASTNode astNode = (ASTNode) t;
-        if(astNode instanceof ClassNode) {
+        if (astNode instanceof ClassNode) {
             ClassNode clazz = (ClassNode) astNode;
-            if(clazz.isArray()) {
+            if (clazz.isArray()) {
                 return arraySignature(clazz);
-            } else if(ClassHelper.isPrimitiveType(clazz)) {
+            } else if (ClassHelper.isPrimitiveType(clazz)) {
                 return primitiveSignature(clazz);
-            } else if(clazz.isUsingGenerics()) {
+            } else if (clazz.isUsingGenerics()) {
                 return parameterizedSignature(clazz);
             }
             return classSignature(astNode);
-        } else if(astNode instanceof GenericsType) {
+        } else if (astNode instanceof GenericsType) {
             return genericSignature(astNode);
-        } else if(astNode instanceof MethodNode) {
+        } else if (astNode instanceof MethodNode) {
             return methodSignature((MethodNode) astNode);
-        } else if(astNode instanceof FieldNode) {
+        } else if (astNode instanceof FieldNode) {
             return variableSignature((FieldNode) astNode);
         }
 
@@ -59,7 +58,13 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String arraySignature(Object type) {
         ClassNode clazz = (ClassNode) type;
-        return signature(clazz.getComponentType()) + "[]";
+        String component;
+        if(clazz.getComponentType().isUsingGenerics()) {
+            component = genericSignature(clazz.getComponentType().getGenericsTypes()[0]);
+        } else {
+            component = signature(clazz.getComponentType());
+        }
+        return component + "[]";
     }
 
     @Override
@@ -72,28 +77,46 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String genericSignature(Object type) {
         GenericsType g = (GenericsType) type;
 
-        StringBuilder s = new StringBuilder(g.getName());
-        s.append(" extends ");
+        if (!g.isPlaceholder() && !g.isWildcard()) {
+            // this is a type name used in a parameterized type
+            return signature(g.getType());
+        }
+
+        String name = g.getName();
+
+        if (typeVariableNameStack == null) {
+            typeVariableNameStack = new HashSet<>();
+        }
+
+        if (!typeVariableNameStack.add(name)) {
+            typeVariableNameStack.remove(name);
+            return "Generic{" + name + "}";
+        }
+
+        StringBuilder s = new StringBuilder("Generic{" + name);
+
 
         StringJoiner bounds = new StringJoiner(" & ");
-        for (ClassNode bound : g.getUpperBounds()) {
-            bounds.add(genericBound(bound));
+
+        if (g.getUpperBounds() != null) {
+            s.append(" extends ");
+            for (ClassNode bound : g.getUpperBounds()) {
+//            if(((ClassNode) astNode).isRedirectNode()) {
+//                return signature(((ClassNode) astNode).redirect());
+//            }
+
+                bounds.add(signature(bound));
+            }
+        } else if (g.getLowerBound() != null) {
+            s.append(" super ");
+            bounds.add(signature(g.getLowerBound()));
         }
+
         s.append(bounds);
 
-        return s.toString();
-    }
+        typeVariableNameStack.remove(name);
 
-    private String genericBound(ClassNode bound) {
-        if (typeStack != null && typeStack.contains(bound)) {
-            return "(*)";
-        }
-
-        if (typeStack == null) {
-            typeStack = Collections.newSetFromMap(new IdentityHashMap<>());
-        }
-        typeStack.add(bound);
-        return signature(bound);
+        return s.append("}").toString();
     }
 
     @Override
@@ -127,7 +150,7 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         StringJoiner parameterTypes = new StringJoiner(",", "[", "]");
         if (node.getParameters().length > 0) {
             for (org.codehaus.groovy.ast.Parameter parameter : node.getParameters()) {
-                parameterTypes.add(parameter.getOriginType().getName());
+                parameterTypes.add(signature(parameter.getOriginType()));
             }
         }
 
@@ -138,6 +161,10 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String variableSignature(FieldNode declaredField) {
-        throw new UnsupportedOperationException("implement me");
+        String owner = signature(declaredField.getOwner());
+        if (owner.contains("<")) {
+            owner = owner.substring(0, owner.indexOf('<'));
+        }
+        return owner + "{name=" + declaredField.getName() + '}';
     }
 }
