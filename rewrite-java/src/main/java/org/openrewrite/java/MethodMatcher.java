@@ -134,9 +134,17 @@ public class MethodMatcher {
         }
 
         // aspectJUtils does not support matching classes separated by packages.
-        // [^.]* is the product of a fully wild cart match for a method. `* foo()`
-        return (targetTypePattern.toString().equals("[^.]*") || matchesTargetType(enclosing.getType())) &&
-                (methodNamePattern.matcher(method.getSimpleName()).matches() || (method.getMethodType() != null && methodNamePattern.matcher(method.getMethodType().getName()).matches())) &&
+        // [^.]* is the product of a fully wild card match for a method. `* foo()`
+        boolean matchesTargetType = targetTypePattern.toString().equals("[^.]*") || matchesTargetType(enclosing.getType());
+        if(!matchesTargetType) {
+            return false;
+        }
+
+        boolean matchesMethodName = methodNamePattern.matcher(method.getSimpleName()).matches() ||
+                // match constructors
+                (method.getMethodType() != null && methodNamePattern.matcher(method.getMethodType().getName()).matches());
+
+        return matchesMethodName &&
                 argumentPattern.matcher(method.getParameters().stream()
                         .map(v -> {
                             if (v instanceof J.VariableDeclarations) {
@@ -268,7 +276,7 @@ public class MethodMatcher {
             }
         }
 
-        return method.getMethodType().getDeclaringType().getFullyQualifiedName() + " " +
+        return typePattern(method.getMethodType().getDeclaringType()) + " " +
                 method.getSimpleName() + "(" + parameters + ")";
     }
 }
@@ -280,7 +288,7 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
         for (ParseTree c : ctx.children) {
             classNameBuilder.append(AspectjUtils.aspectjNameToPattern(c.getText()));
         }
-        String className = classNameBuilder.toString();
+        String className = classNameBuilder.toString().replace("$", "[$.]");
 
         if (!className.contains(".")) {
             try {
