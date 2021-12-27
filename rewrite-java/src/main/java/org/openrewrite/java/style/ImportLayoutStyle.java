@@ -31,6 +31,7 @@ import lombok.Getter;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -490,10 +491,9 @@ public class ImportLayoutStyle implements JavaStyle {
         }
     }
 
-    @SuppressWarnings("deprecation")
     public static boolean isPackageAlwaysFolded(List<Block> packagesToFold, J.Import checkImport) {
         boolean isPackageFolded = false;
-        String anImportName = checkImport.getQualid().printTrimmed();
+        String anImportName = checkImport.getQualid().printTrimmed(new JavaPrinter<>());
         for (Block block : packagesToFold) {
             Block.ImportPackage importPackage = (Block.ImportPackage) block;
             if (checkImport.isStatic() == importPackage.isStatic()) {

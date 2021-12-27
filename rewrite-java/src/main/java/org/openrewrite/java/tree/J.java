@@ -34,9 +34,7 @@ import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 
-import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
@@ -2238,18 +2236,44 @@ public interface J extends Tree {
             return v.visitImport(this, p);
         }
 
-        public boolean isFromType(String clazz) {
-            if ("*".equals(qualid.getSimpleName())) {
-                return qualid.getTarget().printTrimmed().equals(stream(clazz.split("\\."))
-                        .filter(pkgOrNam -> Character.isLowerCase(pkgOrNam.charAt(0)))
-                        .collect(Collectors.joining("."))
-                );
-            }
-            return (isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed()).equals(clazz);
-        }
-
+        /**
+         * The type name of a statically imported inner class is the outermost class.
+         */
         public String getTypeName() {
-            return getTypeName(isStatic() ? (FieldAccess) qualid.getTarget() : qualid);
+            if (isStatic()) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
+
+                // the compiler doesn't type attribute static imports of classes
+                if (fq == null) {
+                    String possibleInnerClassFqn = getTypeName(qualid);
+                    String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.indexOf('$') + 1);
+                    if (possibleInnerClassName.equals("*")) {
+                        return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.indexOf('$'));
+                    }
+                    if (possibleInnerClassName.indexOf('$') >= 0) {
+                        possibleInnerClassName = possibleInnerClassFqn.substring(0, possibleInnerClassName.indexOf('$'));
+                    }
+
+                    JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
+                    if (owner != null) {
+                        for (JavaType.Method method : owner.getMethods()) {
+                            if (method.getName().equals(possibleInnerClassName)) {
+                                return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.indexOf('$'));
+                            }
+                        }
+                        for (JavaType.Variable member : owner.getMembers()) {
+                            if (member.getName().equals(possibleInnerClassName)) {
+                                return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.indexOf('$'));
+                            }
+                        }
+                        return possibleInnerClassFqn;
+                    }
+                }
+
+                return getTypeName((FieldAccess) qualid.getTarget());
+            }
+
+            return getTypeName(qualid);
         }
 
         private String getTypeName(J.FieldAccess type) {

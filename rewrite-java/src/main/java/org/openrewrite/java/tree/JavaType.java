@@ -110,7 +110,8 @@ public interface JavaType {
 
         public String getPackageName() {
             String fqn = getFullyQualifiedName();
-            return fqn.substring(0, fqn.lastIndexOf('.') + 1);
+            int endPackage = fqn.lastIndexOf('.');
+            return endPackage < 0 ? "" : fqn.substring(0, endPackage);
         }
 
         public boolean isAssignableTo(String fullyQualifiedName) {

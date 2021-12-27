@@ -18,8 +18,11 @@ package org.openrewrite.java;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
+import com.sun.tools.javac.code.ClassFinder;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.comp.Enter;
+import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
@@ -35,6 +38,7 @@ import org.openrewrite.style.NamedStyles;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
+import java.lang.module.ModuleFinder;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.*;

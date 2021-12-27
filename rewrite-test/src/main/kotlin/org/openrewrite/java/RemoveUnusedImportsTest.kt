@@ -94,7 +94,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     @Test
     fun leaveImportIfAnnotationOnEnum(jp: JavaParser) = assertUnchanged(
         jp,
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package com.google.gson.annotations;
             
             import java.lang.annotation.Documented;
@@ -109,7 +110,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             public @interface SerializedName {
                 String value();
             }
-        """),
+        """
+        ),
         before = """
             import com.google.gson.annotations.SerializedName;
             
@@ -124,7 +126,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     @Test
     fun leaveImportForStaticImportEnumInAnnotation(jp: JavaParser) = assertUnchanged(
         jp,
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package org.openrewrite.test;
             
             public @interface YesOrNo {
@@ -133,7 +136,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
                     YES, NO
                 }
             }
-        """),
+        """
+        ),
         before = """
             package org.openrewrite.test;
             
@@ -349,6 +353,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             import foo.Foo;
         """
     )
+
     @Test
     fun removePackageInfoStarImports(jp: JavaParser) = assertChanged(
         jp,
@@ -448,14 +453,16 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/845")
     @Test
     fun doesNotRemoveStaticReferenceToNewClass() = assertUnchanged(
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package org.openrewrite;
             public class Bar {
                 public static final class Buz {
                     public Buz() {}
                 }
             }
-        """),
+        """
+        ),
         before = """
             package foo.test;
 
@@ -472,7 +479,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/877")
     @Test
     fun doNotUnfoldStaticValidWildCard() = assertUnchanged(
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package org.openrewrite;
             public class Foo {
                 public static final int FOO_CONSTANT = 10;
@@ -482,7 +490,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
                 }
                 public static void fooMethod() {}
             }
-        """),
+        """
+        ),
         before = """
             package foo.test;
             
@@ -501,7 +510,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/877")
     @Test
     fun unfoldStaticUses() = assertChanged(
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package org.openrewrite;
             public class Foo {
                 public static final int FOO_CONSTANT = 10;
@@ -511,7 +521,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
                 }
                 public static void fooMethod() {}
             }
-        """),
+        """
+        ),
         before = """
             package foo.test;
             
@@ -588,7 +599,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             import static java.util.Collections.*;
 
             class Test {
-                ConcurrentHashMap<String, String> m = emptyMap();
+                Object o = emptyMap();
+                ConcurrentHashMap<String, String> m;
             }
         """,
         after = """
@@ -597,7 +609,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             import static java.util.Collections.emptyMap;
             
             class Test {
-                ConcurrentHashMap<String, String> m = emptyMap();
+                Object o = emptyMap();
+                ConcurrentHashMap<String, String> m;
             }
         """
     )

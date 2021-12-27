@@ -25,41 +25,47 @@ import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 interface ImportTest : JavaTreeTest {
 
     @Test
-    fun typeName(jp: JavaParser) {
-        val cu = jp.parse("""
+    fun typeName(jp: JavaParser.Builder<*, *>) {
+        val cu = jp.logCompilationWarningsAndErrors(true).build().parse("""
+            import static java.util.Map.Entry;
+            import java.util.Map.Entry;
+            
             import java.util.List;
             import java.util.*;
             
             import static java.nio.charset.StandardCharsets.UTF_8;
             import static java.util.Collections.emptyList;
-            import java.util.Map.Entry;
         """.trimIndent())[0]
 
         assertThat(cu.imports.map { it.typeName }).containsExactly(
+            "java.util.Map${'$'}Entry",
+            "java.util.Map${'$'}Entry",
             "java.util.List",
             "java.util.*",
             "java.nio.charset.StandardCharsets",
-            "java.util.Collections",
-            "java.util.Map${'$'}Entry"
+            "java.util.Collections"
         )
     }
 
     @Test
     fun packageName(jp: JavaParser) {
         val cu = jp.parse("""
+            import static java.util.Map.Entry;
+            import java.util.Map.Entry;
+            
             import java.util.List;
             import java.util.*;
             
             import static java.nio.charset.StandardCharsets.UTF_8;
             import static java.util.Collections.emptyList;
-            import java.util.Map.Entry;
         """.trimIndent())[0]
 
         assertThat(cu.imports.map { it.packageName }).containsExactly(
             "java.util",
             "java.util",
-            "java.nio.charset",
             "java.util",
+            "java.util",
+            "java.nio.charset",
             "java.util"
         )
     }
