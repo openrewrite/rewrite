@@ -344,6 +344,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("CatchMayIgnoreException")
     @Test
     fun multiCatch(jp: JavaParser) = assertChanged(
         jp,

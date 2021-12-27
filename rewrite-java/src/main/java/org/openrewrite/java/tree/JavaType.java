@@ -384,7 +384,7 @@ public interface JavaType {
 
             int firstClassNameIndex = 0;
             int lastDot = 0;
-            char[] fullyQualifiedNameChars = fullyQualifiedName.toCharArray();
+            char[] fullyQualifiedNameChars = fullyQualifiedName.replace('$', '.').toCharArray();
             char prev = ' ';
             for (int i = 0; i < fullyQualifiedNameChars.length; i++) {
                 char c = fullyQualifiedNameChars[i];
