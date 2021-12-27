@@ -1394,7 +1394,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
             Space namedVarPrefix = sourceBefore(n.getName().toString());
 
-            J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(), typeMapping.type(node), null);
+            JavaType type = typeMapping.type(node);
+            J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(),
+                    type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
+                    type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
             List<JLeftPadded<Space>> dimensionsAfterName = dimensions.get();
 
             vars.add(
