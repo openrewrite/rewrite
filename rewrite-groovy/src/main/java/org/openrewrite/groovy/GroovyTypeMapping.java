@@ -130,10 +130,10 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
         typeBySignature.put(signature, pt);
 
-        JavaType.Class clazz = classType(type, type.getTypeClass().getName());
+        JavaType.Class clazz = classType(type, type.getPlainNodeReference().getName());
 
         List<JavaType> typeParameters = emptyList();
-        if (type.getGenericsTypes().length > 0) {
+        if (type.getGenericsTypes() != null && type.getGenericsTypes().length > 0) {
             typeParameters = new ArrayList<>(type.getGenericsTypes().length);
             for (GenericsType g : type.getGenericsTypes()) {
                 typeParameters.add(type(g));
