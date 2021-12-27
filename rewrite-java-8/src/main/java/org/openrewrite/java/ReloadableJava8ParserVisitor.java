@@ -794,7 +794,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         JavaType.Method methodReferenceType = null;
         if (ref.sym instanceof Symbol.MethodSymbol) {
             Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) ref.sym;
-            methodReferenceType = typeMapping.methodType(methodSymbol.owner.type, methodSymbol);
+            methodReferenceType = typeMapping.methodInvocationType(methodSymbol.owner.type, methodSymbol);
         }
 
         JavaType.Variable fieldReferenceType = null;
@@ -864,7 +864,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         Symbol genericSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
 
         return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                typeMapping.methodType(jcSelect.type, genericSymbol));
+                typeMapping.methodInvocationType(jcSelect.type, genericSymbol));
     }
 
     @Override
@@ -942,7 +942,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 modifierResults.getLeadingAnnotations(),
                 modifierResults.getModifiers(), typeParams,
                 returnType, name, params, throwss, body, defaultValue,
-                typeMapping.methodType(jcMethod.type, jcMethod.sym));
+                typeMapping.methodDeclarationType(jcMethod.sym, null));
     }
 
     @Override
@@ -1032,7 +1032,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;
-        JavaType.Method constructorType = typeMapping.methodType(jcNewClass.constructorType, jcNewClass.constructor);
+        JavaType.Method constructorType = typeMapping.methodInvocationType(jcNewClass.constructorType, jcNewClass.constructor);
 
         return new J.NewClass(randomId(), fmt, Markers.EMPTY, encl, whitespaceBeforeNew,
                 clazz, args, body, constructorType);

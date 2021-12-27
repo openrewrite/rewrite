@@ -82,7 +82,7 @@ interface JavaTypeTest {
 
         assertThat(annotations)
             .hasSize(1)
-        assertTrue(annotations!![0].hasFullyQualifiedName("java.lang.FunctionalInterface"))
+        assertThat(annotations!![0].asFullyQualified()?.fullyQualifiedName).isEqualTo("java.lang.FunctionalInterface")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1267")

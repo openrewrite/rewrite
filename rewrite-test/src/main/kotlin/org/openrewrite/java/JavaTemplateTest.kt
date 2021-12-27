@@ -689,8 +689,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             val param = type.parameterTypes[0]
             assertThat(param.asArray()!!.elemType)
                 .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'Object[]'")
-                .matches { it.asArray()!!.elemType.hasFullyQualifiedName("java.lang.Object")
-                }
+                .matches { it.asArray()!!.elemType.asFullyQualified()?.fullyQualifiedName == "java.lang.Object" }
         }
     )
 

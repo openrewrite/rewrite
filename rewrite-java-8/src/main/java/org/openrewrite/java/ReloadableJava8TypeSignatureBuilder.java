@@ -93,7 +93,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return "void";
         } else if (type instanceof Type.JCPrimitiveType) {
             return primitiveSignature(type);
-        } else if(type instanceof Type.JCNoType) {
+        } else if (type instanceof Type.JCNoType) {
             return "{undefined}";
         }
 
@@ -194,15 +194,41 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     public String methodSignature(Type selectType, Symbol.MethodSymbol symbol) {
         Type genericType = symbol.type;
-        return classSignature(symbol.owner.type) + '{' +
-                "name=" + symbol.getSimpleName().toString() +
-                ",return=" + signature(selectType.getReturnType()) +
-                ",parameters=" + methodArgumentSignature(selectType, new StringJoiner(",", "[", "]")) +
-                '}';
+        String s = classSignature(symbol.owner.type);
+        if (symbol.isConstructor()) {
+            s += "{name=<constructor>,return=" + s;
+        } else {
+            s += "{name=" + symbol.getSimpleName().toString() +
+                    ",return=" + signature(selectType.getReturnType());
+        }
+
+        return s + ",parameters=" + methodArgumentSignature(selectType) + '}';
     }
 
-    private StringJoiner methodArgumentSignature(Type selectType, StringJoiner resolvedArgumentTypes) {
+    public String methodSignature(Symbol.MethodSymbol symbol) {
+        Type genericType = symbol.type;
+        String s = classSignature(symbol.owner.type);
+        if (symbol.isConstructor()) {
+            s += "{name=<constructor>,return=" + s;
+        } else {
+            s += "{name=" + symbol.getSimpleName().toString() +
+                    ",return=" + signature(symbol.getReturnType());
+        }
+
+        return s + ",parameters=" + methodArgumentSignature(symbol) + '}';
+    }
+
+    private String methodArgumentSignature(Symbol.MethodSymbol sym) {
+        StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
+        for (Symbol.VarSymbol parameter : sym.getParameters()) {
+            genericArgumentTypes.add(signature(parameter.type));
+        }
+        return genericArgumentTypes.toString();
+    }
+
+    private String methodArgumentSignature(Type selectType) {
         if (selectType instanceof Type.MethodType) {
+            StringJoiner resolvedArgumentTypes = new StringJoiner(",", "[", "]");
             Type.MethodType mt = (Type.MethodType) selectType;
             if (!mt.argtypes.isEmpty()) {
                 for (Type argtype : mt.argtypes) {
@@ -211,10 +237,12 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                     }
                 }
             }
+            return resolvedArgumentTypes.toString();
         } else if (selectType instanceof Type.ForAll) {
-            methodArgumentSignature(((Type.ForAll) selectType).qtype, resolvedArgumentTypes);
+            return methodArgumentSignature(((Type.ForAll) selectType).qtype);
         }
-        return resolvedArgumentTypes;
+
+        throw new UnsupportedOperationException("Unexpected method type " + selectType.getClass().getName());
     }
 
     public String variableSignature(Symbol symbol) {

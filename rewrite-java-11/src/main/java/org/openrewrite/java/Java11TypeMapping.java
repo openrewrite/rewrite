@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import javax.lang.model.type.ErrorType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -195,7 +196,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                         if (methods == null) {
                             methods = new ArrayList<>();
                         }
-                        methods.add(methodType(elem.type, elem, clazz));
+                        methods.add(methodDeclarationType(elem, clazz));
                     }
                 }
             }
@@ -276,7 +277,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
     @Nullable
     private JavaType type(Type type, Symbol symbol) {
         if (type instanceof Type.MethodType) {
-            return methodType(type, symbol);
+            return methodInvocationType(type, (Symbol.MethodSymbol) symbol);
         }
         return type(type);
     }
@@ -361,25 +362,137 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
         return variable;
     }
 
+    /**
+     * Method type of a method invocation. Parameters and return type represent resolved types when they are generic
+     * in the method declaration.
+     *
+     * @param selectType   The method type.
+     * @param symbol The method symbol.
+     * @return Method type attribution.
+     */
     @Nullable
-    public JavaType.Method methodType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
-        return methodType(selectType, symbol, null);
+    public JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
+        if (selectType == null || selectType instanceof ErrorType || symbol == null) {
+            return null;
+        }
+
+        Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) symbol;
+
+        StringJoiner argumentTypeSignatures = new StringJoiner(",");
+        if (selectType instanceof Type.ForAll) {
+            Type.ForAll fa = (Type.ForAll) selectType;
+            return methodInvocationType(fa.qtype, methodSymbol);
+        }
+
+        String signature = signatureBuilder.methodSignature(selectType, methodSymbol);
+        JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+
+        List<String> paramNames = null;
+        if (!methodSymbol.params().isEmpty()) {
+            paramNames = new ArrayList<>(methodSymbol.params().size());
+            for (Symbol.VarSymbol p : methodSymbol.params()) {
+                String s = p.name.toString();
+                paramNames.add(s);
+            }
+        }
+
+        JavaType.Method method = new JavaType.Method(
+                methodSymbol.flags_field,
+                null,
+                methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
+                null,
+                paramNames,
+                null, null, null
+        );
+        typeBySignature.put(signature, method);
+
+        Type signatureType = methodSymbol.type instanceof Type.ForAll ?
+                ((Type.ForAll) methodSymbol.type).qtype :
+                methodSymbol.type;
+
+        JavaType returnType = null;
+        List<JavaType> parameterTypes = null;
+        List<JavaType.FullyQualified> exceptionTypes = null;
+
+        if (selectType instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType) selectType;
+
+            if (!methodType.argtypes.isEmpty()) {
+                parameterTypes = new ArrayList<>(methodType.argtypes.size());
+                for (com.sun.tools.javac.code.Type argtype : methodType.argtypes) {
+                    if (argtype != null) {
+                        JavaType javaType = type(argtype);
+                        parameterTypes.add(javaType);
+                    }
+                }
+            }
+
+            returnType = type(methodType.restype);
+
+            if (!methodType.thrown.isEmpty()) {
+                exceptionTypes = new ArrayList<>(methodType.thrown.size());
+                for (Type exceptionType : methodType.thrown) {
+                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
+                    if (javaType == null) {
+                        // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
+                        // been mapped to cyclic)
+                        if (exceptionType instanceof Type.ClassType) {
+                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
+                            javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
+                                    null, null, null, null, null, null);
+                        }
+                    }
+                    if (javaType != null) {
+                        // if the exception type is not resolved, it is not added to the list of exceptions
+                        exceptionTypes.add(javaType);
+                    }
+                }
+            }
+        }
+
+        JavaType.FullyQualified resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+        if (resolvedDeclaringType == null) {
+            return null;
+        }
+
+        List<JavaType.FullyQualified> annotations = null;
+        if (!methodSymbol.getDeclarationAttributes().isEmpty()) {
+            annotations = new ArrayList<>(methodSymbol.getDeclarationAttributes().size());
+            for (Attribute.Compound a : methodSymbol.getDeclarationAttributes()) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type));
+                if (fq != null) {
+                    annotations.add(fq);
+                }
+            }
+        }
+
+        assert returnType != null;
+
+        method.unsafeSet(resolvedDeclaringType,
+                methodSymbol.isConstructor() ? resolvedDeclaringType : returnType,
+                parameterTypes, exceptionTypes, annotations);
+        return method;
     }
 
+    /**
+     * Method type of a method declaration. Parameters and return type represent generic signatures when applicable.
+     *
+     * @param symbol        The method symbol.
+     * @param declaringType The method's declaring type.
+     * @return Method type attribution.
+     */
     @Nullable
-    private JavaType.Method methodType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol,
-                                       @Nullable JavaType.FullyQualified declaringType) {
+    public JavaType.Method methodDeclarationType(@Nullable Symbol symbol, @Nullable JavaType.FullyQualified declaringType) {
         // if the symbol is not a method symbol, there is a parser error in play
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
-        if (methodSymbol != null && selectType != null) {
+        if (methodSymbol != null) {
             StringJoiner argumentTypeSignatures = new StringJoiner(",");
-            if (selectType instanceof Type.ForAll) {
-                Type.ForAll fa = (Type.ForAll) selectType;
-                return methodType(fa.qtype, symbol, declaringType);
-            }
 
-            String signature = signatureBuilder.methodSignature(selectType, methodSymbol);
+            String signature = signatureBuilder.methodSignature(methodSymbol);
             JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
             if (existing != null) {
                 return existing;
@@ -409,6 +522,12 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                     methodSymbol.type;
 
             List<JavaType.FullyQualified> exceptionTypes = null;
+
+            Type selectType = methodSymbol.type;
+            if(selectType instanceof Type.ForAll) {
+                selectType = ((Type.ForAll) selectType).qtype;
+            }
+
             if (selectType instanceof Type.MethodType) {
                 Type.MethodType methodType = (Type.MethodType) selectType;
                 if (!methodType.thrown.isEmpty()) {
