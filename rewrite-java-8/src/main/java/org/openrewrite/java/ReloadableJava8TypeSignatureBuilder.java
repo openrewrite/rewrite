@@ -208,17 +208,29 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String methodSignature(Symbol.MethodSymbol symbol) {
         Type genericType = symbol.type;
         String s = classSignature(symbol.owner.type);
+
+        String returnType;
+        if(symbol.isStaticOrInstanceInit()) {
+            returnType = "void";
+        } else {
+            returnType = signature(symbol.getReturnType());
+        }
+
         if (symbol.isConstructor()) {
             s += "{name=<constructor>,return=" + s;
         } else {
             s += "{name=" + symbol.getSimpleName().toString() +
-                    ",return=" + signature(symbol.getReturnType());
+                    ",return=" + returnType;
         }
 
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';
     }
 
     private String methodArgumentSignature(Symbol.MethodSymbol sym) {
+        if(sym.isStaticOrInstanceInit()) {
+            return "[]";
+        }
+
         StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
         for (Symbol.VarSymbol parameter : sym.getParameters()) {
             genericArgumentTypes.add(signature(parameter.type));
