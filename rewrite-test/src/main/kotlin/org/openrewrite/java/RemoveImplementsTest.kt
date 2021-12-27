@@ -71,7 +71,7 @@ interface RemoveImplementsTest : JavaRecipeTest {
     @Test
     fun innerClassOnly(jp: JavaParser) = assertChanged(
         jp,
-        recipe = RemoveImplements("java.io.Serializable", "com.yourorg.Outer.Inner"),
+        recipe = RemoveImplements("java.io.Serializable", "com.yourorg.Outer${'$'}Inner"),
         before = """
             package com.yourorg;
             

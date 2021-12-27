@@ -19,6 +19,7 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.*
 
 interface MethodInvocationTest {
@@ -45,15 +46,16 @@ interface MethodInvocationTest {
         assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
             inv.arguments.filterIsInstance<J.Literal>().map { it.type })
 
-        val effectParams = inv.methodType!!.resolvedSignature!!.paramTypes
+        val effectParams = inv.methodType!!.parameterTypes
         assertEquals("java.lang.Integer", effectParams[0].asFullyQualified()?.fullyQualifiedName)
-        assertTrue(effectParams[1].asArray()?.elemType.hasFullyQualifiedName("java.lang.Integer"))
+        assertEquals("java.lang.Integer", effectParams[1].asArray()?.elemType.asFullyQualified()?.fullyQualifiedName)
 
         assertEquals("A", inv.methodType?.declaringType?.fullyQualifiedName)
 
         assertEquals("foo ( 0, 1, 2 )", inv.printTrimmed())
     }
 
+    @Suppress("unchecked")
     @Test
     fun genericMethodInvocation(jp: JavaParser) {
         val a = jp.parse("""
@@ -69,18 +71,10 @@ interface MethodInvocationTest {
 
         listOf(genericInv, explicitGenericInv).forEach { test: J.MethodInvocation ->
             // check assumptions about the call site
-            assertEquals("java.lang.Integer", test.type.asFullyQualified()?.fullyQualifiedName)
-            assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
-                test.arguments.filterIsInstance<J.Literal>().map { it.type })
-
-            val effectiveParams = test.methodType!!.resolvedSignature!!.paramTypes
-            assertEquals("java.lang.Integer", effectiveParams[0].asFullyQualified()?.fullyQualifiedName)
-            assertTrue((effectiveParams[1] as JavaType.Array).elemType.hasFullyQualifiedName("java.lang.Integer"))
-
-            val methType = test.methodType!!.genericSignature!!
-            assertEquals("java.lang.Object", methType.returnType.asGeneric()?.bounds?.get(0)?.asFullyQualified()?.fullyQualifiedName)
-            assertEquals("java.lang.Object", methType.paramTypes[0].asGeneric()?.bounds?.get(0)?.asFullyQualified()?.fullyQualifiedName)
-            assertTrue((methType.paramTypes[1] as JavaType.Array).elemType.asGeneric()?.bounds?.get(0).hasFullyQualifiedName("java.lang.Object"))
+            val methType = test.methodType!!
+            assertEquals("java.lang.Integer", methType.returnType.asFullyQualified()?.fullyQualifiedName)
+            assertEquals("java.lang.Integer", methType.parameterTypes[0].asFullyQualified()?.fullyQualifiedName)
+            assertEquals("java.lang.Integer", methType.parameterTypes[1].asArray()!!.elemType.asFullyQualified()?.fullyQualifiedName)
         }
 
         assertEquals("this . < Integer > generic ( 0, 1, 2 )", explicitGenericInv.printTrimmed())
@@ -107,7 +101,7 @@ interface MethodInvocationTest {
 
     @Test
     fun methodThatDoesNotExist(jp: JavaParser) {
-        val a = jp.parse("""
+        val a = jp.parse(InMemoryExecutionContext { t -> fail(t) }, """
             public class A {
                 Integer n = doesNotExist();
             }

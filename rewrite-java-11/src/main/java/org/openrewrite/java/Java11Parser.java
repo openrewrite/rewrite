@@ -34,7 +34,6 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -63,7 +62,7 @@ import static java.util.stream.Collectors.toList;
 @NonNullApi
 public class Java11Parser implements JavaParser {
     private String sourceSet = "main";
-    private final JavaTypeCache typeCache = new JavaTypeCache();
+    private final Map<String, Object> typeBySignature = new HashMap<>();
 
     @Nullable
     private transient JavaSourceSet sourceSetProvenance;
@@ -112,7 +111,7 @@ public class Java11Parser implements JavaParser {
         // MUST be created (registered with the context) after pfm and compilerLog
         compiler = new JavaCompiler(context);
 
-        // otherwise the JavacParser will use EmptyEndPosTable, effectively setting -1 as the end position
+        // otherwise, the JavacParser will use EmptyEndPosTable, effectively setting -1 as the end position
         // for every tree element
         compiler.genEndPos = true;
 
@@ -150,6 +149,64 @@ public class Java11Parser implements JavaParser {
 
     @Override
     public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
+
+        List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
+                .map(cuByPath -> {
+                    Timer.Sample sample = Timer.start();
+                    Input input = cuByPath.getKey();
+                    try {
+                        Java11ParserVisitor parser = new Java11ParserVisitor(
+                                input.getRelativePath(relativeTo),
+                                StringUtils.readFully(input.getSource()),
+                                styles,
+                                typeBySignature,
+                                ctx,
+                                context
+                        );
+
+                        J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
+                        sample.stop(MetricsHelper.successTags(
+                                        Timer.builder("rewrite.parse")
+                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                                .tag("file.type", "Java")
+                                                .tag("step", "(3) Map to Rewrite AST"))
+                                .register(Metrics.globalRegistry));
+                        return cu;
+                    } catch (Throwable t) {
+                        sample.stop(MetricsHelper.errorTags(
+                                        Timer.builder("rewrite.parse")
+                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                                .tag("file.type", "Java")
+                                                .tag("step", "(3) Map to Rewrite AST"), t)
+                                .register(Metrics.globalRegistry));
+
+                        ctx.getOnError().accept(t);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(toList());
+
+        if (!ctx.getMessage(SKIP_SOURCE_SET_MARKER, false)) {
+            JavaSourceSet sourceSet = getSourceSet(ctx);
+            List<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
+            for (J.CompilationUnit cu : mappedCus) {
+                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                    if (type instanceof JavaType.FullyQualified) {
+                        classpath.add((JavaType.FullyQualified) type);
+                    }
+                }
+            }
+            sourceSetProvenance = sourceSet.withClasspath(classpath);
+            assert sourceSetProvenance != null;
+            return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
+        }
+
+        return mappedCus;
+    }
+
+    LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
         if (classpath != null) { // override classpath
             if (context.get(JavaFileManager.class) != pfm) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
@@ -200,65 +257,12 @@ public class Java11Parser implements JavaParser {
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
             ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
         }
-
-        List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
-                .map(cuByPath -> {
-                    Timer.Sample sample = Timer.start();
-                    Input input = cuByPath.getKey();
-                    try {
-                        Java11ParserVisitor parser = new Java11ParserVisitor(
-                                input.getRelativePath(relativeTo),
-                                StringUtils.readFully(input.getSource()),
-                                styles,
-                                typeCache,
-                                ctx,
-                                context
-                        );
-
-                        J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
-                        sample.stop(MetricsHelper.successTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(3) Map to Rewrite AST"))
-                                .register(Metrics.globalRegistry));
-                        return cu;
-                    } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(3) Map to Rewrite AST"), t)
-                                .register(Metrics.globalRegistry));
-
-                        ctx.getOnError().accept(t);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .collect(toList());
-
-        if (!ctx.getMessage(SKIP_SOURCE_SET_MARKER, false)) {
-            JavaSourceSet sourceSet = getSourceSet(ctx);
-            List<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
-            for (J.CompilationUnit cu : mappedCus) {
-                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                    if (type instanceof JavaType.FullyQualified) {
-                        classpath.add((JavaType.FullyQualified) type);
-                    }
-                }
-            }
-            sourceSetProvenance = sourceSet.withClasspath(classpath);
-            assert sourceSetProvenance != null;
-            return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
-        }
-
-        return mappedCus;
+        return cus;
     }
 
     @Override
     public Java11Parser reset() {
-        typeCache.clear();
+        typeBySignature.clear();
         compilerLog.reset();
         pfm.flush();
         Check.instance(context).newRound();
@@ -283,7 +287,7 @@ public class Java11Parser implements JavaParser {
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
         if (sourceSetProvenance == null) {
             sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                    typeCache, ctx);
+                    typeBySignature, ctx);
         }
         return sourceSetProvenance;
     }

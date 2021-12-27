@@ -131,8 +131,8 @@ public class ExternalizableHasNoArgsConstructor extends Recipe {
             boolean hasDefaultConstructor = true;
 
             for (JavaType.Method method : parentFq.getMethods()) {
-                if ("<init>".equals(method.getName())) {
-                    if (method.getParamNames().isEmpty()) {
+                if ("<constructor>".equals(method.getName())) {
+                    if (method.getParameterNames().isEmpty()) {
                         hasNoArgsConstructor = true;
                     } else {
                         hasDefaultConstructor = false;

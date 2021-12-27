@@ -27,7 +27,7 @@ import static org.openrewrite.Tree.randomId;
  */
 public interface TypeTree extends NameTree {
     static <T extends TypeTree & Expression> T build(String fullyQualifiedName) {
-        Scanner scanner = new Scanner(fullyQualifiedName);
+        Scanner scanner = new Scanner(fullyQualifiedName.replace('$', '.'));
         scanner.useDelimiter("\\.");
 
         String fullName = "";
@@ -79,7 +79,7 @@ public interface TypeTree extends NameTree {
                                 Markers.EMPTY
                         ),
                         (Character.isUpperCase(part.charAt(0))) ?
-                                JavaType.Class.build(fullName) :
+                                JavaType.ShallowClass.build(fullName) :
                                 null
                 );
             }

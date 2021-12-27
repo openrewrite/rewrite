@@ -78,8 +78,8 @@ interface AddImportTest : JavaRecipeTest {
     )
 
     @Test
-    fun dontDuplicateImports3(jp: JavaParser) = assertChanged(
-        jp,
+    fun dontDuplicateImports3(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.classpath("junit-jupiter-api").build(),
         recipe = addImports(
             { AddImport("org.junit.jupiter.api.Assertions", "assertNull", false) }
         ),
@@ -824,7 +824,7 @@ interface AddImportTest : JavaRecipeTest {
         jp,
         recipe = addImports({ AddImport("java.util.List", null, false) }),
         before = """
-            import com.acme.*; // contains a List class
+            import java.awt.*; // contains a List class
             import java.util.Collection;
             import java.util.Collections;
             import java.util.Map;
@@ -836,7 +836,7 @@ interface AddImportTest : JavaRecipeTest {
             }
         """,
         after = """
-            import com.acme.*; // contains a List class
+            import java.awt.*; // contains a List class
             import java.util.Collection;
             import java.util.Collections;
             import java.util.List;
@@ -847,11 +847,7 @@ interface AddImportTest : JavaRecipeTest {
             class Test {
                 List list;
             }
-        """,
-        dependsOn = arrayOf("""
-            package com.acme;
-            public class List {}
-        """)
+        """
     )
 
     @Test

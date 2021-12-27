@@ -137,26 +137,11 @@ public class JavaTypeVisitor<P> {
      */
     public JavaType visitMethod(JavaType.Method method, P p) {
         JavaType.Method m = method;
-
         m = m.withDeclaringType((JavaType.FullyQualified) visit(m.getDeclaringType(), p));
-
-        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
-
-        JavaType.Method.Signature genericSignature = m.getGenericSignature();
-        if (genericSignature != null) {
-            m = m.withGenericSignature(genericSignature
-                    .withReturnType(visit(genericSignature.getReturnType(), p))
-                    .withParamTypes(ListUtils.map(genericSignature.getParamTypes(), pt -> visit(pt, p))));
-        }
-
-        JavaType.Method.Signature resolvedSignature = m.getResolvedSignature();
-        if (resolvedSignature != null) {
-            m = m.withResolvedSignature(resolvedSignature
-                    .withReturnType(visit(resolvedSignature.getReturnType(), p))
-                    .withParamTypes(ListUtils.map(resolvedSignature.getParamTypes(), pt -> visit(pt, p))));
-        }
-
+        m = m.withReturnType(visit(m.getReturnType(), p));
+        m = m.withParameterTypes(ListUtils.map(m.getParameterTypes(), pt -> visit(pt, p)));
         m = m.withThrownExceptions(ListUtils.map(m.getThrownExceptions(), t -> (JavaType.FullyQualified) visit(t, p)));
+        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
         return m;
     }
 

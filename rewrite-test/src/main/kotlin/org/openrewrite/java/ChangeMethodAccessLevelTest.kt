@@ -252,7 +252,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
 
     @Test
     fun packagePrivateToProtectedWithConstructor() = assertChanged(
-        recipe = ChangeMethodAccessLevel("com.abc.A A(..)", "protected", null),
+        recipe = ChangeMethodAccessLevel("com.abc.A <constructor>(..)", "protected", null),
         before = """
             package com.abc;
 

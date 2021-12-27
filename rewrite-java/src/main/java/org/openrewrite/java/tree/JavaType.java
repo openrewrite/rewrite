@@ -15,21 +15,24 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.*;
+import com.fasterxml.jackson.annotation.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.joining;
+import static java.util.Collections.*;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
+import static org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder.TO_STRING;
 
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -57,9 +60,8 @@ public interface JavaType {
         Primitive primitive = Primitive.fromKeyword(typeName);
         if (primitive != null) {
             return primitive;
-        } else {
-            return Class.build(typeName);
         }
+        return ShallowClass.build(typeName);
     }
 
     @Getter
@@ -71,7 +73,6 @@ public interface JavaType {
     }
 
     abstract class FullyQualified implements JavaType {
-
         public abstract String getFullyQualifiedName();
 
         public abstract FullyQualified withFullyQualifiedName(String fullyQualifiedName);
@@ -90,32 +91,124 @@ public interface JavaType {
 
         public abstract List<Method> getMethods();
 
+        public Iterator<Method> getVisibleMethods() {
+            return getVisibleMethods(getPackageName());
+        }
+
+        private Iterator<Method> getVisibleMethods(String packageName) {
+            return new FullyQualifiedIterator<>(
+                    this,
+                    packageName,
+                    Method::getFlagsBitMap,
+                    FullyQualified::getMethods,
+                    fq -> fq.getVisibleMethods(packageName)
+            );
+        }
+
+        public Iterator<Variable> getVisibleMembers() {
+            return getVisibleMembers(getPackageName());
+        }
+
+        private Iterator<Variable> getVisibleMembers(String packageName) {
+            return new FullyQualifiedIterator<>(
+                    this,
+                    packageName,
+                    Variable::getFlagsBitMap,
+                    FullyQualified::getMembers,
+                    fq -> fq.getVisibleMembers(packageName)
+            );
+        }
+
+        private static class FullyQualifiedIterator<E> implements Iterator<E> {
+            private final FullyQualified fq;
+            private final String visibleFromPackage;
+            private final Function<E, Long> flags;
+            private final Function<FullyQualified, Iterator<E>> recursive;
+
+            private FullyQualified rec;
+            private E peek;
+
+            private Iterator<E> current;
+
+            @Nullable
+            private Iterator<E> supertypeE;
+
+            @Nullable
+            private Iterator<FullyQualified> interfaces;
+
+            @Nullable
+            private Iterator<E> interfaceE;
+
+            private FullyQualifiedIterator(FullyQualified fq,
+                                           String visibleFromPackage,
+                                           Function<E, Long> flags,
+                                           Function<FullyQualified, List<E>> base,
+                                           Function<FullyQualified, Iterator<E>> recursive) {
+                this.fq = fq;
+                this.rec = fq;
+                this.visibleFromPackage = visibleFromPackage;
+                this.flags = flags;
+                this.recursive = recursive;
+                this.current = base.apply(fq).iterator();
+            }
+
+            @Override
+            public boolean hasNext() {
+                if (current.hasNext()) {
+                    peek = current.next();
+
+                    long peekFlags = flags.apply(peek);
+                    if(((Flag.Public.getBitMask() | Flag.Protected.getBitMask()) & peekFlags) != 0) {
+                        return true;
+                    } else if((Flag.Private.getBitMask() & peekFlags) == 0 && rec.getPackageName().equals(visibleFromPackage)) {
+                        // package private in the same package
+                        return true;
+                    }
+
+                    return true;
+                } else {
+                    if (supertypeE == null) {
+                        supertypeE = fq.getSupertype() == null ? emptyIterator() : recursive.apply(fq.getSupertype());
+                        current = supertypeE;
+                        rec = fq.getSupertype();
+                        return hasNext();
+                    } else if(interfaces == null) {
+                        interfaces = fq.getInterfaces().iterator();
+                        return hasNext();
+                    } else if(interfaces.hasNext()) {
+                        rec = interfaces.next();
+                        current = recursive.apply(rec);
+                        return hasNext();
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public E next() {
+                return peek;
+            }
+        }
+
         @Nullable
         public abstract FullyQualified getOwningClass();
 
         @Nullable
         public abstract FullyQualified getSupertype();
 
-        public abstract List<Variable> getVisibleSupertypeMembers();
-
+        /**
+         * @return The class name without package qualification. If an inner class, outer/inner classes are separated by '.'.
+         */
         public String getClassName() {
-            AtomicBoolean dropWhile = new AtomicBoolean(false);
-            return Arrays.stream(getFullyQualifiedName().split("\\."))
-                    .filter(part -> {
-                        dropWhile.set(dropWhile.get() || !Character.isLowerCase(part.charAt(0)));
-                        return dropWhile.get();
-                    })
-                    .collect(joining("."));
+            String fqn = getFullyQualifiedName();
+            String className = fqn.substring(fqn.lastIndexOf('.') + 1);
+            return className.replace('$', '.');
         }
 
         public String getPackageName() {
-            AtomicBoolean takeWhile = new AtomicBoolean(true);
-            return Arrays.stream(getFullyQualifiedName().split("\\."))
-                    .filter(part -> {
-                        takeWhile.set(takeWhile.get() && !Character.isUpperCase(part.charAt(0)));
-                        return takeWhile.get();
-                    })
-                    .collect(joining("."));
+            String fqn = getFullyQualifiedName();
+            int endPackage = fqn.lastIndexOf('.');
+            return endPackage < 0 ? "" : fqn.substring(0, endPackage);
         }
 
         public boolean isAssignableTo(String fullyQualifiedName) {
@@ -125,7 +218,6 @@ public interface JavaType {
         }
 
         public boolean isAssignableFrom(@Nullable JavaType type) {
-            // TODO This does not take into account type parameters.
             if (type instanceof FullyQualified) {
                 FullyQualified clazz = (FullyQualified) type;
                 return getFullyQualifiedName().equals(clazz.getFullyQualifiedName()) ||
@@ -194,6 +286,11 @@ public interface JavaType {
             this.interfaces = nullIfEmpty(interfaces);
             this.members = nullIfEmpty(members);
             this.methods = nullIfEmpty(methods);
+        }
+
+        @Deprecated
+        public static ShallowClass build(String fullyQualifiedName) {
+            return ShallowClass.build(fullyQualifiedName);
         }
 
         public List<FullyQualified> getAnnotations() {
@@ -279,6 +376,39 @@ public interface JavaType {
         }
 
         /**
+         * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
+         */
+        public void unsafeSet(@Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+                              @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
+                              @Nullable List<Variable> members, @Nullable List<Method> methods) {
+            this.supertype = supertype;
+            this.owningClass = owningClass;
+            this.annotations = nullIfEmpty(annotations);
+            this.interfaces = nullIfEmpty(interfaces);
+            this.members = nullIfEmpty(members);
+            this.methods = nullIfEmpty(methods);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Class aClass = (Class) o;
+            return fullyQualifiedName.equals(aClass.fullyQualifiedName);
+        }
+
+        @Override
+        public String toString() {
+            return TO_STRING.signature(this);
+        }
+    }
+
+    class ShallowClass extends Class {
+        public ShallowClass(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName, Kind kind, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass, @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces, @Nullable List<Variable> members, @Nullable List<Method> methods) {
+            super(managedReference, flagsBitMap, fullyQualifiedName, kind, supertype, owningClass, annotations, interfaces, members, methods);
+        }
+
+        /**
          * Build a class type only from the class' fully qualified name. Since we are not providing any member, type parameter,
          * interface, or supertype information, this fully qualified name could potentially match on more than one version of
          * the class found in the type cache. This method will simply pick one of them, because there is no way of selecting
@@ -287,12 +417,12 @@ public interface JavaType {
          * @param fullyQualifiedName The fully qualified name of the class to build
          * @return Any class found in the type cache
          */
-        public static Class build(String fullyQualifiedName) {
-            Class owningClass = null;
+        public static ShallowClass build(String fullyQualifiedName) {
+            ShallowClass owningClass = null;
 
             int firstClassNameIndex = 0;
             int lastDot = 0;
-            char[] fullyQualifiedNameChars = fullyQualifiedName.toCharArray();
+            char[] fullyQualifiedNameChars = fullyQualifiedName.replace('$', '.').toCharArray();
             char prev = ' ';
             for (int i = 0; i < fullyQualifiedNameChars.length; i++) {
                 char c = fullyQualifiedNameChars[i];
@@ -309,64 +439,60 @@ public interface JavaType {
                 owningClass = build(fullyQualifiedName.substring(0, lastDot));
             }
 
-            return new JavaType.Class(null, 1, fullyQualifiedName, Kind.Class, null, owningClass,
+            return new JavaType.ShallowClass(null, 1, fullyQualifiedName, Kind.Class, null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
-        }
-
-        public List<Variable> getVisibleSupertypeMembers() {
-            List<Variable> members = new ArrayList<>();
-            if (this.supertype != null) {
-                for (Variable member : this.supertype.getMembers()) {
-                    if (!member.hasFlags(Flag.Private)) {
-                        members.add(member);
-                    }
-                }
-                members.addAll(supertype.getVisibleSupertypeMembers());
-            }
-            return members;
-        }
-
-        /**
-         * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
-         */
-        public void unsafeSet(@Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
-                              @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
-                              @Nullable List<Variable> members, @Nullable List<Method> methods) {
-            this.supertype = supertype;
-            this.owningClass = owningClass;
-            this.annotations = nullIfEmpty(annotations);
-            this.interfaces = nullIfEmpty(interfaces);
-            this.members = nullIfEmpty(members);
-            this.methods = nullIfEmpty(methods);
-        }
-
-        @Override
-        public String toString() {
-            return "Class{" + fullyQualifiedName + '}';
         }
     }
 
-    @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @AllArgsConstructor
-    @With
     class Parameterized extends FullyQualified {
+        @Getter
+        @With
         @Nullable
         Integer managedReference;
 
+        @With
         @NonFinal
         @Nullable
         FullyQualified type;
 
         @NonFinal
+        @Nullable
         List<JavaType> typeParameters;
+
+        public Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type,
+                             @Nullable List<JavaType> typeParameters) {
+            this.managedReference = managedReference;
+            this.type = type;
+            this.typeParameters = nullIfEmpty(typeParameters);
+        }
+
+        public FullyQualified getType() {
+            assert type != null;
+            return type;
+        }
+
+        public List<JavaType> getTypeParameters() {
+            return typeParameters == null ? emptyList() : typeParameters;
+        }
+
+        public JavaType.Parameterized withTypeParameters(@Nullable List<JavaType> typeParameters) {
+            if (typeParameters != null && typeParameters.isEmpty()) {
+                typeParameters = null;
+            }
+            if (typeParameters == this.typeParameters) {
+                return this;
+            }
+            return new JavaType.Parameterized(managedReference, type, typeParameters);
+        }
 
         /**
          * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
          */
         public void unsafeSet(FullyQualified type, List<JavaType> typeParameters) {
+            assert type != this;
             this.type = type;
-            this.typeParameters = typeParameters;
+            this.typeParameters = nullIfEmpty(typeParameters);
         }
 
         @Override
@@ -434,78 +560,124 @@ public interface JavaType {
         }
 
         @Override
-        public List<Variable> getVisibleSupertypeMembers() {
-            assert type != null;
-            return type.getVisibleSupertypeMembers();
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Parameterized that = (Parameterized) o;
+            assert type != null && typeParameters != null;
+            return type.equals(that.type) && typeParameters.equals(that.typeParameters);
         }
 
         @Override
         public String toString() {
-            return "Parameterized{" + getFullyQualifiedName() + "}";
+            return TO_STRING.signature(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @AllArgsConstructor
-    @With
     class GenericTypeVariable implements JavaType {
+        @With
         @Getter
         @Nullable
         Integer managedReference;
 
+        @With
         @Getter
         String name;
+
+        @With
+        @NonFinal
+        @Getter
+        Variance variance;
 
         @NonFinal
         @Nullable
         List<JavaType> bounds;
 
-        public List<JavaType> getBounds() {
-            assert bounds != null;
-            return bounds;
+        public GenericTypeVariable(@Nullable Integer managedReference, String name, Variance variance, @Nullable List<JavaType> bounds) {
+            this.managedReference = managedReference;
+            this.name = name;
+            this.variance = variance;
+            this.bounds = nullIfEmpty(bounds);
         }
 
-        public void unsafeSet(List<JavaType> bounds) {
-            this.bounds = bounds;
+        public List<JavaType> getBounds() {
+            return bounds == null ? emptyList() : bounds;
+        }
+
+        public JavaType.GenericTypeVariable withBounds(@Nullable List<JavaType> bounds) {
+            if (bounds != null && bounds.isEmpty()) {
+                bounds = null;
+            }
+            if (bounds == this.bounds) {
+                return this;
+            }
+            return new JavaType.GenericTypeVariable(managedReference, name, variance, bounds);
+        }
+
+        public void unsafeSet(Variance variance, @Nullable List<JavaType> bounds) {
+            this.variance = variance;
+            this.bounds = nullIfEmpty(bounds);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            GenericTypeVariable that = (GenericTypeVariable) o;
+            assert bounds != null;
+            return name.equals(that.name) && variance == that.variance && bounds.equals(that.bounds);
         }
 
         @Override
         public String toString() {
-            return typeToString(this);
+            return TO_STRING.signature(this);
         }
 
-        private static String typeToString(JavaType type) {
-            if (type instanceof GenericTypeVariable){
-                GenericTypeVariable generic = (GenericTypeVariable) type;
-                StringBuilder s = new StringBuilder("GenericTypeVariable{" + generic.name + " extends ");
-                if (generic.bounds == null || generic.bounds.isEmpty()) {
-                    s.append("<no bounds>");
-                } else {
-                    StringJoiner b = new StringJoiner(" & ");
-                    for (JavaType bound : generic.bounds) {
-                        b.add(typeToString(bound));
-                    }
-                    s.append(b);
-                }
-                s.append('}');
-                return s.toString();
-            } else if (type instanceof FullyQualified) {
-                return ((FullyQualified) type).getFullyQualifiedName();
-            }
-            return "";
+        public enum Variance {
+            INVARIANT,
+            COVARIANT,
+            CONTRAVARIANT
         }
     }
 
-    @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @AllArgsConstructor
     @With
     class Array implements JavaType {
+        @Nullable
+        @NonFinal
         JavaType elemType;
+
+        public Array(@Nullable JavaType elemType) {
+            this.elemType = elemType;
+        }
+
+        public JavaType getElemType() {
+            assert elemType != null;
+            return elemType;
+        }
+
+        public void unsafeSet(JavaType elemType) {
+            this.elemType = elemType;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Array array = (Array) o;
+            assert elemType != null;
+            return elemType.equals(array.elemType);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(elemType);
+        }
 
         @Override
         public String toString() {
-            return "Array{" + elemType + "}";
+            return TO_STRING.signature(this);
         }
     }
 
@@ -521,7 +693,6 @@ public interface JavaType {
         Void,
         String,
         None,
-        Wildcard,
         Null;
 
         @Nullable
@@ -547,8 +718,6 @@ public interface JavaType {
                     return Void;
                 case "String":
                     return String;
-                case "*":
-                    return Wildcard;
                 case "null":
                     return Null;
                 case "":
@@ -579,14 +748,17 @@ public interface JavaType {
                     return "void";
                 case String:
                     return "String";
-                case Wildcard:
-                    return "*";
                 case Null:
                     return "null";
                 case None:
                 default:
                     return "";
             }
+        }
+
+        @Override
+        public String toString() {
+            return getKeyword();
         }
     }
 
@@ -599,23 +771,23 @@ public interface JavaType {
 
         @With
         @NonFinal
+        @Nullable
         FullyQualified declaringType;
 
         @With
         String name;
 
-        @Nullable
-        List<String> paramNames;
-
         @With
         @NonFinal
         @Nullable
-        JavaType.Method.Signature genericSignature;
+        JavaType returnType;
 
-        @With
+        @Nullable
+        List<String> parameterNames;
+
         @NonFinal
         @Nullable
-        JavaType.Method.Signature resolvedSignature;
+        List<JavaType> parameterTypes;
 
         @NonFinal
         @Nullable
@@ -625,60 +797,84 @@ public interface JavaType {
         @Nullable
         List<FullyQualified> annotations;
 
-        public Method(long flagsBitMap, FullyQualified declaringType, String name,
-                      @Nullable List<String> paramNames, @Nullable JavaType.Method.Signature genericSignature,
-                      @Nullable JavaType.Method.Signature resolvedSignature,
-                      @Nullable List<FullyQualified> thrownExceptions, @Nullable List<FullyQualified> annotations) {
+        public Method(long flagsBitMap, @Nullable FullyQualified declaringType, String name,
+                      @Nullable JavaType returnType, @Nullable List<String> parameterNames,
+                      @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
+                      @Nullable List<FullyQualified> annotations) {
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = declaringType;
             this.name = name;
-            this.paramNames = nullIfEmpty(paramNames);
-            this.genericSignature = genericSignature;
-            this.resolvedSignature = resolvedSignature;
+            this.returnType = returnType;
+            this.parameterNames = nullIfEmpty(parameterNames);
+            this.parameterTypes = nullIfEmpty(parameterTypes);
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
             this.annotations = nullIfEmpty(annotations);
         }
 
         public void unsafeSet(FullyQualified declaringType,
-                              @Nullable JavaType.Method.Signature genericSignature,
-                              @Nullable JavaType.Method.Signature resolvedSignature,
+                              JavaType returnType,
+                              @Nullable List<JavaType> parameterTypes,
                               @Nullable List<FullyQualified> thrownExceptions,
                               @Nullable List<FullyQualified> annotations) {
             this.declaringType = declaringType;
-            this.genericSignature = genericSignature;
-            this.resolvedSignature = resolvedSignature;
+            this.returnType = returnType;
+            this.parameterTypes = nullIfEmpty(parameterTypes);
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
             this.annotations = nullIfEmpty(annotations);
         }
 
-        public List<String> getParamNames() {
-            return paramNames == null ? emptyList() : paramNames;
+        public boolean isConstructor() {
+            return name.equals("<constructor>");
         }
 
-        public JavaType.Method withParamNames(@Nullable List<String> paramNames) {
-            if (paramNames != null && paramNames.isEmpty()) {
-                paramNames = null;
+        public FullyQualified getDeclaringType() {
+            assert declaringType != null;
+            return declaringType;
+        }
+
+        public List<String> getParameterNames() {
+            return parameterNames == null ? emptyList() : parameterNames;
+        }
+
+        public JavaType.Method withParameterNames(@Nullable List<String> parameterNames) {
+            if (parameterNames != null && parameterNames.isEmpty()) {
+                parameterNames = null;
             }
-            if (paramNames == this.paramNames) {
+            if (parameterNames == this.parameterNames) {
                 return this;
             }
-            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, paramNames,
-                    this.genericSignature, this.resolvedSignature, this.thrownExceptions, this.annotations);
+            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+                    parameterNames, this.parameterTypes, this.thrownExceptions, this.annotations);
+        }
+
+        public List<JavaType> getParameterTypes() {
+            return parameterTypes == null ? emptyList() : parameterTypes;
+        }
+
+        public JavaType.Method withParameterTypes(@Nullable List<JavaType> parameterTypes) {
+            if (parameterTypes != null && parameterTypes.isEmpty()) {
+                parameterTypes = null;
+            }
+            if (parameterTypes == this.parameterTypes) {
+                return this;
+            }
+            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+                    this.parameterNames, parameterTypes, this.thrownExceptions, this.annotations);
         }
 
         public List<FullyQualified> getThrownExceptions() {
             return thrownExceptions == null ? emptyList() : thrownExceptions;
         }
 
-        public JavaType.Method withThrownExceptions(@Nullable List<FullyQualified> exceptions) {
-            if (exceptions != null && exceptions.isEmpty()) {
-                exceptions = null;
+        public JavaType.Method withThrownExceptions(@Nullable List<FullyQualified> thrownExceptions) {
+            if (thrownExceptions != null && thrownExceptions.isEmpty()) {
+                thrownExceptions = null;
             }
-            if (exceptions == this.thrownExceptions) {
+            if (thrownExceptions == this.thrownExceptions) {
                 return this;
             }
-            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.paramNames, this.genericSignature,
-                    this.resolvedSignature, exceptions, this.annotations);
+            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+                    this.parameterNames, this.parameterTypes, thrownExceptions, this.annotations);
         }
 
         public List<FullyQualified> getAnnotations() {
@@ -692,17 +888,8 @@ public interface JavaType {
             if (annotations == this.annotations) {
                 return this;
             }
-            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.paramNames, this.genericSignature,
-                    this.resolvedSignature, this.thrownExceptions, annotations);
-        }
-
-        @Value
-        @With
-        public static class Signature {
-            @Nullable
-            JavaType returnType;
-
-            List<JavaType> paramTypes;
+            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+                    this.parameterNames, this.parameterTypes, this.thrownExceptions, annotations);
         }
 
         public boolean hasFlags(Flag... test) {
@@ -718,9 +905,26 @@ public interface JavaType {
         }
 
         @Override
-        public String toString() {
-            return "Method{" + (declaringType == null ? "<unknown>" : declaringType) + "#" + name + "(" + String.join(", ", (paramNames == null ? emptyList() : paramNames)) + ")}";
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Method method = (Method) o;
+            assert declaringType != null;
+            assert returnType != null;
+            return declaringType.equals(method.declaringType) && name.equals(method.name) &&
+                    returnType.equals(method.returnType) && Objects.equals(parameterTypes, method.parameterTypes);
         }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(declaringType, name, returnType, parameterTypes);
+        }
+
+        @Override
+        public String toString() {
+            return TO_STRING.methodSignature(this);
+        }
+
     }
 
     @Getter
@@ -735,7 +939,8 @@ public interface JavaType {
 
         @With
         @NonFinal
-        FullyQualified owner;
+        @Nullable
+        JavaType owner;
 
         @With
         @NonFinal
@@ -746,13 +951,18 @@ public interface JavaType {
         @Nullable
         List<FullyQualified> annotations;
 
-        public Variable(long flagsBitMap, String name, FullyQualified owner,
+        public Variable(long flagsBitMap, String name, @Nullable JavaType owner,
                         @Nullable JavaType type, @Nullable List<FullyQualified> annotations) {
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.name = name;
             this.owner = owner;
             this.type = type;
             this.annotations = nullIfEmpty(annotations);
+        }
+
+        @Nullable
+        public JavaType getOwner() {
+            return owner;
         }
 
         public List<FullyQualified> getAnnotations() {
@@ -777,7 +987,7 @@ public interface JavaType {
             return Flag.bitMapToFlags(flagsBitMap);
         }
 
-        public void unsafeSet(FullyQualified owner, @Nullable JavaType type,
+        public void unsafeSet(JavaType owner, @Nullable JavaType type,
                               @Nullable List<FullyQualified> annotations) {
             this.owner = owner;
             this.type = type;
@@ -785,8 +995,91 @@ public interface JavaType {
         }
 
         @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Variable variable = (Variable) o;
+            assert owner != null;
+            return name.equals(variable.name) && owner.equals(variable.owner);
+        }
+
+        @Override
         public String toString() {
-            return "Variable{" + (owner == null ? "<unknown>" : owner) + "#" + name + "}";
+            return TO_STRING.variableSignature(this);
+        }
+    }
+
+    final class Unknown extends FullyQualified {
+        private static final Unknown INSTANCE = new Unknown();
+
+        private Unknown() {
+        }
+
+        @JsonCreator
+        public static Unknown getInstance() {
+            return INSTANCE;
+        }
+
+        @Override
+        public String getFullyQualifiedName() {
+            return "<unknown>";
+        }
+
+        @Override
+        public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
+            return this;
+        }
+
+        @Override
+        public List<FullyQualified> getAnnotations() {
+            return emptyList();
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return false;
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return emptySet();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return emptyList();
+        }
+
+        @Override
+        public Kind getKind() {
+            return Kind.Class;
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return emptyList();
+        }
+
+        @Override
+        public List<Method> getMethods() {
+            return emptyList();
+        }
+
+        @Nullable
+        @Override
+        public FullyQualified getOwningClass() {
+            return null;
+        }
+
+        @Nullable
+        @Override
+        public FullyQualified getSupertype() {
+            return null;
+        }
+
+        @Override
+        public String toString() {
+            return "Unknown";
         }
     }
 }

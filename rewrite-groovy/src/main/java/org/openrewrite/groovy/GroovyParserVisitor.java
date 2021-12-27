@@ -23,7 +23,6 @@ import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
@@ -31,7 +30,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
@@ -56,7 +54,7 @@ import static org.openrewrite.java.tree.Space.format;
 public class GroovyParserVisitor {
     private final Path sourcePath;
     private final String source;
-    private final TypeMapping typeMapping;
+    private final GroovyTypeMapping typeMapping;
     private final ExecutionContext ctx;
 
     private int cursor = 0;
@@ -64,21 +62,14 @@ public class GroovyParserVisitor {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public GroovyParserVisitor(Path sourcePath, String source, JavaTypeCache typeCache, ExecutionContext ctx) {
+    public GroovyParserVisitor(Path sourcePath, String source, Map<String, Object> typeBySignature, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.source = source;
-        this.typeMapping = new TypeMapping(typeCache);
+        this.typeMapping = new GroovyTypeMapping(typeBySignature);
         this.ctx = ctx;
     }
 
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
-        for (ClassNode aClass : ast.getClasses()) {
-            try {
-                new StaticTypeCheckingVisitor(unit, aClass).visitClass(aClass);
-            } catch (NoClassDefFoundError ignored) {
-            }
-        }
-
         NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
         for (org.codehaus.groovy.ast.stmt.Statement s : ast.getStatementBlock().getStatements()) {
             if (!isSynthetic(s)) {
@@ -195,14 +186,14 @@ public class GroovyParserVisitor {
                 for (int i = 0; i < interfaces.length; i++) {
                     ClassNode anInterface = interfaces[i];
                     // Any annotation @interface is listed as extending java.lang.annotation.Annotation, although it doesn't appear in source
-                    if(kindType == J.ClassDeclaration.Kind.Type.Annotation && "java.lang.annotation.Annotation".equals(anInterface.getName())) {
+                    if (kindType == J.ClassDeclaration.Kind.Type.Annotation && "java.lang.annotation.Annotation".equals(anInterface.getName())) {
                         continue;
                     }
                     implTypes.add(JRightPadded.build(visitTypeTree(anInterface))
                             .withAfter(i == interfaces.length - 1 ? EMPTY : sourceBefore(",")));
                 }
                 // Can be empty for an annotation @interface which only implements Annotation
-                if(implTypes.size() > 0) {
+                if (implTypes.size() > 0) {
                     implementings = JContainer.build(implPrefix, implTypes, Markers.EMPTY);
                 }
             }
@@ -260,7 +251,7 @@ public class GroovyParserVisitor {
                     name.withPrefix(EMPTY),
                     emptyList(),
                     null,
-                    name.getType()
+                    typeMapping.variableType(name.getSimpleName(), field.getOriginType())
             );
 
             if (field.getInitialExpression() != null) {
@@ -371,7 +362,7 @@ public class GroovyParserVisitor {
 
             JContainer<NameTree> throwz = method.getExceptions().length == 0 ? null : JContainer.build(
                     sourceBefore("throws"),
-                    bodyVisitor.visitRightPadded(method.getExceptions(), ",", null),
+                    bodyVisitor.visitRightPadded(method.getExceptions(), null),
                     Markers.EMPTY
             );
 
@@ -414,7 +405,7 @@ public class GroovyParserVisitor {
             return pollQueue();
         }
 
-        private <T> List<JRightPadded<T>> visitRightPadded(ASTNode[] nodes, String between, @Nullable String afterLast) {
+        private <T> List<JRightPadded<T>> visitRightPadded(ASTNode[] nodes, @Nullable String afterLast) {
             List<JRightPadded<T>> ts = new ArrayList<>(nodes.length);
             for (int i = 0; i < nodes.length; i++) {
                 ASTNode node = nodes[i];
@@ -423,7 +414,7 @@ public class GroovyParserVisitor {
                 if (i == nodes.length - 1) {
                     ts.add(converted.withAfter(afterLast == null ? EMPTY : sourceBefore(afterLast)));
                 } else {
-                    ts.add(converted.withAfter(sourceBefore(between)));
+                    ts.add(converted.withAfter(sourceBefore(",")));
                 }
             }
             return ts;
@@ -687,7 +678,7 @@ public class GroovyParserVisitor {
         public void visitCastExpression(CastExpression cast) {
             // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
             // If the CastExpression starts at the same place as the expression it contains, then it must be a groovy-style cast
-            if(cast.getLineNumber() == cast.getExpression().getLineNumber() && cast.getColumnNumber() == cast.getExpression().getColumnNumber()) {
+            if (cast.getLineNumber() == cast.getExpression().getLineNumber() && cast.getColumnNumber() == cast.getExpression().getColumnNumber()) {
                 Space prefix = whitespace();
                 Expression expr = visit(cast.getExpression());
                 Space asPrefix = sourceBefore("as");
@@ -695,7 +686,7 @@ public class GroovyParserVisitor {
                 String typeIdentifierText;
                 int i = cursor;
                 char c = source.charAt(i);
-                while(Character.isJavaIdentifierPart(c)) {
+                while (Character.isJavaIdentifierPart(c)) {
                     i++;
                     c = source.charAt(i);
                 }
@@ -714,7 +705,7 @@ public class GroovyParserVisitor {
                 String typeIdentifierText;
                 int i = cursor;
                 char c = source.charAt(i);
-                while(Character.isJavaIdentifierPart(c)) {
+                while (Character.isJavaIdentifierPart(c)) {
                     i++;
                     c = source.charAt(i);
                 }
@@ -748,7 +739,8 @@ public class GroovyParserVisitor {
                                     JRightPadded.build(
                                             new J.VariableDeclarations.NamedVariable(randomId(), sourceBefore(p.getName()), Markers.EMPTY,
                                                     new J.Identifier(randomId(), EMPTY, Markers.EMPTY, p.getName(), type, null),
-                                                    emptyList(), null, type)
+                                                    emptyList(), null,
+                                                    typeMapping.variableType(p.getName(), p.getType()))
                                     )
                             ));
                     JRightPadded<J> param = JRightPadded.build(expr);
@@ -844,7 +836,7 @@ public class GroovyParserVisitor {
             JContainer<Expression> args = visit(ctor.getArguments());
             MethodNode methodNode = (MethodNode) ctor.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
             queue.add(new J.NewClass(randomId(), fmt, Markers.EMPTY, null, EMPTY,
-                    clazz, args, null, typeMapping.type(methodNode)));
+                    clazz, args, null, typeMapping.methodType(methodNode)));
         }
 
         @Override
@@ -864,7 +856,7 @@ public class GroovyParserVisitor {
                         name.withPrefix(EMPTY),
                         emptyList(),
                         null,
-                        name.getType()
+                        typeMapping.variableType(name.getSimpleName(), expression.getVariableExpression().getType())
                 );
             }
 
@@ -994,13 +986,13 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitListExpression(ListExpression list) {
-            if(list.getExpressions().isEmpty()) {
+            if (list.getExpressions().isEmpty()) {
                 queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
                         JContainer.build(singletonList(new JRightPadded<>(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore("]"), Markers.EMPTY))),
                         typeMapping.type(list.getType())));
             } else {
                 queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
-                        JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), ",", "]")),
+                        JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), "]")),
                         typeMapping.type(list.getType())));
             }
         }
@@ -1018,7 +1010,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitMapExpression(MapExpression map) {
             queue.add(new G.MapLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
-                    JContainer.build(visitRightPadded(map.getMapEntryExpressions().toArray(new ASTNode[0]), ",", "]")),
+                    JContainer.build(visitRightPadded(map.getMapEntryExpressions().toArray(new ASTNode[0]), "]")),
                     typeMapping.type(map.getType())
             ));
         }
@@ -1058,7 +1050,7 @@ public class GroovyParserVisitor {
             JContainer<Expression> args = visit(call.getArguments());
 
             MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
-            JavaType.Method methodType = typeMapping.type(methodNode);
+            JavaType.Method methodType = typeMapping.methodType(methodNode);
             queue.add(new J.MethodInvocation(randomId(), fmt, Markers.EMPTY,
                     select, null, name, args, methodType));
         }
@@ -1436,7 +1428,7 @@ public class GroovyParserVisitor {
                         expr,
                         padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, part.trim(), null, null)),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
-                                JavaType.Class.build(fullName) :
+                                JavaType.ShallowClass.build(fullName) :
                                 null
                 );
             }
@@ -1468,7 +1460,7 @@ public class GroovyParserVisitor {
         if (cursor < source.length() && source.startsWith("def", cursor)) {
             cursor += 3;
             return new J.Identifier(randomId(), fmt, Markers.EMPTY, "def",
-                    JavaType.Class.build("java.lang.Object"), null);
+                    JavaType.ShallowClass.build("java.lang.Object"), null);
         } else {
             cursor = saveCursor;
         }

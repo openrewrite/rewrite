@@ -20,12 +20,8 @@ import org.assertj.core.api.Assertions.fail
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.internal.JavaTypeCache
 
 interface FindInheritedFieldsTest {
-    val typeCache: JavaTypeCache
-        get() = JavaTypeCache()
-
     @Test
     fun findInheritedField(jp: JavaParser) {
         val a = """

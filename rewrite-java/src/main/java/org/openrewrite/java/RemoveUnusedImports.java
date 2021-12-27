@@ -26,7 +26,9 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
+import static java.util.Collections.emptySet;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
 
 /**
@@ -55,8 +57,9 @@ public class RemoveUnusedImports extends Recipe {
         return Duration.ofMinutes(5);
     }
 
+    @Nullable
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return new NoMissingTypes();
     }
 
@@ -72,12 +75,12 @@ public class RemoveUnusedImports extends Recipe {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                     .orElse(IntelliJ.importLayout());
 
-            Map<String, Set<String>> methodsAndFieldsByTypeName = new HashMap<>();
+            Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
             Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static)) {
-                    methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(), t -> new HashSet<>())
+                    methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(), t -> new TreeSet<>())
                             .add(method.getName());
                 }
             }
@@ -85,27 +88,25 @@ public class RemoveUnusedImports extends Recipe {
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
                 if (fq != null) {
-                    methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new HashSet<>())
+                    methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new TreeSet<>())
                             .add(variable.getName());
                 }
             }
 
             for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
                 if (javaType instanceof JavaType.Parameterized) {
-                    JavaType.Parameterized parameterized = (JavaType.Parameterized)javaType;
-                    typesByPackage.computeIfAbsent(packageKey(parameterized.getType().getPackageName(), parameterized.getType().getClassName()), f -> new HashSet<>())
+                    JavaType.Parameterized parameterized = (JavaType.Parameterized) javaType;
+                    typesByPackage.computeIfAbsent(parameterized.getType().getPackageName(), f -> new HashSet<>())
                             .add(parameterized.getType());
                     for (JavaType typeParameter : parameterized.getTypeParameters()) {
                         JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
                         if (fq != null) {
-                            typesByPackage.computeIfAbsent(packageKey(fq.getPackageName(), fq.getClassName()), f -> new HashSet<>())
-                                    .add(fq);
+                            typesByPackage.computeIfAbsent(fq.getPackageName(), f -> new HashSet<>()).add(fq);
                         }
                     }
                 } else if (javaType instanceof JavaType.FullyQualified) {
-                    JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
-                    typesByPackage.computeIfAbsent(packageKey(fullyQualified.getPackageName(), fullyQualified.getClassName()), f -> new HashSet<>())
-                            .add(fullyQualified);
+                    JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
+                    typesByPackage.computeIfAbsent(fq.getPackageName(), f -> new HashSet<>()).add(fq);
                 }
             }
 
@@ -127,8 +128,19 @@ public class RemoveUnusedImports extends Recipe {
                 J.Identifier name = qualid.getName();
 
                 if (elem.isStatic()) {
-                    Set<String> methodsAndFields = methodsAndFieldsByTypeName.get(elem.getTypeName());
-                    Set<JavaType.FullyQualified> staticClasses = typesByPackage.get(elem.getTypeName());
+                    SortedSet<String> methodsAndFields = methodsAndFieldsByTypeName.get(elem.getTypeName());
+
+                    String outerType = elem.getTypeName();
+                    Set<JavaType.FullyQualified> staticClasses = null;
+                    for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(elem.getPackageName(), emptySet())) {
+                        if(maybeStatic.getOwningClass() != null && outerType.startsWith(maybeStatic.getOwningClass().getFullyQualifiedName())) {
+                            if(staticClasses == null) {
+                                staticClasses = new HashSet<>();
+                            }
+                            staticClasses.add(maybeStatic);
+                        }
+                    }
+
                     if (methodsAndFields == null && staticClasses == null) {
                         anImport.used = false;
                         changed = true;
@@ -142,19 +154,19 @@ public class RemoveUnusedImports extends Recipe {
 
                             // add each unfolded import
                             if (methodsAndFields != null) {
-                                methodsAndFields.stream().sorted().forEach(method ->
-                                        anImport.imports.add(new JRightPadded<>(elem
-                                                .withQualid(qualid.withName(name.withSimpleName(method)))
-                                                .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
-                                );
+                                for (String method : methodsAndFields) {
+                                    anImport.imports.add(new JRightPadded<>(elem
+                                            .withQualid(qualid.withName(name.withSimpleName(method)))
+                                            .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
+                                }
                             }
 
                             if (staticClasses != null) {
-                                staticClasses.forEach(fqn ->
+                                for (JavaType.FullyQualified fqn : staticClasses) {
                                         anImport.imports.add(new JRightPadded<>(elem
                                                 .withQualid(qualid.withName(name.withSimpleName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
-                                                .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
-                                );
+                                                .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
+                                }
                             }
 
                             // move whatever the original prefix of the star import was to the first unfolded import
@@ -163,7 +175,7 @@ public class RemoveUnusedImports extends Recipe {
 
                             changed = true;
                         }
-                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getQualid().printTrimmed(getCursor()).equals(c.getFullyQualifiedName())) ||
+                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getTypeName().equals(c.getFullyQualifiedName())) ||
                             methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) {
                         anImport.used = true;
                     } else {
@@ -171,7 +183,7 @@ public class RemoveUnusedImports extends Recipe {
                         changed = true;
                     }
                 } else {
-                    Set<JavaType.FullyQualified> types = typesByPackage.get(packageKey(elem.getPackageName(), elem.getClassName()));
+                    Set<JavaType.FullyQualified> types = typesByPackage.get(elem.getPackageName());
                     if (types == null) {
                         anImport.used = false;
                         changed = true;
@@ -195,7 +207,12 @@ public class RemoveUnusedImports extends Recipe {
 
                             changed = true;
                         }
-                    } else if (types.stream().noneMatch(c -> elem.isFromType(c.getFullyQualifiedName()))) {
+                    } else if (types.stream().noneMatch(c -> {
+                        if ("*".equals(elem.getQualid().getSimpleName())) {
+                            return elem.getPackageName().equals(c.getPackageName());
+                        }
+                        return elem.getTypeName().equals(c.getFullyQualifiedName());
+                    })) {
                         anImport.used = false;
                         changed = true;
                     }

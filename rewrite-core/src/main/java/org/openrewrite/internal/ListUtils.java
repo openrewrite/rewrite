@@ -121,7 +121,7 @@ public final class ListUtils {
         return ls;
     }
 
-    public static <T> List<T> map(List<T> ls, BiFunction<Integer, T, T> map) {
+    public static <T> List<T> map(@Nullable List<T> ls, BiFunction<Integer, T, T> map) {
         if (ls == null || ls.isEmpty()) {
             return ls;
         }
@@ -145,11 +145,11 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> map(List<T> ls, UnaryOperator<T> map) {
+    public static <T> List<T> map(@Nullable List<T> ls, UnaryOperator<T> map) {
         return map(ls, (i, t) -> map.apply(t));
     }
 
-    public static <T> List<T> flatMap(List<T> ls, BiFunction<Integer, T, Object> flatMap) {
+    public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, Object> flatMap) {
         if (ls == null || ls.isEmpty()) {
             return ls;
         }
@@ -197,7 +197,7 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> flatMap(List<T> ls, Function<T, Object> flatMap) {
+    public static <T> List<T> flatMap(@Nullable List<T> ls, Function<T, Object> flatMap) {
         return flatMap(ls, (i, t) -> flatMap.apply(t));
     }
 

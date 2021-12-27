@@ -108,10 +108,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     }
                     if (returnType != null) {
                         JavaType returnTypeType = JavaType.Class.build(returnType);
-                        transformedType = transformedType.withResolvedSignature(transformedType.getResolvedSignature()
-                                .withReturnType(returnTypeType));
-                        transformedType = transformedType.withGenericSignature(transformedType.getGenericSignature()
-                                .withReturnType(returnTypeType));
+                        transformedType = transformedType.withReturnType(returnTypeType);
                     }
                 }
                 if (m.getSelect() == null) {

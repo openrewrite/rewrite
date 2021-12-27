@@ -52,7 +52,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     @Nullable
     private final Type enclosingClassType;
 
-    private final TypeMapping typeMapping;
+    private final Java11TypeMapping typeMapping;
     private final TreeScanner<J, Space> javaVisitor = new JavaVisitor();
     private final Map<Integer, Javadoc.LineBreak> lineBreaks = new HashMap<>();
 
@@ -64,7 +64,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private String source;
     private int cursor = 0;
 
-    public Java11JavadocVisitor(Context context, TreePath scope, TypeMapping typeMapping, String source, JCTree tree) {
+    public Java11JavadocVisitor(Context context, TreePath scope, Java11TypeMapping typeMapping, String source, JCTree tree) {
         this.attr = Attr.instance(context);
         this.typeMapping = typeMapping;
         this.source = source;
@@ -631,10 +631,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
 
             nextMethod:
             for (JavaType.Method method : classType.getMethods()) {
-                if (method.getName().equals(ref.memberName.toString()) && method.getResolvedSignature() != null) {
+                if (method.getName().equals(ref.memberName.toString())) {
                     if (ref.paramTypes != null) {
                         for (JCTree param : ref.paramTypes) {
-                            for (JavaType testParamType : method.getResolvedSignature().getParamTypes()) {
+                            for (JavaType testParamType : method.getParameterTypes()) {
                                 Type paramType = attr.attribType(param, symbol);
                                 if (testParamType instanceof JavaType.GenericTypeVariable) {
                                     for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
@@ -657,12 +657,10 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             }
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
-            if (generic.getBounds() != null) {
-                for (JavaType bound : generic.getBounds()) {
-                    JavaType.Method method = methodReferenceType(ref, bound);
-                    if (method != null) {
-                        return method;
-                    }
+            for (JavaType bound : generic.getBounds()) {
+                JavaType.Method method = methodReferenceType(ref, bound);
+                if (method != null) {
+                    return method;
                 }
             }
         }
@@ -1048,7 +1046,7 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
             JCTree.JCPrimitiveTypeTree primitiveType = (JCTree.JCPrimitiveTypeTree) node;
             String name = primitiveType.toString();
             cursor += name.length();
-            return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitiveType(primitiveType.typetag), null);
+            return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitive(primitiveType.typetag), null);
         }
     }
 }

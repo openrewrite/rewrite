@@ -34,13 +34,9 @@ import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
-import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
@@ -145,9 +141,13 @@ public interface J extends Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotatedType(this, p);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -227,6 +227,11 @@ public interface J extends Tree {
             return p;
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final Annotation t;
@@ -270,6 +275,11 @@ public interface J extends Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayAccess(this, p);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -307,6 +317,11 @@ public interface J extends Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayType(this, p);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -339,9 +354,13 @@ public interface J extends Tree {
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -413,6 +432,11 @@ public interface J extends Tree {
             return p;
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final Assignment t;
@@ -427,7 +451,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -515,6 +538,11 @@ public interface J extends Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -619,6 +647,11 @@ public interface J extends Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -755,9 +788,13 @@ public interface J extends Tree {
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -818,6 +855,11 @@ public interface J extends Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -1247,6 +1289,11 @@ public interface J extends Tree {
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
     @ToString
@@ -1403,6 +1450,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitEnumValue(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 
@@ -1605,6 +1657,11 @@ public interface J extends Tree {
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
     @ToString
@@ -1655,7 +1712,6 @@ public interface J extends Tree {
             return new CoordinateBuilder.Statement(this);
         }
 
-        @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
@@ -1716,6 +1772,11 @@ public interface J extends Tree {
                     }
                 }
                 return p;
+            }
+
+            @Override
+            public String toString() {
+                return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
             }
 
             @RequiredArgsConstructor
@@ -1817,7 +1878,6 @@ public interface J extends Tree {
             return new CoordinateBuilder.Statement(this);
         }
 
-        @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
@@ -1888,6 +1948,11 @@ public interface J extends Tree {
                     }
                 }
                 return p;
+            }
+
+            @Override
+            public String toString() {
+                return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
             }
 
             @RequiredArgsConstructor
@@ -1974,6 +2039,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitIdentifier(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 
@@ -2166,18 +2236,70 @@ public interface J extends Tree {
             return v.visitImport(this, p);
         }
 
-        public boolean isFromType(String clazz) {
-            if ("*".equals(qualid.getSimpleName())) {
-                return qualid.getTarget().printTrimmed().equals(stream(clazz.split("\\."))
-                        .filter(pkgOrNam -> Character.isLowerCase(pkgOrNam.charAt(0)))
-                        .collect(Collectors.joining("."))
-                );
+        /**
+         * The type name of a statically imported inner class is the outermost class.
+         */
+        public String getTypeName() {
+            if (isStatic()) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
+
+                // the compiler doesn't type attribute static imports of classes
+                if (fq == null) {
+                    String possibleInnerClassFqn = getTypeName(qualid);
+                    String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.indexOf('$') + 1);
+                    if (possibleInnerClassName.equals("*")) {
+                        return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.indexOf('$'));
+                    }
+                    while (possibleInnerClassName.indexOf('$') >= 0) {
+                        possibleInnerClassName = possibleInnerClassName.substring(possibleInnerClassName.indexOf('$') + 1);
+                    }
+
+                    JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
+                    if (owner != null && !(qualid.getTarget().getType() instanceof JavaType.ShallowClass)) {
+                        Iterator<JavaType.Method> visibleMethods = owner.getVisibleMethods();
+                        while(visibleMethods.hasNext()) {
+                            JavaType.Method method = visibleMethods.next();
+                            if (method.getName().equals(possibleInnerClassName)) {
+                                return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.lastIndexOf('$'));
+                            }
+                        }
+
+                        Iterator<JavaType.Variable> visibleMembers = owner.getVisibleMembers();
+                        while(visibleMembers.hasNext()) {
+                            JavaType.Variable member = visibleMembers.next();
+                            if (member.getName().equals(possibleInnerClassName)) {
+                                return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.lastIndexOf('$'));
+                            }
+                        }
+
+                        return possibleInnerClassFqn;
+                    }
+                }
+
+                return getTypeName((FieldAccess) qualid.getTarget());
             }
-            return (isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed()).equals(clazz);
+
+            return getTypeName(qualid);
         }
 
-        public String getTypeName() {
-            return isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed();
+        private String getTypeName(J.FieldAccess type) {
+            StringBuilder typeName = new StringBuilder();
+
+            J.FieldAccess part = type;
+            while (true) {
+                String name = part.getSimpleName();
+                if (part.getTarget() instanceof J.Identifier) {
+                    typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
+                            "." + name);
+                    break;
+                } else {
+                    part = (FieldAccess) part.getTarget();
+                    String delim = Character.isUpperCase(part.getSimpleName().charAt(0)) ? "$" : ".";
+                    typeName.insert(0, delim + name);
+                }
+            }
+
+            return typeName.toString();
         }
 
         /**
@@ -2190,23 +2312,15 @@ public interface J extends Tree {
          * </code>
          */
         public String getPackageName() {
-            JavaType.FullyQualified importType = TypeUtils.asFullyQualified(qualid.getType());
-            if (importType != null) {
-                return importType.getPackageName();
-            }
-
-            AtomicBoolean takeWhile = new AtomicBoolean(true);
-            return stream(qualid.getTarget().printTrimmed().split("\\."))
-                    .filter(pkg -> {
-                        takeWhile.set(takeWhile.get() && !pkg.isEmpty() && Character.isLowerCase(pkg.charAt(0)));
-                        return takeWhile.get();
-                    })
-                    .collect(joining("."));
+            String typeName = getTypeName();
+            int lastDot = typeName.lastIndexOf('.');
+            return lastDot < 0 ? "" : typeName.substring(0, lastDot);
         }
 
         public String getClassName() {
-            String pkg = getPackageName();
-            return pkg.length() > 0 ? getTypeName().substring(pkg.length() + 1) : getTypeName();
+            String typeName = getTypeName();
+            int lastDot = typeName.lastIndexOf('.');
+            return lastDot < 0 ? typeName : typeName.substring(lastDot + 1);
         }
 
         @Override
@@ -2263,9 +2377,13 @@ public interface J extends Tree {
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -2339,9 +2457,13 @@ public interface J extends Tree {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.type);
             }
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -2404,6 +2526,11 @@ public interface J extends Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -2596,7 +2723,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -2695,6 +2821,11 @@ public interface J extends Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -2863,9 +2994,7 @@ public interface J extends Tree {
         }
 
         public JavaType getType() {
-            return methodType == null ? null :
-                    methodType.getGenericSignature() == null ? null :
-                            methodType.getGenericSignature().getReturnType();
+            return methodType == null ? null : methodType.getReturnType();
         }
 
         @SuppressWarnings("unchecked")
@@ -3133,8 +3262,7 @@ public interface J extends Tree {
         @Override
         @Nullable
         public JavaType getType() {
-            return methodType == null ? null : methodType.getResolvedSignature() == null ? null :
-                    methodType.getResolvedSignature().getReturnType();
+            return methodType == null ? null : methodType.getReturnType();
         }
 
         public String getSimpleName() {
@@ -3159,6 +3287,11 @@ public interface J extends Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -3218,6 +3351,11 @@ public interface J extends Tree {
         @Getter
         List<Annotation> annotations;
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         /**
          * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
          * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-1124">JLS</a>.
@@ -3238,7 +3376,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3304,6 +3441,11 @@ public interface J extends Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -3404,7 +3546,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3457,6 +3598,11 @@ public interface J extends Tree {
             return p;
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final ArrayDimension t;
@@ -3471,7 +3617,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3592,6 +3737,11 @@ public interface J extends Tree {
             return p;
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final NewClass t;
@@ -3646,7 +3796,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3719,6 +3868,11 @@ public interface J extends Tree {
             return p;
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final ParameterizedType t;
@@ -3734,7 +3888,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3807,6 +3960,11 @@ public interface J extends Tree {
             return p;
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @RequiredArgsConstructor
         public static class Padding<J2 extends J> {
             private final Parentheses<J2> t;
@@ -3821,7 +3979,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -3902,6 +4059,11 @@ public interface J extends Tree {
             return p;
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @RequiredArgsConstructor
         public static class Padding<J2 extends J> {
             private final ControlParentheses<J2> t;
@@ -3957,6 +4119,11 @@ public interface J extends Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitPrimitive(this, p);
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3985,6 +4152,11 @@ public interface J extends Tree {
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 
@@ -4050,7 +4222,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4127,6 +4298,11 @@ public interface J extends Tree {
             return new CoordinateBuilder.Statement(this);
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final Ternary t;
@@ -4174,6 +4350,11 @@ public interface J extends Tree {
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 
@@ -4295,6 +4476,11 @@ public interface J extends Tree {
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitCatch(this, p);
             }
+
+            @Override
+            public String toString() {
+                return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+            }
         }
 
         public Padding getPadding() {
@@ -4370,6 +4556,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTypeCast(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 
@@ -4455,7 +4646,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4507,6 +4697,11 @@ public interface J extends Tree {
             return p;
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final TypeParameters t;
@@ -4521,7 +4716,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4602,6 +4796,11 @@ public interface J extends Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor
@@ -4712,7 +4911,11 @@ public interface J extends Tree {
                     withTypeExpression(typeExpression.withType(type));
         }
 
-        @ToString
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
@@ -4753,7 +4956,7 @@ public interface J extends Tree {
 
             public NamedVariable withInitializer(@Nullable Expression initializer) {
                 if (initializer == null) {
-                    return this.initializer == null ? this : new NamedVariable(id, prefix, markers, name, dimensionsAfterName, null, type);
+                    return this.initializer == null ? this : new NamedVariable(id, prefix, markers, name, dimensionsAfterName, null, variableType);
                 }
                 return getPadding().withInitializer(JLeftPadded.withElement(this.initializer, initializer));
             }
@@ -4761,7 +4964,17 @@ public interface J extends Tree {
             @With
             @Nullable
             @Getter
-            JavaType type;
+            JavaType.Variable variableType;
+
+            public JavaType getType() {
+                return variableType != null ? variableType.getType() : null;
+            }
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public NamedVariable withType(@Nullable JavaType type) {
+                return variableType != null ? withVariableType(variableType.withType(type)) : this;
+            }
 
             public String getSimpleName() {
                 return name.getSimpleName();
@@ -4797,6 +5010,11 @@ public interface J extends Tree {
                 return p;
             }
 
+            @Override
+            public String toString() {
+                return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+            }
+
             @RequiredArgsConstructor
             public static class Padding {
                 private final NamedVariable t;
@@ -4807,7 +5025,7 @@ public interface J extends Tree {
                 }
 
                 public NamedVariable withInitializer(@Nullable JLeftPadded<Expression> initializer) {
-                    return t.initializer == initializer ? t : new NamedVariable(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.type);
+                    return t.initializer == initializer ? t : new NamedVariable(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.variableType);
                 }
             }
         }
@@ -4922,7 +5140,6 @@ public interface J extends Tree {
         }
     }
 
-    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4996,6 +5213,11 @@ public interface J extends Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
         @RequiredArgsConstructor

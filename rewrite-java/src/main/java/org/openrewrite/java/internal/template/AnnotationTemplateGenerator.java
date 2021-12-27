@@ -267,7 +267,6 @@ public class AnnotationTemplateGenerator {
                 case Null:
                     return "null";
                 case None:
-                case Wildcard:
                 case Void:
                 default:
                     return "";

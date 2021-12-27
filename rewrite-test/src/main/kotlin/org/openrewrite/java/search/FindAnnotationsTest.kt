@@ -237,7 +237,7 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun enumArgument(jp: JavaParser.Builder<*, *>) = assertChanged(
         parser = jp.classpath("jackson-annotations").build(),
-        recipe = FindAnnotations("@com.fasterxml.jackson.annotation.JsonTypeInfo(use=com.fasterxml.jackson.annotation.JsonTypeInfo.Id.CLASS)"),
+        recipe = FindAnnotations("@com.fasterxml.jackson.annotation.JsonTypeInfo(use=com.fasterxml.jackson.annotation.JsonTypeInfo${'$'}Id.CLASS)"),
         before = """
             import com.fasterxml.jackson.annotation.JsonTypeInfo;
             import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;

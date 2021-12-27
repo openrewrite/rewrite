@@ -30,7 +30,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Value
@@ -74,14 +73,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext context) {
-                if(!TypeUtils.isOfClassType(a.getType(), annotationType)) {
+                if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
                     return a;
                 }
 
                 String newAttributeValue = maybeQuoteStringArgument(attributeName, attributeValue, a);
                 List<Expression> currentArgs = a.getArguments();
-                if(currentArgs == null || currentArgs.isEmpty()) {
-                    if(attributeName == null || attributeName.equals("value")) {
+                if (currentArgs == null || currentArgs.isEmpty()) {
+                    if (attributeName == null || attributeName.equals("value")) {
                         return a.withTemplate(
                                 JavaTemplate.builder(this::getCursor, "#{}")
                                         .build(),
@@ -99,30 +98,30 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     AtomicBoolean foundAttributeWithDesiredValue = new AtomicBoolean(false);
                     final J.Annotation finalA = a;
                     List<Expression> newArgs = ListUtils.map(currentArgs, it -> {
-                        if(it instanceof J.Assignment) {
+                        if (it instanceof J.Assignment) {
                             J.Assignment as = (J.Assignment) it;
                             J.Identifier var = (J.Identifier) as.getVariable();
-                            if(attributeName == null || !attributeName.equals(var.getSimpleName())) {
+                            if (attributeName == null || !attributeName.equals(var.getSimpleName())) {
                                 return it;
                             }
                             J.Literal value = (J.Literal) as.getAssignment();
-                            if(newAttributeValue.equals(value.getValueSource())) {
+                            if (newAttributeValue.equals(value.getValueSource())) {
                                 foundAttributeWithDesiredValue.set(true);
                                 return it;
                             }
                             return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
-                        } else if(it instanceof J.Literal) {
+                        } else if (it instanceof J.Literal) {
                             // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
-                            if(attributeName == null || attributeName.equals("value")) {
-                                J.Literal value = (J.Literal)it;
-                                if(newAttributeValue.equals(value.getValueSource())) {
+                            if (attributeName == null || attributeName.equals("value")) {
+                                J.Literal value = (J.Literal) it;
+                                if (newAttributeValue.equals(value.getValueSource())) {
                                     foundAttributeWithDesiredValue.set(true);
                                     return it;
                                 }
                                 return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
                             } else {
                                 //noinspection ConstantConditions
-                                return ((J.Annotation)(finalA.withTemplate(
+                                return ((J.Annotation) (finalA.withTemplate(
                                         JavaTemplate.builder(this::getCursor, "value = #{}")
                                                 .build(),
                                         finalA.getCoordinates().replaceArguments(),
@@ -131,13 +130,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         }
                         return it;
                     });
-                    if(foundAttributeWithDesiredValue.get() || newArgs != currentArgs) {
+                    if (foundAttributeWithDesiredValue.get() || newArgs != currentArgs) {
                         return a.withArguments(newArgs);
                     }
                     // There was no existing value to update, so add a new value into the argument list
                     String effectiveName = (attributeName == null) ? "value" : attributeName;
                     //noinspection ConstantConditions
-                    J.Assignment as = (J.Assignment) ((J.Annotation)a.withTemplate(
+                    J.Assignment as = (J.Assignment) ((J.Annotation) a.withTemplate(
                             JavaTemplate.builder(this::getCursor, effectiveName + " = #{}")
                                     .build(),
                             a.getCoordinates().replaceArguments(),
@@ -153,7 +152,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     private static String maybeQuoteStringArgument(@Nullable String attributeName, String attributeValue, J.Annotation annotation) {
-        if(attributeIsString(attributeName, annotation)) {
+        if (attributeIsString(attributeName, annotation)) {
             return "\"" + attributeValue + "\"";
         } else {
             return attributeValue;
@@ -163,17 +162,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     private static boolean attributeIsString(@Nullable String attributeName, J.Annotation annotation) {
         String actualAttributeName = (attributeName == null) ? "value" : attributeName;
         JavaType.Class annotationType = (JavaType.Class) annotation.getType();
-        assert annotationType != null;
-        Optional<JavaType.Method> maybeMethod = annotationType.getMethods().stream().filter(m -> m.getName().equals(actualAttributeName))
-                .findAny();
-        if(!maybeMethod.isPresent()) {
-            return false;
+        if (annotationType != null) {
+            for (JavaType.Method m : annotationType.getMethods()) {
+                if (m.getName().equals(actualAttributeName)) {
+                    return TypeUtils.isOfClassType(m.getReturnType(), "java.lang.String");
+                }
+            }
         }
-        JavaType.Method method = maybeMethod.get();
-        if(method.getGenericSignature() == null) {
-            return false;
-        }
-        return TypeUtils.isOfClassType(method.getGenericSignature().getReturnType(), "java.lang.String");
-
+        return false;
     }
 }

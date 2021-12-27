@@ -95,8 +95,7 @@ public class NoRedundantJumpStatements extends Recipe {
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, executionContext);
                 JavaType.Method methodType = m.getMethodType();
-                if (m.getBody() != null && methodType != null && methodType.getResolvedSignature() != null &&
-                        JavaType.Primitive.Void.equals(methodType.getResolvedSignature().getReturnType())) {
+                if (m.getBody() != null && methodType != null && JavaType.Primitive.Void.equals(methodType.getReturnType())) {
                     return m.withBody(m.getBody().withStatements(ListUtils.mapLast(m.getBody().getStatements(), s -> s instanceof J.Return ? null : s)));
                 }
 

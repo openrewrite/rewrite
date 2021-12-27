@@ -80,9 +80,6 @@ public class ChangeLiteral<P> extends JavaIsoVisitor<P> {
                 case String:
                     transformedSource = "\"" + StringEscapeUtils.escapeJava(transformed.toString()) + "\"";
                     break;
-                case Wildcard:
-                    transformedSource = "*";
-                    break;
                 case Null:
                     transformedSource = "null";
                     break;

@@ -267,7 +267,7 @@ interface SemanticallyEqualTest {
             "@interface MyAnnotation { boolean value(); }"
         )
 
-        val firstAssign = cu[0].classes[0].leadingAnnotations[0].arguments!!.first()
+        val firstAssign = cu[0].classes[0].leadingAnnotations[0].arguments!!.first() as J.Assignment
         val secondAssign = J.Assignment(
             randomId(),
             Space.EMPTY,
@@ -277,7 +277,7 @@ interface SemanticallyEqualTest {
                 Space.EMPTY,
                 Markers.EMPTY,
                 "value",
-                null, null
+                firstAssign.variable.type, null
             ),
             JLeftPadded(
                 Space.format(" "),

@@ -103,7 +103,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 J.MethodInvocation method = block.getStatements().get(0).withPrefix(tree.getPrefix());
                 //noinspection ConstantConditions
                 return tree.getType() == null ? method :
-                        method.withMethodType(method.getMethodType().withResolvedSignature(method.getMethodType().getResolvedSignature().withReturnType(tree.getType())));
+                        method.withMethodType(method.getMethodType().withReturnType(tree.getType()));
             }
 
             @NotNull

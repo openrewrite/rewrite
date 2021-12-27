@@ -449,5 +449,4 @@ interface ExplicitLambdaArgumentTypesTest : JavaRecipeTest {
             }
         """
     )
-
 }

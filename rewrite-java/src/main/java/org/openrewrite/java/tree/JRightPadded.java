@@ -156,6 +156,6 @@ public class JRightPadded<T> {
 
     @Override
     public String toString() {
-        return "JRightPadded(element=" + element.getClass().getSimpleName() + ", after=" + after + ')';
+        return "JRightPadded(element=" + element + ", after=" + after + ')';
     }
 }

@@ -31,6 +31,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
+
 public class NoEmptyCollectionWithRawType extends Recipe {
 
     @Override
@@ -81,7 +83,7 @@ public class NoEmptyCollectionWithRawType extends Recipe {
             public J visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                 J.Identifier id = (J.Identifier) super.visitIdentifier(identifier, ctx);
                 JavaType.Variable varType = id.getFieldType();
-                if (varType != null && varType.getOwner().getFullyQualifiedName().equals("java.util.Collections") &&
+                if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), "java.util.Collections") &&
                         varType.getName().startsWith("EMPTY_")) {
 
                     J.Identifier methodId = new J.Identifier(
@@ -93,6 +95,16 @@ public class NoEmptyCollectionWithRawType extends Recipe {
                             null
                     );
 
+                    JavaType.Method method = null;
+
+                    //noinspection ConstantConditions
+                    for (JavaType.Method m : TypeUtils.asFullyQualified(varType.getOwner()).getMethods()) {
+                        if (m.getName().equals(updateFields.get(id.getSimpleName()))) {
+                            method = m;
+                            break;
+                        }
+                    }
+
                     return new J.MethodInvocation(
                             Tree.randomId(),
                             id.getPrefix(),
@@ -100,11 +112,8 @@ public class NoEmptyCollectionWithRawType extends Recipe {
                             null,
                             null,
                             methodId,
-                            JContainer.build(Collections.emptyList()),
-                            varType.getOwner().getMethods().stream()
-                                    .filter(m -> m.getName().equals(updateFields.get(id.getSimpleName())))
-                                    .findAny()
-                                    .orElse(null)
+                            JContainer.build(emptyList()),
+                            method
                     );
                 }
                 return id;

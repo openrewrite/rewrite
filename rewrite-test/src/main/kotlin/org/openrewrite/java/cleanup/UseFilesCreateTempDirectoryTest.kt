@@ -69,7 +69,6 @@ interface UseFilesCreateTempDirectoryTest : JavaRecipeTest {
                     File tmpDir = File.createTempFile("test", "dir", testData);
                     tmpDir.delete();
                     tmpDir.mkdir();
-                    System.out.println(tmpDir.getAbsolutePath());
                 }
             }
         """,
@@ -82,7 +81,6 @@ interface UseFilesCreateTempDirectoryTest : JavaRecipeTest {
                 File testData = Files.createTempDirectory("").toFile();
                 void b() throws IOException {
                     File tmpDir = Files.createTempDirectory(testData.toPath(), "test").toFile();
-                    System.out.println(tmpDir.getAbsolutePath());
                 }
             }
         """
@@ -161,5 +159,4 @@ interface UseFilesCreateTempDirectoryTest : JavaRecipeTest {
             }
         """
     )
-
 }

@@ -20,20 +20,13 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 import java.util.Optional;
 
-import static java.util.Collections.emptyList;
-
 public class TypeUtils {
     private TypeUtils() {
     }
 
-    public static List<JavaType.Variable> getVisibleSupertypeMembers(@Nullable JavaType type) {
-        JavaType.FullyQualified classType = TypeUtils.asFullyQualified(type);
-        return classType == null ? emptyList() : classType.getVisibleSupertypeMembers();
-    }
-
     public static boolean isString(@Nullable JavaType type) {
         return type == JavaType.Primitive.String ||
-                ( type instanceof JavaType.FullyQualified &&
+                (type instanceof JavaType.FullyQualified &&
                         "java.lang.String".equals(((JavaType.FullyQualified) type).getFullyQualifiedName())
                 );
     }
@@ -42,28 +35,28 @@ public class TypeUtils {
         if (type1 == type2) {
             return true;
         }
-        if(type1 == null || type2 == null) {
+        if (type1 == null || type2 == null) {
             return false;
         }
 
         // Strings, uniquely amongst all other types, can be either primitives or classes depending on the context
-        if(TypeUtils.isString(type1) && TypeUtils.isString(type2)) {
+        if (TypeUtils.isString(type1) && TypeUtils.isString(type2)) {
             return true;
         }
-        if(type1 instanceof JavaType.Primitive && type2 instanceof JavaType.Primitive) {
-            return ((JavaType.Primitive) type1).getKeyword().equals(((JavaType.Primitive)type2).getKeyword());
+        if (type1 instanceof JavaType.Primitive && type2 instanceof JavaType.Primitive) {
+            return ((JavaType.Primitive) type1).getKeyword().equals(((JavaType.Primitive) type2).getKeyword());
         }
-        if(type1 instanceof JavaType.FullyQualified && type2 instanceof JavaType.FullyQualified) {
+        if (type1 instanceof JavaType.FullyQualified && type2 instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) type1).getFullyQualifiedName().equals(((JavaType.FullyQualified) type2).getFullyQualifiedName());
         }
-        if(type1 instanceof JavaType.Array && type2 instanceof JavaType.Array) {
-            return isOfType(((JavaType.Array)type1).getElemType(), ((JavaType.Array)type2).getElemType());
+        if (type1 instanceof JavaType.Array && type2 instanceof JavaType.Array) {
+            return isOfType(((JavaType.Array) type1).getElemType(), ((JavaType.Array) type2).getElemType());
         }
         if (type1 instanceof JavaType.GenericTypeVariable && type2 instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic1 = (JavaType.GenericTypeVariable) type1;
             JavaType.GenericTypeVariable generic2 = (JavaType.GenericTypeVariable) type2;
             if (generic1.getBounds().size() == generic2.getBounds().size()) {
-                for (int index = 0; index < generic1.getBounds().size(); index ++) {
+                for (int index = 0; index < generic1.getBounds().size(); index++) {
                     if (!isOfType(generic1.getBounds().get(index), generic2.getBounds().get(index))) {
                         return false;
                     }
@@ -77,28 +70,37 @@ public class TypeUtils {
     }
 
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
-        JavaType.FullyQualified classType = asFullyQualified(type);
-        return classType != null && classType.getFullyQualifiedName().equals(fqn);
+        if(type instanceof JavaType.FullyQualified) {
+            return ((JavaType.FullyQualified) type).getFullyQualifiedName().equals(fqn);
+        } else if(type instanceof JavaType.Variable) {
+            return isOfClassType(((JavaType.Variable) type).getType(), fqn);
+        } else if(type instanceof JavaType.Method) {
+            return isOfClassType(((JavaType.Method) type).getReturnType(), fqn);
+        }
+        return false;
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
         if (to instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
             return isAssignableTo(toFq.getFullyQualifiedName(), from);
-        } else if (to instanceof JavaType.GenericTypeVariable){
+        } else if (to instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericTo = (JavaType.GenericTypeVariable) to;
             for (JavaType bound : genericTo.getBounds()) {
                 if (isAssignableTo(bound, from)) {
                     return true;
                 }
             }
+        } else if(to instanceof JavaType.Variable) {
+            return isAssignableTo(((JavaType.Variable) to).getType(), from);
+        } else if(to instanceof JavaType.Method) {
+            return isAssignableTo(((JavaType.Method) to).getReturnType(), from);
         }
         return false;
     }
 
     public static boolean isAssignableTo(String to, @Nullable JavaType from) {
-
-        if (from instanceof  JavaType.FullyQualified) {
+        if (from instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
 
             return to.equals(classFrom.getFullyQualifiedName()) ||
@@ -111,6 +113,10 @@ public class TypeUtils {
                     return true;
                 }
             }
+        } else if(from instanceof JavaType.Variable) {
+            return isAssignableTo(to, ((JavaType.Variable) from).getType());
+        } else if(from instanceof JavaType.Method) {
+            return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
         }
         return false;
     }
@@ -142,14 +148,20 @@ public class TypeUtils {
 
     @Nullable
     public static JavaType.FullyQualified asFullyQualified(@Nullable JavaType type) {
-        return type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
+        if (type instanceof JavaType.FullyQualified) {
+            if (type == JavaType.Unknown.getInstance()) {
+                return null;
+            }
+            return (JavaType.FullyQualified) type;
+        }
+        return null;
     }
 
     /**
      * Determine if a method overrides a method from a superclass or interface.
      *
      * @return `true` if a superclass or implemented interface declares a non-private method with matching signature.
-     *         `false` if a match is not found or the method, declaring type, or generic signature is null.
+     * `false` if a match is not found or the method, declaring type, or generic signature is null.
      */
     public static boolean isOverride(@Nullable JavaType.Method method) {
         return findOverriddenMethod(method).isPresent();
@@ -158,22 +170,22 @@ public class TypeUtils {
     /**
      * Given a method type, searches the declaring type's parent and interfaces for a method with the same name and
      * signature.
-     *
+     * <p>
      * NOTE: This method will return an empty optional if the method, the method's declaring type, or the method's
-     *       generic signature is null.
+     * generic signature is null.
      *
      * @return An optional overridden method type declared in the parent.
      */
     public static Optional<JavaType.Method> findOverriddenMethod(@Nullable JavaType.Method method) {
-        if(method == null || method.getGenericSignature() == null || method.getDeclaringType() == null) {
+        if (method == null) {
             return Optional.empty();
         }
         JavaType.FullyQualified dt = method.getDeclaringType();
-        List<JavaType> argTypes = method.getGenericSignature().getParamTypes();
-        Optional<JavaType.Method> methodResult =  findDeclaredMethod(dt.getSupertype(), method.getName(), argTypes);
+        List<JavaType> argTypes = method.getParameterTypes();
+        Optional<JavaType.Method> methodResult = findDeclaredMethod(dt.getSupertype(), method.getName(), argTypes);
         if (!methodResult.isPresent()) {
             for (JavaType.FullyQualified i : dt.getInterfaces()) {
-                methodResult =  findDeclaredMethod(i, method.getName(), argTypes);
+                methodResult = findDeclaredMethod(i, method.getName(), argTypes);
                 if (methodResult.isPresent()) {
                     break;
                 }
@@ -197,7 +209,7 @@ public class TypeUtils {
             return methodResult;
         }
 
-        for(JavaType.FullyQualified i : clazz.getInterfaces()) {
+        for (JavaType.FullyQualified i : clazz.getInterfaces()) {
             methodResult = findDeclaredMethod(i, name, argumentTypes);
             if (methodResult.isPresent()) {
                 return methodResult;
@@ -207,18 +219,15 @@ public class TypeUtils {
     }
 
     private static boolean methodHasSignature(JavaType.Method m, String name, List<JavaType> argTypes) {
-        if(!name.equals(m.getName())) {
+        if (!name.equals(m.getName())) {
             return false;
         }
-        if(m.getGenericSignature() == null) {
+        List<JavaType> mArgs = m.getParameterTypes();
+        if (mArgs.size() != argTypes.size()) {
             return false;
         }
-        List<JavaType> mArgs = m.getGenericSignature().getParamTypes();
-        if(mArgs.size() != argTypes.size()) {
-            return false;
-        }
-        for(int i = 0; i < mArgs.size(); i++) {
-            if(!TypeUtils.isOfType(mArgs.get(i), argTypes.get(i))) {
+        for (int i = 0; i < mArgs.size(); i++) {
+            if (!TypeUtils.isOfType(mArgs.get(i), argTypes.get(i))) {
                 return false;
             }
         }
@@ -249,6 +258,7 @@ public class TypeUtils {
 
         return true;
     }
+
     static boolean deepEquals(@Nullable JavaType t, @Nullable JavaType t2) {
         return t == null ? t2 == null : t == t2 || t.equals(t2);
     }

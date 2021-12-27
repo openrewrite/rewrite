@@ -335,7 +335,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                                 }
 
                                                 JavaType.GenericTypeVariable genericType = new JavaType.GenericTypeVariable(
-                                                        null, typeParamIdent.getSimpleName(), singletonList(bound));
+                                                        null, typeParamIdent.getSimpleName(),
+                                                        JavaType.GenericTypeVariable.Variance.COVARIANT,
+                                                        singletonList(bound));
 
                                                 paramTypes.add(genericType);
                                             }
@@ -345,10 +347,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     }
                                 }
 
-                                type = new JavaType.Method(Flag.flagsToBitMap(type.getFlags()), type.getDeclaringType(), type.getName(), paramNames,
-                                        type.getGenericSignature().withParamTypes(paramTypes),
-                                        type.getResolvedSignature().withParamTypes(paramTypes),
-                                        type.getThrownExceptions(), type.getAnnotations());
+                                type = type.withParameterNames(paramNames).withParameterTypes(paramTypes);
                             }
 
                             return method.withParameters(parameters).withMethodType(type);
@@ -365,9 +364,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
                                 }
-                                type = new JavaType.Method(Flag.flagsToBitMap(type.getFlags()), type.getDeclaringType(), type.getName(),
-                                        type.getParamNames(), type.getGenericSignature(), type.getResolvedSignature(), newThrows,
-                                        type.getAnnotations());
+                                type = type.withThrownExceptions(newThrows);
                             }
 
                             //noinspection ConstantConditions
@@ -404,7 +401,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
                     JavaType.Method mt = method.getMethodType();
-                    if (m.getMethodType() == null && mt != null && mt.getGenericSignature() != null) {
+                    if (m.getMethodType() == null && mt != null) {
                         List<JavaType> argTypes = m.getArguments().stream()
                                 .map(Expression::getType)
                                 .map(it -> {
@@ -415,8 +412,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     return it;
                                 })
                                 .collect(toList());
-                        mt = mt.withResolvedSignature(mt.getResolvedSignature().withParamTypes(argTypes))
-                                .withGenericSignature(mt.getGenericSignature().withParamTypes(argTypes));
+                        mt = mt.withParameterTypes(argTypes);
                         m = m.withMethodType(mt);
                     }
                     return m;

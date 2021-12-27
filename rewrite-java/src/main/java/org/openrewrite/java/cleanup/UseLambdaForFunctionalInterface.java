@@ -76,44 +76,40 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                             return n;
                         }
 
-                        JavaType.Method.Signature signature = sam.getResolvedSignature();
+                        StringBuilder templateBuilder = new StringBuilder();
+                        J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) n.getBody().getStatements().get(0);
 
-                        if (signature != null) {
-                            StringBuilder templateBuilder = new StringBuilder();
-                            J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) n.getBody().getStatements().get(0);
-
-                            if (methodDeclaration.getParameters().get(0) instanceof J.Empty) {
-                                templateBuilder.append("() -> {");
-                            } else {
-                                templateBuilder.append(methodDeclaration.getParameters().stream()
-                                        .map(param -> ((J.VariableDeclarations) param).getVariables().get(0).getSimpleName())
-                                        .collect(Collectors.joining(",", "(", ") -> {")));
-                            }
-
-                            JavaType returnType = signature.getReturnType();
-                            if (!JavaType.Primitive.Void.equals(returnType)) {
-                                templateBuilder.append("return ").append(valueOfType(returnType)).append('.');
-                            }
-                            templateBuilder.append('}');
-
-                            J.Lambda lambda = n.withTemplate(
-                                    JavaTemplate.builder(this::getCursor, templateBuilder.toString())
-                                            .build(),
-                                    n.getCoordinates().replace()
-                            );
-
-                            lambda = (J.Lambda) new UnnecessaryParenthesesVisitor<ExecutionContext>(Checkstyle.unnecessaryParentheses())
-                                    .visitNonNull(lambda, ctx);
-
-                            J.Block lambdaBody = methodDeclaration.getBody();
-                            assert lambdaBody != null;
-
-                            lambda = lambda.withBody(lambdaBody.withPrefix(Space.format(" ")));
-
-                            lambda = (J.Lambda) new LambdaBlockToExpression().getVisitor().visitNonNull(lambda, ctx);
-
-                            return autoFormat(lambda, ctx, getCursor().getParentOrThrow());
+                        if (methodDeclaration.getParameters().get(0) instanceof J.Empty) {
+                            templateBuilder.append("() -> {");
+                        } else {
+                            templateBuilder.append(methodDeclaration.getParameters().stream()
+                                    .map(param -> ((J.VariableDeclarations) param).getVariables().get(0).getSimpleName())
+                                    .collect(Collectors.joining(",", "(", ") -> {")));
                         }
+
+                        JavaType returnType = sam.getReturnType();
+                        if (!JavaType.Primitive.Void.equals(returnType)) {
+                            templateBuilder.append("return ").append(valueOfType(returnType)).append('.');
+                        }
+                        templateBuilder.append('}');
+
+                        J.Lambda lambda = n.withTemplate(
+                                JavaTemplate.builder(this::getCursor, templateBuilder.toString())
+                                        .build(),
+                                n.getCoordinates().replace()
+                        );
+
+                        lambda = (J.Lambda) new UnnecessaryParenthesesVisitor<ExecutionContext>(Checkstyle.unnecessaryParentheses())
+                                .visitNonNull(lambda, ctx);
+
+                        J.Block lambdaBody = methodDeclaration.getBody();
+                        assert lambdaBody != null;
+
+                        lambda = lambda.withBody(lambdaBody.withPrefix(Space.format(" ")));
+
+                        lambda = (J.Lambda) new LambdaBlockToExpression().getVisitor().visitNonNull(lambda, ctx);
+
+                        return autoFormat(lambda, ctx, getCursor().getParentOrThrow());
                     }
                 }
                 return n;
@@ -137,7 +133,6 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                         case Null:
                             return "null";
                         case None:
-                        case Wildcard:
                         case Void:
                         default:
                             return "";

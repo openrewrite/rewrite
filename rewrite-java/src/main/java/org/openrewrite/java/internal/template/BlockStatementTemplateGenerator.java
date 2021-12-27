@@ -377,7 +377,6 @@ public class BlockStatementTemplateGenerator {
                 case Null:
                     return "null";
                 case None:
-                case Wildcard:
                 case Void:
                 default:
                     return "";

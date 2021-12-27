@@ -31,6 +31,7 @@ import lombok.Getter;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -129,11 +130,11 @@ public class ImportLayoutStyle implements JavaStyle {
         if (ideallyOrdered.size() == originalImports.size()) {
             Set<String> originalPaths = new HashSet<>();
             for (JRightPadded<J.Import> originalImport : originalImports) {
-                originalPaths.add(originalImport.getElement().getQualid().printTrimmed());
+                originalPaths.add(originalImport.getElement().getTypeName());
             }
             int sharedImports = 0;
             for (JRightPadded<J.Import> importJRightPadded : ideallyOrdered) {
-                if (originalPaths.contains(importJRightPadded.getElement().getQualid().printTrimmed())) {
+                if (originalPaths.contains(importJRightPadded.getElement().getTypeName())) {
                     sharedImports++;
                 }
             }
@@ -343,9 +344,8 @@ public class ImportLayoutStyle implements JavaStyle {
                     extraLineSpaceCount += 1;
                 }
             } else {
-                for (JRightPadded<J.Import> orderedImport : block.orderedImports(
-                        layoutState, classCountToUseStarImport, nameCountToUseStarImport, importLayoutConflictDetection, packagesToFold)) {
-
+                List<JRightPadded<J.Import>> blockOrdering = block.orderedImports(layoutState, classCountToUseStarImport, nameCountToUseStarImport, importLayoutConflictDetection, packagesToFold);
+                for (JRightPadded<J.Import> orderedImport : blockOrdering) {
                     boolean whitespaceContainsCRLF = orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n");
                     Space prefix;
                     if (importIndex == 0) {
@@ -490,10 +490,9 @@ public class ImportLayoutStyle implements JavaStyle {
         }
     }
 
-    @SuppressWarnings("deprecation")
     public static boolean isPackageAlwaysFolded(List<Block> packagesToFold, J.Import checkImport) {
         boolean isPackageFolded = false;
-        String anImportName = checkImport.getQualid().printTrimmed();
+        String anImportName = checkImport.getQualid().printTrimmed(new JavaPrinter<>());
         for (Block block : packagesToFold) {
             Block.ImportPackage importPackage = (Block.ImportPackage) block;
             if (checkImport.isStatic() == importPackage.isStatic()) {
@@ -556,34 +555,13 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {
-                // ClassGraph uses a '$' delimited to distinguish inner classes.
-                boolean containsClassGraphStaticDelimiter = classGraphFqn.getClassName().contains("$");
-                String packageName;
-                if (containsClassGraphStaticDelimiter) {
-                    // Example: org.foo.Foo$Bar => package name: org.foo.Foo, class name: Bar
-                    packageName = classGraphFqn.getPackageName() + "." +
-                            classGraphFqn.getClassName().substring(
-                                    0, classGraphFqn.getClassName().lastIndexOf("$")).replace("$", ".");
-                } else {
-                    packageName = classGraphFqn.getPackageName();
-                }
-
+                String packageName = classGraphFqn.getPackageName();
                 if (checkPackageForClasses.contains(packageName)) {
-                    String className;
-                    if (containsClassGraphStaticDelimiter) {
-                        className = classGraphFqn.getClassName().substring(
-                                classGraphFqn.getClassName().lastIndexOf("$") + 1);
-                    } else {
-                        className = classGraphFqn.getClassName();
-                    }
-
+                    String className = classGraphFqn.getClassName();
                     Set<String> packages = nameToPackages.getOrDefault(className, new HashSet<>());
                     packages.add(packageName);
                     nameToPackages.put(className, packages);
-                } else if (checkPackageForClasses.contains(containsClassGraphStaticDelimiter ?
-                        classGraphFqn.getFullyQualifiedName().replace("$", ".") :
-                        classGraphFqn.getFullyQualifiedName())) {
-
+                } else if (checkPackageForClasses.contains(classGraphFqn.getFullyQualifiedName())) {
                     packageName = classGraphFqn.getFullyQualifiedName();
                     for (JavaType.Variable member : classGraphFqn.getMembers()) {
                         if (member.getFlags().contains(Flag.Static)) {
@@ -715,8 +693,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
                 for (List<JRightPadded<J.Import>> importGroup : groupedImports.values()) {
                     JRightPadded<J.Import> toStar = importGroup.get(0);
-                    boolean statik1 = toStar.getElement().isStatic();
-                    int threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
+                    int threshold = toStar.getElement().isStatic() ? nameCountToUseStarImport : classCountToUseStarImport;
                     boolean starImportExists = importGroup.stream()
                             .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
 
@@ -738,13 +715,12 @@ public class ImportLayoutStyle implements JavaStyle {
                                 .findAny();
 
                         if (starImportExists || !oneOfTheTypesIsInAnotherGroupToo.isPresent()) {
-                            ordered.add(toStar.withElement(toStar.getElement().withQualid(qualid.withName(
-                                    name.withSimpleName("*")))));
+                            ordered.add(toStar.withElement(toStar.getElement().withQualid(qualid.withName(name.withSimpleName("*")))));
                             continue;
                         }
                     }
 
-                    Predicate<JRightPadded<J.Import>> predicate = distinctBy(t -> t.getElement().printTrimmed());
+                    Predicate<JRightPadded<J.Import>> predicate = distinctBy(t -> t.getElement().printTrimmed(new JavaPrinter<>()));
                     for (JRightPadded<J.Import> importJRightPadded : importGroup) {
                         if (predicate.test(importJRightPadded)) {
                             ordered.add(importJRightPadded);
@@ -822,9 +798,10 @@ public class ImportLayoutStyle implements JavaStyle {
             return typeName;
         } else {
             String className = anImport.getElement().getClassName();
-            if (className.contains(".")) {
+            if (className.contains("$")) {
                 return anImport.getElement().getPackageName() + "." +
-                        className.substring(0, className.lastIndexOf('.'));
+                        className.substring(0, className.lastIndexOf('$'))
+                                .replace('$', '.');
             }
             return anImport.getElement().getPackageName();
         }
