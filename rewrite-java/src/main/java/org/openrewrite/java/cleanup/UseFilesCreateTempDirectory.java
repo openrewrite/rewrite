@@ -117,11 +117,12 @@ public class UseFilesCreateTempDirectory extends Recipe {
                         }
                     }
                     if (createTempDirectoryStatement != null) {
-                        statements.remove(statementIndex);
-                        statements.remove(statementIndex);
-                        statements.remove(statementIndex);
-                        statements.add(statementIndex, createTempDirectoryStatement);
-                        bl = bl.withStatements(statements);
+                        List<Statement> updatedStatements = new ArrayList<>(statements);
+                        updatedStatements.remove(statementIndex);
+                        updatedStatements.remove(statementIndex);
+                        updatedStatements.remove(statementIndex);
+                        updatedStatements.add(statementIndex, createTempDirectoryStatement);
+                        bl = bl.withStatements(updatedStatements);
                         maybeAddImport("java.nio.file.Files");
                     }
                 }
