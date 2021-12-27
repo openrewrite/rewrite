@@ -136,7 +136,7 @@ public class MethodMatcher {
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild cart match for a method. `* foo()`
         return (targetTypePattern.toString().equals("[^.]*") || matchesTargetType(enclosing.getType())) &&
-                methodNamePattern.matcher(method.getSimpleName()).matches() &&
+                (methodNamePattern.matcher(method.getSimpleName()).matches() || (method.getMethodType() != null && methodNamePattern.matcher(method.getMethodType().getName()).matches())) &&
                 argumentPattern.matcher(method.getParameters().stream()
                         .map(v -> {
                             if (v instanceof J.VariableDeclarations) {
