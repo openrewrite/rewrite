@@ -18,9 +18,11 @@ package org.openrewrite.groovy;
 import groovy.lang.GroovyClassLoader;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.control.*;
 import org.codehaus.groovy.control.io.InputStreamReaderSource;
+import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -88,7 +90,28 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
     @Override
     public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        List<G.CompilationUnit> cus = new ArrayList<>();
+        List<CompiledGroovySource> compilerCus = parseInputsToCompilerAst(sources, relativeTo, ctx);
+        List<G.CompilationUnit> cus = new ArrayList<>(compilerCus.size());
+
+        for (CompiledGroovySource compiled : compilerCus) {
+            try {
+                GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
+                        compiled.getInput().getPath(),
+                        StringUtils.readFully(compiled.getInput().getSource()),
+                        typeBySignature,
+                        ctx
+                );
+                cus.add(mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule()));
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+            }
+        }
+
+        return cus;
+    }
+
+    List<CompiledGroovySource> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+        List<CompiledGroovySource> cus = new ArrayList<>();
 
         for (Input input : sources) {
             CompilerConfiguration configuration = new CompilerConfiguration();
@@ -114,13 +137,15 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             try {
                 compUnit.compile(Phases.CANONICALIZATION);
                 ModuleNode ast = unit.getAST();
-                GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
-                        input.getPath(),
-                        StringUtils.readFully(input.getSource()),
-                        typeBySignature,
-                        ctx
-                );
-                cus.add(mappingVisitor.visit(unit, ast));
+
+                for (ClassNode aClass : ast.getClasses()) {
+                    try {
+                        new StaticTypeCheckingVisitor(unit, aClass).visitClass(aClass);
+                    } catch (NoClassDefFoundError ignored) {
+                    }
+                }
+
+                cus.add(new CompiledGroovySource(input, unit, ast));
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
             } finally {

@@ -23,7 +23,6 @@ import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
@@ -71,13 +70,6 @@ public class GroovyParserVisitor {
     }
 
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
-        for (ClassNode aClass : ast.getClasses()) {
-            try {
-                new StaticTypeCheckingVisitor(unit, aClass).visitClass(aClass);
-            } catch (NoClassDefFoundError ignored) {
-            }
-        }
-
         NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
         for (org.codehaus.groovy.ast.stmt.Statement s : ast.getStatementBlock().getStatements()) {
             if (!isSynthetic(s)) {

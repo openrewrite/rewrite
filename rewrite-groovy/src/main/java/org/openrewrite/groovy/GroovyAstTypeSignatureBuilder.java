@@ -24,7 +24,7 @@ import java.util.IdentityHashMap;
 import java.util.Set;
 import java.util.StringJoiner;
 
-public class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
+class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     private Set<ClassNode> typeStack;
 
@@ -47,6 +47,10 @@ public class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return classSignature(astNode);
         } else if(astNode instanceof GenericsType) {
             return genericSignature(astNode);
+        } else if(astNode instanceof MethodNode) {
+            return methodSignature((MethodNode) astNode);
+        } else if(astNode instanceof FieldNode) {
+            return variableSignature((FieldNode) astNode);
         }
 
         throw new UnsupportedOperationException("Unexpected type " + t.getClass().getName());
@@ -114,21 +118,26 @@ public class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     public String methodSignature(MethodNode node) {
         StringBuilder s = new StringBuilder(node.getDeclaringClass().getName());
-        s.append("{name=").append(node.getName());
+        s.append("{name=").append(node instanceof ConstructorNode ? "<constructor>" : node.getName());
 
-        StringJoiner argumentTypeSignatures = new StringJoiner(",");
+        s.append(",return=").append(node instanceof ConstructorNode ?
+                node.getDeclaringClass().getName() :
+                signature(node.getReturnType()));
+
+        StringJoiner parameterTypes = new StringJoiner(",", "[", "]");
         if (node.getParameters().length > 0) {
             for (org.codehaus.groovy.ast.Parameter parameter : node.getParameters()) {
-                argumentTypeSignatures.add(parameter.getOriginType().getName());
+                parameterTypes.add(parameter.getOriginType().getName());
             }
         }
 
-        s.append(",resolved=").append(signature(node.getReturnType())).append('(').append(argumentTypeSignatures).append(')');
-
-        // TODO how do we calculate the generic signature?
-        s.append(",generic=").append(signature(node.getReturnType())).append('(').append(argumentTypeSignatures).append(')');
+        s.append(",parameters=").append(parameterTypes);
         s.append('}');
 
         return s.toString();
+    }
+
+    public String variableSignature(FieldNode declaredField) {
+        throw new UnsupportedOperationException("implement me");
     }
 }
