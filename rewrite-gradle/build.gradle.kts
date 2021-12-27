@@ -15,7 +15,7 @@ dependencies {
     api(project(":rewrite-groovy"))
 
     runtimeOnly("org.codehaus.groovy:groovy-ant:latest.release")
-    runtimeOnly("org.apache.groovy:groovy-xml:latest.release")
+    runtimeOnly("org.codehaus.groovy:groovy-xml:latest.release")
 
     compileOnly("org.gradle:gradle-base-services:latest.release")
     compileOnly("org.gradle:gradle-core-api:latest.release")
