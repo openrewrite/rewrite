@@ -35,7 +35,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String signature(@Nullable Type type) {
-        if (type == null) {
+        if (type == null || type instanceof Type.UnknownType) {
             return "{undefined}";
         } else if (type instanceof Type.ClassType) {
             try {

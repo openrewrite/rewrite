@@ -35,7 +35,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String signature(@Nullable Type type) {
-        if (type == null) {
+        if (type == null || type instanceof Type.UnknownType) {
             return "{undefined}";
         } else if (type instanceof Type.ClassType) {
             try {
@@ -210,7 +210,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         String s = classSignature(symbol.owner.type);
 
         String returnType;
-        if(symbol.isStaticOrInstanceInit()) {
+        if (symbol.isStaticOrInstanceInit()) {
             returnType = "void";
         } else {
             returnType = signature(symbol.getReturnType());
@@ -227,7 +227,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String methodArgumentSignature(Symbol.MethodSymbol sym) {
-        if(sym.isStaticOrInstanceInit()) {
+        if (sym.isStaticOrInstanceInit()) {
             return "[]";
         }
 
@@ -265,7 +265,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             owner = methodSignature((Symbol.MethodSymbol) symbol.owner);
         } else {
             owner = signature(symbol.owner.type);
-            if(owner.contains("<")) {
+            if (owner.contains("<")) {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
         }

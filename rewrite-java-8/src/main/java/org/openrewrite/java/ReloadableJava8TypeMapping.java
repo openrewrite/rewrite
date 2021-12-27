@@ -44,7 +44,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     private final Map<String, Object> typeBySignature;
 
     public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
-        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType) {
+        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
