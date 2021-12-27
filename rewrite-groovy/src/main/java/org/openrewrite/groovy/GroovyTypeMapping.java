@@ -24,12 +24,15 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
-class GroovyTypeMapping implements JavaTypeMapping<ClassNode> {
+class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     private final GroovyAstTypeSignatureBuilder signatureBuilder = new GroovyAstTypeSignatureBuilder();
 
     private final Map<String, Object> typeBySignature;
@@ -40,148 +43,275 @@ class GroovyTypeMapping implements JavaTypeMapping<ClassNode> {
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeBySignature);
     }
 
-    @Nullable
-    public JavaType type(@Nullable ClassNode node) {
-        return _type(node);
+    public JavaType type(@Nullable ASTNode type) {
+        if (type == null) {
+            return JavaType.Class.Unknown.getInstance();
+        }
+
+        String signature = signatureBuilder.signature(type);
+        JavaType existing = (JavaType) typeBySignature.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+
+        if (type instanceof ClassNode) {
+            ClassNode clazz = (ClassNode) type;
+            if (clazz.isArray()) {
+                return arrayType(clazz, signature);
+            } else if (ClassHelper.isPrimitiveType(clazz)) {
+                //noinspection ConstantConditions
+                return JavaType.Primitive.fromKeyword(clazz.getName());
+            } else if (clazz.isUsingGenerics()) {
+                return parameterizedType(clazz, signature);
+            }
+            return classType((ClassNode) type, signature);
+        } else if (type instanceof GenericsType) {
+            return genericType((GenericsType) type, signature);
+        } else if (type instanceof MethodNode) {
+            //noinspection ConstantConditions
+            return methodType((MethodNode) type);
+        } else if (type instanceof FieldNode) {
+            //noinspection ConstantConditions
+            return variableType((FieldNode) type);
+        }
+
+        throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
     }
 
-    @Nullable
-    private JavaType _type(@Nullable ClassNode node) {
-        if (node == null) {
-            return null;
-        }
+    private JavaType.Class classType(ClassNode node, String signature) {
+        JavaType.Class clazz;
+        try {
+            JavaType type = reflectionTypeMapping.type(node.getTypeClass());
+            clazz = (JavaType.Class) (type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type);
+        } catch (GroovyBugError | NoClassDefFoundError ignored1) {
+            clazz = new JavaType.Class(null, Flag.Public.getBitMask(), node.getName(), JavaType.Class.Kind.Class,
+                    null, null, null, null, null, null);
+            typeBySignature.put(signature, clazz);
 
-        if(node.isArray()) {
-            return arrayType(node);
-        } else if(ClassHelper.isPrimitiveType(node)) {
-            return JavaType.Primitive.fromKeyword(node.getName());
-        }
+            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(node.getSuperClass()));
+            JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(node.getOuterClass()));
 
-        JavaType.Class clazz = (JavaType.Class) typeBySignature.computeIfAbsent(signatureBuilder.signature(node.getTypeClass()), ignored -> {
-            try {
-                return reflectionTypeMapping.type(node.getTypeClass());
-            } catch (GroovyBugError | NoClassDefFoundError ignored1) {
-                return new JavaType.Class(null, Flag.Public.getBitMask(), node.getName(), JavaType.Class.Kind.Class,
-                        null, null, null, null, null, null);
+            List<JavaType.Variable> fields = null;
+            for (FieldNode field : node.getFields()) {
+                fields = new ArrayList<>(node.getFields().size());
+                if(!field.isSynthetic()) {
+                    fields.add(variableType(field));
+                }
             }
-        });
 
-        if(node.isUsingGenerics()) {
-            AtomicBoolean newlyCreated = new AtomicBoolean(false);
+            List<JavaType.Method> methods = null;
+            for (MethodNode method : node.getAllDeclaredMethods()) {
+                methods = new ArrayList<>(node.getAllDeclaredMethods().size());
+                if(!method.isSynthetic()) {
+                    methods.add(methodType(method));
+                }
+            }
 
-            JavaType.Parameterized parameterized = (JavaType.Parameterized) typeBySignature.computeIfAbsent(signatureBuilder.signature(node), ignored -> {
-                newlyCreated.set(true);
-                //noinspection ConstantConditions
-                return new JavaType.Parameterized(null, null, null);
-            });
-
-            if (newlyCreated.get()) {
-                List<JavaType> typeParameters = emptyList();
-                if (node.getGenericsTypes().length > 0) {
-                    typeParameters = new ArrayList<>(node.getGenericsTypes().length);
-                    for (GenericsType g : node.getGenericsTypes()) {
-                        typeParameters.add(genericType(g));
+            List<JavaType.FullyQualified> interfaces = null;
+            if (node.getInterfaces().length > 0) {
+                interfaces = new ArrayList<>(node.getInterfaces().length);
+                for (ClassNode iParam : node.getInterfaces()) {
+                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
+                    if (javaType != null) {
+                        interfaces.add(javaType);
                     }
                 }
-
-                assert clazz != null;
-                parameterized.unsafeSet(clazz, typeParameters);
             }
 
-            return parameterized;
+            List<JavaType.FullyQualified> annotations = getAnnotations(node);
+
+            clazz.unsafeSet(supertype, owner, annotations, interfaces, fields, methods);
         }
 
         return clazz;
     }
 
+    private JavaType parameterizedType(ClassNode type, String signature) {
+        JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
+        typeBySignature.put(signature, pt);
+
+        JavaType.Class clazz = classType(type, type.getTypeClass().getName());
+
+        List<JavaType> typeParameters = emptyList();
+        if (type.getGenericsTypes().length > 0) {
+            typeParameters = new ArrayList<>(type.getGenericsTypes().length);
+            for (GenericsType g : type.getGenericsTypes()) {
+                typeParameters.add(type(g));
+            }
+        }
+
+        pt.unsafeSet(clazz, typeParameters);
+        return pt;
+    }
+
+    private JavaType.Array arrayType(ClassNode array, String signature) {
+        JavaType.Array arr = new JavaType.Array(null);
+        typeBySignature.put(signature, arr);
+
+        if (array.getComponentType().isUsingGenerics()) {
+            arr.unsafeSet(type(array.getComponentType().getGenericsTypes()[0]));
+        } else {
+            arr.unsafeSet(type(array.getComponentType()));
+        }
+
+        return arr;
+    }
+
+    private JavaType genericType(GenericsType g, String signature) {
+        if (!g.isPlaceholder() && !g.isWildcard()) {
+            // this is a type name used in a parameterized type
+            return type(g.getType());
+        }
+
+        JavaType.GenericTypeVariable.Variance variance = INVARIANT;
+
+        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, g.getName(), variance, null);
+        typeBySignature.put(signature, gtv);
+
+        List<JavaType> bounds = null;
+
+        if (g.getUpperBounds() != null) {
+            for (ClassNode bound : g.getUpperBounds()) {
+                JavaType.FullyQualified mappedBound = TypeUtils.asFullyQualified(type(bound));
+                if (mappedBound != null && !mappedBound.getFullyQualifiedName().equals("java.lang.Object")) {
+                    if (bounds == null) {
+                        bounds = new ArrayList<>(g.getUpperBounds().length);
+                    }
+                    bounds.add(mappedBound);
+                    variance = COVARIANT;
+                }
+            }
+        } else if (g.getLowerBound() != null) {
+            JavaType.FullyQualified mappedBound = TypeUtils.asFullyQualified(type(g.getLowerBound()));
+            if (mappedBound != null && !mappedBound.getFullyQualifiedName().equals("java.lang.Object")) {
+                bounds = singletonList(mappedBound);
+                variance = CONTRAVARIANT;
+            }
+        }
+
+        gtv.unsafeSet(variance, bounds);
+        return gtv;
+    }
+
     @Nullable
-    public JavaType.Method type(@Nullable MethodNode node) {
+    public JavaType.Method methodType(@Nullable MethodNode node) {
         if (node == null) {
             return null;
         }
 
-        StringJoiner argumentTypeSignatures = new StringJoiner(",");
+        String signature = signatureBuilder.methodSignature(node);
+        JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+
+        List<String> paramNames = null;
         if (node.getParameters().length > 0) {
+            paramNames = new ArrayList<>(node.getParameters().length);
             for (org.codehaus.groovy.ast.Parameter parameter : node.getParameters()) {
-                argumentTypeSignatures.add(parameter.getOriginType().getName());
+                paramNames.add(parameter.getName());
             }
         }
 
-        //noinspection ConstantConditions
-        return (JavaType.Method) typeBySignature.computeIfAbsent(signatureBuilder.methodSignature(node), ignore -> {
-            List<JavaType> parameterTypes = emptyList();
-            if (node.getParameters().length > 0) {
-                parameterTypes = new ArrayList<>(node.getParameters().length);
-                for (org.codehaus.groovy.ast.Parameter p : node.getParameters()) {
-                    JavaType paramType = _type(p.getOriginType());
-                    if (paramType instanceof JavaType.Parameterized) {
-                        return ((JavaType.Parameterized) paramType).getType();
-                    }
-                    parameterTypes.add(paramType);
-                }
-            }
+        JavaType.Method method = new JavaType.Method(
+                node.getModifiers(),
+                null,
+                node instanceof ConstructorNode ? "<constructor>" : node.getName(),
+                null,
+                paramNames,
+                null, null, null
+        );
+        typeBySignature.put(signature, method);
 
-            List<String> paramNames = null;
-            if (node.getParameters().length > 0) {
-                paramNames = new ArrayList<>(node.getParameters().length);
-                for (org.codehaus.groovy.ast.Parameter parameter : node.getParameters()) {
-                    paramNames.add(parameter.getName());
-                }
+        List<JavaType> parameterTypes = null;
+        if (node.getParameters().length > 0) {
+            parameterTypes = new ArrayList<>(node.getParameters().length);
+            for (org.codehaus.groovy.ast.Parameter parameter : node.getParameters()) {
+                parameterTypes.add(type(parameter.getOriginType()));
             }
+        }
 
-            List<JavaType.FullyQualified> thrownExceptions = null;
-            for (ClassNode e : node.getExceptions()) {
-                thrownExceptions = new ArrayList<>(node.getExceptions().length);
-                JavaType.FullyQualified qualified = (JavaType.FullyQualified) _type(e);
-                thrownExceptions.add(qualified);
-            }
+        List<JavaType.FullyQualified> thrownExceptions = null;
+        for (ClassNode e : node.getExceptions()) {
+            thrownExceptions = new ArrayList<>(node.getExceptions().length);
+            JavaType.FullyQualified qualified = (JavaType.FullyQualified) type(e);
+            thrownExceptions.add(qualified);
+        }
 
-            List<JavaType.FullyQualified> annotations = null;
-            for (AnnotationNode a : node.getAnnotations()) {
-                annotations = new ArrayList<>(node.getAnnotations().size());
-                JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) _type(a.getClassNode());
-                annotations.add(fullyQualified);
-            }
+        List<JavaType.FullyQualified> annotations = getAnnotations(node);
 
-            //noinspection ConstantConditions
-            return new JavaType.Method(
-                    node.getModifiers(),
-                    (JavaType.FullyQualified) _type(node.getDeclaringClass()),
-                    node.getName(),
-                    _type(node.getReturnType()),
-                    paramNames,
-                    parameterTypes,
-                    thrownExceptions,
-                    annotations
-            );
-        });
+        method.unsafeSet(
+                (JavaType.FullyQualified) type(node.getDeclaringClass()),
+                type(node.getReturnType()),
+                parameterTypes,
+                thrownExceptions,
+                annotations
+        );
+
+        return method;
     }
 
-    @SuppressWarnings("ConstantConditions")
-    private JavaType.Array arrayType(ClassNode array) {
-        return (JavaType.Array) typeBySignature.computeIfAbsent(signatureBuilder.signature(array), ignored ->
-                new JavaType.Array(_type(array.getComponentType())));
+    @Nullable
+    public JavaType.Variable variableType(@Nullable FieldNode node) {
+        if (node == null) {
+            return null;
+        }
+
+        String signature = signatureBuilder.variableSignature(node);
+        JavaType.Variable existing = (JavaType.Variable) typeBySignature.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+
+        JavaType.Variable variable = new JavaType.Variable(
+                node.getModifiers(),
+                node.getName(),
+                null, null, null);
+
+        typeBySignature.put(signature, variable);
+
+        List<JavaType.FullyQualified> annotations = getAnnotations(node);
+
+        variable.unsafeSet(type(node.getOwner()), type(node.getType()), annotations);
+
+        return variable;
     }
 
-    private JavaType genericType(GenericsType g) {
-        //noinspection ConstantConditions
-        return (JavaType) typeBySignature.computeIfAbsent(signatureBuilder.signature(g), ignored -> {
-            if (g.getUpperBounds() != null) {
-                List<JavaType> bounds = new ArrayList<>(g.getUpperBounds().length);
-                for (ClassNode bound : g.getUpperBounds()) {
-                    bounds.add(TypeUtils.asFullyQualified(_type(bound)));
-                }
+    /**
+     * With an undefined owner
+     */
+    @Nullable
+    public JavaType.Variable variableType(String name, @Nullable ASTNode type) {
+        if (type == null) {
+            return null;
+        }
 
-                // FIXME how to tell variance type?
-                return new JavaType.GenericTypeVariable(
-                        null,
-                        g.getName(),
-                        JavaType.GenericTypeVariable.Variance.COVARIANT,
-                        bounds
-                );
-            }
+        String signature = signatureBuilder.variableSignature(name);
+        JavaType.Variable existing = (JavaType.Variable) typeBySignature.get(signature);
+        if (existing != null) {
+            return existing;
+        }
 
-            return _type(g.getType());
-        });
+        JavaType.Variable variable = new JavaType.Variable(
+                0,
+                name,
+                null, null, null);
+
+        typeBySignature.put(signature, variable);
+
+        variable.unsafeSet(JavaType.Unknown.getInstance(), type(type), null);
+
+        return variable;
+    }
+
+    @Nullable
+    private List<JavaType.FullyQualified> getAnnotations(AnnotatedNode node) {
+        List<JavaType.FullyQualified> annotations = null;
+        for (AnnotationNode a : node.getAnnotations()) {
+            annotations = new ArrayList<>(node.getAnnotations().size());
+            JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(a.getClassNode());
+            annotations.add(fullyQualified);
+        }
+        return annotations;
     }
 }

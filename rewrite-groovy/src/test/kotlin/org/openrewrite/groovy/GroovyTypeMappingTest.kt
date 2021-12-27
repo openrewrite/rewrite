@@ -13,19 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java
+package org.openrewrite.groovy
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.java.JavaTypeMappingTest
+import org.openrewrite.java.asParameterized
 import org.openrewrite.java.tree.JavaType
 
-class Java11TypeMappingTest : JavaTypeMappingTest {
+@Disabled
+class GroovyTypeMappingTest : JavaTypeMappingTest {
     companion object {
-        private val goat = Java11TypeMappingTest::class.java.getResourceAsStream("/JavaTypeGoat.java")!!
+        private val goat = GroovyTypeMappingTest::class.java.getResourceAsStream("/GroovyTypeGoat.groovy")!!
             .bufferedReader().readText()
     }
 
-    override fun goatType(): JavaType.Parameterized = JavaParser.fromJavaVersion()
+    override fun goatType(): JavaType.Parameterized = GroovyParser.builder()
         .logCompilationWarningsAndErrors(true)
         .build()
         .parse(InMemoryExecutionContext { t -> fail(t) }, goat)[0]

@@ -101,10 +101,6 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if (g.getUpperBounds() != null) {
             s.append(" extends ");
             for (ClassNode bound : g.getUpperBounds()) {
-//            if(((ClassNode) astNode).isRedirectNode()) {
-//                return signature(((ClassNode) astNode).redirect());
-//            }
-
                 bounds.add(signature(bound));
             }
         } else if (g.getLowerBound() != null) {
@@ -125,8 +121,10 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
         StringBuilder s = new StringBuilder(classSignature(type));
         StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
-        for (GenericsType genericsType : classNode.getGenericsTypes()) {
-            typeParameters.add(signature(genericsType));
+        if(classNode.getGenericsTypes() != null) {
+            for (GenericsType genericsType : classNode.getGenericsTypes()) {
+                typeParameters.add(signature(genericsType));
+            }
         }
         s.append(typeParameters);
 
@@ -166,5 +164,9 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             owner = owner.substring(0, owner.indexOf('<'));
         }
         return owner + "{name=" + declaredField.getName() + '}';
+    }
+
+    public String variableSignature(String name) {
+        return "{undefined}{name=" + name + '}';
     }
 }
