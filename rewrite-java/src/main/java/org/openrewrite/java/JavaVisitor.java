@@ -162,16 +162,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return javaType;
     }
 
-    @Nullable
-    public JavaType.Method visitMethodType(@Nullable JavaType.Method javaType, P p) {
-        return javaType;
-    }
-
-    @Nullable
-    public JavaType.Variable visitVariableType(@Nullable JavaType.Variable javaType, P p) {
-        return javaType;
-    }
-
     public <N extends NameTree> N visitTypeName(N nameTree, P p) {
         return nameTree;
     }
@@ -645,7 +635,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             i = (J.Identifier) temp;
         }
-        i = i.withFieldType(visitVariableType(i.getFieldType(), p));
+        i = i.withFieldType((JavaType.Variable) visitType(i.getFieldType(), p));
         i = i.withType(visitType(i.getType(), p));
         return i;
     }
@@ -766,8 +756,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             m = m.getPadding().withTypeParameters(visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
         m = m.getPadding().withReference(visitLeftPadded(m.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p));
-        m = m.withMethodType(visitMethodType(m.getMethodType(), p));
-        m = m.withVariableType(visitVariableType(m.getVariableType(), p));
+        m = m.withMethodType((JavaType.Method) visitType(m.getMethodType(), p));
+        m = m.withVariableType((JavaType.Variable) visitType(m.getVariableType(), p));
         m = m.withType(visitType(m.getType(), p));
         return m;
     }
@@ -818,7 +808,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (m.getPadding().getDefaultValue() != null) {
             m = m.getPadding().withDefaultValue(visitLeftPadded(m.getPadding().getDefaultValue(), JLeftPadded.Location.METHOD_DECLARATION_DEFAULT_VALUE, p));
         }
-        m = m.withMethodType(visitMethodType(m.getMethodType(), p));
+        m = m.withMethodType((JavaType.Method) visitType(m.getMethodType(), p));
         return m;
     }
 
@@ -854,7 +844,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.getPadding().withTypeParameters(visitTypeNames(m.getPadding().getTypeParameters(), p));
         m = m.withName(visitAndCast(m.getName(), p));
         m = m.getPadding().withArguments(visitContainer(m.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p));
-        m = m.withMethodType(visitMethodType(m.getMethodType(), p));
+        m = m.withMethodType((JavaType.Method) visitType(m.getMethodType(), p));
         return m;
     }
 
@@ -947,7 +937,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             n = n.getPadding().withArguments(visitContainer(n.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, p));
         }
         n = n.withBody(visitAndCast(n.getBody(), p));
-        n = n.withConstructorType(visitMethodType(n.getConstructorType(), p));
+        n = n.withConstructorType((JavaType.Method) visitType(n.getConstructorType(), p));
         return n;
     }
 
