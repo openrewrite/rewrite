@@ -25,7 +25,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.ErrorType;
-import java.lang.invoke.MethodType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -198,7 +197,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                             methods = new ArrayList<>();
                         }
                         Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) elem;
-                        if(!methodSymbol.isStaticOrInstanceInit()) {
+                        if (!methodSymbol.isStaticOrInstanceInit()) {
                             methods.add(methodDeclarationType(methodSymbol, clazz));
                         }
                     }
@@ -347,7 +346,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
             Type type = symbol.owner.type;
             Symbol sym = symbol.owner;
 
-            if(sym.type instanceof Type.ForAll) {
+            if (sym.type instanceof Type.ForAll) {
                 type = ((Type.ForAll) type).qtype;
             }
 
@@ -376,13 +375,13 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
      * Method type of a method invocation. Parameters and return type represent resolved types when they are generic
      * in the method declaration.
      *
-     * @param selectType   The method type.
-     * @param symbol The method symbol.
+     * @param selectType The method type.
+     * @param symbol     The method symbol.
      * @return Method type attribution.
      */
     @Nullable
     public JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
-        if (selectType == null || selectType instanceof ErrorType || symbol == null) {
+        if (selectType == null || selectType instanceof ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR) {
             return null;
         }
 
@@ -534,7 +533,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
             List<JavaType.FullyQualified> exceptionTypes = null;
 
             Type selectType = methodSymbol.type;
-            if(selectType instanceof Type.ForAll) {
+            if (selectType instanceof Type.ForAll) {
                 selectType = ((Type.ForAll) selectType).qtype;
             }
 

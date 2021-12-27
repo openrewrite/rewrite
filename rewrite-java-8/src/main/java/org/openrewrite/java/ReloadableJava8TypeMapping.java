@@ -378,7 +378,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
      */
     @Nullable
     public JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
-        if (selectType == null || selectType instanceof ErrorType || symbol == null) {
+        if (selectType == null || selectType instanceof ErrorType || symbol == null || symbol.kind == Kinds.ERR) {
             return null;
         }
 
