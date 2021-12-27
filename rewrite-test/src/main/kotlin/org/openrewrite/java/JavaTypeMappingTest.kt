@@ -38,6 +38,11 @@ interface JavaTypeMappingTest {
     fun firstMethodParameter(methodName: String): JavaType = methodType(methodName).parameterTypes[0]
 
     @Test
+    fun javaLangObjectHasNoSupertype() {
+        assertThat(goatType().supertype.supertype).isNull()
+    }
+
+    @Test
     fun extendsJavaLangObject() {
         // even though it is implicit in the source code...
         assertThat(goatType().supertype.fullyQualifiedName).isEqualTo("java.lang.Object")

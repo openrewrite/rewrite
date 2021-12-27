@@ -20,15 +20,8 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 import java.util.Optional;
 
-import static java.util.Collections.emptyList;
-
 public class TypeUtils {
     private TypeUtils() {
-    }
-
-    public static List<JavaType.Variable> getVisibleSupertypeMembers(@Nullable JavaType type) {
-        JavaType.FullyQualified classType = TypeUtils.asFullyQualified(type);
-        return classType == null ? emptyList() : classType.getVisibleSupertypeMembers();
     }
 
     public static boolean isString(@Nullable JavaType type) {

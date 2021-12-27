@@ -197,7 +197,10 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                         if (methods == null) {
                             methods = new ArrayList<>();
                         }
-                        methods.add(methodDeclarationType(elem, clazz));
+                        Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) elem;
+                        if(!methodSymbol.isStaticOrInstanceInit()) {
+                            methods.add(methodDeclarationType(methodSymbol, clazz));
+                        }
                     }
                 }
             }

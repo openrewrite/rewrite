@@ -344,9 +344,8 @@ public class ImportLayoutStyle implements JavaStyle {
                     extraLineSpaceCount += 1;
                 }
             } else {
-                for (JRightPadded<J.Import> orderedImport : block.orderedImports(
-                        layoutState, classCountToUseStarImport, nameCountToUseStarImport, importLayoutConflictDetection, packagesToFold)) {
-
+                List<JRightPadded<J.Import>> blockOrdering = block.orderedImports(layoutState, classCountToUseStarImport, nameCountToUseStarImport, importLayoutConflictDetection, packagesToFold);
+                for (JRightPadded<J.Import> orderedImport : blockOrdering) {
                     boolean whitespaceContainsCRLF = orderedImport.getElement().getPrefix().getWhitespace().contains("\r\n");
                     Space prefix;
                     if (importIndex == 0) {
@@ -715,8 +714,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
                 for (List<JRightPadded<J.Import>> importGroup : groupedImports.values()) {
                     JRightPadded<J.Import> toStar = importGroup.get(0);
-                    boolean statik1 = toStar.getElement().isStatic();
-                    int threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
+                    int threshold = toStar.getElement().isStatic() ? nameCountToUseStarImport : classCountToUseStarImport;
                     boolean starImportExists = importGroup.stream()
                             .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
 
@@ -738,13 +736,12 @@ public class ImportLayoutStyle implements JavaStyle {
                                 .findAny();
 
                         if (starImportExists || !oneOfTheTypesIsInAnotherGroupToo.isPresent()) {
-                            ordered.add(toStar.withElement(toStar.getElement().withQualid(qualid.withName(
-                                    name.withSimpleName("*")))));
+                            ordered.add(toStar.withElement(toStar.getElement().withQualid(qualid.withName(name.withSimpleName("*")))));
                             continue;
                         }
                     }
 
-                    Predicate<JRightPadded<J.Import>> predicate = distinctBy(t -> t.getElement().printTrimmed());
+                    Predicate<JRightPadded<J.Import>> predicate = distinctBy(t -> t.getElement().printTrimmed(new JavaPrinter<>()));
                     for (JRightPadded<J.Import> importJRightPadded : importGroup) {
                         if (predicate.test(importJRightPadded)) {
                             ordered.add(importJRightPadded);
@@ -822,9 +819,10 @@ public class ImportLayoutStyle implements JavaStyle {
             return typeName;
         } else {
             String className = anImport.getElement().getClassName();
-            if (className.contains(".")) {
+            if (className.contains("$")) {
                 return anImport.getElement().getPackageName() + "." +
-                        className.substring(0, className.lastIndexOf('.'));
+                        className.substring(0, className.lastIndexOf('$'))
+                                .replace('$', '.');
             }
             return anImport.getElement().getPackageName();
         }

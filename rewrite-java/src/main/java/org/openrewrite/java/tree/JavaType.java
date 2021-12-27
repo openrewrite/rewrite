@@ -24,13 +24,13 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.*;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 import static org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder.TO_STRING;
 
@@ -91,13 +91,110 @@ public interface JavaType {
 
         public abstract List<Method> getMethods();
 
+        public Iterator<Method> getVisibleMethods() {
+            return getVisibleMethods(getPackageName());
+        }
+
+        private Iterator<Method> getVisibleMethods(String packageName) {
+            return new FullyQualifiedIterator<>(
+                    this,
+                    packageName,
+                    Method::getFlagsBitMap,
+                    FullyQualified::getMethods,
+                    fq -> fq.getVisibleMethods(packageName)
+            );
+        }
+
+        public Iterator<Variable> getVisibleMembers() {
+            return getVisibleMembers(getPackageName());
+        }
+
+        private Iterator<Variable> getVisibleMembers(String packageName) {
+            return new FullyQualifiedIterator<>(
+                    this,
+                    packageName,
+                    Variable::getFlagsBitMap,
+                    FullyQualified::getMembers,
+                    fq -> fq.getVisibleMembers(packageName)
+            );
+        }
+
+        private static class FullyQualifiedIterator<E> implements Iterator<E> {
+            private final FullyQualified fq;
+            private final String visibleFromPackage;
+            private final Function<E, Long> flags;
+            private final Function<FullyQualified, Iterator<E>> recursive;
+
+            private FullyQualified rec;
+            private E peek;
+
+            private Iterator<E> current;
+
+            @Nullable
+            private Iterator<E> supertypeE;
+
+            @Nullable
+            private Iterator<FullyQualified> interfaces;
+
+            @Nullable
+            private Iterator<E> interfaceE;
+
+            private FullyQualifiedIterator(FullyQualified fq,
+                                           String visibleFromPackage,
+                                           Function<E, Long> flags,
+                                           Function<FullyQualified, List<E>> base,
+                                           Function<FullyQualified, Iterator<E>> recursive) {
+                this.fq = fq;
+                this.rec = fq;
+                this.visibleFromPackage = visibleFromPackage;
+                this.flags = flags;
+                this.recursive = recursive;
+                this.current = base.apply(fq).iterator();
+            }
+
+            @Override
+            public boolean hasNext() {
+                if (current.hasNext()) {
+                    peek = current.next();
+
+                    long peekFlags = flags.apply(peek);
+                    if(((Flag.Public.getBitMask() | Flag.Protected.getBitMask()) & peekFlags) != 0) {
+                        return true;
+                    } else if((Flag.Private.getBitMask() & peekFlags) == 0 && rec.getPackageName().equals(visibleFromPackage)) {
+                        // package private in the same package
+                        return true;
+                    }
+
+                    return true;
+                } else {
+                    if (supertypeE == null) {
+                        supertypeE = fq.getSupertype() == null ? emptyIterator() : recursive.apply(fq.getSupertype());
+                        current = supertypeE;
+                        rec = fq.getSupertype();
+                        return hasNext();
+                    } else if(interfaces == null) {
+                        interfaces = fq.getInterfaces().iterator();
+                        return hasNext();
+                    } else if(interfaces.hasNext()) {
+                        rec = interfaces.next();
+                        current = recursive.apply(rec);
+                        return hasNext();
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public E next() {
+                return peek;
+            }
+        }
+
         @Nullable
         public abstract FullyQualified getOwningClass();
 
         @Nullable
         public abstract FullyQualified getSupertype();
-
-        public abstract List<Variable> getVisibleSupertypeMembers();
 
         /**
          * @return The class name without package qualification. If an inner class, outer/inner classes are separated by '.'.
@@ -308,19 +405,6 @@ public interface JavaType {
                     emptyList(), emptyList(), emptyList(), emptyList());
         }
 
-        public List<Variable> getVisibleSupertypeMembers() {
-            List<Variable> members = new ArrayList<>();
-            if (this.supertype != null) {
-                for (Variable member : this.supertype.getMembers()) {
-                    if (!member.hasFlags(Flag.Private)) {
-                        members.add(member);
-                    }
-                }
-                members.addAll(supertype.getVisibleSupertypeMembers());
-            }
-            return members;
-        }
-
         /**
          * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
          */
@@ -462,12 +546,6 @@ public interface JavaType {
         public FullyQualified getSupertype() {
             assert type != null;
             return type.getSupertype();
-        }
-
-        @Override
-        public List<Variable> getVisibleSupertypeMembers() {
-            assert type != null;
-            return type.getVisibleSupertypeMembers();
         }
 
         @Override
@@ -714,6 +792,9 @@ public interface JavaType {
                       @Nullable List<FullyQualified> annotations) {
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = declaringType;
+            if(name.equals("<clinit>")) {
+                System.out.println("here");
+            }
             this.name = name;
             this.returnType = returnType;
             this.parameterNames = nullIfEmpty(parameterNames);
@@ -986,11 +1067,6 @@ public interface JavaType {
         @Override
         public FullyQualified getSupertype() {
             return null;
-        }
-
-        @Override
-        public List<Variable> getVisibleSupertypeMembers() {
-            return emptyList();
         }
 
         @Override
