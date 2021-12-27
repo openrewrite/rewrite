@@ -26,7 +26,6 @@ class ClassgraphTypeMappingTest : JavaTypeMappingTest {
 
         private val goat = typeMapping.type(
             ClassGraph()
-                .filterClasspathElements { e -> !e.endsWith(".jar") }
                 .enableAnnotationInfo()
                 .enableMemoryMapping()
                 .enableClassInfo()

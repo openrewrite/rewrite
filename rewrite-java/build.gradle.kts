@@ -52,3 +52,7 @@ tasks.withType<Javadoc> {
     // 1 error
     exclude("**/JavaParser**", "**/ChangePackage**", "**/OrderImports**")
 }
+
+tasks.withType<Test> {
+    maxHeapSize = "512m"
+}

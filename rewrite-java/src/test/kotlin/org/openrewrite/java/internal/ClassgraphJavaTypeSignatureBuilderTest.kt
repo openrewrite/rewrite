@@ -24,7 +24,6 @@ import org.openrewrite.java.JavaTypeSignatureBuilderTest
 class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     companion object {
         private val goat = ClassGraph()
-            .filterClasspathElements { e -> !e.endsWith(".jar") }
             .enableMemoryMapping()
             .enableClassInfo()
             .enableFieldInfo()
