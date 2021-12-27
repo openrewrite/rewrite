@@ -130,11 +130,11 @@ public class ImportLayoutStyle implements JavaStyle {
         if (ideallyOrdered.size() == originalImports.size()) {
             Set<String> originalPaths = new HashSet<>();
             for (JRightPadded<J.Import> originalImport : originalImports) {
-                originalPaths.add(originalImport.getElement().getQualid().printTrimmed());
+                originalPaths.add(originalImport.getElement().getTypeName());
             }
             int sharedImports = 0;
             for (JRightPadded<J.Import> importJRightPadded : ideallyOrdered) {
-                if (originalPaths.contains(importJRightPadded.getElement().getQualid().printTrimmed())) {
+                if (originalPaths.contains(importJRightPadded.getElement().getTypeName())) {
                     sharedImports++;
                 }
             }
@@ -555,34 +555,13 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {
-                // ClassGraph uses a '$' delimited to distinguish inner classes.
-                boolean containsClassGraphStaticDelimiter = classGraphFqn.getClassName().contains("$");
-                String packageName;
-                if (containsClassGraphStaticDelimiter) {
-                    // Example: org.foo.Foo$Bar => package name: org.foo.Foo, class name: Bar
-                    packageName = classGraphFqn.getPackageName() + "." +
-                            classGraphFqn.getClassName().substring(
-                                    0, classGraphFqn.getClassName().lastIndexOf("$")).replace("$", ".");
-                } else {
-                    packageName = classGraphFqn.getPackageName();
-                }
-
+                String packageName = classGraphFqn.getPackageName();
                 if (checkPackageForClasses.contains(packageName)) {
-                    String className;
-                    if (containsClassGraphStaticDelimiter) {
-                        className = classGraphFqn.getClassName().substring(
-                                classGraphFqn.getClassName().lastIndexOf("$") + 1);
-                    } else {
-                        className = classGraphFqn.getClassName();
-                    }
-
+                    String className = classGraphFqn.getClassName();
                     Set<String> packages = nameToPackages.getOrDefault(className, new HashSet<>());
                     packages.add(packageName);
                     nameToPackages.put(className, packages);
-                } else if (checkPackageForClasses.contains(containsClassGraphStaticDelimiter ?
-                        classGraphFqn.getFullyQualifiedName().replace("$", ".") :
-                        classGraphFqn.getFullyQualifiedName())) {
-
+                } else if (checkPackageForClasses.contains(classGraphFqn.getFullyQualifiedName())) {
                     packageName = classGraphFqn.getFullyQualifiedName();
                     for (JavaType.Variable member : classGraphFqn.getMembers()) {
                         if (member.getFlags().contains(Flag.Static)) {
