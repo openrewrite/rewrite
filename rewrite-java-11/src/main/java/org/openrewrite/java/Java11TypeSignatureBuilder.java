@@ -267,6 +267,9 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             owner = methodSignature((Symbol.MethodSymbol) symbol.owner);
         } else {
             owner = signature(symbol.owner.type);
+            if(owner.contains("<")) {
+                owner = owner.substring(0, owner.indexOf('<'));
+            }
         }
         return owner + "{name=" + symbol.name.toString() + '}';
     }
