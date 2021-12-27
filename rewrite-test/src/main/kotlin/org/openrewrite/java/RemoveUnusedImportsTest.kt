@@ -325,8 +325,8 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/429")
     @Test
-    fun removePackageInfoImports(jp: JavaParser) = assertChanged(
-        jp,
+    fun removePackageInfoImports(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.logCompilationWarningsAndErrors(true).build(),
         dependsOn = arrayOf(
             """
                 package foo;

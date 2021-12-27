@@ -2250,20 +2250,20 @@ public interface J extends Tree {
                     if (possibleInnerClassName.equals("*")) {
                         return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.indexOf('$'));
                     }
-                    if (possibleInnerClassName.indexOf('$') >= 0) {
-                        possibleInnerClassName = possibleInnerClassFqn.substring(0, possibleInnerClassName.indexOf('$'));
+                    while (possibleInnerClassName.indexOf('$') >= 0) {
+                        possibleInnerClassName = possibleInnerClassName.substring(possibleInnerClassName.indexOf('$') + 1);
                     }
 
                     JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
                     if (owner != null) {
                         for (JavaType.Method method : owner.getMethods()) {
                             if (method.getName().equals(possibleInnerClassName)) {
-                                return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.indexOf('$'));
+                                return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.lastIndexOf('$'));
                             }
                         }
                         for (JavaType.Variable member : owner.getMembers()) {
                             if (member.getName().equals(possibleInnerClassName)) {
-                                return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.indexOf('$'));
+                                return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.lastIndexOf('$'));
                             }
                         }
                         return possibleInnerClassFqn;
@@ -2306,41 +2306,15 @@ public interface J extends Tree {
          * </code>
          */
         public String getPackageName() {
-            boolean seenClassPart = false;
-            boolean packagePart = false;
-            StringBuilder packageName = new StringBuilder();
-
-            J.FieldAccess part = qualid;
-            while (true) {
-                String name = part.getSimpleName();
-                if (!seenClassPart && (name.equals("*") || Character.isUpperCase(name.charAt(0)))) {
-                    seenClassPart = true;
-                }
-
-                if (seenClassPart && !packagePart && Character.isLowerCase(name.charAt(0))) {
-                    packagePart = true;
-                }
-
-                if (part.getTarget() instanceof J.Identifier) {
-                    if (packagePart) {
-                        packageName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
-                                "." + name);
-                    }
-                    break;
-                } else {
-                    if (packagePart) {
-                        packageName.insert(0, "." + name);
-                    }
-                    part = (FieldAccess) part.getTarget();
-                }
-            }
-
-            return packageName.toString();
+            String typeName = getTypeName();
+            int lastDot = typeName.lastIndexOf('.');
+            return lastDot < 0 ? "" : typeName.substring(0, lastDot);
         }
 
         public String getClassName() {
-            String pkg = getPackageName();
-            return pkg.length() > 0 ? getTypeName().substring(pkg.length() + 1) : getTypeName();
+            String typeName = getTypeName();
+            int lastDot = typeName.lastIndexOf('.');
+            return lastDot < 0 ? typeName : typeName.substring(lastDot + 1);
         }
 
         @Override
