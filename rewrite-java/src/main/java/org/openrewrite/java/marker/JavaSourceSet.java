@@ -36,9 +36,6 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
 public class JavaSourceSet implements Marker {
-    private static Map<String, JavaType.FullyQualified> JAVA8_CLASSPATH;
-    private static Map<String, JavaType.FullyQualified> JAVA11_CLASSPATH;
-
     @EqualsAndHashCode.Include
     UUID id;
 
@@ -80,12 +77,6 @@ public class JavaSourceSet implements Marker {
     private static Map<String, JavaType.FullyQualified> jvmClasses(Map<String, Object> typeBySignature, ExecutionContext ctx) {
         boolean java8 = System.getProperty("java.version").startsWith("1.8");
 
-        if (java8 && JAVA8_CLASSPATH != null) {
-            return JAVA8_CLASSPATH;
-        } else if (!java8 && JAVA11_CLASSPATH != null) {
-            return JAVA11_CLASSPATH;
-        }
-
         ClassInfoList classInfos = new ClassGraph()
                 .enableMemoryMapping()
                 .enableAnnotationInfo()
@@ -110,12 +101,6 @@ public class JavaSourceSet implements Marker {
             } catch (Exception e) {
                 ctx.getOnError().accept(e);
             }
-        }
-
-        if (java8) {
-            JAVA8_CLASSPATH = fqns;
-        } else {
-            JAVA11_CLASSPATH = fqns;
         }
 
         return fqns;
