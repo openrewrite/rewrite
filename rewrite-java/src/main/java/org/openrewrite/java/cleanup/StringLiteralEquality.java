@@ -87,6 +87,7 @@ public class StringLiteralEquality extends Recipe {
                     new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, "equals", JavaType.Primitive.Boolean, null),
                     JContainer.build(singletonList(new JRightPadded<>(binary.getRight().withPrefix(Space.EMPTY), Space.EMPTY, Markers.EMPTY))),
                     new JavaType.Method(
+                            null,
                             Flag.Public.getBitMask(),
                             TYPE_STRING,
                             "equals",

@@ -672,17 +672,29 @@ public interface JavaType {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @With
     class Array implements JavaType {
+        @With
+        @Nullable
+        @NonFinal
+        Integer managedReference;
+
         @Nullable
         @NonFinal
         JavaType elemType;
 
-        public Array(@Nullable JavaType elemType) {
+        public Array(@Nullable Integer managedReference, @Nullable JavaType elemType) {
+            this.managedReference = managedReference;
             this.elemType = elemType;
         }
 
         public JavaType getElemType() {
             assert elemType != null;
             return elemType;
+        }
+
+        @Override
+        public Array unsafeSetManagedReference(Integer id) {
+            this.managedReference = id;
+            return this;
         }
 
         public Array unsafeSet(JavaType elemType) {
@@ -795,6 +807,11 @@ public interface JavaType {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     class Method implements JavaType {
+        @With
+        @Nullable
+        @NonFinal
+        Integer managedReference;
+
         @With(AccessLevel.PRIVATE)
         long flagsBitMap;
 
@@ -826,10 +843,11 @@ public interface JavaType {
         @Nullable
         List<FullyQualified> annotations;
 
-        public Method(long flagsBitMap, @Nullable FullyQualified declaringType, String name,
+        public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
                       @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
                       @Nullable List<FullyQualified> annotations) {
+            this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = declaringType;
             this.name = name;
@@ -838,6 +856,12 @@ public interface JavaType {
             this.parameterTypes = nullIfEmpty(parameterTypes);
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
             this.annotations = nullIfEmpty(annotations);
+        }
+
+        @Override
+        public Method unsafeSetManagedReference(Integer id) {
+            this.managedReference = id;
+            return this;
         }
 
         public Method unsafeSet(FullyQualified declaringType,
@@ -873,7 +897,7 @@ public interface JavaType {
             if (parameterNames == this.parameterNames) {
                 return this;
             }
-            return new Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+            return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
                     parameterNames, this.parameterTypes, this.thrownExceptions, this.annotations);
         }
 
@@ -888,7 +912,7 @@ public interface JavaType {
             if (parameterTypes == this.parameterTypes) {
                 return this;
             }
-            return new Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+            return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
                     this.parameterNames, parameterTypes, this.thrownExceptions, this.annotations);
         }
 
@@ -903,7 +927,7 @@ public interface JavaType {
             if (thrownExceptions == this.thrownExceptions) {
                 return this;
             }
-            return new Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+            return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
                     this.parameterNames, this.parameterTypes, thrownExceptions, this.annotations);
         }
 
@@ -918,7 +942,7 @@ public interface JavaType {
             if (annotations == this.annotations) {
                 return this;
             }
-            return new Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+            return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
                     this.parameterNames, this.parameterTypes, this.thrownExceptions, annotations);
         }
 
@@ -961,6 +985,11 @@ public interface JavaType {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     class Variable implements JavaType {
+        @With
+        @Nullable
+        @NonFinal
+        Integer managedReference;
+
         @With(AccessLevel.NONE)
         long flagsBitMap;
 
@@ -981,8 +1010,9 @@ public interface JavaType {
         @Nullable
         List<FullyQualified> annotations;
 
-        public Variable(long flagsBitMap, String name, @Nullable JavaType owner,
+        public Variable(@Nullable Integer managedReference, long flagsBitMap, String name, @Nullable JavaType owner,
                         @Nullable JavaType type, @Nullable List<FullyQualified> annotations) {
+            this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.name = name;
             this.owner = owner;
@@ -1006,7 +1036,7 @@ public interface JavaType {
             if (this.annotations == annotations) {
                 return this;
             }
-            return new Variable(this.flagsBitMap, this.name, this.owner, this.type, annotations);
+            return new Variable(this.managedReference, this.flagsBitMap, this.name, this.owner, this.type, annotations);
         }
 
         public boolean hasFlags(Flag... test) {
@@ -1015,6 +1045,12 @@ public interface JavaType {
 
         public Set<Flag> getFlags() {
             return Flag.bitMapToFlags(flagsBitMap);
+        }
+
+        @Override
+        public Variable unsafeSetManagedReference(Integer id) {
+            this.managedReference = id;
+            return this;
         }
 
         public Variable unsafeSet(JavaType owner, @Nullable JavaType type,

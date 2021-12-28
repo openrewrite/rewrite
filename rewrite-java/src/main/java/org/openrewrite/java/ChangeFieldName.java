@@ -75,6 +75,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
                         toName,
                         i.getType(),
                         new JavaType.Variable(
+                                null,
                                 Flag.flagsToBitMap(varType.getFlags()),
                                 toName,
                                 varType.getOwner(),

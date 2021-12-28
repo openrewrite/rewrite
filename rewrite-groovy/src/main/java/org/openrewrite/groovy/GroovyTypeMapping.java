@@ -145,7 +145,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     }
 
     private JavaType.Array arrayType(ClassNode array, String signature) {
-        JavaType.Array arr = new JavaType.Array(null);
+        JavaType.Array arr = new JavaType.Array(null, null);
         typeBySignature.put(signature, arr);
 
         if (array.getComponentType().isUsingGenerics()) {
@@ -214,6 +214,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         JavaType.Method method = new JavaType.Method(
+                null,
                 node.getModifiers(),
                 null,
                 node instanceof ConstructorNode ? "<constructor>" : node.getName(),
@@ -264,6 +265,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         JavaType.Variable variable = new JavaType.Variable(
+                null,
                 node.getModifiers(),
                 node.getName(),
                 null, null, null);
@@ -293,6 +295,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         JavaType.Variable variable = new JavaType.Variable(
+                null,
                 0,
                 name,
                 null, null, null);

@@ -78,14 +78,14 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType.Array array(Class<?> clazz, String signature) {
-        JavaType.Array arr = new JavaType.Array(null);
+        JavaType.Array arr = new JavaType.Array(null, null);
         typeBySignature.put(signature, arr);
         arr.unsafeSet(type(clazz.getComponentType()));
         return arr;
     }
 
     private JavaType.Array array(GenericArrayType type, String signature) {
-        JavaType.Array arr = new JavaType.Array(null);
+        JavaType.Array arr = new JavaType.Array(null, null);
         typeBySignature.put(signature, arr);
         arr.unsafeSet(type(type.getGenericComponentType()));
         return arr;
@@ -279,6 +279,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         JavaType.Variable mappedVariable = new JavaType.Variable(
+                null,
                 field.getModifiers(),
                 field.getName(),
                 null, null, null
@@ -294,7 +295,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        mappedVariable.unsafeSet((JavaType.FullyQualified) type(field.getDeclaringClass()), type(field.getType()), annotations);
+        mappedVariable.unsafeSet(type(field.getDeclaringClass()), type(field.getType()), annotations);
         return mappedVariable;
     }
 
@@ -323,6 +324,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         JavaType.Method mappedMethod = new JavaType.Method(
+                null,
                 method.getModifiers(),
                 null,
                 "<constructor>",
@@ -380,6 +382,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         JavaType.Method mappedMethod = new JavaType.Method(
+                null,
                 method.getModifiers(),
                 null,
                 method.getName(),

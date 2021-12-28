@@ -286,6 +286,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                         variableName,
                         JavaType.Primitive.String,
                         new JavaType.Variable(
+                                null,
                                 Flag.flagsToBitMap(new HashSet<>(Arrays.asList(Flag.Private, Flag.Static, Flag.Final))),
                                 variableName,
                                 isClass.getType(),

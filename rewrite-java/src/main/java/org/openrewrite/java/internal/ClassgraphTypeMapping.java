@@ -196,7 +196,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             return existing;
         }
 
-        JavaType.Variable variable = new JavaType.Variable(fieldInfo.getModifiers(), fieldInfo.getName(),
+        JavaType.Variable variable = new JavaType.Variable(null, fieldInfo.getModifiers(), fieldInfo.getName(),
                 null, null, null);
         typeBySignature.put(signature, variable);
 
@@ -233,6 +233,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         }
 
         JavaType.Method method = new JavaType.Method(
+                null,
                 methodInfo.getModifiers(),
                 null,
                 methodInfo.isConstructor() ? "<constructor>" : methodInfo.getName(),
@@ -444,7 +445,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
     }
 
     private JavaType array(ArrayTypeSignature typeSignature, String signature) {
-        JavaType.Array arr = new JavaType.Array(null);
+        JavaType.Array arr = new JavaType.Array(null, null);
         typeBySignature.put(signature, arr);
         arr.unsafeSet(type(typeSignature.getNestedType()));
         return arr;

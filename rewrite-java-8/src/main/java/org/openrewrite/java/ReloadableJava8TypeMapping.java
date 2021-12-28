@@ -75,7 +75,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType array(Type type, String signature) {
-        JavaType.Array arr = new JavaType.Array(null);
+        JavaType.Array arr = new JavaType.Array(null, null);
         typeBySignature.put(signature, arr);
         arr.unsafeSet(type(((Type.ArrayType) type).elemtype));
         return arr;
@@ -334,6 +334,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         JavaType.Variable variable = new JavaType.Variable(
+                null,
                 symbol.flags_field,
                 symbol.name.toString(),
                 null, null, null);
@@ -408,6 +409,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         JavaType.Method method = new JavaType.Method(
+                null,
                 methodSymbol.flags_field,
                 null,
                 methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
@@ -516,6 +518,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             JavaType.Method method = new JavaType.Method(
+                    null,
                     methodSymbol.flags_field,
                     null,
                     methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
