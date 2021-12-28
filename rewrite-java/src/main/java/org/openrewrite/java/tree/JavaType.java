@@ -672,7 +672,7 @@ public interface JavaType {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @With
     class Array implements JavaType {
-        @With
+        @Getter
         @Nullable
         @NonFinal
         Integer managedReference;
@@ -805,7 +805,6 @@ public interface JavaType {
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     class Method implements JavaType {
         @With
         @Nullable
@@ -983,7 +982,6 @@ public interface JavaType {
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     class Variable implements JavaType {
         @With
         @Nullable
