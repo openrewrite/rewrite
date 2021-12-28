@@ -371,6 +371,36 @@ class MergeYamlTest : YamlRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1292")
+    @Test
+    fun mergeSequenceWithinMap() = assertChanged(
+        recipe = MergeYaml(
+            "$",
+            """
+               core:
+                 - map2:
+                     value:
+                       - 1
+                       - 2
+            """.trimIndent(),
+            true,
+            null
+        ),
+        before = """
+            noncore:
+              key1: value01
+        """,
+        after = """
+            noncore:
+              key1: value01
+            core:
+              - map2:
+                  value:
+                    - 1
+                    - 2
+        """
+    )
+
     @Test
     fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
         val matchingFile = tempDir.resolve("a.yml").toFile().apply {

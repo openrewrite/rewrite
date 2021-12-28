@@ -85,8 +85,8 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             // - key:
             //     value
             getCursor().putMessage("lastIndent", indent + style.getIndentSize());
+            getCursor().pollNearestMessage("lastSequenceEntryIndent");
         }
-
         return y;
     }
 
