@@ -34,7 +34,7 @@ import static java.util.Collections.*;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 import static org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder.TO_STRING;
 
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "UnusedReturnValue"})
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface JavaType {
@@ -69,7 +69,13 @@ public interface JavaType {
     @AllArgsConstructor
     @With
     class MultiCatch implements JavaType {
+        @NonFinal
         List<JavaType> throwableTypes;
+
+        public MultiCatch unsafeSet(List<JavaType> throwableTypes) {
+            this.throwableTypes = throwableTypes;
+            return this;
+        }
     }
 
     abstract class FullyQualified implements JavaType {
@@ -297,14 +303,14 @@ public interface JavaType {
             return annotations == null ? emptyList() : annotations;
         }
 
-        public JavaType.Class withAnnotations(@Nullable List<FullyQualified> annotations) {
+        public Class withAnnotations(@Nullable List<FullyQualified> annotations) {
             if (annotations != null && annotations.isEmpty()) {
                 annotations = null;
             }
             if (annotations == this.annotations) {
                 return this;
             }
-            return new JavaType.Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
+            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
                     this.owningClass, annotations, this.interfaces, this.members, this.methods);
         }
 
@@ -316,14 +322,14 @@ public interface JavaType {
             return interfaces == null ? emptyList() : interfaces;
         }
 
-        public JavaType.Class withInterfaces(@Nullable List<FullyQualified> interfaces) {
+        public Class withInterfaces(@Nullable List<FullyQualified> interfaces) {
             if (interfaces != null && interfaces.isEmpty()) {
                 interfaces = null;
             }
             if (interfaces == this.interfaces) {
                 return this;
             }
-            return new JavaType.Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
+            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
                     this.owningClass, this.annotations, interfaces, this.members, this.methods);
         }
 
@@ -335,14 +341,14 @@ public interface JavaType {
             return members == null ? emptyList() : members;
         }
 
-        public JavaType.Class withMembers(@Nullable List<Variable> members) {
+        public Class withMembers(@Nullable List<Variable> members) {
             if (members != null && members.isEmpty()) {
                 members = null;
             }
             if (members == this.members) {
                 return this;
             }
-            return new JavaType.Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
+            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
                     this.owningClass, this.annotations, this.interfaces, members, this.methods);
         }
 
@@ -354,14 +360,14 @@ public interface JavaType {
             return methods == null ? emptyList() : methods;
         }
 
-        public JavaType.Class withMethods(@Nullable List<Method> methods) {
+        public Class withMethods(@Nullable List<Method> methods) {
             if (methods != null && methods.isEmpty()) {
                 methods = null;
             }
             if (methods == this.methods) {
                 return this;
             }
-            return new JavaType.Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
+            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
                     this.owningClass, this.annotations, this.interfaces, this.members, methods);
         }
 
@@ -375,10 +381,7 @@ public interface JavaType {
             return Flag.bitMapToFlags(flagsBitMap);
         }
 
-        /**
-         * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
-         */
-        public void unsafeSet(@Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+        public Class unsafeSet(@Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
                               @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
                               @Nullable List<Variable> members, @Nullable List<Method> methods) {
             this.supertype = supertype;
@@ -387,6 +390,7 @@ public interface JavaType {
             this.interfaces = nullIfEmpty(interfaces);
             this.members = nullIfEmpty(members);
             this.methods = nullIfEmpty(methods);
+            return this;
         }
 
         @Override
@@ -439,7 +443,7 @@ public interface JavaType {
                 owningClass = build(fullyQualifiedName.substring(0, lastDot));
             }
 
-            return new JavaType.ShallowClass(null, 1, fullyQualifiedName, Kind.Class, null, owningClass,
+            return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
         }
     }
@@ -476,23 +480,21 @@ public interface JavaType {
             return typeParameters == null ? emptyList() : typeParameters;
         }
 
-        public JavaType.Parameterized withTypeParameters(@Nullable List<JavaType> typeParameters) {
+        public Parameterized withTypeParameters(@Nullable List<JavaType> typeParameters) {
             if (typeParameters != null && typeParameters.isEmpty()) {
                 typeParameters = null;
             }
             if (typeParameters == this.typeParameters) {
                 return this;
             }
-            return new JavaType.Parameterized(managedReference, type, typeParameters);
+            return new Parameterized(managedReference, type, typeParameters);
         }
 
-        /**
-         * Only meant to be used by parsers to avoid infinite recursion when building Class instances.
-         */
-        public void unsafeSet(FullyQualified type, List<JavaType> typeParameters) {
+        public Parameterized unsafeSet(FullyQualified type, List<JavaType> typeParameters) {
             assert type != this;
             this.type = type;
             this.typeParameters = nullIfEmpty(typeParameters);
+            return this;
         }
 
         @Override
@@ -605,19 +607,20 @@ public interface JavaType {
             return bounds == null ? emptyList() : bounds;
         }
 
-        public JavaType.GenericTypeVariable withBounds(@Nullable List<JavaType> bounds) {
+        public GenericTypeVariable withBounds(@Nullable List<JavaType> bounds) {
             if (bounds != null && bounds.isEmpty()) {
                 bounds = null;
             }
             if (bounds == this.bounds) {
                 return this;
             }
-            return new JavaType.GenericTypeVariable(managedReference, name, variance, bounds);
+            return new GenericTypeVariable(managedReference, name, variance, bounds);
         }
 
-        public void unsafeSet(Variance variance, @Nullable List<JavaType> bounds) {
+        public GenericTypeVariable unsafeSet(Variance variance, @Nullable List<JavaType> bounds) {
             this.variance = variance;
             this.bounds = nullIfEmpty(bounds);
+            return this;
         }
 
         @Override
@@ -657,8 +660,9 @@ public interface JavaType {
             return elemType;
         }
 
-        public void unsafeSet(JavaType elemType) {
+        public Array unsafeSet(JavaType elemType) {
             this.elemType = elemType;
+            return this;
         }
 
         @Override
@@ -811,7 +815,7 @@ public interface JavaType {
             this.annotations = nullIfEmpty(annotations);
         }
 
-        public void unsafeSet(FullyQualified declaringType,
+        public Method unsafeSet(FullyQualified declaringType,
                               JavaType returnType,
                               @Nullable List<JavaType> parameterTypes,
                               @Nullable List<FullyQualified> thrownExceptions,
@@ -821,6 +825,7 @@ public interface JavaType {
             this.parameterTypes = nullIfEmpty(parameterTypes);
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
             this.annotations = nullIfEmpty(annotations);
+            return this;
         }
 
         public boolean isConstructor() {
@@ -836,14 +841,14 @@ public interface JavaType {
             return parameterNames == null ? emptyList() : parameterNames;
         }
 
-        public JavaType.Method withParameterNames(@Nullable List<String> parameterNames) {
+        public Method withParameterNames(@Nullable List<String> parameterNames) {
             if (parameterNames != null && parameterNames.isEmpty()) {
                 parameterNames = null;
             }
             if (parameterNames == this.parameterNames) {
                 return this;
             }
-            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+            return new Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
                     parameterNames, this.parameterTypes, this.thrownExceptions, this.annotations);
         }
 
@@ -851,14 +856,14 @@ public interface JavaType {
             return parameterTypes == null ? emptyList() : parameterTypes;
         }
 
-        public JavaType.Method withParameterTypes(@Nullable List<JavaType> parameterTypes) {
+        public Method withParameterTypes(@Nullable List<JavaType> parameterTypes) {
             if (parameterTypes != null && parameterTypes.isEmpty()) {
                 parameterTypes = null;
             }
             if (parameterTypes == this.parameterTypes) {
                 return this;
             }
-            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+            return new Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
                     this.parameterNames, parameterTypes, this.thrownExceptions, this.annotations);
         }
 
@@ -866,14 +871,14 @@ public interface JavaType {
             return thrownExceptions == null ? emptyList() : thrownExceptions;
         }
 
-        public JavaType.Method withThrownExceptions(@Nullable List<FullyQualified> thrownExceptions) {
+        public Method withThrownExceptions(@Nullable List<FullyQualified> thrownExceptions) {
             if (thrownExceptions != null && thrownExceptions.isEmpty()) {
                 thrownExceptions = null;
             }
             if (thrownExceptions == this.thrownExceptions) {
                 return this;
             }
-            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+            return new Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
                     this.parameterNames, this.parameterTypes, thrownExceptions, this.annotations);
         }
 
@@ -881,14 +886,14 @@ public interface JavaType {
             return annotations == null ? emptyList() : annotations;
         }
 
-        public JavaType.Method withAnnotations(@Nullable List<FullyQualified> annotations) {
+        public Method withAnnotations(@Nullable List<FullyQualified> annotations) {
             if (annotations != null && annotations.isEmpty()) {
                 annotations = null;
             }
             if (annotations == this.annotations) {
                 return this;
             }
-            return new JavaType.Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
+            return new Method(this.flagsBitMap, this.declaringType, this.name, this.returnType,
                     this.parameterNames, this.parameterTypes, this.thrownExceptions, annotations);
         }
 
@@ -969,14 +974,14 @@ public interface JavaType {
             return annotations == null ? emptyList() : annotations;
         }
 
-        public JavaType.Variable withAnnotations(@Nullable List<FullyQualified> annotations) {
+        public Variable withAnnotations(@Nullable List<FullyQualified> annotations) {
             if (annotations != null && annotations.isEmpty()) {
                 annotations = null;
             }
             if (this.annotations == annotations) {
                 return this;
             }
-            return new JavaType.Variable(this.flagsBitMap, this.name, this.owner, this.type, annotations);
+            return new Variable(this.flagsBitMap, this.name, this.owner, this.type, annotations);
         }
 
         public boolean hasFlags(Flag... test) {
@@ -987,11 +992,12 @@ public interface JavaType {
             return Flag.bitMapToFlags(flagsBitMap);
         }
 
-        public void unsafeSet(JavaType owner, @Nullable JavaType type,
+        public Variable unsafeSet(JavaType owner, @Nullable JavaType type,
                               @Nullable List<FullyQualified> annotations) {
             this.owner = owner;
             this.type = type;
             this.annotations = nullIfEmpty(annotations);
+            return this;
         }
 
         @Override
