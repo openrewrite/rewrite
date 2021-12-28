@@ -5,12 +5,6 @@ val compiler = javaToolchains.compilerFor {
     languageVersion.set(JavaLanguageVersion.of(8))
 }
 
-val maybeExe = if(getCurrentOperatingSystem().isWindows) {
-    ".exe"
-} else {
-    ""
-}
-val javac = compiler.get().metadata.installationPath.file("bin/javac${maybeExe}")
 val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 
 dependencies {
@@ -33,8 +27,9 @@ dependencies {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(8))
+    }
 }
 
 tasks.withType<KotlinCompile>().configureEach {
@@ -48,8 +43,7 @@ tasks.withType<JavaCompile>().configureEach {
     sourceCompatibility = JavaVersion.VERSION_1_8.toString()
     targetCompatibility = JavaVersion.VERSION_1_8.toString()
     options.isFork = true
-    options.forkOptions.executable = javac.toString()
-    options.compilerArgs.clear() // remove `--release 8` set in root gradle build
+    options.release.set(null as? Int) // remove `--release 8` set in root gradle build
 }
 
 tasks.withType<Test>().configureEach {
