@@ -60,20 +60,10 @@ subprojects {
     apply(plugin = "com.github.jk1.dependency-license-report")
 
     java {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(11))
+        }
     }
-
-    val compiler = javaToolchains.compilerFor {
-        languageVersion.set(JavaLanguageVersion.of(11))
-    }
-
-    val maybeExe = if(getCurrentOperatingSystem().isWindows) {
-        ".exe"
-    } else {
-        ""
-    }
-    val javac = compiler.get().metadata.installationPath.file("bin/javac${maybeExe}")
 
     if(!name.contains("benchmark")) {
         apply(plugin = "maven-publish")
@@ -177,17 +167,8 @@ subprojects {
     }
 
     tasks.named<JavaCompile>("compileJava").configure {
-        sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-        targetCompatibility = JavaVersion.VERSION_1_8.toString()
-
         options.isFork = true
-        options.forkOptions.executable = javac.toString()
-        options.compilerArgs.addAll(listOf("--release", "8"))
-    }
-
-    java {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        options.release.set(8)
     }
 
     configure<LicenseReportExtension> {
