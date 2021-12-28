@@ -113,12 +113,12 @@ public class JavaTypeVisitor<P> {
 
     public JavaType visitClass(JavaType.Class aClass, P p) {
         JavaType.Class c = aClass;
-        c = c.withAnnotations(ListUtils.map(c.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
         c = c.withSupertype((JavaType.FullyQualified) visit(c.getSupertype(), p));
+        c = c.withOwningClass((JavaType.FullyQualified) visit(c.getOwningClass(), p));
+        c = c.withAnnotations(ListUtils.map(c.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
         c = c.withInterfaces(ListUtils.map(c.getInterfaces(), i -> (JavaType.FullyQualified) visit(i, p)));
         c = c.withMembers(ListUtils.map(c.getMembers(), m -> (JavaType.Variable) visit(m, p)));
         c = c.withMethods(ListUtils.map(c.getMethods(), m -> (JavaType.Method) visit(m, p)));
-        c = c.withOwningClass((JavaType.FullyQualified) visit(c.getOwningClass(), p));
         return c;
     }
 
@@ -166,8 +166,8 @@ public class JavaTypeVisitor<P> {
     public JavaType visitVariable(JavaType.Variable variable, P p) {
         JavaType.Variable v = variable;
         v = v.withOwner(visit(v.getOwner(), p));
-        v = v.withAnnotations(ListUtils.map(v.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
         v = v.withType(visit(variable.getType(), p));
+        v = v.withAnnotations(ListUtils.map(v.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
         return v;
     }
 }
