@@ -52,6 +52,10 @@ public interface JavaType {
         return this;
     }
 
+    default JavaType unsafeSetManagedReference(Integer id) {
+        return this;
+    }
+
     /**
      * Return a JavaType for the specified string.
      * The string is expected to be either a primitive type like "int" or a fully-qualified-class name like "java.lang.String"
@@ -164,9 +168,9 @@ public interface JavaType {
                     peek = current.next();
 
                     long peekFlags = flags.apply(peek);
-                    if(((Flag.Public.getBitMask() | Flag.Protected.getBitMask()) & peekFlags) != 0) {
+                    if (((Flag.Public.getBitMask() | Flag.Protected.getBitMask()) & peekFlags) != 0) {
                         return true;
-                    } else if((Flag.Private.getBitMask() & peekFlags) == 0 && rec.getPackageName().equals(visibleFromPackage)) {
+                    } else if ((Flag.Private.getBitMask() & peekFlags) == 0 && rec.getPackageName().equals(visibleFromPackage)) {
                         // package private in the same package
                         return true;
                     }
@@ -178,10 +182,10 @@ public interface JavaType {
                         current = supertypeE;
                         rec = fq.getSupertype();
                         return hasNext();
-                    } else if(interfaces == null) {
+                    } else if (interfaces == null) {
                         interfaces = fq.getInterfaces().iterator();
                         return hasNext();
-                    } else if(interfaces.hasNext()) {
+                    } else if (interfaces.hasNext()) {
                         rec = interfaces.next();
                         current = recursive.apply(rec);
                         return hasNext();
@@ -253,6 +257,7 @@ public interface JavaType {
     class Class extends FullyQualified {
         @With
         @Nullable
+        @NonFinal
         Integer managedReference;
 
         @With(AccessLevel.NONE)
@@ -381,9 +386,15 @@ public interface JavaType {
             return Flag.bitMapToFlags(flagsBitMap);
         }
 
+        @Override
+        public Class unsafeSetManagedReference(Integer id) {
+            this.managedReference = id;
+            return this;
+        }
+
         public Class unsafeSet(@Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
-                              @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
-                              @Nullable List<Variable> members, @Nullable List<Method> methods) {
+                               @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
+                               @Nullable List<Variable> members, @Nullable List<Method> methods) {
             this.supertype = supertype;
             this.owningClass = owningClass;
             this.annotations = nullIfEmpty(annotations);
@@ -453,6 +464,7 @@ public interface JavaType {
         @Getter
         @With
         @Nullable
+        @NonFinal
         Integer managedReference;
 
         @With
@@ -488,6 +500,12 @@ public interface JavaType {
                 return this;
             }
             return new Parameterized(managedReference, type, typeParameters);
+        }
+
+        @Override
+        public Parameterized unsafeSetManagedReference(Integer id) {
+            this.managedReference = id;
+            return this;
         }
 
         public Parameterized unsafeSet(FullyQualified type, List<JavaType> typeParameters) {
@@ -581,6 +599,7 @@ public interface JavaType {
         @With
         @Getter
         @Nullable
+        @NonFinal
         Integer managedReference;
 
         @With
@@ -615,6 +634,12 @@ public interface JavaType {
                 return this;
             }
             return new GenericTypeVariable(managedReference, name, variance, bounds);
+        }
+
+        @Override
+        public GenericTypeVariable unsafeSetManagedReference(Integer id) {
+            this.managedReference = id;
+            return this;
         }
 
         public GenericTypeVariable unsafeSet(Variance variance, @Nullable List<JavaType> bounds) {
@@ -816,10 +841,10 @@ public interface JavaType {
         }
 
         public Method unsafeSet(FullyQualified declaringType,
-                              JavaType returnType,
-                              @Nullable List<JavaType> parameterTypes,
-                              @Nullable List<FullyQualified> thrownExceptions,
-                              @Nullable List<FullyQualified> annotations) {
+                                JavaType returnType,
+                                @Nullable List<JavaType> parameterTypes,
+                                @Nullable List<FullyQualified> thrownExceptions,
+                                @Nullable List<FullyQualified> annotations) {
             this.declaringType = declaringType;
             this.returnType = returnType;
             this.parameterTypes = nullIfEmpty(parameterTypes);
@@ -993,7 +1018,7 @@ public interface JavaType {
         }
 
         public Variable unsafeSet(JavaType owner, @Nullable JavaType type,
-                              @Nullable List<FullyQualified> annotations) {
+                                  @Nullable List<FullyQualified> annotations) {
             this.owner = owner;
             this.type = type;
             this.annotations = nullIfEmpty(annotations);
