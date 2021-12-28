@@ -68,6 +68,16 @@ public class ChangeStaticFieldToMethod extends Recipe {
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
+
+            @Override
+            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext context) {
+                if(TypeUtils.isOfClassType(classDecl.getType(), oldClassName)) {
+                    // Don't modify the class that declares the static field being replaced
+                    return classDecl;
+                }
+                return super.visitClassDeclaration(classDecl, context);
+            }
+
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 if (getCursor().firstEnclosing(J.Import.class) == null &&
@@ -83,7 +93,6 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 JavaType.Variable varType = ident.getFieldType();
                 if (varType != null &&
                         TypeUtils.isOfClassType(varType.getOwner(), oldClassName) &&
-                        !TypeUtils.isOfClassType(getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class).getType(), oldClassName) &&
                         varType.getName().equals(oldFieldName)) {
                     return useNewMethod(ident);
                 }

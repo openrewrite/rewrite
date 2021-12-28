@@ -194,4 +194,20 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun leavesOwnerAlone() = assertUnchanged(
+        recipe = ChangeStaticFieldToMethod(
+            "com.example.Test",
+            "EXAMPLE",
+            "com.doesntmatter.Foo",
+            "BAR"),
+        before = """
+            package com.example;
+            
+            class Test {
+                public static Object EXAMPLE = null;
+            }
+        """
+    )
+
 }
