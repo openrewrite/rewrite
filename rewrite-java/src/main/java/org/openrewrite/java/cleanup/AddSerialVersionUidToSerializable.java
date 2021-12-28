@@ -52,6 +52,7 @@ public class AddSerialVersionUidToSerializable extends Recipe {
         return Collections.singleton("RSPEC-2057");
     }
 
+
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
@@ -60,16 +61,22 @@ public class AddSerialVersionUidToSerializable extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 // only interested in class declaration variables
-                return super.visitMethodDeclaration(method, executionContext);
+                return method;
             }
 
             @Override
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+                if (!implementsSerializable(getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class).getType())) {
+                    return multiVariable;
+                }
                 J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
                 for (J.VariableDeclarations.NamedVariable v : varDecls.getVariables()) {
                     if ("serialVersionUID".equals((v.getSimpleName()))) {
                         getCursor().dropParentUntil(J.ClassDeclaration.class::isInstance).putMessage("has-serial-version-id", Boolean.TRUE);
-                        doAfterVisit(new MaybeFixSerialVersionUidVar(varDecls));
+                        varDecls = maybeFixVariableDeclarations(varDecls);
+                        if (multiVariable != varDecls) {
+                            varDecls = maybeAutoFormat(multiVariable, varDecls, executionContext, getCursor().getParentOrThrow());
+                        }
                         break;
                     }
                 }
@@ -85,20 +92,8 @@ public class AddSerialVersionUidToSerializable extends Recipe {
                 }
                 return c;
             }
-        };
-    }
 
-    private static final class MaybeFixSerialVersionUidVar extends JavaIsoVisitor<ExecutionContext> {
-        private final J.VariableDeclarations searialVersionUidVar;
-
-        public MaybeFixSerialVersionUidVar(J.VariableDeclarations searialVersionUidVar) {
-            this.searialVersionUidVar = searialVersionUidVar;
-        }
-
-        @Override
-        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-            J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, ctx);
-            if (varDecls.equals(searialVersionUidVar)) {
+            private J.VariableDeclarations maybeFixVariableDeclarations(J.VariableDeclarations varDecls) {
                 List<J.Modifier> modifiers = varDecls.getModifiers();
                 if (!J.Modifier.hasModifier(modifiers, J.Modifier.Type.Private)
                         || !J.Modifier.hasModifier(modifiers, J.Modifier.Type.Static)
@@ -113,41 +108,38 @@ public class AddSerialVersionUidToSerializable extends Recipe {
                 if (variableType != JavaType.Primitive.Long) {
                     varDecls = varDecls.withTypeExpression(new J.Primitive(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JavaType.Primitive.Long));
                 }
-                if (multiVariable != varDecls) {
-                    return autoFormat(varDecls, ctx).withPrefix(varDecls.getPrefix());
-                }
+                return varDecls;
             }
-            return varDecls;
-        }
-    }
 
-    public static boolean implementsSerializable(@Nullable JavaType type) {
-        if (type == null) {
-            return false;
-        } else if (type instanceof JavaType.Primitive) {
-            return true;
-        } else if (type instanceof JavaType.Array) {
-            return implementsSerializable(((JavaType.Array) type).getElemType());
-        } else if (type instanceof JavaType.Parameterized) {
-            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-            if (parameterized.isAssignableTo("java.util.Collection") || parameterized.isAssignableTo("java.util.Map")) {
-                //If the type is either a collection or a map, make sure the type parameters are serializable. We
-                //force all type parameters to be checked to correctly scoop up all non-serializable candidates.
-                boolean typeParametersSerializable = true;
-                for (JavaType typeParameter : parameterized.getTypeParameters()) {
-                    typeParametersSerializable = typeParametersSerializable && implementsSerializable(typeParameter);
+            private boolean implementsSerializable(@Nullable JavaType type) {
+                if (type == null) {
+                    return false;
+                } else if (type instanceof JavaType.Primitive) {
+                    return true;
+                } else if (type instanceof JavaType.Array) {
+                    return implementsSerializable(((JavaType.Array) type).getElemType());
+                } else if (type instanceof JavaType.Parameterized) {
+                    JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+                    if (parameterized.isAssignableTo("java.util.Collection") || parameterized.isAssignableTo("java.util.Map")) {
+                        //If the type is either a collection or a map, make sure the type parameters are serializable. We
+                        //force all type parameters to be checked to correctly scoop up all non-serializable candidates.
+                        boolean typeParametersSerializable = true;
+                        for (JavaType typeParameter : parameterized.getTypeParameters()) {
+                            typeParametersSerializable = typeParametersSerializable && implementsSerializable(typeParameter);
+                        }
+                        return typeParametersSerializable;
+                    }
+                    //All other parameterized types fall through
+                } else if (type instanceof JavaType.FullyQualified) {
+                    JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
+                    if (fq.getKind() != JavaType.Class.Kind.Interface &&
+                            !fq.isAssignableTo("java.lang.Throwable")) {
+                        return fq.isAssignableTo("java.io.Serializable");
+                    }
                 }
-                return typeParametersSerializable;
+                return false;
             }
-            //All other parameterized types fall through
-        } else if (type instanceof JavaType.FullyQualified) {
-            JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
-            if (fq.getKind() != JavaType.Class.Kind.Interface &&
-                    !fq.isAssignableTo("java.lang.Throwable")) {
-                return fq.isAssignableTo("java.io.Serializable");
-            }
-        }
-        return false;
+        };
     }
 
 }

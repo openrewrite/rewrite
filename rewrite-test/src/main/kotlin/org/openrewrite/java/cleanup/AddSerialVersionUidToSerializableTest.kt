@@ -140,6 +140,33 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
     )
 
     @Test
+    fun methodDeclarationsAreNotVisited() = assertChanged(
+        before = """
+            import java.io.Serializable;
+                        
+            public class Example implements Serializable {
+                private String fred;
+                private int numberOfFreds;
+                void doSomething() {
+                    int serialVersionUID = 1;
+                }
+            }
+        """,
+        after = """
+            import java.io.Serializable;
+                        
+            public class Example implements Serializable {
+                private static final long serialVersionUID = 1;
+                private String fred;
+                private int numberOfFreds;
+                void doSomething() {
+                    int serialVersionUID = 1;
+                }
+            }
+        """
+    )
+
+    @Test
     fun doNotAlterAnInterface() = assertUnchanged(
         before = """
             import java.io.Serializable;
