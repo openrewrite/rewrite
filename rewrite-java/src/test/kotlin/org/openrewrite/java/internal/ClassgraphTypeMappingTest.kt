@@ -18,7 +18,6 @@ package org.openrewrite.java.internal
 import io.github.classgraph.ClassGraph
 import org.openrewrite.java.JavaTypeMappingTest
 import org.openrewrite.java.asParameterized
-import org.openrewrite.java.tree.JavaType
 
 class ClassgraphTypeMappingTest : JavaTypeMappingTest {
     companion object {
@@ -26,6 +25,7 @@ class ClassgraphTypeMappingTest : JavaTypeMappingTest {
 
         private val goat = typeMapping.type(
             ClassGraph()
+                .filterClasspathElements { e -> e.contains("rewrite") }
                 .enableAnnotationInfo()
                 .enableMemoryMapping()
                 .enableClassInfo()
@@ -38,5 +38,5 @@ class ClassgraphTypeMappingTest : JavaTypeMappingTest {
         ).asParameterized()!!
     }
 
-    override fun goatType(): JavaType.Parameterized = goat
+    override fun goatType() = goat
 }

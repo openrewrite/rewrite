@@ -24,6 +24,7 @@ import org.openrewrite.java.JavaTypeSignatureBuilderTest
 class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     companion object {
         private val goat = ClassGraph()
+            .filterClasspathElements { e -> e.contains("rewrite") }
             .enableMemoryMapping()
             .enableClassInfo()
             .enableFieldInfo()
