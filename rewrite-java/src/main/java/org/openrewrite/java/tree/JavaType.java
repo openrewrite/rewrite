@@ -34,7 +34,7 @@ import static java.util.Collections.*;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 import static org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder.TO_STRING;
 
-@SuppressWarnings({"unused", "UnusedReturnValue"})
+@SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface JavaType {
