@@ -21,6 +21,7 @@ import com.sun.tools.javac.code.TypeTag;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
+import javax.lang.model.type.NullType;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -35,7 +36,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String signature(@Nullable Type type) {
-        if (type == null || type instanceof Type.UnknownType) {
+        if (type == null || type instanceof Type.UnknownType || type instanceof NullType) {
             return "{undefined}";
         } else if (type instanceof Type.ClassType) {
             try {

@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import javax.lang.model.type.NullType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +43,8 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
     private final Map<String, Object> typeBySignature;
 
     public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
-        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType) {
+        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
+            type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
