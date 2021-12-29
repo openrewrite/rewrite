@@ -32,7 +32,7 @@ import kotlin.math.pow
 
 class JavaSourceSetTest {
 
-    @Disabled("Temporary to get CI working")
+//    @Disabled("Temporary to get CI working")
     @Test
     fun typesFromClasspath() {
         val ctx = InMemoryExecutionContext { e -> throw e }

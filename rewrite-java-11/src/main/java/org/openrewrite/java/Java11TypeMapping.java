@@ -146,7 +146,8 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) classType.tsym;
         Type.ClassType symType = (Type.ClassType) sym.type;
 
-        JavaType.Class clazz = (JavaType.Class) typeBySignature.get(sym.flatName().toString());
+        JavaType.FullyQualified fq = (JavaType.FullyQualified) typeBySignature.get(sym.flatName().toString());
+        JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
         if (clazz == null) {
             if (!sym.completer.isTerminal()) {
                 completeClassSymbol(sym);
@@ -218,9 +219,9 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
             if (!sym.getDeclarationAttributes().isEmpty()) {
                 annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
                 for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type));
-                    if (fq != null) {
-                        annotations.add(fq);
+                    JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
+                    if (annotType != null) {
+                        annotations.add(annotType);
                     }
                 }
             }
