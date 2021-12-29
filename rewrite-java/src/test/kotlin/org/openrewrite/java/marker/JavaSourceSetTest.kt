@@ -99,7 +99,7 @@ class JavaSourceSetTest {
             .contains("org.junit.jupiter.api.Test")
 
         assertThat(signatureCollisions.entries.map { "${it.key}${if(it.value > 1) " (x${it.value})" else ""}" })
-            .`as`("More than one instance of a type collides on the same signature. See the sysout above for details.")
+            .`as`("More than one instance of a type collides on the same signature.")
             .isEmpty()
     }
 
