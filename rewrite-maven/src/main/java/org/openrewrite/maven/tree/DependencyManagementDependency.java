@@ -16,6 +16,7 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -32,6 +33,7 @@ import static java.util.Collections.emptyMap;
  * Dependency management sections contain a combination of single dependency definitions and imports of
  * BOMs and their dependency management sections/properties.
  */
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface DependencyManagementDependency {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
