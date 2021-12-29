@@ -15,6 +15,7 @@
  */
 package org.openrewrite.json.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
@@ -54,6 +55,7 @@ public class Space {
         this.whitespace = whitespace == null || whitespace.isEmpty() ? null : whitespace;
     }
 
+    @JsonCreator
     public static Space build(@Nullable String whitespace, List<Comment> comments) {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {
