@@ -300,7 +300,7 @@ public interface JavaType {
         }
 
         @Deprecated
-        public static ShallowClass build(String fullyQualifiedName) {
+        public static Class build(String fullyQualifiedName) {
             return ShallowClass.build(fullyQualifiedName);
         }
 
