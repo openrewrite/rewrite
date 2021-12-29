@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
@@ -169,28 +170,6 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 owner = TypeUtils.asFullyQualified(type(sym.owner.type));
             }
 
-            List<JavaType.FullyQualified> annotations = null;
-            if (!sym.getDeclarationAttributes().isEmpty()) {
-                annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
-                for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-                    JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
-                    if (annotType != null) {
-                        annotations.add(annotType);
-                    }
-                }
-            }
-
-            List<JavaType.FullyQualified> interfaces = null;
-            if (symType.interfaces_field != null) {
-                interfaces = new ArrayList<>(symType.interfaces_field.length());
-                for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
-                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
-                    if (javaType != null) {
-                        interfaces.add(javaType);
-                    }
-                }
-            }
-
             List<JavaType.Variable> fields = null;
             List<JavaType.Method> methods = null;
 
@@ -224,22 +203,41 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
 
+            List<JavaType.FullyQualified> interfaces = null;
+            if (symType.interfaces_field != null) {
+                interfaces = new ArrayList<>(symType.interfaces_field.length());
+                for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
+                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
+                    if (javaType != null) {
+                        interfaces.add(javaType);
+                    }
+                }
+            }
+
+            List<JavaType.FullyQualified> annotations = null;
+            if (!sym.getDeclarationAttributes().isEmpty()) {
+                annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
+                for (Attribute.Compound a : sym.getDeclarationAttributes()) {
+                    JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
+                    if (annotType != null) {
+                        annotations.add(annotType);
+                    }
+                }
+            }
+
             clazz.unsafeSet(supertype, owner, annotations, interfaces, fields, methods);
         }
 
         if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
-            JavaType.Parameterized pt = (JavaType.Parameterized) typeBySignature.get(signature);
-            if (pt == null) {
-                pt = new JavaType.Parameterized(null, null, null);
-                typeBySignature.put(signature, pt);
+            JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
+            typeBySignature.put(signature, pt);
 
-                List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
-                for (Type tParam : classType.typarams_field) {
-                    typeParameters.add(type(tParam));
-                }
-
-                pt.unsafeSet(clazz, typeParameters);
+            List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
+            for (Type tParam : classType.typarams_field) {
+                typeParameters.add(type(tParam));
             }
+
+            pt.unsafeSet(clazz, typeParameters);
             return pt;
         }
 
@@ -389,6 +387,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
 
         Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) symbol;
 
+        StringJoiner argumentTypeSignatures = new StringJoiner(",");
         if (selectType instanceof Type.ForAll) {
             Type.ForAll fa = (Type.ForAll) selectType;
             return methodInvocationType(fa.qtype, methodSymbol);
@@ -419,6 +418,10 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 null, null, null
         );
         typeBySignature.put(signature, method);
+
+        Type signatureType = methodSymbol.type instanceof Type.ForAll ?
+                ((Type.ForAll) methodSymbol.type).qtype :
+                methodSymbol.type;
 
         JavaType returnType = null;
         List<JavaType> parameterTypes = null;
@@ -497,6 +500,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
         if (methodSymbol != null) {
+            StringJoiner argumentTypeSignatures = new StringJoiner(",");
 
             String signature = signatureBuilder.methodSignature(methodSymbol);
             JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);

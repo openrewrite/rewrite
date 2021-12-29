@@ -125,12 +125,12 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 }
             }
 
-            if (!aClass.getDeclaredConstructorInfo().isEmpty()) {
-                if (methods == null) {
+            if(!aClass.getDeclaredConstructorInfo().isEmpty()) {
+                if(methods == null) {
                     methods = new ArrayList<>(aClass.getDeclaredConstructorInfo().size());
                 }
                 for (MethodInfo ctor : aClass.getDeclaredConstructorInfo()) {
-                    if (!(ctor.isBridge() || ctor.isSynthetic())) {
+                    if(!(ctor.isBridge() || ctor.isSynthetic())) {
                         methods.add(methodType(ctor));
                     }
                 }
