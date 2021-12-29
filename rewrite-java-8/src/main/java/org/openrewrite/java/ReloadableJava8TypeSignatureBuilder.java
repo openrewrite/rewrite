@@ -255,7 +255,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return resolvedArgumentTypes.toString();
         } else if (selectType instanceof Type.ForAll) {
             return methodArgumentSignature(((Type.ForAll) selectType).qtype);
-        } else if (selectType instanceof Type.JCNoType) {
+        } else if (selectType instanceof Type.JCNoType || selectType instanceof Type.UnknownType) {
             return "{undefined}";
         }
 
