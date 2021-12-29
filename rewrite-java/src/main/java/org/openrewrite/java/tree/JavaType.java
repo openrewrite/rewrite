@@ -712,11 +712,6 @@ public interface JavaType {
         }
 
         @Override
-        public int hashCode() {
-            return Objects.hash(elemType);
-        }
-
-        @Override
         public String toString() {
             return TO_STRING.signature(this);
         }
@@ -966,11 +961,6 @@ public interface JavaType {
             assert returnType != null;
             return declaringType.equals(method.declaringType) && name.equals(method.name) &&
                     returnType.equals(method.returnType) && Objects.equals(parameterTypes, method.parameterTypes);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(declaringType, name, returnType, parameterTypes);
         }
 
         @Override
