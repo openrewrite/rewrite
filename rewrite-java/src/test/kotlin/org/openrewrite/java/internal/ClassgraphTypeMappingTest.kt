@@ -16,8 +16,13 @@
 package org.openrewrite.java.internal
 
 import io.github.classgraph.ClassGraph
+import io.micrometer.core.instrument.util.DoubleFormat
+import org.junit.jupiter.api.Test
+import org.openjdk.jol.info.GraphStats
 import org.openrewrite.java.JavaTypeMappingTest
 import org.openrewrite.java.asParameterized
+import kotlin.math.ln
+import kotlin.math.pow
 
 class ClassgraphTypeMappingTest : JavaTypeMappingTest {
     companion object {
@@ -39,4 +44,35 @@ class ClassgraphTypeMappingTest : JavaTypeMappingTest {
     }
 
     override fun goatType() = goat
+
+    @Test
+    fun eclipsePersistenceRecursiveParameterizedTypeDefinition() {
+        val type = typeMapping.type(
+            ClassGraph()
+                .enableAnnotationInfo()
+                .enableMemoryMapping()
+                .enableClassInfo()
+                .enableFieldInfo()
+                .enableMethodInfo()
+                .ignoreClassVisibility()
+                .scan()
+                .getClassInfo("org.eclipse.persistence.core.queries.CoreAttributeItem")
+        ).asParameterized()!!
+
+        println("Heap size: ${humanReadableByteCount(GraphStats.parseInstance(type).totalSize().toDouble())}")
+
+        // if not handled correctly, causes StackOverflowException in DefaultJavaTypeSignatureBuilder
+        type.toString()
+    }
+
+    private fun humanReadableByteCount(bytes: Double): String {
+        val unit = 1024
+        return if (bytes >= unit.toDouble() && !bytes.isNaN()) {
+            val exp = (ln(bytes) / ln(unit.toDouble())).toInt()
+            val pre = "${"KMGTPE"[exp - 1]}i"
+            "${DoubleFormat.decimalOrNan(bytes / unit.toDouble().pow(exp.toDouble()))} ${pre}B"
+        } else {
+            "${DoubleFormat.decimalOrNan(bytes)} B"
+        }
+    }
 }

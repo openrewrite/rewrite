@@ -85,8 +85,6 @@ public class JavaSourceSet implements Marker {
                 .enableFieldInfo()
                 .enableSystemJarsAndModules()
                 .acceptPackages("java")
-//                .rejectPackages("java.awt")
-//                .rejectPackages("java.applet")
                 .ignoreClassVisibility()
                 .ignoreFieldVisibility()
                 .ignoreMethodVisibility()

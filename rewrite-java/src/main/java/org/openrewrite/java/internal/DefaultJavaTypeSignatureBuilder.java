@@ -19,15 +19,16 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.util.StringJoiner;
+import java.util.*;
 
 public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public static final DefaultJavaTypeSignatureBuilder TO_STRING = new DefaultJavaTypeSignatureBuilder();
 
     @Nullable
     private Set<String> typeVariableNameStack;
+
+    @Nullable
+    private Set<JavaType> parameterizedStack;
 
     @Override
     public String signature(@Nullable Object type) {
@@ -70,13 +71,16 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         StringBuilder s = new StringBuilder("Generic{" + gtv.getName());
 
         if (typeVariableNameStack == null) {
-            typeVariableNameStack = new HashSet<>();
+            typeVariableNameStack = new LinkedHashSet<>();
         }
         if (!gtv.getName().equals("?") && !typeVariableNameStack.add(gtv.getName())) {
             typeVariableNameStack.remove(gtv.getName());
             s.append('}');
             return s.toString();
         }
+
+//        System.out.println((gtv.getName() + " | " + (typeVariableNameStack == null ? "[]" : typeVariableNameStack.stream()
+//                .collect(Collectors.joining("->", "[", "]")))).toLowerCase());
 
         switch (gtv.getVariance()) {
             case INVARIANT:
@@ -91,7 +95,9 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
 
         StringJoiner bounds = new StringJoiner(" & ");
         for (JavaType bound : gtv.getBounds()) {
-            bounds.add(signature(bound));
+            if(parameterizedStack == null || !parameterizedStack.contains(bound)) {
+                bounds.add(signature(bound));
+            }
         }
 
         s.append(bounds).append('}');
@@ -104,7 +110,15 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
     public String parameterizedSignature(Object type) {
         JavaType.Parameterized pt = (JavaType.Parameterized) type;
 
-        StringBuilder s = new StringBuilder(signature(pt.getType()));
+        if(parameterizedStack == null) {
+            parameterizedStack = Collections.newSetFromMap(new IdentityHashMap<>());
+        }
+        parameterizedStack.add(pt);
+
+        String baseType = signature(pt.getType());
+        StringBuilder s = new StringBuilder(baseType);
+
+//        System.out.println(baseType + "|" + System.identityHashCode(type));
 
         StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
         for (JavaType typeParameter : pt.getTypeParameters()) {
@@ -112,6 +126,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         }
         s.append(typeParameters);
 
+        parameterizedStack.remove(pt);
         return s.toString();
     }
 
