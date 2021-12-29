@@ -36,11 +36,7 @@ class JavaSourceSetTest {
     @Test
     fun typesFromClasspath() {
         val ctx = InMemoryExecutionContext { e -> throw e }
-        val typeBySignature = object: HashMap<String, Any>() {
-            override fun put(key: String, value: Any): Any? {
-                return super.put(key, value)
-            }
-        }
+        val typeBySignature = mutableMapOf<String, Any>()
         val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeBySignature, ctx)
 
         val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
@@ -105,6 +101,35 @@ class JavaSourceSetTest {
         assertThat(signatureCollisions.entries.map { "${it.key}${if(it.value > 1) " (x${it.value})" else ""}" })
             .`as`("More than one instance of a type collides on the same signature. See the sysout above for details.")
             .isEmpty()
+    }
+
+    @Disabled
+    @Test
+    fun typesByPackage() {
+        val ctx = InMemoryExecutionContext { e -> throw e }
+        val typeBySignature = mutableMapOf<String, Any>()
+        val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeBySignature, ctx)
+
+        val typesByPackage: MutableMap<String, MutableSet<String>> = TreeMap()
+
+        javaSourceSet.classpath.forEach {
+            object : JavaTypeVisitor<Int>() {
+                override fun visit(javaType: JavaType?, p: Int): JavaType? {
+                    if (javaType is JavaType.Class) {
+                        typesByPackage.compute(javaType.packageName) { _, acc ->
+                            val types = acc ?: mutableSetOf()
+                            types.add(javaType.fullyQualifiedName)
+                            types
+                        }
+                    }
+                    return javaType
+                }
+            }.visit(it, 0)
+        }
+
+        typesByPackage.entries.sortedByDescending { it.value.size }.forEach {
+            println("${it.key} | ${it.value.size}")
+        }
     }
 
     private fun humanReadableByteCount(bytes: Double): String {
