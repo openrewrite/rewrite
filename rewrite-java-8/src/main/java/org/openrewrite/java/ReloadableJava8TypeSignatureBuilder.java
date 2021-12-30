@@ -69,16 +69,6 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private void completeClassSymbol(Symbol.ClassSymbol classSymbol) {
-        String packageName = classSymbol.packge().fullname.toString();
-        if (packageName.startsWith("com.sun.") ||
-                packageName.startsWith("sun.") ||
-                packageName.startsWith("java.awt.") ||
-                packageName.startsWith("java.applet.") ||
-                packageName.startsWith("jdk.") ||
-                packageName.startsWith("org.graalvm")) {
-            return;
-        }
-
         try {
             classSymbol.complete();
         } catch (Symbol.CompletionFailure ignore) {
