@@ -32,30 +32,31 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.Callable;
 
 public class MapdbMavenPomCache implements MavenPomCache {
-    private static final Serializer<Optional<RawMaven>> MAVEN_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawMaven.class);
+
     private static final Serializer<MavenRepository> REPOSITORY_SERIALIZER = new JacksonMapdbSerializer<>(MavenRepository.class);
-    private static final Serializer<Optional<MavenRepository>> OPTIONAL_REPOSITORY_SERIALIZER = new OptionalJacksonMapdbSerializer<>(MavenRepository.class);
-    private static final Serializer<Optional<MavenMetadata>> MAVEN_METADATA_SERIALIZER = new OptionalJacksonMapdbSerializer<>(MavenMetadata.class);
-    private static final Serializer<GroupArtifactRepository> GROUP_ARTIFACT_SERIALIZER = new JacksonMapdbSerializer<>(GroupArtifactRepository.class);
+    private static final Serializer<PomKey> POM_KEY_SERIALIZER = new JacksonMapdbSerializer<>(PomKey.class);
+    private static final Serializer<MetadataKey> METADATA_KEY_SERIALIZER = new JacksonMapdbSerializer<>(MetadataKey.class);
 
-    private final HTreeMap<String, Optional<RawMaven>> pomCache;
-    private final HTreeMap<GroupArtifactRepository, Optional<MavenMetadata>> mavenMetadataCache;
-    private final HTreeMap<MavenRepository, Optional<MavenRepository>> normalizedRepositoryUrls;
+    private static final Serializer<CacheResult<RawMaven>> MAVEN_SERIALIZER = new CacheResultJacksonMapdbSerializer<>(RawMaven.class);
+    private static final Serializer<CacheResult<MavenRepository>> OPTIONAL_REPOSITORY_SERIALIZER = new CacheResultJacksonMapdbSerializer<>(MavenRepository.class);
+    private static final Serializer<CacheResult<MavenMetadata>> MAVEN_METADATA_SERIALIZER = new CacheResultJacksonMapdbSerializer<>(MavenMetadata.class);
 
-    private final Set<String> unresolvablePoms = new HashSet<>();
+    private final HTreeMap<PomKey, CacheResult<RawMaven>> pomCache;
+    private final HTreeMap<MetadataKey, CacheResult<MavenMetadata>> mavenMetadataCache;
+    private final HTreeMap<MavenRepository, CacheResult<MavenRepository>> normalizedRepositoryUrls;
+    private final long releaseTimeToLiveMilliseconds;
+    private final long snapshotTimeToLiveMilliseconds;
 
-    CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<MavenRepository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
+    public MapdbMavenPomCache(@Nullable File workspace, @Nullable Long maxCacheStoreSize,
+                              long releaseTimeToLiveMilliseconds, long snapshotTimeToLiveMilliseconds) {
 
-    public MapdbMavenPomCache(@Nullable File workspace,
-                              @Nullable Long maxCacheStoreSize) {
+        this.releaseTimeToLiveMilliseconds = releaseTimeToLiveMilliseconds;
+        this.snapshotTimeToLiveMilliseconds = snapshotTimeToLiveMilliseconds;
+
         if (workspace != null) {
             if(!workspace.exists() && !workspace.mkdirs()) {
                 throw new IllegalStateException("Unable to find or create maven pom cache at " + workspace);
@@ -75,15 +76,13 @@ public class MapdbMavenPomCache implements MavenPomCache {
 
             pomCache = localRepositoryDiskDb
                     .hashMap("pom.disk")
-                    .keySerializer(new SerializerString())
+                    .keySerializer(POM_KEY_SERIALIZER)
                     .valueSerializer(MAVEN_SERIALIZER)
                     .createOrOpen();
 
-            fillUnresolvablePoms();
-
             mavenMetadataCache = localRepositoryDiskDb
                     .hashMap("metadata.disk")
-                    .keySerializer(GROUP_ARTIFACT_SERIALIZER)
+                    .keySerializer(METADATA_KEY_SERIALIZER)
                     .valueSerializer(MAVEN_METADATA_SERIALIZER)
                     .createOrOpen();
 
@@ -104,16 +103,14 @@ public class MapdbMavenPomCache implements MavenPomCache {
             // fast in-memory collection with limited size
             pomCache = inMemoryDb
                     .hashMap("pom.inmem")
-                    .keySerializer(new SerializerString())
+                    .keySerializer(POM_KEY_SERIALIZER)
                     .valueSerializer(MAVEN_SERIALIZER)
                     .expireStoreSize(maxCacheStoreSize == null ? 0 : maxCacheStoreSize)
                     .create();
 
-            fillUnresolvablePoms();
-
             mavenMetadataCache = inMemoryDb
                     .hashMap("metadata.inmem")
-                    .keySerializer(GROUP_ARTIFACT_SERIALIZER)
+                    .keySerializer(METADATA_KEY_SERIALIZER)
                     .valueSerializer(MAVEN_METADATA_SERIALIZER)
                     .expireStoreSize(maxCacheStoreSize == null ? 0 : maxCacheStoreSize)
                     .create();
@@ -130,85 +127,57 @@ public class MapdbMavenPomCache implements MavenPomCache {
         }
     }
 
-    private void fillUnresolvablePoms() {
-        new BufferedReader(new InputStreamReader(MavenPomDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
-                .lines()
-                .filter(line -> !line.isEmpty())
-                .forEach(unresolvablePoms::add);
+    @Override
+    public CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key) {
+        CacheResult<MavenMetadata> metadata = mavenMetadataCache.get(key);
+        if (metadata != null && metadata.getTtl() > 0 && metadata.getTtl() < System.currentTimeMillis()) {
+            //If current time is greater than time to live, return null (a cache miss)
+            return null;
+        } else {
+            return metadata;
+        }
     }
 
     @Override
-    public CacheResult<MavenMetadata> computeMavenMetadata(URI repo, String groupId, String artifactId, Callable<MavenMetadata> orElseGet) throws Exception {
-        GroupArtifactRepository gar = new GroupArtifactRepository(repo, new GroupArtifact(groupId, artifactId));
-        Optional<MavenMetadata> rawMavenMetadata = mavenMetadataCache.get(gar);
-
-        //noinspection OptionalAssignedToNull
-        if (rawMavenMetadata == null) {
-            try {
-                MavenMetadata metadata = orElseGet.call();
-                mavenMetadataCache.put(gar, Optional.ofNullable(metadata));
-                return new CacheResult<>(CacheResult.State.Updated, metadata);
-            } catch (Exception e) {
-                mavenMetadataCache.put(gar, Optional.empty());
-                throw e;
-            }
-        }
-
-        return rawMavenMetadata
-                .map(metadata -> new CacheResult<>(CacheResult.State.Cached, metadata))
-                .orElse(UNAVAILABLE_METADATA);
+    public CacheResult<MavenMetadata> setMavenMetadata(MetadataKey key, MavenMetadata metadata, boolean isSnapshot) {
+        long ttl = System.currentTimeMillis() + (isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
+        mavenMetadataCache.put(key, new CacheResult<>(CacheResult.State.Cached, metadata, ttl));
+        return new CacheResult<>(CacheResult.State.Updated, metadata, ttl);
     }
 
     @Override
-    public CacheResult<RawMaven> computeMaven(URI repo, String groupId, String artifactId, String version,
-                                                      Callable<RawMaven> orElseGet) throws Exception {
-        //There are a few exceptional artifacts that will never be resolved by the repositories. This will always
-        //result in an Unavailable response from the cache.
-        String artifactCoordinates = groupId + ':' + artifactId + ':' + version;
-        if (unresolvablePoms.contains(artifactCoordinates)) {
-            return UNAVAILABLE_POM;
+    public CacheResult<RawMaven> getMaven(PomKey key) {
+        CacheResult<RawMaven> rawMaven = pomCache.get(key);
+        if (rawMaven != null && rawMaven.getTtl() > 0 && rawMaven.getTtl() < System.currentTimeMillis()) {
+            //If current time is greater than time to live, return null (a cache miss)
+            return null;
+        } else {
+            return rawMaven;
         }
-
-        String cacheKey = repo.toString() + ":" + artifactCoordinates;
-        Optional<RawMaven> rawMaven = pomCache.get(cacheKey);
-
-        //noinspection OptionalAssignedToNull
-        if (rawMaven == null) {
-            try {
-                RawMaven maven = orElseGet.call();
-                pomCache.put(cacheKey, Optional.ofNullable(maven));
-                return new CacheResult<>(CacheResult.State.Updated, maven);
-            } catch (Exception e) {
-                pomCache.put(cacheKey, Optional.empty());
-                throw e;
-            }
-        }
-
-        return rawMaven
-                .map(pom -> new CacheResult<>(CacheResult.State.Cached, pom))
-                .orElse(UNAVAILABLE_POM);
     }
 
     @Override
-    public CacheResult<MavenRepository> computeRepository(MavenRepository repository,
-                                                          Callable<MavenRepository> orElseGet) throws Exception {
-        Optional<MavenRepository> normalizedRepository = normalizedRepositoryUrls.get(repository);
+    public CacheResult<RawMaven> setMaven(PomKey key, RawMaven maven, boolean isSnapshot) {
+        long ttl = System.currentTimeMillis() + (isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
+        pomCache.put(key, new CacheResult<>(CacheResult.State.Cached, maven, ttl));
+        return new CacheResult<>(CacheResult.State.Updated, maven, ttl);
+    }
 
-        //noinspection OptionalAssignedToNull
-        if (normalizedRepository == null) {
-            try {
-                MavenRepository repo = orElseGet.call();
-                normalizedRepositoryUrls.put(repository, Optional.ofNullable(repo));
-                return new CacheResult<>(CacheResult.State.Updated, repo);
-            } catch (Exception e) {
-                normalizedRepositoryUrls.put(repository, Optional.empty());
-                throw e;
-            }
+    @Override
+    public CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+        CacheResult<MavenRepository> normalized = normalizedRepositoryUrls.get(repository);
+        if (normalized != null && normalized.getTtl() > 0 && normalized.getTtl() < System.currentTimeMillis()) {
+            //If current time is greater than time to live, return null (a cache miss)
+            return null;
+        } else {
+            return normalized;
         }
+    }
 
-        return normalizedRepository
-                .map(pom -> new CacheResult<>(CacheResult.State.Cached, pom))
-                .orElse(UNAVAILABLE_REPOSITORY);
+    @Override
+    public CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
+        normalizedRepositoryUrls.put(repository, new CacheResult<>(CacheResult.State.Cached, normalized, -1));
+        return new CacheResult<>(CacheResult.State.Updated, normalized, -1);
     }
 
     @Override

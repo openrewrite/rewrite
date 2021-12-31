@@ -30,17 +30,19 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.CacheResult;
 import org.openrewrite.maven.cache.MavenPomCache;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.MavenRepositoryCredentials;
-import org.openrewrite.maven.tree.MavenRepositoryMirror;
+import org.openrewrite.maven.tree.*;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -50,6 +52,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
 public class MavenPomDownloader {
+
     private static final RetryConfig retryConfig = RetryConfig.custom()
             .retryOnException(throwable -> throwable instanceof SocketTimeoutException ||
                     throwable instanceof TimeoutException)
@@ -71,6 +74,22 @@ public class MavenPomDownloader {
     private static final MavenRepository SUPER_POM_REPOSITORY = new MavenRepository("central",
             URI.create("https://repo.maven.apache.org/maven2"), true, false, true, null, null);
 
+    private static final Set<String> unresolvablePoms = new HashSet<>();
+    private static final CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null, -1);
+    private static final CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null, -1);
+    private static final CacheResult<MavenRepository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null, -1);
+
+    static {
+        //noinspection ConstantConditions
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(MavenPomDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))) {
+            reader.lines()
+                    .filter(line -> !line.isEmpty())
+                    .forEach(unresolvablePoms::add);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     private final MavenPomCache mavenPomCache;
     private final Map<Path, RawMaven> projectPoms;
     private final MavenExecutionContextView ctx;
@@ -81,7 +100,14 @@ public class MavenPomDownloader {
         this.ctx = new MavenExecutionContextView(ctx);
     }
 
+    @Nullable
     public MavenMetadata downloadMetadata(String groupId, String artifactId, Collection<MavenRepository> repositories) {
+        return downloadMetadata(groupId, artifactId, null, repositories);
+    }
+
+    @Nullable
+    public MavenMetadata downloadMetadata(String groupId, String artifactId, @Nullable String version,
+                                          Collection<MavenRepository> repositories) {
         Timer.Sample sample = Timer.start();
 
         MavenMetadata mavenMetadata = MavenMetadata.EMPTY;
@@ -94,11 +120,18 @@ public class MavenPomDownloader {
                     .tag("type", "metadata");
 
             try {
-                CacheResult<MavenMetadata> result = mavenPomCache.computeMavenMetadata(repo.getUri(), groupId, artifactId,
-                        () -> downloadMetadata(groupId, artifactId, null, singletonList(repo)));
-
+                MavenPomCache.MetadataKey metadataKey = new MavenPomCache.MetadataKey(repo.getUri(), groupId, artifactId, version);
+                MavenMetadata currentMetadata;
+                CacheResult<MavenMetadata> result = mavenPomCache.getMavenMetadata(metadataKey);
+                if (result == null) {
+                    //Go download this bad boy.
+                    currentMetadata = forceDownloadMetadata(groupId, artifactId, version, repo);
+                    result = mavenPomCache.setMavenMetadata(metadataKey, currentMetadata, version != null && version.endsWith("SNAPSHOT"));
+                } else {
+                    currentMetadata = result.getData();
+                }
                 sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
-                MavenMetadata currentMetadata = result.getData();
+
                 if (currentMetadata != null) {
                     if (mavenMetadata == MavenMetadata.EMPTY) {
                         if (currentMetadata != MavenMetadata.EMPTY) {
@@ -111,26 +144,6 @@ public class MavenPomDownloader {
             } catch (Exception e) {
                 sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
                         .register(Metrics.globalRegistry));
-            }
-        }
-        return mavenMetadata;
-    }
-
-    @Nullable
-    public MavenMetadata downloadMetadata(String groupId, String artifactId, @Nullable String version,
-                                          Collection<MavenRepository> repositories) {
-
-        MavenMetadata mavenMetadata = MavenMetadata.EMPTY;
-        for (MavenRepository repo : getDistinctNormalizedRepositories(repositories)) {
-            MavenMetadata currentMetadata = forceDownloadMetadata(groupId, artifactId, version, repo);
-            if (currentMetadata != null) {
-                if (mavenMetadata == MavenMetadata.EMPTY) {
-                    if (currentMetadata != MavenMetadata.EMPTY) {
-                        mavenMetadata = currentMetadata;
-                    }
-                } else if (currentMetadata != MavenMetadata.EMPTY) {
-                    mavenMetadata = mergeMetadata(mavenMetadata, currentMetadata);
-                }
             }
         }
         return mavenMetadata;
@@ -246,41 +259,50 @@ public class MavenPomDownloader {
                     .tag("type", "pom");
 
             try {
-                CacheResult<RawMaven> result = mavenPomCache.computeMaven(repo.getUri(), groupId, artifactId,
-                        versionMaybeDatedSnapshot, () -> {
-                            String uri = URI.create(repo.getUri().toString()) + "/" +
-                                    groupId.replace('.', '/') + '/' +
-                                    artifactId + '/' +
-                                    version + '/' +
-                                    artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
+                //There are a few exceptional artifacts that will never be resolved by the repositories. This will always
+                //result in an Unavailable response from the cache.
+                String artifactCoordinates = groupId + ':' + artifactId + ':' + version;
+                if (unresolvablePoms.contains(artifactCoordinates)) {
+                    return null;
+                }
 
-                            Request.Builder request = applyAuthenticationToRequest(repo, new Request.Builder().url(uri).get());
-                            int responseCode;
-                            try (Response response = sendRequest.apply(request.build())) {
-                                responseCode = response.code();
-                                if (response.isSuccessful() && response.body() != null) {
-                                    @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
-                                            .bytes();
+                MavenPomCache.PomKey pomKey = new MavenPomCache.PomKey(repo.getUri(), groupId, artifactId, versionMaybeDatedSnapshot);
+                CacheResult<RawMaven> result = mavenPomCache.getMaven(pomKey);
 
-                                    // This path doesn't matter except for debugging/error logs where it might get displayed
-                                    Path inputPath = Paths.get(groupId, artifactId, version);
-                                    return RawMaven.parse(
-                                            new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
-                                            null,
-                                            versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot,
-                                            ctx
-                                    ).withRepository(repo);
-                                }
-                            } catch (Throwable throwable) {
-                                throw new MavenDownloadingException(throwable);
-                            }
-                            throw new MavenDownloadingException("HTTP response code: %d", responseCode, uri);
-                        });
+                if (result == null) {
+                    String uri = URI.create(repo.getUri().toString()) + "/" +
+                            groupId.replace('.', '/') + '/' +
+                            artifactId + '/' +
+                            version + '/' +
+                            artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
+
+                    Request.Builder request = applyAuthenticationToRequest(repo, new Request.Builder().url(uri).get());
+                    int responseCode;
+                    try (Response response = sendRequest.apply(request.build())) {
+                        responseCode = response.code();
+                        if (response.isSuccessful() && response.body() != null) {
+                            @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
+                                    .bytes();
+
+                            // This path doesn't matter except for debugging/error logs where it might get displayed
+                            Path inputPath = Paths.get(groupId, artifactId, version);
+                            RawMaven rawMaven = RawMaven.parse(
+                                    new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
+                                    null,
+                                    versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot,
+                                    ctx
+                            ).withRepository(repo);
+                            result = mavenPomCache.setMaven(pomKey, rawMaven, version.endsWith("-SNAPSHOT"));
+                        } else {
+                            throw new MavenDownloadingException("Download failure. Response code is [" + responseCode + "]. URI = " + uri);
+                        }
+                    } catch (Throwable throwable) {
+                        throw new MavenDownloadingException(throwable);
+                    }
+                }
 
                 sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
-                if (result.getState() != CacheResult.State.Unavailable) {
-                    return result.getData();
-                }
+                return result.getData();
             } catch (Exception e) {
                 sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
                         .register(Metrics.globalRegistry));
@@ -311,15 +333,17 @@ public class MavenPomDownloader {
             }
 
             MavenMetadata mavenMetadata;
-            for (MavenRepository normalizedRepo : getDistinctNormalizedRepositories(repositories)) {
-                if (normalizedRepo.acceptsVersion(version)) {
-                    mavenMetadata = downloadMetadata(groupId, artifactId, version, singletonList(normalizedRepo));
-                    if (mavenMetadata != null) {
-                        MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
-                        if (snapshot != null) {
-                            return version.replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
-                        }
-                    }
+            Set<MavenRepository> normalizedRepos = getDistinctNormalizedRepositories(repositories);
+            Set<MavenRepository> repos = normalizedRepos
+                    .stream()
+                    .filter(repo -> repo.acceptsVersion(version))
+                    .collect(toSet());
+
+            mavenMetadata = downloadMetadata(groupId, artifactId, version, repos);
+            if (mavenMetadata != null) {
+                MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
+                if (snapshot != null) {
+                    return version.replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
                 }
             }
         }
@@ -350,7 +374,8 @@ public class MavenPomDownloader {
                 return repository;
             }
             String originalUrl = repository.getUri().toString();
-            result = mavenPomCache.computeRepository(repository, () -> {
+            result = mavenPomCache.getNormalizedRepository(repository);
+            if (result == null) {
                 // Always prefer to use https, fallback to http only if https isn't available
                 // URLs are case-sensitive after the domain name, so it can be incorrect to lowerCase() a whole URL
                 // This regex accepts any capitalization of the letters in "http"
@@ -360,26 +385,30 @@ public class MavenPomDownloader {
 
                 Request.Builder request = applyAuthenticationToRequest(repository, new Request.Builder()
                         .url(httpsUri).get());
+                MavenRepository normalized = null;
                 try (Response ignored = sendRequest.apply(request.build())) {
-                    return repository.withUri(URI.create(httpsUri));
+                    normalized = repository.withUri(URI.create(httpsUri));
                 } catch (Throwable t) {
-                    // Fallback to http if https is unavailable and the original URL was an http URL
-                    if (httpsUri.equals(originalUrl)) {
-                        return null;
-                    }
-                    try (Response ignored = sendRequest.apply(request.url(originalUrl).build())) {
-                        return new MavenRepository(
-                                repository.getId(),
-                                URI.create(originalUrl),
-                                repository.isReleases(),
-                                repository.isSnapshots(),
-                                repository.getUsername(),
-                                repository.getPassword());
-                    } catch (Throwable t2) {
-                        return null;
+                    if (!httpsUri.equals(originalUrl)) {
+                        try (Response ignored = sendRequest.apply(request.url(originalUrl).build())) {
+                            normalized = new MavenRepository(
+                                    repository.getId(),
+                                    URI.create(originalUrl),
+                                    repository.isReleases(),
+                                    repository.isSnapshots(),
+                                    repository.getUsername(),
+                                    repository.getPassword());
+                        } catch (Throwable t2) {
+                            //Fall through, normalized will be null.
+                        }
                     }
                 }
-            });
+                if (normalized != null) {
+                    result = mavenPomCache.setNormalizedRepository(repository, normalized);
+                } else {
+                    return null;
+                }
+            }
         } catch (Exception e) {
             return null;
         }

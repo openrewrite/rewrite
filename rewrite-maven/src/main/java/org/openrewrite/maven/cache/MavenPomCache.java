@@ -15,59 +15,94 @@
  */
 package org.openrewrite.maven.cache;
 
+import lombok.Value;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawMaven;
+import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenRepository;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 public interface MavenPomCache extends AutoCloseable {
+
+    CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key);
+    CacheResult<MavenMetadata> setMavenMetadata(MetadataKey key, MavenMetadata metadata, boolean isSnapshot);
+
+    CacheResult<RawMaven> getMaven(PomKey key);
+    CacheResult<RawMaven> setMaven(PomKey key, RawMaven maven, boolean isSnapshot);
+
+    CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository);
+    CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized);
+
+    void clear();
+
     MavenPomCache NOOP = new MavenPomCache() {
+
+        @Override
+        @Nullable
+        public CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key) {
+            return null;
+        }
+
+        @Override
+        public CacheResult<MavenMetadata> setMavenMetadata(MetadataKey key, MavenMetadata metadata, boolean isSnapshot) {
+            return new CacheResult<>(CacheResult.State.Updated, metadata, -1);
+        }
+
+        @Override
+        @Nullable
+        public CacheResult<RawMaven> getMaven(PomKey key) {
+            return null;
+        }
+
+        @Override
+        public CacheResult<RawMaven> setMaven(PomKey key, RawMaven maven, boolean isSnapshot) {
+            return new CacheResult<>(CacheResult.State.Updated, maven, -1);
+        }
+
+        @Override
+        @Nullable
+        public CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+            return null;
+        }
+
+        @Override
+        public CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
+            return new CacheResult<>(CacheResult.State.Updated, normalized, -1);
+        }
+
         @Override
         public void clear() {
         }
 
         @Override
-        public CacheResult<MavenMetadata> computeMavenMetadata(URI repo, String groupId, String artifactId,
-                                                               Callable<MavenMetadata> orElseGet) throws Exception {
-            return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
-        }
-
-        @Override
-        public CacheResult<RawMaven> computeMaven(URI repo, String groupId, String artifactId, String version,
-                                                  Callable<RawMaven> orElseGet) throws Exception {
-            return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
-        }
-
-        @Override
-        public CacheResult<MavenRepository> computeRepository(MavenRepository repository,
-                                                              Callable<MavenRepository> orElseGet) throws Exception {
-            return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
+        public void close() {
         }
     };
 
-    CacheResult<MavenMetadata> computeMavenMetadata(URI repo,
-                                                    String groupId,
-                                                    String artifactId,
-                                                    Callable<MavenMetadata> orElseGet) throws Exception;
+    @Value
+    class PomKey {
+        URI repo;
+        String groupId;
+        String artifactId;
+        String version;
+    }
 
-    CacheResult<RawMaven> computeMaven(URI repo,
-                                       String groupId,
-                                       String artifactId,
-                                       String version,
-                                       Callable<RawMaven> orElseGet) throws Exception;
-
-    /**
-     * Store a normalized repository given an input repository. Normalization takes, for example,
-     * an http:// scheme repository URL for a repository that now requires https and changes the scheme.
-     */
-    CacheResult<MavenRepository> computeRepository(MavenRepository repository,
-                                                   Callable<MavenRepository> orElseGet) throws Exception;
-
-    void clear();
-
-    @Override
-    default void close() {
+    @Value
+    class MetadataKey {
+        URI repo;
+        String groupId;
+        String artifactId;
+        @Nullable
+        String version;
     }
 }

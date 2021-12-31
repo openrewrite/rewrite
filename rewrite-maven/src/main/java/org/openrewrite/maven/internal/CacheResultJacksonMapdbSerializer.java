@@ -18,30 +18,34 @@ package org.openrewrite.maven.internal;
 import org.mapdb.DataInput2;
 import org.mapdb.DataOutput2;
 import org.mapdb.Serializer;
+import org.openrewrite.maven.cache.CacheResult;
 
 import java.io.IOException;
-import java.util.Optional;
 
-public class OptionalJacksonMapdbSerializer<T> implements Serializer<Optional<T>> {
+public class CacheResultJacksonMapdbSerializer<T> implements Serializer<CacheResult<T>> {
     private final JacksonMapdbSerializer<T> jacksonMapdbSerializer;
 
-    public OptionalJacksonMapdbSerializer(Class<T> tClass) {
+    public CacheResultJacksonMapdbSerializer(Class<T> tClass) {
         this.jacksonMapdbSerializer = new JacksonMapdbSerializer<>(tClass);
     }
 
     @Override
-    public void serialize(DataOutput2 out, Optional<T> value) throws IOException {
-        if (value.isPresent()) {
+    public void serialize(DataOutput2 out, CacheResult<T> value) throws IOException {
+        if (value.getData() != null) {
             out.writeBoolean(true);
-            jacksonMapdbSerializer.serialize(out, value.get());
+            out.writeLong(value.getTtl());
+            jacksonMapdbSerializer.serialize(out, value.getData());
         } else {
             out.writeBoolean(false);
+            out.writeLong(value.getTtl());
         }
     }
 
     @Override
-    public Optional<T> deserialize(DataInput2 input, int available) throws IOException {
+    public CacheResult<T> deserialize(DataInput2 input, int available) throws IOException {
         boolean present = input.readBoolean();
-        return present ? Optional.of(jacksonMapdbSerializer.deserialize(input, available)) : Optional.empty();
+        long ttl = input.readLong();
+        T data = present ? jacksonMapdbSerializer.deserialize(input, available) : null;
+        return new CacheResult<>(CacheResult.State.Cached, data, ttl);
     }
 }
