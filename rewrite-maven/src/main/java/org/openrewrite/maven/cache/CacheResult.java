@@ -35,6 +35,9 @@ public class CacheResult<T> {
     @Nullable
     T data;
 
+    /**
+     * The time to live is calculated by taking the current time in milliseconds and adding a TTL value (also in millis)
+     */
     long ttl;
 
 }

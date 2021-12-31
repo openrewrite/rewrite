@@ -47,13 +47,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     @Override
     @Nullable
     public CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key) {
-        CacheResult<MavenMetadata> metadata = mavenMetadataCache.get(key);
-        if (metadata != null && metadata.getTtl() > 0 && metadata.getTtl() < System.currentTimeMillis()) {
-            //If current time is greater than time to live, return null (a cache miss)
-            return null;
-        } else {
-            return metadata;
-        }
+        return filterExpired(mavenMetadataCache.get(key));
     }
 
     @Override
@@ -66,13 +60,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     @Override
     @Nullable
     public CacheResult<RawMaven> getMaven(PomKey key) {
-        CacheResult<RawMaven> rawMavenEntry = pomCache.get(key);
-        if (rawMavenEntry != null && rawMavenEntry.getTtl() > 0 && rawMavenEntry.getTtl() < System.currentTimeMillis()) {
-            //If current time is greater than time to live, return null (a cache miss)
-            return null;
-        } else {
-            return rawMavenEntry;
-        }
+        return filterExpired(pomCache.get(key));
     }
 
     @Override
@@ -85,13 +73,14 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     @Override
     @Nullable
     public CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository) {
-        return repositoryCache.get(repository);
+        return filterExpired(repositoryCache.get(repository));
     }
 
     @Override
     public CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
-        repositoryCache.put(repository, new CacheResult<>(CacheResult.State.Cached, normalized, -1));
-        return new CacheResult<>(CacheResult.State.Updated, normalized, -1);
+        long ttl = calculateExpiration(normalized == null ? 60_000 : 60_000 * 60);
+        repositoryCache.put(repository, new CacheResult<>(CacheResult.State.Cached, normalized, ttl));
+        return new CacheResult<>(CacheResult.State.Updated, normalized, ttl);
     }
 
     @Override

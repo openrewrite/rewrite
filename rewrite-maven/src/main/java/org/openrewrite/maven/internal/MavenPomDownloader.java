@@ -122,7 +122,6 @@ public class MavenPomDownloader {
                 MavenMetadata currentMetadata;
                 CacheResult<MavenMetadata> result = mavenPomCache.getMavenMetadata(metadataKey);
                 if (result == null) {
-                    //Go download this bad boy.
                     currentMetadata = forceDownloadMetadata(groupId, artifactId, version, repo);
                     result = mavenPomCache.setMavenMetadata(metadataKey, currentMetadata, version != null && version.endsWith("SNAPSHOT"));
                 } else {
@@ -142,6 +141,7 @@ public class MavenPomDownloader {
             } catch (Exception e) {
                 sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
                         .register(Metrics.globalRegistry));
+                ctx.getOnError().accept(e);
             }
         }
         return mavenMetadata;

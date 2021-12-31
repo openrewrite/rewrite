@@ -142,17 +142,12 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                 e.printStackTrace();
             }
         }
-        if (metadata != null && metadata.getTtl() > 0 && metadata.getTtl() < System.currentTimeMillis()) {
-            //If current time is greater than time to live, return null (a cache miss)
-            return null;
-        } else {
-            return metadata;
-        }
+        return filterExpired(metadata);
     }
 
     @Override
     public CacheResult<MavenMetadata> setMavenMetadata(MetadataKey key, MavenMetadata metadata, boolean isSnapshot) {
-        long ttl = System.currentTimeMillis() + (isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
+        long ttl = calculateExpiration(isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
         CacheResult<MavenMetadata> cached = new CacheResult<>(CacheResult.State.Cached, metadata, ttl);
         l1MavenMetadataCache.put(key, cached);
         try {
@@ -175,17 +170,12 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                 e.printStackTrace();
             }
         }
-        if (rawMavenEntry != null && rawMavenEntry.getTtl() > 0 && rawMavenEntry.getTtl() < System.currentTimeMillis()) {
-            //If current time is greater than time to live, return null (a cache miss)
-            return null;
-        } else {
-            return rawMavenEntry;
-        }
+        return filterExpired(rawMavenEntry);
     }
 
     @Override
     public CacheResult<RawMaven> setMaven(PomKey key, RawMaven maven, boolean isSnapshot) {
-        long ttl = System.currentTimeMillis() + (isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
+        long ttl = calculateExpiration(isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
         CacheResult<RawMaven> cached = new CacheResult<>(CacheResult.State.Cached, maven, ttl);
         l1PomCache.put(key, cached);
         try {
@@ -207,16 +197,12 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                 e.printStackTrace();
             }
         }
-        if (repositoryCacheResult != null && repositoryCacheResult.getTtl() > 0 && repositoryCacheResult.getTtl() < System.currentTimeMillis()) {
-            //If current time is greater than time to live, return null (a cache miss)
-            return null;
-        }
-        return repositoryCacheResult;
+        return filterExpired(repositoryCacheResult);
     }
 
     @Override
     public CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
-        long ttl = normalized == null ? 60_000 : 60_000 * 60;
+        long ttl = calculateExpiration(normalized == null ? 60_000 : 60_000 * 60);
         CacheResult<MavenRepository> cached = new CacheResult<>(CacheResult.State.Cached, normalized, ttl);
         l1RepositoryCache.put(repository, cached);
         try {

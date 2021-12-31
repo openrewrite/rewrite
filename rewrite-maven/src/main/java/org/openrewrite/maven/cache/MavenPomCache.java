@@ -23,6 +23,10 @@ import org.openrewrite.maven.tree.MavenRepository;
 
 import java.net.URI;
 
+/**
+ * A cache used to store the pom, it's metadata, and normalized maven repositories. A cache implementation can decide
+ * to use "time-to-live" semantics on the cache results and should expire keys once they have aged past their TTL.
+ */
 public interface MavenPomCache extends AutoCloseable {
 
     CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key);
@@ -35,6 +39,32 @@ public interface MavenPomCache extends AutoCloseable {
     CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized);
 
     void clear();
+
+    /**
+     * Given a time-to-live value in milliseconds, this method will calculate the time at which a cache entry should
+     * be expired. A negative ttl indicates that the entry should never expire.
+     *
+     * @param ttl Time-to-live in milliseconds.
+     * @return The current time in milliseconds plus the TTL value.
+     */
+    default long calculateExpiration(long ttl) {
+        return ttl < 0 ? -1 : System.currentTimeMillis() + ttl;
+    }
+
+    /**
+     * Checks a cache result's ttl value and if the result is expired, returns null.
+     *
+     * @param result A cache result with a TTL value.
+     * @param <T> The tye of cached data.
+     * @return result or null depending on if the cache result has expired.
+     */
+    @Nullable
+    default <T> CacheResult<T> filterExpired(CacheResult<T> result) {
+        if (result != null && result.getTtl() > 0 && result.getTtl() < System.currentTimeMillis()) {
+            return null;
+        }
+        return result;
+    }
 
     MavenPomCache NOOP = new MavenPomCache() {
 

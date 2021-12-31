@@ -121,55 +121,38 @@ public class MapdbMavenPomCache implements MavenPomCache {
 
     @Override
     public CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key) {
-        CacheResult<MavenMetadata> metadata = mavenMetadataCache.get(key);
-        if (metadata != null && metadata.getTtl() > 0 && metadata.getTtl() < System.currentTimeMillis()) {
-            //If current time is greater than time to live, return null (a cache miss)
-            return null;
-        } else {
-            return metadata;
-        }
+        return filterExpired(mavenMetadataCache.get(key));
     }
 
     @Override
     public CacheResult<MavenMetadata> setMavenMetadata(MetadataKey key, MavenMetadata metadata, boolean isSnapshot) {
-        long ttl = System.currentTimeMillis() + (isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
+        long ttl = calculateExpiration(isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
         mavenMetadataCache.put(key, new CacheResult<>(CacheResult.State.Cached, metadata, ttl));
         return new CacheResult<>(CacheResult.State.Updated, metadata, ttl);
     }
 
     @Override
     public CacheResult<RawMaven> getMaven(PomKey key) {
-        CacheResult<RawMaven> rawMaven = pomCache.get(key);
-        if (rawMaven != null && rawMaven.getTtl() > 0 && rawMaven.getTtl() < System.currentTimeMillis()) {
-            //If current time is greater than time to live, return null (a cache miss)
-            return null;
-        } else {
-            return rawMaven;
-        }
+        return filterExpired(pomCache.get(key));
     }
 
     @Override
     public CacheResult<RawMaven> setMaven(PomKey key, RawMaven maven, boolean isSnapshot) {
-        long ttl = System.currentTimeMillis() + (isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
+        long ttl = calculateExpiration(isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
         pomCache.put(key, new CacheResult<>(CacheResult.State.Cached, maven, ttl));
         return new CacheResult<>(CacheResult.State.Updated, maven, ttl);
     }
 
     @Override
     public CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository) {
-        CacheResult<MavenRepository> normalized = normalizedRepositoryUrls.get(repository);
-        if (normalized != null && normalized.getTtl() > 0 && normalized.getTtl() < System.currentTimeMillis()) {
-            //If current time is greater than time to live, return null (a cache miss)
-            return null;
-        } else {
-            return normalized;
-        }
+        return filterExpired(normalizedRepositoryUrls.get(repository));
     }
 
     @Override
     public CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
-        normalizedRepositoryUrls.put(repository, new CacheResult<>(CacheResult.State.Cached, normalized, -1));
-        return new CacheResult<>(CacheResult.State.Updated, normalized, -1);
+        long ttl = calculateExpiration(normalized == null ? 60_000 : 60_000 * 60);
+        normalizedRepositoryUrls.put(repository, new CacheResult<>(CacheResult.State.Cached, normalized, ttl));
+        return new CacheResult<>(CacheResult.State.Updated, normalized, ttl);
     }
 
     @Override
