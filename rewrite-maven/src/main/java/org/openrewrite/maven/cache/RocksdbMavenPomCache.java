@@ -207,19 +207,24 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                 e.printStackTrace();
             }
         }
+        if (repositoryCacheResult != null && repositoryCacheResult.getTtl() > 0 && repositoryCacheResult.getTtl() < System.currentTimeMillis()) {
+            //If current time is greater than time to live, return null (a cache miss)
+            return null;
+        }
         return repositoryCacheResult;
     }
 
     @Override
     public CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
-        CacheResult<MavenRepository> cached = new CacheResult<>(CacheResult.State.Cached, normalized, -1);
+        long ttl = normalized == null ? 60_000 : 60_000 * 60;
+        CacheResult<MavenRepository> cached = new CacheResult<>(CacheResult.State.Cached, normalized, ttl);
         l1RepositoryCache.put(repository, cached);
         try {
             cache.put(serialize(repository), serialize(cached));
         } catch (RocksDBException e) {
             e.printStackTrace();
         }
-        return new CacheResult<>(CacheResult.State.Updated, normalized, -1);
+        return new CacheResult<>(CacheResult.State.Updated, normalized, ttl);
     }
 
     @Override

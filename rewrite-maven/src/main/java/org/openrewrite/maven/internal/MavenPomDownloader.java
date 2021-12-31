@@ -367,8 +367,8 @@ public class MavenPomDownloader {
     @Nullable
     protected MavenRepository normalizeRepository(MavenRepository originalRepository) {
         CacheResult<MavenRepository> result;
+        MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
         try {
-            MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
             if (repository.isKnownToExist()) {
                 return repository;
             }
@@ -398,18 +398,17 @@ public class MavenPomDownloader {
                                     repository.getUsername(),
                                     repository.getPassword());
                         } catch (Throwable t2) {
-                            //Fall through, normalized will be null.
+                            ctx.getOnError().accept(t2);
+                            //ok to fall through here and cache a null. the TTL for null repositories can be set to
+                            //have it periodically retry the repo.
                         }
                     }
                 }
-                if (normalized != null) {
-                    result = mavenPomCache.setNormalizedRepository(repository, normalized);
-                } else {
-                    return null;
-                }
+                result = mavenPomCache.setNormalizedRepository(repository, normalized);
             }
         } catch (Exception e) {
-            return null;
+            ctx.getOnError().accept(e);
+            result = mavenPomCache.setNormalizedRepository(repository, null);
         }
 
         MavenRepository repo = result.getData();
