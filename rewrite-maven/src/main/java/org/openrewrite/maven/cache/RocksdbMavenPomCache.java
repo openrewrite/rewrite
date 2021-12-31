@@ -28,27 +28,20 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawMaven;
-import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteOptions;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.Callable;
 
 /**
  * Implementation of the maven cache that leverages Rocksdb. The keys and values are serialized to/from byte arrays

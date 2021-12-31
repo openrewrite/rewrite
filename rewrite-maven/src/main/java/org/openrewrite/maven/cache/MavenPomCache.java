@@ -18,19 +18,10 @@ package org.openrewrite.maven.cache;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawMaven;
-import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenRepository;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.Callable;
 
 public interface MavenPomCache extends AutoCloseable {
 

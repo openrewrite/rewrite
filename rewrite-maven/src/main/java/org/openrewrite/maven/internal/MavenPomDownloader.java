@@ -42,12 +42,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 
@@ -297,6 +295,7 @@ public class MavenPomDownloader {
                             throw new MavenDownloadingException("Download failure. Response code is [" + responseCode + "]. URI = " + uri);
                         }
                     } catch (Throwable throwable) {
+                        mavenPomCache.setMaven(pomKey, null, version.endsWith("-SNAPSHOT"));
                         throw new MavenDownloadingException(throwable);
                     }
                 }

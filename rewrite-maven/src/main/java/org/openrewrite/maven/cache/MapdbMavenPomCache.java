@@ -21,19 +21,11 @@ import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.HTreeMap;
 import org.mapdb.Serializer;
-import org.mapdb.serializer.SerializerString;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.*;
-import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenRepository;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.util.Optional;
-import java.util.concurrent.Callable;
 
 public class MapdbMavenPomCache implements MavenPomCache {
 
