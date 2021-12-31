@@ -104,18 +104,22 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     //This is a two-layer cache, The first layer stores cache entries in memory, the second layer stores cache entries
     //on disk using rocksdb. Without the in-memory cache, each cache entry would be deserialized into a separate instance
     //which can quickly consume all memory when there are a lot of duplicate maven depenencies.
-    private final Map<String, Optional<RawMaven>> l1PomCache = new HashMap<>();
-    private final Map<GroupArtifactRepository, Optional<MavenMetadata>> l1MavenMetadataCache = new HashMap<>();
-    private final Map<MavenRepository, Optional<MavenRepository>> l1RepositoryCache = new HashMap<>();
+    private final Map<PomKey, CacheResult<RawMaven>> l1PomCache = new HashMap<>();
+    private final Map<MetadataKey, CacheResult<MavenMetadata>> l1MavenMetadataCache = new HashMap<>();
+    private final Map<MavenRepository, CacheResult<MavenRepository>> l1RepositoryCache = new HashMap<>();
 
     private final RocksCache cache;
-    private final Set<String> unresolvablePoms = new HashSet<>();
-
-    CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<MavenRepository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
+    private final long releaseTimeToLiveMilliseconds;
+    private final long snapshotTimeToLiveMilliseconds;
 
     public RocksdbMavenPomCache(@Nullable Path workspace) {
+        //Default ttl is one minute for snapshot artifacts and an hour for release artifacts.
+        this(workspace, 60_000 * 60, 60_000);
+    }
+
+    public RocksdbMavenPomCache(@Nullable Path workspace, long releaseTimeToLiveMilliseconds, long snapshotTimeToLiveMilliseconds) {
+        this.releaseTimeToLiveMilliseconds = releaseTimeToLiveMilliseconds;
+        this.snapshotTimeToLiveMilliseconds = snapshotTimeToLiveMilliseconds;
 
         assert workspace != null;
 
@@ -132,107 +136,97 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             lock.delete();
         }
         cache = getCache(pomCacheDir.getAbsolutePath());
-        fillUnresolvablePoms();
     }
 
     @Override
-    public CacheResult<MavenMetadata> computeMavenMetadata(URI repo, String groupId, String artifactId, Callable<MavenMetadata> orElseGet) throws Exception {
-        GroupArtifactRepository gar = new GroupArtifactRepository(repo, new GroupArtifact(groupId, artifactId));
-        Optional<MavenMetadata> rawMavenMetadata = l1MavenMetadataCache.get(gar);
-        if (rawMavenMetadata == null) {
-
-            byte[] key = serialize(gar);
-            rawMavenMetadata = deserializeMavenMetadata(cache.get(key));
-
-            //noinspection OptionalAssignedToNull
-            if (rawMavenMetadata == null) {
-                //a null is a cache miss.
-                try {
-                    MavenMetadata metadata = orElseGet.call();
-                    //Note: we store an empty optional in the cache if not resolved.
-                    cache.put(key, serialize(Optional.ofNullable(metadata)));
-                    l1MavenMetadataCache.put(gar, Optional.ofNullable(metadata));
-                    return new CacheResult<>(CacheResult.State.Updated, metadata);
-                } catch (Exception e) {
-                    cache.put(key, serialize(Optional.empty()));
-                    l1MavenMetadataCache.put(gar, Optional.empty());
-                    throw e;
-                }
+    @Nullable
+    public CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key) {
+        CacheResult<MavenMetadata> metadata = l1MavenMetadataCache.get(key);
+        if (metadata == null) {
+            try {
+                metadata = deserializeMavenMetadata(cache.get(serialize(key)));
+            } catch (RocksDBException e) {
+                e.printStackTrace();
             }
         }
-
-        return rawMavenMetadata
-                .map(metadata -> new CacheResult<>(CacheResult.State.Cached, metadata))
-                .orElse(UNAVAILABLE_METADATA);
+        if (metadata != null && metadata.getTtl() > 0 && metadata.getTtl() < System.currentTimeMillis()) {
+            //If current time is greater than time to live, return null (a cache miss)
+            return null;
+        } else {
+            return metadata;
+        }
     }
 
     @Override
-    public CacheResult<RawMaven> computeMaven(URI repo, String groupId, String artifactId, String version, Callable<RawMaven> orElseGet) throws Exception {
-
-        //There are a few exceptional artifacts that will never be resolved by the repositories. This will always
-        //result in an Unavailable response from the cache.
-        String artifactCoordinates = groupId + ':' + artifactId + ':' + version;
-        if (unresolvablePoms.contains(artifactCoordinates)) {
-            return UNAVAILABLE_POM;
+    public CacheResult<MavenMetadata> setMavenMetadata(MetadataKey key, MavenMetadata metadata, boolean isSnapshot) {
+        long ttl = System.currentTimeMillis() + (isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
+        CacheResult<MavenMetadata> cached = new CacheResult<>(CacheResult.State.Cached, metadata, ttl);
+        l1MavenMetadataCache.put(key, cached);
+        try {
+            cache.put(serialize(key), serialize(cached));
+        } catch (RocksDBException e) {
+            e.printStackTrace();
         }
-        String cacheKey = repo.toString() + ":" + artifactCoordinates;
-        Optional<RawMaven> rawMavenEntry = l1PomCache.get(cacheKey);
+        return new CacheResult<>(CacheResult.State.Updated, metadata, ttl);
+    }
+
+    @Override
+    @Nullable
+    public CacheResult<RawMaven> getMaven(PomKey key) {
+        CacheResult<RawMaven> rawMavenEntry = l1PomCache.get(key);
         if (rawMavenEntry == null) {
-            byte[] key = serialize(cacheKey);
-            rawMavenEntry = deserializeRawMaven(cache.get(key));
-
-            //noinspection OptionalAssignedToNull
-            if (rawMavenEntry == null) {
-                //a null is a cache miss
-                try {
-                    RawMaven rawMaven = orElseGet.call();
-                    //Note: we store an empty optional in the cache if not resolved.
-                    cache.put(key, serialize(Optional.ofNullable(rawMaven)));
-                    l1PomCache.put(cacheKey, Optional.ofNullable(rawMaven));
-                    return new CacheResult<>(CacheResult.State.Updated, rawMaven);
-                } catch (Exception e) {
-                    cache.put(key, serialize(Optional.empty()));
-                    l1PomCache.put(cacheKey, Optional.empty());
-                    throw e;
-                }
+            byte[] rocksKey = serialize(key);
+            try {
+                rawMavenEntry = deserializeRawMaven(cache.get(rocksKey));
+            } catch (RocksDBException e) {
+                e.printStackTrace();
             }
         }
-        return rawMavenEntry
-                .map(rawMaven -> new CacheResult<>(CacheResult.State.Cached, rawMaven))
-                .orElse(UNAVAILABLE_POM);
+        if (rawMavenEntry != null && rawMavenEntry.getTtl() > 0 && rawMavenEntry.getTtl() < System.currentTimeMillis()) {
+            //If current time is greater than time to live, return null (a cache miss)
+            return null;
+        } else {
+            return rawMavenEntry;
+        }
     }
 
     @Override
-    public CacheResult<MavenRepository> computeRepository(MavenRepository repository, Callable<MavenRepository> orElseGet) throws Exception {
+    public CacheResult<RawMaven> setMaven(PomKey key, RawMaven maven, boolean isSnapshot) {
+        long ttl = System.currentTimeMillis() + (isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
+        CacheResult<RawMaven> cached = new CacheResult<>(CacheResult.State.Cached, maven, ttl);
+        l1PomCache.put(key, cached);
+        try {
+            cache.put(serialize(key), serialize(cached));
+        } catch (RocksDBException e) {
+            e.printStackTrace();
+        }
+        return new CacheResult<>(CacheResult.State.Updated, maven, ttl);
+    }
 
-        Optional<MavenRepository> cacheEntry = l1RepositoryCache.get(repository);
-
-        //noinspection OptionalAssignedToNull
-        if (cacheEntry == null) {
-
-            byte[] key = serialize(repository);
-            cacheEntry = deserializeMavenRepository(cache.get(key));
-
-            //noinspection OptionalAssignedToNull
-            if (cacheEntry == null) {
-                //a null is a cache miss
-                try {
-                    MavenRepository mavenRepository = orElseGet.call();
-                    //Note: we store an empty optional in the cache if not resolved
-                    cache.put(key, serialize(Optional.ofNullable(mavenRepository)));
-                    l1RepositoryCache.put(repository, Optional.ofNullable(mavenRepository));
-                    return new CacheResult<>(CacheResult.State.Updated, mavenRepository);
-                } catch (Exception e) {
-                    cache.put(key, serialize(Optional.empty()));
-                    l1RepositoryCache.put(repository, Optional.empty());
-                    throw e;
-                }
+    @Override
+    @Nullable
+    public CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+        CacheResult<MavenRepository> repositoryCacheResult = l1RepositoryCache.get(repository);
+        if (repositoryCacheResult == null) {
+            try {
+                repositoryCacheResult = deserializeMavenRepository(cache.get(serialize(repository)));
+            } catch (RocksDBException e) {
+                e.printStackTrace();
             }
         }
+        return repositoryCacheResult;
+    }
 
-        return cacheEntry
-                .map(mavenRepository -> new CacheResult<>(CacheResult.State.Cached, mavenRepository))
-                .orElse(UNAVAILABLE_REPOSITORY);
+    @Override
+    public CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
+        CacheResult<MavenRepository> cached = new CacheResult<>(CacheResult.State.Cached, normalized, -1);
+        l1RepositoryCache.put(repository, cached);
+        try {
+            cache.put(serialize(repository), serialize(cached));
+        } catch (RocksDBException e) {
+            e.printStackTrace();
+        }
+        return new CacheResult<>(CacheResult.State.Updated, normalized, -1);
     }
 
     @Override
@@ -240,13 +234,6 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         l1PomCache.clear();
         l1MavenMetadataCache.clear();
         l1RepositoryCache.clear();
-    }
-
-    private void fillUnresolvablePoms() {
-        new BufferedReader(new InputStreamReader(MavenPomDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
-                .lines()
-                .filter(line -> !line.isEmpty())
-                .forEach(unresolvablePoms::add);
     }
 
     static <T> byte[] serialize(T object) {
@@ -260,14 +247,12 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
     }
 
-    // Note: these methods intentionally return a null optional, which is used as a "cache miss".
-    @SuppressWarnings("OptionalAssignedToNull")
-    static Optional<MavenRepository> deserializeMavenRepository(byte[] bytes) {
+    static CacheResult<MavenRepository> deserializeMavenRepository(byte[] bytes) {
         if (bytes == null) {
             return null;
         }
         try {
-            return mapper.readValue(bytes, new TypeReference<Optional<MavenRepository>>() {
+            return mapper.readValue(bytes, new TypeReference<CacheResult<MavenRepository>>() {
             });
         } catch (Exception e) {
             //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
@@ -276,13 +261,12 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
     }
 
-    @SuppressWarnings("OptionalAssignedToNull")
-    static Optional<RawMaven> deserializeRawMaven(byte[] bytes) {
+    static CacheResult<RawMaven> deserializeRawMaven(byte[] bytes) {
         if (bytes == null) {
             return null;
         }
         try {
-            return mapper.readValue(bytes, new TypeReference<Optional<RawMaven>>() {
+            return mapper.readValue(bytes, new TypeReference<CacheResult<RawMaven>>() {
             });
         } catch (Exception e) {
             //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
@@ -291,19 +275,23 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
     }
 
-    @SuppressWarnings("OptionalAssignedToNull")
-    static Optional<MavenMetadata> deserializeMavenMetadata(byte[] bytes) {
+    static CacheResult<MavenMetadata> deserializeMavenMetadata(byte[] bytes) {
         if (bytes == null) {
             return null;
         }
         try {
-            return mapper.readValue(bytes, new TypeReference<Optional<MavenMetadata>>() {
+            return mapper.readValue(bytes, new TypeReference<CacheResult<MavenMetadata>>() {
             });
         } catch (Exception e) {
             //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
             //results.
             return null;
         }
+    }
+
+    @Override
+    public void close() throws Exception {
+        //Do nothing implementation because the rocksdb is managed at the statically.
     }
 
     /**

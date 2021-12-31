@@ -34,4 +34,7 @@ public class CacheResult<T> {
 
     @Nullable
     T data;
+
+    long ttl;
+
 }
