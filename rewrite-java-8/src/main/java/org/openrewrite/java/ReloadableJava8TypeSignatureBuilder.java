@@ -44,6 +44,8 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             } catch (Symbol.CompletionFailure ignored) {
                 return classSignature(type);
             }
+        } else if (type instanceof Type.CapturedType) {  // CapturedType must be evaluated before TypeVar
+            return signature(((Type.CapturedType) type).wildcard);
         } else if (type instanceof Type.TypeVar) {
             return genericSignature(type);
         } else if (type instanceof Type.JCPrimitiveType) {

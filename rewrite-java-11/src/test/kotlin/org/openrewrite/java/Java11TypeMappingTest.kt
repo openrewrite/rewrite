@@ -15,8 +15,10 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 class Java11TypeMappingTest : JavaTypeMappingTest {
@@ -32,4 +34,31 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
         .classes[0]
         .type
         .asParameterized()!!
+
+    @Test
+    fun noStackOverflowOnCapturedType() {
+        val source = """
+            import java.util.AbstractList;
+            import java.util.List;
+            
+            class A {
+                void method(PT<?, ?> type) {
+                    //noinspection StatementWithEmptyBody, ConstantConditions
+                    if (type instanceof PT) { // type is Type.CapturedType symbol
+                    }
+                }
+                class PT<S, T extends PT<S, T>> {
+                }
+            }
+        """.trimIndent()
+        val pt: JavaType.Parameterized = (((((JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true)
+            .build()
+            .parse(InMemoryExecutionContext { t -> fail(t) }, source)[0]
+            .classes[0]).body.statements[0] as J.MethodDeclaration)
+            .body!!.statements[0] as J.If)
+            .ifCondition.tree as J.InstanceOf).expression as J.Identifier)
+            .type as JavaType.Parameterized
+        pt.toString()
+    }
 }
