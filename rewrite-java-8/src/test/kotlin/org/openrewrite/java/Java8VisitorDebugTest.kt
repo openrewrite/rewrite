@@ -233,7 +233,7 @@ class Java8FindTypesTest : Java8Test, FindTypesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8GenerateGetterTest : Java8Test, GenerateGetterTest
+class Java8GenerateGetterTestAndSetter : Java8Test, GenerateGetterAndSetterTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

@@ -233,7 +233,7 @@ class Java11FindTypesTest : Java11Test, FindTypesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11GenerateGetterTest : Java11Test, GenerateGetterTest
+class Java11GenerateGetterTestAndSetter : Java11Test, GenerateGetterAndSetterTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
