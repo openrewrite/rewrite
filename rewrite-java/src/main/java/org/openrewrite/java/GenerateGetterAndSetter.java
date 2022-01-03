@@ -32,13 +32,13 @@ import java.util.Collections;
 public class GenerateGetterAndSetter extends Recipe {
 
     @Option(displayName = "Field name",
-            description = "Name of field to generate getter for.",
+            description = "Name of field to generate getter and setter for.",
             example = "foo")
     String fieldName;
 
     @Override
     public String getDisplayName() {
-        return "Generate getter and setter";
+        return "Generate getter and setter methods for field";
     }
 
     @Override
