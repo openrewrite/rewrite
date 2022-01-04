@@ -28,7 +28,6 @@ import javax.lang.model.type.NullType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
@@ -196,9 +195,8 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             List<JavaType.Variable> fields = null;
-            Map<String, JavaType.Variable> fieldMap = null;
             List<JavaType.Method> methods = null;
-            Map<String, JavaType.Method> methodMap = null;
+
             if (sym.members_field != null) {
                 for (Symbol elem : sym.members_field.getSymbols()) {
                     if (elem instanceof Symbol.VarSymbol &&
@@ -211,30 +209,24 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                             continue;
                         }
 
-                        if (fieldMap == null) {
-                            fieldMap = new TreeMap<>();
+                        if (fields == null) {
+                            fields = new ArrayList<>();
                         }
-                        fieldMap.put(signatureBuilder.variableSignature(elem), variableType(elem, clazz));
+                        fields.add(variableType(elem, clazz));
                     } else if (elem instanceof Symbol.MethodSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                     Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                        if (methodMap == null) {
-                            methodMap = new TreeMap<>();
+                        if (methods == null) {
+                            methods = new ArrayList<>();
                         }
                         Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) elem;
                         if (!methodSymbol.isStaticOrInstanceInit()) {
-                            methodMap.put(signatureBuilder.methodSignature(methodSymbol), methodDeclarationType(methodSymbol, clazz));
+                            methods.add(methodDeclarationType(methodSymbol, clazz));
                         }
                     }
                 }
             }
 
-            if (fieldMap != null) {
-                fields = new ArrayList<>(fieldMap.values());
-            }
-            if (methodMap != null) {
-                methods = new ArrayList<>(methodMap.values());
-            }
             clazz.unsafeSet(supertype, owner, annotations, interfaces, fields, methods);
         }
 
