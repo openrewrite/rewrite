@@ -26,6 +26,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -103,39 +104,46 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             }
 
             List<JavaType.Variable> variables = null;
+            Map<String, JavaType.Variable> variableMap = null;
             if (!aClass.getDeclaredFieldInfo().isEmpty()) {
-                variables = new ArrayList<>(aClass.getDeclaredFieldInfo().size());
+                variableMap = new TreeMap<>();
                 for (FieldInfo fieldInfo : aClass.getDeclaredFieldInfo()) {
                     if (!fieldInfo.isSynthetic()) {
                         if (!aClass.getName().equals("java.lang.String") || !fieldInfo.getName().equals("serialPersistentFields")) {
-                            JavaType.Variable variable = variableType(fieldInfo);
-                            variables.add(variable);
+                            variableMap.put(signatureBuilder.variableSignature(fieldInfo), variableType(fieldInfo));
                         }
                     }
                 }
             }
 
             List<JavaType.Method> methods = null;
+            Map<String, JavaType.Method> methodMap = null;
             if (!aClass.getDeclaredMethodInfo().isEmpty()) {
-                methods = new ArrayList<>(aClass.getDeclaredMethodInfo().size() + aClass.getDeclaredConstructorInfo().size());
+                methodMap = new TreeMap<>();
                 for (MethodInfo methodInfo : aClass.getDeclaredMethodInfo()) {
                     if (!(methodInfo.isBridge() || methodInfo.isSynthetic())) {
-                        methods.add(methodType(methodInfo));
+                        methodMap.put(signatureBuilder.methodSignature(methodInfo), methodType(methodInfo));
                     }
                 }
             }
 
             if (!aClass.getDeclaredConstructorInfo().isEmpty()) {
-                if (methods == null) {
-                    methods = new ArrayList<>(aClass.getDeclaredConstructorInfo().size());
+                if (methodMap == null) {
+                    methodMap = new TreeMap<>();
                 }
                 for (MethodInfo ctor : aClass.getDeclaredConstructorInfo()) {
                     if (!(ctor.isBridge() || ctor.isSynthetic())) {
-                        methods.add(methodType(ctor));
+                        methodMap.put(signatureBuilder.methodSignature(ctor), methodType(ctor));
                     }
                 }
             }
 
+            if (variableMap != null) {
+                variables = new ArrayList<>(variableMap.values());
+            }
+            if (methodMap != null) {
+                methods = new ArrayList<>(methodMap.values());
+            }
             ((JavaType.Class) clazz).unsafeSet(supertype, owner, annotations, interfaces, variables, methods);
         }
 
