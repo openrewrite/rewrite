@@ -31,6 +31,13 @@ public class TypeUtils {
                 );
     }
 
+    public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
+        if (fqn1 != null && fqn2 != null) {
+            return fqn1.replace("$", ".").equals(fqn2.replace("$", "."));
+        }
+        return fqn1 == null && fqn2 == null;
+    }
+
     public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2) {
         if (type1 == type2) {
             return true;
@@ -47,7 +54,8 @@ public class TypeUtils {
             return ((JavaType.Primitive) type1).getKeyword().equals(((JavaType.Primitive) type2).getKeyword());
         }
         if (type1 instanceof JavaType.FullyQualified && type2 instanceof JavaType.FullyQualified) {
-            return ((JavaType.FullyQualified) type1).getFullyQualifiedName().equals(((JavaType.FullyQualified) type2).getFullyQualifiedName());
+            return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type1).getFullyQualifiedName(),
+                    ((JavaType.FullyQualified) type2).getFullyQualifiedName());
         }
         if (type1 instanceof JavaType.Array && type2 instanceof JavaType.Array) {
             return isOfType(((JavaType.Array) type1).getElemType(), ((JavaType.Array) type2).getElemType());
@@ -71,7 +79,7 @@ public class TypeUtils {
 
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
         if(type instanceof JavaType.FullyQualified) {
-            return ((JavaType.FullyQualified) type).getFullyQualifiedName().equals(fqn);
+            return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type).getFullyQualifiedName(), (fqn));
         } else if(type instanceof JavaType.Variable) {
             return isOfClassType(((JavaType.Variable) type).getType(), fqn);
         } else if(type instanceof JavaType.Method) {

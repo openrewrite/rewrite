@@ -64,13 +64,14 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         Set<String> originalImports = new HashSet<>();
         for (J.Import cuImport : cu.getImports()) {
             if (cuImport.getQualid().getType() != null) {
-                originalImports.add(((JavaType.FullyQualified) cuImport.getQualid().getType()).getFullyQualifiedName());
+                originalImports.add(((JavaType.FullyQualified) cuImport.getQualid().getType()).getFullyQualifiedName().replace("$", "."));
             }
         }
 
         for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
             JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-            if (fq != null && (fq.getFullyQualifiedName().equals(type) || fq.getFullyQualifiedName().equals(owner))) {
+            if (fq != null && (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), type)
+                    || TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), owner))) {
                 methodsAndFieldsUsed.add(variable.getName());
             }
         }
@@ -78,7 +79,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
             if (method.hasFlags(Flag.Static)) {
                 String declaringType = method.getDeclaringType().getFullyQualifiedName();
-                if (declaringType.equals(type)) {
+                if (TypeUtils.fullyQualifiedNamesAreEqual(declaringType, type)) {
                     methodsAndFieldsUsed.add(method.getName());
                 } else if (declaringType.equals(owner)) {
                     if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
@@ -93,10 +94,11 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
             if (javaType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
-                if (fullyQualified.getFullyQualifiedName().equals(type)) {
+                if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), type)) {
                     typeUsed = true;
-                } else if (fullyQualified.getFullyQualifiedName().equals(owner) || fullyQualified.getPackageName().equals(owner)) {
-                    if (!originalImports.contains(fullyQualified.getFullyQualifiedName())) {
+                } else if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), owner)
+                        || TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getPackageName(), owner)) {
+                    if (!originalImports.contains(fullyQualified.getFullyQualifiedName().replace("$", "."))) {
                         otherTypesInPackageUsed.add(fullyQualified.getClassName());
                     }
                 }
@@ -116,11 +118,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             String typeName = impoort.getTypeName();
             if (impoort.isStatic()) {
                 String imported = impoort.getQualid().getSimpleName();
-                if ((typeName + "." + imported).equals(type) && (force || !methodsAndFieldsUsed.contains(imported))) {
+                if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) && (force || !methodsAndFieldsUsed.contains(imported))) {
                     // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                     spaceForNextImport.set(impoort.getPrefix());
                     return null;
-                } else if ("*".equals(imported) && (typeName.equals(type) || (typeName + type.substring(type.lastIndexOf('.'))).equals(type))) {
+                } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)
+                        || TypeUtils.fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), type))) {
                     if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                         spaceForNextImport.set(impoort.getPrefix());
                         return null;
@@ -129,12 +132,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
                         return unfoldStarImport(impoort, methodsAndFieldsUsed);
                     }
-                } else if (typeName.equals(type) && !methodsAndFieldsUsed.contains(imported)) {
+                } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) && !methodsAndFieldsUsed.contains(imported)) {
                     // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
                     spaceForNextImport.set(impoort.getPrefix());
                     return null;
                 }
-            } else if (!keepImport && typeName.equals(type)) {
+            } else if (!keepImport && TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)) {
                 if (impoort.getPrefix().isEmpty() || impoort.getPrefix().getLastWhitespace().chars().filter(s -> s == '\n').count() > 1) {
                     spaceForNextImport.set(impoort.getPrefix());
                 }
