@@ -18,6 +18,7 @@ package org.openrewrite.yaml.format;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.Autodetect;
 import org.openrewrite.yaml.style.IndentsStyle;
@@ -47,6 +48,10 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
                 .orElse(Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())), stopAfter)
                 .visit(y, p, cursor.fork());
 
+        y = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(docs.getStyle(GeneralFormatStyle.class))
+                .orElse(Autodetect.generalFormat(docs)), stopAfter)
+                .visit(y, p, cursor.fork());
+
         return y;
     }
 
@@ -58,6 +63,10 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
 
         y = (Yaml.Documents) new IndentsVisitor<>(Optional.ofNullable(documents.getStyle(IndentsStyle.class))
                 .orElse(Autodetect.tabsAndIndents(y, YamlDefaultStyles.indents())), stopAfter)
+                .visit(documents, p);
+
+        y = (Yaml.Documents) new NormalizeLineBreaksVisitor<>(Optional.ofNullable(documents.getStyle(GeneralFormatStyle.class))
+                .orElse(Autodetect.generalFormat(y)), stopAfter)
                 .visit(documents, p);
 
         assert y != null;

@@ -15,6 +15,10 @@
  */
 package org.openrewrite.yaml.style;
 
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.search.FindIndentYamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -28,5 +32,36 @@ public class Autodetect {
         return findIndent.nonZeroIndents() > 0 ?
                 new IndentsStyle(findIndent.getMostCommonIndent()) :
                 orElse;
+    }
+
+    public static GeneralFormatStyle generalFormat(Yaml yaml) {
+        FindLineFormatJavaVisitor<Void> findLineFormat = new FindLineFormatJavaVisitor<>();
+
+        //noinspection ConstantConditions
+        findLineFormat.visit(yaml, null);
+
+        return new GeneralFormatStyle(findLineFormat.isIndentedWithCRLFNewLines());
+    }
+
+    private static class FindLineFormatJavaVisitor<P> extends YamlIsoVisitor<P> {
+        private int linesWithCRLFNewLines = 0;
+        private int linesWithLFNewLines = 0;
+
+        public boolean isIndentedWithCRLFNewLines() {
+            return linesWithCRLFNewLines >= linesWithLFNewLines;
+        }
+
+        @Override
+        public @Nullable Yaml visit(@Nullable Tree tree, P p) {
+            Yaml y = super.visit(tree, p);
+            if (y != null) {
+                if (y.getPrefix().startsWith("\r\n")) {
+                    linesWithCRLFNewLines++;
+                } else if (y.getPrefix().startsWith("\n")) {
+                    linesWithLFNewLines++;
+                }
+            }
+            return y;
+        }
     }
 }
