@@ -107,7 +107,6 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         if (!typeVariableNameStack.add(name)) {
-            typeVariableNameStack.remove(name);
             return "Generic{" + name + "}";
         }
 

@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
-import com.sun.tools.javac.tree.JCTree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
@@ -108,7 +107,6 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         if (!typeVariableNameStack.add(name)) {
-            typeVariableNameStack.remove(name);
             return "Generic{" + name + "}";
         }
 

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
@@ -41,10 +42,10 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
             import java.util.AbstractList;
             import java.util.List;
             
-            class A {
-                void method(PT<?, ?> type) {
+            class Test {
+                void method(PT<?, ?> capturedType) {
                     //noinspection StatementWithEmptyBody, ConstantConditions
-                    if (type instanceof PT) { // type is Type.CapturedType symbol
+                    if (capturedType instanceof PT) { // type is Type.CapturedType symbol
                     }
                 }
                 class PT<S, T extends PT<S, T>> {
@@ -59,6 +60,24 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
             .body!!.statements[0] as J.If)
             .ifCondition.tree as J.InstanceOf).expression as J.Identifier)
             .type as JavaType.Parameterized
-        pt.toString()
+        Assertions.assertThat(pt).isNotNull
+    }
+
+    @Test
+    fun noStackOverflowOnRecursiveIntersectionType() {
+        val source = """
+            class Test {
+                abstract static class Extension<E extends Extension<E>> {
+                }
+                interface Intersection<E extends Extension<E> & Intersection<E>> {
+                    E getIntersectionType();
+                }
+            }
+        """.trimIndent()
+        val cu = JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true)
+            .build()
+            .parse(InMemoryExecutionContext { t -> fail(t) }, source)
+        Assertions.assertThat(cu).isNotNull
     }
 }

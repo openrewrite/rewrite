@@ -74,7 +74,6 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
             typeVariableNameStack = new LinkedHashSet<>();
         }
         if (!gtv.getName().equals("?") && !typeVariableNameStack.add(gtv.getName())) {
-            typeVariableNameStack.remove(gtv.getName());
             s.append('}');
             return s.toString();
         }
