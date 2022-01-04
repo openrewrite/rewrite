@@ -23,6 +23,7 @@ import org.openrewrite.java.tree.JavaType;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -199,9 +200,14 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                         methods.add(method(ctor, mappedClazz));
                     }
                 }
-
             }
 
+            if (members != null) {
+                members.sort(Comparator.comparing(JavaType::toString));
+            }
+            if (methods != null) {
+                methods.sort(Comparator.comparing(JavaType::toString));
+            }
             mappedClazz.unsafeSet(supertype, owner, annotations, interfaces, members, methods);
         }
 

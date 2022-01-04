@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.NullType;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -226,6 +227,12 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
 
+            if (fields != null) {
+                fields.sort(Comparator.comparing(JavaType::toString));
+            }
+            if (methods != null) {
+                methods.sort(Comparator.comparing(JavaType::toString));
+            }
             clazz.unsafeSet(supertype, owner, annotations, interfaces, fields, methods);
         }
 

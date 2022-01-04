@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -120,6 +121,12 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
 
             List<JavaType.FullyQualified> annotations = getAnnotations(node);
 
+            if (fields != null) {
+                fields.sort(Comparator.comparing(JavaType::toString));
+            }
+            if (methods != null) {
+                methods.sort(Comparator.comparing(JavaType::toString));
+            }
             clazz.unsafeSet(supertype, owner, annotations, interfaces, fields, methods);
         }
 
