@@ -17,7 +17,6 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
-import org.openrewrite.java.tree.JavaType;
 
 import java.lang.reflect.*;
 import java.util.HashSet;

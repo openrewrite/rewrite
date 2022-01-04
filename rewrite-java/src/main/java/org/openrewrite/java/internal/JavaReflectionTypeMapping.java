@@ -148,7 +148,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             JavaType.FullyQualified owner = (
                     clazz.getName().equals("java.lang.Object") ?
                             null :
-                            (JavaType.FullyQualified) type(clazz.getDeclaringClass()));
+                            (clazz.getDeclaringClass() == null ? null : (JavaType.FullyQualified) type(clazz.getDeclaringClass())));
             List<JavaType.FullyQualified> annotations = null;
             if (clazz.getDeclaredAnnotations().length > 0) {
                 annotations = new ArrayList<>(clazz.getDeclaredAnnotations().length);

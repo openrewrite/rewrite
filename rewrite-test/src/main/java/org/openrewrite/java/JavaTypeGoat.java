@@ -32,14 +32,15 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public abstract void clazz(C n);
     public abstract void primitive(int n);
     public abstract void array(C[][] n);
-    public abstract void parameterized(PT<C> n);
-    public abstract void parameterizedRecursive(PT<PT<C>> n);
-    public abstract void generic(PT<? extends C> n);
-    public abstract void genericContravariant(PT<? super C> n);
-    public abstract <U extends JavaTypeGoat<U, ?>> void genericRecursive(JavaTypeGoat<? extends U[], ?> n);
-    public abstract <U> void genericUnbounded(PT<U> n);
+    public abstract PT<C> parameterized(PT<C> n);
+    public abstract PT<PT<C>> parameterizedRecursive(PT<PT<C>> n);
+    public abstract PT<? extends C> generic(PT<? extends C> n);
+    public abstract PT<? super C> genericContravariant(PT<? super C> n);
+    public abstract <U extends JavaTypeGoat<U, ?>> JavaTypeGoat<? extends U[], ?> genericRecursive(JavaTypeGoat<? extends U[], ?> n);
+    public abstract <U> PT<U> genericUnbounded(PT<U> n);
     public abstract void genericArray(PT<C>[] n);
     public abstract void inner(C.Inner n);
+    public abstract T genericT(T n); // remove after signatures are common.
 }
 
 interface C {
