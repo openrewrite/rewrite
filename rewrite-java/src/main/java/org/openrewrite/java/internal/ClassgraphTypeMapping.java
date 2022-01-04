@@ -24,7 +24,6 @@ import org.openrewrite.java.tree.JavaType;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -137,12 +136,6 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 }
             }
 
-            if (variables != null) {
-                variables.sort(Comparator.comparing(JavaType::toString));
-            }
-            if (methods != null) {
-                methods.sort(Comparator.comparing(JavaType::toString));
-            }
             ((JavaType.Class) clazz).unsafeSet(supertype, owner, annotations, interfaces, variables, methods);
         }
 

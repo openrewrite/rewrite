@@ -187,7 +187,7 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
         StringBuilder s = new StringBuilder(declaringTypeName);
 
         s.append("{name=").append(method.getName());
-        s.append(",return=").append(signature(method.getReturnType()));
+        s.append(",return=").append(method.getReturnType().getName());
 
         StringJoiner parameterTypeSignatures = new StringJoiner(",", "[", "]");
         if (method.getParameters().length > 0) {
