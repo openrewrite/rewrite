@@ -64,7 +64,7 @@ public class FindTypes extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        JavaType.FullyQualified fullyQualifiedType = JavaType.Class.build(fullyQualifiedTypeName);
+        JavaType.FullyQualified fullyQualifiedType = JavaType.ShallowClass.build(fullyQualifiedTypeName);
 
         return new JavaVisitor<ExecutionContext>() {
             @Override
@@ -115,7 +115,7 @@ public class FindTypes extends Recipe {
     }
 
     private static Set<NameTree> find(boolean checkAssignability, J j, String fullyQualifiedClassName) {
-        JavaType.FullyQualified fullyQualifiedType = JavaType.Class.build(fullyQualifiedClassName);
+        JavaType.FullyQualified fullyQualifiedType = JavaType.ShallowClass.build(fullyQualifiedClassName);
 
         JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
             @Override
@@ -161,7 +161,7 @@ public class FindTypes extends Recipe {
                                        @Nullable JavaType.FullyQualified test) {
         return test != null && match != null && (checkAssignability ?
                 match.isAssignableFrom(test) :
-                match.getFullyQualifiedName().equals(test.getFullyQualifiedName())
+                TypeUtils.fullyQualifiedNamesAreEqual(match.getFullyQualifiedName(), test.getFullyQualifiedName())
         );
     }
 }

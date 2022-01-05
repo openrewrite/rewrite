@@ -222,7 +222,7 @@ public interface JavaType {
         }
 
         public boolean isAssignableTo(String fullyQualifiedName) {
-            return getFullyQualifiedName().equals(fullyQualifiedName) ||
+            return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), fullyQualifiedName) ||
                     getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName))
                     || (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
         }
@@ -230,7 +230,7 @@ public interface JavaType {
         public boolean isAssignableFrom(@Nullable JavaType type) {
             if (type instanceof FullyQualified) {
                 FullyQualified clazz = (FullyQualified) type;
-                return getFullyQualifiedName().equals(clazz.getFullyQualifiedName()) ||
+                return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), clazz.getFullyQualifiedName()) ||
                         isAssignableFrom(clazz.getSupertype()) ||
                         clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
             } else if (type instanceof GenericTypeVariable) {
@@ -409,7 +409,7 @@ public interface JavaType {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Class aClass = (Class) o;
-            return fullyQualifiedName.equals(aClass.fullyQualifiedName);
+            return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName);
         }
 
         @Override

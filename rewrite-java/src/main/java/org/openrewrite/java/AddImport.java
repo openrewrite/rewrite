@@ -62,7 +62,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
     public AddImport(String type, @Nullable String statik, boolean onlyIfReferenced) {
         this.type = type;
-        this.classType = JavaType.Class.build(type);
+        this.classType = JavaType.ShallowClass.build(type);
         this.statik = statik;
         this.onlyIfReferenced = onlyIfReferenced;
     }

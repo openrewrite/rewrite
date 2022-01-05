@@ -84,7 +84,7 @@ public class Substitutions {
                         if (arrayType.getElemType() instanceof JavaType.Primitive) {
                             s += ((JavaType.Primitive) arrayType.getElemType()).getKeyword();
                         } else if (arrayType.getElemType() instanceof JavaType.FullyQualified) {
-                            s += ((JavaType.FullyQualified) arrayType.getElemType()).getFullyQualifiedName();
+                            s += ((JavaType.FullyQualified) arrayType.getElemType()).getFullyQualifiedName().replace("$", ".");
                         }
 
                         s += "[0]" + extraDim + ")";
@@ -101,6 +101,8 @@ public class Substitutions {
                                 fqn = getTypeName(((TypedTree) parameter).getType());
                             }
                         }
+
+                        fqn = fqn.replace("$", ".");
 
                         JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
                         s = "__P__." + (primitive == null || primitive.equals(JavaType.Primitive.String) ?
