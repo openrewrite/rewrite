@@ -18,12 +18,12 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 
-interface GenerateGetterAndSetterTest : JavaRecipeTest {
+interface GenerateGetterAndSetterVisitorTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1301")
     @Test
     fun getterAndSetterForPrimitiveInteger(jp: JavaParser) = assertChanged(
-        recipe = GenerateGetterAndSetter("counter"),
+        recipe = toRecipe { GenerateGetterAndSetterVisitor("counter") },
         before = """
             class T {
                 int counter;
@@ -44,7 +44,7 @@ interface GenerateGetterAndSetterTest : JavaRecipeTest {
 
     @Test
     fun getterAndSetterForNonPrimitive(jp: JavaParser) = assertChanged(
-        recipe = GenerateGetterAndSetter("size"),
+        recipe = toRecipe { GenerateGetterAndSetterVisitor("size") },
         before = """
             class T {
                 Float size;
@@ -65,7 +65,7 @@ interface GenerateGetterAndSetterTest : JavaRecipeTest {
 
     @Test
     fun getterAndSetterPrimitiveBoolean(jp: JavaParser) = assertChanged(
-        recipe = GenerateGetterAndSetter("valid"),
+        recipe = toRecipe{ GenerateGetterAndSetterVisitor("valid") },
         before = """
             class T {
                 boolean valid;

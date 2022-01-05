@@ -186,7 +186,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindTypesTck : FindTypesTest
 
     @Nested
-    inner class GenerateGetterAndSetterTck : GenerateGetterAndSetterTest
+    inner class GenerateGetterAndSetterVisitorTck : GenerateGetterAndSetterVisitorTest
 
     @Nested
     inner class HiddenFieldTck : HiddenFieldTest
