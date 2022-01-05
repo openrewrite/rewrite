@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 public enum Flag {
     Public(1L),
@@ -44,6 +45,9 @@ public enum Flag {
     PotentiallyAmbiguous(1L << 48);
 
     private final long bitMask;
+
+    public static final long VALID_CLASS_FLAGS = Stream.of(Public, Private, Protected, Static,  Final, Interface, Abstract)
+            .map(Flag::getBitMask).reduce(0L, (m1, m2) -> m1 | m2);
 
     public static final long VALID_FLAGS = Arrays.stream(Flag.values())
             .map(Flag::getBitMask)
