@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal;
 
 import io.github.classgraph.*;
+import nonapi.io.github.classgraph.types.TypeUtils;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
@@ -24,6 +25,7 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -453,41 +455,21 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
     }
 
     private long getFlagsFromClass(ClassInfo classInfo) {
-        long flags = 0;
-        flags = flags | (classInfo.isPublic() ? Flag.Public.getBitMask() : 0);
-        flags = flags | (classInfo.isPrivate() ? Flag.Private.getBitMask() : 0);
-        flags = flags | (classInfo.isProtected() ? Flag.Protected.getBitMask() : 0);
-        flags = flags | (classInfo.isStatic() ? Flag.Static.getBitMask() : 0);
-        flags = flags | (classInfo.isFinal() ? Flag.Final.getBitMask() : 0);
-        flags = flags | (classInfo.isInterface() ? Flag.Interface.getBitMask() : 0);
-        flags = flags | (classInfo.isAbstract() ? Flag.Abstract.getBitMask() : 0);
-        return flags;
+        return classInfo.getModifiers();
     }
 
     private long getFlagsFromMethod(MethodInfo methodInfo) {
-        long flags = 0;
-        flags = flags | (methodInfo.isPublic() ? Flag.Public.getBitMask() : 0);
-        flags = flags | (methodInfo.isPrivate() ? Flag.Private.getBitMask() : 0);
-        flags = flags | (methodInfo.isProtected() ? Flag.Protected.getBitMask() : 0);
-        flags = flags | (methodInfo.isStatic() ? Flag.Static.getBitMask() : 0);
-        flags = flags | (methodInfo.isFinal() ? Flag.Final.getBitMask() : 0);
-        flags = flags | (methodInfo.isAbstract() ? Flag.Abstract.getBitMask() : 0);
-        flags = flags | (methodInfo.isSynchronized() ? Flag.Synchronized.getBitMask() : 0);
-        flags = flags | (methodInfo.isVarArgs() ? Flag.Varargs.getBitMask() : 0);
-        flags = flags | (methodInfo.isDefault() ? Flag.Default.getBitMask() : 0);
-        flags = flags | (methodInfo.isNative() ? Flag.Native.getBitMask() : 0);
-        flags = flags | (methodInfo.isStrict() ? Flag.Strictfp.getBitMask() : 0);
+        long flags = methodInfo.getModifiers();
+        if (methodInfo.isVarArgs()) {
+            //method's overload the transient field to indicate varargs. clear the transient bit and then set the varargs
+            //bit.
+            flags = flags & ~Flag.Transient.getBitMask();
+            flags = flags | Flag.Varargs.getBitMask();
+        }
         return flags;
     }
 
     private long getFlagsFromField(FieldInfo fieldInfo) {
-        long flags = 0;
-        flags = flags | (fieldInfo.isPublic() ? Flag.Public.getBitMask() : 0);
-        flags = flags | (fieldInfo.isPrivate() ? Flag.Private.getBitMask() : 0);
-        flags = flags | (fieldInfo.isProtected() ? Flag.Protected.getBitMask() : 0);
-        flags = flags | (fieldInfo.isStatic() ? Flag.Static.getBitMask() : 0);
-        flags = flags | (fieldInfo.isFinal() ? Flag.Final.getBitMask() : 0);
-        flags = flags | (fieldInfo.isTransient() ? Flag.Transient.getBitMask() : 0);
-        return flags;
+        return fieldInfo.getModifiers();
     }
 }
