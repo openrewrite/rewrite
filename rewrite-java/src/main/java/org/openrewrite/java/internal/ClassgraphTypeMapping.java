@@ -16,7 +16,6 @@
 package org.openrewrite.java.internal;
 
 import io.github.classgraph.*;
-import nonapi.io.github.classgraph.types.TypeUtils;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
@@ -25,7 +24,6 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -90,25 +88,28 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                     type(aClass.getOuterClasses().get(0));
 
             List<JavaType.FullyQualified> annotations = null;
-            if (!aClass.getAnnotationInfo().isEmpty()) {
-                annotations = new ArrayList<>(aClass.getAnnotationInfo().size());
-                for (AnnotationInfo annotationInfo : aClass.getAnnotationInfo()) {
+            AnnotationInfoList classGraphAnnotations = aClass.getAnnotationInfo();
+            if (!classGraphAnnotations.isEmpty()) {
+                annotations = new ArrayList<>(classGraphAnnotations.size());
+                for (AnnotationInfo annotationInfo : classGraphAnnotations) {
                     annotations.add(type(annotationInfo.getClassInfo()));
                 }
             }
 
             List<JavaType.FullyQualified> interfaces = null;
-            if (!aClass.getInterfaces().isEmpty()) {
-                interfaces = new ArrayList<>(aClass.getInterfaces().size());
-                for (ClassInfo anInterface : aClass.getInterfaces()) {
+            ClassInfoList classGraphInterfaces = aClass.getInterfaces().directOnly();
+            if (!classGraphInterfaces.isEmpty()) {
+                interfaces = new ArrayList<>(classGraphInterfaces.size());
+                for (ClassInfo anInterface : classGraphInterfaces) {
                     interfaces.add(type(anInterface));
                 }
             }
 
             List<JavaType.Variable> variables = null;
-            if (!aClass.getDeclaredFieldInfo().isEmpty()) {
-                variables = new ArrayList<>(aClass.getDeclaredFieldInfo().size());
-                for (FieldInfo fieldInfo : aClass.getDeclaredFieldInfo()) {
+            FieldInfoList classGraphVariables = aClass.getDeclaredFieldInfo();
+            if (!classGraphVariables.isEmpty()) {
+                variables = new ArrayList<>(classGraphVariables.size());
+                for (FieldInfo fieldInfo : classGraphVariables) {
                     if (!fieldInfo.isSynthetic()) {
                         if (!aClass.getName().equals("java.lang.String") || !fieldInfo.getName().equals("serialPersistentFields")) {
                             JavaType.Variable variable = variableType(fieldInfo);
@@ -119,20 +120,22 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             }
 
             List<JavaType.Method> methods = null;
-            if (!aClass.getDeclaredMethodInfo().isEmpty()) {
-                methods = new ArrayList<>(aClass.getDeclaredMethodInfo().size() + aClass.getDeclaredConstructorInfo().size());
-                for (MethodInfo methodInfo : aClass.getDeclaredMethodInfo()) {
+            MethodInfoList classGraphMethods = aClass.getDeclaredMethodInfo();
+            MethodInfoList classGraphConstructors = aClass.getDeclaredConstructorInfo();
+            if (!classGraphMethods.isEmpty()) {
+                methods = new ArrayList<>(classGraphMethods.size() + classGraphConstructors.size());
+                for (MethodInfo methodInfo : classGraphMethods) {
                     if (!(methodInfo.isBridge() || methodInfo.isSynthetic())) {
                         methods.add(methodType(methodInfo));
                     }
                 }
             }
 
-            if (!aClass.getDeclaredConstructorInfo().isEmpty()) {
+            if (!classGraphConstructors.isEmpty()) {
                 if (methods == null) {
-                    methods = new ArrayList<>(aClass.getDeclaredConstructorInfo().size());
+                    methods = new ArrayList<>(classGraphConstructors.size());
                 }
-                for (MethodInfo ctor : aClass.getDeclaredConstructorInfo()) {
+                for (MethodInfo ctor : classGraphConstructors) {
                     if (!(ctor.isBridge() || ctor.isSynthetic())) {
                         methods.add(methodType(ctor));
                     }
