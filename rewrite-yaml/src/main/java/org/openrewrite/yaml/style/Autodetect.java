@@ -40,15 +40,15 @@ public class Autodetect {
         //noinspection ConstantConditions
         findLineFormat.visit(yaml, null);
 
-        return new GeneralFormatStyle(findLineFormat.isIndentedWithCRLFNewLines());
+        return new GeneralFormatStyle(!findLineFormat.isIndentedWithLFNewLines());
     }
 
     private static class FindLineFormatJavaVisitor<P> extends YamlIsoVisitor<P> {
         private int linesWithCRLFNewLines = 0;
         private int linesWithLFNewLines = 0;
 
-        public boolean isIndentedWithCRLFNewLines() {
-            return linesWithCRLFNewLines >= linesWithLFNewLines;
+        public boolean isIndentedWithLFNewLines() {
+            return linesWithLFNewLines >= linesWithCRLFNewLines;
         }
 
         @Override
