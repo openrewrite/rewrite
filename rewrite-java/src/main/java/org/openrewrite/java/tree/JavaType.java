@@ -288,7 +288,7 @@ public interface JavaType {
                      @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
                      @Nullable List<Variable> members, @Nullable List<Method> methods) {
             this.managedReference = managedReference;
-            this.flagsBitMap = flagsBitMap & Flag.VALID_CLASS_FLAGS;
+            this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.fullyQualifiedName = fullyQualifiedName;
             this.kind = kind;
             this.supertype = supertype;
