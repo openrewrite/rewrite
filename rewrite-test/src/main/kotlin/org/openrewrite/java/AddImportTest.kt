@@ -729,7 +729,7 @@ interface AddImportTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/776")
     @Test
     fun addImportAndFoldIntoWildcard(jp: JavaParser) = assertChanged(
-        jp,
+        JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build(),
         dependsOn = arrayOf(
             """
                 package foo;
@@ -745,10 +745,13 @@ interface AddImportTest : JavaRecipeTest {
         before = """
             import foo.B;
             import foo.C;
+            
             import java.util.Collections;
             import java.util.List;
             import java.util.HashSet;
             import java.util.HashMap;
+            import java.util.Map;
+            import java.util.Set;
             
             class A {
                 B b = new B();
