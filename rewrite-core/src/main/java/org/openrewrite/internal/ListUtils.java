@@ -164,18 +164,23 @@ public final class ListUtils {
                 }
 
                 if (newTreeOrTrees instanceof Iterable) {
-                    int n = 0;
+                    boolean addedTree = false;
                     //noinspection unchecked
                     for (T newTree : (Iterable<T>) newTreeOrTrees) {
                         if (j >= newLs.size()) {
                             newLs.add(newTree);
-                        } else if (n == 0) {
+                        } else if (!addedTree) {
                             newLs.set(j, newTree);
                         } else {
                             newLs.add(j, newTree);
                         }
+                        addedTree = true;
                         j++;
-                        n++;
+                    }
+                    if (addedTree) {
+                        j--;
+                    } else {
+                        newLs.set(j, null);
                     }
                 } else {
                     if (j >= newLs.size()) {

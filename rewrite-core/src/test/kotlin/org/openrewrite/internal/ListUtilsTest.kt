@@ -31,4 +31,46 @@ class ListUtilsTest {
             }
         }).containsExactly(1.0, 2.0, 2.1, 2.2, 3.0)
     }
+
+    @Test
+    fun replaceSingleWithMultipleAtPosition0() {
+        val l = listOf(1)
+        assertThat(ListUtils.flatMap(l) { l1 -> listOf(2, 3) }).containsExactly(2, 3)
+    }
+    @Test
+    fun removeSingleItem() {
+        val l = listOf(1, 2, 3)
+        assertThat(ListUtils.flatMap(l) { l1 ->
+            if (l1.equals(2)) {
+                null
+            } else {
+                l1
+            }
+        }).containsExactly(1, 3)
+    }
+
+    @Test
+    fun replaceItemWithCollectionThenRemoveNextItem() {
+        val l = listOf(2, 0)
+        assertThat(ListUtils.flatMap(l) { l1 ->
+            if (l1.equals(2)) {
+                listOf(10, 11)
+            } else {
+                null
+            }
+        }).containsExactly(10, 11)
+    }
+
+    @Test
+    fun removeByAddingEmptyCollection() {
+        val l = listOf(2, 0)
+        assertThat(ListUtils.flatMap(l) { l1 ->
+            if (l1.equals(2)) {
+                listOf(10, 11)
+            } else {
+                listOf<Int>()
+            }
+        }).containsExactly(10, 11)
+    }
+
 }

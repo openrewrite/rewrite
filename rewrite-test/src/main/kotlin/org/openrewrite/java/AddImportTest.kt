@@ -745,10 +745,13 @@ interface AddImportTest : JavaRecipeTest {
         before = """
             import foo.B;
             import foo.C;
+            
             import java.util.Collections;
             import java.util.List;
             import java.util.HashSet;
             import java.util.HashMap;
+            import java.util.Map;
+            import java.util.Set;
             
             class A {
                 B b = new B();
