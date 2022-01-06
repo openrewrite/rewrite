@@ -30,6 +30,7 @@ import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
 
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
@@ -45,9 +46,10 @@ public class XmlParser implements Parser<Xml.Document> {
                             .description("The time spent parsing an XML file")
                             .tag("file.type", "XML");
                     Timer.Sample sample = Timer.start();
-                    try {
+
+                    try (InputStream sourceStream = sourceFile.getSource()) {
                         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                                CharStreams.fromStream(sourceFile.getSource()))));
+                                CharStreams.fromStream(sourceStream))));
 
                         parser.removeErrorListeners();
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));

@@ -30,6 +30,7 @@ import org.openrewrite.json.internal.grammar.JSON5Lexer;
 import org.openrewrite.json.internal.grammar.JSON5Parser;
 import org.openrewrite.json.tree.Json;
 
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
@@ -45,9 +46,9 @@ public class JsonParser implements Parser<Json.Document> {
                             .description("The time spent parsing an Json file")
                             .tag("file.type", "Json");
                     Timer.Sample sample = Timer.start();
-                    try {
+                    try (InputStream sourceStream = sourceFile.getSource()) {
                         JSON5Parser parser = new JSON5Parser(new CommonTokenStream(new JSON5Lexer(
-                                CharStreams.fromStream(sourceFile.getSource()))));
+                                CharStreams.fromStream(sourceStream))));
 
                         parser.removeErrorListeners();
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));

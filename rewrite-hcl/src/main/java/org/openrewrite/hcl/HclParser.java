@@ -30,6 +30,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,8 +53,8 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
                             .description("The time spent parsing an HCL file")
                             .tag("file.type", "HCL");
                     Timer.Sample sample = Timer.start();
-                    try {
-                        HCLLexer lexer = new HCLLexer(CharStreams.fromStream(sourceFile.getSource()));
+                    try (InputStream sourceStream = sourceFile.getSource()) {
+                        HCLLexer lexer = new HCLLexer(CharStreams.fromStream(sourceStream));
                         lexer.removeErrorListeners();
                         lexer.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
