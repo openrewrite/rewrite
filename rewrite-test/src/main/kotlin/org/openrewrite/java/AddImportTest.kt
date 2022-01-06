@@ -729,7 +729,7 @@ interface AddImportTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/776")
     @Test
     fun addImportAndFoldIntoWildcard(jp: JavaParser) = assertChanged(
-        JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build(),
+        jp,
         dependsOn = arrayOf(
             """
                 package foo;
