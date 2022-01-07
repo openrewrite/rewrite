@@ -203,7 +203,8 @@ public class MavenPomDownloader {
                              @Nullable RawMaven containingPom,
                              Collection<MavenRepository> repositories,
                              ExecutionContext ctx) {
-        Map<MavenRepository, Exception> errors = new HashMap<>();
+
+        Map<MavenRepository, String> errors = new HashMap<>();
 
         String versionMaybeDatedSnapshot = datedSnapshotVersion(groupId, artifactId, version, repositories, ctx);
         Timer.Sample sample = Timer.start();
@@ -256,56 +257,52 @@ public class MavenPomDownloader {
                     .tag("artifact.id", artifactId)
                     .tag("type", "pom");
 
-            try {
-                //There are a few exceptional artifacts that will never be resolved by the repositories. This will always
-                //result in an Unavailable response from the cache.
-                String artifactCoordinates = groupId + ':' + artifactId + ':' + version;
-                if (unresolvablePoms.contains(artifactCoordinates)) {
-                    return null;
-                }
+            //There are a few exceptional artifacts that will never be resolved by the repositories. This will always
+            //result in an Unavailable response from the cache.
+            String artifactCoordinates = groupId + ':' + artifactId + ':' + version;
+            if (unresolvablePoms.contains(artifactCoordinates)) {
+                return null;
+            }
 
-                MavenPomCache.PomKey pomKey = new MavenPomCache.PomKey(repo.getUri(), groupId, artifactId, versionMaybeDatedSnapshot);
-                CacheResult<RawMaven> result = mavenPomCache.getMaven(pomKey);
+            MavenPomCache.PomKey pomKey = new MavenPomCache.PomKey(repo.getUri(), groupId, artifactId, versionMaybeDatedSnapshot);
+            CacheResult<RawMaven> result = mavenPomCache.getMaven(pomKey);
 
-                if (result == null) {
-                    String uri = URI.create(repo.getUri().toString()) + "/" +
-                            groupId.replace('.', '/') + '/' +
-                            artifactId + '/' +
-                            version + '/' +
-                            artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
+            if (result == null) {
+                String uri = URI.create(repo.getUri().toString()) + "/" +
+                        groupId.replace('.', '/') + '/' +
+                        artifactId + '/' +
+                        version + '/' +
+                        artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
 
-                    Request.Builder request = applyAuthenticationToRequest(repo, new Request.Builder().url(uri).get());
-                    int responseCode;
-                    try (Response response = sendRequest.apply(request.build())) {
-                        responseCode = response.code();
-                        if (response.isSuccessful() && response.body() != null) {
-                            @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
-                                    .bytes();
+                Request.Builder request = applyAuthenticationToRequest(repo, new Request.Builder().url(uri).get());
+                int responseCode;
+                try (Response response = sendRequest.apply(request.build())) {
+                    responseCode = response.code();
+                    if (response.isSuccessful() && response.body() != null) {
+                        @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
+                                .bytes();
 
-                            // This path doesn't matter except for debugging/error logs where it might get displayed
-                            Path inputPath = Paths.get(groupId, artifactId, version);
-                            RawMaven rawMaven = RawMaven.parse(
-                                    new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
-                                    null,
-                                    versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot,
-                                    ctx
-                            ).withRepository(repo);
-                            result = mavenPomCache.setMaven(pomKey, rawMaven, version.endsWith("-SNAPSHOT"));
-                        } else {
-                            throw new MavenDownloadingException("Download failure. Response code is [" + responseCode + "]. URI = " + uri);
-                        }
-                    } catch (Throwable throwable) {
-                        mavenPomCache.setMaven(pomKey, null, version.endsWith("-SNAPSHOT"));
-                        throw new MavenDownloadingException(throwable);
+                        // This path doesn't matter except for debugging/error logs where it might get displayed
+                        Path inputPath = Paths.get(groupId, artifactId, version);
+                        RawMaven rawMaven = RawMaven.parse(
+                                new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
+                                null,
+                                versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot,
+                                ctx
+                        ).withRepository(repo);
+                        result = mavenPomCache.setMaven(pomKey, rawMaven, version.endsWith("-SNAPSHOT"));
+                    } else {
+                        errors.put(repo, "Download failure. Response code is [" + responseCode + "].");
+                        result = mavenPomCache.setMaven(pomKey, null, version.endsWith("-SNAPSHOT"));
                     }
+                } catch (Throwable throwable) {
+                    errors.put(repo, "Download failure. " + throwable.getMessage());
+                    result = mavenPomCache.setMaven(pomKey, null, version.endsWith("-SNAPSHOT"));
                 }
-
-                sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
+            }
+            sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
+            if (result.getData() != null) {
                 return result.getData();
-            } catch (Exception e) {
-                sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
-                        .register(Metrics.globalRegistry));
-                errors.put(repo, e);
             }
         }
 

@@ -338,8 +338,8 @@ public class RawMavenResolver {
                     version = requestedVersion.resolve(downloader, partialMaven.getRepositories());
 
                     if (version == null || version.contains("${")) {
-                        ctx.getOnError().accept(new MavenParsingException("Unable to download %s:%s:%s. Including POM is at %s",
-                                groupId, artifactId, version, rawMaven));
+                        ctx.getOnError().accept(new MavenParsingException("Could not resolve version %s:%s:%s. Including POM is at %s",
+                                MavenParsingException.Severity.Info, groupId, artifactId, version, rawMaven));
                         return null;
                     }
 
@@ -348,8 +348,7 @@ public class RawMavenResolver {
                             partialMaven.getRepositories(), ctx);
 
                     if (download == null) {
-                        ctx.getOnError().accept(new MavenParsingException("Unable to download %s:%s:%s. Including POM is at %s",
-                                groupId, artifactId, version, rawMaven));
+                        //No need to log an error, that will be done in the downloader.
                         return null;
                     }
 
@@ -817,13 +816,13 @@ public class RawMavenResolver {
                     }
 
                     if (required) {
-                        ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s. Including POM is at %s", v, rawPom));
+                        ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s. Including POM is at %s", MavenParsingException.Severity.Info, v, rawPom));
                     }
                     return null;
                 });
             } catch (Throwable t) {
                 if (required) {
-                    ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s. Including POM is at %s", v, rawPom));
+                    ctx.getOnError().accept(new MavenParsingException("Unable to resolve property %s. Including POM is at %s", MavenParsingException.Severity.Info, v, rawPom));
                 }
                 return null;
             }
