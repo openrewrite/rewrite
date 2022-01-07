@@ -18,6 +18,7 @@ package org.openrewrite.java.marker;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ClassInfoList;
+import io.github.classgraph.ScanResult;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
@@ -51,7 +52,8 @@ public class JavaSourceSet implements Marker {
         ClassgraphTypeMapping typeMapping = new ClassgraphTypeMapping(typeBySignature, jvmClasses);
 
         if (classpath.iterator().hasNext()) {
-            for (ClassInfo classInfo : new ClassGraph()
+
+            try (ScanResult scanResult = new ClassGraph()
                     .overrideClasspath(classpath)
                     .enableAnnotationInfo()
                     .enableMemoryMapping()
@@ -61,12 +63,14 @@ public class JavaSourceSet implements Marker {
                     .ignoreClassVisibility()
                     .ignoreFieldVisibility()
                     .ignoreMethodVisibility()
-                    .scan()
-                    .getAllClasses()) {
-                try {
-                    fqns.add(typeMapping.type(classInfo));
-                } catch (Exception e) {
-                    ctx.getOnError().accept(e);
+                    .scan()) {
+
+                for (ClassInfo classInfo : scanResult.getAllClasses()) {
+                    try {
+                        fqns.add(typeMapping.type(classInfo));
+                    } catch (Exception e) {
+                        ctx.getOnError().accept(e);
+                    }
                 }
             }
         }
@@ -77,7 +81,8 @@ public class JavaSourceSet implements Marker {
     private static Map<String, JavaType.FullyQualified> jvmClasses(Map<String, Object> typeBySignature, ExecutionContext ctx) {
         boolean java8 = System.getProperty("java.version").startsWith("1.8");
 
-        ClassInfoList classInfos = new ClassGraph()
+        ClassInfoList classInfos;
+        try (ScanResult scanResult = new ClassGraph()
                 .enableMemoryMapping()
                 .enableAnnotationInfo()
                 .enableClassInfo()
@@ -88,19 +93,18 @@ public class JavaSourceSet implements Marker {
                 .ignoreClassVisibility()
                 .ignoreFieldVisibility()
                 .ignoreMethodVisibility()
-                .scan()
-                .getAllClasses();
-
-        ClassgraphTypeMapping builder = new ClassgraphTypeMapping(typeBySignature, emptyMap());
-        Map<String, JavaType.FullyQualified> fqns = new HashMap<>(classInfos.size());
-        for (ClassInfo classInfo : classInfos) {
-            try {
-                fqns.put(classInfo.getName(), builder.type(classInfo));
-            } catch (Exception e) {
-                ctx.getOnError().accept(e);
+                .scan()) {
+            classInfos = scanResult.getAllClasses();
+            ClassgraphTypeMapping builder = new ClassgraphTypeMapping(typeBySignature, emptyMap());
+            Map<String, JavaType.FullyQualified> fqns = new HashMap<>(classInfos.size());
+            for (ClassInfo classInfo : classInfos) {
+                try {
+                    fqns.put(classInfo.getName(), builder.type(classInfo));
+                } catch (Exception e) {
+                    ctx.getOnError().accept(e);
+                }
             }
+            return fqns;
         }
-
-        return fqns;
     }
 }
