@@ -42,7 +42,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             try {
                 return type.isParameterized() ? parameterizedSignature(type) : classSignature(type);
             } catch (Symbol.CompletionFailure ignored) {
-                return classSignature(type);
+                return type.isParameterized() ? parameterizedSignature(type) : classSignature(type);
             }
         } else if (type instanceof Type.CapturedType) { // CapturedType must be evaluated before TypeVar
             return signature(((Type.CapturedType) type).wildcard);
