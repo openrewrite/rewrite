@@ -25,6 +25,8 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.NullType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -172,17 +174,6 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                 owner = TypeUtils.asFullyQualified(type(sym.owner.type));
             }
 
-            List<JavaType.FullyQualified> annotations = null;
-            if (!sym.getDeclarationAttributes().isEmpty()) {
-                annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
-                for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-                    JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
-                    if (annotType != null) {
-                        annotations.add(annotType);
-                    }
-                }
-            }
-
             List<JavaType.FullyQualified> interfaces = null;
             if (symType.interfaces_field != null) {
                 interfaces = new ArrayList<>(symType.interfaces_field.length());
@@ -227,7 +218,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
 
-            clazz.unsafeSet(supertype, owner, annotations, interfaces, fields, methods);
+            clazz.unsafeSet(supertype, owner, listAnnotations(sym), interfaces, fields, methods);
         }
 
         if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
@@ -361,18 +352,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
             assert resolvedOwner != null;
         }
 
-        List<JavaType.FullyQualified> annotations = null;
-        if (!symbol.getDeclarationAttributes().isEmpty()) {
-            annotations = new ArrayList<>(symbol.getDeclarationAttributes().size());
-            for (Attribute.Compound a : symbol.getDeclarationAttributes()) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type));
-                if (fq != null) {
-                    annotations.add(fq);
-                }
-            }
-        }
-
-        variable.unsafeSet(resolvedOwner, type(symbol.type), annotations);
+        variable.unsafeSet(resolvedOwner, type(symbol.type), listAnnotations(symbol));
         return variable;
     }
 
@@ -468,22 +448,11 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
             return null;
         }
 
-        List<JavaType.FullyQualified> annotations = null;
-        if (!methodSymbol.getDeclarationAttributes().isEmpty()) {
-            annotations = new ArrayList<>(methodSymbol.getDeclarationAttributes().size());
-            for (Attribute.Compound a : methodSymbol.getDeclarationAttributes()) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type));
-                if (fq != null) {
-                    annotations.add(fq);
-                }
-            }
-        }
-
         assert returnType != null;
 
         method.unsafeSet(resolvedDeclaringType,
                 methodSymbol.isConstructor() ? resolvedDeclaringType : returnType,
-                parameterTypes, exceptionTypes, annotations);
+                parameterTypes, exceptionTypes, listAnnotations(methodSymbol));
         return method;
     }
 
@@ -571,17 +540,6 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                 return null;
             }
 
-            List<JavaType.FullyQualified> annotations = null;
-            if (!methodSymbol.getDeclarationAttributes().isEmpty()) {
-                annotations = new ArrayList<>(methodSymbol.getDeclarationAttributes().size());
-                for (Attribute.Compound a : methodSymbol.getDeclarationAttributes()) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(a.type));
-                    if (fq != null) {
-                        annotations.add(fq);
-                    }
-                }
-            }
-
             JavaType returnType;
             List<JavaType> parameterTypes = null;
 
@@ -608,7 +566,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
 
             method.unsafeSet(resolvedDeclaringType,
                     methodSymbol.isConstructor() ? resolvedDeclaringType : returnType,
-                    parameterTypes, exceptionTypes, annotations);
+                    parameterTypes, exceptionTypes, listAnnotations(methodSymbol));
             return method;
         }
 
@@ -620,5 +578,25 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
             classSymbol.complete();
         } catch (Symbol.CompletionFailure ignore) {
         }
+    }
+
+    @Nullable
+    private List<JavaType.FullyQualified> listAnnotations(Symbol symb) {
+        List<JavaType.FullyQualified> annotations = null;
+        if (!symb.getDeclarationAttributes().isEmpty()) {
+            annotations = new ArrayList<>(symb.getDeclarationAttributes().size());
+            for (Attribute.Compound a : symb.getDeclarationAttributes()) {
+                JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
+                if (annotType == null) {
+                    continue;
+                }
+                Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
+                if(retention != null && retention.value() == RetentionPolicy.SOURCE) {
+                    continue;
+                }
+                annotations.add(annotType);
+            }
+        }
+        return annotations;
     }
 }

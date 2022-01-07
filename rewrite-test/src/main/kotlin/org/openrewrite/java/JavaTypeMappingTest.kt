@@ -147,4 +147,15 @@ interface JavaTypeMappingTest {
         val clazz = firstMethodParameter("inner").asFullyQualified()!!
         assertThat(clazz.fullyQualifiedName).isEqualTo("org.openrewrite.java.C${"$"}Inner")
     }
+
+    @Test
+    fun ignoreSourceRetentionAnnotations() {
+        val goat = goatType()
+        assertThat(goat.annotations.size == 1)
+        assertThat(goat.annotations.first().className == "AnnotationWithRuntimeRetention")
+
+        val clazzMethod = methodType("clazz")
+        assertThat(clazzMethod.annotations.size == 1)
+        assertThat(clazzMethod.annotations.first().className == "AnnotationWithRuntimeRetention")
+    }
 }

@@ -15,7 +15,12 @@
  */
 package org.openrewrite.java;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
 // Whenever this class is changed, make a corresponding change in JavaTypeGoat in the main java source set.
+@AnnotationWithRuntimeRetention
+@AnnotationWithSourceRetention
 public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public JavaTypeGoat() {
     }
@@ -29,6 +34,8 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
         }
     }
 
+    @AnnotationWithRuntimeRetention
+    @AnnotationWithSourceRetention
     public abstract void clazz(C n);
     public abstract void primitive(int n);
     public abstract void array(C[][] n);
@@ -50,3 +57,9 @@ interface C {
 
 interface PT<T> {
 }
+
+@Retention(RetentionPolicy.SOURCE)
+@interface AnnotationWithSourceRetention {}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface AnnotationWithRuntimeRetention {}
