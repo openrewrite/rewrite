@@ -13,22 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.openrewrite.maven.tree;
 
+import lombok.Value;
+import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Set;
+import java.net.URI;
 
-public interface DependencyDescriptor {
-    String getGroupId();
-    String getArtifactId();
-    String getVersion();
-
+@Value
+@With
+public class ResolvedGroupArtifactVersion {
     @Nullable
-    String getClassifier();
+    URI repository;
 
+    String groupId;
+    String artifactId;
+    String version;
+
+    /**
+     * In the form "${version}-${timestamp}-${buildNumber}", e.g. for the artifact rewrite-testing-frameworks-1.7.0-20210614.172805-1.jar,
+     * the dated snapshot version is "1.7.0-20210614.172805-1".
+     */
     @Nullable
-    Scope getScope();
+    String datedSnapshotVersion;
 
-    Set<GroupArtifact> getExclusions();
+    @Override
+    public String toString() {
+        return groupId + ":" + artifactId + ":" + (datedSnapshotVersion == null ? version : datedSnapshotVersion);
+    }
 }

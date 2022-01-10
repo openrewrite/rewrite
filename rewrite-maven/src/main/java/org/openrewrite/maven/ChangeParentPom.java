@@ -19,11 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -110,7 +110,7 @@ public class ChangeParentPom extends Recipe {
         return new MavenVisitor() {
             @Override
             public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-                Pom parent = maven.getMavenModel().getPom().getParent();
+                Parent parent = maven.getMavenResolutionResult().getPom().getRequested().getParent();
                 if(parent != null && oldArtifactId.equals(parent.getArtifactId()) && oldGroupId.equals(parent.getGroupId())) {
                     return maven.withMarkers(maven.getMarkers().add(Tree::randomId));
                 }
@@ -169,8 +169,8 @@ public class ChangeParentPom extends Recipe {
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
                                                                 ExecutionContext ctx) {
                 if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                            emptyMap(), ctx).downloadMetadata(groupId, artifactId, getCursor().firstEnclosingOrThrow(Maven.class).getModel().getEffectiveRepositories());
+                    MavenMetadata mavenMetadata = new MavenPomDownloader(emptyMap(), ctx)
+                            .downloadMetadata(new GroupArtifact(groupId, artifactId), getCursor().firstEnclosingOrThrow(Maven.class).getMavenResolutionResult().getPom().getRepositories());
                     if (mavenMetadata == null) {
                         availableVersions = Collections.emptyList();
                     } else {

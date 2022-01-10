@@ -15,82 +15,78 @@
  */
 package org.openrewrite.maven.cache;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
+import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.RawMaven;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
-import java.util.*;
+import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+
+import java.net.URI;
 
 public class InMemoryMavenPomCache implements MavenPomCache {
+    @Value
+    private static class MetadataKey {
+        URI repository;
+        GroupArtifactVersion gav;
+    }
 
-    private final Map<PomKey, CacheResult<RawMaven>> pomCache = new HashMap<>();
-    private final Map<MetadataKey, CacheResult<MavenMetadata>> mavenMetadataCache = new HashMap<>();
-    private final Map<MavenRepository, CacheResult<MavenRepository>> repositoryCache = new HashMap<>();
-    private final long releaseTimeToLiveMilliseconds;
-    private final long snapshotTimeToLiveMilliseconds;
+    private final Cache<ResolvedGroupArtifactVersion, CacheResult<Pom>> pomCache = Caffeine.newBuilder()
+            .maximumSize(100_000)
+            .build();
+
+    private final Cache<MetadataKey, CacheResult<MavenMetadata>> mavenMetadataCache = Caffeine.newBuilder()
+            .maximumSize(100_000)
+            .build();
+
+    private final Cache<MavenRepository, CacheResult<MavenRepository>> repositoryCache = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .build();
 
     public InMemoryMavenPomCache() {
-        this(60_000 * 60, 60_000);
+        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, pomCache, "Maven POMs");
+        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, mavenMetadataCache, "Maven metadata");
+        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, repositoryCache, "Maven repositories");
     }
 
-    public InMemoryMavenPomCache(long releaseTimeToLiveMilliseconds, long snapshotTimeToLiveMilliseconds) {
-        this.releaseTimeToLiveMilliseconds = releaseTimeToLiveMilliseconds;
-        this.snapshotTimeToLiveMilliseconds = snapshotTimeToLiveMilliseconds;
-
-        Metrics.gaugeMapSize("rewrite.maven.cache.size", Tags.of("type", "inmem", "content", "poms"), pomCache);
-        Metrics.gaugeMapSize("rewrite.maven.cache.size", Tags.of("type", "inmem", "content", "metadata"), mavenMetadataCache);
-        Metrics.gaugeMapSize("rewrite.maven.cache.size", Tags.of("type", "inmem", "content", "repository urls"), repositoryCache);
-    }
-
-    @Override
     @Nullable
-    public CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key) {
-        return filterExpired(mavenMetadataCache.get(key));
+    @Override
+    public CacheResult<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+        return mavenMetadataCache.getIfPresent(new MetadataKey(repo, gav));
     }
 
     @Override
-    public CacheResult<MavenMetadata> setMavenMetadata(MetadataKey key, MavenMetadata metadata, boolean isSnapshot) {
-        long ttl = System.currentTimeMillis() + (isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
-        mavenMetadataCache.put(key, new CacheResult<>(CacheResult.State.Cached, metadata, ttl));
-        return new CacheResult<>(CacheResult.State.Updated, metadata, ttl);
+    public CacheResult<MavenMetadata> putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadata metadata) {
+        mavenMetadataCache.put(new MetadataKey(repo, gav), new CacheResult<>(CacheResult.State.Cached, metadata));
+        return new CacheResult<>(CacheResult.State.Updated, metadata);
     }
 
-    @Override
     @Nullable
-    public CacheResult<RawMaven> getMaven(PomKey key) {
-        return filterExpired(pomCache.get(key));
+    @Override
+    public CacheResult<Pom> getPom(ResolvedGroupArtifactVersion gav) {
+        return pomCache.getIfPresent(gav);
     }
 
     @Override
-    public CacheResult<RawMaven> setMaven(PomKey key, RawMaven maven, boolean isSnapshot) {
-        long ttl = System.currentTimeMillis() + (isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
-        pomCache.put(key, new CacheResult<>(CacheResult.State.Cached, maven, ttl));
-        return new CacheResult<>(CacheResult.State.Updated, maven, ttl);
+    public CacheResult<Pom> putPom(ResolvedGroupArtifactVersion gav, Pom pom) {
+        pomCache.put(gav, new CacheResult<>(CacheResult.State.Cached, pom));
+        return new CacheResult<>(CacheResult.State.Updated, pom);
     }
 
     @Override
     @Nullable
     public CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository) {
-        return filterExpired(repositoryCache.get(repository));
+        return repositoryCache.getIfPresent(repository);
     }
 
     @Override
-    public CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
-        long ttl = calculateExpiration(normalized == null ? 60_000 : 60_000 * 60);
-        repositoryCache.put(repository, new CacheResult<>(CacheResult.State.Cached, normalized, ttl));
-        return new CacheResult<>(CacheResult.State.Updated, normalized, ttl);
-    }
-
-    @Override
-    public void clear() {
-        pomCache.clear();
-        mavenMetadataCache.clear();
-        repositoryCache.clear();
-    }
-
-    @Override
-    public void close() throws Exception {
+    public CacheResult<MavenRepository> putNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
+        repositoryCache.put(repository, new CacheResult<>(CacheResult.State.Cached, normalized));
+        return new CacheResult<>(CacheResult.State.Updated, normalized);
     }
 }

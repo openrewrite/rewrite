@@ -17,14 +17,11 @@ package org.openrewrite.maven.internal
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.Parser
-import java.nio.file.Paths
 
 class RawMavenTest {
     @Test
     fun emptyContainers() {
-        val maven = RawMaven.parse(Parser.Input(Paths.get("pom.xml")) {
+        val pom = RawPom.parse(
             """
                 <project>
                     <dependencyManagement>
@@ -43,18 +40,17 @@ class RawMavenTest {
                         <!--  none, for now  -->
                     </profiles>
                 </project>
-            """.trimIndent().byteInputStream()
-        }, null, null, InMemoryExecutionContext())
+            """.trimIndent().byteInputStream(), null)
 
-        assertThat(maven.pom.dependencyManagement?.dependencies).isNull()
-        assertThat(maven.pom.getActiveRepositories(emptyList())).isEmpty()
-        assertThat(maven.pom.innerLicenses).isEmpty()
-        assertThat(maven.pom.innerProfiles).isEmpty()
+        assertThat(pom.dependencyManagement?.dependencies).isNull()
+        assertThat(pom.repositories?.repositories).isEmpty()
+        assertThat(pom.licenses?.licenses).isEmpty()
+        assertThat(pom.profiles?.profiles).isEmpty()
     }
 
     @Test
     fun dependencyManagement() {
-        val maven = RawMaven.parse(Parser.Input(Paths.get("pom.xml")) {
+        val pom = RawPom.parse(
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -71,9 +67,9 @@ class RawMavenTest {
                     </dependencies>
                   </dependencyManagement>
                 </project>
-            """.trimIndent().byteInputStream()
-        }, null, null, InMemoryExecutionContext())
+            """.trimIndent().byteInputStream(), null
+        )
 
-        assertThat(maven.pom.dependencyManagement?.dependencies?.dependencies).isNotEmpty()
+        assertThat(pom.dependencyManagement?.dependencies?.dependencies).isNotEmpty
     }
 }

@@ -19,7 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -87,12 +87,8 @@ public class ExcludeDependency extends Recipe {
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependencyTag()) {
-                Pom.Dependency dependency = findDependency(tag);
-                if (dependency != null && (scope == null || scope.equals(dependency.getScope())) &&
-                        (!dependency.getGroupId().equals(groupId) || !dependency.getArtifactId().equals(artifactId)) &&
-                        dependency.findDependencies(groupId, artifactId).stream().anyMatch(transitive -> transitive.getScope()
-                                .isInClasspathOf(dependency.getScope()))) {
-
+                ResolvedDependency dependency = findDependency(tag, scope);
+                if (dependency != null && dependency.findDependency(groupId, artifactId) != null) {
                     Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                     if (maybeExclusions.isPresent()) {
                         Xml.Tag exclusions = maybeExclusions.get();

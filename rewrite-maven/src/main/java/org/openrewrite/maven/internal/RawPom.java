@@ -21,13 +21,22 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.*;
 
 import javax.xml.bind.annotation.XmlRootElement;
-import java.util.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 /**
  * A value object deserialized directly from POM XML
@@ -89,89 +98,16 @@ public class RawPom {
     @Nullable
     Profiles profiles;
 
-    public Map<String, String> getActiveProperties(Iterable<String> activeProfiles) {
-        Map<String, String> activeProperties = new HashMap<>();
-
-        if (properties != null) {
-            activeProperties.putAll(properties);
-        }
-
-        if (profiles != null) {
-            for (RawPom.Profile profile : getInnerProfiles()) {
-                if (profile.isActive(activeProfiles) && profile.getProperties() != null) {
-                    activeProperties.putAll(profile.getProperties());
-                }
+    public static RawPom parse(InputStream inputStream, @Nullable String snapshotVersion) {
+        try {
+            RawPom pom = MavenXmlMapper.readMapper().readValue(inputStream, RawPom.class);
+            if (snapshotVersion != null) {
+                pom.setSnapshotVersion(snapshotVersion);
             }
+            return pom;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to parse pom", e);
         }
-
-        return activeProperties;
-    }
-
-    public Collection<Dependency> getActiveDependencyManagementDependencies(Iterable<String> activeProfiles) {
-        Collection<Dependency> activeDependencies = new ArrayList<>();
-
-        if (dependencyManagement != null && dependencyManagement.dependencies != null) {
-            activeDependencies.addAll(dependencyManagement.dependencies.getDependencies());
-        }
-
-        if (profiles != null) {
-            for (RawPom.Profile profile : getInnerProfiles()) {
-                if (profile.isActive(activeProfiles) && profile.getDependencyManagement() != null &&
-                        profile.getDependencyManagement().dependencies != null) {
-                    activeDependencies.addAll(profile.getDependencyManagement().dependencies.getDependencies());
-                }
-            }
-        }
-
-        return activeDependencies;
-    }
-
-    public List<Dependency> getActiveDependencies(Collection<String> activeProfiles) {
-        List<Dependency> activeDependencies = new ArrayList<>();
-
-        if (dependencies != null) {
-            activeDependencies.addAll(dependencies.getDependencies());
-        }
-
-        if (profiles != null) {
-            for (Profile profile : getInnerProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    if (profile.dependencies != null) {
-                        activeDependencies.addAll(profile.dependencies.dependencies);
-                    }
-                }
-            }
-        }
-
-        return activeDependencies;
-    }
-
-    public List<RawRepositories.Repository> getActiveRepositories(Collection<String> activeProfiles) {
-        List<RawRepositories.Repository> activeRepositories = new ArrayList<>();
-
-        if (repositories != null) {
-            activeRepositories.addAll(repositories.getRepositories());
-        }
-
-        if (profiles != null) {
-            for (Profile profile : getInnerProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    if (profile.repositories != null) {
-                        activeRepositories.addAll(profile.repositories.getRepositories());
-                    }
-                }
-            }
-        }
-
-        return activeRepositories;
-    }
-
-    public List<License> getInnerLicenses() {
-        return licenses == null ? emptyList() : licenses.getLicenses();
-    }
-
-    public List<Profile> getInnerProfiles() {
-        return profiles == null ? emptyList() : profiles.getProfiles();
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -196,8 +132,8 @@ public class RawPom {
         Boolean optional;
 
         @Nullable
-        @JacksonXmlElementWrapper(useWrapping = true)
-        Set<GroupArtifact> exclusions;
+        @JacksonXmlElementWrapper
+        List<GroupArtifact> exclusions;
     }
 
     @Getter
@@ -300,10 +236,6 @@ public class RawPom {
 
         @Nullable
         RawRepositories repositories;
-
-        public boolean isActive(Iterable<String> activeProfiles) {
-            return ProfileActivation.isActive(id, activeProfiles, activation);
-        }
     }
 
     @Nullable
@@ -314,5 +246,119 @@ public class RawPom {
     @Nullable
     public String getVersion() {
         return version == null && parent != null ? parent.getVersion() : version;
+    }
+
+    public Pom toPom(@Nullable Path inputPath, @Nullable MavenRepository repo) {
+        org.openrewrite.maven.tree.Parent parent = getParent() == null ? null : new org.openrewrite.maven.tree.Parent(new GroupArtifactVersion(
+                getParent().getGroupId(), getParent().getArtifactId(),
+                getParent().getVersion()), getParent().getRelativePath());
+
+        return new Pom(
+                inputPath,
+                repo,
+                parent,
+                new ResolvedGroupArtifactVersion(repo == null ? null : repo.getUri(), groupId, artifactId, version, null),
+                name,
+                getPackaging(),
+                getProperties() == null ? emptyMap() : getProperties(),
+                mapDependencyManagement(getDependencyManagement()),
+                mapRequestedDependencies(getDependencies()),
+                mapRepositories(getRepositories()),
+                mapLicenses(getLicenses()),
+                mapProfiles(getProfiles())
+        );
+    }
+
+    private List<org.openrewrite.maven.tree.License> mapLicenses(@Nullable Licenses rawLicenses) {
+        List<org.openrewrite.maven.tree.License> licenses = emptyList();
+        if (rawLicenses != null) {
+            List<License> unmappedLicenses = rawLicenses.getLicenses();
+            if (unmappedLicenses != null) {
+                licenses = new ArrayList<>(unmappedLicenses.size());
+                for (License l : unmappedLicenses) {
+                    licenses.add(org.openrewrite.maven.tree.License.fromName(l.getName()));
+                }
+            }
+        }
+        return licenses;
+    }
+
+    private List<org.openrewrite.maven.tree.Profile> mapProfiles(@Nullable Profiles rawProfiles) {
+        List<org.openrewrite.maven.tree.Profile> profiles = emptyList();
+        if (rawProfiles != null) {
+            List<Profile> unmappedProfiles = rawProfiles.getProfiles();
+            if (unmappedProfiles != null) {
+                profiles = new ArrayList<>(unmappedProfiles.size());
+
+                // profiles are mapped in reverse order to put them in precedence order left to right
+                for (int i = unmappedProfiles.size() - 1; i >= 0; i--) {
+                    Profile p = unmappedProfiles.get(i);
+                    profiles.add(new org.openrewrite.maven.tree.Profile(
+                            p.getId(),
+                            p.getActivation(),
+                            p.getProperties() == null ? emptyMap() : p.getProperties(),
+                            mapRequestedDependencies(p.getDependencies()),
+                            mapDependencyManagement(p.getDependencyManagement()),
+                            mapRepositories(p.getRepositories())
+                    ));
+                }
+
+            }
+        }
+        return profiles;
+    }
+
+    @NotNull
+    private List<MavenRepository> mapRepositories(@Nullable RawRepositories rawRepositories) {
+        List<MavenRepository> pomRepositories = emptyList();
+        if (rawRepositories != null) {
+            List<RawRepositories.Repository> unmappedRepos = rawRepositories.getRepositories();
+            if (unmappedRepos != null) {
+                pomRepositories = new ArrayList<>(unmappedRepos.size());
+                for (RawRepositories.Repository r : unmappedRepos) {
+                    pomRepositories.add(new MavenRepository(r.getId(), URI.create(r.getUrl()),
+                            r.getReleases() == null || r.getReleases().isEnabled(),
+                            r.getSnapshots() != null && r.getSnapshots().isEnabled(),
+                            false, null, null));
+                }
+
+            }
+        }
+        return pomRepositories;
+    }
+
+    private List<DependencyManagementDependency> mapDependencyManagement(@Nullable DependencyManagement rawDependencyManagement) {
+        List<DependencyManagementDependency> dependencyManagementDependencies = emptyList();
+        if (rawDependencyManagement != null && rawDependencyManagement.getDependencies() != null) {
+            List<Dependency> unmappedDependencies = rawDependencyManagement.getDependencies().getDependencies();
+            if (unmappedDependencies != null) {
+                dependencyManagementDependencies = new ArrayList<>(unmappedDependencies.size());
+                for (Dependency d : unmappedDependencies) {
+                    GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
+                    if ("import".equals(d.getType())) {
+                        dependencyManagementDependencies.add(new DependencyManagementDependency.Imported(dGav));
+                    } else {
+                        dependencyManagementDependencies.add(new DependencyManagementDependency.Defined(dGav, d.getScope(), d.getType(), d.getClassifier(), d.getExclusions()));
+                    }
+                }
+            }
+        }
+        return dependencyManagementDependencies;
+    }
+
+    private List<org.openrewrite.maven.tree.Dependency> mapRequestedDependencies(@Nullable Dependencies rawDependencies) {
+        List<org.openrewrite.maven.tree.Dependency> dependencies = emptyList();
+        if (rawDependencies != null && rawDependencies.getDependencies() != null) {
+            List<Dependency> unmappedDependencies = rawDependencies.getDependencies();
+            if (unmappedDependencies != null) {
+                dependencies = new ArrayList<>(unmappedDependencies.size());
+                for (Dependency d : unmappedDependencies) {
+                    GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
+                    dependencies.add(new org.openrewrite.maven.tree.Dependency(dGav, d.getClassifier(), d.getType(), d.getScope(), d.getExclusions(),
+                            d.getOptional() != null && d.getOptional()));
+                }
+            }
+        }
+        return dependencies;
     }
 }

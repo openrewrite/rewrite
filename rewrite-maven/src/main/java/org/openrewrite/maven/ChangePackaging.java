@@ -23,7 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -67,11 +67,11 @@ public class ChangePackaging extends Recipe {
         return new MavenVisitor() {
             @Override
             public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-                Pom pom = maven.getModel();
+                ResolvedPom pom = maven.getMavenResolutionResult().getPom();
                 if(!(matchesGlob(pom.getGroupId(), groupId) && matchesGlob(pom.getArtifactId(), artifactId))) {
                     return maven;
                 }
-                maven = maven.withModel(pom.withPackaging(packaging));
+                maven = maven.withMavenResolutionResult(pom.withRequested(pom.getRequested().withPackaging(packaging)));
                 return super.visitMaven(maven, ctx);
             }
 

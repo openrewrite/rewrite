@@ -26,7 +26,6 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -233,12 +232,13 @@ public class RequestedVersion {
     }
 
     @Nullable
-    public String resolve(MavenPomDownloader downloader, Collection<MavenRepository> repositories) {
-        String selectedVersion;
+    public String resolve(MavenPomDownloader downloader, List<MavenRepository> repositories) {
+        String selectedVersion = null;
         if (isRange() || isDynamic()) {
-            MavenMetadata metadata = downloader.downloadMetadata(groupArtifact.getGroupId(),
-                    groupArtifact.getArtifactId(), repositories);
-            selectedVersion = selectFrom(metadata.getVersioning().getVersions());
+            MavenMetadata metadata = downloader.downloadMetadata(groupArtifact, repositories);
+            if(metadata != null) {
+                selectedVersion = selectFrom(metadata.getVersioning().getVersions());
+            }
         } else {
             selectedVersion = nearestVersion();
         }

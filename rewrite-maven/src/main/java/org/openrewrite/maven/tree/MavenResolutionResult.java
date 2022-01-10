@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.openrewrite.maven.tree;
 
-package org.openrewrite.maven.cache;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.marker.Marker;
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.experimental.FieldDefaults;
-import org.openrewrite.internal.lang.Nullable;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
-public class CacheResult<T> {
-    public enum State {
-        Cached,
-        Updated,
-        Unavailable
-    }
+@Value
+public class MavenResolutionResult implements Marker {
+    @EqualsAndHashCode.Include
+    @With
+    UUID id;
 
-    State state;
+    @With
+    ResolvedPom pom;
 
-    @Nullable
-    T data;
+    @With
+    Map<Scope, List<ResolvedDependency>> dependencies;
 }

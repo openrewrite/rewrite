@@ -19,16 +19,12 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.maven.cache.InMemoryMavenPomCache
+import org.openrewrite.maven.tree.License
 import org.openrewrite.maven.tree.Maven
-import org.openrewrite.maven.tree.Pom
 import org.openrewrite.maven.tree.Scope
 import java.nio.file.Path
 
 class MavenLicenseParsingIntegTest {
-    companion object {
-        private val mavenCache = InMemoryMavenPomCache()
-    }
 
     @Test
     fun springCloudStarterSecurity(@TempDir tempDir: Path) {
@@ -65,17 +61,16 @@ class MavenLicenseParsingIntegTest {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
 
         val pomAst: Maven = MavenParser.builder()
-                .cache(mavenCache)
                 .build()
                 .parse(listOf(pomFile.toPath()), null, InMemoryExecutionContext())
                 .first()
 
-        val unknownLicenses = pomAst.model.getDependencies(Scope.Test)
-                .filter { it.model.licenses.any { l -> l.type == Pom.LicenseType.Unknown && !exceptions.contains(l.name) } }
+        val unknownLicenses = pomAst.mavenResolutionResult.dependencies[Scope.Test]!!
+                .filter { it.licenses.any { l -> l.type == License.Type.Unknown && !exceptions.contains(l.name) } }
                 .map {
-                    "${it.model.groupId}:${it.model.artifactId}:${it.model.version} contains unknown licenses " +
+                    "${it.groupId}:${it.artifactId}:${it.version} contains unknown licenses " +
                             "[${
-                                it.model.licenses.filter { l -> l.type == Pom.LicenseType.Unknown }
+                                it.licenses.filter { l -> l.type == License.Type.Unknown }
                                         .joinToString { l -> l.name }
                             }]"
                 }

@@ -16,7 +16,7 @@
 package org.openrewrite.maven.cache;
 
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -33,14 +33,15 @@ public class ReadOnlyLocalMavenArtifactCache extends LocalMavenArtifactCache {
                 Paths.get(System.getProperty("user.home"), ".m2", "repository"));
     }
 
+    @Nullable
     @Override
-    public @Nullable Path getArtifact(Pom.Dependency dependency) {
+    public Path getArtifact(ResolvedDependency dependency) {
         return super.getArtifact(dependency);
     }
 
-    @Override
     @Nullable
-    public Path putArtifact(Pom.Dependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
+    @Override
+    public Path putArtifact(ResolvedDependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
         return null;
     }
 }

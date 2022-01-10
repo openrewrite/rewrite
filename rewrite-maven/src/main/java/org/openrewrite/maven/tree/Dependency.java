@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,42 @@
  */
 package org.openrewrite.maven.tree;
 
-import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.marker.Marker;
+import org.openrewrite.internal.lang.Nullable;
 
-import java.util.UUID;
+import java.util.List;
 
 @Value
-public class MavenModel implements Marker {
-    @EqualsAndHashCode.Include
-    @With
-    UUID id;
+@With
+public class Dependency {
+    GroupArtifactVersion gav;
 
-    @With
-    Pom pom;
+    @Nullable
+    String classifier;
+
+    @Nullable
+    String type;
+
+    String scope;
+    List<GroupArtifact> exclusions;
+    boolean optional;
+
+    public String getGroupId() {
+        return gav.getGroupId();
+    }
+
+    public String getArtifactId() {
+        return gav.getArtifactId();
+    }
+
+    @Nullable
+    public String getVersion() {
+        return gav.getVersion();
+    }
+
+    @Override
+    public String toString() {
+        return gav.toString();
+    }
 }

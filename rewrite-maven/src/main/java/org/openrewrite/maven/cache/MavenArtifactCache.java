@@ -16,7 +16,7 @@
 package org.openrewrite.maven.cache;
 
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,13 +27,13 @@ import java.util.function.Consumer;
 public interface MavenArtifactCache {
     MavenArtifactCache NOOP = new MavenArtifactCache() {
         @Override
-        public Path getArtifact(Pom.Dependency dependency) {
+        public Path getArtifact(ResolvedDependency dependency) {
             return null;
         }
 
         @Override
         @Nullable
-        public Path putArtifact(Pom.Dependency dependency, InputStream is, Consumer<Throwable> onError) {
+        public Path putArtifact(ResolvedDependency dependency, InputStream is, Consumer<Throwable> onError) {
             try {
                 is.close();
             } catch (IOException e) {
@@ -44,13 +44,13 @@ public interface MavenArtifactCache {
     };
 
     @Nullable
-    Path getArtifact(Pom.Dependency dependency);
+    Path getArtifact(ResolvedDependency dependency);
 
     @Nullable
-    Path putArtifact(Pom.Dependency dependency, InputStream is, Consumer<Throwable> onError);
+    Path putArtifact(ResolvedDependency dependency, InputStream is, Consumer<Throwable> onError);
 
     @Nullable
-    default Path computeArtifact(Pom.Dependency dependency, Callable<@Nullable InputStream> orElseGet,
+    default Path computeArtifact(ResolvedDependency dependency, Callable<@Nullable InputStream> orElseGet,
                                  Consumer<Throwable> onError) {
         Path artifact = getArtifact(dependency);
         if (artifact == null) {
@@ -70,14 +70,14 @@ public interface MavenArtifactCache {
         return new MavenArtifactCache() {
             @Override
             @Nullable
-            public Path getArtifact(Pom.Dependency dependency) {
+            public Path getArtifact(ResolvedDependency dependency) {
                 Path artifact = me.getArtifact(dependency);
                 return artifact == null ? other.getArtifact(dependency) : artifact;
             }
 
             @Override
             @Nullable
-            public Path putArtifact(Pom.Dependency dependency, InputStream is, Consumer<Throwable> onError) {
+            public Path putArtifact(ResolvedDependency dependency, InputStream is, Consumer<Throwable> onError) {
                 Path artifact = me.putArtifact(dependency, is, onError);
                 return artifact == null ? other.putArtifact(dependency, is, onError) : artifact;
             }

@@ -25,9 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 
 import java.util.HashMap;
@@ -179,21 +177,18 @@ public class AddDependency extends Recipe {
                             return s;
                         }
                         //If the dependency is already in scope, no need to continue.
-                        Pom ancestor = ((Maven) s).getMavenModel().getPom();
-                        while (ancestor != null) {
-                            for (Pom.Dependency d : ancestor.getDependencies(Scope.Compile)) {
+                        MavenResolutionResult resolutionResult = ((Maven) s).getMavenResolutionResult();
+                        for (ResolvedDependency d : resolutionResult.getDependencies().get(Scope.Compile)) {
+                            if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                return s;
+                            }
+                        }
+                        if (resolvedScope.equals("test")) {
+                            for (ResolvedDependency d : resolutionResult.getDependencies().get(Scope.Test)) {
                                 if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                                     return s;
                                 }
                             }
-                            if (resolvedScope.equals("test")) {
-                                for (Pom.Dependency d : ancestor.getDependencies(Scope.Test)) {
-                                    if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
-                                        return s;
-                                    }
-                                }
-                            }
-                            ancestor = ancestor.getParent();
                         }
 
                         return (SourceFile) new AddDependencyVisitor(

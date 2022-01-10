@@ -75,7 +75,7 @@ public class ChangeDependencyScope extends Recipe {
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependencyTag()) {
-                if (groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
+                if (groupId.equals(tag.getChildValue("groupId").orElse(resolutionResult.getPom().getGroupId())) &&
                         artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
                     Optional<Xml.Tag> scope = tag.getChild("scope");
                     if (scope.isPresent()) {

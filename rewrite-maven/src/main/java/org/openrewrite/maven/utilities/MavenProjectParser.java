@@ -25,9 +25,7 @@ import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.MavenParser;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.yaml.YamlParser;
@@ -101,7 +99,7 @@ public class MavenProjectParser {
 
         logger.info("The order in which projects are being parsed is:");
         for (Maven maven : mavens) {
-            logger.info("  {}:{}", maven.getModel().getGroupId(), maven.getModel().getArtifactId());
+            logger.info("  {}:{}", maven.getMavenResolutionResult().getPom().getGroupId(), maven.getMavenResolutionResult().getPom().getArtifactId());
         }
 
         List<SourceFile> sourceFiles = new ArrayList<>();
@@ -109,7 +107,7 @@ public class MavenProjectParser {
             List<Marker> projectProvenance = getJavaProvenance(maven, projectDirectory);
             sourceFiles.add(addProjectProvenance(maven, projectProvenance));
 
-            List<Path> dependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Compile));
+            List<Path> dependencies = downloadArtifacts(maven.getMavenResolutionResult().getDependencies().get(Scope.Compile));
             javaParser.setSourceSet("main");
             javaParser.setClasspath(dependencies);
             sourceFiles.addAll(ListUtils.map(javaParser.parse(
@@ -117,7 +115,7 @@ public class MavenProjectParser {
             //Resources in the src/main should also have the main source set attached to them.
             parseResources(maven.getResources(projectDirectory, ctx), projectDirectory, sourceFiles, projectProvenance, javaParser.getSourceSet(ctx));
 
-            List<Path> testDependencies = downloadArtifacts(maven.getModel().getDependencies(Scope.Test));
+            List<Path> testDependencies = downloadArtifacts(maven.getMavenResolutionResult().getDependencies().get(Scope.Test));
             javaParser.setSourceSet("test");
             javaParser.setClasspath(testDependencies);
             sourceFiles.addAll(ListUtils.map(javaParser.parse(
@@ -130,7 +128,7 @@ public class MavenProjectParser {
     }
 
     private List<Marker> getJavaProvenance(Maven maven, Path projectDirectory) {
-        Pom mavenModel = maven.getModel();
+        ResolvedPom mavenModel = maven.getMavenResolutionResult().getPom();
         String javaRuntimeVersion = System.getProperty("java.runtime.version");
         String javaVendor = System.getProperty("java.vm.vendor");
         String sourceCompatibility = javaRuntimeVersion;
@@ -165,7 +163,7 @@ public class MavenProjectParser {
         return Arrays.asList(
                 new BuildTool(randomId(), BuildTool.Type.Maven, mavenVersion),
                 new JavaVersion(randomId(), javaRuntimeVersion, javaVendor, sourceCompatibility, targetCompatibility),
-                new JavaProject(randomId(), mavenModel.getName(), new JavaProject.Publication(
+                new JavaProject(randomId(), mavenModel.getRequested().getName(), new JavaProject.Publication(
                         mavenModel.getGroupId(),
                         mavenModel.getArtifactId(),
                         mavenModel.getVersion()
@@ -221,7 +219,7 @@ public class MavenProjectParser {
         };
     }
 
-    private List<Path> downloadArtifacts(Set<Pom.Dependency> dependencies) {
+    private List<Path> downloadArtifacts(Collection<ResolvedDependency> dependencies) {
         return dependencies.stream()
                 .filter(d -> d.getRepository() != null)
                 .map(artifactDownloader::downloadArtifact)
@@ -235,11 +233,13 @@ public class MavenProjectParser {
 
         for (Maven maven : mavens) {
             byDependedOn.computeIfAbsent(maven, m -> new HashSet<>());
-            for (Pom.Dependency dependency : maven.getModel().getDependencies()) {
-                for (Maven test : mavens) {
-                    if (test.getModel().getGroupId().equals(dependency.getGroupId()) &&
-                            test.getModel().getArtifactId().equals(dependency.getArtifactId())) {
-                        byDependedOn.computeIfAbsent(maven, m -> new HashSet<>()).add(test);
+            for (List<ResolvedDependency> dependencies : maven.getMavenResolutionResult().getDependencies().values()) {
+                for (ResolvedDependency dependency : dependencies) {
+                    for (Maven test : mavens) {
+                        if (test.getMavenResolutionResult().getPom().getGroupId().equals(dependency.getGroupId()) &&
+                                test.getMavenResolutionResult().getPom().getArtifactId().equals(dependency.getArtifactId())) {
+                            byDependedOn.computeIfAbsent(maven, m -> new HashSet<>()).add(test);
+                        }
                     }
                 }
             }

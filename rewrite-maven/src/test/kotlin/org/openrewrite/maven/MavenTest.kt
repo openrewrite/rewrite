@@ -18,8 +18,8 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.maven.tree.MavenModel
-import org.openrewrite.maven.tree.Pom
+import org.openrewrite.maven.tree.License
+import org.openrewrite.maven.tree.MavenResolutionResult
 
 class MavenTest : MavenRecipeTest {
 
@@ -38,9 +38,10 @@ class MavenTest : MavenRecipeTest {
             .build()
             .parse(pom)[0]
 
-        val maven2 = maven.withModel(maven.model.withLicenses(listOf(Pom.License("apache", Pom.LicenseType.Apache2))))
+        val maven2 = maven.withMavenResolutionResult(maven.mavenResolutionResult.pom.withRequested(
+            maven.mavenResolutionResult.pom.requested.withLicenses(listOf(License("apache", License.Type.Apache2)))))
 
-        assertThat(maven2.markers.findAll(MavenModel::class.java)).hasSize(1)
-        assertThat(maven2.markers.findAll(MavenModel::class.java).first().pom.licenses).hasSize(1)
+        assertThat(maven2.markers.findAll(MavenResolutionResult::class.java)).hasSize(1)
+        assertThat(maven2.markers.findAll(MavenResolutionResult::class.java).first().pom.requested.licenses).hasSize(1)
     }
 }

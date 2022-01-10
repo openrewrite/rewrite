@@ -19,18 +19,18 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.MavenModel;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
-import static java.util.stream.Collectors.toList;
+import static java.util.Collections.emptyList;
 
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class MavenVisitor extends XmlVisitor<ExecutionContext> {
@@ -40,8 +40,8 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     private static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
     private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
 
-    protected Pom model;
-    protected Collection<Pom> modules;
+    protected MavenResolutionResult resolutionResult;
+    protected List<MavenResolutionResult> modules;
 
     @Override
     public String getLanguage() {
@@ -54,13 +54,10 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     }
 
     public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-        this.model = maven.getModel();
-
-        //noinspection ConstantConditions
-        if (model == null) {
+        this.resolutionResult = maven.getMavenResolutionResult();
+        if (resolutionResult == null) {
             return maven;
         }
-
         this.modules = maven.getModules();
         return (Maven) visitDocument(maven, ctx);
     }
@@ -68,11 +65,11 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     @Override
     public final Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
         // Maven visitors should not attempt to apply themselves to non-Maven Xml.Documents
-        if(!document.getMarkers().findFirst(MavenModel.class).isPresent()) {
+        if (!document.getMarkers().findFirst(MavenResolutionResult.class).isPresent()) {
             return document;
         }
         Xml.Document refactored = (Xml.Document) super.visitDocument(document, ctx);
-        if (refactored != document && refactored.getMarkers().findFirst(MavenModel.class).isPresent()) {
+        if (refactored != document && refactored.getMarkers().findFirst(MavenResolutionResult.class).isPresent()) {
             return new Maven(refactored);
         }
         return refactored;
@@ -116,11 +113,11 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
 
     private boolean hasGroupId(String groupId) {
         Xml.Tag tag = getCursor().getValue();
-        boolean isGroupIdFound = groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId()));
-        if (!isGroupIdFound && model.getProperties() != null) {
+        boolean isGroupIdFound = groupId.equals(tag.getChildValue("groupId").orElse(resolutionResult.getPom().getGroupId()));
+        if (!isGroupIdFound && resolutionResult.getPom().getProperties() != null) {
             if (tag.getChildValue("groupId").isPresent() && tag.getChildValue("groupId").get().trim().startsWith("${")) {
                 String propertyKey = tag.getChildValue("groupId").get().trim();
-                String value = model.getValue(propertyKey);
+                String value = resolutionResult.getPom().getValue(propertyKey);
                 isGroupIdFound = value != null && StringUtils.matchesGlob(value, groupId);
             }
         }
@@ -133,10 +130,10 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
                 .map(a -> a.equals(artifactId))
                 .orElse(artifactId == null);
 
-        if (!isArtifactIdFound && artifactId != null && model.getProperties() != null) {
+        if (!isArtifactIdFound && artifactId != null && resolutionResult.getPom().getProperties() != null) {
             if (tag.getChildValue("artifactId").isPresent() && tag.getChildValue("artifactId").get().trim().startsWith("${")) {
                 String propertyKey = tag.getChildValue("artifactId").get().trim();
-                String value = model.getValue(propertyKey);
+                String value = resolutionResult.getPom().getValue(propertyKey);
                 isArtifactIdFound = value != null && StringUtils.matchesGlob(value, artifactId);
             }
         }
@@ -144,12 +141,31 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     }
 
     @Nullable
-    public Pom.Dependency findDependency(Xml.Tag tag) {
-        return model.getDependencies().stream()
-                .filter(d -> tag.getChildValue("groupId").orElse(model.getGroupId()).equals(d.getGroupId()) &&
-                        tag.getChildValue("artifactId").orElse(model.getArtifactId()).equals(d.getArtifactId()))
-                .findAny()
-                .orElse(null);
+    public ResolvedDependency findDependency(Xml.Tag tag) {
+        for (List<ResolvedDependency> scope : resolutionResult.getDependencies().values()) {
+            for (ResolvedDependency d : scope) {
+                if (tag.getChildValue("groupId").orElse(resolutionResult.getPom().getGroupId()).equals(d.getGroupId()) &&
+                        tag.getChildValue("artifactId").orElse(resolutionResult.getPom().getArtifactId()).equals(d.getArtifactId())) {
+                    return d;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    public ResolvedDependency findDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
+        for (Map.Entry<Scope, List<ResolvedDependency>> scope : resolutionResult.getDependencies().entrySet()) {
+            if(inClasspathOf == null || scope.getKey().isInClasspathOf(inClasspathOf)) {
+                for (ResolvedDependency d : scope.getValue()) {
+                    if (tag.getChildValue("groupId").orElse(resolutionResult.getPom().getGroupId()).equals(d.getGroupId()) &&
+                            tag.getChildValue("artifactId").orElse(resolutionResult.getPom().getArtifactId()).equals(d.getArtifactId())) {
+                        return d;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -159,7 +175,7 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
      * @param artifactId The artifactId to match.
      * @return dependencies (including transitive dependencies) with any version matching the provided group and artifact id, if any.
      */
-    public Collection<Pom.Dependency> findDependencies(String groupId, String artifactId) {
+    public Collection<ResolvedDependency> findDependencies(String groupId, String artifactId) {
         return findDependencies(d -> StringUtils.matchesGlob(d.getGroupId(), groupId) && StringUtils.matchesGlob(d.getArtifactId(), artifactId));
     }
 
@@ -169,11 +185,18 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
      * @param matcher A dependency test
      * @return dependencies (including transitive dependencies) with any version matching the given predicate.
      */
-    public Collection<Pom.Dependency> findDependencies(Predicate<Pom.Dependency> matcher) {
-        return Stream.concat(
-                model.getDependencies().stream().filter(matcher),
-                model.getDependencies().stream()
-                        .flatMap(d -> d.findDependencies(matcher).stream())
-        ).collect(toList());
+    public Collection<ResolvedDependency> findDependencies(Predicate<ResolvedDependency> matcher) {
+        List<ResolvedDependency> found = null;
+        for (List<ResolvedDependency> scope : resolutionResult.getDependencies().values()) {
+            for (ResolvedDependency d : scope) {
+                if (matcher.test(d)) {
+                    if (found == null) {
+                        found = new ArrayList<>();
+                    }
+                    found.add(d);
+                }
+            }
+        }
+        return found == null ? emptyList() : found;
     }
 }

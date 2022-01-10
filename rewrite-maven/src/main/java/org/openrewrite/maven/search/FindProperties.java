@@ -68,7 +68,7 @@ public class FindProperties extends Recipe {
                 Optional<String> value = tag.getValue();
                 if (t.getContent() != null && value.isPresent() && value.get().contains("${")) {
                     t = t.withContent(ListUtils.mapFirst(t.getContent(), v ->
-                            v.withMarkers(v.getMarkers().searchResult(model.getValue(value.get())))));
+                            v.withMarkers(v.getMarkers().searchResult(resolutionResult.getPom().getValue(value.get())))));
                 }
                 return t;
             }

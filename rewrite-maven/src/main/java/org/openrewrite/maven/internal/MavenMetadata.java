@@ -19,6 +19,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
+import lombok.Value;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlParser;

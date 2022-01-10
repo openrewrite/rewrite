@@ -29,8 +29,11 @@ import java.net.URI;
 @Data
 @RequiredArgsConstructor
 public class MavenRepository {
+    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", URI.create("https://repo.maven.apache.org/maven2"), true, false, true, null, null);
+
     @EqualsAndHashCode.Include
     @With
+    @Nullable
     String id;
 
     @With
@@ -57,7 +60,7 @@ public class MavenRepository {
     String password;
 
     @JsonIgnore
-    public MavenRepository(String id, URI uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password) {
+    public MavenRepository(@Nullable String id, URI uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password) {
         this.id = id;
         this.uri = uri;
         this.releases = releases;

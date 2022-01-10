@@ -28,5 +28,5 @@ public class Modules implements Marker {
     UUID id;
 
     @With
-    List<Pom> modules;
+    List<MavenResolutionResult> modules;
 }

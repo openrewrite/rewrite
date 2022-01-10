@@ -19,20 +19,21 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.search.FindPlugin;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Optional;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyMap;
 
 /**
  * Upgrade the version of a plugin using Node Semver
@@ -136,7 +137,7 @@ public class UpgradePluginVersion extends Recipe {
             Optional<Xml.Tag> versionTag = model.getChild("version");
             versionTag.flatMap(Xml.Tag::getValue).ifPresent(versionValue -> {
                 String versionLookup = versionValue.startsWith("${")
-                        ? super.model.getValue(versionValue.trim())
+                        ? super.resolutionResult.getPom().getValue(versionValue.trim())
                         : versionValue;
 
                 if (versionLookup != null) {
@@ -151,11 +152,16 @@ public class UpgradePluginVersion extends Recipe {
 
         private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion, ExecutionContext ctx) {
             if (availableVersions == null) {
-                MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP, Collections.emptyMap(), ctx)
-                        .downloadMetadata(groupId, artifactId, getCursor().firstEnclosingOrThrow(Maven.class).getModel().getEffectiveRepositories());
-                availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(v -> versionComparator.isValid(currentVersion, v))
-                        .collect(Collectors.toList());
+                MavenMetadata mavenMetadata = new MavenPomDownloader(emptyMap(), ctx)
+                        .downloadMetadata(new GroupArtifact(groupId, artifactId), getCursor().firstEnclosingOrThrow(Maven.class).getMavenResolutionResult().getPom().getRepositories());
+                if(mavenMetadata != null) {
+                    availableVersions = new ArrayList<>();
+                    for (String v : mavenMetadata.getVersioning().getVersions()) {
+                        if (versionComparator.isValid(currentVersion, v)) {
+                            availableVersions.add(v);
+                        }
+                    }
+                }
             }
             return versionComparator.upgrade(currentVersion, availableVersions);
         }
@@ -179,7 +185,7 @@ public class UpgradePluginVersion extends Recipe {
                 if (versionTag.isPresent()) {
                     String version = versionTag.get().getValue().orElse(null);
                     if (version != null) {
-                        if (version.trim().startsWith("${") && !newVersion.equals(model.getValue(version.trim()))) {
+                        if (version.trim().startsWith("${") && !newVersion.equals(resolutionResult.getPom().getValue(version.trim()))) {
                             doAfterVisit(new ChangePropertyValue(version, newVersion, false));
                         } else if (!newVersion.equals(version)) {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));

@@ -24,8 +24,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.internal.MavenDownloadingException;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.Pom;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -79,8 +79,8 @@ public class MavenArtifactDownloader {
      * @return The path on disk of the downloaded artifact or <code>null</code> if unable to download.
      */
     @Nullable
-    public Path downloadArtifact(Pom.Dependency dependency) {
-        if (dependency.getType() != null && !"jar".equals(dependency.getType())) {
+    public Path downloadArtifact(ResolvedDependency dependency) {
+        if (dependency.getRequested().getType() != null && !"jar".equals(dependency.getRequested().getType())) {
             return null;
         }
 

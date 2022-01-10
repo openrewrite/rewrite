@@ -19,14 +19,11 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.Version;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -34,12 +31,11 @@ import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 @RequiredArgsConstructor
 public class AddDependencyVisitor extends MavenVisitor {
@@ -93,26 +89,33 @@ public class AddDependencyVisitor extends MavenVisitor {
 
         doAfterVisit(new InsertDependencyInOrder(scope));
 
-        List<Pom.Dependency> dependencies = new ArrayList<>(model.getDependencies());
+        List<ResolvedDependency> dependenciesForScope = new ArrayList<>(resolutionResult.getDependencies().get(Scope.fromName(scope)));
         String packaging = (type == null) ? "jar" : type;
 
         String dependencyVersion = findVersionToUse(groupId, artifactId, ctx);
-        dependencies.add(
-                new Pom.Dependency(
-                        null,
-                        Scope.fromName(scope),
-                        classifier,
-                        type,
-                        optional != null && optional,
-                        Pom.build(groupId, artifactId, dependencyVersion, null, null, null, packaging, classifier,
-                                null, emptyList(), Pom.DependencyManagement.empty(), emptyList(), emptyList(), emptyMap(),
-                                emptyMap(), true),
-                        dependencyVersion,
-                        emptySet()
-                )
-        );
+//        dependenciesForScope.add(
+//                new ResolvedDependency(
+//                        null,
+//                        new ResolvedGroupArtifactVersion(MavenRepository.MAVEN_CENTRAL.getUri(),
+//                                groupId, artifactId, dependencyVersion, null),
+//                        new Dependency(
+//                                new GroupArtifactVersion(groupId, artifactId, dependencyVersion),
+//                                classifier,
+//                                type,
+//                                scope,
+//                                emptyList(),
+//                                optional != null && optional
+//                        ),
+//                        Scope.fromName(scope),
+//                        emptyList(),
+//                        emptyList()
+//                )
+//        );
 
-        return m.withModel(m.getModel().withDependencies(dependencies));
+        Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>(resolutionResult.getDependencies());
+        dependencies.put(Scope.fromName(scope), dependenciesForScope);
+
+        return m.withMavenResolutionResult(m.getMavenResolutionResult().withDependencies(dependencies));
     }
 
     private String findVersionToUse(String groupId, String artifactId, ExecutionContext ctx) {
@@ -121,18 +124,20 @@ public class AddDependencyVisitor extends MavenVisitor {
             if (versionComparator == null) {
                 resolvedVersion = version;
             } else {
+                MavenMetadata mavenMetadata = new MavenPomDownloader(emptyMap(), ctx)
+                        .downloadMetadata(new GroupArtifact(groupId, artifactId), emptyList());
 
-                MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                        emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
-
-                LatestRelease latest = new LatestRelease(versionPattern);
-                resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(v -> versionComparator.isValid(null, v))
-                        .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
-                        .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-                        .orElse(version);
+                if(mavenMetadata != null) {
+                    LatestRelease latest = new LatestRelease(versionPattern);
+                    resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
+                            .filter(v -> versionComparator.isValid(null, v))
+                            .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                            .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                            .orElse(version);
+                }
             }
         }
+
         return resolvedVersion;
     }
 
@@ -147,11 +152,11 @@ public class AddDependencyVisitor extends MavenVisitor {
             if (DEPENDENCIES_MATCHER.matches(getCursor())) {
                 String versionToUse = null;
 
-                if (model.getManagedVersion(groupId, artifactId) == null) {
+                if (resolutionResult.getPom().getManagedVersion(groupId, artifactId, type, classifier) == null) {
                     if (familyRegex != null) {
                         versionToUse = findDependencies(d -> familyRegex.matcher(d.getGroupId()).matches()).stream()
                                 .max(Comparator.comparing(d -> new Version(d.getVersion())))
-                                .map(Pom.Dependency::getRequestedVersion)
+                                .map(d -> d.getRequested().getVersion())
                                 .orElse(null);
                     }
                     if (versionToUse == null) {

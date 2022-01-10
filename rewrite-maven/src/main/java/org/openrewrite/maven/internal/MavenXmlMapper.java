@@ -40,7 +40,7 @@ public class MavenXmlMapper {
 
     static {
         // disable namespace handling, as some POMs contain undefined namespaces like Xlint in
-        // https://repo.maven.apache.org/maven2/com/sun/istack/istack-commons/3.0.11/istack-commons-3.0.11.pom
+        // https://repo.maven.apache.org/maven/com/sun/istack/istack-commons/3.0.11/istack-commons-3.0.11.pom
         XMLInputFactory input = new WstxInputFactory();
         input.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
         input.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, false);

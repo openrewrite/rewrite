@@ -42,15 +42,15 @@ class MavenDependencyDownloadIntegTest {
             .parse(ctx, singleDependencyPom("org.springframework:spring-webmvc:5.3.2"))
             .first()
 
-        val compileDependencies = maven.model.getDependencies(Scope.Compile)
+        val compileDependencies = maven.mavenResolutionResult.dependencies[Scope.Compile]!!
 
         compileDependencies.forEach { dep ->
-            println("${dep.repository} ${dep.coordinates}")
+            println("${dep.repository} ${dep.gav}")
         }
 
         val downloader = downloader(tempDir)
         compileDependencies.forEach { dep ->
-            println(dep.coordinates + downloader.downloadArtifact(dep))
+            println(dep.gav.toString() + downloader.downloadArtifact(dep))
         }
     }
 
@@ -61,12 +61,12 @@ class MavenDependencyDownloadIntegTest {
             .parse(ctx, singleDependencyPom("org.openrewrite:rewrite-core:6.0.1"))
             .first()
 
-        val runtimeDependencies = maven.model.getDependencies(Scope.Runtime)
-            .sortedBy { d -> d.coordinates }
+        val runtimeDependencies = maven.mavenResolutionResult.dependencies[Scope.Runtime]!!
+            .sortedBy { d -> d.gav.toString() }
 
         val downloader = downloader(tempDir)
         runtimeDependencies.forEach { dep ->
-            println(dep.coordinates + downloader.downloadArtifact(dep))
+            println(dep.gav.toString() + downloader.downloadArtifact(dep))
         }
     }
 }

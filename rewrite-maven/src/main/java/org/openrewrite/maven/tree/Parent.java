@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.openrewrite.maven.tree;
 
-package org.openrewrite.maven.cache;
-
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.experimental.FieldDefaults;
+import lombok.Value;
+import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
-public class CacheResult<T> {
-    public enum State {
-        Cached,
-        Updated,
-        Unavailable
-    }
-
-    State state;
+@Value
+@With
+public class Parent {
+    GroupArtifactVersion gav;
 
     @Nullable
-    T data;
+    String relativePath;
+
+    public String getGroupId() {
+        return gav.getGroupId();
+    }
+
+    public String getArtifactId() {
+        return gav.getArtifactId();
+    }
+
+    public String getVersion() {
+        return gav.getVersion();
+    }
 }

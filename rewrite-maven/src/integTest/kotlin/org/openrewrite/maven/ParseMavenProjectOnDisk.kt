@@ -47,19 +47,19 @@ object ParseMavenProjectOnDisk {
             errorConsumer
         )
 
-        val pomCache = RocksdbMavenPomCache(
+        val rocksCache = RocksdbMavenPomCache(
             Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "poms"),
         )
 
         val mavenParserBuilder = MavenParser.builder()
-            .cache(pomCache)
             .mavenConfig(projectDir.resolve(".mvn/maven.config"))
 
         val parser = MavenProjectParser(
             downloader,
             mavenParserBuilder,
             JavaParser.fromJavaVersion(),
-            InMemoryExecutionContext(errorConsumer)
+            MavenExecutionContextView(InMemoryExecutionContext(errorConsumer))
+                .apply { pomCache = rocksCache }
         )
 
         parser.parse(projectDir).forEach {

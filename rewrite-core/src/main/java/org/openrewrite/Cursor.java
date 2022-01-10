@@ -195,7 +195,6 @@ public class Cursor {
                 getPathAsStream().anyMatch(p -> p instanceof Tree && ((Tree) p).getId().equals(scope.getId()));
     }
 
-    @Incubating(since = "7.0.0")
     public void putMessageOnFirstEnclosing(Class<?> enclosing, String key, Object value) {
         if (enclosing.isInstance(this.getValue())) {
             putMessage(key, value);
@@ -204,7 +203,6 @@ public class Cursor {
         }
     }
 
-    @Incubating(since = "7.0.0")
     public void putMessage(String key, Object value) {
         if (messages == null) {
             messages = new HashMap<>();
@@ -212,7 +210,6 @@ public class Cursor {
         messages.put(key, value);
     }
 
-    @Incubating(since = "7.1.0")
     public <T> T computeMessageIfAbsent(String key, Function<String, ? extends T> mappingFunction) {
         if (messages == null) {
             messages = new HashMap<>();
@@ -228,11 +225,21 @@ public class Cursor {
      * @param <T> The expected value of the message.
      * @return The closest message matching the provided key in the cursor stack, or <code>null</code> if none.
      */
-    @Incubating(since = "7.0.0")
     @Nullable
     public <T> T getNearestMessage(String key) {
         @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
         return t == null && parent != null ? parent.getNearestMessage(key) : t;
+    }
+
+    public <T> T getNearestMessage(String key, T defaultValue) {
+        @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
+        if(t == null) {
+            if(parent != null) {
+                return parent.getNearestMessage(key, defaultValue);
+            }
+            return defaultValue;
+        }
+        return t;
     }
 
     /**
@@ -242,7 +249,6 @@ public class Cursor {
      * @param <T> The expected value of the message.
      * @return The closest message matching the provided key in the cursor stack, or <code>null</code> if none.
      */
-    @Incubating(since = "7.0.0")
     @Nullable
     public <T> T pollNearestMessage(String key) {
         @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.remove(key);
@@ -256,11 +262,15 @@ public class Cursor {
      * @param <T> The expected value of the message.
      * @return The message matching the provided key, or <code>null</code> if none.
      */
-    @Incubating(since = "7.0.0")
     @Nullable
     public <T> T getMessage(String key) {
         //noinspection unchecked
         return messages == null ? null : (T) messages.get(key);
+    }
+
+    public <T> T getMessage(String key, T defaultValue) {
+        //noinspection unchecked
+        return messages == null ? defaultValue : (T) messages.getOrDefault(key, defaultValue);
     }
 
     /**
@@ -270,7 +280,6 @@ public class Cursor {
      * @param <T> The expected value of the message.
      * @return The message matching the provided key, or <code>null</code> if none.
      */
-    @Incubating(since = "7.0.0")
     @Nullable
     public <T> T pollMessage(String key) {
         //noinspection unchecked

@@ -18,16 +18,12 @@ package org.openrewrite.maven.tree;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.AccessLevel;
-import lombok.Data;
+import lombok.Value;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static java.util.Collections.emptyMap;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Dependency management sections contain a combination of single dependency definitions and imports of
@@ -36,89 +32,73 @@ import static java.util.Collections.emptyMap;
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface DependencyManagementDependency {
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
-    class Defined implements DependencyManagementDependency,
-            DependencyDescriptor {
-        String groupId;
-        String artifactId;
+    @Value
+    @With
+    class Defined implements DependencyManagementDependency {
+        GroupArtifactVersion gav;
 
         @Nullable
-        @With
-        String version;
-
-        String requestedVersion;
+        String scope;
 
         @Nullable
-        Scope scope;
+        String type;
 
         @Nullable
         String classifier;
 
-        Set<GroupArtifact> exclusions;
+        List<GroupArtifact> exclusions;
 
-        @Override
-        public List<DependencyDescriptor> getDependencies() {
-            return Collections.singletonList(this);
+        public String getGroupId() {
+            return gav.getGroupId();
         }
 
+        public String getArtifactId() {
+            return gav.getArtifactId();
+        }
+
+        public String getVersion() {
+            assert gav.getVersion() != null;
+            return gav.getVersion();
+        }
+
+        @SuppressWarnings("unchecked")
         @Override
-        public Map<String, String> getProperties() {
-            return emptyMap();
+        public Defined withVersion(String version) {
+            return withGav(gav.withVersion(version));
+        }
+
+        public boolean matches(String groupId, String artifactId,
+                               @Nullable String type, @Nullable String classifier) {
+            return groupId.equals(gav.getGroupId()) && artifactId.equals(gav.getArtifactId()) &&
+                    (type == null ? "jar" : type).equals(this.type == null ? "jar" : this.type) &&
+                    Objects.equals(classifier, this.classifier);
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
+    @With
     class Imported implements DependencyManagementDependency {
-        String groupId;
-        String artifactId;
+        GroupArtifactVersion gav;
 
-        @With
-        String version;
-
-        String requestedVersion;
-        Pom maven;
-
-        @Override
-        public List<DependencyDescriptor> getDependencies() {
-            return maven.getEffectiveDependencyManagement().getDependencies().stream()
-                    .flatMap(dep -> dep.getDependencies().stream())
-                    .collect(Collectors.toList());
+        public String getGroupId() {
+            return gav.getGroupId();
         }
 
-        @Override
-        public Map<String, String> getProperties() {
-            // FIXME should be active properties by profile as well? also parent properties?
-            return maven.getProperties();
+        public String getArtifactId() {
+            return gav.getArtifactId();
         }
 
-        public boolean deepEquals(@Nullable Object other) {
-            if (other instanceof Imported) {
-                Imported i = (Imported) other;
-                return this == other || (
-                        Objects.equals(this.groupId, i.groupId)
-                                && Objects.equals(this.artifactId, i.artifactId)
-                                && Objects.equals(this.version, i.version)
-                                && Objects.equals(this.requestedVersion, i.requestedVersion)
-                                && (this.maven == i.maven || (this.maven != null && this.maven.deepEquals(i.maven))
-                        )
-                );
-            }
-            return false;
+        public String getVersion() {
+            assert gav.getVersion() != null;
+            return gav.getVersion();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Imported withVersion(String version) {
+            return withGav(gav.withVersion(version));
         }
     }
-
-    /**
-     * @return A list of managed dependencies in order of precedence.
-     */
-    List<DependencyDescriptor> getDependencies();
-
-    /**
-     * @return A map of properties inherited from import-scope BOMs defined as
-     * dependencyManagement dependencies.
-     */
-    Map<String, String> getProperties();
 
     String getGroupId();
 
@@ -127,6 +107,4 @@ public interface DependencyManagementDependency {
     String getVersion();
 
     <D extends DependencyManagementDependency> D withVersion(String version);
-
-    String getRequestedVersion();
 }

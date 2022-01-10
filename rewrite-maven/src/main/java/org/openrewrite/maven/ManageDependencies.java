@@ -24,9 +24,9 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.internal.Version;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
@@ -112,9 +112,9 @@ public class ManageDependencies extends Recipe {
 
         @Override
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            model = maven.getModel();
+            resolutionResult = maven.getMavenResolutionResult();
 
-            Collection<Pom.Dependency> manageableDependencies = findDependencies(d ->
+            Collection<ResolvedDependency> manageableDependencies = findDependencies(d ->
                     groupPattern.matcher(d.getGroupId()).matches() && (artifactPattern == null || artifactPattern.matcher(d.getArtifactId()).matches()));
 
             selectedVersion = version;
@@ -122,13 +122,13 @@ public class ManageDependencies extends Recipe {
             if (!manageableDependencies.isEmpty()) {
                 if (version == null) {
                     selectedVersion = manageableDependencies.stream()
-                            .map(Pom.Dependency::getVersion)
+                            .map(ResolvedDependency::getVersion)
                             .max(Comparator.comparing(Version::new))
                             .get();
                 }
 
                 List<GroupArtifact> requiresDependencyManagement = manageableDependencies.stream()
-                        .filter(d -> model.getManagedVersion(d.getGroupId(), d.getArtifactId()) == null)
+                        .filter(d -> resolutionResult.getPom().getManagedVersion(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier()) == null)
                         .map(d -> new GroupArtifact(d.getGroupId(), d.getArtifactId()))
                         .distinct()
                         .collect(toList());
@@ -166,9 +166,9 @@ public class ManageDependencies extends Recipe {
         }
 
         private boolean hasMatchingGroupArtifact(Xml.Tag tag) {
-            return groupPattern.matcher(tag.getChildValue("groupId").orElse(model.getGroupId())).matches() &&
+            return groupPattern.matcher(tag.getChildValue("groupId").orElse(resolutionResult.getPom().getGroupId())).matches() &&
                     (artifactPattern == null || artifactPattern.matcher(tag.getChildValue("artifactId")
-                            .orElse(model.getArtifactId())).matches());
+                            .orElse(resolutionResult.getPom().getArtifactId())).matches());
         }
 
         private class InsertDependencyInOrder extends MavenVisitor {

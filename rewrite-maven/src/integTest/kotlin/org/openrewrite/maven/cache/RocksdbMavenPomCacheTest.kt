@@ -15,27 +15,18 @@
  */
 package org.openrewrite.maven.cache
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.maven.MavenExecutionContextView
 import org.openrewrite.maven.MavenParser
 import java.nio.file.Path
 
 class RocksdbMavenPomCacheTest {
 
-    companion object {
-        private val executionContext: ExecutionContext
-            get() = InMemoryExecutionContext { t ->
-                    t.printStackTrace()
-                }
-    }
-
     @Test
     fun rocksCache(@TempDir tempDir: Path) {
-
-
         val pom = """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -185,11 +176,11 @@ class RocksdbMavenPomCacheTest {
 
         val mavenCache = RocksdbMavenPomCache(workspace)
         val pomAst = MavenParser.builder()
-            .cache(mavenCache)
             .build()
-            .parse(executionContext, pom)
+            .parse(MavenExecutionContextView(InMemoryExecutionContext { t -> t.printStackTrace() })
+                .apply { pomCache = mavenCache }, pom)
             .first()
 
-        Assertions.assertThat(pomAst.model).isNotNull
+        assertThat(pomAst.mavenResolutionResult).isNotNull
     }
 }

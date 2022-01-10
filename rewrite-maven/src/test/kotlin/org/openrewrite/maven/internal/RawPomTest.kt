@@ -18,12 +18,8 @@ package org.openrewrite.maven.internal
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.mapdb.DBMaker
-import org.mapdb.serializer.SerializerString
-import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.Parser
+import org.openrewrite.maven.tree.ProfileActivation
 import java.nio.file.Path
-import java.nio.file.Paths
 
 class RawPomTest {
     @Test
@@ -40,45 +36,8 @@ class RawPomTest {
     }
 
     @Test
-    fun serializeAndDeserialize(@TempDir tempDir: Path) {
-        val pom = RawMaven.parse(Parser.Input(Paths.get("pom.xml")) {
-            """
-                <project>
-                <modelVersion>4.0.0</modelVersion>
-            
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-
-                <developers>
-                    <developer>
-                        <name>Trygve Laugst&oslash;l</name>
-                    </developer>
-                </developers>
-                
-                <licenses>
-                    <license>
-                        <name>Apache License, Version 2.0</name>
-                    </license>
-                </licenses>
-
-                <dependencies>
-                  <dependency>
-                    <groupId>org.junit.jupiter</groupId>
-                    <artifactId>junit-jupiter-api</artifactId>
-                    <version>5.7.0</version>
-                  </dependency>
-                </dependencies>
-            </project>
-            """.trimIndent().byteInputStream()
-        }, null, null, InMemoryExecutionContext()).pom
-
-        assertSerializationRoundTrip(tempDir, pom)
-    }
-
-    @Test
     fun repositoriesSerializationAndDeserialization(@TempDir tempDir: Path) {
-        val pom = RawMaven.parse(Parser.Input(Paths.get("pom.xml")) {
+        val pom = RawPom.parse(
             """
                 <project>
                   `<modelVersion>4.0.0</modelVersion>
@@ -95,11 +54,9 @@ class RawPomTest {
                     </repository>
                   </repositories>
                 </project>
-            """.trimIndent().byteInputStream()
-        }, null, null, InMemoryExecutionContext()).pom
+            """.trimIndent().byteInputStream(), null)
 
-        val rawPom = assertSerializationRoundTrip(tempDir, pom)
-        assertThat(rawPom.getActiveRepositories(emptyList())).hasSize(1)
+        assertThat(pom.repositories?.repositories).hasSize(1)
     }
 
     @Test
@@ -202,7 +159,7 @@ class RawPomTest {
 
         assertThat(model.packaging).isEqualTo("jar")
 
-        assertThat(model.getActiveDependencies(emptyList())[0].groupId)
+        assertThat(model.dependencies!!.dependencies[0].groupId)
             .isEqualTo("org.junit.jupiter")
 
         assertThat(model.dependencies!!.dependencies[0].exclusions!!.first().groupId)
@@ -211,25 +168,13 @@ class RawPomTest {
         assertThat(model.dependencyManagement?.dependencies?.dependencies?.first()?.groupId)
             .isEqualTo("org.springframework.cloud")
 
-        assertThat(model.innerLicenses.first()?.name)
+        assertThat(model.licenses?.licenses?.first()?.name)
             .isEqualTo("Apache License, Version 2.0")
 
-        assertThat(model.getActiveRepositories(emptyList()).first()?.url)
+        assertThat(model.repositories?.repositories?.first()?.url)
             .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots")
 
-        assertThat(model.innerProfiles[0].dependencies!!.dependencies.first().groupId).isEqualTo("javax.xml.bind")
-        assertThat(model.innerProfiles[1].dependencies!!.dependencies).isEmpty()
+        assertThat(model.profiles!!.profiles[0].dependencies!!.dependencies.first().groupId).isEqualTo("javax.xml.bind")
+        assertThat(model.profiles!!.profiles[1].dependencies!!.dependencies).isEmpty()
     }
-
-    private fun assertSerializationRoundTrip(tempDir: Path, pom: RawPom): RawPom =
-            DBMaker
-                    .fileDB(tempDir.resolve("cache.db").toFile())
-                    .make()
-                    .hashMap("pom", SerializerString(), JacksonMapdbSerializer(RawPom::class.java))
-                    .create()
-                    .use { pomCache ->
-                        pomCache["test"] = pom
-                        assertThat(pomCache["test"]).isEqualTo(pom)
-                        pom
-                    }
 }
