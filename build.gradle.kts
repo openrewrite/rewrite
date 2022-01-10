@@ -27,7 +27,7 @@ plugins {
     id("nebula.source-jar") version "17.3.2" apply false
     id("nebula.maven-apache-license") version "17.3.2" apply false
 
-    id("org.openrewrite.rewrite") version "5.10.0"
+    id("org.openrewrite.rewrite") version "latest.release"
 }
 
 repositories {
@@ -35,7 +35,7 @@ repositories {
 }
 
 configure<org.openrewrite.gradle.RewriteExtension> {
-    activeRecipes = listOf("org.openrewrite.java.cleanup.UnnecessaryParentheses")
+    activeRecipes = listOf("org.openrewrite.java.format.AutoFormat")
 }
 
 configure<nebula.plugin.release.git.base.ReleasePluginExtension> {
