@@ -1133,4 +1133,24 @@ interface JavadocTest : JavaTreeTest {
                 "    void method(String arg0) {}\r\n" +
                 "}"
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1313")
+    @Disabled
+    fun endOfLineAndNewlineWhitespaceBetweenTextAndJavadocTag(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        //language=java
+        """
+            /**
+             * The end of this comment has a whitespace space character, as does the empty newline between this comment and the author tag. 
+             * 
+             * @author example
+             */
+            interface Test {
+                void method();
+            }
+        """.trimIndent()
+    )
+
 }
