@@ -24,6 +24,8 @@ dependencies {
     implementation("commons-lang:commons-lang:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 
+    implementation("org.xerial.snappy:snappy-java:1.1.8.4")
+
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
     implementation("org.ow2.asm:asm:latest.release")

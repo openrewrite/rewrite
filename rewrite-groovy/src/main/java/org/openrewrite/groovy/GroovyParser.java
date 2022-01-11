@@ -31,6 +31,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
@@ -49,7 +50,7 @@ import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class GroovyParser implements Parser<G.CompilationUnit> {
-    private final Map<String, Object> typeBySignature = new HashMap<>();
+    private final JavaTypeCache typeCache = new JavaTypeCache();
 
     @Nullable
     private final Collection<Path> classpath;
@@ -98,7 +99,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                         compiled.getInput().getPath(),
                         StringUtils.readFully(compiled.getInput().getSource()),
-                        typeBySignature,
+                        typeCache,
                         ctx
                 );
                 cus.add(mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule()));
@@ -171,7 +172,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
     @Override
     public GroovyParser reset() {
-        typeBySignature.clear();
+        typeCache.clear();
         return this;
     }
 

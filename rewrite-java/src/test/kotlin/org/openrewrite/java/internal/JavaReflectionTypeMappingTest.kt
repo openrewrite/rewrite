@@ -22,7 +22,7 @@ import org.openrewrite.java.tree.JavaType
 
 class JavaReflectionTypeMappingTest : JavaTypeMappingTest {
     companion object {
-        private val typeMapping = JavaReflectionTypeMapping(mutableMapOf())
+        private val typeMapping = JavaReflectionTypeMapping(JavaTypeCache())
         private val goat = typeMapping.type(JavaTypeGoat::class.java).asParameterized()!!
     }
 

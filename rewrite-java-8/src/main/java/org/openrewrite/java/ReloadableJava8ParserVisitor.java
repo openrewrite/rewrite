@@ -28,6 +28,7 @@ import com.sun.tools.javac.util.Context;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -46,7 +47,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.lang.Math.max;
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
@@ -83,7 +85,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     public ReloadableJava8ParserVisitor(Path sourcePath, String source,
                                         Collection<NamedStyles> styles,
-                                        Map<String, Object> typeBySignature,
+                                        JavaTypeCache typeCache,
                                         ExecutionContext ctx,
                                         Context context) {
         this.sourcePath = sourcePath;
@@ -91,7 +93,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         this.styles = styles;
         this.ctx = ctx;
         this.context = context;
-        this.typeMapping = new ReloadableJava8TypeMapping(typeBySignature);
+        this.typeMapping = new ReloadableJava8TypeMapping(typeCache);
     }
 
     @Override

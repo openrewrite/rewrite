@@ -34,6 +34,7 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -62,7 +63,7 @@ import static java.util.stream.Collectors.toList;
 @NonNullApi
 public class Java11Parser implements JavaParser {
     private String sourceSet = "main";
-    private final Map<String, Object> typeBySignature = new HashMap<>();
+    private final JavaTypeCache typeCache = new JavaTypeCache();
 
     @Nullable
     private transient JavaSourceSet sourceSetProvenance;
@@ -160,7 +161,7 @@ public class Java11Parser implements JavaParser {
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
                                 styles,
-                                typeBySignature,
+                                typeCache,
                                 ctx,
                                 context
                         );
@@ -262,7 +263,7 @@ public class Java11Parser implements JavaParser {
 
     @Override
     public Java11Parser reset() {
-        typeBySignature.clear();
+        typeCache.clear();
         compilerLog.reset();
         pfm.flush();
         Check.instance(context).newRound();
@@ -287,7 +288,7 @@ public class Java11Parser implements JavaParser {
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
         if (sourceSetProvenance == null) {
             sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                    typeBySignature, ctx);
+                    typeCache, ctx);
         }
         return sourceSetProvenance;
     }

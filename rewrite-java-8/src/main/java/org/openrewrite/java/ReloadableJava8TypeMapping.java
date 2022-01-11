@@ -20,6 +20,7 @@ import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.JCTree;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -29,7 +30,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
@@ -42,7 +42,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
 
     private final ReloadableJava8TypeSignatureBuilder signatureBuilder = new ReloadableJava8TypeSignatureBuilder();
 
-    private final Map<String, Object> typeBySignature;
+    private final JavaTypeCache typeCache;
 
     public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
@@ -51,7 +51,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         String signature = signatureBuilder.signature(type);
-        JavaType existing = (JavaType) typeBySignature.get(signature);
+        JavaType existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -79,14 +79,14 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
 
     private JavaType array(Type type, String signature) {
         JavaType.Array arr = new JavaType.Array(null, null);
-        typeBySignature.put(signature, arr);
+        typeCache.put(signature, arr);
         arr.unsafeSet(type(((Type.ArrayType) type).elemtype));
         return arr;
     }
 
     private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature) {
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, "?", INVARIANT, null);
-        typeBySignature.put(signature, gtv);
+        typeCache.put(signature, gtv);
 
         JavaType.GenericTypeVariable.Variance variance;
         List<JavaType> bounds;
@@ -120,7 +120,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         String name = type.tsym.name.toString();
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
                 name, INVARIANT, null);
-        typeBySignature.put(signature, gtv);
+        typeCache.put(signature, gtv);
 
         List<JavaType> bounds = null;
         if (type.getUpperBound() instanceof Type.IntersectionClassType) {
@@ -151,7 +151,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) classType.tsym;
         Type.ClassType symType = (Type.ClassType) sym.type;
 
-        JavaType.FullyQualified fq = (JavaType.FullyQualified) typeBySignature.get(sym.flatName().toString());
+        JavaType.FullyQualified fq = typeCache.get(sym.flatName().toString());
         JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
         if (clazz == null) {
             completeClassSymbol(sym);
@@ -163,7 +163,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     null, null, null, null, null, null
             );
 
-            typeBySignature.put(sym.flatName().toString(), clazz);
+            typeCache.put(sym.flatName().toString(), clazz);
 
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(classType.supertype_field == null ? symType.supertype_field :
                     classType.supertype_field));
@@ -223,10 +223,10 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
             // NOTE because of completion that happens when building the base type,
             // the signature may shift from when it was first calculated.
-            JavaType.Parameterized pt = (JavaType.Parameterized) typeBySignature.get(signatureBuilder.signature(classType));
+            JavaType.Parameterized pt = typeCache.get(signatureBuilder.signature(classType));
             if (pt == null) {
                 pt = new JavaType.Parameterized(null, null, null);
-                typeBySignature.put(signature, pt);
+                typeCache.put(signature, pt);
 
                 List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
                 for (Type tParam : classType.typarams_field) {
@@ -325,7 +325,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         String signature = signatureBuilder.variableSignature(symbol);
-        JavaType.Variable existing = (JavaType.Variable) typeBySignature.get(signature);
+        JavaType.Variable existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -336,7 +336,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 symbol.name.toString(),
                 null, null, null);
 
-        typeBySignature.put(signature, variable);
+        typeCache.put(signature, variable);
 
         JavaType resolvedOwner = owner;
         if (owner == null) {
@@ -379,7 +379,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         String signature = signatureBuilder.methodSignature(selectType, methodSymbol);
-        JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
+        JavaType.Method existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -402,7 +402,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 paramNames,
                 null, null, null
         );
-        typeBySignature.put(signature, method);
+        typeCache.put(signature, method);
 
         JavaType returnType = null;
         List<JavaType> parameterTypes = null;
@@ -472,7 +472,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         if (methodSymbol != null) {
 
             String signature = signatureBuilder.methodSignature(methodSymbol);
-            JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
+            JavaType.Method existing = typeCache.get(signature);
             if (existing != null) {
                 return existing;
             }
@@ -495,7 +495,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     paramNames,
                     null, null, null
             );
-            typeBySignature.put(signature, method);
+            typeCache.put(signature, method);
 
             Type signatureType = methodSymbol.type instanceof Type.ForAll ?
                     ((Type.ForAll) methodSymbol.type).qtype :

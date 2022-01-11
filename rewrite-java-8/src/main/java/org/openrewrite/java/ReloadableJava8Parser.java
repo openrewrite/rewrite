@@ -33,6 +33,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -56,7 +57,7 @@ import static java.util.stream.Collectors.toList;
 
 class ReloadableJava8Parser implements JavaParser {
     private String sourceSet = "main";
-    private final Map<String, Object> typeBySignature = new HashMap<>();
+    private final JavaTypeCache typeCache = new JavaTypeCache();
 
     @Nullable
     private transient JavaSourceSet sourceSetProvenance;
@@ -190,7 +191,7 @@ class ReloadableJava8Parser implements JavaParser {
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
                                 styles,
-                                typeBySignature,
+                                typeCache,
                                 ctx,
                                 context);
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
@@ -236,7 +237,7 @@ class ReloadableJava8Parser implements JavaParser {
 
     @Override
     public ReloadableJava8Parser reset() {
-        typeBySignature.clear();
+        typeCache.clear();
         compilerLog.reset();
         pfm.flush();
         Check.instance(context).compiled.clear();
@@ -258,7 +259,7 @@ class ReloadableJava8Parser implements JavaParser {
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
         if (sourceSetProvenance == null) {
             sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                    typeBySignature, ctx);
+                    typeCache, ctx);
         }
         return sourceSetProvenance;
     }

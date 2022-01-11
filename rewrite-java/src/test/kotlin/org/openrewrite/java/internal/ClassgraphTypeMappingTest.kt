@@ -26,7 +26,7 @@ import kotlin.math.pow
 
 class ClassgraphTypeMappingTest : JavaTypeMappingTest {
     companion object {
-        private val typeMapping = ClassgraphTypeMapping(mutableMapOf(), mapOf())
+        private val typeMapping = ClassgraphTypeMapping(JavaTypeCache(), mapOf())
 
         private val goat = typeMapping.type(
             ClassGraph()
