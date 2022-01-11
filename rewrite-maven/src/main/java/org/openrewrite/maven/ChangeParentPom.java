@@ -170,17 +170,15 @@ public class ChangeParentPom extends Recipe {
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
                             emptyMap(), ctx).downloadMetadata(groupId, artifactId, getCursor().firstEnclosingOrThrow(Maven.class).getModel().getEffectiveRepositories());
-                    availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                            .filter(v -> versionComparator.isValid(currentVersion, v))
-                            .collect(Collectors.toList());
+                    if (mavenMetadata != null) {
+                        availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                                .filter(v -> versionComparator.isValid(currentVersion, v))
+                                .filter(v -> allowVersionDowngrades || versionComparator.compare(currentVersion, currentVersion, v) < 0)
+                                .collect(Collectors.toList());
+                        return allowVersionDowngrades ? availableVersions.stream().max((v1, v2) -> versionComparator.compare(currentVersion, v1, v2)) : versionComparator.upgrade(currentVersion, availableVersions);
+                    }
                 }
-
-                return availableVersions.stream()
-                        .filter(v -> versionComparator.isValid(currentVersion, v))
-                        .max((v1, v2) -> versionComparator.compare(currentVersion, v1, v2))
-                        // Once a target version is resolved, only apply the change if the new artifact is different from
-                        // the old artifact OR the new version is greater than the current version.
-                        .filter(resolved -> allowVersionDowngrades || newGroupId != null || newArtifactId != null || versionComparator.compare(currentVersion, currentVersion, resolved) < 0);
+                return Optional.empty();
             }
         };
     }

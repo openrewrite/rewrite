@@ -17,8 +17,37 @@ package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class UpgradeParentVersionTest : MavenRecipeTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1317")
+    @Test
+    fun doesNotDowngradeVersion() = assertUnchanged(
+        recipe = UpgradeParentVersion(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "~1.5",
+            null
+        ),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>2.4.12</version>
+                <relativePath/> <!-- lookup parent from repository -->
+              </parent>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
+        """
+    )
+
     @Test
     fun upgradeVersion() = assertChanged(
         recipe = UpgradeParentVersion(
