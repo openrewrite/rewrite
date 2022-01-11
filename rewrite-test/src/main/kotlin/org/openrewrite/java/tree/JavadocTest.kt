@@ -665,20 +665,59 @@ interface JavadocTest : JavaTreeTest {
     )
 
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1313")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1094")
     @Disabled
-    fun whitespaceOnBlankLineBetweenBodyEndingInWhitespaceAndTags(jp: JavaParser) = assertParsePrintAndProcess(
+    fun trailingWhitespaceAfterText(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         //language=java
         """
-            /**
-             * The end of this comment has a whitespace space character, as does the empty newline between this comment and the author tag. 
-             * 
-             * @author example
-             */
-            interface Test {
-                void method();
+            class Test {
+                /**
+                 * Text with trailing whitespace.    
+                 * More trailing whitespace    
+                 */
+                void method() {
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1094")
+    @Disabled
+    fun trailingWhitespaceAfterAnnotation(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        //language=java
+        """
+            class Test {
+                /**
+                 * @param arg test text.    
+                 * More trailing whitespace    
+                 */
+                void method(String arg) {
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1094")
+    @Disabled
+    fun trailingWhitespaceWithWhitespaceOnEmptyLine(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        //language=java
+        """
+            class Test {
+                /**
+                 * Text with trailing whitespace.    
+                 * 
+                 * @param arg more trailing whitespace    
+                 */
+                void method(String arg) {
+                }
             }
         """.trimIndent()
     )
