@@ -463,6 +463,9 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
     private long getFlagsFromMethod(MethodInfo methodInfo) {
         long flags = methodInfo.getModifiers();
+        if (methodInfo.isDefault()) {
+            flags = flags | Flag.Default.getBitMask();
+        }
         if (methodInfo.isVarArgs()) {
             //method's overload the transient field to indicate varargs. clear the transient bit and then set the varargs
             //bit.
