@@ -34,6 +34,7 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -174,9 +175,13 @@ public class UpgradeDependencyVersion extends Recipe {
             if (availableVersions == null) {
                 MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
                         emptyMap(), ctx).downloadMetadata(groupId, artifactId, getCursor().firstEnclosingOrThrow(Maven.class).getModel().getEffectiveRepositories());
-                availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(v -> versionComparator.isValid(currentVersion, v))
-                        .collect(Collectors.toList());
+                if (mavenMetadata == null) {
+                    availableVersions = Collections.emptyList();
+                } else {
+                    availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                            .filter(v -> versionComparator.isValid(currentVersion, v))
+                            .collect(Collectors.toList());
+                }
             }
             return versionComparator.upgrade(currentVersion, availableVersions);
         }
@@ -218,7 +223,7 @@ public class UpgradeDependencyVersion extends Recipe {
         return findManagedVersion(pom.getParent(), dependency);
     }
 
-    private class ChangeDependencyVersionVisitor extends MavenVisitor {
+    private static class ChangeDependencyVersionVisitor extends MavenVisitor {
         private final String newVersion;
         private final String groupId;
         private final String artifactId;
