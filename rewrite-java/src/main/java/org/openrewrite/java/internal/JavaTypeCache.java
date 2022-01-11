@@ -15,39 +15,20 @@
  */
 package org.openrewrite.java.internal;
 
-import lombok.Value;
+import org.apache.commons.collections4.trie.PatriciaTrie;
 import org.openrewrite.internal.lang.Nullable;
-import org.xerial.snappy.Snappy;
-
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.HashMap;
-import java.util.Map;
 
 public class JavaTypeCache {
-    @Value
-    private static class BytesKey {
-        byte[] data;
-    }
-
-    Map<BytesKey, Object> typeCache = new HashMap<>();
+    PatriciaTrie<Object> typeCache = new PatriciaTrie<>();
 
     @Nullable
     public <T> T get(String signature) {
         //noinspection unchecked
-        return (T) typeCache.get(key(signature));
+        return (T) typeCache.get(signature);
     }
 
     public void put(String signature, Object o) {
-        typeCache.put(key(signature), o);
-    }
-
-    private BytesKey key(String signature) {
-        try {
-            return new BytesKey(Snappy.compress(signature));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        typeCache.put(signature, o);
     }
 
     public void clear() {
