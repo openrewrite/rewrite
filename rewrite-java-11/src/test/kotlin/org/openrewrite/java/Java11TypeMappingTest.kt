@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
@@ -53,7 +54,7 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
             }
         """.trimIndent()
         val pt: JavaType.Parameterized = (((((JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true)
+            .logCompilationWarningsAndErrors(false)
             .build()
             .parse(InMemoryExecutionContext { t -> fail(t) }, source)[0]
             .classes[0]).body.statements[0] as J.MethodDeclaration)
@@ -71,6 +72,41 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
                 }
                 interface Intersection<E extends Extension<E> & Intersection<E>> {
                     E getIntersectionType();
+                }
+            }
+        """.trimIndent()
+        val cu = JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(false)
+            .build()
+            .parse(InMemoryExecutionContext { t -> fail(t) }, source)
+        Assertions.assertThat(cu).isNotNull
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1318")
+    @Test
+    fun methodInvocationOnUnknownType() {
+        val source = """
+            import java.util.ArrayList;
+            // do not import List to create an UnknownType
+            
+            class Test {
+                class Base {
+                    private int foo;
+                    public boolean setFoo(int foo) {
+                        this.foo = foo;
+                    }
+                    public int getFoo() {
+                        return foo;
+                    }
+                }
+                List<Base> createUnknownType(List<Integer> values) {
+                    List<Base> bases = new ArrayList<>();
+                    values.forEach((v) -> {
+                        Base b = new Base();
+                        b.setFoo(v);
+                        bases.add(b);
+                    });
+                    return bases;
                 }
             }
         """.trimIndent()

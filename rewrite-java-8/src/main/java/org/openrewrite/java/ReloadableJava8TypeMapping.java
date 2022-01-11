@@ -442,6 +442,8 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     }
                 }
             }
+        } else if (selectType instanceof Type.UnknownType) {
+            returnType = JavaType.Unknown.getInstance();
         }
 
         JavaType.FullyQualified resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
