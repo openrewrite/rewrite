@@ -30,6 +30,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
@@ -62,10 +63,10 @@ public class GroovyParserVisitor {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public GroovyParserVisitor(Path sourcePath, String source, Map<String, Object> typeBySignature, ExecutionContext ctx) {
+    public GroovyParserVisitor(Path sourcePath, String source, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.source = source;
-        this.typeMapping = new GroovyTypeMapping(typeBySignature);
+        this.typeMapping = new GroovyTypeMapping(typeCache);
         this.ctx = ctx;
     }
 

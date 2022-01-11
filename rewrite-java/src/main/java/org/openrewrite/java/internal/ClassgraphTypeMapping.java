@@ -35,13 +35,13 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
     private final ClassgraphJavaTypeSignatureBuilder signatureBuilder;
 
-    private final Map<String, Object> typeBySignature;
+    private final JavaTypeCache typeCache;
     private final JavaReflectionTypeMapping reflectionTypeMapping;
     private final Map<String, JavaType.FullyQualified> jvmTypes;
 
-    public ClassgraphTypeMapping(Map<String, Object> typeBySignature, Map<String, JavaType.FullyQualified> jvmTypes) {
-        this.typeBySignature = typeBySignature;
-        this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeBySignature);
+    public ClassgraphTypeMapping(JavaTypeCache typeCache, Map<String, JavaType.FullyQualified> jvmTypes) {
+        this.typeCache = typeCache;
+        this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeCache);
         this.jvmTypes = jvmTypes;
         this.signatureBuilder = new ClassgraphJavaTypeSignatureBuilder(jvmTypes);
     }
@@ -52,7 +52,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         }
 
         String className = aClass.getName();
-        JavaType.FullyQualified clazz = (JavaType.FullyQualified) typeBySignature.get(className);
+        JavaType.FullyQualified clazz = (JavaType.FullyQualified) typeCache.get(className);
 
         if (clazz == null) {
             JavaType.Class.Kind kind;
@@ -74,7 +74,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                     null, null, null, null, null, null
             );
 
-            typeBySignature.put(className, clazz);
+            typeCache.put(className, clazz);
 
             ClassInfo superclassInfo = aClass.getSuperclass();
             JavaType.FullyQualified supertype;
@@ -151,13 +151,13 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         }
 
         String signature = signatureBuilder.signature(aClass.getTypeSignature());
-        JavaType.Parameterized parameterized = (JavaType.Parameterized) typeBySignature.get(signature);
+        JavaType.Parameterized parameterized = (JavaType.Parameterized) typeCache.get(signature);
         if (parameterized != null) {
             return parameterized;
         }
 
         parameterized = new JavaType.Parameterized(null, clazz, null);
-        typeBySignature.put(signature, parameterized);
+        typeCache.put(signature, parameterized);
 
         List<JavaType> typeParameters = new ArrayList<>(typeSignature.getTypeParameters().size());
         for (TypeParameter tParam : typeSignature.getTypeParameters()) {
@@ -170,7 +170,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
     private JavaType type(HierarchicalTypeSignature typeSignature) {
         String signature = signatureBuilder.signature(typeSignature);
-        JavaType existing = (JavaType) typeBySignature.get(signature);
+        JavaType existing = (JavaType) typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -197,14 +197,14 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
     private JavaType.Variable variableType(FieldInfo fieldInfo) {
         String signature = signatureBuilder.variableSignature(fieldInfo);
-        JavaType.Variable existing = (JavaType.Variable) typeBySignature.get(signature);
+        JavaType.Variable existing = (JavaType.Variable) typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
 
         JavaType.Variable variable = new JavaType.Variable(null, getFlagsFromField(fieldInfo), fieldInfo.getName(),
                 null, null, null);
-        typeBySignature.put(signature, variable);
+        typeCache.put(signature, variable);
 
         JavaType.FullyQualified owner = type(fieldInfo.getClassInfo());
 
@@ -225,7 +225,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         long flags = methodInfo.getModifiers();
 
         String signature = signatureBuilder.methodSignature(methodInfo);
-        JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
+        JavaType.Method existing = (JavaType.Method) typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -247,7 +247,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 paramNames,
                 null, null, null
         );
-        typeBySignature.put(signature, method);
+        typeCache.put(signature, method);
 
         JavaType returnType = methodInfo.getTypeSignature() == null ?
                 type(methodInfo.getTypeDescriptor().getResultType()) :
@@ -287,7 +287,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
     private JavaType.GenericTypeVariable generic(TypeParameter typeParameter, String signature) {
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, typeParameter.getName(),
                 INVARIANT, null);
-        typeBySignature.put(signature, gtv);
+        typeCache.put(signature, gtv);
 
         List<JavaType> bounds = null;
         if (typeParameter.getClassBound() != null) {
@@ -318,7 +318,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         } catch (IllegalArgumentException ignored) {
             JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, typeVariableSignature.getName(),
                     INVARIANT, null);
-            typeBySignature.put(signature, gtv);
+            typeCache.put(signature, gtv);
             return gtv;
         }
     }
@@ -333,7 +333,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                 return type(typeArgument.getTypeSignature());
             case EXTENDS: {
                 gtv = new JavaType.GenericTypeVariable(null, "?", COVARIANT, null);
-                typeBySignature.put(signature, gtv);
+                typeCache.put(signature, gtv);
                 JavaType mappedBound = type(typeArgument.getTypeSignature());
                 if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound)
                         .getFullyQualifiedName().equals("java.lang.Object")) {
@@ -343,7 +343,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             }
             case SUPER: {
                 gtv = new JavaType.GenericTypeVariable(null, "?", CONTRAVARIANT, null);
-                typeBySignature.put(signature, gtv);
+                typeCache.put(signature, gtv);
                 JavaType mappedBound = type(typeArgument.getTypeSignature());
                 if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound)
                         .getFullyQualifiedName().equals("java.lang.Object")) {
@@ -354,7 +354,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             case ANY:
             default:
                 gtv = new JavaType.GenericTypeVariable(null, "?", INVARIANT, null);
-                typeBySignature.put(signature, gtv);
+                typeCache.put(signature, gtv);
                 break;
         }
 
@@ -376,7 +376,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                     type = (JavaType.FullyQualified) reflectionTypeMapping.type(Object.class);
                 } else {
                     type = JavaType.Unknown.getInstance();
-                    typeBySignature.put(className, type);
+                    typeCache.put(className, type);
                 }
             }
         } else {
@@ -384,7 +384,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
         }
 
         if (!classRefSignature.getTypeArguments().isEmpty()) {
-            JavaType existing = (JavaType) typeBySignature.get(signature);
+            JavaType existing = (JavaType) typeCache.get(signature);
             if (existing != null) {
                 return existing;
             }
@@ -392,7 +392,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             JavaType.Parameterized parameterized = new JavaType.Parameterized(null,
                     type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type, null);
 
-            typeBySignature.put(signature, parameterized);
+            typeCache.put(signature, parameterized);
 
             List<JavaType> typeParameters = new ArrayList<>(classRefSignature.getTypeArguments().size());
             for (TypeArgument typeArgument : classRefSignature.getTypeArguments()) {
@@ -425,7 +425,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
                         fallback = JavaType.Unknown.getInstance();
                     }
                 }
-                typeBySignature.put(signature, fallback);
+                typeCache.put(signature, fallback);
                 return fallback;
             }
 
@@ -436,7 +436,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             }
 
             JavaType.Parameterized parameterized = new JavaType.Parameterized(null, null, null);
-            typeBySignature.put(signature, parameterized);
+            typeCache.put(signature, parameterized);
 
             List<JavaType> typeParameters = new ArrayList<>(classSignature.getTypeParameters().size());
             for (TypeParameter typeParameter : classSignature.getTypeParameters()) {
@@ -452,7 +452,7 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
 
     private JavaType array(ArrayTypeSignature typeSignature, String signature) {
         JavaType.Array arr = new JavaType.Array(null, null);
-        typeBySignature.put(signature, arr);
+        typeCache.put(signature, arr);
         arr.unsafeSet(type(typeSignature.getNestedType()));
         return arr;
     }

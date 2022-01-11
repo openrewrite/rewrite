@@ -28,12 +28,12 @@ class TypeMappingUniquenessTest {
 
     @Test
     fun noMoreTypesAdded() {
-        val typeBySignature = mutableMapOf<String, Any>()
+        val typeCache = JavaTypeCache()
 
-        val reflection = JavaReflectionTypeMapping(typeBySignature).type(JavaTypeGoat::class.java)
+        val reflection = JavaReflectionTypeMapping(typeCache).type(JavaTypeGoat::class.java)
         newUniqueTypes(reflection)
 
-        val classgraph = ClassgraphTypeMapping(typeBySignature, emptyMap()).type(
+        val classgraph = ClassgraphTypeMapping(typeCache, emptyMap()).type(
             ClassGraph()
                 .filterClasspathElements { e -> !e.endsWith(".jar") }
                 .enableAnnotationInfo()

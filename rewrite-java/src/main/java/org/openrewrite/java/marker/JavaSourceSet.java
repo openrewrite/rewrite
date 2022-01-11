@@ -24,6 +24,7 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.internal.ClassgraphTypeMapping;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
 
@@ -44,12 +45,12 @@ public class JavaSourceSet implements Marker {
     List<JavaType.FullyQualified> classpath;
 
     public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath,
-                                      Map<String, Object> typeBySignature, ExecutionContext ctx) {
+                                      JavaTypeCache typeCache, ExecutionContext ctx) {
 
-        Map<String, JavaType.FullyQualified> jvmClasses = jvmClasses(typeBySignature, ctx);
+        Map<String, JavaType.FullyQualified> jvmClasses = jvmClasses(typeCache, ctx);
         List<JavaType.FullyQualified> fqns = new ArrayList<>(jvmClasses.values());
 
-        ClassgraphTypeMapping typeMapping = new ClassgraphTypeMapping(typeBySignature, jvmClasses);
+        ClassgraphTypeMapping typeMapping = new ClassgraphTypeMapping(typeCache, jvmClasses);
 
         if (classpath.iterator().hasNext()) {
 
@@ -78,7 +79,7 @@ public class JavaSourceSet implements Marker {
         return new JavaSourceSet(randomId(), sourceSetName, fqns);
     }
 
-    private static Map<String, JavaType.FullyQualified> jvmClasses(Map<String, Object> typeBySignature, ExecutionContext ctx) {
+    private static Map<String, JavaType.FullyQualified> jvmClasses(JavaTypeCache javaTypeCache, ExecutionContext ctx) {
         boolean java8 = System.getProperty("java.version").startsWith("1.8");
 
         ClassInfoList classInfos;
@@ -95,7 +96,7 @@ public class JavaSourceSet implements Marker {
                 .ignoreMethodVisibility()
                 .scan()) {
             classInfos = scanResult.getAllClasses();
-            ClassgraphTypeMapping builder = new ClassgraphTypeMapping(typeBySignature, emptyMap());
+            ClassgraphTypeMapping builder = new ClassgraphTypeMapping(javaTypeCache, emptyMap());
             Map<String, JavaType.FullyQualified> fqns = new HashMap<>(classInfos.size());
             for (ClassInfo classInfo : classInfos) {
                 try {

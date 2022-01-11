@@ -20,13 +20,13 @@ import org.codehaus.groovy.ast.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -35,12 +35,12 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     private final GroovyAstTypeSignatureBuilder signatureBuilder = new GroovyAstTypeSignatureBuilder();
 
-    private final Map<String, Object> typeBySignature;
+    private final JavaTypeCache typeCache;
     private final JavaReflectionTypeMapping reflectionTypeMapping;
 
-    GroovyTypeMapping(Map<String, Object> typeBySignature) {
-        this.typeBySignature = typeBySignature;
-        this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeBySignature);
+    GroovyTypeMapping(JavaTypeCache typeCache) {
+        this.typeCache = typeCache;
+        this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeCache);
     }
 
     public JavaType type(@Nullable ASTNode type) {
@@ -49,7 +49,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         String signature = signatureBuilder.signature(type);
-        JavaType existing = (JavaType) typeBySignature.get(signature);
+        JavaType existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -86,7 +86,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         } catch (GroovyBugError | NoClassDefFoundError ignored1) {
             clazz = new JavaType.Class(null, Flag.Public.getBitMask(), node.getName(), JavaType.Class.Kind.Class,
                     null, null, null, null, null, null);
-            typeBySignature.put(signature, clazz);
+            typeCache.put(signature, clazz);
 
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(node.getSuperClass()));
             JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(node.getOuterClass()));
@@ -128,7 +128,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
 
     private JavaType parameterizedType(ClassNode type, String signature) {
         JavaType.Parameterized pt = new JavaType.Parameterized(null, null, null);
-        typeBySignature.put(signature, pt);
+        typeCache.put(signature, pt);
 
         JavaType.Class clazz = classType(type, type.getPlainNodeReference().getName());
 
@@ -146,7 +146,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
 
     private JavaType.Array arrayType(ClassNode array, String signature) {
         JavaType.Array arr = new JavaType.Array(null, null);
-        typeBySignature.put(signature, arr);
+        typeCache.put(signature, arr);
 
         if (array.getComponentType().isUsingGenerics()) {
             arr.unsafeSet(type(array.getComponentType().getGenericsTypes()[0]));
@@ -166,7 +166,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         JavaType.GenericTypeVariable.Variance variance = INVARIANT;
 
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, g.getName(), variance, null);
-        typeBySignature.put(signature, gtv);
+        typeCache.put(signature, gtv);
 
         List<JavaType> bounds = null;
 
@@ -200,7 +200,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         String signature = signatureBuilder.methodSignature(node);
-        JavaType.Method existing = (JavaType.Method) typeBySignature.get(signature);
+        JavaType.Method existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -222,7 +222,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                 paramNames,
                 null, null, null
         );
-        typeBySignature.put(signature, method);
+        typeCache.put(signature, method);
 
         List<JavaType> parameterTypes = null;
         if (node.getParameters().length > 0) {
@@ -259,7 +259,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         String signature = signatureBuilder.variableSignature(node);
-        JavaType.Variable existing = (JavaType.Variable) typeBySignature.get(signature);
+        JavaType.Variable existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -270,7 +270,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                 node.getName(),
                 null, null, null);
 
-        typeBySignature.put(signature, variable);
+        typeCache.put(signature, variable);
 
         List<JavaType.FullyQualified> annotations = getAnnotations(node);
 
@@ -289,7 +289,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         String signature = signatureBuilder.variableSignature(name);
-        JavaType.Variable existing = (JavaType.Variable) typeBySignature.get(signature);
+        JavaType.Variable existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -300,7 +300,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                 name,
                 null, null, null);
 
-        typeBySignature.put(signature, variable);
+        typeCache.put(signature, variable);
 
         variable.unsafeSet(JavaType.Unknown.getInstance(), type(type), null);
 

@@ -24,6 +24,7 @@ import org.openjdk.jol.info.GraphStats
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTypeVisitor
+import org.openrewrite.java.internal.JavaTypeCache
 import org.openrewrite.java.tree.JavaType
 import java.util.*
 import kotlin.math.ln
@@ -35,11 +36,11 @@ class JavaSourceSetTest {
     @Test
     fun typesFromClasspath() {
         val ctx = InMemoryExecutionContext { e -> throw e }
-        val typeBySignature = mutableMapOf<String, Any>()
-        val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeBySignature, ctx)
+        val typeCache = JavaTypeCache()
+        val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeCache, ctx)
 
         val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
-        val typeBySignatureAfterMapping = mutableMapOf<String, JavaType>()
+        val typeCacheAfterMapping = mutableMapOf<String, JavaType>()
         val signatureCollisions = sortedMapOf<String, Int>()
 
         val methodsByType: MutableMap<String, MutableSet<String>> = mutableMapOf()
@@ -50,7 +51,7 @@ class JavaSourceSetTest {
                 override fun visit(javaType: JavaType?, p: Int): JavaType? {
                     if (javaType is JavaType) {
                         if (uniqueTypes.add(javaType)) {
-                            typeBySignatureAfterMapping.compute(javaType.toString()) { _, existing ->
+                            typeCacheAfterMapping.compute(javaType.toString()) { _, existing ->
                                 if (existing != null && javaType !== existing) {
                                     signatureCollisions.compute(javaType.toString()) { _, acc -> (acc ?: 0) + 1 }
                                 }
@@ -89,7 +90,7 @@ class JavaSourceSetTest {
         println("\n\n")
 
         println("Heap size: ${humanReadableByteCount(GraphStats.parseInstance(javaSourceSet).totalSize().toDouble())}")
-        println("Unique signatures: ${typeBySignature.size}")
+        println("Unique signatures: ${typeCache.size()}")
         println("Shallow type count: ${javaSourceSet.classpath.size}")
         println("Deep type count: ${uniqueTypes.size}")
         println("Signature collisions: ${signatureCollisions.size}")
@@ -106,9 +107,8 @@ class JavaSourceSetTest {
     @Test
     fun typesByPackage() {
         val ctx = InMemoryExecutionContext { e -> throw e }
-        val typeBySignature = mutableMapOf<String, Any>()
-        val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeBySignature, ctx)
-
+        val typeCache = JavaTypeCache()
+        val javaSourceSet = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeCache, ctx)
         val typesByPackage: MutableMap<String, MutableSet<String>> = TreeMap()
 
         javaSourceSet.classpath.forEach {
