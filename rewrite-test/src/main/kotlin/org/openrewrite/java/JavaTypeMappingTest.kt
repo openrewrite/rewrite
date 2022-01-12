@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.tree.Flag
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*
 
@@ -40,6 +41,14 @@ interface JavaTypeMappingTest {
     @Test
     fun javaLangObjectHasNoSupertype() {
         assertThat(goatType().supertype.supertype).isNull()
+    }
+
+    @Test
+    fun interfacesContainImplicitAbstractFlag() {
+        val clazz = firstMethodParameter("clazz") as JavaType.Class
+        val methodType = methodType("clazz")
+        assertThat(clazz.flags.contains(Flag.Abstract))
+        assertThat(methodType.flags.contains(Flag.Abstract))
     }
 
     @Test
