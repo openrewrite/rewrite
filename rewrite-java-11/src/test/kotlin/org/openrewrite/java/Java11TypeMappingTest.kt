@@ -116,4 +116,30 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
             .parse(InMemoryExecutionContext { t -> fail(t) }, source)
         Assertions.assertThat(cu).isNotNull
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1327")
+    @Test
+    fun consistentSuperType() {
+        val sources: Array<String> = arrayOf("""
+            public abstract class TypeA extends TypeB<Object> {} // `classType.superfield_type` is TypeC<Object>
+        """.trimIndent(), """
+            public abstract class TypeB<T> extends TypeC<T> {}
+        """.trimIndent(),"""
+            public abstract class TypeC<T> {}
+        """.trimIndent(), """
+            public abstract class TypeD<T> extends TypeB<T> {} // `classType.superfield_type` is TypeC<T>, and should not be TypeC<Object>
+        """.trimIndent()
+        )
+        val cus = JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true)
+            .build()
+            .parse(InMemoryExecutionContext { t -> fail(t) }, *sources)
+        Assertions.assertThat(cus).isNotNull
+        val superTypeOfTypeA = (((cus[0].classes[0].type!!.supertype) as JavaType.Parameterized)
+            .supertype as JavaType.Parameterized).typeParameters[0]
+        Assertions.assertThat(superTypeOfTypeA is JavaType.GenericTypeVariable).isTrue
+        val superTypeOfTypeD = (((cus[3].classes[0].type!!.supertype) as JavaType.Parameterized)
+            .supertype as JavaType.Parameterized).typeParameters[0]
+        Assertions.assertThat(superTypeOfTypeD is JavaType.GenericTypeVariable).isTrue
+    }
 }
