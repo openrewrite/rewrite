@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,20 +15,12 @@
  */
 package org.openrewrite.xml.internal.grammar;
 
-// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.9.2
+// Generated from /Users/pat/dev/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLLexer.g4 by ANTLR 4.9.2
 
-
-
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.ParserATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
-import org.antlr.v4.runtime.tree.ParseTreeVisitor;
-import org.antlr.v4.runtime.tree.TerminalNode;
-
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.tree.*;
 import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
@@ -40,11 +32,11 @@ public class XMLParser extends Parser {
 			new PredictionContextCache();
 	public static final int
 			COMMENT=1, CDATA=2, ParamEntityRef=3, EntityRef=4, CharRef=5, SEA_WS=6,
-			SPECIAL_OPEN_XML=7, OPEN=8, SPECIAL_OPEN=9, DTD_OPEN=10, TEXT=11, DTD_CLOSE=12,
-			DTD_SUBSET_OPEN=13, DTD_S=14, DOCTYPE=15, DTD_SUBSET_CLOSE=16, MARKUP_OPEN=17,
-			DTS_SUBSET_S=18, MARK_UP_CLOSE=19, MARKUP_S=20, MARKUP_TEXT=21, MARKUP_SUBSET=22,
-			PI_S=23, PI_TEXT=24, CLOSE=25, SPECIAL_CLOSE=26, SLASH_CLOSE=27, S=28,
-			SLASH=29, EQUALS=30, STRING=31, Name=32;
+			UTF_8_BOM=7, SPECIAL_OPEN_XML=8, OPEN=9, SPECIAL_OPEN=10, DTD_OPEN=11,
+			TEXT=12, DTD_CLOSE=13, DTD_SUBSET_OPEN=14, DTD_S=15, DOCTYPE=16, DTD_SUBSET_CLOSE=17,
+			MARKUP_OPEN=18, DTS_SUBSET_S=19, MARK_UP_CLOSE=20, MARKUP_S=21, MARKUP_TEXT=22,
+			MARKUP_SUBSET=23, PI_S=24, PI_TEXT=25, CLOSE=26, SPECIAL_CLOSE=27, SLASH_CLOSE=28,
+			S=29, SLASH=30, EQUALS=31, STRING=32, Name=33;
 	public static final int
 			RULE_document = 0, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4,
 			RULE_intsubset = 5, RULE_markupdecl = 6, RULE_declSep = 7, RULE_externalid = 8,
@@ -61,20 +53,20 @@ public class XMLParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-				null, null, null, null, null, null, null, null, "'<'", null, null, null,
-				null, null, null, "'DOCTYPE'", null, null, null, null, null, null, null,
-				null, null, null, "'?>'", "'/>'", null, "'/'", "'='"
+				null, null, null, null, null, null, null, "'\uFEFF'", null, "'<'", null,
+				null, null, null, null, null, "'DOCTYPE'", null, null, null, null, null,
+				null, null, null, null, null, "'?>'", "'/>'", null, "'/'", "'='"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
 				null, "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef", "SEA_WS",
-				"SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN", "DTD_OPEN", "TEXT", "DTD_CLOSE",
-				"DTD_SUBSET_OPEN", "DTD_S", "DOCTYPE", "DTD_SUBSET_CLOSE", "MARKUP_OPEN",
-				"DTS_SUBSET_S", "MARK_UP_CLOSE", "MARKUP_S", "MARKUP_TEXT", "MARKUP_SUBSET",
-				"PI_S", "PI_TEXT", "CLOSE", "SPECIAL_CLOSE", "SLASH_CLOSE", "S", "SLASH",
-				"EQUALS", "STRING", "Name"
+				"UTF_8_BOM", "SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN", "DTD_OPEN",
+				"TEXT", "DTD_CLOSE", "DTD_SUBSET_OPEN", "DTD_S", "DOCTYPE", "DTD_SUBSET_CLOSE",
+				"MARKUP_OPEN", "DTS_SUBSET_S", "MARK_UP_CLOSE", "MARKUP_S", "MARKUP_TEXT",
+				"MARKUP_SUBSET", "PI_S", "PI_TEXT", "CLOSE", "SPECIAL_CLOSE", "SLASH_CLOSE",
+				"S", "SLASH", "EQUALS", "STRING", "Name"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
@@ -135,6 +127,7 @@ public class XMLParser extends Parser {
 		public ElementContext element() {
 			return getRuleContext(ElementContext.class,0);
 		}
+		public TerminalNode UTF_8_BOM() { return getToken(XMLParser.UTF_8_BOM, 0); }
 		public DocumentContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -157,12 +150,23 @@ public class XMLParser extends Parser {
 	public final DocumentContext document() throws RecognitionException {
 		DocumentContext _localctx = new DocumentContext(_ctx, getState());
 		enterRule(_localctx, 0, RULE_document);
+		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(30);
-				prolog();
 				setState(31);
+				_errHandler.sync(this);
+				_la = _input.LA(1);
+				if (_la==UTF_8_BOM) {
+					{
+						setState(30);
+						match(UTF_8_BOM);
+					}
+				}
+
+				setState(33);
+				prolog();
+				setState(34);
 				element();
 			}
 		}
@@ -213,27 +217,27 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(34);
+				setState(37);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==SPECIAL_OPEN_XML) {
 					{
-						setState(33);
+						setState(36);
 						xmldecl();
 					}
 				}
 
-				setState(39);
+				setState(42);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << COMMENT) | (1L << SPECIAL_OPEN) | (1L << DTD_OPEN))) != 0)) {
 					{
 						{
-							setState(36);
+							setState(39);
 							misc();
 						}
 					}
-					setState(41);
+					setState(44);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				}
@@ -285,23 +289,23 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(42);
+				setState(45);
 				match(SPECIAL_OPEN_XML);
-				setState(46);
+				setState(49);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				while (_la==Name) {
 					{
 						{
-							setState(43);
+							setState(46);
 							attribute();
 						}
 					}
-					setState(48);
+					setState(51);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				}
-				setState(49);
+				setState(52);
 				match(SPECIAL_CLOSE);
 			}
 		}
@@ -349,24 +353,24 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(54);
+				setState(57);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 					case COMMENT:
 					{
-						setState(51);
+						setState(54);
 						match(COMMENT);
 					}
 					break;
 					case DTD_OPEN:
 					{
-						setState(52);
+						setState(55);
 						doctypedecl();
 					}
 					break;
 					case SPECIAL_OPEN:
 					{
-						setState(53);
+						setState(56);
 						processinginstruction();
 					}
 					break;
@@ -429,43 +433,43 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(56);
-				match(DTD_OPEN);
-				setState(57);
-				match(DOCTYPE);
-				setState(58);
-				match(Name);
 				setState(59);
+				match(DTD_OPEN);
+				setState(60);
+				match(DOCTYPE);
+				setState(61);
+				match(Name);
+				setState(62);
 				externalid();
-				setState(63);
+				setState(66);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				while (_la==STRING) {
 					{
 						{
-							setState(60);
+							setState(63);
 							match(STRING);
 						}
 					}
-					setState(65);
+					setState(68);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				}
-				setState(70);
+				setState(73);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==DTD_SUBSET_OPEN) {
 					{
-						setState(66);
+						setState(69);
 						match(DTD_SUBSET_OPEN);
-						setState(67);
+						setState(70);
 						intsubset();
-						setState(68);
+						setState(71);
 						match(DTD_SUBSET_CLOSE);
 					}
 				}
 
-				setState(72);
+				setState(75);
 				match(DTD_CLOSE);
 			}
 		}
@@ -519,25 +523,25 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(78);
+				setState(81);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << COMMENT) | (1L << ParamEntityRef) | (1L << SPECIAL_OPEN) | (1L << MARKUP_OPEN))) != 0)) {
 					{
-						setState(76);
+						setState(79);
 						_errHandler.sync(this);
 						switch (_input.LA(1)) {
 							case COMMENT:
 							case SPECIAL_OPEN:
 							case MARKUP_OPEN:
 							{
-								setState(74);
+								setState(77);
 								markupdecl();
 							}
 							break;
 							case ParamEntityRef:
 							{
-								setState(75);
+								setState(78);
 								declSep();
 							}
 							break;
@@ -545,7 +549,7 @@ public class XMLParser extends Parser {
 								throw new NoViableAltException(this);
 						}
 					}
-					setState(80);
+					setState(83);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				}
@@ -601,50 +605,50 @@ public class XMLParser extends Parser {
 		enterRule(_localctx, 12, RULE_markupdecl);
 		int _la;
 		try {
-			setState(97);
+			setState(100);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 				case MARKUP_OPEN:
 					enterOuterAlt(_localctx, 1);
 				{
 					{
-						setState(81);
+						setState(84);
 						match(MARKUP_OPEN);
-						setState(83);
+						setState(86);
 						_errHandler.sync(this);
-						switch ( getInterpreter().adaptivePredict(_input,8,_ctx) ) {
+						switch ( getInterpreter().adaptivePredict(_input,9,_ctx) ) {
 							case 1:
 							{
-								setState(82);
+								setState(85);
 								match(MARKUP_TEXT);
 							}
 							break;
 						}
-						setState(88);
+						setState(91);
 						_errHandler.sync(this);
 						_la = _input.LA(1);
 						while (_la==MARKUP_SUBSET) {
 							{
 								{
-									setState(85);
+									setState(88);
 									match(MARKUP_SUBSET);
 								}
 							}
-							setState(90);
+							setState(93);
 							_errHandler.sync(this);
 							_la = _input.LA(1);
 						}
-						setState(92);
+						setState(95);
 						_errHandler.sync(this);
 						_la = _input.LA(1);
 						if (_la==MARKUP_TEXT) {
 							{
-								setState(91);
+								setState(94);
 								match(MARKUP_TEXT);
 							}
 						}
 
-						setState(94);
+						setState(97);
 						match(MARK_UP_CLOSE);
 					}
 				}
@@ -652,14 +656,14 @@ public class XMLParser extends Parser {
 				case SPECIAL_OPEN:
 					enterOuterAlt(_localctx, 2);
 				{
-					setState(95);
+					setState(98);
 					processinginstruction();
 				}
 				break;
 				case COMMENT:
 					enterOuterAlt(_localctx, 3);
 				{
-					setState(96);
+					setState(99);
 					match(COMMENT);
 				}
 				break;
@@ -705,7 +709,7 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(99);
+				setState(102);
 				match(ParamEntityRef);
 			}
 		}
@@ -748,12 +752,12 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(102);
+				setState(105);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==Name) {
 					{
-						setState(101);
+						setState(104);
 						match(Name);
 					}
 				}
@@ -800,11 +804,11 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(104);
+				setState(107);
 				match(SPECIAL_OPEN);
-				setState(105);
+				setState(108);
 				match(PI_TEXT);
-				setState(106);
+				setState(109);
 				match(SPECIAL_CLOSE);
 			}
 		}
@@ -859,44 +863,44 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(114);
+				setState(117);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 					case OPEN:
 					{
-						setState(108);
+						setState(111);
 						element();
 					}
 					break;
 					case EntityRef:
 					case CharRef:
 					{
-						setState(109);
+						setState(112);
 						reference();
 					}
 					break;
 					case SPECIAL_OPEN:
 					{
-						setState(110);
+						setState(113);
 						processinginstruction();
 					}
 					break;
 					case CDATA:
 					{
-						setState(111);
+						setState(114);
 						match(CDATA);
 					}
 					break;
 					case COMMENT:
 					{
-						setState(112);
+						setState(115);
 						match(COMMENT);
 					}
 					break;
 					case SEA_WS:
 					case TEXT:
 					{
-						setState(113);
+						setState(116);
 						chardata();
 					}
 					break;
@@ -968,80 +972,80 @@ public class XMLParser extends Parser {
 		int _la;
 		try {
 			int _alt;
-			setState(144);
+			setState(147);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,17,_ctx) ) {
+			switch ( getInterpreter().adaptivePredict(_input,18,_ctx) ) {
 				case 1:
 					enterOuterAlt(_localctx, 1);
 				{
-					setState(116);
+					setState(119);
 					match(OPEN);
-					setState(117);
+					setState(120);
 					match(Name);
-					setState(121);
+					setState(124);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 					while (_la==Name) {
 						{
 							{
-								setState(118);
+								setState(121);
 								attribute();
 							}
 						}
-						setState(123);
+						setState(126);
 						_errHandler.sync(this);
 						_la = _input.LA(1);
 					}
-					setState(124);
+					setState(127);
 					match(CLOSE);
-					setState(128);
+					setState(131);
 					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,15,_ctx);
+					_alt = getInterpreter().adaptivePredict(_input,16,_ctx);
 					while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 						if ( _alt==1 ) {
 							{
 								{
-									setState(125);
+									setState(128);
 									content();
 								}
 							}
 						}
-						setState(130);
+						setState(133);
 						_errHandler.sync(this);
-						_alt = getInterpreter().adaptivePredict(_input,15,_ctx);
+						_alt = getInterpreter().adaptivePredict(_input,16,_ctx);
 					}
-					setState(131);
-					match(OPEN);
-					setState(132);
-					match(SLASH);
-					setState(133);
-					match(Name);
 					setState(134);
+					match(OPEN);
+					setState(135);
+					match(SLASH);
+					setState(136);
+					match(Name);
+					setState(137);
 					match(CLOSE);
 				}
 				break;
 				case 2:
 					enterOuterAlt(_localctx, 2);
 				{
-					setState(135);
+					setState(138);
 					match(OPEN);
-					setState(136);
+					setState(139);
 					match(Name);
-					setState(140);
+					setState(143);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 					while (_la==Name) {
 						{
 							{
-								setState(137);
+								setState(140);
 								attribute();
 							}
 						}
-						setState(142);
+						setState(145);
 						_errHandler.sync(this);
 						_la = _input.LA(1);
 					}
-					setState(143);
+					setState(146);
 					match(SLASH_CLOSE);
 				}
 				break;
@@ -1087,7 +1091,7 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(146);
+				setState(149);
 				_la = _input.LA(1);
 				if ( !(_la==EntityRef || _la==CharRef) ) {
 					_errHandler.recoverInline(this);
@@ -1139,11 +1143,11 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(148);
+				setState(151);
 				match(Name);
-				setState(149);
+				setState(152);
 				match(EQUALS);
-				setState(150);
+				setState(153);
 				match(STRING);
 			}
 		}
@@ -1187,7 +1191,7 @@ public class XMLParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(152);
+				setState(155);
 				_la = _input.LA(1);
 				if ( !(_la==SEA_WS || _la==TEXT) ) {
 					_errHandler.recoverInline(this);
@@ -1211,49 +1215,50 @@ public class XMLParser extends Parser {
 	}
 
 	public static final String _serializedATN =
-			"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\"\u009d\4\2\t\2\4"+
+			"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3#\u00a0\4\2\t\2\4"+
 					"\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\4\t\t\t\4\n\t\n\4\13\t"+
-					"\13\4\f\t\f\4\r\t\r\4\16\t\16\4\17\t\17\4\20\t\20\3\2\3\2\3\2\3\3\5\3"+
-					"%\n\3\3\3\7\3(\n\3\f\3\16\3+\13\3\3\4\3\4\7\4/\n\4\f\4\16\4\62\13\4\3"+
-					"\4\3\4\3\5\3\5\3\5\5\59\n\5\3\6\3\6\3\6\3\6\3\6\7\6@\n\6\f\6\16\6C\13"+
-					"\6\3\6\3\6\3\6\3\6\5\6I\n\6\3\6\3\6\3\7\3\7\7\7O\n\7\f\7\16\7R\13\7\3"+
-					"\b\3\b\5\bV\n\b\3\b\7\bY\n\b\f\b\16\b\\\13\b\3\b\5\b_\n\b\3\b\3\b\3\b"+
-					"\5\bd\n\b\3\t\3\t\3\n\5\ni\n\n\3\13\3\13\3\13\3\13\3\f\3\f\3\f\3\f\3\f"+
-					"\3\f\5\fu\n\f\3\r\3\r\3\r\7\rz\n\r\f\r\16\r}\13\r\3\r\3\r\7\r\u0081\n"+
-					"\r\f\r\16\r\u0084\13\r\3\r\3\r\3\r\3\r\3\r\3\r\3\r\7\r\u008d\n\r\f\r\16"+
-					"\r\u0090\13\r\3\r\5\r\u0093\n\r\3\16\3\16\3\17\3\17\3\17\3\17\3\20\3\20"+
-					"\3\20\2\2\21\2\4\6\b\n\f\16\20\22\24\26\30\32\34\36\2\4\3\2\6\7\4\2\b"+
-					"\b\r\r\2\u00a5\2 \3\2\2\2\4$\3\2\2\2\6,\3\2\2\2\b8\3\2\2\2\n:\3\2\2\2"+
-					"\fP\3\2\2\2\16c\3\2\2\2\20e\3\2\2\2\22h\3\2\2\2\24j\3\2\2\2\26t\3\2\2"+
-					"\2\30\u0092\3\2\2\2\32\u0094\3\2\2\2\34\u0096\3\2\2\2\36\u009a\3\2\2\2"+
-					" !\5\4\3\2!\"\5\30\r\2\"\3\3\2\2\2#%\5\6\4\2$#\3\2\2\2$%\3\2\2\2%)\3\2"+
-					"\2\2&(\5\b\5\2\'&\3\2\2\2(+\3\2\2\2)\'\3\2\2\2)*\3\2\2\2*\5\3\2\2\2+)"+
-					"\3\2\2\2,\60\7\t\2\2-/\5\34\17\2.-\3\2\2\2/\62\3\2\2\2\60.\3\2\2\2\60"+
-					"\61\3\2\2\2\61\63\3\2\2\2\62\60\3\2\2\2\63\64\7\34\2\2\64\7\3\2\2\2\65"+
-					"9\7\3\2\2\669\5\n\6\2\679\5\24\13\28\65\3\2\2\28\66\3\2\2\28\67\3\2\2"+
-					"\29\t\3\2\2\2:;\7\f\2\2;<\7\21\2\2<=\7\"\2\2=A\5\22\n\2>@\7!\2\2?>\3\2"+
-					"\2\2@C\3\2\2\2A?\3\2\2\2AB\3\2\2\2BH\3\2\2\2CA\3\2\2\2DE\7\17\2\2EF\5"+
-					"\f\7\2FG\7\22\2\2GI\3\2\2\2HD\3\2\2\2HI\3\2\2\2IJ\3\2\2\2JK\7\16\2\2K"+
-					"\13\3\2\2\2LO\5\16\b\2MO\5\20\t\2NL\3\2\2\2NM\3\2\2\2OR\3\2\2\2PN\3\2"+
-					"\2\2PQ\3\2\2\2Q\r\3\2\2\2RP\3\2\2\2SU\7\23\2\2TV\7\27\2\2UT\3\2\2\2UV"+
-					"\3\2\2\2VZ\3\2\2\2WY\7\30\2\2XW\3\2\2\2Y\\\3\2\2\2ZX\3\2\2\2Z[\3\2\2\2"+
-					"[^\3\2\2\2\\Z\3\2\2\2]_\7\27\2\2^]\3\2\2\2^_\3\2\2\2_`\3\2\2\2`d\7\25"+
-					"\2\2ad\5\24\13\2bd\7\3\2\2cS\3\2\2\2ca\3\2\2\2cb\3\2\2\2d\17\3\2\2\2e"+
-					"f\7\5\2\2f\21\3\2\2\2gi\7\"\2\2hg\3\2\2\2hi\3\2\2\2i\23\3\2\2\2jk\7\13"+
-					"\2\2kl\7\32\2\2lm\7\34\2\2m\25\3\2\2\2nu\5\30\r\2ou\5\32\16\2pu\5\24\13"+
-					"\2qu\7\4\2\2ru\7\3\2\2su\5\36\20\2tn\3\2\2\2to\3\2\2\2tp\3\2\2\2tq\3\2"+
-					"\2\2tr\3\2\2\2ts\3\2\2\2u\27\3\2\2\2vw\7\n\2\2w{\7\"\2\2xz\5\34\17\2y"+
-					"x\3\2\2\2z}\3\2\2\2{y\3\2\2\2{|\3\2\2\2|~\3\2\2\2}{\3\2\2\2~\u0082\7\33"+
-					"\2\2\177\u0081\5\26\f\2\u0080\177\3\2\2\2\u0081\u0084\3\2\2\2\u0082\u0080"+
-					"\3\2\2\2\u0082\u0083\3\2\2\2\u0083\u0085\3\2\2\2\u0084\u0082\3\2\2\2\u0085"+
-					"\u0086\7\n\2\2\u0086\u0087\7\37\2\2\u0087\u0088\7\"\2\2\u0088\u0093\7"+
-					"\33\2\2\u0089\u008a\7\n\2\2\u008a\u008e\7\"\2\2\u008b\u008d\5\34\17\2"+
-					"\u008c\u008b\3\2\2\2\u008d\u0090\3\2\2\2\u008e\u008c\3\2\2\2\u008e\u008f"+
-					"\3\2\2\2\u008f\u0091\3\2\2\2\u0090\u008e\3\2\2\2\u0091\u0093\7\35\2\2"+
-					"\u0092v\3\2\2\2\u0092\u0089\3\2\2\2\u0093\31\3\2\2\2\u0094\u0095\t\2\2"+
-					"\2\u0095\33\3\2\2\2\u0096\u0097\7\"\2\2\u0097\u0098\7 \2\2\u0098\u0099"+
-					"\7!\2\2\u0099\35\3\2\2\2\u009a\u009b\t\3\2\2\u009b\37\3\2\2\2\24$)\60"+
-					"8AHNPUZ^cht{\u0082\u008e\u0092";
+					"\13\4\f\t\f\4\r\t\r\4\16\t\16\4\17\t\17\4\20\t\20\3\2\5\2\"\n\2\3\2\3"+
+					"\2\3\2\3\3\5\3(\n\3\3\3\7\3+\n\3\f\3\16\3.\13\3\3\4\3\4\7\4\62\n\4\f\4"+
+					"\16\4\65\13\4\3\4\3\4\3\5\3\5\3\5\5\5<\n\5\3\6\3\6\3\6\3\6\3\6\7\6C\n"+
+					"\6\f\6\16\6F\13\6\3\6\3\6\3\6\3\6\5\6L\n\6\3\6\3\6\3\7\3\7\7\7R\n\7\f"+
+					"\7\16\7U\13\7\3\b\3\b\5\bY\n\b\3\b\7\b\\\n\b\f\b\16\b_\13\b\3\b\5\bb\n"+
+					"\b\3\b\3\b\3\b\5\bg\n\b\3\t\3\t\3\n\5\nl\n\n\3\13\3\13\3\13\3\13\3\f\3"+
+					"\f\3\f\3\f\3\f\3\f\5\fx\n\f\3\r\3\r\3\r\7\r}\n\r\f\r\16\r\u0080\13\r\3"+
+					"\r\3\r\7\r\u0084\n\r\f\r\16\r\u0087\13\r\3\r\3\r\3\r\3\r\3\r\3\r\3\r\7"+
+					"\r\u0090\n\r\f\r\16\r\u0093\13\r\3\r\5\r\u0096\n\r\3\16\3\16\3\17\3\17"+
+					"\3\17\3\17\3\20\3\20\3\20\2\2\21\2\4\6\b\n\f\16\20\22\24\26\30\32\34\36"+
+					"\2\4\3\2\6\7\4\2\b\b\16\16\2\u00a9\2!\3\2\2\2\4\'\3\2\2\2\6/\3\2\2\2\b"+
+					";\3\2\2\2\n=\3\2\2\2\fS\3\2\2\2\16f\3\2\2\2\20h\3\2\2\2\22k\3\2\2\2\24"+
+					"m\3\2\2\2\26w\3\2\2\2\30\u0095\3\2\2\2\32\u0097\3\2\2\2\34\u0099\3\2\2"+
+					"\2\36\u009d\3\2\2\2 \"\7\t\2\2! \3\2\2\2!\"\3\2\2\2\"#\3\2\2\2#$\5\4\3"+
+					"\2$%\5\30\r\2%\3\3\2\2\2&(\5\6\4\2\'&\3\2\2\2\'(\3\2\2\2(,\3\2\2\2)+\5"+
+					"\b\5\2*)\3\2\2\2+.\3\2\2\2,*\3\2\2\2,-\3\2\2\2-\5\3\2\2\2.,\3\2\2\2/\63"+
+					"\7\n\2\2\60\62\5\34\17\2\61\60\3\2\2\2\62\65\3\2\2\2\63\61\3\2\2\2\63"+
+					"\64\3\2\2\2\64\66\3\2\2\2\65\63\3\2\2\2\66\67\7\35\2\2\67\7\3\2\2\28<"+
+					"\7\3\2\29<\5\n\6\2:<\5\24\13\2;8\3\2\2\2;9\3\2\2\2;:\3\2\2\2<\t\3\2\2"+
+					"\2=>\7\r\2\2>?\7\22\2\2?@\7#\2\2@D\5\22\n\2AC\7\"\2\2BA\3\2\2\2CF\3\2"+
+					"\2\2DB\3\2\2\2DE\3\2\2\2EK\3\2\2\2FD\3\2\2\2GH\7\20\2\2HI\5\f\7\2IJ\7"+
+					"\23\2\2JL\3\2\2\2KG\3\2\2\2KL\3\2\2\2LM\3\2\2\2MN\7\17\2\2N\13\3\2\2\2"+
+					"OR\5\16\b\2PR\5\20\t\2QO\3\2\2\2QP\3\2\2\2RU\3\2\2\2SQ\3\2\2\2ST\3\2\2"+
+					"\2T\r\3\2\2\2US\3\2\2\2VX\7\24\2\2WY\7\30\2\2XW\3\2\2\2XY\3\2\2\2Y]\3"+
+					"\2\2\2Z\\\7\31\2\2[Z\3\2\2\2\\_\3\2\2\2][\3\2\2\2]^\3\2\2\2^a\3\2\2\2"+
+					"_]\3\2\2\2`b\7\30\2\2a`\3\2\2\2ab\3\2\2\2bc\3\2\2\2cg\7\26\2\2dg\5\24"+
+					"\13\2eg\7\3\2\2fV\3\2\2\2fd\3\2\2\2fe\3\2\2\2g\17\3\2\2\2hi\7\5\2\2i\21"+
+					"\3\2\2\2jl\7#\2\2kj\3\2\2\2kl\3\2\2\2l\23\3\2\2\2mn\7\f\2\2no\7\33\2\2"+
+					"op\7\35\2\2p\25\3\2\2\2qx\5\30\r\2rx\5\32\16\2sx\5\24\13\2tx\7\4\2\2u"+
+					"x\7\3\2\2vx\5\36\20\2wq\3\2\2\2wr\3\2\2\2ws\3\2\2\2wt\3\2\2\2wu\3\2\2"+
+					"\2wv\3\2\2\2x\27\3\2\2\2yz\7\13\2\2z~\7#\2\2{}\5\34\17\2|{\3\2\2\2}\u0080"+
+					"\3\2\2\2~|\3\2\2\2~\177\3\2\2\2\177\u0081\3\2\2\2\u0080~\3\2\2\2\u0081"+
+					"\u0085\7\34\2\2\u0082\u0084\5\26\f\2\u0083\u0082\3\2\2\2\u0084\u0087\3"+
+					"\2\2\2\u0085\u0083\3\2\2\2\u0085\u0086\3\2\2\2\u0086\u0088\3\2\2\2\u0087"+
+					"\u0085\3\2\2\2\u0088\u0089\7\13\2\2\u0089\u008a\7 \2\2\u008a\u008b\7#"+
+					"\2\2\u008b\u0096\7\34\2\2\u008c\u008d\7\13\2\2\u008d\u0091\7#\2\2\u008e"+
+					"\u0090\5\34\17\2\u008f\u008e\3\2\2\2\u0090\u0093\3\2\2\2\u0091\u008f\3"+
+					"\2\2\2\u0091\u0092\3\2\2\2\u0092\u0094\3\2\2\2\u0093\u0091\3\2\2\2\u0094"+
+					"\u0096\7\36\2\2\u0095y\3\2\2\2\u0095\u008c\3\2\2\2\u0096\31\3\2\2\2\u0097"+
+					"\u0098\t\2\2\2\u0098\33\3\2\2\2\u0099\u009a\7#\2\2\u009a\u009b\7!\2\2"+
+					"\u009b\u009c\7\"\2\2\u009c\35\3\2\2\2\u009d\u009e\t\3\2\2\u009e\37\3\2"+
+					"\2\2\25!\',\63;DKQSX]afkw~\u0085\u0091\u0095";
 	public static final ATN _ATN =
 			new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

@@ -32,7 +32,7 @@ parser grammar XMLParser;
 options { tokenVocab=XMLLexer; }
 
 document
-    :   prolog element
+    :   UTF_8_BOM? prolog element
     ;
 
 prolog

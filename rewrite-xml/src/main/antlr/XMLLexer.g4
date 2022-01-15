@@ -40,7 +40,7 @@ CharRef           :  '&#' DIGIT+ ';'
                   ;
 
 SEA_WS            :  (' '|'\t'|'\r'? '\n')+       -> skip ;
-
+UTF_8_BOM         : '\uFEFF'                      -> skip ;
 SPECIAL_OPEN_XML  :  '<?xml' S                    -> pushMode(INSIDE) ;
 OPEN              :  '<'                          -> pushMode(INSIDE) ;
 
