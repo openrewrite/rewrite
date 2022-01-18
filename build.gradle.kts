@@ -2,7 +2,6 @@ import com.github.jk1.license.LicenseReportExtension
 import nebula.plugin.contacts.Contact
 import nebula.plugin.contacts.ContactsExtension
 import nl.javadude.gradle.plugins.license.LicenseExtension
-import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem
 import java.util.*
 
 plugins {
@@ -13,7 +12,7 @@ plugins {
     id("nebula.release") version "15.3.1"
     id("io.github.gradle-nexus.publish-plugin") version "1.0.0"
 
-    id("com.github.johnrengelman.shadow") version "6.1.0" apply false
+    id("com.github.johnrengelman.shadow") version "7.1.2" apply false
     id("com.github.hierynomus.license") version "0.16.1" apply false
     id("org.jetbrains.kotlin.jvm") version "1.5.21" apply false
     id("org.gradle.test-retry") version "1.2.1" apply false
@@ -21,7 +20,7 @@ plugins {
 
     id("nebula.maven-publish") version "17.3.2" apply false
     id("nebula.contacts") version "5.1.0" apply false
-    id("nebula.info") version "9.3.0" apply false
+    id("nebula.info") version "11.1.0" apply false
 
     id("nebula.javadoc-jar") version "17.3.2" apply false
     id("nebula.source-jar") version "17.3.2" apply false
