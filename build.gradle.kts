@@ -17,6 +17,7 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "1.5.21" apply false
     id("org.gradle.test-retry") version "1.2.1" apply false
     id("com.github.jk1.dependency-license-report") version "2.0" apply false
+    id("org.owasp.dependencycheck") version "6.5.3" apply false
 
     id("nebula.maven-publish") version "17.3.2" apply false
     id("nebula.contacts") version "5.1.0" apply false
@@ -49,8 +50,14 @@ nexusPublishing {
 
 allprojects {
     apply(plugin = "license")
+    apply(plugin = "org.owasp.dependencycheck")
     group = "org.openrewrite"
     description = "Eliminate tech-debt. Automatically."
+    configure<org.owasp.dependencycheck.gradle.extension.DependencyCheckExtension> {
+        skipConfigurations = listOf("integTestImplementationDependenciesMetadata")
+        analyzers.assemblyEnabled = false
+        failBuildOnCVSS = 9.0F
+    }
 }
 
 subprojects {
