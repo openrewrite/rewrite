@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -36,7 +37,7 @@ import org.openrewrite.java.JavaRecipeTest
 )
 interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     override val recipe: Recipe
-        get() = RemoveUnusedLocalVariables()
+        get() = RemoveUnusedLocalVariables(null)
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/841")
@@ -47,6 +48,58 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
                     int a = 0;
                     @SuppressWarnings("unused") int b = 0;
                     return a + 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1332")
+    @Suppress("MethodMayBeStatic")
+    fun ignoreVariablesNamed() = assertUnchanged(
+        recipe = RemoveUnusedLocalVariables(arrayOf("unused", "ignoreMe")),
+        before = """
+            class Test {
+                void method(Object someData) {
+                    int unused = writeDataToTheDB(someData);
+                    int ignoreMe = writeDataToTheDB(someData);
+                }
+
+                int writeDataToTheDB(Object save) {
+                    return 1;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1278")
+    @Disabled
+    @Suppress("MethodMayBeStatic")
+    fun keepRightHandSideStatement() = assertChanged(
+        recipe = RemoveUnusedLocalVariables(arrayOf("ignoreMeCompletely")),
+        before = """
+            class Test {
+                void method(Object someData) {
+                    int ignoreMeCompletely = writeDataToTheDB(someData);
+                    int replaceMeWithRightHandSideStatement = writeDataToTheDB(someData);
+                    int removeMeEntirelyBecauseRightHandSideIsNotAStandaloneStatement = 1 + writeDataToTheDB(someData);
+                }
+
+                int writeDataToTheDB(Object save) {
+                    return 1;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void method(Object someData) {
+                    int ignoreMeCompletely = writeDataToTheDB(someData);
+                    writeDataToTheDB(someData);
+                }
+
+                int writeDataToTheDB(Object save) {
+                    return 1;
                 }
             }
         """

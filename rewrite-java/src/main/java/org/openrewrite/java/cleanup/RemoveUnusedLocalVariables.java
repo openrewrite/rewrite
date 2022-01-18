@@ -15,10 +15,9 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.DeleteStatement;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -30,8 +29,18 @@ import java.time.Duration;
 import java.util.*;
 import java.util.function.Predicate;
 
+@Value
+@EqualsAndHashCode(callSuper = true)
 @SuppressWarnings("ConstantConditions")
 public class RemoveUnusedLocalVariables extends Recipe {
+    @Incubating(since = "7.17.2")
+    @Option(displayName = "Ignore matching variable names",
+            description = "An array of variable identifier names for local variables to ignore, even if the local variable is unused.",
+            required = false,
+            example = "[unused, notUsed, IGNORE_ME]")
+    @Nullable
+    String[] ignoreVariablesNamed;
+
     @Override
     public String getDisplayName() {
         return "Remove unused local variables";
@@ -57,8 +66,8 @@ public class RemoveUnusedLocalVariables extends Recipe {
         return new RemoveUnusedLocalVariablesVisitor();
     }
 
-    private static class RemoveUnusedLocalVariablesVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private static Cursor getCursorToParentScope(Cursor cursor) {
+    private class RemoveUnusedLocalVariablesVisitor extends JavaIsoVisitor<ExecutionContext> {
+        private Cursor getCursorToParentScope(Cursor cursor) {
             return cursor.dropParentUntil(is ->
                     is instanceof J.Block ||
                             is instanceof J.MethodDeclaration ||
@@ -77,6 +86,12 @@ public class RemoveUnusedLocalVariables extends Recipe {
 
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+            // skip matching ignored variable names right away
+            if (ignoreVariablesNamed != null &&
+                    Arrays.stream(ignoreVariablesNamed).anyMatch(v -> variable.getSimpleName().equals(v))) {
+                return variable;
+            }
+
             Cursor parentScope = getCursorToParentScope(getCursor());
             J parent = parentScope.getValue();
             if (parentScope.getParent() == null ||
