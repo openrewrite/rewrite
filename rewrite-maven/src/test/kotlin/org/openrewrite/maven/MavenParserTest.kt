@@ -522,6 +522,8 @@ class MavenParserTest {
                 }
             }
         }.use { mockRepo ->
+            mockRepo.start()
+
             val ctx = MavenExecutionContextView(InMemoryExecutionContext { err -> throw err })
             val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
                 """

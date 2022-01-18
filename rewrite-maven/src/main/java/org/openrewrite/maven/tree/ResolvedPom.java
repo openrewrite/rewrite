@@ -90,6 +90,16 @@ public class ResolvedPom implements DependencyManagementDependency {
             }
         }
 
+        List<Dependency> resolvedRequestedDependencies = resolved.getRequestedDependencies();
+        if (requestedDependencies.size() != resolvedRequestedDependencies.size()) {
+            return resolved;
+        }
+        for (int i = 0; i < resolvedRequestedDependencies.size(); i++) {
+            if (!requestedDependencies.get(i).equals(resolvedRequestedDependencies.get(i))) {
+                return resolved;
+            }
+        }
+
         List<DependencyManagementDependency> resolvedDependencyManagement = resolved.getDependencyManagement();
         if (dependencyManagement.size() != resolvedDependencyManagement.size()) {
             return resolved;

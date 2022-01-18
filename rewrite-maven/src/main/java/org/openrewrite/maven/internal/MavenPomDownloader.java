@@ -305,7 +305,7 @@ public class MavenPomDownloader {
                 normalizedRepositories.add(normalizedRepo);
             }
         }
-        normalizedRepositories.add(MavenRepository.MAVEN_CENTRAL);
+        normalizedRepositories.add(normalizeRepository(MavenRepository.MAVEN_CENTRAL));
         return normalizedRepositories;
     }
 
