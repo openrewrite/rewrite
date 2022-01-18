@@ -340,6 +340,51 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
+    fun upgradeGuavaWithExplicitBlankVersionPattern() = assertChanged(
+            recipe = UpgradeDependencyVersion(
+                    "com.google.guava",
+                    "*",
+                    "latest.release",
+                    "",
+                    null
+            ),
+            before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>25.0-android</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>23.0</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
+
+    @Test
     fun upgradeGuavaInParent(@TempDir tempDir: Path) {
         val parent = tempDir.resolve("pom.xml")
         val server = tempDir.resolve("server/pom.xml")

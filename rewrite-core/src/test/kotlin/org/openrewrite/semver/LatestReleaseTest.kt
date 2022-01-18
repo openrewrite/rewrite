@@ -91,6 +91,7 @@ class LatestReleaseTest {
         assertThat(LatestRelease("-jre").isValid("1.0", "29.0-jre")).isTrue
         assertThat(LatestRelease("-jre").isValid("1.0", "29.0")).isFalse
         assertThat(LatestRelease("-jre").isValid("1.0", "29.0-android")).isFalse
+        assertThat(LatestRelease("").isValid("1.0", "29.0")).isTrue
     }
 
     @Test
