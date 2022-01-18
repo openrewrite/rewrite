@@ -28,6 +28,7 @@ import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.net.URI;
+import java.util.Optional;
 
 public class InMemoryMavenPomCache implements MavenPomCache {
     @Value
@@ -36,15 +37,15 @@ public class InMemoryMavenPomCache implements MavenPomCache {
         GroupArtifactVersion gav;
     }
 
-    private final Cache<ResolvedGroupArtifactVersion, CacheResult<Pom>> pomCache = Caffeine.newBuilder()
+    private final Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache = Caffeine.newBuilder()
             .maximumSize(100_000)
             .build();
 
-    private final Cache<MetadataKey, CacheResult<MavenMetadata>> mavenMetadataCache = Caffeine.newBuilder()
+    private final Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache = Caffeine.newBuilder()
             .maximumSize(100_000)
             .build();
 
-    private final Cache<MavenRepository, CacheResult<MavenRepository>> repositoryCache = Caffeine.newBuilder()
+    private final Cache<MavenRepository, Optional<MavenRepository>> repositoryCache = Caffeine.newBuilder()
             .maximumSize(10_000)
             .build();
 
@@ -56,37 +57,34 @@ public class InMemoryMavenPomCache implements MavenPomCache {
 
     @Nullable
     @Override
-    public CacheResult<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+    public Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
         return mavenMetadataCache.getIfPresent(new MetadataKey(repo, gav));
     }
 
     @Override
-    public CacheResult<MavenMetadata> putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadata metadata) {
-        mavenMetadataCache.put(new MetadataKey(repo, gav), new CacheResult<>(CacheResult.State.Cached, metadata));
-        return new CacheResult<>(CacheResult.State.Updated, metadata);
+    public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
+        mavenMetadataCache.put(new MetadataKey(repo, gav), Optional.ofNullable(metadata));
     }
 
     @Nullable
     @Override
-    public CacheResult<Pom> getPom(ResolvedGroupArtifactVersion gav) {
+    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) {
         return pomCache.getIfPresent(gav);
     }
 
     @Override
-    public CacheResult<Pom> putPom(ResolvedGroupArtifactVersion gav, Pom pom) {
-        pomCache.put(gav, new CacheResult<>(CacheResult.State.Cached, pom));
-        return new CacheResult<>(CacheResult.State.Updated, pom);
+    public void putPom(ResolvedGroupArtifactVersion gav, @Nullable Pom pom) {
+        pomCache.put(gav, Optional.ofNullable(pom));
     }
 
     @Override
     @Nullable
-    public CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+    public Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
         return repositoryCache.getIfPresent(repository);
     }
 
     @Override
-    public CacheResult<MavenRepository> putNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
-        repositoryCache.put(repository, new CacheResult<>(CacheResult.State.Cached, normalized));
-        return new CacheResult<>(CacheResult.State.Updated, normalized);
+    public void putNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
+        repositoryCache.put(repository, Optional.ofNullable(normalized));
     }
 }

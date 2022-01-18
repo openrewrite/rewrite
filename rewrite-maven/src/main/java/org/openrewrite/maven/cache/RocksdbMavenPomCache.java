@@ -48,6 +48,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Implementation of the maven cache that leverages Rocksdb. The keys and values are serialized to/from byte arrays
@@ -65,6 +66,7 @@ import java.util.Map;
  * <li> Rocksdb computes checksums for all of its files, normally it checks those on startup, this has been disabled as
  * well.</li>
  */
+@SuppressWarnings("OptionalAssignedToNull")
 public class RocksdbMavenPomCache implements MavenPomCache {
     static ObjectMapper mapper;
 
@@ -100,18 +102,8 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     }
 
     private final RocksCache cache;
-    private final long releaseTimeToLiveMilliseconds;
-    private final long snapshotTimeToLiveMilliseconds;
 
     public RocksdbMavenPomCache(@Nullable Path workspace) {
-        //Default ttl is one minute for snapshot artifacts and an hour for release artifacts.
-        this(workspace, 60_000 * 60, 60_000);
-    }
-
-    public RocksdbMavenPomCache(@Nullable Path workspace, long releaseTimeToLiveMilliseconds, long snapshotTimeToLiveMilliseconds) {
-        this.releaseTimeToLiveMilliseconds = releaseTimeToLiveMilliseconds;
-        this.snapshotTimeToLiveMilliseconds = snapshotTimeToLiveMilliseconds;
-
         assert workspace != null;
 
         File pomCacheDir = new File(workspace.toFile(), ".rewrite-cache");
@@ -129,8 +121,9 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         cache = getCache(pomCacheDir.getAbsolutePath());
     }
 
+    @Nullable
     @Override
-    public CacheResult<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+    public Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
         try {
             return deserializeMavenMetadata(cache.get((repo.toString() + "/" + gav).getBytes()));
         } catch (RocksDBException e) {
@@ -139,18 +132,20 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    public CacheResult<MavenMetadata> putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadata metadata) {
+    public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
+        if (metadata == null) {
+            return;
+        }
+
         try {
-            CacheResult<MavenMetadata> cached = new CacheResult<>(CacheResult.State.Cached, metadata);
-            cache.put(serialize((repo.toString() + "/" + gav).getBytes()), serialize(cached));
+            cache.put(serialize((repo.toString() + "/" + gav).getBytes()), serialize(metadata));
         } catch (RocksDBException e) {
             throw new MavenDownloadingException(e);
         }
-        return new CacheResult<>(CacheResult.State.Updated, metadata);
     }
 
     @Override
-    public CacheResult<Pom> getPom(ResolvedGroupArtifactVersion gav) {
+    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) {
         try {
             return deserializePom(cache.get(gav.toString().getBytes()));
         } catch (RocksDBException e) {
@@ -159,19 +154,17 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    public CacheResult<Pom> putPom(ResolvedGroupArtifactVersion gav, Pom pom) {
+    public void putPom(ResolvedGroupArtifactVersion gav, Pom pom) {
         try {
-            CacheResult<Pom> cached = new CacheResult<>(CacheResult.State.Cached, pom);
             cache.put(serialize(gav.toString().getBytes(StandardCharsets.UTF_8)), serialize(pom));
         } catch (RocksDBException e) {
             e.printStackTrace();
         }
-        return new CacheResult<>(CacheResult.State.Updated, pom);
     }
 
     @Override
     @Nullable
-    public CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+    public Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
         try {
             return deserializeMavenRepository(cache.get(serialize(repository)));
         } catch (RocksDBException e) {
@@ -180,14 +173,12 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    public CacheResult<MavenRepository> putNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
+    public void putNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
         try {
-            CacheResult<MavenRepository> cached = new CacheResult<>(CacheResult.State.Cached, normalized);
-            cache.put(serialize(repository), serialize(cached));
+            cache.put(serialize(repository), serialize(normalized));
         } catch (RocksDBException e) {
             throw new MavenDownloadingException(e);
         }
-        return new CacheResult<>(CacheResult.State.Updated, repository);
     }
 
     static <T> byte[] serialize(T object) {
@@ -201,13 +192,13 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
     }
 
-    static CacheResult<MavenRepository> deserializeMavenRepository(byte[] bytes) {
+    static Optional<MavenRepository> deserializeMavenRepository(byte[] bytes) {
         if (bytes == null) {
             return null;
         }
         try {
-            return mapper.readValue(bytes, new TypeReference<CacheResult<MavenRepository>>() {
-            });
+            return Optional.of(mapper.readValue(bytes, new TypeReference<MavenRepository>() {
+            }));
         } catch (Exception e) {
             //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
             //results.
@@ -215,13 +206,14 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
     }
 
-    static CacheResult<Pom> deserializePom(byte[] bytes) {
+    @Nullable
+    static Optional<Pom> deserializePom(byte[] bytes) {
         if (bytes == null) {
             return null;
         }
         try {
-            return mapper.readValue(bytes, new TypeReference<CacheResult<Pom>>() {
-            });
+            return Optional.of(mapper.readValue(bytes, new TypeReference<Pom>() {
+            }));
         } catch (Exception e) {
             //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
             //results.
@@ -229,13 +221,13 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
     }
 
-    static CacheResult<MavenMetadata> deserializeMavenMetadata(byte[] bytes) {
+    static Optional<MavenMetadata> deserializeMavenMetadata(byte[] bytes) {
         if (bytes == null) {
             return null;
         }
         try {
-            return mapper.readValue(bytes, new TypeReference<CacheResult<MavenMetadata>>() {
-            });
+            return Optional.of(mapper.readValue(bytes, new TypeReference<MavenMetadata>() {
+            }));
         } catch (Exception e) {
             //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
             //results.

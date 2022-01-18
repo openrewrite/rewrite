@@ -44,6 +44,7 @@ class MavenParserTest {
 
     @BeforeEach
     fun before() {
+//        cache = CompositeMavenPomCache(InMemoryMavenPomCache(), RocksdbMavenPomCache(Paths.get(".cache")))
         cache = InMemoryMavenPomCache()
         ctx = MavenExecutionContextView(InMemoryExecutionContext { t -> throw t })
             .apply { pomCache = cache }

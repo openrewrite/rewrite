@@ -27,7 +27,6 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.cache.CacheResult;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.*;
 
@@ -43,6 +42,7 @@ import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
 
+@SuppressWarnings("OptionalAssignedToNull")
 public class MavenPomDownloader {
 
     private static final RetryConfig retryConfig = RetryConfig.custom()
@@ -61,10 +61,6 @@ public class MavenPomDownloader {
     private static final CheckedFunction1<Request, Response> sendRequest = Retry.decorateCheckedFunction(
             mavenDownloaderRetry,
             request -> httpClient.newCall(request).execute());
-
-    private static final CacheResult<Pom> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
-    private static final CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
-    private static final CacheResult<MavenRepository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
     private final MavenPomCache mavenCache;
     private final Map<Path, Pom> projectPoms;
@@ -100,23 +96,23 @@ public class MavenPomDownloader {
                     .tag("type", "metadata");
 
             try {
-                MavenMetadata currentMetadata;
-                CacheResult<MavenMetadata> result = mavenCache.getMavenMetadata(repo.getUri(), gav);
+                Optional<MavenMetadata> result = mavenCache.getMavenMetadata(repo.getUri(), gav);
                 if (result == null) {
-                    currentMetadata = forceDownloadMetadata(gav, repo);
-                    result = mavenCache.putMavenMetadata(repo.getUri(), gav, currentMetadata);
+                    result = Optional.ofNullable(forceDownloadMetadata(gav, repo));
+                    timer = timer.tags("outcome", result.isPresent() ? "unavailable" : "downloaded", "exception", "none");
+                    mavenCache.putMavenMetadata(repo.getUri(), gav, result.orElse(null));
                 } else {
-                    currentMetadata = result.getData();
+                    timer = timer.tags("outcome", "cached", "exception", "none");
                 }
-                sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
+                sample.stop(timer.register(Metrics.globalRegistry));
 
-                if (currentMetadata != null) {
+                if (result.isPresent()) {
                     if (mavenMetadata == MavenMetadata.EMPTY) {
-                        if (currentMetadata != MavenMetadata.EMPTY) {
-                            mavenMetadata = currentMetadata;
+                        if (result.get() != MavenMetadata.EMPTY) {
+                            mavenMetadata = result.get();
                         }
-                    } else if (currentMetadata != MavenMetadata.EMPTY) {
-                        mavenMetadata = mergeMetadata(mavenMetadata, currentMetadata);
+                    } else {
+                        mavenMetadata = mergeMetadata(mavenMetadata, result.get());
                     }
                 }
             } catch (Exception e) {
@@ -159,21 +155,6 @@ public class MavenPomDownloader {
         }
 
         return null;
-    }
-
-    private Timer.Builder addTagsByResult(Timer.Builder timer, CacheResult<?> result) {
-        switch (result.getState()) {
-            case Cached:
-                timer = timer.tags("outcome", "cached", "exception", "none");
-                break;
-            case Unavailable:
-                timer = timer.tags("outcome", "unavailable", "exception", "none");
-                break;
-            case Updated:
-                timer = timer.tags("outcome", "downloaded", "exception", "none");
-                break;
-        }
-        return timer;
     }
 
     public Pom download(GroupArtifactVersion gav,
@@ -235,7 +216,7 @@ public class MavenPomDownloader {
 
             ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(
                     repo.getUri(), gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), versionMaybeDatedSnapshot);
-            CacheResult<Pom> result = mavenCache.getPom(resolvedGav);
+            Optional<Pom> result = mavenCache.getPom(resolvedGav);
 
             if (result == null) {
                 String uri = URI.create(repo.getUri().toString()) + "/" +
@@ -248,40 +229,38 @@ public class MavenPomDownloader {
                 int responseCode;
                 try (Response response = sendRequest.apply(request.build())) {
                     responseCode = response.code();
-                    if (response.isSuccessful()) {
-                        ResponseBody body = response.body();
-                        if (body != null) {
-                            byte[] responseBody = body.bytes();
+                    if (response.isSuccessful() && response.body() != null) {
+                        //noinspection ConstantConditions
+                        byte[] responseBody = response.body().bytes();
 
-                            // This path doesn't matter except for debugging/error logs where it might get displayed
-                            Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
+                        // This path doesn't matter except for debugging/error logs where it might get displayed
+                        Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
 
-                            RawPom rawPom = RawPom.parse(
-                                    new ByteArrayInputStream(responseBody),
-                                    versionMaybeDatedSnapshot.equals(gav.getVersion()) ? null : versionMaybeDatedSnapshot
-                            );
+                        RawPom rawPom = RawPom.parse(
+                                new ByteArrayInputStream(responseBody),
+                                versionMaybeDatedSnapshot.equals(gav.getVersion()) ? null : versionMaybeDatedSnapshot
+                        );
 
-                            Pom pom = rawPom.toPom(inputPath, repo);
-                            if (!versionMaybeDatedSnapshot.equals(pom.getVersion())) {
-                                pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
-                            }
-                            result = mavenCache.putPom(resolvedGav, pom);
-                        } else {
-                            errors.put(repo, "Download failure. Response code is [" + responseCode + "].");
-                            result = mavenCache.putPom(resolvedGav, null);
+                        Pom pom = rawPom.toPom(inputPath, repo);
+                        if (!versionMaybeDatedSnapshot.equals(pom.getVersion())) {
+                            pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                         }
+                        mavenCache.putPom(resolvedGav, pom);
+                        timer = timer.tags("outcome", pom == null ? "unavailable" : "downloaded", "exception", "none");
+                        result = Optional.ofNullable(pom);
                     } else {
                         errors.put(repo, "Download failure. Response code is [" + responseCode + "].");
-                        result = mavenCache.putPom(resolvedGav, null);
+                        mavenCache.putPom(resolvedGav, null);
+                        timer = timer.tags("outcome", "unavailable", "exception", "none");
                     }
                 } catch (Throwable throwable) {
                     errors.put(repo, "Download failure. " + throwable.getMessage());
-                    result = mavenCache.putPom(resolvedGav, null);
+                    timer = timer.tags("outcome", "unavailable", "exception", "none");
                 }
             }
-            sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
-            if (result.getData() != null) {
-                return result.getData();
+            sample.stop(timer.register(Metrics.globalRegistry));
+            if (result != null && result.isPresent()) {
+                return result.get();
             }
         }
 
@@ -332,7 +311,7 @@ public class MavenPomDownloader {
 
     @Nullable
     protected MavenRepository normalizeRepository(MavenRepository originalRepository) {
-        CacheResult<MavenRepository> result;
+        Optional<MavenRepository> result = null;
         MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
         try {
             if (repository.isKnownToExist()) {
@@ -370,15 +349,15 @@ public class MavenPomDownloader {
                         }
                     }
                 }
-                result = mavenCache.putNormalizedRepository(repository, normalized);
+                mavenCache.putNormalizedRepository(repository, normalized);
+                result = Optional.ofNullable(normalized);
             }
         } catch (Exception e) {
             ctx.getOnError().accept(e);
-            result = mavenCache.putNormalizedRepository(repository, null);
+            mavenCache.putNormalizedRepository(repository, null);
         }
 
-        MavenRepository repo = result.getData();
-        return repo == null ? null : applyAuthenticationToRepository(repo);
+        return result == null || !result.isPresent() ? null : applyAuthenticationToRepository(result.get());
     }
 
     /**

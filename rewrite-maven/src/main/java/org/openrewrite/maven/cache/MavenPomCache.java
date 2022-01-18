@@ -23,20 +23,21 @@ import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.net.URI;
+import java.util.Optional;
 
 public interface MavenPomCache {
     @Nullable
-    CacheResult<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav);
+    Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav);
 
-    CacheResult<MavenMetadata> putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadata metadata);
-
-    @Nullable
-    CacheResult<Pom> getPom(ResolvedGroupArtifactVersion gav);
-
-    CacheResult<Pom> putPom(ResolvedGroupArtifactVersion gav, Pom pom);
+    void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata);
 
     @Nullable
-    CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository);
+    Optional<Pom> getPom(ResolvedGroupArtifactVersion gav);
 
-    CacheResult<MavenRepository> putNormalizedRepository(MavenRepository repository, MavenRepository normalized);
+    void putPom(ResolvedGroupArtifactVersion gav, @Nullable Pom pom);
+
+    @Nullable
+    Optional<MavenRepository> getNormalizedRepository(MavenRepository repository);
+
+    void putNormalizedRepository(MavenRepository repository, MavenRepository normalized);
 }
