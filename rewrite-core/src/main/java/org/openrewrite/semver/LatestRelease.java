@@ -16,6 +16,7 @@
 package org.openrewrite.semver;
 
 import org.openrewrite.Validated;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,6 +39,7 @@ public class LatestRelease implements VersionComparator {
             return false;
         }
         return metadataPattern == null ||
+                (StringUtils.isBlank(metadataPattern) && matcher.group(5) == null) ||
                 (matcher.group(5) != null && matcher.group(5).matches(metadataPattern));
     }
 
