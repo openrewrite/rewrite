@@ -369,34 +369,38 @@ public class ResolvedPom implements DependencyManagementDependency {
                 }
 
                 d = dd.getDefinedIn().getValues(d, depth);
-                Pom dPom = downloader.download(d.getGav(), null, null, getRepositories(), ctx);
-                Scope dScope = Scope.fromName(d.getScope());
+                try {
+                    Pom dPom = downloader.download(d.getGav(), null, null, getRepositories(), ctx);
+                    Scope dScope = Scope.fromName(d.getScope());
 
-                ResolvedPom resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), getProperties(),
-                        getDependencyManagement(), getRepositories(), emptyList());
-                resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
+                    ResolvedPom resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), getProperties(),
+                            getDependencyManagement(), getRepositories(), emptyList());
+                    resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
 
-                ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
-                        resolvedPom.getGav(), d, emptyList(),
-                        resolvedPom.getRequested().getLicenses());
+                    ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
+                            resolvedPom.getGav(), d, emptyList(),
+                            resolvedPom.getRequested().getLicenses());
 
-                // build link between the including dependency and this one
-                ResolvedDependency includedBy = dd.getDependent();
-                if (includedBy != null) {
-                    if (includedBy.getDependencies().isEmpty()) {
-                        includedBy.unsafeSetDependencies(new ArrayList<>());
+                    // build link between the including dependency and this one
+                    ResolvedDependency includedBy = dd.getDependent();
+                    if (includedBy != null) {
+                        if (includedBy.getDependencies().isEmpty()) {
+                            includedBy.unsafeSetDependencies(new ArrayList<>());
+                        }
+                        includedBy.getDependencies().add(resolved);
                     }
-                    includedBy.getDependencies().add(resolved);
-                }
 
-                dependencies.add(resolved);
+                    dependencies.add(resolved);
 
-                for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
-                    if (!d2.isOptional()) { // only zero depth optional dependencies resolved
-                        if (Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
-                            dependenciesAtNextDepth.add(new DependencyAndDependent(d2, resolved, resolvedPom));
+                    for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
+                        if (!d2.isOptional()) { // only zero depth optional dependencies resolved
+                            if (Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
+                                dependenciesAtNextDepth.add(new DependencyAndDependent(d2, resolved, resolvedPom));
+                            }
                         }
                     }
+                } catch(MavenDownloadingException e) {
+                    ctx.getOnError().accept(e);
                 }
             }
 
@@ -418,11 +422,6 @@ public class ResolvedPom implements DependencyManagementDependency {
             if (version == null) {
                 version = d.getVersion();
             }
-        }
-
-        if (version == null) {
-            throw new MavenDownloadingException("Expected a managed version for " +
-                    d.getGroupId() + ":" + d.getArtifactId());
         }
 
         String scope = d.getScope() == null ?

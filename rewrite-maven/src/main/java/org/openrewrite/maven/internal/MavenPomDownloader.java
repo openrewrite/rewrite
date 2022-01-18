@@ -166,7 +166,10 @@ public class MavenPomDownloader {
         Map<MavenRepository, String> errors = new HashMap<>();
 
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, repositories, ctx);
-        Timer.Sample sample = Timer.start();
+        if(gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
+            String errorText = "Unable to download dependency " + gav;
+            throw new MavenDownloadingException(errorText);
+        }
 
         // The pom being examined might be from a remote repository or a local filesystem.
         // First try to match the requested download with one of the project poms so we don't needlessly ping remote repos
@@ -208,6 +211,7 @@ public class MavenPomDownloader {
 
         Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, gav.getVersion());
         for (MavenRepository repo : normalizedRepos) {
+            Timer.Sample sample = Timer.start();
             Timer.Builder timer = Timer.builder("rewrite.maven.download")
                     .tag("repo.id", repo.getUri().toString())
                     .tag("group.id", gav.getGroupId())
@@ -272,8 +276,7 @@ public class MavenPomDownloader {
     }
 
     private String datedSnapshotVersion(GroupArtifactVersion gav, List<MavenRepository> repositories, ExecutionContext ctx) {
-        assert gav.getVersion() != null;
-        if (gav.getVersion().endsWith("-SNAPSHOT")) {
+        if (gav.getVersion() != null && gav.getVersion().endsWith("-SNAPSHOT")) {
             for (ResolvedGroupArtifactVersion pinnedSnapshotVersion : new MavenExecutionContextView(ctx).getPinnedSnapshotVersions()) {
                 if (pinnedSnapshotVersion.getDatedSnapshotVersion() != null &&
                         pinnedSnapshotVersion.getGroupId().equals(gav.getGroupId()) &&

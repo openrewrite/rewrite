@@ -204,7 +204,7 @@ class MavenParserTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/199")
     @Test
-    fun continueOnErrorInvalidScope() {
+    fun continueOnInvalidScope() {
         val invalidPom = """
             <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -223,7 +223,7 @@ class MavenParserTest {
                 </dependencies>
             </project>
         """
-        assertThatThrownBy { parser.parse(ctx, invalidPom) }
+        parser.parse(ctx, invalidPom)
         parser.parse(invalidPom)
     }
 
