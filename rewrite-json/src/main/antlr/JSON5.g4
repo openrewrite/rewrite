@@ -145,3 +145,5 @@ fragment NEWLINE
 WS
    : [ \t\n\r\u00A0\uFEFF\u2003] + -> skip
    ;
+
+UTF_8_BOM : '\uFEFF' -> skip;
