@@ -63,10 +63,19 @@ public class RemoveUnusedLocalVariables extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemoveUnusedLocalVariablesVisitor();
+        return new RemoveUnusedLocalVariablesVisitor(ignoreVariablesNamed);
     }
 
-    private class RemoveUnusedLocalVariablesVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private static class RemoveUnusedLocalVariablesVisitor extends JavaIsoVisitor<ExecutionContext> {
+        private Set<String> ignoreVariableNames;
+
+        RemoveUnusedLocalVariablesVisitor(String[] ignoreVariablesNamed) {
+            if (ignoreVariablesNamed != null) {
+                ignoreVariableNames = new HashSet<>(ignoreVariablesNamed.length);
+                ignoreVariableNames.addAll(Arrays.asList(ignoreVariablesNamed));
+            }
+        }
+
         private Cursor getCursorToParentScope(Cursor cursor) {
             return cursor.dropParentUntil(is ->
                     is instanceof J.Block ||
@@ -87,8 +96,7 @@ public class RemoveUnusedLocalVariables extends Recipe {
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             // skip matching ignored variable names right away
-            if (ignoreVariablesNamed != null &&
-                    Arrays.stream(ignoreVariablesNamed).anyMatch(v -> variable.getSimpleName().equals(v))) {
+            if (ignoreVariableNames != null && ignoreVariableNames.contains(variable.getSimpleName())) {
                 return variable;
             }
 
