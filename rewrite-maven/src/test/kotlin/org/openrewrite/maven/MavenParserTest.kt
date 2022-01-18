@@ -103,7 +103,6 @@ class MavenParserTest {
                         <groupId>org.junit.jupiter</groupId>
                         <artifactId>junit-jupiter-api</artifactId>
                         <version>5.7.0</version>
-                        <type>pom</type>
                         <scope>test</scope>
                       </dependency>
                     </dependencies>
@@ -114,7 +113,7 @@ class MavenParserTest {
         assertThat(maven.mavenResolutionResult.dependencies[Scope.Test]?.first()?.licenses?.first()?.type)
             .isEqualTo(License.Type.Eclipse)
         assertThat(maven.mavenResolutionResult.dependencies[Scope.Test]?.first()?.type)
-            .isEqualTo("pom")
+            .isEqualTo("jar")
         assertThat(maven.mavenResolutionResult.pom.packaging)
             .isEqualTo("pom")
     }
@@ -353,7 +352,7 @@ class MavenParserTest {
 
         // Maven itself would respond to this pom with a fatal error.
         // So long as we don't produce an AST with cycles it's OK
-        assertThat(maven.mavenResolutionResult.dependencies).hasSize(1)
+        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]).hasSize(1)
     }
 
     @Test
@@ -480,7 +479,7 @@ class MavenParserTest {
         """
 
         val maven = MavenParser.builder().build().parse(pomSource)[0]
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId })
+        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId }?.take(2))
             .containsExactly("junit-jupiter", "guava")
     }
 
@@ -848,7 +847,7 @@ class MavenParserTest {
             ).find { it.mavenResolutionResult.pom.artifactId == "a" }
 
         assertThat(maven!!.mavenResolutionResult.dependencies[Scope.Compile])
-            .hasSize(1)
+            .hasSize(7)
             .matches { it.first().artifactId == "guava" && it.first().version == "29.0-jre" }
     }
 

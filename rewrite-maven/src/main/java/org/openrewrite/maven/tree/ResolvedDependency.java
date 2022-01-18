@@ -66,9 +66,8 @@ public class ResolvedDependency {
         return gav.getVersion();
     }
 
-    @Nullable
     public String getType() {
-        return requested.getType();
+        return requested.getType() == null ? "jar" : requested.getType();
     }
 
     @Nullable
