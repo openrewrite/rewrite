@@ -246,11 +246,14 @@ public class ResolvedPom implements DependencyManagementDependency {
         MavenPomDownloader downloader;
 
         public ResolvedPom resolve() throws MavenDownloadingException {
-            resolveParentsRecursively(requested);
+            List<Pom> pomAncestry = new ArrayList<>();
+            pomAncestry.add(requested);
+            resolveParentsRecursively(pomAncestry);
             return ResolvedPom.this;
         }
 
-        void resolveParentsRecursively(Pom pom) {
+        void resolveParentsRecursively(List<Pom> pomAncestry) {
+            Pom pom = pomAncestry.get(0);
             mergeRepositories(pom.getRepositories());
 
             for (Profile profile : pom.getProfiles()) {
@@ -272,7 +275,16 @@ public class ResolvedPom implements DependencyManagementDependency {
             if (pom.getParent() != null) {
                 Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
                         pom.getParent().getRelativePath(), pom, repositories, ctx);
-                resolveParentsRecursively(parentPom);
+
+                for (Pom ancestor : pomAncestry) {
+                    if(ancestor.getGav().equals(parentPom.getGav())) {
+                        // parent cycle
+                        return;
+                    }
+                }
+
+                pomAncestry.add(parentPom);
+                resolveParentsRecursively(pomAncestry);
             }
         }
 
@@ -376,7 +388,9 @@ public class ResolvedPom implements DependencyManagementDependency {
 
                     ResolvedPom resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), getProperties(),
                             getDependencyManagement(), getRepositories(), emptyList());
-                    resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
+                    List<Pom> dPomAncestry = new ArrayList<>();
+                    dPomAncestry.add(dPom);
+                    resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPomAncestry);
 
                     ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
                             resolvedPom.getGav(), d, emptyList(),
