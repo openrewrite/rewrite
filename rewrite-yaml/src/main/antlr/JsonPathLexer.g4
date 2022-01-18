@@ -67,3 +67,5 @@ Identifier
    ;
 
 WS : [ \t\n\r\u000C] + -> skip;
+
+UTF_8_BOM : '\uFEFF' -> skip;
