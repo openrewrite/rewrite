@@ -387,6 +387,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1334")
     fun upgradeGuavaWithExplicitBlankVersionPattern() = assertChanged(
             recipe = UpgradeDependencyVersion(
                     "com.google.guava",
@@ -407,7 +408,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 <dependency>
                   <groupId>com.google.guava</groupId>
                   <artifactId>guava</artifactId>
-                  <version>25.0-android</version>
+                  <version>22.0</version>
                 </dependency>
               </dependencies>
             </project>
