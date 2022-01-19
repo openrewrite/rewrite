@@ -39,9 +39,10 @@ CharRef           :  '&#' DIGIT+ ';'
                   |  '&#x' HEXDIGIT+ ';'
                   ;
 
-SEA_WS            :  (' '|'\t'|'\r'? '\n'|'\uFEFF')+  -> skip ;
-SPECIAL_OPEN_XML  :  '<?xml' S                        -> pushMode(INSIDE) ;
-OPEN              :  '<'                              -> pushMode(INSIDE) ;
+SEA_WS            :  (' '|'\t'|'\r'? '\n')+       -> skip ;
+UTF_8_BOM         : '\uFEFF'                      -> skip ;
+SPECIAL_OPEN_XML  :  '<?xml' S                    -> pushMode(INSIDE) ;
+OPEN              :  '<'                          -> pushMode(INSIDE) ;
 
 SPECIAL_OPEN      :  '<?'Name                     -> pushMode(INSIDE_PROCESS_INSTRUCTION) ;
 
