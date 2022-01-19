@@ -37,19 +37,29 @@ public class InMemoryMavenPomCache implements MavenPomCache {
         GroupArtifactVersion gav;
     }
 
-    private final Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache = Caffeine.newBuilder()
-            .maximumSize(100_000)
-            .build();
-
-    private final Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache = Caffeine.newBuilder()
-            .maximumSize(100_000)
-            .build();
-
-    private final Cache<MavenRepository, Optional<MavenRepository>> repositoryCache = Caffeine.newBuilder()
-            .maximumSize(10_000)
-            .build();
+    private final Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache;
+    private final Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache;
+    private final Cache<MavenRepository, Optional<MavenRepository>> repositoryCache;
 
     public InMemoryMavenPomCache() {
+        this(
+                Caffeine.newBuilder()
+                        .maximumSize(100_000)
+                        .build(),
+                Caffeine.newBuilder()
+                        .maximumSize(100_000)
+                        .build(),
+                Caffeine.newBuilder()
+                        .maximumSize(10_000)
+                        .build()
+        );
+    }
+
+    public InMemoryMavenPomCache(Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache, Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache, Cache<MavenRepository, Optional<MavenRepository>> repositoryCache) {
+        this.pomCache = pomCache;
+        this.mavenMetadataCache = mavenMetadataCache;
+        this.repositoryCache = repositoryCache;
+
         CaffeineCacheMetrics.monitor(Metrics.globalRegistry, pomCache, "Maven POMs");
         CaffeineCacheMetrics.monitor(Metrics.globalRegistry, mavenMetadataCache, "Maven metadata");
         CaffeineCacheMetrics.monitor(Metrics.globalRegistry, repositoryCache, "Maven repositories");

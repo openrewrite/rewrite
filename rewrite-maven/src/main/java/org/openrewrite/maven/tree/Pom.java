@@ -35,7 +35,7 @@ import java.util.Map;
  */
 @Value
 @With
-public class Pom implements DependencyManagementDependency {
+public class Pom {
     @Nullable
     Path sourcePath;
 
@@ -49,12 +49,6 @@ public class Pom implements DependencyManagementDependency {
 
     @Nullable
     String name;
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public Pom withVersion(String version) {
-        return withGav(gav.withVersion(version));
-    }
 
     @Nullable
     String packaging;

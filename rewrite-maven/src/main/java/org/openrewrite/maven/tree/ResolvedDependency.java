@@ -100,9 +100,7 @@ public class ResolvedDependency {
 
     @Override
     public String toString() {
-        return "Dependency {" + gav +
-                ", requested=" + requested +
-                (requested.isOptional() ? ", optional" : "") +
-                '}';
+        return repository.getUri() + "/" + gav.getGroupId().replace('.', '/') + "/" +
+                gav.getArtifactId() + "/" + gav.getVersion() + "/" + gav.getArtifactId() + "-" + gav.getVersion() + ".pom";
     }
 }

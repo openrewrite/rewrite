@@ -63,10 +63,10 @@ public class MavenPomDownloader {
             request -> httpClient.newCall(request).execute());
 
     private final MavenPomCache mavenCache;
-    private final Map<Path, Pom> projectPoms;
+    private final Map<Path, ResolvedPom> projectPoms;
     private final MavenExecutionContextView ctx;
 
-    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx) {
+    public MavenPomDownloader(Map<Path, ResolvedPom> projectPoms, ExecutionContext ctx) {
         this.projectPoms = projectPoms;
         if (ctx instanceof MavenExecutionContextView) {
             this.ctx = (MavenExecutionContextView) ctx;
@@ -84,6 +84,10 @@ public class MavenPomDownloader {
 
     @Nullable
     public MavenMetadata downloadMetadata(GroupArtifactVersion gav, List<MavenRepository> repositories) {
+        if(gav.getGroupId() == null) {
+            throw new MavenDownloadingException("Unable to download maven metadata because of a missing groupId.");
+        }
+
         Timer.Sample sample = Timer.start();
 
         MavenMetadata mavenMetadata = MavenMetadata.EMPTY;
@@ -136,6 +140,8 @@ public class MavenPomDownloader {
 
     @Nullable
     private MavenMetadata forceDownloadMetadata(GroupArtifactVersion gav, MavenRepository repo) {
+        assert gav.getGroupId() != null;
+
         String uri = repo.getUri().toString() + "/" +
                 gav.getGroupId().replace('.', '/') + '/' +
                 gav.getArtifactId() + '/' +
@@ -159,7 +165,7 @@ public class MavenPomDownloader {
 
     public Pom download(GroupArtifactVersion gav,
                         @Nullable String relativePath,
-                        @Nullable Pom containingPom,
+                        @Nullable ResolvedPom containingPom,
                         List<MavenRepository> repositories,
                         ExecutionContext ctx) throws MavenDownloadingException {
 
@@ -174,37 +180,35 @@ public class MavenPomDownloader {
         // The pom being examined might be from a remote repository or a local filesystem.
         // First try to match the requested download with one of the project poms so we don't needlessly ping remote repos
         Pom projectMatch = null;
-        for (Pom projectPom : projectPoms.values()) {
+        for (ResolvedPom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
                     gav.getArtifactId().equals(projectPom.getArtifactId())) {
                 // In a real project you'd never expect there to be more than one project pom with the same group/artifact but different version numbers
                 // But in unit tests that supply all of the poms as "project" poms like these, there might be more than one entry
-                assert gav.getVersion() != null;
                 if (gav.getVersion().equals(projectPom.getVersion())) {
-                    return projectPom;
+                    return projectPom.getRequested();
                 }
-                projectMatch = projectPom;
+                projectMatch = projectPom.getRequested();
             }
         }
         if (projectMatch != null) {
             return projectMatch;
         }
 
-        if (containingPom != null && containingPom.getSourcePath() != null &&
+        if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
                 !StringUtils.isBlank(relativePath)) {
-            Path folderContainingPom = containingPom.getSourcePath().getParent();
+            Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
             if (folderContainingPom != null) {
-                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
+                ResolvedPom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
                         .normalize());
                 // Even poms published to remote repositories still contain relative paths to their parent poms
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote
                 // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
-                assert gav.getVersion() != null;
                 if (maybeLocalPom != null
                         && gav.getGroupId().equals(maybeLocalPom.getGroupId())
                         && gav.getArtifactId().equals(maybeLocalPom.getArtifactId())
                         && gav.getVersion().equals(maybeLocalPom.getVersion())) {
-                    return maybeLocalPom;
+                    return maybeLocalPom.getRequested();
                 }
             }
         }
@@ -246,6 +250,7 @@ public class MavenPomDownloader {
                         );
 
                         Pom pom = rawPom.toPom(inputPath, repo);
+                        pom = pom.withGav(resolvedGav);
                         if (!versionMaybeDatedSnapshot.equals(pom.getVersion())) {
                             pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                         }
@@ -297,6 +302,7 @@ public class MavenPomDownloader {
             }
         }
 
+        assert gav.getVersion() != null;
         return gav.getVersion();
     }
 

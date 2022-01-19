@@ -36,6 +36,7 @@ public class Dependency {
     List<GroupArtifact> exclusions;
     boolean optional;
 
+    @Nullable
     public String getGroupId() {
         return gav.getGroupId();
     }

@@ -26,6 +26,7 @@ import java.net.URI;
 import java.util.Optional;
 
 public interface MavenPomCache {
+
     @Nullable
     Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav);
 

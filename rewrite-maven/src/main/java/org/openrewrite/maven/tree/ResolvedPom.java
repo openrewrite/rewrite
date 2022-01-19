@@ -274,7 +274,7 @@ public class ResolvedPom implements DependencyManagementDependency {
 
             if (pom.getParent() != null) {
                 Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
-                        pom.getParent().getRelativePath(), pom, repositories, ctx);
+                        pom.getParent().getRelativePath(), ResolvedPom.this, repositories, ctx);
 
                 for (Pom ancestor : pomAncestry) {
                     if(ancestor.getGav().equals(parentPom.getGav())) {
@@ -283,7 +283,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                     }
                 }
 
-                pomAncestry.add(parentPom);
+                pomAncestry.add(0, parentPom);
                 resolveParentsRecursively(pomAncestry);
             }
         }
@@ -351,7 +351,7 @@ public class ResolvedPom implements DependencyManagementDependency {
         }
     }
 
-    public List<ResolvedDependency> resolve(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) {
+    public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) {
         Set<GroupArtifact> nearer = new HashSet<>();
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
@@ -383,7 +383,7 @@ public class ResolvedPom implements DependencyManagementDependency {
 
                 d = dd.getDefinedIn().getValues(d, depth);
                 try {
-                    Pom dPom = downloader.download(d.getGav(), null, null, getRepositories(), ctx);
+                    Pom dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories(), ctx);
                     Scope dScope = Scope.fromName(d.getScope());
 
                     ResolvedPom resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), getProperties(),
@@ -429,6 +429,7 @@ public class ResolvedPom implements DependencyManagementDependency {
     private Dependency getValues(Dependency dep, int depth) {
         Dependency d = dep.withGav(getValues(dep.getGav()))
                 .withScope(getValue(dep.getScope()));
+        assert d.getGroupId() != null;
 
         String version = d.getVersion();
         if (d.getVersion() == null || depth > 0) {

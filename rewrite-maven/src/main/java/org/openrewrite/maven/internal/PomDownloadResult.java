@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,26 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package org.openrewrite.maven.tree;
+package org.openrewrite.maven.internal;
 
 import lombok.Value;
-import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.Pom;
+
+import java.util.List;
 
 @Value
-@With
-public class GroupArtifactVersion {
-    @Nullable
-    String groupId;
-
-    String artifactId;
-
-    @Nullable
-    String version;
-
-    @Override
-    public String toString() {
-        return groupId + ":" + artifactId + (version == null ? "" : ":" + version);
-    }
+public class PomDownloadResult {
+    GroupArtifactVersion requested;
+    List<MavenRepository> repositories;
+    String errors;
+    Pom pom;
 }

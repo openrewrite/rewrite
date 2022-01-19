@@ -63,7 +63,7 @@ public class MavenParser implements Parser<Maven> {
     public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                    ExecutionContext ctx) {
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
-        Map<Path, Pom> projectPomsByPath = new HashMap<>();
+        Map<Path, ResolvedPom> projectPomsByPath = new HashMap<>();
         for (Input source : sources) {
             Pom pom = RawPom.parse(source.getSource(), null).toPom(source.getPath(), null);
             if (relativeTo != null) {
@@ -87,10 +87,10 @@ public class MavenParser implements Parser<Maven> {
             ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
 
             Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
-            dependencies.put(Scope.Compile, resolvedPom.resolve(Scope.Compile, downloader, ctx));
-            dependencies.put(Scope.Test, resolvedPom.resolve(Scope.Test, downloader, ctx));
-            dependencies.put(Scope.Runtime, resolvedPom.resolve(Scope.Runtime, downloader, ctx));
-            dependencies.put(Scope.Provided, resolvedPom.resolve(Scope.Provided, downloader, ctx));
+            dependencies.put(Scope.Compile, resolvedPom.resolveDependencies(Scope.Compile, downloader, ctx));
+            dependencies.put(Scope.Test, resolvedPom.resolveDependencies(Scope.Test, downloader, ctx));
+            dependencies.put(Scope.Runtime, resolvedPom.resolveDependencies(Scope.Runtime, downloader, ctx));
+            dependencies.put(Scope.Provided, resolvedPom.resolveDependencies(Scope.Provided, downloader, ctx));
 
             MavenResolutionResult model = new MavenResolutionResult(randomId(),
                     resolvedPom, dependencies);
