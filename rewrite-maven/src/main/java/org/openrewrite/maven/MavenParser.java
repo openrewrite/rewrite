@@ -76,7 +76,7 @@ public class MavenParser implements Parser<Maven> {
                     .iterator().next();
 
             projectPoms.put(xml, pom);
-            projectPomsByPath.put(source.getPath(), pom);
+            projectPomsByPath.put(source.getPath(), new ResolvedPom(pom, this.activeProfiles));
         }
 
         List<Maven> parsed = new ArrayList<>();
