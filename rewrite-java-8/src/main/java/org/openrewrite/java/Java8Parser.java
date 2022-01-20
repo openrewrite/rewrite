@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 
@@ -132,12 +133,12 @@ public class Java8Parser implements JavaParser {
 
                 Constructor<?> delegateParserConstructor = reloadableParser
                         .getDeclaredConstructor(Collection.class, Collection.class, Collection.class, Charset.class,
-                                Boolean.TYPE, Collection.class);
+                                Boolean.TYPE, Collection.class, JavaTypeCache.class);
 
                 delegateParserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) delegateParserConstructor
-                        .newInstance(classpath, classBytesClasspath, dependsOn, charset, logCompilationWarningsAndErrors, styles);
+                        .newInstance(classpath, classBytesClasspath, dependsOn, charset, logCompilationWarningsAndErrors, styles, javaTypeCache);
 
                 return new Java8Parser(delegate);
             } catch (Exception e) {

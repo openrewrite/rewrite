@@ -57,7 +57,7 @@ import static java.util.stream.Collectors.toList;
 
 class ReloadableJava8Parser implements JavaParser {
     private String sourceSet = "main";
-    private final JavaTypeCache typeCache = new JavaTypeCache();
+    private final JavaTypeCache typeCache;
 
     @Nullable
     private transient JavaSourceSet sourceSetProvenance;
@@ -80,10 +80,12 @@ class ReloadableJava8Parser implements JavaParser {
                           @Nullable Collection<Input> dependsOn,
                           Charset charset,
                           boolean logCompilationWarningsAndErrors,
-                          Collection<NamedStyles> styles) {
+                          Collection<NamedStyles> styles,
+                          JavaTypeCache typeCache) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
+        this.typeCache = typeCache;
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);

@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
@@ -194,6 +195,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> {
         protected Collection<Path> classpath = Collections.emptyList();
         protected Collection<byte[]> classBytesClasspath = Collections.emptyList();
+        protected JavaTypeCache javaTypeCache = new JavaTypeCache();
 
         @Nullable
         protected Collection<Input> dependsOn;
@@ -204,6 +206,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
+            return (B) this;
+        }
+
+        public B typeCache(JavaTypeCache javaTypeCache) {
+            this.javaTypeCache = javaTypeCache;
             return (B) this;
         }
 

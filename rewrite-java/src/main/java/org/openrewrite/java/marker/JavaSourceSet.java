@@ -44,20 +44,13 @@ public class JavaSourceSet implements Marker {
     String name;
     List<JavaType.FullyQualified> classpath;
 
-    private static Map<String, JavaType.FullyQualified> jvmClasses;
-
     public static JavaSourceSet build(String sourceSetName, Iterable<Path> classpath,
-                                      JavaTypeCache typeCache, ExecutionContext ctx) {
-
-        if(jvmClasses == null) {
-            jvmClasses = jvmClasses(typeCache, ctx);
-        }
+                                       JavaTypeCache typeCache, ExecutionContext ctx) {
+        Map<String, JavaType.FullyQualified> jvmClasses = jvmClasses(typeCache, ctx);
         List<JavaType.FullyQualified> fqns = new ArrayList<>(jvmClasses.values());
-
         ClassgraphTypeMapping typeMapping = new ClassgraphTypeMapping(typeCache, jvmClasses);
 
         if (classpath.iterator().hasNext()) {
-
             try (ScanResult scanResult = new ClassGraph()
                     .overrideClasspath(classpath)
                     .enableAnnotationInfo()

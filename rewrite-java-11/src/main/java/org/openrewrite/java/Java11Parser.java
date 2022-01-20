@@ -63,7 +63,7 @@ import static java.util.stream.Collectors.toList;
 @NonNullApi
 public class Java11Parser implements JavaParser {
     private String sourceSet = "main";
-    private final JavaTypeCache typeCache = new JavaTypeCache();
+    private final JavaTypeCache typeCache;
 
     @Nullable
     private transient JavaSourceSet sourceSetProvenance;
@@ -80,15 +80,17 @@ public class Java11Parser implements JavaParser {
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
 
-    private Java11Parser(@Nullable Collection<Path> classpath,
+    private Java11Parser(boolean logCompilationWarningsAndErrors,
+                         @Nullable Collection<Path> classpath,
                          Collection<byte[]> classBytesClasspath,
                          @Nullable Collection<Input> dependsOn,
                          Charset charset,
-                         boolean logCompilationWarningsAndErrors,
-                         Collection<NamedStyles> styles) {
+                         Collection<NamedStyles> styles,
+                         JavaTypeCache typeCache) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
+        this.typeCache = typeCache;
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
@@ -364,7 +366,7 @@ public class Java11Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<Java11Parser, Builder> {
         @Override
         public Java11Parser build() {
-            return new Java11Parser(classpath, classBytesClasspath, dependsOn, charset, logCompilationWarningsAndErrors, styles);
+            return new Java11Parser(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
         }
     }
 
