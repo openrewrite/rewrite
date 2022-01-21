@@ -123,7 +123,7 @@ subprojects {
 
         "testImplementation"("org.assertj:assertj-core:latest.release")
 
-        "testRuntimeOnly"("ch.qos.logback:logback-classic:1.0.13")
+        "testRuntimeOnly"("ch.qos.logback:logback-classic:1.2.10")
     }
 
     tasks.withType<JavaCompile>().configureEach {

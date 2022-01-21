@@ -56,7 +56,7 @@ dependencies {
     integTestImplementation(project(":rewrite-yaml"))
 
     testImplementation(project(":rewrite-test"))
-    testImplementation("ch.qos.logback:logback-classic:1.0.13")
+    testImplementation("ch.qos.logback:logback-classic:1.2.10")
     testImplementation("com.squareup.okhttp3:mockwebserver:latest.release")
     testImplementation("org.mapdb:mapdb:latest.release")
 
