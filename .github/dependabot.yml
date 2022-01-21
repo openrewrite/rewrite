@@ -4,6 +4,13 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
     commit-message:
       prefix: "chore(ci)"
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: "chore(ci)"
+    open-pull-requests-limit: 0
