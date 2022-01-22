@@ -24,6 +24,7 @@ import guru.nidi.graphviz.model.Link;
 import guru.nidi.graphviz.model.MutableGraph;
 import guru.nidi.graphviz.model.MutableNode;
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -34,9 +35,11 @@ import static guru.nidi.graphviz.model.Link.to;
 
 @RequiredArgsConstructor
 public class GraphvizResolutionEventListener implements ResolutionEventListener {
+    public static final String GRAPH_NAME = "resolution";
+
     private final Map<GroupArtifactVersion, MutableNode> pomToNode = new HashMap<>();
     private final Map<GroupArtifactVersion, MutableNode> dmToNode = new HashMap<>();
-    private final MutableGraph g = mutGraph("resolution").setDirected(true);
+    private final MutableGraph g = mutGraph(GRAPH_NAME).setDirected(true);
 
     private final Scope scope;
 
@@ -92,12 +95,17 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
     }
 
     private MutableNode gavNode(ResolvedGroupArtifactVersion gav) {
-        return gavNode(new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
+        return gavNode(new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(),
+                gav.getDatedSnapshotVersion() == null ? gav.getVersion() : gav.getDatedSnapshotVersion()));
     }
 
     private MutableNode gavNode(GroupArtifactVersion gav) {
         return pomToNode.computeIfAbsent(gav, ignored -> {
             MutableNode node = mutNode(gav.toString()).add(Shape.RECTANGLE);
+            String url = gavUrl(gav);
+            if(url != null) {
+                node = node.add("URL", url);
+            }
             g.add(node);
             return node;
         });
@@ -106,8 +114,22 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
     private MutableNode dmNode(GroupArtifactVersion gav) {
         return pomToNode.computeIfAbsent(gav, ignored -> {
             MutableNode node = mutNode(gav.toString()).add(Shape.RECTANGLE);
+            String url = gavUrl(gav);
+            if(url != null) {
+                node = node.add("URL", url);
+            }
             g.add(node);
             return node;
         });
+    }
+
+    @Nullable
+    private String gavUrl(GroupArtifactVersion gav) {
+        if(gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
+            return null;
+        }
+        return "https://repo1.maven.org/maven2/" + gav.getGroupId().replace('.', '/') + '/' +
+                gav.getArtifactId() + '/' + gav.getVersion() + '/' + gav.getArtifactId() + '-' +
+                gav.getVersion() + ".pom";
     }
 }

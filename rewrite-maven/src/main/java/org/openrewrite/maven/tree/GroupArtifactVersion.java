@@ -33,6 +33,7 @@ public class GroupArtifactVersion {
 
     @Override
     public String toString() {
-        return groupId + ":" + artifactId + (version == null ? "" : ":" + version);
+        return (groupId == null ? "" : groupId) + ':' + artifactId +
+                (version == null ? "" : ":" + version);
     }
 }
