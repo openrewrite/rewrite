@@ -29,6 +29,70 @@ import java.util.Comparator.comparing
 @Suppress("Convert2MethodRef")
 interface JavaTemplateTest : JavaRecipeTest {
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1339")
+    @Test
+    fun templateStatementIsWithinTryWithResourcesBlock() = assertChanged(
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+                override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J {
+                    var nc = super.visitNewClass(newClass, p)
+                    val md: J.MethodDeclaration? = cursor.firstEnclosing(J.MethodDeclaration::class.java)
+                    if (md != null && md.simpleName.equals("createBis")) {
+                        return nc
+                    }
+                    if (newClass.type != null && (newClass.type as JavaType.Class).fullyQualifiedName.equals("java.io.ByteArrayInputStream")
+                        && newClass.arguments.isNotEmpty()
+                    ) {
+                        nc = nc.withTemplate(
+                            JavaTemplate.builder({ this.cursor }, "createBis(#{anyArray()})").build(),
+                            newClass.coordinates.replace(), newClass.arguments[0]
+                        )
+                    }
+                    return nc
+                }
+            }
+        },
+        before = """
+            import java.io.*;
+            import java.nio.charset.StandardCharsets;
+            
+            class Test {
+                ByteArrayInputStream createBis(byte[] bytes) {
+                    return new ByteArrayInputStream(bytes);
+                }
+                
+                void doSomething() {
+                    String sout = "";
+                    try (BufferedReader br = new BufferedReader(new FileReader(null))) {
+                        new ByteArrayInputStream("bytes".getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        """,
+        after = """
+            import java.io.*;
+            import java.nio.charset.StandardCharsets;
+            
+            class Test {
+                ByteArrayInputStream createBis(byte[] bytes) {
+                    return new ByteArrayInputStream(bytes);
+                }
+                
+                void doSomething() {
+                    String sout = "";
+                    try (BufferedReader br = new BufferedReader(new FileReader(null))) {
+                        createBis("bytes".getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1092")
     @Test
     fun methodInvocationReplacementHasContextAboutLocalVariables() = assertChanged(

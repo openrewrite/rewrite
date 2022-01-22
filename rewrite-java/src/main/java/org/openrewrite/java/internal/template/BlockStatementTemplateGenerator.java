@@ -230,7 +230,6 @@ public class BlockStatementTemplateGenerator {
                     before.insert(0, resource.withPrefix(Space.EMPTY).printTrimmed(cursor).trim() + ';');
                 }
                 before.insert(0, "try(");
-                after.append("catch(Throwable t) { throw new RuntimeException(t); }");
             }
         } else if (j instanceof J.Lambda) {
             J.Lambda l = (J.Lambda) j;
