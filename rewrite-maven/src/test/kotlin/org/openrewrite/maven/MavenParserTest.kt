@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven
 
-import guru.nidi.graphviz.engine.Format
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -31,11 +30,9 @@ import org.openrewrite.Issue
 import org.openrewrite.Parser
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.cache.MavenPomCache
-import org.openrewrite.maven.tree.GraphvizResolutionEventListener
 import org.openrewrite.maven.tree.License
 import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Scope
-import java.io.File
 import java.nio.file.Paths
 
 class MavenParserTest {
@@ -54,46 +51,12 @@ class MavenParserTest {
 
     @Test
     fun transitiveDependencyVersionDeterminedByBom() {
-        visualize(ctx) {
-            MavenParser.builder().build().parse(
-                ctx, """
-                    <project>
-                        <groupId>com.example</groupId>
-                        <artifactId>demo</artifactId>
-                        <version>0.0.1-SNAPSHOT</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.neo4j</groupId>
-                                <artifactId>neo4j-ogm-core</artifactId>
-                                <version>3.2.21</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                """
-            )
-        }
+        visualize("org.neo4j:neo4j-ogm-core:3.2.21")
     }
 
     @Test
     fun springBoot() {
-        visualize(ctx) {
-            MavenParser.builder().build().parse(
-                ctx, """
-                    <project>
-                        <groupId>com.example</groupId>
-                        <artifactId>demo</artifactId>
-                        <version>0.0.1-SNAPSHOT</version>
-                        <dependencies>
-                            <dependency>
-                              <groupId>org.springframework.boot</groupId>
-                              <artifactId>spring-boot</artifactId>
-                              <version>2.6.3</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                """
-            )
-        }
+        visualize("org.springframework.boot:spring-boot-starter-webflux:2.6.3")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")

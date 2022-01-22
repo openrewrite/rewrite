@@ -378,9 +378,9 @@ public class ResolvedPom implements DependencyManagementDependency {
 
             for (DependencyAndDependent dd : dependenciesAtDepth) {
                 Dependency d = dd.getDependency();
+                d = dd.getDefinedIn().getValues(d, depth);
 
-                if (!nearer.add(new GroupArtifact(dd.getDefinedIn().getValue(d.getGroupId()),
-                        dd.getDefinedIn().getValue(d.getArtifactId())))) {
+                if (!nearer.add(new GroupArtifact(d.getGroupId(), d.getArtifactId()))) {
                     // there was a nearer dependency with the same group and artifact that
                     // has higher precedence in conflict resolution
                     continue;
@@ -390,7 +390,6 @@ public class ResolvedPom implements DependencyManagementDependency {
                     continue;
                 }
 
-                d = dd.getDefinedIn().getValues(d, depth);
                 try {
                     Pom dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories(), ctx);
                     Scope dScope = Scope.fromName(d.getScope());
@@ -407,7 +406,7 @@ public class ResolvedPom implements DependencyManagementDependency {
 
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()
-                            .dependency(dScope, resolved, this);
+                            .dependency(scope, resolved, dd.getDefinedIn());
 
                     // build link between the including dependency and this one
                     ResolvedDependency includedBy = dd.getDependent();
