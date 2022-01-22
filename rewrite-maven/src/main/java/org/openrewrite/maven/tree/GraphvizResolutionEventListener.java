@@ -79,6 +79,12 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
         gavNode(containing.getGav()).addLink(link);
     }
 
+    @Override
+    public void downloadError(GroupArtifactVersion gav, Pom containing) {
+        gavNode(containing.getGav())
+                .addLink(to(gavNode(gav).add(Style.FILLED, Color.RED, Color.WHITE.font())));
+    }
+
     public Graphviz graphviz() {
         return Graphviz.fromGraph(g);
     }

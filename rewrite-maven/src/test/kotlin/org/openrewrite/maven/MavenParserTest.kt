@@ -54,11 +54,6 @@ class MavenParserTest {
         visualize("org.neo4j:neo4j-ogm-core:3.2.21")
     }
 
-    @Test
-    fun springBoot() {
-        visualize("org.springframework.boot:spring-boot-starter-webflux:2.6.3")
-    }
-
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")
     @Test
     fun parseDependencyManagementWithNoVersion() {

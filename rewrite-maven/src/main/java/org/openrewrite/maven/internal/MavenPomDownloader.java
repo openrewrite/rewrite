@@ -68,11 +68,7 @@ public class MavenPomDownloader {
 
     public MavenPomDownloader(Map<Path, ResolvedPom> projectPoms, ExecutionContext ctx) {
         this.projectPoms = projectPoms;
-        if (ctx instanceof MavenExecutionContextView) {
-            this.ctx = (MavenExecutionContextView) ctx;
-        } else {
-            this.ctx = new MavenExecutionContextView(ctx);
-        }
+        this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenCache = this.ctx.getPomCache();
     }
 
@@ -166,14 +162,15 @@ public class MavenPomDownloader {
     public Pom download(GroupArtifactVersion gav,
                         @Nullable String relativePath,
                         @Nullable ResolvedPom containingPom,
-                        List<MavenRepository> repositories,
-                        ExecutionContext ctx) throws MavenDownloadingException {
-
+                        List<MavenRepository> repositories) throws MavenDownloadingException {
         Map<MavenRepository, String> errors = new HashMap<>();
 
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, repositories, ctx);
         if(gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
             String errorText = "Unable to download dependency " + gav;
+            if (containingPom != null) {
+                ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
+            }
             throw new MavenDownloadingException(errorText);
         }
 
@@ -277,9 +274,13 @@ public class MavenPomDownloader {
                 errors.entrySet().stream()
                         .map(entry -> "    Id: " + entry.getKey().getId() + ", URL: " + entry.getKey().getUri().toString() + ", cause: " + entry.getValue())
                         .collect(Collectors.joining("\n"));
+        if(containingPom != null) {
+            ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
+        }
         throw new MavenDownloadingException(errorText);
     }
 
+    @Nullable
     private String datedSnapshotVersion(GroupArtifactVersion gav, List<MavenRepository> repositories, ExecutionContext ctx) {
         if (gav.getVersion() != null && gav.getVersion().endsWith("-SNAPSHOT")) {
             for (ResolvedGroupArtifactVersion pinnedSnapshotVersion : new MavenExecutionContextView(ctx).getPinnedSnapshotVersions()) {
@@ -302,7 +303,6 @@ public class MavenPomDownloader {
             }
         }
 
-        assert gav.getVersion() != null;
         return gav.getVersion();
     }
 

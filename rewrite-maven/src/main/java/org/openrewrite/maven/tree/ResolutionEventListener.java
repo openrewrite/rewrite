@@ -18,6 +18,10 @@ package org.openrewrite.maven.tree;
 public interface ResolutionEventListener {
     ResolutionEventListener NOOP = new ResolutionEventListener() {
         @Override
+        public void downloadError(GroupArtifactVersion gav, Pom containing) {
+        }
+
+        @Override
         public void parent(Pom parent, Pom containing) {
         }
 
@@ -30,6 +34,7 @@ public interface ResolutionEventListener {
         }
     };
 
+    void downloadError(GroupArtifactVersion gav, Pom containing);
     void parent(Pom parent, Pom containing);
     void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing);
     void dependencyManagement(DependencyManagementDependency dependencyManagement, Pom containing);
