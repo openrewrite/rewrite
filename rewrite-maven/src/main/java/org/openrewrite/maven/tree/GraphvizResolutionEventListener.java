@@ -17,6 +17,7 @@ package org.openrewrite.maven.tree;
 
 import guru.nidi.graphviz.attribute.Color;
 import guru.nidi.graphviz.attribute.Label;
+import guru.nidi.graphviz.attribute.Shape;
 import guru.nidi.graphviz.attribute.Style;
 import guru.nidi.graphviz.engine.Graphviz;
 import guru.nidi.graphviz.model.Link;
@@ -45,8 +46,7 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
 
     @Override
     public void parent(Pom parent, Pom containing) {
-        Link link = to(gavNode(parent.getGav()))
-                .with(Style.DASHED);
+        Link link = to(gavNode(parent.getGav()).add(Style.FILLED, Color.rgb("deefee"))).with(Style.DASHED);
         if(parentLinks++ == 0) {
             link = link.with(Label.of("parent"));
         }
@@ -60,7 +60,7 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
             return;
         }
 
-        Link link = to(gavNode(resolvedDependency.getGav()));
+        Link link = to(gavNode(resolvedDependency.getGav()).add(Style.FILLED, Color.rgb("e6eaff")));
         if(dependencyLinks++ == 0) {
             link = link.with(Label.of("dependency"));
         }
@@ -71,7 +71,7 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
     @Override
     public void dependencyManagement(DependencyManagementDependency dependencyManagement, Pom containing) {
         GroupArtifactVersion gav = new GroupArtifactVersion(dependencyManagement.getGroupId(), dependencyManagement.getArtifactId(), dependencyManagement.getVersion());
-        Link link = to(dmNode(gav)).with(Color.RED);
+        Link link = to(dmNode(gav).add(Style.FILLED, Color.rgb("d6d6de")));
         if(managedDependencies++ == 0) {
             link = link.with(Label.of("dependencyManagement"));
         }
@@ -81,8 +81,10 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
 
     @Override
     public void downloadError(GroupArtifactVersion gav, Pom containing) {
+        Link link = to(gavNode(gav).add(Style.FILLED, Color.rgb("ff1947")))
+                .with(Label.of("error"));
         gavNode(containing.getGav())
-                .addLink(to(gavNode(gav).add(Style.FILLED, Color.RED, Color.WHITE.font())));
+                .addLink(link);
     }
 
     public Graphviz graphviz() {
@@ -95,8 +97,7 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
 
     private MutableNode gavNode(GroupArtifactVersion gav) {
         return pomToNode.computeIfAbsent(gav, ignored -> {
-            MutableNode node = mutNode(gav.toString())
-                    .add(pomToNode.isEmpty() ? Style.BOLD : Style.SOLID);
+            MutableNode node = mutNode(gav.toString()).add(Shape.RECTANGLE);
             g.add(node);
             return node;
         });
@@ -104,7 +105,7 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
 
     private MutableNode dmNode(GroupArtifactVersion gav) {
         return pomToNode.computeIfAbsent(gav, ignored -> {
-            MutableNode node = mutNode(gav.toString()).add(Color.RED);
+            MutableNode node = mutNode(gav.toString()).add(Shape.RECTANGLE);
             g.add(node);
             return node;
         });
