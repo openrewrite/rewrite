@@ -34,6 +34,10 @@ public interface ResolutionEventListener {
         }
 
         @Override
+        public void property(String key, String value, Pom containing) {
+        }
+
+        @Override
         public void dependencyManagement(DependencyManagementDependency dependencyManagement, Pom containing) {
         }
     };
@@ -42,5 +46,6 @@ public interface ResolutionEventListener {
     void parent(Pom parent, Pom containing);
     void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing);
     void bomImport(ResolvedGroupArtifactVersion gav, Pom containing);
+    void property(String key, String value, Pom containing);
     void dependencyManagement(DependencyManagementDependency dependencyManagement, Pom containing);
 }

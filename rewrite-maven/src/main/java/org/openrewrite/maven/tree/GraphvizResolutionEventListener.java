@@ -41,6 +41,7 @@ import static java.util.Collections.emptySet;
 public class GraphvizResolutionEventListener implements ResolutionEventListener {
     public static final String GRAPH_NAME = "resolution";
 
+    private final Map<String, MutableNode> propToNode = new HashMap<>();
     private final Map<GroupArtifactVersion, MutableNode> pomToNode = new HashMap<>();
     private final Map<GroupArtifactVersion, MutableNode> dmToNode = new HashMap<>();
     private final Map<GroupArtifactVersion, Set<GroupArtifactVersion>> alreadySeenDm = new HashMap<>();
@@ -72,6 +73,11 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
             link = link.with(Label.of("dependency"));
         }
         gavNode(containing.getGav()).addLink(link);
+    }
+
+    @Override
+    public void property(String key, String value, Pom containing) {
+        gavNode(containing.getGav()).addLink(propNode(key, value));
     }
 
     @Override
@@ -139,6 +145,14 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
             if (url != null) {
                 node = node.add("URL", url);
             }
+            g.add(node);
+            return node;
+        });
+    }
+
+    private MutableNode propNode(String key, String value) {
+        return propToNode.computeIfAbsent(key + "=" + value, ignored -> {
+            MutableNode node = mutNode(Label.lines(key, value));
             g.add(node);
             return node;
         });

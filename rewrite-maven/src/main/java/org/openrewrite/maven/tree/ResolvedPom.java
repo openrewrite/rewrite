@@ -259,10 +259,10 @@ public class ResolvedPom implements DependencyManagementDependency {
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
-                    mergeProperties(profile.getProperties());
+                    mergeProperties(profile.getProperties(), pom);
                 }
             }
-            mergeProperties(pom.getProperties());
+            mergeProperties(pom.getProperties(), pom);
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
@@ -322,12 +322,15 @@ public class ResolvedPom implements DependencyManagementDependency {
             }
         }
 
-        private void mergeProperties(Map<String, String> incomingProperties) {
+        private void mergeProperties(Map<String, String> incomingProperties, Pom pom) {
             if (!incomingProperties.isEmpty()) {
                 if (properties == null || properties.isEmpty()) {
                     properties = new HashMap<>(incomingProperties);
                 }
                 for (Map.Entry<String, String> property : incomingProperties.entrySet()) {
+                    MavenExecutionContextView.view(ctx)
+                            .getResolutionListener()
+                            .property(property.getKey(), property.getValue(), pom);
                     if (!properties.containsKey(property.getKey())) {
                         properties.put(property.getKey(), property.getValue());
                     }
