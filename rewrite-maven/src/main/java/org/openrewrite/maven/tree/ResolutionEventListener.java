@@ -30,6 +30,10 @@ public interface ResolutionEventListener {
         }
 
         @Override
+        public void bomImport(ResolvedGroupArtifactVersion gav, Pom containing) {
+        }
+
+        @Override
         public void dependencyManagement(DependencyManagementDependency dependencyManagement, Pom containing) {
         }
     };
@@ -37,5 +41,6 @@ public interface ResolutionEventListener {
     void downloadError(GroupArtifactVersion gav, Pom containing);
     void parent(Pom parent, Pom containing);
     void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing);
+    void bomImport(ResolvedGroupArtifactVersion gav, Pom containing);
     void dependencyManagement(DependencyManagementDependency dependencyManagement, Pom containing);
 }

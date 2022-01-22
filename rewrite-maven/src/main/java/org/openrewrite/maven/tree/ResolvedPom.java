@@ -278,7 +278,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                         pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
 
                 for (Pom ancestor : pomAncestry) {
-                    if(ancestor.getGav().equals(parentPom.getGav())) {
+                    if (ancestor.getGav().equals(parentPom.getGav())) {
                         // parent cycle
                         return;
                     }
@@ -297,9 +297,8 @@ public class ResolvedPom implements DependencyManagementDependency {
             if (!incomingRequestedDependencies.isEmpty()) {
                 if (requestedDependencies == null || requestedDependencies.isEmpty()) {
                     requestedDependencies = new ArrayList<>(incomingRequestedDependencies);
-                } else {
-                    requestedDependencies.addAll(incomingRequestedDependencies);
                 }
+                requestedDependencies.addAll(incomingRequestedDependencies);
             }
         }
 
@@ -307,18 +306,18 @@ public class ResolvedPom implements DependencyManagementDependency {
             if (!incomingRepositories.isEmpty()) {
                 if (repositories == null || repositories.isEmpty()) {
                     repositories = new ArrayList<>(incomingRepositories);
-                } else {
-                    nextRepository:
-                    for (MavenRepository incomingRepository : incomingRepositories) {
-                        if (incomingRepository.getId() != null) {
-                            for (MavenRepository repository : repositories) {
-                                if (incomingRepository.getId().equals(repository.getId())) {
-                                    continue nextRepository;
-                                }
+                }
+
+                nextRepository:
+                for (MavenRepository incomingRepository : incomingRepositories) {
+                    if (incomingRepository.getId() != null) {
+                        for (MavenRepository repository : repositories) {
+                            if (incomingRepository.getId().equals(repository.getId())) {
+                                continue nextRepository;
                             }
                         }
-                        repositories.add(incomingRepository);
                     }
+                    repositories.add(incomingRepository);
                 }
             }
         }
@@ -327,11 +326,10 @@ public class ResolvedPom implements DependencyManagementDependency {
             if (!incomingProperties.isEmpty()) {
                 if (properties == null || properties.isEmpty()) {
                     properties = new HashMap<>(incomingProperties);
-                } else {
-                    for (Map.Entry<String, String> property : incomingProperties.entrySet()) {
-                        if (!properties.containsKey(property.getKey())) {
-                            properties.put(property.getKey(), property.getValue());
-                        }
+                }
+                for (Map.Entry<String, String> property : incomingProperties.entrySet()) {
+                    if (!properties.containsKey(property.getKey())) {
+                        properties.put(property.getKey(), property.getValue());
                     }
                 }
             }
@@ -341,19 +339,22 @@ public class ResolvedPom implements DependencyManagementDependency {
             if (!incomingDependencyManagement.isEmpty()) {
                 if (dependencyManagement == null || dependencyManagement.isEmpty()) {
                     dependencyManagement = new ArrayList<>(incomingDependencyManagement);
-                } else {
-                    for (DependencyManagementDependency d : incomingDependencyManagement) {
+                }
+                for (DependencyManagementDependency d : incomingDependencyManagement) {
+                    if (d instanceof Imported) {
+                        ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, null, emptyList())
+                                .resolve(emptyList(), downloader, ctx);
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
-                                .dependencyManagement(d, pom);
-
-                        if (d instanceof Imported) {
-                            ResolvedPom bom = downloader.download(((Imported) d).getGav(), null, null, emptyList())
-                                    .resolve(emptyList(), downloader, ctx);
-                            dependencyManagement.add(bom);
-                        } else {
-                            dependencyManagement.add(d);
-                        }
+                                .bomImport(bom.getGav(), pom);
+                        dependencyManagement.addAll(bom.getDependencyManagement());
+                    } else if (d instanceof Defined) {
+                        Defined defined = (Defined) d;
+                        defined = defined.withGav(getValues(defined.getGav()));
+                        MavenExecutionContextView.view(ctx)
+                                .getResolutionListener()
+                                .dependencyManagement(defined, pom);
+                        dependencyManagement.add(defined);
                     }
                 }
             }
@@ -426,7 +427,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                             }
                         }
                     }
-                } catch(MavenDownloadingException e) {
+                } catch (MavenDownloadingException e) {
                     ctx.getOnError().accept(e);
                 }
             }

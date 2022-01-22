@@ -335,7 +335,7 @@ public class RawPom {
                 dependencyManagementDependencies = new ArrayList<>(unmappedDependencies.size());
                 for (Dependency d : unmappedDependencies) {
                     GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
-                    if ("import".equals(d.getType())) {
+                    if ("import".equals(d.getScope())) {
                         dependencyManagementDependencies.add(new DependencyManagementDependency.Imported(dGav));
                     } else {
                         dependencyManagementDependencies.add(new DependencyManagementDependency.Defined(dGav, d.getScope(), d.getType(), d.getClassifier(), d.getExclusions()));

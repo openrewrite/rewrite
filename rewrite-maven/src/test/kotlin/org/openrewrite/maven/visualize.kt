@@ -2,13 +2,16 @@ package org.openrewrite.maven
 
 import guru.nidi.graphviz.engine.Format
 import guru.nidi.graphviz.engine.Rasterizer
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.tree.GraphvizResolutionEventListener
 import org.openrewrite.maven.tree.Scope
 import java.awt.Toolkit
+import java.net.URL
 import java.nio.file.Path
 import java.nio.file.Paths
+import kotlin.io.path.exists
 
 fun <T> visualize(
     ctx: ExecutionContext = InMemoryExecutionContext { t -> throw t },
@@ -23,11 +26,37 @@ fun <T> visualize(
         runnable()
     } finally {
         viz.graphviz().render(Format.DOT).toFile(outputFileLocation.resolve("${outputFilePrefix}.dot").toFile())
-        viz.graphviz().height(500).render(Format.PNG).toFile(outputFileLocation.resolve("${outputFilePrefix}.png").toFile())
+        viz.graphviz().render(Format.SVG).toFile(outputFileLocation.resolve("${outputFilePrefix}.svg").toFile())
+
+        val panZoom = outputFileLocation.resolve("svg-pan-zoom.min.js")
+        if(!panZoom.exists()) {
+            panZoom.toFile().writeText(
+                URL("https://raw.githubusercontent.com/bumbu/svg-pan-zoom/master/dist/svg-pan-zoom.min.js")
+                    .openStream().bufferedReader().readText()
+            )
+        }
+
         outputFileLocation.resolve("${outputFilePrefix}.html").toFile().writeText(
+            //language=html
             """
-                <img src="${outputFilePrefix}.png" usemap="#${GraphvizResolutionEventListener.GRAPH_NAME}"/>
-                ${viz.graphviz().height(500).render(Format.CMAPX)}
+                <html>
+                    <head>
+                        <script src="svg-pan-zoom.min.js"></script>
+                    </head>
+                    <body>
+                        <embed id="resolution" type="image/svg+xml" style="width: 100%; height: 100%; border:1px solid black; " src="${outputFilePrefix}.svg">
+                        <script>
+                          window.onload = function() {
+                            svgPanZoom('#resolution', {
+                              zoomEnabled: true,
+                              controlIconsEnabled: true,
+                              mouseWheelZoomEnabled: true,
+                              fit: false
+                            });
+                          };
+                        </script>
+                    </body>
+                </html>
             """.trimIndent()
         )
     }
