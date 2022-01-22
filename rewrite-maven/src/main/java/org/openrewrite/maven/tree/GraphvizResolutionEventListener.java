@@ -55,7 +55,11 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
     }
 
     @Override
-    public void dependency(ResolvedDependency resolvedDependency, ResolvedPom containing) {
+    public void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing) {
+        if(scope != this.scope) {
+            return;
+        }
+
         Link link = to(gavNode(resolvedDependency.getGav()));
         if(dependencyLinks++ == 0) {
             link = link.with(Label.of("dependency"));

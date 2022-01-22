@@ -22,7 +22,7 @@ public interface ResolutionEventListener {
         }
 
         @Override
-        public void dependency(ResolvedDependency resolvedDependency, ResolvedPom containing) {
+        public void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing) {
         }
 
         @Override
@@ -31,6 +31,6 @@ public interface ResolutionEventListener {
     };
 
     void parent(Pom parent, Pom containing);
-    void dependency(ResolvedDependency resolvedDependency, ResolvedPom containing);
+    void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing);
     void dependencyManagement(DependencyManagementDependency dependencyManagement, Pom containing);
 }

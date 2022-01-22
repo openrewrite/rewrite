@@ -407,7 +407,7 @@ public class ResolvedPom implements DependencyManagementDependency {
 
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()
-                            .dependency(resolved, this);
+                            .dependency(dScope, resolved, this);
 
                     // build link between the including dependency and this one
                     ResolvedDependency includedBy = dd.getDependent();
