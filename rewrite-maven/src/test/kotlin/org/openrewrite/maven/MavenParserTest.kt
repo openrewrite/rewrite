@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven
 
+import guru.nidi.graphviz.engine.Format
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -25,20 +26,21 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Parser
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.cache.MavenPomCache
+import org.openrewrite.maven.tree.GraphvizResolutionEventListener
 import org.openrewrite.maven.tree.License
 import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Scope
+import java.io.File
 import java.nio.file.Paths
 
 class MavenParserTest {
     private lateinit var cache: MavenPomCache
-    private lateinit var ctx: ExecutionContext
+    private lateinit var ctx: MavenExecutionContextView
 
     private val parser = MavenParser.builder().build()
 
@@ -48,6 +50,50 @@ class MavenParserTest {
         cache = InMemoryMavenPomCache()
         ctx = MavenExecutionContextView(InMemoryExecutionContext { t -> throw t })
             .apply { pomCache = cache }
+    }
+
+    @Test
+    fun transitiveDependencyVersionDeterminedByBom() {
+        visualize(ctx) {
+            MavenParser.builder().build().parse(
+                ctx, """
+                    <project>
+                        <groupId>com.example</groupId>
+                        <artifactId>demo</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.neo4j</groupId>
+                                <artifactId>neo4j-ogm-core</artifactId>
+                                <version>3.2.21</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+        }
+    }
+
+    @Test
+    fun springBoot() {
+        visualize(ctx) {
+            MavenParser.builder().build().parse(
+                ctx, """
+                    <project>
+                        <groupId>com.example</groupId>
+                        <artifactId>demo</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
+                        <dependencies>
+                            <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot</artifactId>
+                              <version>2.6.3</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")

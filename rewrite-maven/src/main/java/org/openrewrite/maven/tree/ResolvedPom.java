@@ -23,6 +23,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
@@ -265,11 +266,11 @@ public class ResolvedPom implements DependencyManagementDependency {
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
-                    mergeDependencyManagement(profile.getDependencyManagement());
+                    mergeDependencyManagement(profile.getDependencyManagement(), pom);
                     mergeRequestedDependencies(profile.getDependencies());
                 }
             }
-            mergeDependencyManagement(pom.getDependencyManagement());
+            mergeDependencyManagement(pom.getDependencyManagement(), pom);
             mergeRequestedDependencies(pom.getDependencies());
 
             if (pom.getParent() != null) {
@@ -282,6 +283,10 @@ public class ResolvedPom implements DependencyManagementDependency {
                         return;
                     }
                 }
+
+                MavenExecutionContextView.view(ctx)
+                        .getResolutionListener()
+                        .parent(parentPom, pom);
 
                 pomAncestry.add(0, parentPom);
                 resolveParentsRecursively(pomAncestry);
@@ -332,12 +337,16 @@ public class ResolvedPom implements DependencyManagementDependency {
             }
         }
 
-        private void mergeDependencyManagement(List<DependencyManagementDependency> incomingDependencyManagement) {
+        private void mergeDependencyManagement(List<DependencyManagementDependency> incomingDependencyManagement, Pom pom) {
             if (!incomingDependencyManagement.isEmpty()) {
                 if (dependencyManagement == null || dependencyManagement.isEmpty()) {
                     dependencyManagement = new ArrayList<>(incomingDependencyManagement);
                 } else {
                     for (DependencyManagementDependency d : incomingDependencyManagement) {
+                        MavenExecutionContextView.view(ctx)
+                                .getResolutionListener()
+                                .dependencyManagement(d, pom);
+
                         if (d instanceof Imported) {
                             ResolvedPom bom = downloader.download(((Imported) d).getGav(), null, null,
                                     emptyList(), ctx).resolve(emptyList(), downloader, ctx);
@@ -395,6 +404,10 @@ public class ResolvedPom implements DependencyManagementDependency {
                     ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
                             resolvedPom.getGav(), d, emptyList(),
                             resolvedPom.getRequested().getLicenses());
+
+                    MavenExecutionContextView.view(ctx)
+                            .getResolutionListener()
+                            .dependency(resolved, this);
 
                     // build link between the including dependency and this one
                     ResolvedDependency includedBy = dd.getDependent();

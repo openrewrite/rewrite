@@ -30,6 +30,8 @@ dependencies {
     // needed by AddDependency
     implementation(project(":rewrite-java"))
 
+    implementation("guru.nidi:graphviz-java:latest.release")
+
     compileOnly("org.rocksdb:rocksdbjni:latest.release")
     compileOnly(project(":rewrite-yaml"))
     compileOnly(project(":rewrite-properties"))

@@ -22,10 +22,7 @@ import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.MavenRepositoryCredentials;
-import org.openrewrite.maven.tree.MavenRepositoryMirror;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.*;
 
 import java.net.URI;
 import java.util.Arrays;
@@ -44,9 +41,25 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_REPOSITORIES = "org.openrewrite.maven.repos";
     private static final String MAVEN_PINNED_SNAPSHOT_VERSIONS = "org.openrewrite.maven.pinnedSnapshotVersions";
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
+    private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
+    }
+
+    public static MavenExecutionContextView view(ExecutionContext ctx) {
+        if(ctx instanceof MavenExecutionContextView) {
+            return (MavenExecutionContextView) ctx;
+        }
+        return new MavenExecutionContextView(ctx);
+    }
+
+    public void setResoutionListener(ResolutionEventListener listener) {
+        putMessage(MAVEN_RESOLUTION_LISTENER, listener);
+    }
+
+    public ResolutionEventListener getResolutionListener() {
+        return getMessage(MAVEN_RESOLUTION_LISTENER, ResolutionEventListener.NOOP);
     }
 
     public void setMirrors(Collection<MavenRepositoryMirror> mirrors) {
