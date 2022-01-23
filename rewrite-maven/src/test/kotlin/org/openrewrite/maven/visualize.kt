@@ -1,13 +1,12 @@
 package org.openrewrite.maven
 
 import guru.nidi.graphviz.engine.Format
-import guru.nidi.graphviz.engine.Rasterizer
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import guru.nidi.graphviz.model.SvgElementFinder
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.tree.GraphvizResolutionEventListener
 import org.openrewrite.maven.tree.Scope
-import java.awt.Toolkit
+import org.w3c.dom.Element
 import java.net.URL
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -18,18 +17,28 @@ fun <T> visualize(
     scope: Scope = Scope.Compile,
     outputFileLocation: Path = Paths.get("diagrams"),
     outputFilePrefix: String = "maven",
+    showProperties: Boolean = false,
+    showManagedDependencies: Boolean = false,
     runnable: () -> T
 ) {
-    val viz = GraphvizResolutionEventListener(scope)
+    val viz = GraphvizResolutionEventListener(scope, showProperties, showManagedDependencies)
     MavenExecutionContextView(ctx).setResoutionListener(viz)
     try {
         runnable()
     } finally {
         viz.graphviz().render(Format.DOT).toFile(outputFileLocation.resolve("${outputFilePrefix}.dot").toFile())
-        viz.graphviz().render(Format.SVG).toFile(outputFileLocation.resolve("${outputFilePrefix}.svg").toFile())
+        viz.graphviz()
+            .postProcessor { result, _, _ ->
+                result.mapString { svg ->
+                    svg.replace("font-family=\"Times,serif\" ", "")
+                        .replace("a xlink:href", "a target=\"_blank\" xlink:href")
+                }
+            }
+            .render(Format.SVG)
+            .toFile(outputFileLocation.resolve("${outputFilePrefix}.svg").toFile())
 
         val panZoom = outputFileLocation.resolve("svg-pan-zoom.min.js")
-        if(!panZoom.exists()) {
+        if (!panZoom.exists()) {
             panZoom.toFile().writeText(
                 URL("https://raw.githubusercontent.com/bumbu/svg-pan-zoom/master/dist/svg-pan-zoom.min.js")
                     .openStream().bufferedReader().readText()
@@ -42,6 +51,11 @@ fun <T> visualize(
                 <html>
                     <head>
                         <script src="svg-pan-zoom.min.js"></script>
+                        <style>
+                            body {
+                                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+                            }
+                        </style>
                     </head>
                     <body>
                         <embed id="resolution" type="image/svg+xml" style="width: 100%; height: 100%; border:1px solid black; " src="${outputFilePrefix}.svg">

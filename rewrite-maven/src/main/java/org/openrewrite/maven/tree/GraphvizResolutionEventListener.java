@@ -48,6 +48,8 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
     private final MutableGraph g = mutGraph(GRAPH_NAME).setDirected(true);
 
     private final Scope scope;
+    private final boolean showProperties;
+    private final boolean showManagedDependencies;
 
     private int parentLinks = 0;
     private int dependencyLinks = 0;
@@ -77,11 +79,17 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
 
     @Override
     public void property(String key, String value, Pom containing) {
+        if (!showProperties) {
+            return;
+        }
         gavNode(containing.getGav()).addLink(propNode(key, value));
     }
 
     @Override
     public void dependencyManagement(DependencyManagementDependency dependencyManagement, Pom containing) {
+        if (!showManagedDependencies) {
+            return;
+        }
         GroupArtifactVersion gav = new GroupArtifactVersion(dependencyManagement.getGroupId(), dependencyManagement.getArtifactId(), dependencyManagement.getVersion());
 
         if (alreadySeenDm.getOrDefault(simplifyGav(containing.getGav()), emptySet()).contains(gav)) {
@@ -128,7 +136,8 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
 
     private MutableNode gavNode(GroupArtifactVersion gav) {
         return pomToNode.computeIfAbsent(gav, ignored -> {
-            MutableNode node = mutNode(Label.lines(gav.getGroupId(), gav.getArtifactId(), gav.getVersion())).add(Shape.RECTANGLE);
+            MutableNode node = mutNode(Label.lines(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()))
+                    .add(Shape.RECTANGLE, Style.FILLED, Color.rgb("f9a91b"));
             String url = gavUrl(gav);
             if (url != null) {
                 node = node.add("URL", url);
