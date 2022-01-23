@@ -42,9 +42,12 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
     public static final String GRAPH_NAME = "resolution";
 
     private final Map<String, MutableNode> propToNode = new HashMap<>();
+
     private final Map<GroupArtifactVersion, MutableNode> pomToNode = new HashMap<>();
+
     private final Map<GroupArtifactVersion, MutableNode> dmToNode = new HashMap<>();
-    private final Map<GroupArtifactVersion, Set<GroupArtifactVersion>> alreadySeenDm = new HashMap<>();
+    private final Map<GroupArtifactVersion, Set<GroupArtifactVersion>> alreadySeen = new HashMap<>();
+
     private final MutableGraph g = mutGraph(GRAPH_NAME).setDirected(true);
 
     private final Scope scope;
@@ -57,6 +60,11 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
 
     @Override
     public void parent(Pom parent, Pom containing) {
+        if (alreadySeen.getOrDefault(simplifyGav(containing.getGav()), emptySet()).contains(simplifyGav(parent.getGav()))) {
+            return;
+        }
+        alreadySeen.computeIfAbsent(simplifyGav(containing.getGav()), g -> new HashSet<>()).add(simplifyGav(parent.getGav()));
+
         Link link = to(gavNode(parent.getGav()).add(Style.FILLED, Color.rgb("deefee"))).with(Style.DASHED);
         if (parentLinks++ == 0) {
             link = link.with(Label.of("parent"));
@@ -92,10 +100,10 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
         }
         GroupArtifactVersion gav = new GroupArtifactVersion(dependencyManagement.getGroupId(), dependencyManagement.getArtifactId(), dependencyManagement.getVersion());
 
-        if (alreadySeenDm.getOrDefault(simplifyGav(containing.getGav()), emptySet()).contains(gav)) {
+        if (alreadySeen.getOrDefault(simplifyGav(containing.getGav()), emptySet()).contains(gav)) {
             return;
         }
-        alreadySeenDm.computeIfAbsent(simplifyGav(containing.getGav()), g -> new HashSet<>()).add(gav);
+        alreadySeen.computeIfAbsent(simplifyGav(containing.getGav()), g -> new HashSet<>()).add(gav);
 
         Link link = to(dmNode(gav).add(Style.FILLED, Color.rgb("d6d6de")));
         if (managedDependencies++ == 0) {
@@ -114,6 +122,11 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
 
     @Override
     public void bomImport(ResolvedGroupArtifactVersion gav, Pom containing) {
+        if (alreadySeen.getOrDefault(simplifyGav(containing.getGav()), emptySet()).contains(simplifyGav(gav))) {
+            return;
+        }
+        alreadySeen.computeIfAbsent(simplifyGav(containing.getGav()), g -> new HashSet<>()).add(simplifyGav(gav));
+
         Link link = to(gavNode(gav).add(Style.FILLED, Color.rgb("e6eaff")));
         if (dependencyLinks++ == 0) {
             link = link.with(Label.of("dependency"));

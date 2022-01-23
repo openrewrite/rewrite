@@ -351,6 +351,8 @@ public class ResolvedPom implements DependencyManagementDependency {
                                 .getResolutionListener()
                                 .bomImport(bom.getGav(), pom);
                         dependencyManagement.addAll(bom.getDependencyManagement());
+                        mergeProperties(bom.getProperties(), bom.getRequested());
+                        mergeRequestedDependencies(bom.getRequestedDependencies());
                     } else if (d instanceof Defined) {
                         Defined defined = (Defined) d;
                         defined = defined.withGav(getValues(defined.getGav()));
