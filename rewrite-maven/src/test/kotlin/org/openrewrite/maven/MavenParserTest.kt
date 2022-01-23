@@ -51,7 +51,7 @@ class MavenParserTest {
 
     @Test
     fun transitiveDependencyVersionDeterminedByBom() {
-        visualize("org.neo4j:neo4j-ogm-core:3.2.21")
+        parse("org.neo4j:neo4j-ogm-core:3.2.21")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")

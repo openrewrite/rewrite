@@ -1,12 +1,10 @@
 package org.openrewrite.maven
 
 import guru.nidi.graphviz.engine.Format
-import guru.nidi.graphviz.model.SvgElementFinder
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.tree.GraphvizResolutionEventListener
 import org.openrewrite.maven.tree.Scope
-import org.w3c.dom.Element
 import java.net.URL
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -82,22 +80,26 @@ fun visualize(
     scope: Scope = Scope.Compile
 ) {
     visualize(ctx, scope, Paths.get("diagrams"), gav.replace(':', '_')) {
-        val (group, artifact, version) = gav.split(":")
-        MavenParser.builder().build().parse(
-            ctx, """
-                    <project>
-                        <groupId>org.openrewrite</groupId>
-                        <artifactId>dependency-viz</artifactId>
-                        <version>0.0.1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>${group}</groupId>
-                                <artifactId>${artifact}</artifactId>
-                                <version>${version}</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                """
-        )
+        parse(gav, ctx)
     }
+}
+
+fun parse(gav: String, ctx: ExecutionContext = InMemoryExecutionContext { t -> throw t }) {
+    val (group, artifact, version) = gav.split(":")
+    MavenParser.builder().build().parse(
+        ctx, """
+            <project>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>dependency-viz</artifactId>
+                <version>0.0.1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>${group}</groupId>
+                        <artifactId>${artifact}</artifactId>
+                        <version>${version}</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
 }
