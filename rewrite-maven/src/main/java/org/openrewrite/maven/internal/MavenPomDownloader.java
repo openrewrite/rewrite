@@ -63,10 +63,10 @@ public class MavenPomDownloader {
             request -> httpClient.newCall(request).execute());
 
     private final MavenPomCache mavenCache;
-    private final Map<Path, ResolvedPom> projectPoms;
+    private final Map<Path, Pom> projectPoms;
     private final MavenExecutionContextView ctx;
 
-    public MavenPomDownloader(Map<Path, ResolvedPom> projectPoms, ExecutionContext ctx) {
+    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx) {
         this.projectPoms = projectPoms;
         this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenCache = this.ctx.getPomCache();
@@ -161,7 +161,7 @@ public class MavenPomDownloader {
 
     public Pom download(GroupArtifactVersion gav,
                         @Nullable String relativePath,
-                        @Nullable ResolvedPom containingPom,
+                        @Nullable Pom containingPom,
                         List<MavenRepository> repositories) throws MavenDownloadingException {
         Map<MavenRepository, String> errors = new HashMap<>();
 
@@ -169,34 +169,30 @@ public class MavenPomDownloader {
         if(gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
             String errorText = "Unable to download dependency " + gav;
             if (containingPom != null) {
-                ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
+                ctx.getResolutionListener().downloadError(gav, containingPom);
             }
             throw new MavenDownloadingException(errorText);
         }
 
         // The pom being examined might be from a remote repository or a local filesystem.
-        // First try to match the requested download with one of the project poms so we don't needlessly ping remote repos
-        Pom projectMatch = null;
-        for (ResolvedPom projectPom : projectPoms.values()) {
+        // First try to match the requested download with one of the project POMs.
+        for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
                     gav.getArtifactId().equals(projectPom.getArtifactId())) {
                 // In a real project you'd never expect there to be more than one project pom with the same group/artifact but different version numbers
                 // But in unit tests that supply all of the poms as "project" poms like these, there might be more than one entry
                 if (gav.getVersion().equals(projectPom.getVersion())) {
-                    return projectPom.getRequested();
+                    return projectPom;
                 }
-                projectMatch = projectPom.getRequested();
+                return projectPom;
             }
         }
-        if (projectMatch != null) {
-            return projectMatch;
-        }
 
-        if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
+        if (containingPom != null && containingPom.getSourcePath() != null &&
                 !StringUtils.isBlank(relativePath)) {
-            Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
+            Path folderContainingPom = containingPom.getSourcePath().getParent();
             if (folderContainingPom != null) {
-                ResolvedPom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
+                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
                         .normalize());
                 // Even poms published to remote repositories still contain relative paths to their parent poms
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote
@@ -205,7 +201,7 @@ public class MavenPomDownloader {
                         && gav.getGroupId().equals(maybeLocalPom.getGroupId())
                         && gav.getArtifactId().equals(maybeLocalPom.getArtifactId())
                         && gav.getVersion().equals(maybeLocalPom.getVersion())) {
-                    return maybeLocalPom.getRequested();
+                    return maybeLocalPom;
                 }
             }
         }
@@ -275,7 +271,7 @@ public class MavenPomDownloader {
                         .map(entry -> "    Id: " + entry.getKey().getId() + ", URL: " + entry.getKey().getUri().toString() + ", cause: " + entry.getValue())
                         .collect(Collectors.joining("\n"));
         if(containingPom != null) {
-            ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
+            ctx.getResolutionListener().downloadError(gav, containingPom);
         }
         throw new MavenDownloadingException(errorText);
     }

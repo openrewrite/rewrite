@@ -257,7 +257,7 @@ public class RawPom {
                 inputPath,
                 repo,
                 parent,
-                new ResolvedGroupArtifactVersion(repo == null ? null : repo.getUri(), groupId, artifactId, version, null),
+                new ResolvedGroupArtifactVersion(repo == null ? null : repo.getUri(), getGroupId(), artifactId, getVersion(), null),
                 name,
                 getPackaging(),
                 getProperties() == null ? emptyMap() : getProperties(),

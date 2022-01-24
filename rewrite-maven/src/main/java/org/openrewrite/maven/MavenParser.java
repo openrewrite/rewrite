@@ -63,7 +63,7 @@ public class MavenParser implements Parser<Maven> {
     public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                    ExecutionContext ctx) {
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
-        Map<Path, ResolvedPom> projectPomsByPath = new HashMap<>();
+        Map<Path, Pom> projectPomsByPath = new HashMap<>();
         for (Input source : sources) {
             Pom pom = RawPom.parse(source.getSource(), null).toPom(source.getPath(), null);
             if (relativeTo != null) {
@@ -76,7 +76,7 @@ public class MavenParser implements Parser<Maven> {
                     .iterator().next();
 
             projectPoms.put(xml, pom);
-            projectPomsByPath.put(source.getPath(), new ResolvedPom(pom, this.activeProfiles));
+            projectPomsByPath.put(source.getPath(), pom);
         }
 
         List<Maven> parsed = new ArrayList<>();

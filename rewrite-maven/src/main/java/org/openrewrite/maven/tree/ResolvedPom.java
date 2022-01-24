@@ -275,7 +275,7 @@ public class ResolvedPom implements DependencyManagementDependency {
 
             if (pom.getParent() != null) {
                 Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
-                        pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                        pom.getParent().getRelativePath(), requested, repositories);
 
                 for (Pom ancestor : pomAncestry) {
                     if (ancestor.getGav().equals(parentPom.getGav())) {
@@ -397,7 +397,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                 }
 
                 try {
-                    Pom dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories());
+                    Pom dPom = downloader.download(d.getGav(), null, dd.definedIn.requested, getRepositories());
                     Scope dScope = Scope.fromName(d.getScope());
 
                     ResolvedPom resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), getProperties(),
@@ -447,7 +447,10 @@ public class ResolvedPom implements DependencyManagementDependency {
     private Dependency getValues(Dependency dep, int depth) {
         Dependency d = dep.withGav(getValues(dep.getGav()))
                 .withScope(getValue(dep.getScope()));
-        assert d.getGroupId() != null;
+
+        if(d.getGroupId() == null) {
+            return d;
+        }
 
         String version = d.getVersion();
         if (d.getVersion() == null || depth > 0) {
