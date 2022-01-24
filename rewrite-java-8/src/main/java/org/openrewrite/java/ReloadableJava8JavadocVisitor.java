@@ -973,15 +973,20 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
             J.Identifier id = (J.Identifier) javaVisitor.scan(node.getType(), Space.EMPTY);
             List<JRightPadded<Expression>> expressions = new ArrayList<>(node.getTypeArguments().size());
-            cursor += 1; // skip '<'
-            for (int i = 0; i < node.getTypeArguments().size(); i++) {
-                if (i > 0) {
-                    cursor++; // skip ','
-                }
+            cursor += 1; // skip '<', JavaDocVisitor does not interpret List <Integer> as Parameterized.
+            int argsSize = node.getTypeArguments().size();
+            for (int i = 0; i < argsSize; i++) {
                 Space space = Space.build(whitespaceBeforeAsString(), emptyList());
-                expressions.add(JRightPadded.build((Expression) javaVisitor.scan(node.getTypeArguments().get(i), space)));
+                JRightPadded<Expression> expression = JRightPadded.build((Expression) javaVisitor.scan(node.getTypeArguments().get(i), space));
+                Space after;
+                if (i == argsSize - 1) {
+                    after = Space.build(sourceBeforeAsString(">"), emptyList());
+                } else {
+                    after = Space.build(sourceBeforeAsString(","), emptyList());
+                }
+                expression = expression.withAfter(after);
+                expressions.add(expression);
             }
-            cursor += 1; // skip '>'
             return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions));
         }
     }
