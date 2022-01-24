@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import com.sun.source.doctree.*;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.MemberSelectTree;
+import com.sun.source.tree.ParameterizedTypeTree;
 import com.sun.source.tree.PrimitiveTypeTree;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
@@ -966,6 +967,27 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             String name = primitiveType.toString();
             cursor += name.length();
             return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitive(primitiveType.typetag), null);
+        }
+
+        @Override
+        public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
+            J.Identifier id = (J.Identifier) javaVisitor.scan(node.getType(), Space.EMPTY);
+            List<JRightPadded<Expression>> expressions = new ArrayList<>(node.getTypeArguments().size());
+            cursor += 1; // skip '<', JavaDocVisitor does not interpret List <Integer> as Parameterized.
+            int argsSize = node.getTypeArguments().size();
+            for (int i = 0; i < argsSize; i++) {
+                Space space = Space.build(whitespaceBeforeAsString(), emptyList());
+                JRightPadded<Expression> expression = JRightPadded.build((Expression) javaVisitor.scan(node.getTypeArguments().get(i), space));
+                Space after;
+                if (i == argsSize - 1) {
+                    after = Space.build(sourceBeforeAsString(">"), emptyList());
+                } else {
+                    after = Space.build(sourceBeforeAsString(","), emptyList());
+                }
+                expression = expression.withAfter(after);
+                expressions.add(expression);
+            }
+            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions));
         }
     }
 }

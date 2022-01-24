@@ -337,6 +337,57 @@ interface JavadocTest : JavaTreeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1274")
+    @Test
+    fun whitespaceBeforeAndAfterDelimiter(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            import java.util.Map;
+            
+            /**
+             * {@link Map< String , Integer > }
+             */
+            class Test {
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1274")
+    @Test
+    fun multiParameterizedType(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            import java.util.Map;
+            
+            /**
+             * {@link Map<String, Map<String, Integer>>} multiple parameterized type
+             */
+            class Test {
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1274")
+    @Test
+    fun parameterizedType(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            import java.util.List;
+            
+            class Test {
+                /**
+                 * @return - {@link List<String>} - description.
+                 * @throws Exception - exception.
+                 */
+                List<String> method() throws Exception {
+                }
+            }
+        """
+    )
+
     @Test
     fun fullyQualifiedLink(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
