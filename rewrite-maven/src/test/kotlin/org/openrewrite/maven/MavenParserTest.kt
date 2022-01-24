@@ -43,7 +43,6 @@ class MavenParserTest {
 
     @BeforeEach
     fun before() {
-//        cache = CompositeMavenPomCache(InMemoryMavenPomCache(), RocksdbMavenPomCache(Paths.get(".cache")))
         cache = InMemoryMavenPomCache()
         ctx = MavenExecutionContextView(InMemoryExecutionContext { t -> throw t })
             .apply { pomCache = cache }
@@ -59,27 +58,30 @@ class MavenParserTest {
     fun parseDependencyManagementWithNoVersion() {
         val parser = MavenParser.builder().build()
 
-        parser.parse("""
-            <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <exclusions>
-                                  <exclusion>
-                                      <groupId>org.springframework</groupId>
-                                      <artifactId>spring-core</artifactId>
-                                  </exclusion>
-                              </exclusions>
-                          </dependency>
-                      </dependencies>
-                </dependencyManagement>
-            </project>
-        """)
+        parser.parse(
+            ctx,
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.google.guava</groupId>
+                                  <artifactId>guava</artifactId>
+                                  <exclusions>
+                                      <exclusion>
+                                          <groupId>org.springframework</groupId>
+                                          <artifactId>spring-core</artifactId>
+                                      </exclusion>
+                                  </exclusions>
+                              </dependency>
+                          </dependencies>
+                    </dependencyManagement>
+                </project>
+            """
+        )
     }
 
     @Suppress("CheckDtdRefs")
@@ -88,6 +90,7 @@ class MavenParserTest {
         val parser = MavenParser.builder().build()
 
         val maven = parser.parse(
+            ctx,
             """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -126,6 +129,7 @@ class MavenParserTest {
     fun emptyArtifactPolicy() {
         // example from https://repo1.maven.org/maven2/org/openid4java/openid4java-parent/0.9.6/openid4java-parent-0.9.6.pom
         MavenParser.builder().build().parse(
+            ctx,
             """
                 <project>
                     <groupId>com.mycompany.app</groupId>
@@ -140,13 +144,14 @@ class MavenParserTest {
                         </repository>
                     </repositories>
                 </project>
-            """.trimIndent()
+            """
         )
     }
 
     @Test
     fun handlesRepositories() {
         MavenParser.builder().build().parse(
+            ctx,
             """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -171,7 +176,7 @@ class MavenParserTest {
                         </repository>
                     </repositories>
                 </project>
-            """.trimIndent()
+            """
         )
     }
 
@@ -179,6 +184,7 @@ class MavenParserTest {
     @Test
     fun handlesPropertiesInDependencyScope() {
         val maven = MavenParser.builder().build().parse(
+            ctx,
             """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -310,6 +316,7 @@ class MavenParserTest {
         MavenParser.builder()
             .build()
             .parse(
+                ctx,
                 """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
@@ -334,6 +341,7 @@ class MavenParserTest {
         val maven = MavenParser.builder()
             .build()
             .parse(
+                ctx,
                 """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
@@ -399,7 +407,7 @@ class MavenParserTest {
             </project>
         """
 
-        val maven = MavenParser.builder().build().parse(pomSource, parent)[0]
+        val maven = MavenParser.builder().build().parse(ctx, pomSource, parent)[0]
         assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId to it.version })
             .contains("jaxb-runtime" to "2.3.3")
     }
@@ -440,7 +448,7 @@ class MavenParserTest {
             </project>
         """
 
-        val maven = MavenParser.builder().build().parse(pomSource)[0]
+        val maven = MavenParser.builder().build().parse(ctx, pomSource)[0]
         assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId })
             .containsExactly("junit-jupiter", "guava")
     }
@@ -482,7 +490,7 @@ class MavenParserTest {
             </project>
         """
 
-        val maven = MavenParser.builder().build().parse(pomSource)[0]
+        val maven = MavenParser.builder().build().parse(ctx, pomSource)[0]
         assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId }?.take(2))
             .containsExactly("junit-jupiter", "guava")
     }
@@ -518,7 +526,7 @@ class MavenParserTest {
                                   <version>1.0.0</version>
                                   
                                 </project>
-                            """.trimIndent()
+                            """
                             )
                         }
                     }
@@ -547,7 +555,7 @@ class MavenParserTest {
                             </server>
                         </servers>
                     </settings>
-                """.trimIndent().byteInputStream()
+                """.byteInputStream()
             }, ctx)!!
 
             ctx.setMavenSettings(settings)
@@ -591,6 +599,7 @@ class MavenParserTest {
         val maven = MavenParser.builder()
             .build()
             .parse(
+                ctx,
                 """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
@@ -680,6 +689,7 @@ class MavenParserTest {
         val maven = MavenParser.builder()
             .build()
             .parse(
+                ctx,
                 """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
@@ -778,6 +788,7 @@ class MavenParserTest {
         MavenParser.builder()
             .build()
             .parse(
+                ctx,
                 """
                     <project>
                         <groupId>org.openrewrite.maven</groupId>
@@ -801,6 +812,7 @@ class MavenParserTest {
         val maven = MavenParser.builder()
             .build()
             .parse(
+                ctx,
                 """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
@@ -866,6 +878,7 @@ class MavenParserTest {
         val a = MavenParser.builder()
             .build()
             .parse(
+                ctx,
                 """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
