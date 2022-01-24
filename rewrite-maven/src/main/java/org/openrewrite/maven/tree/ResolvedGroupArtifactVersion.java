@@ -20,13 +20,11 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.net.URI;
-
 @Value
 @With
 public class ResolvedGroupArtifactVersion {
     @Nullable
-    URI repository;
+    String repository;
 
     String groupId;
     String artifactId;

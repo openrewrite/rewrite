@@ -21,10 +21,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 
-import java.net.URI;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -130,7 +128,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                     try {
                         return new MavenRepository(
                                 repo.getId(),
-                                URI.create(repo.getUrl()),
+                                repo.getUrl(),
                                 repo.getReleases() == null || repo.getReleases().isEnabled(),
                                 repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
                                 null,

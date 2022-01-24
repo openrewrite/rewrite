@@ -29,15 +29,18 @@ import java.net.URI;
 @Data
 @RequiredArgsConstructor
 public class MavenRepository {
-    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", URI.create("https://repo.maven.apache.org/maven2"), true, false, true, null, null);
+    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", true, false, true, null, null);
 
     @EqualsAndHashCode.Include
     @With
     @Nullable
     String id;
 
+    /**
+     * Not a {@link URI} because this could be a property reference.
+     */
     @With
-    URI uri;
+    String uri;
 
     @With
     boolean releases;
@@ -60,7 +63,7 @@ public class MavenRepository {
     String password;
 
     @JsonIgnore
-    public MavenRepository(@Nullable String id, URI uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password) {
+    public MavenRepository(@Nullable String id, String uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password) {
         this.id = id;
         this.uri = uri;
         this.releases = releases;
@@ -73,7 +76,7 @@ public class MavenRepository {
     public boolean acceptsVersion(String version) {
         if (version.endsWith("-SNAPSHOT")) {
             return snapshots;
-        } else if (uri.toString().equalsIgnoreCase("https://repo.spring.io/milestone")) {
+        } else if (uri.equalsIgnoreCase("https://repo.spring.io/milestone")) {
             // special case this repository since it will be so commonly used
             return version.matches(".*(M|RC)\\d+$");
         }

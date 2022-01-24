@@ -316,7 +316,7 @@ public class RawPom {
             if (unmappedRepos != null) {
                 pomRepositories = new ArrayList<>(unmappedRepos.size());
                 for (RawRepositories.Repository r : unmappedRepos) {
-                    pomRepositories.add(new MavenRepository(r.getId(), URI.create(r.getUrl()),
+                    pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
                             r.getReleases() == null || r.getReleases().isEnabled(),
                             r.getSnapshots() != null && r.getSnapshots().isEnabled(),
                             false, null, null));

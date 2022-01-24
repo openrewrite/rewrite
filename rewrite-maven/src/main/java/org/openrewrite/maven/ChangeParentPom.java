@@ -170,7 +170,8 @@ public class ChangeParentPom extends Recipe {
                                                                 ExecutionContext ctx) {
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = new MavenPomDownloader(emptyMap(), ctx)
-                            .downloadMetadata(new GroupArtifact(groupId, artifactId), getCursor().firstEnclosingOrThrow(Maven.class).getMavenResolutionResult().getPom().getRepositories());
+                            .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
+                                    getCursor().firstEnclosingOrThrow(Maven.class).getMavenResolutionResult().getPom().getRepositories());
                     if (mavenMetadata == null) {
                         availableVersions = Collections.emptyList();
                     } else {

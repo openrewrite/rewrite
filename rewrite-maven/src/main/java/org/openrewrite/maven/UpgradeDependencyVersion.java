@@ -146,7 +146,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = new MavenPomDownloader(emptyMap(), ctx)
-                            .downloadMetadata(new GroupArtifact(groupId, artifactId), getCursor().firstEnclosingOrThrow(Maven.class)
+                            .downloadMetadata(new GroupArtifact(groupId, artifactId), null, getCursor().firstEnclosingOrThrow(Maven.class)
                                     .getMavenResolutionResult().getPom().getRepositories());
                     if (mavenMetadata == null) {
                         availableVersions = emptyList();

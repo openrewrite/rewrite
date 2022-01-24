@@ -125,7 +125,7 @@ public class AddDependencyVisitor extends MavenVisitor {
                 resolvedVersion = version;
             } else {
                 MavenMetadata mavenMetadata = new MavenPomDownloader(emptyMap(), ctx)
-                        .downloadMetadata(new GroupArtifact(groupId, artifactId), emptyList());
+                        .downloadMetadata(new GroupArtifact(groupId, artifactId), null, emptyList());
 
                 if(mavenMetadata != null) {
                     LatestRelease latest = new LatestRelease(versionPattern);

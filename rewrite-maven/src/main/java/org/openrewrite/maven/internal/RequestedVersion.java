@@ -235,7 +235,7 @@ public class RequestedVersion {
     public String resolve(MavenPomDownloader downloader, List<MavenRepository> repositories) {
         String selectedVersion = null;
         if (isRange() || isDynamic()) {
-            MavenMetadata metadata = downloader.downloadMetadata(groupArtifact, repositories);
+            MavenMetadata metadata = downloader.downloadMetadata(groupArtifact, null, repositories);
             if(metadata != null) {
                 selectedVersion = selectFrom(metadata.getVersioning().getVersions());
             }
