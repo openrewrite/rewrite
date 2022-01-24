@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import com.sun.source.doctree.*;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.MemberSelectTree;
+import com.sun.source.tree.ParameterizedTypeTree;
 import com.sun.source.tree.PrimitiveTypeTree;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
@@ -966,6 +967,22 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             String name = primitiveType.toString();
             cursor += name.length();
             return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitive(primitiveType.typetag), null);
+        }
+
+        @Override
+        public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
+            J.Identifier id = (J.Identifier) javaVisitor.scan(node.getType(), Space.EMPTY);
+            List<JRightPadded<Expression>> expressions = new ArrayList<>(node.getTypeArguments().size());
+            cursor += 1; // skip '<'
+            for (int i = 0; i < node.getTypeArguments().size(); i++) {
+                if (i > 0) {
+                    cursor++; // skip ','
+                }
+                Space space = Space.build(whitespaceBeforeAsString(), emptyList());
+                expressions.add(JRightPadded.build((Expression) javaVisitor.scan(node.getTypeArguments().get(i), space)));
+            }
+            cursor += 1; // skip '>'
+            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions));
         }
     }
 }

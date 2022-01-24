@@ -356,6 +356,15 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitParameterizedType(J.ParameterizedType type, PrintOutputCapture<P> p) {
+            visitSpace(type.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p);
+            visitMarkers(type.getMarkers(), p);
+            visit(type.getClazz(), p);
+            visitContainer("<", type.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            return type;
+        }
+
+        @Override
         public J visitTypeParameter(J.TypeParameter typeParam, PrintOutputCapture<P> p) {
             visitSpace(typeParam.getPrefix(), Space.Location.TYPE_PARAMETERS_PREFIX, p);
             visitMarkers(typeParam.getMarkers(), p);
