@@ -54,7 +54,7 @@ public class ChangePropertyValue extends Recipe {
     @Option(displayName = "Optional file matcher",
             description = "Matching files will be modified. This is a glob expression.",
             required = false,
-            example = "**/application-*.properties")
+            example = "'**/application-*.properties'")
     @Nullable
     String fileMatcher;
 
