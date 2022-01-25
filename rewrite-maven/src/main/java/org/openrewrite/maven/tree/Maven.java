@@ -94,7 +94,9 @@ public class Maven extends Xml.Document {
     }
 
     public List<Path> getJavaSources(Path projectDir, ExecutionContext ctx) {
-        if (!"jar".equals(mavenResolutionResult.getPom().getPackaging()) && !"bundle".equals(mavenResolutionResult.getPom().getPackaging())) {
+        if (!"war".equals(mavenResolutionResult.getPom().getPackaging()) &&
+                !"jar".equals(mavenResolutionResult.getPom().getPackaging()) &&
+                !"bundle".equals(mavenResolutionResult.getPom().getPackaging())) {
             return emptyList();
         }
         return getSources(projectDir.resolve(getSourcePath()).getParent().resolve(Paths.get("src", "main", "java")),
