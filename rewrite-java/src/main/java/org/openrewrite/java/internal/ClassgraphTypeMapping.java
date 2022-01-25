@@ -120,24 +120,12 @@ public class ClassgraphTypeMapping implements JavaTypeMapping<ClassInfo> {
             }
 
             List<JavaType.Method> methods = null;
-            MethodInfoList classGraphMethods = aClass.getDeclaredMethodInfo();
-            MethodInfoList classGraphConstructors = aClass.getDeclaredConstructorInfo();
-            if (!classGraphMethods.isEmpty()) {
-                methods = new ArrayList<>(classGraphMethods.size() + classGraphConstructors.size());
-                for (MethodInfo methodInfo : classGraphMethods) {
+            MethodInfoList methodInfos = aClass.getDeclaredMethodAndConstructorInfo();
+            if (!methodInfos.isEmpty()) {
+                methods = new ArrayList<>(methodInfos.size());
+                for (MethodInfo methodInfo : methodInfos) {
                     if (!(methodInfo.isBridge() || methodInfo.isSynthetic())) {
                         methods.add(methodType(methodInfo));
-                    }
-                }
-            }
-
-            if (!classGraphConstructors.isEmpty()) {
-                if (methods == null) {
-                    methods = new ArrayList<>(classGraphConstructors.size());
-                }
-                for (MethodInfo ctor : classGraphConstructors) {
-                    if (!(ctor.isBridge() || ctor.isSynthetic())) {
-                        methods.add(methodType(ctor));
                     }
                 }
             }
