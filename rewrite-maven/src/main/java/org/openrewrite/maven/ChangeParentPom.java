@@ -17,12 +17,12 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -30,11 +30,10 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -106,15 +105,15 @@ public class ChangeParentPom extends Recipe {
     }
 
     @Override
-    protected MavenVisitor getSingleSourceApplicableTest() {
-        return new MavenVisitor() {
+    protected MavenVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+        return new MavenVisitor<ExecutionContext>() {
             @Override
-            public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-                Parent parent = maven.getMavenResolutionResult().getPom().getRequested().getParent();
-                if(parent != null && oldArtifactId.equals(parent.getArtifactId()) && oldGroupId.equals(parent.getGroupId())) {
-                    return maven.withMarkers(maven.getMarkers().add(Tree::randomId));
+            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                Parent parent = getResolutionResult().getPom().getRequested().getParent();
+                if (parent != null && oldArtifactId.equals(parent.getArtifactId()) && oldGroupId.equals(parent.getGroupId())) {
+                    return document.withMarkers(document.getMarkers().searchResult());
                 }
-                return maven;
+                return document;
             }
         };
     }
@@ -130,17 +129,26 @@ public class ChangeParentPom extends Recipe {
     }
 
     @Override
-    protected MavenVisitor getVisitor() {
-        return new MavenVisitor() {
+    protected MavenVisitor<ExecutionContext> getVisitor() {
+        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+        assert versionComparator != null;
+
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Nullable
             private Collection<String> availableVersions;
 
-            @SuppressWarnings("ConstantConditions")
-            final VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                Xml.Document m = super.visitDocument(document, executionContext);
+                if(m != document) {
+                    doAfterVisit(new UpdateMavenModel());
+                }
+                return m;
+            }
 
             @SuppressWarnings("OptionalGetWithoutIsPresent")
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isParentTag()) {
                     String targetGroupId = newGroupId == null ? oldGroupId : newGroupId;
                     String targetArtifactId = newArtifactId == null ? oldArtifactId : newArtifactId;
@@ -149,13 +157,13 @@ public class ChangeParentPom extends Recipe {
                         tag.getChildValue("version")
                                 .flatMap(parentVersion -> findNewerDependencyVersion(targetGroupId, targetArtifactId, parentVersion, ctx))
                                 .ifPresent(newVersion -> {
-                                    if(!oldGroupId.equals(targetGroupId)) {
+                                    if (!oldGroupId.equals(targetGroupId)) {
                                         doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("groupId").get(), targetGroupId));
                                     }
-                                    if(!oldArtifactId.equals(targetArtifactId)) {
+                                    if (!oldArtifactId.equals(targetArtifactId)) {
                                         doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("artifactId").get(), targetArtifactId));
                                     }
-                                    if(!newVersion.equals(tag.getChildValue("version").orElse(null))) {
+                                    if (!newVersion.equals(tag.getChildValue("version").orElse(null))) {
                                         doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("version").get(), newVersion));
                                     }
                                     doAfterVisit(new RemoveRedundantDependencyVersions());
@@ -169,11 +177,9 @@ public class ChangeParentPom extends Recipe {
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
                                                                 ExecutionContext ctx) {
                 if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = new MavenPomDownloader(emptyMap(), ctx)
-                            .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
-                                    getCursor().firstEnclosingOrThrow(Maven.class).getMavenResolutionResult().getPom().getRepositories());
+                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
                     if (mavenMetadata == null) {
-                        availableVersions = Collections.emptyList();
+                        availableVersions = emptyList();
                     } else {
                         availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                                 .filter(v -> versionComparator.isValid(currentVersion, v))

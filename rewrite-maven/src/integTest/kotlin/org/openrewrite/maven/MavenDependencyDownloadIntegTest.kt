@@ -20,7 +20,6 @@ import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.cache.LocalMavenArtifactCache
 import org.openrewrite.maven.cache.ReadOnlyLocalMavenArtifactCache
-import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Scope
 import org.openrewrite.maven.utilities.MavenArtifactDownloader
 import java.nio.file.Path
@@ -37,12 +36,12 @@ class MavenDependencyDownloadIntegTest {
 
     @Test
     fun springWebMvc(@TempDir tempDir: Path) {
-        val maven: Maven = MavenParser.builder()
+        val maven = MavenParser.builder()
             .build()
             .parse(ctx, singleDependencyPom("org.springframework:spring-webmvc:5.3.2"))
             .first()
 
-        val compileDependencies = maven.mavenResolutionResult.dependencies[Scope.Compile]!!
+        val compileDependencies = maven.mavenResolutionResult().dependencies[Scope.Compile]!!
 
         compileDependencies.forEach { dep ->
             println("${dep.repository} ${dep.gav}")
@@ -56,12 +55,12 @@ class MavenDependencyDownloadIntegTest {
 
     @Test
     fun rewriteCore(@TempDir tempDir: Path) {
-        val maven: Maven = MavenParser.builder()
+        val maven = MavenParser.builder()
             .build()
             .parse(ctx, singleDependencyPom("org.openrewrite:rewrite-core:6.0.1"))
             .first()
 
-        val runtimeDependencies = maven.mavenResolutionResult.dependencies[Scope.Runtime]!!
+        val runtimeDependencies = maven.mavenResolutionResult().dependencies[Scope.Runtime]!!
             .sortedBy { d -> d.gav.toString() }
 
         val downloader = downloader(tempDir)

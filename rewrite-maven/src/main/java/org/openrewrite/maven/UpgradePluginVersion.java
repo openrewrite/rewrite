@@ -20,10 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.search.FindPlugin;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -32,8 +29,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
-
-import static java.util.Collections.emptyMap;
 
 /**
  * Upgrade the version of a plugin using Node Semver
@@ -98,77 +93,62 @@ public class UpgradePluginVersion extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new MavenVisitor() {
-            @Override
-            public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-                if (!FindPlugin.find(maven, groupId, artifactId).isEmpty()) {
-                    maven = maven.withMarkers(maven.getMarkers().searchResult());
-                }
-                return super.visitMaven(maven, ctx);
-            }
-        };
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new FindPlugin(groupId, artifactId).getVisitor();
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new UpgradePluginVersionVisitor();
-    }
+        final VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+        assert versionComparator != null;
 
-    private class UpgradePluginVersionVisitor extends MavenVisitor {
-        private final VersionComparator versionComparator;
-        @Nullable
-        private Collection<String> availableVersions;
+        return new MavenVisitor<ExecutionContext>() {
+            @Nullable
+            private Collection<String> availableVersions;
 
-        public UpgradePluginVersionVisitor() {
-            //noinspection ConstantConditions
-            versionComparator = Semver.validate(newVersion, versionPattern).getValue();
-        }
+            @Override
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml xml = super.visitDocument(document, ctx);
+                FindPlugin.find((Xml.Document) xml, groupId, artifactId).forEach(plugin ->
+                        maybeChangePluginVersion(plugin, ctx));
+                return xml;
+            }
 
-        @Override
-        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            Maven m = super.visitMaven(maven, ctx);
-            FindPlugin.find(m, groupId, artifactId).forEach(plugin ->
-                    maybeChangePluginVersion(plugin, ctx));
-            return m;
-        }
+            private void maybeChangePluginVersion(Xml.Tag model, ExecutionContext ctx) {
+                Optional<Xml.Tag> versionTag = model.getChild("version");
+                versionTag.flatMap(Xml.Tag::getValue).ifPresent(versionValue -> {
+                    String versionLookup = versionValue.startsWith("${")
+                            ? super.getResolutionResult().getPom().getValue(versionValue.trim())
+                            : versionValue;
 
-        private void maybeChangePluginVersion(Xml.Tag model, ExecutionContext ctx) {
-            Optional<Xml.Tag> versionTag = model.getChild("version");
-            versionTag.flatMap(Xml.Tag::getValue).ifPresent(versionValue -> {
-                String versionLookup = versionValue.startsWith("${")
-                        ? super.resolutionResult.getPom().getValue(versionValue.trim())
-                        : versionValue;
+                    if (versionLookup != null) {
+                        findNewerDependencyVersion(groupId, artifactId, versionLookup, ctx).ifPresent(newer -> {
+                            ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(groupId, artifactId, newer);
+                            doAfterVisit(changeDependencyVersion);
+                        });
+                    }
 
-                if (versionLookup != null) {
-                    findNewerDependencyVersion(groupId, artifactId, versionLookup, ctx).ifPresent(newer -> {
-                        ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(groupId, artifactId, newer);
-                        doAfterVisit(changeDependencyVersion);
-                    });
-                }
+                });
+            }
 
-            });
-        }
-
-        private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion, ExecutionContext ctx) {
-            if (availableVersions == null) {
-                MavenMetadata mavenMetadata = new MavenPomDownloader(emptyMap(), ctx)
-                        .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
-                                getCursor().firstEnclosingOrThrow(Maven.class).getMavenResolutionResult().getPom().getRepositories());
-                if(mavenMetadata != null) {
-                    availableVersions = new ArrayList<>();
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(currentVersion, v)) {
-                            availableVersions.add(v);
+            private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion, ExecutionContext ctx) {
+                if (availableVersions == null) {
+                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                    if (mavenMetadata != null) {
+                        availableVersions = new ArrayList<>();
+                        for (String v : mavenMetadata.getVersioning().getVersions()) {
+                            if (versionComparator.isValid(currentVersion, v)) {
+                                availableVersions.add(v);
+                            }
                         }
                     }
                 }
+                return versionComparator.upgrade(currentVersion, availableVersions);
             }
-            return versionComparator.upgrade(currentVersion, availableVersions);
-        }
+        };
     }
 
-    private static class ChangePluginVersionVisitor extends MavenVisitor {
+    private static class ChangePluginVersionVisitor extends MavenVisitor<ExecutionContext> {
         private final String groupId;
         private final String artifactId;
         private final String newVersion;
@@ -186,7 +166,7 @@ public class UpgradePluginVersion extends Recipe {
                 if (versionTag.isPresent()) {
                     String version = versionTag.get().getValue().orElse(null);
                     if (version != null) {
-                        if (version.trim().startsWith("${") && !newVersion.equals(resolutionResult.getPom().getValue(version.trim()))) {
+                        if (version.trim().startsWith("${") && !newVersion.equals(getResolutionResult().getPom().getValue(version.trim()))) {
                             doAfterVisit(new ChangePropertyValue(version, newVersion, false));
                         } else if (!newVersion.equals(version)) {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
@@ -198,5 +178,4 @@ public class UpgradePluginVersion extends Recipe {
             return super.visitTag(tag, ctx);
         }
     }
-
 }

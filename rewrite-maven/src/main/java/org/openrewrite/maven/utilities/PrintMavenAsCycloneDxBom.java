@@ -15,18 +15,14 @@
  */
 package org.openrewrite.maven.utilities;
 
-import lombok.Value;
-import org.openrewrite.maven.tree.*;
-
-import java.time.Instant;
-import java.util.*;
+import org.openrewrite.xml.tree.Xml;
 
 /**
  * Print the dependency graph in the CycloneDX (https://cyclonedx.org/) bill of materials (BOM) format.
  */
 public final class PrintMavenAsCycloneDxBom {
 
-    public static String print(Maven maven) {
+    public static String print(Xml.Document maven) {
         return "";
     }
 

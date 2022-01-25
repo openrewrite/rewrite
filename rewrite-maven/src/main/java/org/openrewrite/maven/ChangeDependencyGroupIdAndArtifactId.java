@@ -61,24 +61,22 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangeDependencyGroupIdAndArtifactIdVisitor();
-    }
+        return new MavenVisitor<ExecutionContext>() {
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (isDependencyTag(oldGroupId, oldArtifactId)) {
+                    Optional<Xml.Tag> groupIdTag = tag.getChild("groupId");
+                    if (groupIdTag.isPresent() && !newGroupId.equals(groupIdTag.get().getValue().orElse(null))) {
+                        doAfterVisit(new ChangeTagValueVisitor<>(groupIdTag.get(), newGroupId));
+                    }
+                    Optional<Xml.Tag> artifactIdTag = tag.getChild("artifactId");
+                    if (artifactIdTag.isPresent() && !newArtifactId.equals(artifactIdTag.get().getValue().orElse(null))) {
+                        doAfterVisit(new ChangeTagValueVisitor<>(artifactIdTag.get(), newArtifactId));
+                    }
+                }
 
-    private class ChangeDependencyGroupIdAndArtifactIdVisitor extends MavenVisitor {
-        @Override
-        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isDependencyTag(oldGroupId, oldArtifactId)) {
-                Optional<Xml.Tag> groupIdTag = tag.getChild("groupId");
-                if (groupIdTag.isPresent() && !newGroupId.equals(groupIdTag.get().getValue().orElse(null))) {
-                    doAfterVisit(new ChangeTagValueVisitor<>(groupIdTag.get(), newGroupId));
-                }
-                Optional<Xml.Tag> artifactIdTag = tag.getChild("artifactId");
-                if (artifactIdTag.isPresent() && !newArtifactId.equals(artifactIdTag.get().getValue().orElse(null))) {
-                    doAfterVisit(new ChangeTagValueVisitor<>(artifactIdTag.get(), newArtifactId));
-                }
+                return super.visitTag(tag, ctx);
             }
-
-            return super.visitTag(tag, ctx);
-        }
+        };
     }
 }

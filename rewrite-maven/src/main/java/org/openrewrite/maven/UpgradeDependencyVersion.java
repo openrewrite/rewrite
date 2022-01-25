@@ -18,11 +18,11 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -33,7 +33,6 @@ import java.util.Collection;
 import java.util.Map;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 
 /**
  * Upgrade the version of a dependency by specifying a group or group and artifact using Node Semver
@@ -101,39 +100,29 @@ public class UpgradeDependencyVersion extends Recipe {
         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         assert versionComparator != null;
 
-        return new MavenVisitor() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Nullable
             Collection<String> availableVersions;
 
             @Override
-            public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-                Maven m = super.visitMaven(maven, ctx);
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml.Document m = super.visitDocument(document, ctx);
                 Map<Dependency, String> upgraded = getCursor().getMessage("upgraded.dependencies");
                 if (upgraded != null) {
-                    Pom requestedPom = m.getMavenResolutionResult().getPom().getRequested();
-                    m = m.withMavenResolutionResult(m.getMavenResolutionResult().getPom().withRequested(requestedPom.withDependencies(
-                            ListUtils.map(requestedPom.getDependencies(), requested -> {
-                                for (Dependency upgrade : upgraded.keySet()) {
-                                    if (upgrade == requested) {
-                                        return requested.withGav(requested.getGav()
-                                                .withVersion(upgraded.get(upgrade)));
-                                    }
-                                }
-                                return requested;
-                            })
-                    )));
+                    Pom requestedPom = getResolutionResult().getPom().getRequested();
+                    doAfterVisit(new UpdateMavenModel());
                     doAfterVisit(new RemoveRedundantDependencyVersions());
                 }
                 return m;
             }
 
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, executionContext);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
+                Xml.Tag t = super.visitTag(tag, executionContext);
                 ResolvedDependency dependency = findDependency(tag);
                 if (dependency != null) {
                     String newerVersion = findNewerDependencyVersion(dependency, executionContext);
-                    if(newerVersion != null) {
+                    if (newerVersion != null) {
                         t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(t, newerVersion).visitNonNull(t, 0);
                     }
                 }
@@ -145,9 +134,7 @@ public class UpgradeDependencyVersion extends Recipe {
                 ResolvedDependency resolvedDependency = null;
 
                 if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = new MavenPomDownloader(emptyMap(), ctx)
-                            .downloadMetadata(new GroupArtifact(groupId, artifactId), null, getCursor().firstEnclosingOrThrow(Maven.class)
-                                    .getMavenResolutionResult().getPom().getRepositories());
+                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
                     if (mavenMetadata == null) {
                         availableVersions = emptyList();
                     } else {

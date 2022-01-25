@@ -19,8 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.maven.search.FindPlugin;
-import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.RemoveContentVisitor;
+import org.openrewrite.xml.tree.Xml;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -49,16 +49,14 @@ public class RemovePlugin extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemovePluginVisitor();
-    }
-
-    private class RemovePluginVisitor extends MavenVisitor {
-
-        @Override
-        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            FindPlugin.find(maven, groupId, artifactId).forEach(plugin -> doAfterVisit(new RemoveContentVisitor<>(plugin, true)));
-            return super.visitMaven(maven, ctx);
-        }
-
+        return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                for (Xml.Tag plugin : FindPlugin.find(document, groupId, artifactId)) {
+                    doAfterVisit(new RemoveContentVisitor<>(plugin, true));
+                }
+                return super.visitDocument(document, executionContext);
+            }
+        };
     }
 }

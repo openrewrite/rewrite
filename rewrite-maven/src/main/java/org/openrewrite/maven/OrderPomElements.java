@@ -17,7 +17,6 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.AutoFormatVisitor;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
@@ -78,11 +77,11 @@ public class OrderPomElements extends Recipe {
     }
 
     @Override
-    protected MavenVisitor getVisitor() {
-        return new MavenVisitor() {
+    protected MavenVisitor<ExecutionContext> getVisitor() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-                Maven mvn = super.visitMaven(maven, ctx);
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml.Document mvn = super.visitDocument(document, ctx);
                 Xml.Tag root = mvn.getRoot();
                 if (root.getContent() != null) {
                     Map<String, List<Content>> groupedContents = new HashMap<>(root.getContent().size());
@@ -158,15 +157,15 @@ public class OrderPomElements extends Recipe {
                     if (foundChange) {
                         root = root.withContent(updatedOrder);
                         mvn = mvn.withRoot(root);
-                        mvn = (Maven) new AutoFormatVisitor<>().visitNonNull(mvn, ctx);
+                        mvn = (Xml.Document) new AutoFormatVisitor<>().visitNonNull(mvn, ctx);
                     }
                 }
                 return mvn;
             }
 
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
-                Xml.Tag tg = (Xml.Tag) super.visitTag(tag, executionContext);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
+                Xml.Tag tg = super.visitTag(tag, executionContext);
                 if ("dependency".equals(tg.getName()) || "parent".equals(tg.getName())) {
                     tg = orderGav(tg);
                 }

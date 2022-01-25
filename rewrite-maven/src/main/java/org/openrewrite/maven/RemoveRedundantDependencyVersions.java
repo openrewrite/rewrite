@@ -40,12 +40,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new MavenVisitor() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 ResolvedDependency d = findDependency(tag);
                 if (d != null && d.getRequested().getVersion() != null) {
-                    if (d.getRequested().getVersion().equals(resolutionResult.getPom().getManagedVersion(d.getGroupId(), d.getArtifactId(), d.getRequested().getType(),
+                    if (d.getRequested().getVersion().equals(getResolutionResult().getPom().getManagedVersion(d.getGroupId(), d.getArtifactId(), d.getRequested().getType(),
                             d.getRequested().getClassifier()))) {
                         Xml.Tag version = tag.getChild("version").orElse(null);
                         return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));

@@ -24,12 +24,12 @@ import org.junit.jupiter.api.BeforeAll
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.LoggingMeterRegistry
-import org.openrewrite.maven.tree.Maven
+import org.openrewrite.xml.tree.Xml
 import java.io.File
 import java.nio.file.Path
 
 @Suppress("unused")
-interface MavenRecipeTest : RecipeTest<Maven> {
+interface MavenRecipeTest : RecipeTest<Xml.Document> {
     companion object {
         private val meterRegistry = LoggingMeterRegistry.builder().build()
 
@@ -66,7 +66,7 @@ interface MavenRecipeTest : RecipeTest<Maven> {
         @Language("xml") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (Maven) -> Unit = { }
+        afterConditions: (Xml.Document) -> Unit = { }
     ) {
         super.assertChangedBase(
             parser,
@@ -89,7 +89,7 @@ interface MavenRecipeTest : RecipeTest<Maven> {
         @Language("xml") after: String,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (Maven) -> Unit = { }
+        afterConditions: (Xml.Document) -> Unit = { }
     ) {
         super.assertChangedBase(
             parser,

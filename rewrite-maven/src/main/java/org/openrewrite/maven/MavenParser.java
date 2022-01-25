@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
-public class MavenParser implements Parser<Maven> {
+public class MavenParser implements Parser<Xml.Document> {
     private final Collection<String> activeProfiles;
 
     /**
@@ -48,12 +48,12 @@ public class MavenParser implements Parser<Maven> {
     }
 
     @Override
-    public List<Maven> parse(@Language("xml") String... sources) {
+    public List<Xml.Document> parse(@Language("xml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override
-    public List<Maven> parse(ExecutionContext ctx, @Language("xml") String... sources) {
+    public List<Xml.Document> parse(ExecutionContext ctx, @Language("xml") String... sources) {
         return Parser.super.parse(ctx, sources);
     }
 
@@ -65,7 +65,7 @@ public class MavenParser implements Parser<Maven> {
     }
 
     @Override
-    public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
+    public List<Xml.Document> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                    ExecutionContext ctx) {
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
         Map<Path, Pom> projectPomsByPath = new HashMap<>();
@@ -84,7 +84,7 @@ public class MavenParser implements Parser<Maven> {
             projectPomsByPath.put(source.getPath(), pom);
         }
 
-        List<Maven> parsed = new ArrayList<>();
+        List<Xml.Document> parsed = new ArrayList<>();
 
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
 
@@ -100,20 +100,25 @@ public class MavenParser implements Parser<Maven> {
             MavenResolutionResult model = new MavenResolutionResult(randomId(),
                     resolvedPom, dependencies);
 
-            parsed.add(new Maven(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers()
-                    .compute(model, (old, n) -> n))));
+            parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers()
+                    .compute(model, (old, n) -> n)));
         }
 
         for (int i = 0; i < parsed.size(); i++) {
-            Maven maven = parsed.get(i);
+            Xml.Document maven = parsed.get(i);
+            MavenResolutionResult resolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class)
+                    .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
+
             List<MavenResolutionResult> modules = new ArrayList<>(0);
-            for (Maven possibleModule : parsed) {
-                Parent parent = possibleModule.getMavenResolutionResult().getPom().getRequested().getParent();
+            for (Xml.Document possibleModule : parsed) {
+                MavenResolutionResult moduleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class)
+                        .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
+                Parent parent = moduleResolutionResult.getPom().getRequested().getParent();
                 if (parent != null &&
-                        parent.getGroupId().equals(maven.getMavenResolutionResult().getPom().getGroupId()) &&
-                        parent.getArtifactId().equals(maven.getMavenResolutionResult().getPom().getArtifactId()) &&
-                        parent.getVersion().equals(maven.getMavenResolutionResult().getPom().getVersion())) {
-                    modules.add(possibleModule.getMavenResolutionResult());
+                        parent.getGroupId().equals(resolutionResult.getPom().getGroupId()) &&
+                        parent.getArtifactId().equals(resolutionResult.getPom().getArtifactId()) &&
+                        parent.getVersion().equals(resolutionResult.getPom().getVersion())) {
+                    modules.add(moduleResolutionResult);
                 }
             }
 

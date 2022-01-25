@@ -25,8 +25,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashMap;
 import java.util.List;
@@ -170,33 +172,35 @@ public class AddDependency extends Recipe {
         Pattern familyPatternCompiled = this.familyPattern == null ? null : Pattern.compile(this.familyPattern.replace("*", ".*"));
 
         return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
-                .map(javaProject -> {
-                    if (s instanceof Maven) {
-                        String resolvedScope = this.scope == null ? scopeByProject.get(javaProject) : this.scope;
+                .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                        Xml maven = super.visitDocument(document, executionContext);
+
+                        String resolvedScope = scope == null ? scopeByProject.get(javaProject) : scope;
                         if (resolvedScope == null) {
-                            return s;
+                            return maven;
                         }
                         //If the dependency is already in scope, no need to continue.
-                        MavenResolutionResult resolutionResult = ((Maven) s).getMavenResolutionResult();
-                        for (ResolvedDependency d : resolutionResult.getDependencies().get(Scope.Compile)) {
+                        for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
                             if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
-                                return s;
+                                return maven;
                             }
                         }
                         if (resolvedScope.equals("test")) {
-                            for (ResolvedDependency d : resolutionResult.getDependencies().get(Scope.Test)) {
+                            for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Test)) {
                                 if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
-                                    return s;
+                                    return maven;
                                 }
                             }
                         }
 
-                        return (SourceFile) new AddDependencyVisitor(
+                        return new AddDependencyVisitor(
                                 groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
-                                type, classifier, optional, familyPatternCompiled).visit(s, ctx);
+                                type, classifier, optional, familyPatternCompiled).visitNonNull(s, ctx);
                     }
-                    return s;
-                })
+                }.visit(s, ctx))
+                .map(SourceFile.class::cast)
                 .orElse(s)
         );
     }

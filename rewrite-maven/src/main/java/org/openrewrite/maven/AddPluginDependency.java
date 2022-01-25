@@ -78,7 +78,7 @@ public class AddPluginDependency extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new MavenVisitor() {
+        return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag plugins = (Xml.Tag) super.visitTag(tag, ctx);

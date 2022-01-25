@@ -22,7 +22,6 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
@@ -87,20 +86,21 @@ public class AddPlugin extends Recipe {
         return new AddPluginVisitor();
     }
 
-    private class AddPluginVisitor extends MavenVisitor {
+    private class AddPluginVisitor extends MavenIsoVisitor<ExecutionContext> {
 
         @Override
-        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            Xml.Tag root = maven.getRoot();
+        public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+            Xml.Tag root = document.getRoot();
             if (!root.getChild("build").isPresent()) {
-                maven = (Maven) new AddToTagVisitor<>(root, Xml.Tag.build("<build/>")).visitNonNull(maven, ctx, getCursor().getParentOrThrow());
+                document = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<build/>"))
+                        .visitNonNull(document, ctx, getCursor().getParentOrThrow());
             }
-            return super.visitMaven(maven, ctx);
+            return super.visitDocument(document, ctx);
         }
 
         @Override
-        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            Xml.Tag t = super.visitTag(tag, ctx);
 
             if (BUILD_MATCHER.matches(getCursor())) {
                 Optional<Xml.Tag> maybePlugins = t.getChild("plugins");

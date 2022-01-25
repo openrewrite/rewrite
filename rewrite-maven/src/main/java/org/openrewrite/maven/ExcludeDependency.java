@@ -82,7 +82,7 @@ public class ExcludeDependency extends Recipe {
         return new ExcludeDependencyVisitor();
     }
 
-    private class ExcludeDependencyVisitor extends MavenVisitor {
+    private class ExcludeDependencyVisitor extends MavenVisitor<ExecutionContext> {
         @Nullable
         private final Scope scope = ExcludeDependency.this.scope == null ? null : Scope.fromName(ExcludeDependency.this.scope);
 

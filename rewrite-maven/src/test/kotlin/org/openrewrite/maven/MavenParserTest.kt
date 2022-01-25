@@ -30,7 +30,6 @@ import org.openrewrite.Parser
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.cache.MavenPomCache
 import org.openrewrite.maven.tree.License
-import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Scope
 import java.nio.file.Paths
 
@@ -112,11 +111,11 @@ class MavenParserTest {
             """
         )[0]
 
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Test]?.first()?.licenses?.first()?.type)
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Test]?.first()?.licenses?.first()?.type)
             .isEqualTo(License.Type.Eclipse)
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Test]?.first()?.type)
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Test]?.first()?.type)
             .isEqualTo("jar")
-        assertThat(maven.mavenResolutionResult.pom.packaging)
+        assertThat(maven.mavenResolutionResult().pom.packaging)
             .isEqualTo("pom")
     }
 
@@ -203,7 +202,7 @@ class MavenParserTest {
                 </project>
             """
         ).first()
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]).hasSize(7)
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]).hasSize(7)
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/199")
@@ -285,7 +284,7 @@ class MavenParserTest {
 
         // Maven itself would respond to this pom with a fatal error.
         // So long as we don't produce an AST with cycles it's OK
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]).hasSize(1)
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]).hasSize(1)
     }
 
     @Test
@@ -330,7 +329,7 @@ class MavenParserTest {
 
         visualize(ctx) {
             val maven = parser.parse(ctx, pomSource, parent)[0]
-            assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId to it.version })
+            assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]?.map { it.artifactId to it.version })
                 .contains("jaxb-runtime" to "2.3.3")
         }
     }
@@ -372,9 +371,9 @@ class MavenParserTest {
         """
 
         val maven = parser.parse(ctx, pomSource)[0]
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Test]?.map { it.artifactId })
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Test]?.map { it.artifactId })
             .contains("junit-jupiter", "guava")
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId })
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]?.map { it.artifactId })
             .doesNotContain("junit-jupiter")
     }
 
@@ -416,7 +415,7 @@ class MavenParserTest {
         """
 
         val maven = parser.parse(ctx, pomSource)[0]
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId }?.take(2))
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]?.map { it.artifactId }?.take(2))
             .containsExactly("junit-jupiter", "guava")
     }
 
@@ -485,7 +484,7 @@ class MavenParserTest {
 
             ctx.setMavenSettings(settings)
 
-            val maven: Maven = parser.parse(
+            val maven = parser.parse(
                 ctx,
                 """
                     <project>
@@ -510,7 +509,7 @@ class MavenParserTest {
                 .isGreaterThan(0)
                 .`as`("The mock repository received no requests. Applying mirrors is probably broken")
 
-            assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile])
+            assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile])
                 .hasSize(1)
                 .matches { it.first().groupId == "com.foo" && it.first().artifactId == "bar" }
         }
@@ -599,9 +598,9 @@ class MavenParserTest {
                     </project>
                 """
             )
-            .find { it.mavenResolutionResult.pom.artifactId == "a" }!!
+            .find { it.mavenResolutionResult().pom.artifactId == "a" }!!
 
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.first()?.version).isEqualTo("0.1.0-SNAPSHOT")
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]?.first()?.version).isEqualTo("0.1.0-SNAPSHOT")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/124")
@@ -702,9 +701,9 @@ class MavenParserTest {
                         </properties>
                     </project>
                 """
-            ).find { it.mavenResolutionResult.pom.artifactId == "a" }!!
+            ).find { it.mavenResolutionResult().pom.artifactId == "a" }!!
 
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.first()?.version).isEqualTo("0.1.0-SNAPSHOT")
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]?.first()?.version).isEqualTo("0.1.0-SNAPSHOT")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/378")
@@ -785,9 +784,9 @@ class MavenParserTest {
                         </dependencies>
                     </project>
                 """
-            ).find { it.mavenResolutionResult.pom.artifactId == "a" }
+            ).find { it.mavenResolutionResult().pom.artifactId == "a" }
 
-        assertThat(maven!!.mavenResolutionResult.dependencies[Scope.Compile])
+        assertThat(maven!!.mavenResolutionResult().dependencies[Scope.Compile])
             .hasSize(7)
             .matches { it.first().artifactId == "guava" && it.first().version == "29.0-jre" }
     }
@@ -893,9 +892,9 @@ class MavenParserTest {
                     </project>
                 """
             )
-            .find { it.mavenResolutionResult.pom.artifactId == "a" }
+            .find { it.mavenResolutionResult().pom.artifactId == "a" }
 
-        val compileDependencies = a!!.mavenResolutionResult.dependencies[Scope.Compile]
+        val compileDependencies = a!!.mavenResolutionResult().dependencies[Scope.Compile]
         assertThat(compileDependencies).hasSize(2)
         assertThat(compileDependencies).anyMatch { it.artifactId == "b" && it.version == "0.1.0-SNAPSHOT" }
         assertThat(compileDependencies).anyMatch { it.artifactId == "d" && it.version == "0.2.0-SNAPSHOT" }

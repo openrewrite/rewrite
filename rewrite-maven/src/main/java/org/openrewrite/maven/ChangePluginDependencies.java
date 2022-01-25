@@ -83,7 +83,7 @@ public class ChangePluginDependencies extends Recipe {
                     }).collect(Collectors.joining("\n")) +
                     "\n</dependencies>\n");
         }
-        return new MavenVisitor() {
+        return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag plugins = (Xml.Tag) super.visitTag(tag, ctx);

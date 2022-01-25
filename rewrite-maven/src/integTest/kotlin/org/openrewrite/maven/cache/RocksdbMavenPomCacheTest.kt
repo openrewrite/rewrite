@@ -21,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.MavenExecutionContextView
 import org.openrewrite.maven.MavenParser
+import org.openrewrite.maven.mavenResolutionResult
 import java.nio.file.Path
 
 class RocksdbMavenPomCacheTest {
@@ -49,7 +50,6 @@ class RocksdbMavenPomCacheTest {
                         <guava-bom.version>30.1-jre</guava-bom.version>
                         <revision>1.0.0</revision>
                         <owaspDb>${"$"}{maven.repo.local}/org/owasp/dependency-check-data/3.0</owaspDb>
-                        <argLine></argLine>
                         <org.mapstruct.version>1.4.2.Final</org.mapstruct.version>
                         <tomcat.version>9.0.43</tomcat.version>
                     </properties>
@@ -178,9 +178,10 @@ class RocksdbMavenPomCacheTest {
         val pomAst = MavenParser.builder()
             .build()
             .parse(MavenExecutionContextView(InMemoryExecutionContext { t -> t.printStackTrace() })
-                .apply { pomCache = mavenCache }, pom)
+                .apply { pomCache = mavenCache }, pom
+            )
             .first()
 
-        assertThat(pomAst.mavenResolutionResult).isNotNull
+        assertThat(pomAst.mavenResolutionResult()).isNotNull
     }
 }

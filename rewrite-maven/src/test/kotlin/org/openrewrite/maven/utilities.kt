@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven;
+package org.openrewrite.maven
 
-import org.openrewrite.ExecutionContext;
+import org.openrewrite.maven.tree.MavenResolutionResult
+import org.openrewrite.xml.tree.Xml
 
-public class UpdateMavenModel extends MavenVisitor<ExecutionContext> {
-}
+fun Xml.Document.mavenResolutionResult(): MavenResolutionResult =
+    markers.findFirst(MavenResolutionResult::class.java).orElseThrow()

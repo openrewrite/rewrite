@@ -47,7 +47,7 @@ public class RemoveProperty extends Recipe {
         return new RemovePropertyVisitor();
     }
 
-    private class RemovePropertyVisitor extends MavenVisitor {
+    private class RemovePropertyVisitor extends MavenVisitor<ExecutionContext> {
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isPropertyTag() && propertyName.equals(tag.getName())) {

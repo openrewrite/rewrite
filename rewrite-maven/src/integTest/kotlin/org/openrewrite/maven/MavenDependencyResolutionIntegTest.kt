@@ -227,8 +227,8 @@ class MavenDependencyResolutionIntegTest {
             .parse(pom)
             .first()
 
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]!!.first().version).isEqualTo("7.10.0-SNAPSHOT")
-        assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]!!.first().datedSnapshotVersion).startsWith("7.10.0")
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]!!.first().version).isEqualTo("7.10.0-SNAPSHOT")
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]!!.first().datedSnapshotVersion).startsWith("7.10.0")
     }
 
     @Issue("#166")
@@ -385,7 +385,7 @@ class MavenDependencyResolutionIntegTest {
         // Maven says that the correct version is org.slf4j:slf4j-api:1.7.30, but aether says org.slf4j:slf4j-api:1.7.25
         // This asserts that the versions match Maven's expectation
         val expected = javaClass.getResource("/springBootParentExpected.txt")!!.readText()
-        assertThat(printTreeRecursive(parse(pom).mavenResolutionResult.dependencies[Scope.Test]!!, false))
+        assertThat(printTreeRecursive(parse(pom).mavenResolutionResult().dependencies[Scope.Test]!!, false))
             .isEqualTo(expected)
     }
 
@@ -481,7 +481,7 @@ class MavenDependencyResolutionIntegTest {
         // Maven says that the correct version is org.slf4j:slf4j-api:1.7.30, but aether says org.slf4j:slf4j-api:1.7.25
         // This asserts that the versions match Maven's expectation
         val importDependenciesExpected = javaClass.getResource("/importDependenciesExpected.txt")!!.readText()
-        assertThat(printTreeRecursive(parse(pom).mavenResolutionResult.dependencies[Scope.Test]!!, false))
+        assertThat(printTreeRecursive(parse(pom).mavenResolutionResult().dependencies[Scope.Test]!!, false))
             .isEqualTo(importDependenciesExpected)
     }
 
@@ -960,7 +960,7 @@ class MavenDependencyResolutionIntegTest {
         val mavenParser = MavenParser.builder().build()
         val mavens = mavenParser.parse(pomSource)
         val maven = mavens[0]
-        val dependencies = maven.mavenResolutionResult.dependencies[Scope.Test]
+        val dependencies = maven.mavenResolutionResult().dependencies[Scope.Test]
 
         assertThat(dependencies).hasSize(4)
         assertThat(dependencies).anyMatch {
@@ -982,7 +982,7 @@ class MavenDependencyResolutionIntegTest {
     private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String, ignoreScopes: Boolean = false) {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
         val pomAst = parse(pom)
-        val rewriteResult = printTreeRecursive(pomAst.mavenResolutionResult.dependencies[Scope.Test]!!, ignoreScopes)
+        val rewriteResult = printTreeRecursive(pomAst.mavenResolutionResult().dependencies[Scope.Test]!!, ignoreScopes)
         val aetherResult = MavenAetherParser().dependencyTree(pomFile, ignoreScopes)
         assertThat(rewriteResult).isEqualTo(aetherResult)
     }

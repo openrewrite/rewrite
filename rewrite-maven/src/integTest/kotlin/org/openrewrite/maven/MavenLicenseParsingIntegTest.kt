@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.tree.License
-import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Scope
 import java.nio.file.Path
 
@@ -60,12 +59,12 @@ class MavenLicenseParsingIntegTest {
     private fun assertLicensesRecognized(tempDir: Path, pom: String, vararg exceptions: String) {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
 
-        val pomAst: Maven = MavenParser.builder()
+        val pomAst = MavenParser.builder()
                 .build()
                 .parse(listOf(pomFile.toPath()), null, InMemoryExecutionContext())
                 .first()
 
-        val unknownLicenses = pomAst.mavenResolutionResult.dependencies[Scope.Test]!!
+        val unknownLicenses = pomAst.mavenResolutionResult().dependencies[Scope.Test]!!
                 .filter { it.licenses.any { l -> l.type == License.Type.Unknown && !exceptions.contains(l.name) } }
                 .map {
                     "${it.groupId}:${it.artifactId}:${it.version} contains unknown licenses " +
