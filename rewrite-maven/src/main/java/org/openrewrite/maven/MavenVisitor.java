@@ -156,7 +156,7 @@ public class MavenVisitor extends XmlVisitor<ExecutionContext> {
     @Nullable
     public ResolvedDependency findDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
         for (Map.Entry<Scope, List<ResolvedDependency>> scope : resolutionResult.getDependencies().entrySet()) {
-            if(inClasspathOf == null || scope.getKey().isInClasspathOf(inClasspathOf)) {
+            if(inClasspathOf == null || scope.getKey() == inClasspathOf || scope.getKey().isInClasspathOf(inClasspathOf)) {
                 for (ResolvedDependency d : scope.getValue()) {
                     if (tag.getChildValue("groupId").orElse(resolutionResult.getPom().getGroupId()).equals(d.getGroupId()) &&
                             tag.getChildValue("artifactId").orElse(resolutionResult.getPom().getArtifactId()).equals(d.getArtifactId())) {

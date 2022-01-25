@@ -88,7 +88,7 @@ class DependencyInsightTest : MavenRecipeTest {
               <version>1</version>
               
               <dependencies>
-                <!--~~(io.prometheus:simpleclient:0.9.0)~~>--><dependency>
+                <!--~~(io.prometheus:simpleclient_common:0.9.0)~~>--><dependency>
                     <groupId>io.micrometer</groupId>
                     <artifactId>micrometer-registry-prometheus</artifactId>
                     <version>1.6.3</version>

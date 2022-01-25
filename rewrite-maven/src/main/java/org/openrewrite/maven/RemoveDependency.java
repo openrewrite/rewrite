@@ -78,26 +78,11 @@ public class RemoveDependency extends Recipe {
                 ResolvedDependency dependency = findDependency(tag, checkScope);
                 if (dependency != null) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                    doAfterVisit(new UpdateMavenModel());
                 }
             }
 
             return super.visitTag(tag, ctx);
-        }
-
-        @Override
-        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            Maven m = super.visitMaven(maven, ctx);
-
-//            if (model.getDependencies().stream().anyMatch(dep -> (dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))) {
-//                List<ResolvedDependency> dependencies = model.getDependencies().stream()
-//                        .filter(dep -> !(dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))
-//                        .collect(toList());
-//                return m.withModel(model.withDependencies(dependencies));
-//            } else {
-//                return m;
-//            }
-
-            return m;
         }
     }
 }
