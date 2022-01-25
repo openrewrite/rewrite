@@ -372,7 +372,8 @@ public class ResolvedPom implements DependencyManagementDependency {
 
         List<DependencyAndDependent> dependenciesAtDepth = new ArrayList<>();
         for (Dependency requestedDependency : getRequestedDependencies()) {
-            Scope dScope = Scope.fromName(getValue(requestedDependency.getScope()));
+            Dependency d = getValues(requestedDependency, 0);
+            Scope dScope = Scope.fromName(d.getScope());
             if (dScope == scope || dScope.isInClasspathOf(scope)) {
                 dependenciesAtDepth.add(new DependencyAndDependent(requestedDependency, null, this));
             }

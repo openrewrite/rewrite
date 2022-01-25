@@ -60,6 +60,11 @@ public class MavenParser implements Parser<Maven> {
     }
 
     @Override
+    public List<Maven> parse(ExecutionContext ctx, @Language("xml") String... sources) {
+        return Parser.super.parse(ctx, sources);
+    }
+
+    @Override
     public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                    ExecutionContext ctx) {
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();

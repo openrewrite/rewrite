@@ -21,7 +21,6 @@ import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import okhttp3.Credentials
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -56,8 +55,6 @@ class MavenParserTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")
     @Test
     fun parseDependencyManagementWithNoVersion() {
-        val parser = MavenParser.builder().build()
-
         parser.parse(
             ctx,
             """
@@ -87,8 +84,6 @@ class MavenParserTest {
     @Suppress("CheckDtdRefs")
     @Test
     fun parse() {
-        val parser = MavenParser.builder().build()
-
         val maven = parser.parse(
             ctx,
             """
@@ -128,7 +123,7 @@ class MavenParserTest {
     @Test
     fun emptyArtifactPolicy() {
         // example from https://repo1.maven.org/maven2/org/openid4java/openid4java-parent/0.9.6/openid4java-parent-0.9.6.pom
-        MavenParser.builder().build().parse(
+        parser.parse(
             ctx,
             """
                 <project>
@@ -150,7 +145,7 @@ class MavenParserTest {
 
     @Test
     fun handlesRepositories() {
-        MavenParser.builder().build().parse(
+        parser.parse(
             ctx,
             """
                 <project>
@@ -183,7 +178,7 @@ class MavenParserTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/198")
     @Test
     fun handlesPropertiesInDependencyScope() {
-        val maven = MavenParser.builder().build().parse(
+        val maven = parser.parse(
             ctx,
             """
                 <project>
@@ -233,80 +228,6 @@ class MavenParserTest {
             </project>
         """
         parser.parse(ctx, invalidPom)
-        parser.parse(invalidPom)
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/199")
-    @Test
-    fun continueOnErrorMissingGroupId() {
-        val invalidPom = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-
-                <groupId>org.openrewrite.maven</groupId>
-                <artifactId>single-project</artifactId>
-                <version>0.1.0-SNAPSHOT</version>
-
-                <dependencies>
-                    <dependency>
-                        <artifactId>guava</artifactId>
-                        <version>29.0-jre</version>
-                    </dependency>
-                </dependencies>
-            </project>
-        """
-        assertThatThrownBy { parser.parse(ctx, invalidPom) }
-        parser.parse(invalidPom)
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/199")
-    @Test
-    fun continueOnErrorMissingVersion() {
-        val invalidPom = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-
-                <groupId>org.openrewrite.maven</groupId>
-                <artifactId>single-project</artifactId>
-                <version>0.1.0-SNAPSHOT</version>
-
-                <dependencies>
-                    <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                    </dependency>
-                </dependencies>
-            </project>
-        """
-        assertThatThrownBy { parser.parse(ctx, invalidPom) }
-        parser.parse(invalidPom)
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/199")
-    @Test
-    fun continueOnErrorMalformedExclusion() {
-        val invalidPom = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                    <dependency>
-                            <groupId>io.github.resilience4j</groupId>
-                            <artifactId>resilience4j-retry</artifactId>
-                            <version>1.7.0</version>
-                            <exclusions>
-                                <exclusion>
-                                    <groupId>${"$"}{missing.property}</groupId>
-                                </exclusion>
-                            </exclusions> 
-                    </dependency>
-                </dependencies>
-            </project>
-        """
-        assertThatThrownBy { parser.parse(ctx, invalidPom) }
         parser.parse(invalidPom)
     }
 
@@ -408,7 +329,7 @@ class MavenParserTest {
         """
 
         visualize(ctx) {
-            val maven = MavenParser.builder().build().parse(ctx, pomSource, parent)[0]
+            val maven = parser.parse(ctx, pomSource, parent)[0]
             assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId to it.version })
                 .contains("jaxb-runtime" to "2.3.3")
         }
@@ -450,9 +371,11 @@ class MavenParserTest {
             </project>
         """
 
-        val maven = MavenParser.builder().build().parse(ctx, pomSource)[0]
+        val maven = parser.parse(ctx, pomSource)[0]
+        assertThat(maven.mavenResolutionResult.dependencies[Scope.Test]?.map { it.artifactId })
+            .contains("junit-jupiter", "guava")
         assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId })
-            .containsExactly("junit-jupiter", "guava")
+            .doesNotContain("junit-jupiter")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/323")
@@ -492,7 +415,7 @@ class MavenParserTest {
             </project>
         """
 
-        val maven = MavenParser.builder().build().parse(ctx, pomSource)[0]
+        val maven = parser.parse(ctx, pomSource)[0]
         assertThat(maven.mavenResolutionResult.dependencies[Scope.Compile]?.map { it.artifactId }?.take(2))
             .containsExactly("junit-jupiter", "guava")
     }
@@ -562,7 +485,7 @@ class MavenParserTest {
 
             ctx.setMavenSettings(settings)
 
-            val maven: Maven = MavenParser.builder().build().parse(
+            val maven: Maven = parser.parse(
                 ctx,
                 """
                     <project>
