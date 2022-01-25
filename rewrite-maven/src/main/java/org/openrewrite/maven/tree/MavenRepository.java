@@ -31,6 +31,7 @@ import java.net.URI;
 public class MavenRepository {
     public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", true, false, true, null, null);
 
+    @EqualsAndHashCode.Include
     @With
     @Nullable
     String id;
