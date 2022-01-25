@@ -39,6 +39,7 @@ public class MavenRepository {
     /**
      * Not a {@link URI} because this could be a property reference.
      */
+    @EqualsAndHashCode.Include
     @With
     String uri;
 
