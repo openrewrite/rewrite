@@ -52,6 +52,14 @@ interface JavaTypeMappingTest {
     }
 
     @Test
+    fun inheritedJavaTypeGoat() {
+        val clazz = firstMethodParameter("inheritedJavaTypeGoat") as JavaType.Parameterized
+        val goat = goatType()
+        assertThat(clazz).isNotNull
+        assertThat(clazz.supertype.toString()).isEqualTo(goat.toString())
+    }
+
+    @Test
     fun extendsJavaLangObject() {
         // even though it is implicit in the source code...
         assertThat(goatType().supertype.fullyQualifiedName).isEqualTo("java.lang.Object")
