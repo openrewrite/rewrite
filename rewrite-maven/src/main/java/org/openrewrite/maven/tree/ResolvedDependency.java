@@ -90,7 +90,7 @@ public class ResolvedDependency {
             return this;
         }
         for (ResolvedDependency dependency : dependencies) {
-            ResolvedDependency found = findDependency(groupId, artifactId);
+            ResolvedDependency found = dependency.findDependency(groupId, artifactId);
             if (found != null) {
                 return found;
             }

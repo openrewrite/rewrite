@@ -52,16 +52,16 @@ public class MavenParser implements Parser<Maven> {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
+    @Override
+    public List<Maven> parse(ExecutionContext ctx, @Language("xml") String... sources) {
+        return Parser.super.parse(ctx, sources);
+    }
+
     private static class MavenXmlParser extends XmlParser {
         @Override
         public boolean accept(Path path) {
             return super.accept(path) || path.toString().endsWith(".pom");
         }
-    }
-
-    @Override
-    public List<Maven> parse(ExecutionContext ctx, @Language("xml") String... sources) {
-        return Parser.super.parse(ctx, sources);
     }
 
     @Override

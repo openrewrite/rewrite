@@ -806,8 +806,6 @@ class MavenParserTest {
                 ctx,
                 """
                     <project>
-                        <modelVersion>4.0.0</modelVersion>
-                    
                         <parent>
                             <groupId>org.openrewrite.maven</groupId>
                             <artifactId>a-parent</artifactId>
@@ -828,8 +826,6 @@ class MavenParserTest {
                 """,
                 """
                     <project>
-                        <modelVersion>4.0.0</modelVersion>
-                    
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>a-parent</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
@@ -848,8 +844,6 @@ class MavenParserTest {
                 """,
                 """
                     <project>
-                        <modelVersion>4.0.0</modelVersion>
-                    
                         <parent>
                             <groupId>org.openrewrite.maven</groupId>
                             <artifactId>b-parent</artifactId>
@@ -869,13 +863,10 @@ class MavenParserTest {
                 """,
                 """
                     <project>
-                        <modelVersion>4.0.0</modelVersion>
-                    
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>b-parent</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
                         <packaging>pom</packaging>
-                    
                         <dependencyManagement>
                             <dependencies>
                                 <dependency>
@@ -889,30 +880,16 @@ class MavenParserTest {
                 """,
                 """
                     <project>
-                        <modelVersion>4.0.0</modelVersion>
-                    
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>d</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                    
-                        <properties>
-                            <maven.compiler.source>1.8</maven.compiler.source>
-                            <maven.compiler.target>1.8</maven.compiler.target>
-                        </properties>
                     </project>
                 """,
                 """
                     <project>
-                        <modelVersion>4.0.0</modelVersion>
-                    
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>d</artifactId>
                         <version>0.2.0-SNAPSHOT</version>
-                    
-                        <properties>
-                            <maven.compiler.source>1.8</maven.compiler.source>
-                            <maven.compiler.target>1.8</maven.compiler.target>
-                        </properties>
                     </project>
                 """
             )
@@ -921,6 +898,6 @@ class MavenParserTest {
         val compileDependencies = a!!.mavenResolutionResult.dependencies[Scope.Compile]
         assertThat(compileDependencies).hasSize(2)
         assertThat(compileDependencies).anyMatch { it.artifactId == "b" && it.version == "0.1.0-SNAPSHOT" }
-        assertThat(compileDependencies).anyMatch { it.artifactId == "d" && it.version == "0.1.0-SNAPSHOT" }
+        assertThat(compileDependencies).anyMatch { it.artifactId == "d" && it.version == "0.2.0-SNAPSHOT" }
     }
 }
