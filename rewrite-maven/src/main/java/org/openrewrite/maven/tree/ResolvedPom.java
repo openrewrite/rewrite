@@ -249,13 +249,13 @@ public class ResolvedPom implements DependencyManagementDependency {
         public ResolvedPom resolve() throws MavenDownloadingException {
             List<Pom> pomAncestry = new ArrayList<>();
             pomAncestry.add(requested);
+            resolveParentPropertiesRecursively(pomAncestry);
             resolveParentsRecursively(pomAncestry);
             return ResolvedPom.this;
         }
 
-        void resolveParentsRecursively(List<Pom> pomAncestry) {
+        void resolveParentPropertiesRecursively(List<Pom> pomAncestry) {
             Pom pom = pomAncestry.get(0);
-            mergeRepositories(pom.getRepositories());
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
@@ -263,6 +263,26 @@ public class ResolvedPom implements DependencyManagementDependency {
                 }
             }
             mergeProperties(pom.getProperties(), pom);
+
+            if (pom.getParent() != null) {
+                Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
+                        pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+
+                for (Pom ancestor : pomAncestry) {
+                    if (ancestor.getGav().equals(parentPom.getGav())) {
+                        // parent cycle
+                        return;
+                    }
+                }
+
+                pomAncestry.add(0, parentPom);
+                resolveParentPropertiesRecursively(pomAncestry);
+            }
+        }
+
+        void resolveParentsRecursively(List<Pom> pomAncestry) {
+            Pom pom = pomAncestry.get(0);
+            mergeRepositories(pom.getRepositories());
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {

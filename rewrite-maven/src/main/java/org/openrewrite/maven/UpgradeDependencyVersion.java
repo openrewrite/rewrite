@@ -31,6 +31,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.util.Collections.emptyList;
 
@@ -119,11 +120,16 @@ public class UpgradeDependencyVersion extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
                 Xml.Tag t = super.visitTag(tag, executionContext);
-                ResolvedDependency dependency = findDependency(tag);
-                if (dependency != null) {
-                    String newerVersion = findNewerDependencyVersion(dependency, executionContext);
-                    if (newerVersion != null) {
-                        t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(t, newerVersion).visitNonNull(t, 0);
+                if(isDependencyTag(groupId, artifactId)) {
+                    ResolvedDependency dependency = findDependency(tag);
+                    if (dependency != null) {
+                        String newerVersion = findNewerDependencyVersion(dependency, executionContext);
+                        if (newerVersion != null) {
+                            Optional<Xml.Tag> version = t.getChild("version");
+                            if (version.isPresent()) {
+                                t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(version.get(), newerVersion).visitNonNull(t, 0, getCursor());
+                            }
+                        }
                     }
                 }
                 return t;
@@ -134,7 +140,7 @@ public class UpgradeDependencyVersion extends Recipe {
                 ResolvedDependency resolvedDependency = null;
 
                 if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                    MavenMetadata mavenMetadata = downloadMetadata(dependency.getGroupId(), dependency.getArtifactId(), ctx);
                     if (mavenMetadata == null) {
                         availableVersions = emptyList();
                     } else {

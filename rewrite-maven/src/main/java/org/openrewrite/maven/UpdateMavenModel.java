@@ -18,4 +18,5 @@ package org.openrewrite.maven;
 import org.openrewrite.ExecutionContext;
 
 public class UpdateMavenModel extends MavenVisitor<ExecutionContext> {
+    // FIXME the future home of updating dependencies after changing a POM
 }
