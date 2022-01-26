@@ -267,6 +267,7 @@ public class ResolvedPom implements DependencyManagementDependency {
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
                     mergeProperties(profile.getProperties(), pom);
+                    mergeRepositories(profile.getRepositories());
                 }
             }
             mergeProperties(pom.getProperties(), pom);
@@ -289,14 +290,16 @@ public class ResolvedPom implements DependencyManagementDependency {
 
         private void resolveParentDependenciesRecursively(List<Pom> pomAncestry) {
             Pom pom = pomAncestry.get(0);
-            mergeRepositories(pom.getRepositories());
 
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
                     mergeDependencyManagement(profile.getDependencyManagement(), pom);
                     mergeRequestedDependencies(profile.getDependencies());
+                    mergeRepositories(profile.getRepositories());
                 }
             }
+
+            mergeRepositories(pom.getRepositories());
             mergeDependencyManagement(pom.getDependencyManagement(), pom);
             mergeRequestedDependencies(pom.getDependencies());
 
@@ -372,7 +375,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                 }
                 for (DependencyManagementDependency d : incomingDependencyManagement) {
                     if (d instanceof Imported) {
-                        ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, null, emptyList())
+                        ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, null, repositories)
                                 .resolve(emptyList(), downloader, ctx);
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
