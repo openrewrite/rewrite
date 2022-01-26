@@ -155,6 +155,10 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
     @Override
     public void putPom(ResolvedGroupArtifactVersion gav, Pom pom) {
+        if (pom == null) {
+            return;
+        }
+
         try {
             cache.put(serialize(gav.toString().getBytes(StandardCharsets.UTF_8)), serialize(pom));
         } catch (RocksDBException e) {
@@ -174,6 +178,9 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
     @Override
     public void putNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
+        if (repository == null) {
+            return;
+        }
         try {
             cache.put(serialize(repository), serialize(normalized));
         } catch (RocksDBException e) {
