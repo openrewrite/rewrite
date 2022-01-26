@@ -34,6 +34,9 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
         }
     }
 
+    public enum EnumType {
+    }
+
     @AnnotationWithRuntimeRetention
     @AnnotationWithSourceRetention
     public abstract void clazz(C n);
@@ -47,6 +50,7 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public abstract <U> PT<U> genericUnbounded(PT<U> n);
     public abstract void genericArray(PT<C>[] n);
     public abstract void inner(C.Inner n);
+    public abstract void enumType(EnumType enumType);
     public abstract T genericT(T n); // remove after signatures are common.
 }
 

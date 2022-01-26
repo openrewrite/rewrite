@@ -158,6 +158,13 @@ interface JavaTypeMappingTest {
     }
 
     @Test
+    fun enumType() {
+        val clazz = firstMethodParameter("enumType") as JavaType.Class
+        val type = clazz.methods.find { it.name == "<constructor>" } // no generated constructor
+        assertThat(type).isNull()
+    }
+
+    @Test
     fun ignoreSourceRetentionAnnotations() {
         val goat = goatType()
         assertThat(goat.annotations.size == 1)

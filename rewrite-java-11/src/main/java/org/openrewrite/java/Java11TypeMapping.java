@@ -205,7 +205,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                         fields.add(variableType(elem, clazz));
                     } else if (elem instanceof Symbol.MethodSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                    Flags.ANONCONSTR)) == 0) {
+                                    Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
                         if (methods == null) {
                             methods = new ArrayList<>();
                         }
