@@ -51,6 +51,11 @@ class MavenParserTest {
         parse("org.neo4j:neo4j-ogm-core:3.2.21")
     }
 
+    @Test
+    fun guava25() {
+        visualize("com.google.guava:guava:25.0-android")
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")
     @Test
     fun parseDependencyManagementWithNoVersion() {

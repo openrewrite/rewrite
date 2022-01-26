@@ -21,7 +21,6 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Incubating;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -248,18 +247,21 @@ public class ResolvedPom implements DependencyManagementDependency {
         MavenPomDownloader downloader;
 
         public ResolvedPom resolve() throws MavenDownloadingException {
+            resolveParentsRecursively(requested);
+            return ResolvedPom.this;
+        }
+
+        void resolveParentsRecursively(Pom requested) {
             List<Pom> pomAncestry = new ArrayList<>();
             pomAncestry.add(requested);
             resolveParentPropertiesRecursively(pomAncestry);
 
             pomAncestry.clear();
             pomAncestry.add(requested);
-            resolveParentsRecursively(pomAncestry);
-
-            return ResolvedPom.this;
+            resolveParentDependenciesRecursively(pomAncestry);
         }
 
-        void resolveParentPropertiesRecursively(List<Pom> pomAncestry) {
+        private void resolveParentPropertiesRecursively(List<Pom> pomAncestry) {
             Pom pom = pomAncestry.get(0);
 
             for (Profile profile : pom.getProfiles()) {
@@ -285,7 +287,7 @@ public class ResolvedPom implements DependencyManagementDependency {
             }
         }
 
-        void resolveParentsRecursively(List<Pom> pomAncestry) {
+        private void resolveParentDependenciesRecursively(List<Pom> pomAncestry) {
             Pom pom = pomAncestry.get(0);
             mergeRepositories(pom.getRepositories());
 
@@ -314,7 +316,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                         .parent(parentPom, pom);
 
                 pomAncestry.add(0, parentPom);
-                resolveParentsRecursively(pomAncestry);
+                resolveParentDependenciesRecursively(pomAncestry);
             }
         }
 
@@ -428,9 +430,7 @@ public class ResolvedPom implements DependencyManagementDependency {
 
                     ResolvedPom resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), getProperties(),
                             getDependencyManagement(), getRepositories(), emptyList());
-                    List<Pom> dPomAncestry = new ArrayList<>();
-                    dPomAncestry.add(dPom);
-                    resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPomAncestry);
+                    resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
 
                     ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
                             resolvedPom.getGav(), d, emptyList(),
