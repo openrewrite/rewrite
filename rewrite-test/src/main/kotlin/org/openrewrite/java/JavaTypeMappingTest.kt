@@ -16,7 +16,9 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.tree.Flag
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*
@@ -157,11 +159,33 @@ interface JavaTypeMappingTest {
         assertThat(clazz.fullyQualifiedName).isEqualTo("org.openrewrite.java.C${"$"}Inner")
     }
 
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1349")
     @Test
     fun enumType() {
         val clazz = firstMethodParameter("enumType") as JavaType.Class
-        val type = clazz.methods.find { it.name == "<constructor>" } // no generated constructor
+        val type = clazz.methods.find { it.name == "<constructor>" } // note: JavaReflectionTypeMapping will return a constructor with 2 params.
         assertThat(type).isNull()
+
+        val supertype = clazz.supertype
+        assertThat(supertype).isNotNull
+        assertThat(supertype!!.toString()).isEqualTo("java.lang.Enum") // temporary signature to show Javac and Classgraph generate different types.
+    }
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1349")
+    @Test
+    fun implementedPT() {
+        val clazz = firstMethodParameter("implementedPT") as JavaType
+        if (clazz is JavaType.Parameterized) {
+            val pt = clazz as JavaType.Parameterized // Classgraph returns ParameterizedType
+            val ptInterface = pt.type.interfaces[0]
+            assertThat(ptInterface!!.toString()).isEqualTo("org.openrewrite.java.PT<Generic{T}>")
+        } else {
+            val c = clazz as JavaType.Class // TypeMapping returns a Class
+            val cInterface = c.interfaces[0]
+            assertThat(cInterface!!.toString()).isEqualTo("org.openrewrite.java.PT<Generic{T}>")
+        }
     }
 
     @Test

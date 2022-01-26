@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
@@ -142,5 +143,30 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
         Assertions.assertThat(typeASuperSuperType).isNotNull
         Assertions.assertThat(typeASuperSuperType!!.toString()).isEqualTo("java.util.AbstractCollection<Generic{E}>")
         Assertions.assertThat(typeBSuperSuperType).isEqualTo(typeBSuperSuperType)
+    }
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1349")
+    @Test
+    fun consistentEnumSuperType() {
+        val sources: Array<String> = arrayOf("""
+            public enum TypeA {}
+            """.trimIndent(), """
+            public enum TypeB {}
+            """.trimIndent()
+        )
+        val cus = JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true)
+            .build()
+            .parse(InMemoryExecutionContext { t -> fail(t) }, *sources)
+
+        Assertions.assertThat(cus).isNotNull
+        val typeA = cus[0].classes[0].type!! as JavaType.Class
+        val typeASuperType = typeA.supertype
+        val typeB = cus[1].classes[0].type!! as JavaType.Class
+        val typeBSuperType = typeB.supertype
+
+        Assertions.assertThat(typeASuperType).isNotNull
+        Assertions.assertThat(typeASuperType).isEqualTo(typeBSuperType)
     }
 }

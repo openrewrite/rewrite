@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -144,5 +146,15 @@ public interface JavaTypeSignatureBuilderTest {
                 .isEqualTo("org.openrewrite.java.C$Inner");
         assertThat(methodSignature("inner"))
                 .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=inner,return=void,parameters=[org.openrewrite.java.C$Inner]}");
+    }
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1349")
+    @Test
+    default void inheritedJavaTypeGoat() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("inheritedJavaTypeGoat")))
+                .isEqualTo("org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat");
+        assertThat(methodSignature("inheritedJavaTypeGoat"))
+                .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=inheritedJavaTypeGoat,return=org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat,parameters=[org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat]}");
     }
 }
