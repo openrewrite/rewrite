@@ -58,7 +58,7 @@ public class FindAnnotations extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override

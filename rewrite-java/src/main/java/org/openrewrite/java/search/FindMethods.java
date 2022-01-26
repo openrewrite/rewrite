@@ -68,7 +68,7 @@ public class FindMethods extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override

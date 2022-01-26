@@ -63,7 +63,7 @@ public class FindTypes extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         JavaType.FullyQualified fullyQualifiedType = JavaType.ShallowClass.build(fullyQualifiedTypeName);
 
         return new JavaVisitor<ExecutionContext>() {
