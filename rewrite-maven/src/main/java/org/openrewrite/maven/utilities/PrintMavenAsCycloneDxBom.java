@@ -15,209 +15,188 @@
  */
 package org.openrewrite.maven.utilities;
 
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
+
+import java.time.Instant;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * Print the dependency graph in the CycloneDX (https://cyclonedx.org/) bill of materials (BOM) format.
  */
 public final class PrintMavenAsCycloneDxBom {
 
-    public static String print(Xml.Document maven) {
-        return "";
+    private PrintMavenAsCycloneDxBom() {
     }
 
-//    private PrintMavenAsCycloneDxBom() {
-//    }
-//
-//    public static String print(Maven maven) {
-//        ResolvedPom pom = maven.getModel();
-//        StringBuilder bom = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-//        bom.append("<bom xmlns=\"http://cyclonedx.org/schema/bom/1.2\" serialNumber=\"urn:uuid:")
-//                .append(maven.getId().toString()).append("\" version=\"1\">\n");
-//        writeMetadata(maven.getModel(), bom);
-//
-//        //Collect all transitive dependencies, The returned map is a (gav + a set of exclusions) -> dependency. Because
-//        //of exclusions, we may encounter the same gav multiple times.
-//        Map <DependencyKey, ResolvedDependency> dependencies = traverseDependencies(pom.getDependencies(), new LinkedHashMap<>());
-//        writeComponents(dependencies, bom);
-//        writeDependencies(dependencies, bom);
-//
-//        bom.append("</bom>\n");
-//
-//        return bom.toString();
-//    }
-//
-//    private static void writeMetadata(ResolvedPom pom, StringBuilder bom) {
-//        bom.append("    <metadata>\n");
-//        bom.append("        <timestamp>").append(Instant.now().toString()).append("</timestamp>\n");
-//        bom.append("        <tools>\n");
-//        bom.append("            <tool>\n");
-//        bom.append("                <vendor>OpenRewrite</vendor>\n");
-//        bom.append("                <name>OpenRewrite CycloneDX</name>\n");
-//        //Probably should pull the version from build properties.
-//        bom.append("                <version>7.0.0</version>\n");
-//        bom.append("            </tool>\n");
-//        bom.append("        </tools>\n");
-//        String bomReference = getBomReference(pom.getGroupId(), pom.getArtifactId(), pom.getValue(pom.getVersion()));
-//
-//        writeComponent(pom, bomReference, pom.getVersion(), Scope.Compile, bom);
-//        bom.append("    </metadata>\n");
-//    }
-//
-//    private static void writeComponents(Map <DependencyKey, ResolvedDependency> dependencyMap, StringBuilder bom) {
-//        if (dependencyMap.isEmpty()) {
-//            return;
-//        }
-//        //The components are a flattened view of the dependencies (where we might see the same gav multiple times,
-//        //we only want to print the component once.
-//        Set<String> componentsWritten = new HashSet<>(dependencyMap.size());
-//        bom.append("    <components>\n");
-//        for (ResolvedDependency component : dependencyMap.values()) {
-//            String bomReference = getBomReference(component.getGroupId(), component.getArtifactId(), component.getVersion());
-//            if (componentsWritten.contains(bomReference)) {
-//                continue;
-//            }
-//            writeComponent(component.getModel(), bomReference, component.getVersion(), component.getScope(), bom);
-//            componentsWritten.add(bomReference);
-//        }
-//        bom.append("    </components>\n");
-//    }
-//
-//    private static void writeDependencies(Map <DependencyKey, ResolvedDependency> dependencyMap, StringBuilder bom) {
-//        if (dependencyMap.isEmpty()) {
-//            return;
-//        }
-//        bom.append("    <dependencies>\n");
-//        for (ResolvedDependency dependency : dependencyMap.values()) {
-//            writeDependency(dependency, bom);
-//        }
-//        bom.append("    </dependencies>\n");
-//    }
-//
-//    private static void writeDependency(ResolvedDependency dependency, StringBuilder bom) {
-//        String bomReference = getBomReference(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
-//        bom.append("        <dependency ref=\"").append(bomReference).append("\">\n");
-//        if (dependency.getModel().getDependencies() != null) {
-//            for (ResolvedDependency nested : dependency.getModel().getDependencies()) {
-//                bom.append("            <dependency ref=\"")
-//                        .append(getBomReference(
-//                                nested.getGroupId(),
-//                                nested.getArtifactId(),
-//                                nested.getVersion())
-//                        ).append("\"/>\n");
-//            }
-//        }
-//        bom.append("        </dependency>\n");
-//    }
-//
-//    private static void writeComponent(Pom pom, String bomReference, String version, Scope scope, StringBuilder bom) {
-//        String type = "library";
-//        if (pom.getPackaging().equals("war") || pom.getPackaging().equals("ear")) {
-//            type = "application";
-//        }
-//        String indent = "        ";
-//        bom.append(indent).append("<component bom-ref=\"").append(bomReference).append("\" type=\"").append(type).append("\">\n");
-//        bom.append(indent).append("    <group>").append(pom.getGroupId()).append("</group>\n");
-//        bom.append(indent).append("    <name>").append(pom.getArtifactId()).append("</name>\n");
-//        bom.append(indent).append("    <version>").append(version).append("</version>\n");
-//        if (pom.getDescription() != null) {
-//            bom.append(indent).append("    <description>\n");
-//            bom.append(indent).append("        <![CDATA[").append(pom.getDescription()).append("]]>\n");
-//            bom.append(indent).append("    </description>\n");
-//        }
-//        if (scope != null) {
-//            //Cyclone schema allows three scopes:
-//            String cycloneScope;
-//            switch (scope) {
-//                case Compile:
-//                case System:
-//                    cycloneScope = "required";
-//                    break;
-//                case None:
-//                case Invalid:
-//                case Test:
-//                    cycloneScope = "excluded";
-//                    break;
-//                default:
-//                    cycloneScope = "optional";
-//            }
-//            bom.append(indent).append("    <scope>").append(cycloneScope).append("</scope>\n");
-//        }
-//        writeLicenses(pom, bom, indent);
-//        bom.append(indent).append("    <purl>").append(bomReference).append("</purl>\n");
-//        bom.append(indent).append("</component>\n");
-//    }
-//
-//    private static void writeLicenses(Pom pom, StringBuilder bom, String indent) {
-//        if (!pom.getLicenses().isEmpty()) {
-//            bom.append(indent).append("    <licenses>\n");
-//
-//            for (License license : pom.getLicenses()) {
-//                bom.append(indent).append("        <license>\n");
-//                String spdxId = null;
-//
-//                //This logic maps the rewrite license type to the spdx equivalent.
-//
-//                //The only license type that we can establish unambiguously is the Apache 2.0 license.
-//
-//                //BSD has several SPDX Mappings (no way to resolve this)
-//                //CDDL has a v1.0 and v1.1 (we do not distinguish them)
-//                //CreativeCommons has several SPDX Mappings (no way to resolve this)
-//                //Eclipse has a v1.0 and v2.0 (we do not distinguish them)
-//                //GPL has several SPDX Mappings (no way to resolve this)
-//                //LGPL has several SPDX Mappings (no way to resolve this)
-//                //MIT has several SPDX Mappings (no way to resolve this)
-//                //Mozilla has several SPDX Mappings (no way to resolve this)
-//                //PublicDomain unclear which ID to use.
-//
-//                if (license.getType() == License.Type.Apache2) {
-//                    spdxId = "Apache-2.0";
-//                }
-//                if (spdxId != null) {
-//                    bom.append(indent).append("            <id>").append(spdxId).append("</id>\n");
-//                }
-//                bom.append(indent).append("            <name>").append(license.getName()).append("</name>\n");
-//                bom.append(indent).append("        </license>\n");
-//            }
-//            bom.append(indent).append("      </licenses>\n");
-//        }
-//    }
-//
-//    private static String getBomReference(String group, String artifactId, String version) {
-//        return "pkg:maven/" + group + "/" + artifactId + "@" + version + "?type=jar";
-//    }
-//
-//    private static Map<DependencyKey, ResolvedDependency> traverseDependencies(Map<Scope, List<ResolvedDependency>> dependencies,
-//                                                                               Map<DependencyKey, ResolvedDependency> dependencyMap) {
-//        if (dependencies == null) {
-//            return dependencyMap;
-//        }
-//        dependencies.stream()
-//                .filter(PrintMavenAsCycloneDxBom::isDependencyInScope)
-//                .forEach(d -> {
-//                    DependencyKey key = getDependencyKey(d);
-//                    if (!dependencyMap.containsKey(key)) {
-//                        dependencyMap.put(key, d);
-//                        traverseDependencies(d.getModel().getDependencies() , dependencyMap);
-//                    }
-//                });
-//        return dependencyMap;
-//    }
-//
-//    private static boolean isDependencyInScope(ResolvedDependency dependency) {
-//        return !dependency.getRequested().isOptional() && dependency.getScope() != Scope.Test;
-//    }
-//
-//    private static DependencyKey getDependencyKey(ResolvedDependency dependency) {
-//        return new DependencyKey(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), dependency.getRequested().getExclusions());
-//    }
-//
-//    @Value
-//    static class DependencyKey {
-//        String groupId;
-//        String artifactId;
-//        String version;
-//        Set<GroupArtifact> exclusions;
-//    }
+    public static String print(Xml.Document maven) {
 
+        MavenResolutionResult resolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class)
+                .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
+
+        ResolvedPom pom = resolutionResult.getPom();
+        Map<Scope, List<ResolvedDependency>> dependencies = resolutionResult.getDependencies();
+
+        StringBuilder bom = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        bom.append("<bom xmlns=\"http://cyclonedx.org/schema/bom/1.2\" serialNumber=\"urn:uuid:")
+                .append(maven.getId().toString()).append("\" version=\"1\">\n");
+        writeMetadata(pom, bom);
+
+        List<ResolvedDependency> compileScopeDependencies = dependencies.get(Scope.Compile);
+        //May need to do more dependencies (in the various scopes)
+        writeComponents(compileScopeDependencies, bom);
+        writeDependencies(compileScopeDependencies, bom);
+
+        bom.append("</bom>\n");
+
+        return bom.toString();
+    }
+
+    private static void writeMetadata(ResolvedPom pom, StringBuilder bom) {
+        bom.append("    <metadata>\n");
+        bom.append("        <timestamp>").append(Instant.now().toString()).append("</timestamp>\n");
+        bom.append("        <tools>\n");
+        bom.append("            <tool>\n");
+        bom.append("                <vendor>OpenRewrite</vendor>\n");
+        bom.append("                <name>OpenRewrite CycloneDX</name>\n");
+        //Probably should pull the version from build properties.
+        bom.append("                <version>7.0.0</version>\n");
+        bom.append("            </tool>\n");
+        bom.append("        </tools>\n");
+        String bomReference = getBomReference(pom.getGroupId(), pom.getArtifactId(), pom.getVersion());
+
+        //(Scope scope, String groupId, String artifactId, String version, String packaging, List<String> licenses, String bomReference, StringBuilder bom) {
+        String packaging = ("war".equals(pom.getPackaging()) || "ear".equals(pom.getPackaging())) ? "application" : "library";
+
+        writeComponent(
+                Scope.Compile,
+                pom.getGroupId(),
+                pom.getArtifactId(),
+                pom.getVersion(),
+                packaging,
+                pom.getRequested().getLicenses(),
+                bom);
+
+        bom.append("    </metadata>\n");
+    }
+
+    private static void writeComponents(List<ResolvedDependency> dependencies, StringBuilder bom) {
+        if (dependencies.isEmpty()) {
+            return;
+        }
+
+        bom.append("    <components>\n");
+        for (ResolvedDependency dependency : dependencies) {
+            writeComponent(
+                    Scope.Compile,
+                    dependency.getGroupId(),
+                    dependency.getArtifactId(),
+                    dependency.getVersion(),
+                    "library",
+                    dependency.getLicenses(),
+                    bom);
+        }
+        bom.append("    </components>\n");
+    }
+    private static void writeDependencies(List<ResolvedDependency> dependencies, StringBuilder bom) {
+        if (dependencies.isEmpty()) {
+            return;
+        }
+        bom.append("    <dependencies>\n");
+        for (ResolvedDependency dependency : dependencies) {
+            writeDependency(dependency, bom);
+        }
+        bom.append("    </dependencies>\n");
+    }
+
+    private static void writeDependency(ResolvedDependency dependency, StringBuilder bom) {
+        String bomReference = getBomReference(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
+        bom.append("        <dependency ref=\"").append(bomReference).append("\">\n");
+        if (dependency.getDependencies() != null) {
+            for (ResolvedDependency nested : dependency.getDependencies()) {
+                bom.append("            <dependency ref=\"")
+                        .append(getBomReference(
+                                nested.getGroupId(),
+                                nested.getArtifactId(),
+                                nested.getVersion())
+                        ).append("\"/>\n");
+            }
+        }
+        bom.append("        </dependency>\n");
+    }
+
+    private static void writeComponent(Scope scope, String groupId, String artifactId, String version,
+                                       String packaging, List<License> licenses, StringBuilder bom) {
+
+        String indent = "        ";
+        String bomReference = getBomReference(groupId, artifactId, version);
+        bom.append(indent).append("<component bom-ref=\"").append(bomReference).append("\" type=\"").append(packaging).append("\">\n");
+        bom.append(indent).append("    <group>").append(groupId).append("</group>\n");
+        bom.append(indent).append("    <name>").append(artifactId).append("</name>\n");
+        bom.append(indent).append("    <version>").append(version).append("</version>\n");
+
+        if (scope != null) {
+            //Cyclone schema allows three scopes:
+            String cycloneScope;
+            switch (scope) {
+                case Compile:
+                case System:
+                    cycloneScope = "required";
+                    break;
+                case None:
+                case Invalid:
+                case Test:
+                    cycloneScope = "excluded";
+                    break;
+                default:
+                    cycloneScope = "optional";
+            }
+            bom.append(indent).append("    <scope>").append(cycloneScope).append("</scope>\n");
+        }
+        writeLicenses(licenses, bom, indent);
+        bom.append(indent).append("    <purl>").append(bomReference).append("</purl>\n");
+        bom.append(indent).append("</component>\n");
+    }
+
+    private static void writeLicenses(List<License> licenses, StringBuilder bom, String indent) {
+
+        if (!licenses.isEmpty()) {
+            bom.append(indent).append("    <licenses>\n");
+
+            for (License license : licenses) {
+                bom.append(indent).append("        <license>\n");
+                String spdxId = null;
+
+                //This logic maps the rewrite license type to the spdx equivalent.
+
+                //The only license type that we can establish unambiguously is the Apache 2.0 license.
+
+                //BSD has several SPDX Mappings (no way to resolve this)
+                //CDDL has a v1.0 and v1.1 (we do not distinguish them)
+                //CreativeCommons has several SPDX Mappings (no way to resolve this)
+                //Eclipse has a v1.0 and v2.0 (we do not distinguish them)
+                //GPL has several SPDX Mappings (no way to resolve this)
+                //LGPL has several SPDX Mappings (no way to resolve this)
+                //MIT has several SPDX Mappings (no way to resolve this)
+                //Mozilla has several SPDX Mappings (no way to resolve this)
+                //PublicDomain unclear which ID to use.
+
+                if (license.getType() == License.Type.Apache2) {
+                    spdxId = "Apache-2.0";
+                }
+                if (spdxId != null) {
+                    bom.append(indent).append("            <id>").append(spdxId).append("</id>\n");
+                }
+                bom.append(indent).append("            <name>").append(license.getName()).append("</name>\n");
+                bom.append(indent).append("        </license>\n");
+            }
+            bom.append(indent).append("      </licenses>\n");
+        }
+    }
+
+    private static String getBomReference(String group, String artifactId, String version) {
+        return "pkg:maven/" + group + "/" + artifactId + "@" + version + "?type=jar";
+    }
 }

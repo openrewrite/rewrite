@@ -74,9 +74,6 @@ class PrintMavenAsCycloneDxBomTest {
                         <group>org.yaml</group>
                         <name>snakeyaml</name>
                         <version>1.27</version>
-                        <description>
-                            <![CDATA[YAML 1.1 parser and emitter for Java]]>
-                        </description>
                         <scope>required</scope>
                         <licenses>
                             <license>
