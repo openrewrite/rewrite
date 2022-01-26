@@ -73,6 +73,9 @@ public class MavenParser implements Parser<Xml.Document> {
         for (Input source : sources) {
             Pom pom = RawPom.parse(source.getSource(), null).toPom(source.getPath(), null);
             if (relativeTo != null) {
+                if (pom.getProperties() == null || pom.getProperties().isEmpty()) {
+                    pom = pom.withProperties(new LinkedHashMap<>());
+                }
                 pom.getProperties().put("project.basedir", relativeTo.toString());
                 pom.getProperties().put("basedir", relativeTo.toString());
             }
