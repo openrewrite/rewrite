@@ -121,25 +121,26 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
     @Test
     fun consistentSuperType() {
         val sources: Array<String> = arrayOf("""
-            public abstract class TypeA extends TypeB<Object> {} // `classType.superfield_type` is TypeC<Object>
-        """.trimIndent(), """
-            public abstract class TypeB<T> extends TypeC<T> {}
-        """.trimIndent(),"""
-            public abstract class TypeC<T> {}
-        """.trimIndent(), """
-            public abstract class TypeD<T> extends TypeB<T> {} // `classType.superfield_type` is TypeC<T>, and should not be TypeC<Object>
-        """.trimIndent()
+            public abstract class TypeA<String> extends java.util.AbstractList<String> {}
+            """.trimIndent(), """
+            public abstract class TypeB<Integer> extends java.util.AbstractList<Integer> {}
+            """.trimIndent()
         )
         val cus = JavaParser.fromJavaVersion()
             .logCompilationWarningsAndErrors(true)
             .build()
             .parse(InMemoryExecutionContext { t -> fail(t) }, *sources)
+
         Assertions.assertThat(cus).isNotNull
-        val superTypeOfTypeA = (((cus[0].classes[0].type!!.supertype) as JavaType.Parameterized)
-            .supertype as JavaType.Parameterized).typeParameters[0]
-        Assertions.assertThat(superTypeOfTypeA is JavaType.GenericTypeVariable).isTrue
-        val superTypeOfTypeD = (((cus[3].classes[0].type!!.supertype) as JavaType.Parameterized)
-            .supertype as JavaType.Parameterized).typeParameters[0]
-        Assertions.assertThat(superTypeOfTypeD is JavaType.GenericTypeVariable).isTrue
+        val typeA = cus[0].classes[0].type!! as JavaType.Parameterized
+        val typeASuperType = typeA.supertype
+        val typeASuperSuperType = typeASuperType.supertype
+        val typeB = cus[1].classes[0].type!! as JavaType.Parameterized
+        val typeBSuperType = typeB.supertype
+        val typeBSuperSuperType = typeBSuperType.supertype
+
+        Assertions.assertThat(typeASuperSuperType).isNotNull
+        Assertions.assertThat(typeASuperSuperType!!.toString()).isEqualTo("java.util.AbstractCollection<Generic{E}>")
+        Assertions.assertThat(typeBSuperSuperType).isEqualTo(typeBSuperSuperType)
     }
 }
