@@ -433,7 +433,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                     resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
 
                     ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
-                            resolvedPom.getGav(), d, emptyList(),
+                            resolvedPom.getGav(), dd.getDependency(), emptyList(),
                             resolvedPom.getRequested().getLicenses());
 
                     MavenExecutionContextView.view(ctx)
@@ -452,7 +452,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                     dependencies.add(resolved);
 
                     for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
-                        if (!d2.isOptional()) { // only zero depth optional dependencies resolved
+                        if (!d2.isOptional()) { // only zero-depth optional dependencies resolved
                             if (Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
                                 dependenciesAtNextDepth.add(new DependencyAndDependent(d2, resolved, resolvedPom));
                             }

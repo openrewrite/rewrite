@@ -22,18 +22,22 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 
 @Value
-@With
 public class Dependency {
     GroupArtifactVersion gav;
 
+    @With
     @Nullable
     String classifier;
 
+    @With
     @Nullable
     String type;
 
+    @With
     String scope;
+    @With
     List<GroupArtifact> exclusions;
+    @With
     boolean optional;
 
     @Nullable
@@ -48,6 +52,13 @@ public class Dependency {
     @Nullable
     public String getVersion() {
         return gav.getVersion();
+    }
+
+    public Dependency withGav(GroupArtifactVersion gav) {
+        if(gav == this.gav) {
+            return this;
+        }
+        return new Dependency(gav, classifier, type, scope, exclusions, optional);
     }
 
     @Override
