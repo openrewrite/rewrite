@@ -34,6 +34,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
@@ -97,11 +98,8 @@ public class MavenParser implements Parser<Xml.Document> {
             dependencies.put(Scope.Runtime, resolvedPom.resolveDependencies(Scope.Runtime, downloader, ctx));
             dependencies.put(Scope.Provided, resolvedPom.resolveDependencies(Scope.Provided, downloader, ctx));
 
-            MavenResolutionResult model = new MavenResolutionResult(randomId(),
-                    resolvedPom, dependencies);
-
-            parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers()
-                    .compute(model, (old, n) -> n)));
+            MavenResolutionResult model = new MavenResolutionResult(randomId(), resolvedPom, emptyList(), dependencies);
+            parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
         }
 
         for (int i = 0; i < parsed.size(); i++) {
@@ -123,7 +121,7 @@ public class MavenParser implements Parser<Xml.Document> {
             }
 
             if (!modules.isEmpty()) {
-                parsed.set(i, maven.withMarkers(maven.getMarkers().compute(new Modules(randomId(), modules), (old, n) -> n)));
+                parsed.set(i, maven.withMarkers(maven.getMarkers().computeByType(resolutionResult.withModules(modules), (old, n) -> n)));
             }
         }
 

@@ -69,19 +69,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return resolutionResult;
     }
 
-    public List<MavenResolutionResult> getModules() {
-        //noinspection ConstantConditions
-        if (modules == null) {
-            modules = ((Xml.Document) getCursor()
-                    .getPath(Xml.Document.class::isInstance)
-                    .next())
-                    .getMarkers().findFirst(Modules.class)
-                    .map(Modules::getModules)
-                    .orElseThrow(() -> new IllegalStateException("Maven visitors should not be visiting XML documents without a Maven marker"));
-        }
-        return modules;
-    }
-
     public boolean isPropertyTag() {
         return PROPERTY_MATCHER.matches(getCursor());
     }
@@ -114,7 +101,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return PARENT_MATCHER.matches(getCursor());
     }
 
-    private boolean hasGroupAndArtifact(String groupId, @Nullable String artifactId) {
+    public boolean hasGroupAndArtifact(String groupId, @Nullable String artifactId) {
         return hasGroupId(groupId) && hasArtifactId(artifactId);
     }
 
@@ -154,6 +141,17 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                         tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
                     return d;
                 }
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    public DependencyManagementDependency findManagedDependency(Xml.Tag tag) {
+        for (DependencyManagementDependency d : getResolutionResult().getPom().getDependencyManagement()) {
+            if (tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()).equals(d.getGroupId()) &&
+                    tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
+                return d;
             }
         }
         return null;

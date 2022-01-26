@@ -78,6 +78,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         child.toFile().parentFile.mkdirs()
 
         parent.toFile().writeText(
+            //language=xml
             """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -99,6 +100,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         )
 
         child.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -370,22 +372,22 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             </project>
         """,
         after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>28.0-android</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>28.0-android</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """
     )
 
     @Test
@@ -395,6 +397,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         server.toFile().parentFile.mkdirs()
 
         parent.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -412,6 +415,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         )
 
         server.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -471,6 +475,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         val server = tempDir.resolve("server/pom.xml")
         server.toFile().parentFile.mkdirs()
         parent.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -487,6 +492,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             """.trimIndent()
         )
         server.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -573,7 +579,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent(),
+        """,
         after = """            
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -598,7 +604,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent()
+        """
     )
 
     @Test
@@ -633,7 +639,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent(),
+        """,
         after = """            
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -658,7 +664,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent()
+        """
     )
 
     @Test
@@ -718,6 +724,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         val server = tempDir.resolve("server/pom.xml")
         server.toFile().parentFile.mkdirs()
         parent.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -734,6 +741,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             """.trimIndent()
         )
         server.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -870,7 +878,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent(),
+        """,
         after = """            
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -886,6 +894,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent()
+        """
     )
 }

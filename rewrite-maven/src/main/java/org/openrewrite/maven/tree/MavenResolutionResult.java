@@ -18,6 +18,8 @@ package org.openrewrite.maven.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.Incubating;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
 import java.util.List;
@@ -33,6 +35,28 @@ public class MavenResolutionResult implements Marker {
     @With
     ResolvedPom pom;
 
+    /**
+     * Resolution results of POMs in this repository that hold this POM as a parent.
+     */
+    @With
+    List<MavenResolutionResult> modules;
+
     @With
     Map<Scope, List<ResolvedDependency>> dependencies;
+
+    @Incubating(since = "7.18.0")
+    @Nullable
+    public ResolvedDependency getResolvedDependency(Dependency dependency) {
+        for (int i = Scope.values().length - 1; i >= 0; i--) {
+            Scope scope = Scope.values()[i];
+            if(dependencies.containsKey(scope)) {
+                for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
+                    if (resolvedDependency.getRequested() == dependency) {
+                        return resolvedDependency;
+                    }
+                }
+            }
+        }
+        return null;
+    }
 }

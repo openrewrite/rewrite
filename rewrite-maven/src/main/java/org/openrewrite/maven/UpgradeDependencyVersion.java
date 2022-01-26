@@ -20,9 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -30,10 +28,10 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Map;
 import java.util.Optional;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 /**
  * Upgrade the version of a dependency by specifying a group or group and artifact using Node Semver
@@ -108,22 +106,59 @@ public class UpgradeDependencyVersion extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Document m = super.visitDocument(document, ctx);
-                Map<Dependency, String> upgraded = getCursor().getMessage("upgraded.dependencies");
-                if (upgraded != null) {
+
+                for (MavenResolutionResult module : getResolutionResult().getModules()) {
+                    String newerVersion = null;
+                    String requestedVersion = null;
+
+                    for (Dependency requestedDependency : module.getPom().getRequestedDependencies()) {
+                        ResolvedDependency resolved = module.getResolvedDependency(requestedDependency);
+                        if(resolved != null) {
+                            if (matchesGlob(resolved.getGroupId(), groupId) && matchesGlob(resolved.getArtifactId(), artifactId)) {
+                                newerVersion = findNewerVersion(resolved.getGroupId(), resolved.getArtifactId(),
+                                        resolved.getVersion(), ctx);
+                                requestedVersion = requestedDependency.getVersion();
+                            }
+                        }
+                    }
+
+                    if (newerVersion == null) {
+                        for (DependencyManagementDependency dm : module.getPom().getRequested().getDependencyManagement()) {
+                            if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
+                                //noinspection ConstantConditions
+                                newerVersion = findNewerVersion(dm.getGroupId(), dm.getArtifactId(),
+                                        module.getPom().getValue(dm.getVersion()), ctx);
+                                requestedVersion = dm.getVersion();
+                            }
+                        }
+                    }
+
+                    if (newerVersion != null) {
+                        assert requestedVersion != null;
+                        if (requestedVersion.contains("${")) {
+                            m = (Xml.Document) new ChangePropertyValue(requestedVersion, newVersion, false).getVisitor()
+                                    .visitNonNull(m, ctx, getCursor());
+                            break;
+                        }
+                    }
+                }
+
+                if (m != document) {
                     Pom requestedPom = getResolutionResult().getPom().getRequested();
                     doAfterVisit(new UpdateMavenModel());
                     doAfterVisit(new RemoveRedundantDependencyVersions());
                 }
+
                 return m;
             }
 
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
-                Xml.Tag t = super.visitTag(tag, executionContext);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
                 if(isDependencyTag(groupId, artifactId)) {
-                    ResolvedDependency dependency = findDependency(tag);
-                    if (dependency != null) {
-                        String newerVersion = findNewerDependencyVersion(dependency, executionContext);
+                    ResolvedDependency d = findDependency(tag);
+                    if (d != null) {
+                        String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                         if (newerVersion != null) {
                             Optional<Xml.Tag> version = t.getChild("version");
                             if (version.isPresent()) {
@@ -136,23 +171,21 @@ public class UpgradeDependencyVersion extends Recipe {
             }
 
             @Nullable
-            private String findNewerDependencyVersion(ResolvedDependency dependency, ExecutionContext ctx) {
-                ResolvedDependency resolvedDependency = null;
-
+            private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) {
                 if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = downloadMetadata(dependency.getGroupId(), dependency.getArtifactId(), ctx);
+                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
                     if (mavenMetadata == null) {
                         availableVersions = emptyList();
                     } else {
                         availableVersions = new ArrayList<>();
                         for (String v : mavenMetadata.getVersioning().getVersions()) {
-                            if (versionComparator.isValid(dependency.getVersion(), v)) {
+                            if (versionComparator.isValid(version, v)) {
                                 availableVersions.add(v);
                             }
                         }
                     }
                 }
-                return versionComparator.upgrade(dependency.getVersion(), availableVersions).orElse(null);
+                return versionComparator.upgrade(version, availableVersions).orElse(null);
             }
         };
     }

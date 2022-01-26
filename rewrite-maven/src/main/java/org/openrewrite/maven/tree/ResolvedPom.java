@@ -21,6 +21,7 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -250,7 +251,11 @@ public class ResolvedPom implements DependencyManagementDependency {
             List<Pom> pomAncestry = new ArrayList<>();
             pomAncestry.add(requested);
             resolveParentPropertiesRecursively(pomAncestry);
+
+            pomAncestry.clear();
+            pomAncestry.add(requested);
             resolveParentsRecursively(pomAncestry);
+
             return ResolvedPom.this;
         }
 
