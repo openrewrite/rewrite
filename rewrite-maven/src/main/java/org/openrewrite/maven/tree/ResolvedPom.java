@@ -21,6 +21,7 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -386,9 +387,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
                                 .bomImport(bom.getGav(), pom);
-                        dependencyManagement.addAll(bom.getDependencyManagement());
-                        mergeProperties(bom.getProperties(), bom.getRequested());
-                        mergeRequestedDependencies(bom.getRequestedDependencies());
+                        dependencyManagement.addAll(getImportedManageDependencies(bom));
                     } else if (d instanceof Defined) {
                         Defined defined = (Defined) d;
                         defined = defined.withGav(getValues(defined.getGav()));
@@ -399,6 +398,46 @@ public class ResolvedPom implements DependencyManagementDependency {
                     }
                 }
             }
+        }
+
+        /**
+         * When importing a bom, any property placeholders should be resolved relative to the importedBom.This method
+         * returns a list of dependency management dependencies with all property placeholders resolved.
+         *
+         * @param importedBom The bom that is being imported.
+         * @return List of dependency management dependencies with all placeholders resolved
+         */
+        @SuppressWarnings("ConstantConditions")
+        private List<DependencyManagementDependency> getImportedManageDependencies(ResolvedPom importedBom) {
+            return ListUtils.map(importedBom.getDependencyManagement(), d -> {
+                if (d instanceof Defined) {
+                    Defined defined = (Defined) d;
+                    defined = defined.withGav(defined.getGav().withGroupId(importedBom.getValue(defined.getGav().getGroupId())));
+                    defined = defined.withGav(defined.getGav().withArtifactId(importedBom.getValue(defined.getGav().getArtifactId())));
+                    defined = defined.withVersion(importedBom.getValue(defined.getVersion()));
+                    defined = defined.withScope(importedBom.getValue(defined.getScope()));
+                    defined = defined.withType(importedBom.getValue(defined.getType()));
+                    defined = defined.withClassifier(importedBom.getValue(defined.getClassifier()));
+                    defined = defined.withExclusions(ListUtils.map(defined.getExclusions(), e -> {
+                        String groupId = importedBom.getValue(getGroupId());
+                        String artifactId = importedBom.getValue(e.getArtifactId());
+
+                        if (!e.getArtifactId().equals(artifactId) || !e.getGroupId().equals(groupId)) {
+                            return new GroupArtifact(groupId, artifactId);
+                        } else {
+                            return e;
+                        }
+                    }));
+                    return defined;
+                } else if (d instanceof Imported) {
+                    Imported imported = (Imported) d;
+                    imported = imported.withGav(imported.getGav().withGroupId(importedBom.getValue(imported.getGav().getGroupId())));
+                    imported = imported.withGav(imported.getGav().withArtifactId(importedBom.getValue(imported.getGav().getArtifactId())));
+                    imported = imported.withVersion(importedBom.getValue(imported.getVersion()));
+                    return imported;
+                }
+                return d;
+            });
         }
     }
 
