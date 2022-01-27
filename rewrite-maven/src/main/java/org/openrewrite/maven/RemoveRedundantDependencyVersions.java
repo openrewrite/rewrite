@@ -22,7 +22,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.Objects;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -43,15 +46,27 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                ResolvedDependency d = findDependency(tag);
-                if (d != null && d.getRequested().getVersion() != null) {
-                    if (d.getRequested().getVersion().equals(getResolutionResult().getPom().getManagedVersion(d.getGroupId(), d.getArtifactId(), d.getRequested().getType(),
-                            d.getRequested().getClassifier()))) {
-                        Xml.Tag version = tag.getChild("version").orElse(null);
-                        return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                if (!isManagedDependencyTag()) {
+                    ResolvedDependency d = findDependency(tag);
+                    if (d != null && matchesVersion(d) && matchesScope(d, tag)) {
+                            Xml.Tag version = tag.getChild("version").orElse(null);
+                            return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
                     }
                 }
                 return super.visitTag(tag, ctx);
+            }
+
+            private boolean matchesVersion(ResolvedDependency d) {
+                return d.getRequested().getVersion() != null
+                        && d.getRequested().getVersion().equals(getResolutionResult().getPom().getManagedVersion(d.getGroupId(), d.getArtifactId(),
+                        d.getRequested().getType(), d.getRequested().getClassifier()));
+            }
+
+            private boolean matchesScope(ResolvedDependency d, Xml.Tag dependencyTag) {
+                return Objects.equals(
+                        Scope.fromName(dependencyTag.getChildValue("scope").orElse(null)),
+                        Scope.fromName(getResolutionResult().getPom().getManagedScope(d.getGroupId(), d.getArtifactId(), d.getRequested().getType(),
+                                d.getRequested().getClassifier())));
             }
         };
     }
