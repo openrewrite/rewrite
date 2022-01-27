@@ -254,23 +254,31 @@ public class ResolvedPom implements DependencyManagementDependency {
         void resolveParentsRecursively(Pom requested) {
             List<Pom> pomAncestry = new ArrayList<>();
             pomAncestry.add(requested);
-            resolveParentPropertiesRecursively(pomAncestry);
+            resolveParentPropertiesAndRepositoriesRecursively(pomAncestry);
 
             pomAncestry.clear();
             pomAncestry.add(requested);
             resolveParentDependenciesRecursively(pomAncestry);
         }
 
-        private void resolveParentPropertiesRecursively(List<Pom> pomAncestry) {
+        private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) {
             Pom pom = pomAncestry.get(0);
 
+            //Resolve properties
             for (Profile profile : pom.getProfiles()) {
                 if (profile.isActive(activeProfiles)) {
                     mergeProperties(profile.getProperties(), pom);
-                    mergeRepositories(profile.getRepositories());
                 }
             }
             mergeProperties(pom.getProperties(), pom);
+
+            //Resolve repositories (which may rely on properties ^^^)
+            for (Profile profile : pom.getProfiles()) {
+                if (profile.isActive(activeProfiles)) {
+                    mergeRepositories(profile.getRepositories());
+                }
+            }
+            mergeRepositories(pom.getRepositories());
 
             if (pom.getParent() != null) {
                 Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
@@ -284,7 +292,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                 }
 
                 pomAncestry.add(0, parentPom);
-                resolveParentPropertiesRecursively(pomAncestry);
+                resolveParentPropertiesAndRepositoriesRecursively(pomAncestry);
             }
         }
 
@@ -295,11 +303,9 @@ public class ResolvedPom implements DependencyManagementDependency {
                 if (profile.isActive(activeProfiles)) {
                     mergeDependencyManagement(profile.getDependencyManagement(), pom);
                     mergeRequestedDependencies(profile.getDependencies());
-                    mergeRepositories(profile.getRepositories());
                 }
             }
 
-            mergeRepositories(pom.getRepositories());
             mergeDependencyManagement(pom.getDependencyManagement(), pom);
             mergeRequestedDependencies(pom.getDependencies());
 

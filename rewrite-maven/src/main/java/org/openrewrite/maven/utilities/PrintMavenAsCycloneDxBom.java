@@ -62,19 +62,18 @@ public final class PrintMavenAsCycloneDxBom {
         bom.append("                <vendor>OpenRewrite</vendor>\n");
         bom.append("                <name>OpenRewrite CycloneDX</name>\n");
         //Probably should pull the version from build properties.
-        bom.append("                <version>7.0.0</version>\n");
+        bom.append("                <version>7.18.0</version>\n");
         bom.append("            </tool>\n");
         bom.append("        </tools>\n");
-        String bomReference = getBomReference(pom.getGroupId(), pom.getArtifactId(), pom.getVersion());
 
         //(Scope scope, String groupId, String artifactId, String version, String packaging, List<String> licenses, String bomReference, StringBuilder bom) {
         String packaging = ("war".equals(pom.getPackaging()) || "ear".equals(pom.getPackaging())) ? "application" : "library";
 
         writeComponent(
                 Scope.Compile,
-                pom.getGroupId(),
+                pom.getValue(pom.getGroupId()),
                 pom.getArtifactId(),
-                pom.getVersion(),
+                pom.getValue(pom.getVersion()),
                 packaging,
                 pom.getRequested().getLicenses(),
                 bom);
