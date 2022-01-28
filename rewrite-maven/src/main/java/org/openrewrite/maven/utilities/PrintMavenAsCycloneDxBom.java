@@ -15,13 +15,15 @@
  */
 package org.openrewrite.maven.utilities;
 
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
 import java.time.Instant;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Print the dependency graph in the CycloneDX (https://cyclonedx.org/) bill of materials (BOM) format.
@@ -37,21 +39,32 @@ public final class PrintMavenAsCycloneDxBom {
                 .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
 
         ResolvedPom pom = resolutionResult.getPom();
-        Map<Scope, List<ResolvedDependency>> dependencies = resolutionResult.getDependencies();
 
         StringBuilder bom = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         bom.append("<bom xmlns=\"http://cyclonedx.org/schema/bom/1.2\" serialNumber=\"urn:uuid:")
                 .append(maven.getId().toString()).append("\" version=\"1\">\n");
         writeMetadata(pom, bom);
 
-        List<ResolvedDependency> compileScopeDependencies = dependencies.get(Scope.Compile);
+        List<ResolvedDependency> compileScopeDependencies = resolutionResult.getDependencies().get(Scope.Compile);
+        List<ResolvedDependency> providedScopeDependencies = resolutionResult.getDependencies().get(Scope.Provided);
+
+        if (providedScopeDependencies != null && !providedScopeDependencies.isEmpty()) {
+            //Filter out duplicate group/artifacts that already exist in compile scope
+            Set<GroupArtifact> artifacts = compileScopeDependencies.stream().map(PrintMavenAsCycloneDxBom::dependencyToGroupArtifact).collect(Collectors.toSet());
+            providedScopeDependencies = providedScopeDependencies.stream().filter(d -> !artifacts.contains(PrintMavenAsCycloneDxBom.dependencyToGroupArtifact(d))).collect(Collectors.toList());
+        }
+
         //May need to do more dependencies (in the various scopes)
-        writeComponents(compileScopeDependencies, bom);
-        writeDependencies(compileScopeDependencies, bom);
+        writeComponents(compileScopeDependencies, providedScopeDependencies, bom);
+        writeDependencies(ListUtils.concatAll(compileScopeDependencies, providedScopeDependencies), bom);
 
         bom.append("</bom>\n");
 
         return bom.toString();
+    }
+
+    private static GroupArtifact dependencyToGroupArtifact(ResolvedDependency dependency) {
+        return new GroupArtifact(dependency.getGroupId(), dependency.getArtifactId());
     }
 
     private static void writeMetadata(ResolvedPom pom, StringBuilder bom) {
@@ -81,7 +94,7 @@ public final class PrintMavenAsCycloneDxBom {
         bom.append("    </metadata>\n");
     }
 
-    private static void writeComponents(List<ResolvedDependency> dependencies, StringBuilder bom) {
+    private static void writeComponents(List<ResolvedDependency> dependencies, List<ResolvedDependency> provided, StringBuilder bom) {
         if (dependencies.isEmpty()) {
             return;
         }
@@ -90,6 +103,16 @@ public final class PrintMavenAsCycloneDxBom {
         for (ResolvedDependency dependency : dependencies) {
             writeComponent(
                     Scope.Compile,
+                    dependency.getGroupId(),
+                    dependency.getArtifactId(),
+                    dependency.getVersion(),
+                    "library",
+                    dependency.getLicenses(),
+                    bom);
+        }
+        for (ResolvedDependency dependency : provided) {
+            writeComponent(
+                    Scope.Provided,
                     dependency.getGroupId(),
                     dependency.getArtifactId(),
                     dependency.getVersion(),
