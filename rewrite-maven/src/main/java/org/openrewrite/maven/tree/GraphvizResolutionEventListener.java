@@ -42,21 +42,29 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
     public static final String GRAPH_NAME = "resolution";
 
     private final Map<String, MutableNode> propToNode = new HashMap<>();
-
     private final Map<GroupArtifactVersion, MutableNode> pomToNode = new HashMap<>();
-
-    private final Map<GroupArtifactVersion, MutableNode> dmToNode = new HashMap<>();
     private final Map<GroupArtifactVersion, Set<GroupArtifactVersion>> alreadySeen = new HashMap<>();
 
-    private final MutableGraph g = mutGraph(GRAPH_NAME).setDirected(true);
+    private MutableGraph g = mutGraph(GRAPH_NAME).setDirected(true);
 
     private final Scope scope;
     private final boolean showProperties;
     private final boolean showManagedDependencies;
 
-    private int parentLinks = 0;
-    private int dependencyLinks = 0;
-    private int managedDependencies = 0;
+    private int parentLinks;
+    private int dependencyLinks;
+    private int managedDependencies;
+
+    @Override
+    public void clear() {
+        g = mutGraph(GRAPH_NAME).setDirected(true);
+        propToNode.clear();
+        pomToNode.clear();
+        alreadySeen.clear();
+        parentLinks = 0;
+        dependencyLinks = 0;
+        managedDependencies = 0;
+    }
 
     @Override
     public void parent(Pom parent, Pom containing) {

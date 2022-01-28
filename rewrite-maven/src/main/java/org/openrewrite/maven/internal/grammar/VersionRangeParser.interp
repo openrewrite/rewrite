@@ -23,7 +23,7 @@ Version
 WS
 
 rule names:
-requestedVersion
+versionRequirement
 range
 bounds
 exactly

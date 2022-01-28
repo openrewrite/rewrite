@@ -40,8 +40,13 @@ public interface ResolutionEventListener {
         @Override
         public void dependencyManagement(DependencyManagementDependency dependencyManagement, Pom containing) {
         }
+
+        @Override
+        public void clear() {
+        }
     };
 
+    void clear();
     void downloadError(GroupArtifactVersion gav, Pom containing);
     void parent(Pom parent, Pom containing);
     void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing);

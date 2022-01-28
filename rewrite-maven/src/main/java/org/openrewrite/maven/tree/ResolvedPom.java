@@ -25,10 +25,15 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.internal.VersionRequirement;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.*;
 
@@ -442,7 +447,11 @@ public class ResolvedPom implements DependencyManagementDependency {
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) {
-        Set<GroupArtifact> nearer = new HashSet<>();
+        return resolveDependencies(scope, new HashMap<>(), downloader, ctx);
+    }
+
+    public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
+                                                        MavenPomDownloader downloader, ExecutionContext ctx) {
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
         List<DependencyAndDependent> dependenciesAtDepth = new ArrayList<>();
@@ -459,27 +468,59 @@ public class ResolvedPom implements DependencyManagementDependency {
             List<DependencyAndDependent> dependenciesAtNextDepth = new ArrayList<>();
 
             for (DependencyAndDependent dd : dependenciesAtDepth) {
-                Dependency d = dd.getDependency();
-                d = dd.getDefinedIn().getValues(d, depth);
-
-                if (!nearer.add(new GroupArtifact(d.getGroupId(), d.getArtifactId()))) {
-                    // there was a nearer dependency with the same group and artifact that
-                    // has higher precedence in conflict resolution
-                    continue;
-                }
+                Dependency d = dd.getDefinedIn().getValues(dd.getDependency(), depth);
+                assert d.getVersion() != null;
 
                 if (d.getType() != null && !"jar".equals(d.getType())) {
                     continue;
                 }
 
                 try {
+                    GroupArtifact ga = new GroupArtifact(d.getGroupId(), d.getArtifactId());
+                    VersionRequirement existingRequirement = requirements.get(ga);
+                    if (existingRequirement == null) {
+                        VersionRequirement newRequirement = VersionRequirement.fromVersion(d.getVersion(), depth);
+                        requirements.put(ga, newRequirement);
+                        String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
+                        if (newRequiredVersion == null) {
+                            throw new MavenDownloadingException("No matching version found");
+                        }
+                        d = d.withGav(d.getGav().withVersion(newRequiredVersion));
+                    } else {
+                        VersionRequirement newRequirement = existingRequirement.addRequirement(d.getVersion());
+                        requirements.put(ga, newRequirement);
+
+                        String existingRequiredVersion = existingRequirement.resolve(ga, downloader, getRepositories());
+                        String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
+
+                        assert existingRequiredVersion != null;
+                        if (!existingRequiredVersion.equals(newRequiredVersion)) {
+                            // start over from the top with the knowledge of this new requirement and throwing
+                            // away any in progress resolution because this requirement could cause a change
+                            // to just about anything we've seen to this point
+                            MavenExecutionContextView.view(ctx)
+                                    .getResolutionListener()
+                                    .clear();
+                            return resolveDependencies(scope, requirements, downloader, ctx);
+                        } else {
+                            // we've already resolved this previously and the requirement didn't change,
+                            // so just skip and continue on
+                            continue;
+                        }
+                    }
+
                     Pom dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories());
+
+                    MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
+                    ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
+                    if (resolvedPom == null) {
+                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), getProperties(),
+                                getDependencyManagement(), getRepositories(), emptyList());
+                        resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
+                        cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
+                    }
+
                     Scope dScope = Scope.fromName(d.getScope());
-
-                    ResolvedPom resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), getProperties(),
-                            getDependencyManagement(), getRepositories(), emptyList());
-                    resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
-
                     ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
                             resolvedPom.getGav(), dd.getDependency(), emptyList(),
                             resolvedPom.getRequested().getLicenses());
@@ -499,6 +540,7 @@ public class ResolvedPom implements DependencyManagementDependency {
 
                     dependencies.add(resolved);
 
+                    // FIXME if you have more than one dependency of the same group and artifact, the LAST one wins.
                     for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
                         if (!d2.isOptional()) { // only zero-depth optional dependencies resolved
                             if (Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
@@ -522,7 +564,7 @@ public class ResolvedPom implements DependencyManagementDependency {
         Dependency d = dep.withGav(getValues(dep.getGav()))
                 .withScope(getValue(dep.getScope()));
 
-        if(d.getGroupId() == null) {
+        if (d.getGroupId() == null) {
             return d;
         }
 

@@ -19,7 +19,7 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.internal.RequestedVersion;
+import org.openrewrite.maven.internal.VersionRequirement;
 
 import static java.util.Collections.singletonList;
 
@@ -59,18 +59,11 @@ public class ProfileActivation {
         }
 
         String version = System.getProperty("java.version");
-        RequestedVersion requestedVersion = new RequestedVersion(
-                new GroupArtifact("", ""),
-                null,
-                jdk
-        );
-
-        if (requestedVersion.isDynamic() || requestedVersion.isRange()) {
-            return requestedVersion.selectFrom(singletonList(version)) != null;
+        if (version.startsWith(jdk)) {
+            return true;
         }
 
-        //noinspection ConstantConditions
-        return version.startsWith(requestedVersion.nearestVersion());
+        return VersionRequirement.fromVersion(jdk, 0).resolve(() -> singletonList(version)) != null;
     }
 
     private boolean isActiveByProperty() {

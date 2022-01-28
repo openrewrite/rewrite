@@ -29,10 +29,7 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.*;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -123,6 +120,16 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
     @Nullable
     @Override
+    public ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
+        return null;
+    }
+
+    @Override
+    public void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved) {
+    }
+
+    @Nullable
+    @Override
     public Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
         try {
             return deserializeMavenMetadata(cache.get((repo.toString() + "/" + gav).getBytes()));
@@ -169,23 +176,11 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     @Override
     @Nullable
     public Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
-        try {
-            return deserializeMavenRepository(cache.get(serialize(repository)));
-        } catch (RocksDBException e) {
-            throw new MavenDownloadingException(e);
-        }
+        return null;
     }
 
     @Override
     public void putNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
-        if (repository == null) {
-            return;
-        }
-        try {
-            cache.put(serialize(repository), serialize(normalized));
-        } catch (RocksDBException e) {
-            throw new MavenDownloadingException(e);
-        }
     }
 
     static <T> byte[] serialize(T object) {

@@ -22,10 +22,7 @@ import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.*;
 
 import java.net.URI;
 import java.util.Optional;
@@ -40,6 +37,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     private final Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache;
     private final Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache;
     private final Cache<MavenRepository, Optional<MavenRepository>> repositoryCache;
+    private final Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache;
 
     public InMemoryMavenPomCache() {
         this(
@@ -51,18 +49,37 @@ public class InMemoryMavenPomCache implements MavenPomCache {
                         .build(),
                 Caffeine.newBuilder()
                         .maximumSize(10_000)
+                        .build(),
+                Caffeine.newBuilder()
+                        .maximumSize(100_000)
                         .build()
         );
     }
 
-    public InMemoryMavenPomCache(Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache, Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache, Cache<MavenRepository, Optional<MavenRepository>> repositoryCache) {
+    public InMemoryMavenPomCache(Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache,
+                                 Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
+                                 Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
+                                 Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
         this.pomCache = pomCache;
         this.mavenMetadataCache = mavenMetadataCache;
         this.repositoryCache = repositoryCache;
+        this.dependencyCache = dependencyCache;
 
         CaffeineCacheMetrics.monitor(Metrics.globalRegistry, pomCache, "Maven POMs");
         CaffeineCacheMetrics.monitor(Metrics.globalRegistry, mavenMetadataCache, "Maven metadata");
         CaffeineCacheMetrics.monitor(Metrics.globalRegistry, repositoryCache, "Maven repositories");
+        CaffeineCacheMetrics.monitor(Metrics.globalRegistry, dependencyCache, "Resolved dependency POMs");
+    }
+
+    @Nullable
+    @Override
+    public ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
+        return dependencyCache.getIfPresent(dependency);
+    }
+
+    @Override
+    public void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved) {
+        dependencyCache.put(dependency, resolved);
     }
 
     @Nullable

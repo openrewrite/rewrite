@@ -18,10 +18,7 @@ package org.openrewrite.maven.cache;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.*;
 
 import java.net.URI;
 import java.util.Optional;
@@ -31,6 +28,26 @@ import java.util.Optional;
 public class CompositeMavenPomCache implements MavenPomCache {
     private final MavenPomCache l1;
     private final MavenPomCache l2;
+
+    @Nullable
+    @Override
+    public ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
+        ResolvedPom l1r = l1.getResolvedDependencyPom(dependency);
+        if(l1r != null) {
+            return l1r;
+        }
+        ResolvedPom l2r = l2.getResolvedDependencyPom(dependency);
+        if(l2r != null) {
+            l1.putResolvedDependencyPom(dependency, l2r);
+        }
+        return l2r;
+    }
+
+    @Override
+    public void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved) {
+        l1.putResolvedDependencyPom(dependency, resolved);
+        l2.putResolvedDependencyPom(dependency, resolved);
+    }
 
     @Nullable
     @Override

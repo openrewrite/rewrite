@@ -2,8 +2,8 @@ parser grammar VersionRangeParser;
 
 options { tokenVocab=VersionRangeLexer; }
 
-requestedVersion
-    : (range (COMMA range)*) | version;
+versionRequirement
+    : range (COMMA range)*;
 
 range
     : (OPEN_RANGE_OPEN | CLOSED_RANGE_OPEN) bounds (OPEN_RANGE_CLOSE | CLOSED_RANGE_CLOSE)

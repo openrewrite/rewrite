@@ -353,10 +353,8 @@ public class MavenPomDownloader {
                                     repository.isSnapshots(),
                                     repository.getUsername(),
                                     repository.getPassword());
-                        } catch (Throwable t2) {
-                            ctx.getOnError().accept(t2);
-                            //ok to fall through here and cache a null. the TTL for null repositories can be set to
-                            //have it periodically retry the repo.
+                        } catch (Throwable ignored) {
+                            // ok to fall through here and cache a null
                         }
                     }
                 }

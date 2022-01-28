@@ -47,13 +47,34 @@ class MavenParserTest {
     }
 
     @Test
+    fun rangeVersion() {
+        parser.parse(ctx,
+            """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                
+                  <dependencies>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>[4.11]</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+        )
+    }
+
+    @Test
     fun transitiveDependencyVersionDeterminedByBom() {
         parse("org.neo4j:neo4j-ogm-core:3.2.21")
     }
 
     @Test
     fun guava25() {
-        visualize("com.google.guava:guava:25.0-android")
+        parse("com.google.guava:guava:25.0-android")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")

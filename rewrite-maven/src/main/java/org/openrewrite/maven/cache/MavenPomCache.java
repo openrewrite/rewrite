@@ -17,15 +17,17 @@ package org.openrewrite.maven.cache;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.*;
 
 import java.net.URI;
 import java.util.Optional;
 
 public interface MavenPomCache {
+
+    @Nullable
+    ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency);
+
+    void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved);
 
     @Nullable
     Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav);
