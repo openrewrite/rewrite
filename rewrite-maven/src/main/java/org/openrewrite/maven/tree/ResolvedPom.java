@@ -514,7 +514,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                     MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
-                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), getProperties(),
+                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
                                 getDependencyManagement(), getRepositories(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
@@ -542,10 +542,13 @@ public class ResolvedPom implements DependencyManagementDependency {
 
                     // FIXME if you have more than one dependency of the same group and artifact, the LAST one wins.
                     for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
-                        if (!d2.isOptional()) { // only zero-depth optional dependencies resolved
-                            if (Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
-                                dependenciesAtNextDepth.add(new DependencyAndDependent(d2, resolved, resolvedPom));
-                            }
+                        if (d.getExclusions() != null && d.getExclusions().contains(groupArtifact(d2))
+                                || d2.isOptional()) {
+                            //If the dependency has been excluded or the dependency is optional (and depth is greater than 0) skip it.
+                            continue;
+                        }
+                        if (Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
+                            dependenciesAtNextDepth.add(new DependencyAndDependent(d2, resolved, resolvedPom));
                         }
                     }
                 } catch (MavenDownloadingException e) {
@@ -558,6 +561,10 @@ public class ResolvedPom implements DependencyManagementDependency {
         }
 
         return dependencies;
+    }
+
+    private GroupArtifact groupArtifact(Dependency dependency) {
+        return new GroupArtifact(dependency.getGroupId(), dependency.getArtifactId());
     }
 
     private Dependency getValues(Dependency dep, int depth) {
