@@ -542,12 +542,8 @@ public class ResolvedPom implements DependencyManagementDependency {
 
                     // FIXME if you have more than one dependency of the same group and artifact, the LAST one wins.
                     for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
-                        if (d.getExclusions() != null && d.getExclusions().contains(groupArtifact(d2))
-                                || d2.isOptional()) {
-                            //If the dependency has been excluded or the dependency is optional (and depth is greater than 0) skip it.
-                            continue;
-                        }
-                        if (Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
+                        if ((d.getExclusions() == null || !d.getExclusions().contains(groupArtifact(d2)))
+                                && !d2.isOptional() && Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
                             dependenciesAtNextDepth.add(new DependencyAndDependent(d2, resolved, resolvedPom));
                         }
                     }
