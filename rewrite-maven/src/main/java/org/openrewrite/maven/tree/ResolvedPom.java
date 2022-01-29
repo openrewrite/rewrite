@@ -541,9 +541,24 @@ public class ResolvedPom implements DependencyManagementDependency {
                     dependencies.add(resolved);
 
                     // FIXME if you have more than one dependency of the same group and artifact, the LAST one wins.
+                    nextDependency:
                     for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
-                        if ((d.getExclusions() == null || !d.getExclusions().contains(groupArtifact(d2)))
-                                && !d2.isOptional() && Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
+                        if (d2.getGroupId() == null) {
+                            d2 = d2.withGav(d2.getGav().withGroupId(resolvedPom.getGroupId()));
+                        }
+                        if (d2.isOptional()) {
+                            continue;
+                        }
+                        if (d.getExclusions() != null) {
+                            for (GroupArtifact exclusion : d.getExclusions()) {
+                                //noinspection ConstantConditions
+                                if (d2.getGroupId().equals(getValue(exclusion.getGroupId())) &&
+                                        d2.getArtifactId().equals(getValue(exclusion.getArtifactId()))) {
+                                    continue nextDependency;
+                                }
+                            }
+                        }
+                        if (Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
                             dependenciesAtNextDepth.add(new DependencyAndDependent(d2, resolved, resolvedPom));
                         }
                     }
