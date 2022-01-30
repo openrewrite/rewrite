@@ -569,10 +569,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         f = f.withTarget(visitAndCast(f.getTarget(), p));
         f = f.getPadding().withName(visitLeftPadded(f.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p));
-
-        JavaType type = visitType(f.getType(), p);
-        f = f.withType(type);
-
+        f = f.withType(visitType(f.getType(), p));
         return f;
     }
 
