@@ -635,8 +635,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             i = (J.Identifier) temp;
         }
-        i = i.withFieldType((JavaType.Variable) visitType(i.getFieldType(), p));
         i = i.withType(visitType(i.getType(), p));
+        i = i.withFieldType((JavaType.Variable) visitType(i.getFieldType(), p));
         return i;
     }
 
@@ -756,9 +756,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             m = m.getPadding().withTypeParameters(visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
         m = m.getPadding().withReference(visitLeftPadded(m.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p));
+        m = m.withType(visitType(m.getType(), p));
         m = m.withMethodType((JavaType.Method) visitType(m.getMethodType(), p));
         m = m.withVariableType((JavaType.Variable) visitType(m.getVariableType(), p));
-        m = m.withType(visitType(m.getType(), p));
         return m;
     }
 
@@ -872,16 +872,16 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.withModifiers(ListUtils.map(m.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
         m = m.withTypeExpression(visitAndCast(m.getTypeExpression(), p));
-        m = m.withDimensionsBeforeName(ListUtils.map(m.getDimensionsBeforeName(), dim ->
-                dim.withBefore(visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p))
-                        .withElement(visitSpace(dim.getElement(), Space.Location.DIMENSION, p))
-        ));
         m = m.withTypeExpression(m.getTypeExpression() == null ?
                 null :
                 visitTypeName(m.getTypeExpression(), p));
         m = m.withVarargs(m.getVarargs() == null ?
                 null :
                 visitSpace(m.getVarargs(), Space.Location.VARARGS, p));
+        m = m.withDimensionsBeforeName(ListUtils.map(m.getDimensionsBeforeName(), dim ->
+                dim.withBefore(visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p))
+                        .withElement(visitSpace(dim.getElement(), Space.Location.DIMENSION, p))
+        ));
         m = m.getPadding().withVariables(ListUtils.map(m.getPadding().getVariables(), t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, p)));
         return m;
     }
@@ -964,7 +964,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             pt = pt.getPadding().withTypeParameters(visitContainer(pt.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
         pt = pt.getPadding().withTypeParameters(visitTypeNames(pt.getPadding().getTypeParameters(), p));
-        pt = pt.withType(visitType(pt.getType(), p));
         return pt;
     }
 
