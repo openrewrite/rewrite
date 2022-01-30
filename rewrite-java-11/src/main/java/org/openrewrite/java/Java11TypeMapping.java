@@ -166,7 +166,8 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
 
             typeCache.put(sym.flatName().toString(), clazz);
 
-            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
+            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(classType.supertype_field == null ? symType.supertype_field :
+                    classType.supertype_field));
 
             JavaType.FullyQualified owner = null;
             if (sym.owner instanceof Symbol.ClassSymbol) {
