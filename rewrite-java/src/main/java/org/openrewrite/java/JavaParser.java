@@ -40,10 +40,10 @@ import static java.util.stream.Collectors.*;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
     /**
-     * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to skip inclusion of
-     * a {@link JavaSourceSet} marker with type attribution from the classpath.
+     * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to skip generation of
+     * type attribution from the class in {@link JavaSourceSet} marker.
      */
-    String SKIP_SOURCE_SET_MARKER = "org.openrewrite.java.skipSourceSetMarker";
+    String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.java.skipSourceSetTypeGeneration";
 
     /**
      * @deprecated Won't work in isolated classloaders.

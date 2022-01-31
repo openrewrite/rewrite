@@ -29,6 +29,7 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
@@ -189,8 +190,8 @@ public class Java11Parser implements JavaParser {
                 .filter(Objects::nonNull)
                 .collect(toList());
 
-        if (!ctx.getMessage(SKIP_SOURCE_SET_MARKER, false)) {
-            JavaSourceSet sourceSet = getSourceSet(ctx);
+        JavaSourceSet sourceSet = getSourceSet(ctx);
+        if (!ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
             List<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
             for (J.CompilationUnit cu : mappedCus) {
                 for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
@@ -200,11 +201,10 @@ public class Java11Parser implements JavaParser {
                 }
             }
             sourceSetProvenance = sourceSet.withClasspath(classpath);
-            assert sourceSetProvenance != null;
-            return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
         }
 
-        return mappedCus;
+        assert sourceSetProvenance != null;
+        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
     }
 
     LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
@@ -287,8 +287,12 @@ public class Java11Parser implements JavaParser {
     @Override
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
         if (sourceSetProvenance == null) {
-            sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                    typeCache, ctx);
+            if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
+                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList());
+            } else {
+                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
+                        typeCache, ctx);
+            }
         }
         return sourceSetProvenance;
     }
