@@ -32,7 +32,7 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     override val executionContext: ExecutionContext
         get() {
             val ctx = super.executionContext
-            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_MARKER, true)
+            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true)
             return ctx
         }
 

@@ -26,7 +26,7 @@ interface AddImportTest : JavaRecipeTest {
     override val executionContext: ExecutionContext
         get() {
             val ctx = super.executionContext
-            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_MARKER, false)
+            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, false)
             return ctx
         }
 

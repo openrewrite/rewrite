@@ -17,7 +17,6 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
@@ -30,7 +29,7 @@ interface JavaTypeTest {
     val executionContext: ExecutionContext
         get() {
             val ctx = InMemoryExecutionContext { t: Throwable? -> fail<Any>("Failed to parse", t) }
-            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_MARKER, true)
+            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true)
             return ctx
         }
 
