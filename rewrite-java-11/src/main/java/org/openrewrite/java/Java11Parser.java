@@ -288,13 +288,13 @@ public class Java11Parser implements JavaParser {
 
     @Override
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
-        if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-            sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList());
-        }
-
         if (sourceSetProvenance == null) {
-            sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                    typeCache, ctx);
+            if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
+                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList());
+            } else {
+                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
+                        typeCache, ctx);
+            }
         }
         return sourceSetProvenance;
     }
