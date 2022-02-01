@@ -132,7 +132,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     @Override
     public Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
         try {
-            return deserializeMavenMetadata(cache.get((repo.toString() + "/" + gav).getBytes()));
+            return deserializeMavenMetadata(cache.get(serialize((repo.toString() + "/" + gav).getBytes(StandardCharsets.UTF_8))));
         } catch (RocksDBException e) {
             throw new MavenDownloadingException(e);
         }
@@ -145,7 +145,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
 
         try {
-            cache.put(serialize((repo.toString() + "/" + gav).getBytes()), serialize(metadata));
+            cache.put(serialize((repo.toString() + "/" + gav).getBytes(StandardCharsets.UTF_8)), serialize(metadata));
         } catch (RocksDBException e) {
             throw new MavenDownloadingException(e);
         }
@@ -154,7 +154,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     @Override
     public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) {
         try {
-            return deserializePom(cache.get(gav.toString().getBytes()));
+            return deserializePom(cache.get(serialize(gav.toString().getBytes(StandardCharsets.UTF_8))));
         } catch (RocksDBException e) {
             throw new MavenDownloadingException(e);
         }

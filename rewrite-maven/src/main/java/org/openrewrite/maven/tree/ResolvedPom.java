@@ -388,7 +388,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                 for (DependencyManagementDependency d : incomingDependencyManagement) {
                     if (d instanceof Imported) {
                         ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, null, repositories)
-                                .resolve(emptyList(), downloader, ctx);
+                                .resolve(activeProfiles, downloader, ctx);
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
                                 .bomImport(bom.getGav(), pom);
