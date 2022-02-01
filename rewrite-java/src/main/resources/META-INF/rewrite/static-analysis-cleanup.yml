@@ -59,9 +59,9 @@ recipeList:
   - org.openrewrite.java.cleanup.PrimitiveWrapperClassConstructorToValueOf
   - org.openrewrite.java.cleanup.RedundantFileCreation
   - org.openrewrite.java.cleanup.RemoveExtraSemicolons
-  - org.openrewrite.java.RemoveUnusedImports
+#  - org.openrewrite.java.RemoveUnusedImports
   - org.openrewrite.java.cleanup.RemoveUnusedLocalVariables
-  - org.openrewrite.java.cleanup.RemoveUnusedPrivateMethods
+#  - org.openrewrite.java.cleanup.RemoveUnusedPrivateMethods
   - org.openrewrite.java.cleanup.RenameLocalVariablesToCamelCase
   - org.openrewrite.java.cleanup.SimplifyBooleanExpression
   - org.openrewrite.java.cleanup.SimplifyBooleanReturn
