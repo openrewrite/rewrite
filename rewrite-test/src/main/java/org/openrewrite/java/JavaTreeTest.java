@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.fail;
 public interface JavaTreeTest {
     default ExecutionContext getExecutionContext() {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> fail("Failed to parse", t));
-        ctx.putMessage(JavaParser.SKIP_SOURCE_SET_MARKER, true);
+        ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         return ctx;
     }
 
