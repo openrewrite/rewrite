@@ -92,9 +92,11 @@ fun <T> visualize(
 fun visualize(
     gav: String,
     ctx: ExecutionContext = InMemoryExecutionContext { t -> throw t },
-    scope: Scope = Scope.Compile
+    scope: Scope = Scope.Compile,
+    showProperties: Boolean = false,
+    showManagedDependencies: Boolean = false
 ) {
-    visualize(ctx, scope, Paths.get("diagrams"), gav.replace(':', '_')) {
+    visualize(ctx, scope, Paths.get("diagrams"), gav.replace(':', '_'), showProperties, showManagedDependencies) {
         parse(gav, ctx)
     }
 }

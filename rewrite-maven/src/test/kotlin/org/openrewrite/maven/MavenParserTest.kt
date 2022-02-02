@@ -353,11 +353,9 @@ class MavenParserTest {
             </project>
         """
 
-        visualize(ctx) {
-            val maven = parser.parse(ctx, pomSource, parent)[0]
-            assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]?.map { it.artifactId to it.version })
-                .contains("jaxb-runtime" to "2.3.3")
-        }
+        val maven = parser.parse(ctx, pomSource, parent)[0]
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]?.map { it.artifactId to it.version })
+            .contains("jaxb-runtime" to "2.3.3")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/323")
