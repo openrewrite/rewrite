@@ -385,7 +385,7 @@ public class ResolvedPom implements DependencyManagementDependency {
         private void mergeDependencyManagement(List<DependencyManagementDependency> incomingDependencyManagement, Pom pom) {
             if (!incomingDependencyManagement.isEmpty()) {
                 if (dependencyManagement == null || dependencyManagement.isEmpty()) {
-                    dependencyManagement = new ArrayList<>(incomingDependencyManagement);
+                    dependencyManagement = new ArrayList<>();
                 }
                 for (DependencyManagementDependency d : incomingDependencyManagement) {
                     if (d instanceof Imported) {
