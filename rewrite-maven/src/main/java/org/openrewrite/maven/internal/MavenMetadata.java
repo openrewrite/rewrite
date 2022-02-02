@@ -25,6 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlParser;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -68,6 +69,14 @@ public class MavenMetadata {
             this.versions = versions;
             this.snapshotVersions = snapshotVersions;
             this.snapshot = snapshot;
+        }
+    }
+
+    public static MavenMetadata parse(InputStream document) {
+        try {
+            return MavenXmlMapper.readMapper().readValue(document, MavenMetadata.class);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

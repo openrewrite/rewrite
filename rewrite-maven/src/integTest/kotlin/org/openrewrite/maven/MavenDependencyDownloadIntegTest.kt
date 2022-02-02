@@ -38,7 +38,7 @@ class MavenDependencyDownloadIntegTest {
     fun springWebMvc(@TempDir tempDir: Path) {
         val maven = MavenParser.builder()
             .build()
-            .parse(ctx, singleDependencyPom("org.springframework:spring-webmvc:5.3.2"))
+            .parse(ctx, singleDependencyPom("org.springframework:spring-webmvc:5.3.8"))
             .first()
 
         val compileDependencies = maven.mavenResolutionResult().dependencies[Scope.Compile]!!
