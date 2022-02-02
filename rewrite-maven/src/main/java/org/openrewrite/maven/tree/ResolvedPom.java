@@ -23,6 +23,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.*;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Getter
 public class ResolvedPom implements DependencyManagementDependency {
@@ -551,9 +553,8 @@ public class ResolvedPom implements DependencyManagementDependency {
                         }
                         if (d.getExclusions() != null) {
                             for (GroupArtifact exclusion : d.getExclusions()) {
-                                //noinspection ConstantConditions
-                                if (d2.getGroupId().equals(getValue(exclusion.getGroupId())) &&
-                                        d2.getArtifactId().equals(getValue(exclusion.getArtifactId()))) {
+                                if (matchesGlob(d2.getGroupId(), getValue(exclusion.getGroupId())) &&
+                                        matchesGlob(d2.getArtifactId(), getValue(exclusion.getArtifactId()))) {
                                     continue nextDependency;
                                 }
                             }
