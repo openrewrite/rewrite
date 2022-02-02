@@ -920,7 +920,8 @@ class MavenParserTest {
 
         val compileDependencies = a!!.mavenResolutionResult().dependencies[Scope.Compile]
         assertThat(compileDependencies).hasSize(2)
+
         assertThat(compileDependencies).anyMatch { it.artifactId == "b" && it.version == "0.1.0-SNAPSHOT" }
-        assertThat(compileDependencies).anyMatch { it.artifactId == "d" && it.version == "0.2.0-SNAPSHOT" }
+        assertThat(compileDependencies).anyMatch { it.artifactId == "d" && it.version == "0.1.0-SNAPSHOT" }
     }
 }

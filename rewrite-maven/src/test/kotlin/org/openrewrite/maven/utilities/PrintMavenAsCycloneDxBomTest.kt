@@ -58,7 +58,7 @@ class PrintMavenAsCycloneDxBomTest {
                         <tool>
                             <vendor>OpenRewrite</vendor>
                             <name>OpenRewrite CycloneDX</name>
-                            <version>7.0.0</version>
+                            <version>7.18.0</version>
                         </tool>
                     </tools>
                     <component bom-ref="pkg:maven/com.mycompany.app/my-app@1?type=jar" type="library">

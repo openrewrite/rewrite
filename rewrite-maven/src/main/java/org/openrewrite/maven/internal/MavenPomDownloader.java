@@ -71,14 +71,12 @@ public class MavenPomDownloader {
         this.mavenCache = this.ctx.getPomCache();
     }
 
-    @Nullable
     public MavenMetadata downloadMetadata(GroupArtifact groupArtifact, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) {
         return downloadMetadata(new GroupArtifactVersion(groupArtifact.getGroupId(), groupArtifact.getArtifactId(), null),
                 containingPom,
                 repositories);
     }
 
-    @Nullable
     public MavenMetadata downloadMetadata(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) {
         if (gav.getGroupId() == null) {
             throw new MavenDownloadingException("Unable to download maven metadata because of a missing groupId.");
@@ -118,6 +116,10 @@ public class MavenPomDownloader {
                                         .bytes();
                                 result = Optional.of(MavenMetadata.parse(responseBody));
                                 mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, result.get());
+                            } else if (response.code() >= 400 && response.code() <= 404){
+                                //got a response back that was not successful, if the response code is a common client-side
+                                //error, cache a null result, as this is likely to continue to occur.
+                                mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, null);
                             }
                         } catch (Throwable ignored) {
                             // various kinds of connection failures
@@ -160,7 +162,6 @@ public class MavenPomDownloader {
                         @Nullable String relativePath,
                         @Nullable ResolvedPom containingPom,
                         List<MavenRepository> repositories) throws MavenDownloadingException {
-        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         if (gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
             String errorText = "Unable to download dependency " + gav;
             if (containingPom != null) {
@@ -209,6 +210,7 @@ public class MavenPomDownloader {
                 .tag("artifact.id", gav.getArtifactId())
                 .tag("type", "pom");
 
+        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         for (MavenRepository repo : normalizedRepos) {
             ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(
                     repo.getUri(), gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), versionMaybeDatedSnapshot);
@@ -229,13 +231,13 @@ public class MavenPomDownloader {
                             continue;
                         }
                         try (FileInputStream fis = new FileInputStream(f)) {
-                            RawPom rawPom = RawPom.parse(fis, versionMaybeDatedSnapshot.equals(gav.getVersion()) ? null : versionMaybeDatedSnapshot);
+                            RawPom rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
 
                             // so that the repository path is the same regardless of user name
                             pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
 
-                            if (!versionMaybeDatedSnapshot.equals(pom.getVersion())) {
+                            if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                             }
                             mavenCache.putPom(resolvedGav, pom);
@@ -257,10 +259,10 @@ public class MavenPomDownloader {
                         Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
                         RawPom rawPom = RawPom.parse(
                                 new ByteArrayInputStream(responseBody),
-                                versionMaybeDatedSnapshot.equals(gav.getVersion()) ? null : versionMaybeDatedSnapshot
+                                Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
                         );
                         Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
-                        if (!versionMaybeDatedSnapshot.equals(pom.getVersion())) {
+                        if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                             pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                         }
                         mavenCache.putPom(resolvedGav, pom);
@@ -300,11 +302,9 @@ public class MavenPomDownloader {
             MavenMetadata mavenMetadata;
             Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
             mavenMetadata = downloadMetadata(gav, containingPom, repositories);
-            if (mavenMetadata != null) {
-                MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
-                if (snapshot != null) {
-                    return gav.getVersion().replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
-                }
+            MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
+            if (snapshot != null) {
+                return gav.getVersion().replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
             }
         }
 

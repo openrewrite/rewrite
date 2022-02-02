@@ -178,14 +178,10 @@ public class ChangeParentPom extends Recipe {
                                                                 ExecutionContext ctx) {
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
-                    if (mavenMetadata == null) {
-                        availableVersions = emptyList();
-                    } else {
-                        availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                                .filter(v -> versionComparator.isValid(currentVersion, v))
-                                .filter(v -> allowVersionDowngrades || versionComparator.compare(currentVersion, currentVersion, v) < 0)
-                                .collect(Collectors.toList());
-                    }
+                    availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                            .filter(v -> versionComparator.isValid(currentVersion, v))
+                            .filter(v -> allowVersionDowngrades || versionComparator.compare(currentVersion, currentVersion, v) < 0)
+                            .collect(Collectors.toList());
                 }
                 return allowVersionDowngrades ? availableVersions.stream().max((v1, v2) -> versionComparator.compare(currentVersion, v1, v2)) : versionComparator.upgrade(currentVersion, availableVersions);
             }

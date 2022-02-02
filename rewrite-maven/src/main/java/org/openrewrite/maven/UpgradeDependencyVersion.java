@@ -174,14 +174,10 @@ public class UpgradeDependencyVersion extends Recipe {
             private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) {
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
-                    if (mavenMetadata == null) {
-                        availableVersions = emptyList();
-                    } else {
-                        availableVersions = new ArrayList<>();
-                        for (String v : mavenMetadata.getVersioning().getVersions()) {
-                            if (versionComparator.isValid(version, v)) {
-                                availableVersions.add(v);
-                            }
+                    availableVersions = new ArrayList<>();
+                    for (String v : mavenMetadata.getVersioning().getVersions()) {
+                        if (versionComparator.isValid(version, v)) {
+                            availableVersions.add(v);
                         }
                     }
                 }

@@ -31,10 +31,7 @@ import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.VersionRequirement;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static java.util.Collections.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -484,9 +481,6 @@ public class ResolvedPom implements DependencyManagementDependency {
                         VersionRequirement newRequirement = VersionRequirement.fromVersion(d.getVersion(), depth);
                         requirements.put(ga, newRequirement);
                         String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
-                        if (newRequiredVersion == null) {
-                            throw new MavenDownloadingException("No matching version found");
-                        }
                         d = d.withGav(d.getGav().withVersion(newRequiredVersion));
                     } else {
                         VersionRequirement newRequirement = existingRequirement.addRequirement(d.getVersion());
@@ -495,8 +489,7 @@ public class ResolvedPom implements DependencyManagementDependency {
                         String existingRequiredVersion = existingRequirement.resolve(ga, downloader, getRepositories());
                         String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
 
-                        assert existingRequiredVersion != null;
-                        if (!existingRequiredVersion.equals(newRequiredVersion)) {
+                        if (!Objects.equals(existingRequiredVersion, newRequiredVersion)) {
                             // start over from the top with the knowledge of this new requirement and throwing
                             // away any in progress resolution because this requirement could cause a change
                             // to just about anything we've seen to this point

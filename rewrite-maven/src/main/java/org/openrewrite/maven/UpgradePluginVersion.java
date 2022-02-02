@@ -134,12 +134,10 @@ public class UpgradePluginVersion extends Recipe {
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion, ExecutionContext ctx) {
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
-                    if (mavenMetadata != null) {
-                        availableVersions = new ArrayList<>();
-                        for (String v : mavenMetadata.getVersioning().getVersions()) {
-                            if (versionComparator.isValid(currentVersion, v)) {
-                                availableVersions.add(v);
-                            }
+                    availableVersions = new ArrayList<>();
+                    for (String v : mavenMetadata.getVersioning().getVersions()) {
+                        if (versionComparator.isValid(currentVersion, v)) {
+                            availableVersions.add(v);
                         }
                     }
                 }

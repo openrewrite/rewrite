@@ -259,10 +259,7 @@ public class VersionRequirement {
     public String resolve(GroupArtifact groupArtifact, MavenPomDownloader downloader, List<MavenRepository> repositories) {
         return resolve(() -> {
             MavenMetadata metadata = downloader.downloadMetadata(groupArtifact, null, repositories);
-            if (metadata != null) {
-                return metadata.getVersioning().getVersions();
-            }
-            return emptyList();
+            return metadata.getVersioning().getVersions();
         });
     }
 

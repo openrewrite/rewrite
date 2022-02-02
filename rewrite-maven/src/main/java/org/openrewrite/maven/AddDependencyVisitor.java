@@ -141,14 +141,12 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                     resolvedVersion = version;
                 } else {
                     MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
-                    if(mavenMetadata != null) {
-                        LatestRelease latest = new LatestRelease(versionPattern);
-                        resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
-                                .filter(v -> versionComparator.isValid(null, v))
-                                .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
-                                .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-                                .orElse(version);
-                    }
+                    LatestRelease latest = new LatestRelease(versionPattern);
+                    resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
+                            .filter(v -> versionComparator.isValid(null, v))
+                            .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                            .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                            .orElse(version);
                 }
             }
 
