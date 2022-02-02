@@ -81,7 +81,7 @@ public class MavenPomDownloader {
 
     @Nullable
     public MavenMetadata downloadMetadata(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) {
-        if(gav.getGroupId() == null) {
+        if (gav.getGroupId() == null) {
             throw new MavenDownloadingException("Unable to download maven metadata because of a missing groupId.");
         }
 
@@ -90,6 +90,15 @@ public class MavenPomDownloader {
         MavenMetadata mavenMetadata = MavenMetadata.EMPTY;
         Collection<MavenRepository> repos = distinctNormalizedRepositories(repositories, containingPom, null);
         for (MavenRepository repo : repos) {
+            String version = gav.getVersion();
+            if (version != null) {
+                if (version.endsWith("-SNAPSHOT") && !repo.isSnapshots()) {
+                    continue;
+                } else if (version.equals("RELEASE") && !repo.isReleases()) {
+                    continue;
+                }
+            }
+
             Timer.Builder timer = Timer.builder("rewrite.maven.download")
                     .tag("repo.id", repo.getUri())
                     .tag("group.id", gav.getGroupId())
@@ -167,7 +176,7 @@ public class MavenPomDownloader {
         Map<MavenRepository, String> errors = new HashMap<>();
 
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
-        if(gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
+        if (gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
             String errorText = "Unable to download dependency " + gav;
             if (containingPom != null) {
                 ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
@@ -271,7 +280,7 @@ public class MavenPomDownloader {
                 errors.entrySet().stream()
                         .map(entry -> "    Id: " + entry.getKey().getId() + ", URL: " + entry.getKey().getUri() + ", cause: " + entry.getValue())
                         .collect(Collectors.joining("\n"));
-        if(containingPom != null) {
+        if (containingPom != null) {
             ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
         }
         throw new MavenDownloadingException(errorText);
@@ -321,7 +330,7 @@ public class MavenPomDownloader {
     protected MavenRepository normalizeRepository(MavenRepository originalRepository, @Nullable ResolvedPom containingPom) {
         Optional<MavenRepository> result = null;
         MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
-        if(containingPom != null) {
+        if (containingPom != null) {
             repository = repository.withUri(containingPom.getValue(repository.getUri()));
         }
         try {

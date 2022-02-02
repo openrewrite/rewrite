@@ -29,7 +29,6 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -318,7 +317,7 @@ public class RawPom {
                 for (RawRepositories.Repository r : unmappedRepos) {
                     pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
                             r.getReleases() == null || r.getReleases().isEnabled(),
-                            r.getSnapshots() != null && r.getSnapshots().isEnabled(),
+                            r.getSnapshots() == null || r.getSnapshots().isEnabled(),
                             false, null, null));
                 }
 

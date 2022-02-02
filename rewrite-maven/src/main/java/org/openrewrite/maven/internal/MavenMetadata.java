@@ -79,15 +79,13 @@ public class MavenMetadata {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     public static class Snapshot {
         String timestamp;
         String buildNumber;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     public static class SnapshotVersion {
         String extension;
         String value;
