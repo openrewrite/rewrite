@@ -18,10 +18,12 @@ package org.openrewrite.maven.cache;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
@@ -37,6 +39,7 @@ import org.rocksdb.WriteOptions;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
@@ -75,7 +78,9 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     static {
         SmileFactory f = new SmileFactory();
         f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
-        ObjectMapper m = new ObjectMapper(f)
+        ObjectMapper m = JsonMapper.builder(f)
+                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                .build()
                 .registerModule(new ParameterNamesModule())
                 .registerModule(new Jdk8Module())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
@@ -195,45 +200,27 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     }
 
     static Optional<MavenRepository> deserializeMavenRepository(byte[] bytes) {
-        if (bytes == null) {
-            return null;
-        }
         try {
-            return Optional.of(mapper.readValue(bytes, new TypeReference<MavenRepository>() {
-            }));
-        } catch (Exception e) {
-            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
-            //results.
-            return null;
+            return bytes == null ? null : Optional.of(mapper.readValue(bytes, MavenRepository.class));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
     @Nullable
     static Optional<Pom> deserializePom(byte[] bytes) {
-        if (bytes == null) {
-            return null;
-        }
         try {
-            return Optional.of(mapper.readValue(bytes, new TypeReference<Pom>() {
-            }));
-        } catch (Exception e) {
-            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
-            //results.
-            return null;
+            return bytes == null ? null : Optional.of(mapper.readValue(bytes, Pom.class));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
     static Optional<MavenMetadata> deserializeMavenMetadata(byte[] bytes) {
-        if (bytes == null) {
-            return null;
-        }
         try {
-            return Optional.of(mapper.readValue(bytes, new TypeReference<MavenMetadata>() {
-            }));
-        } catch (Exception e) {
-            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
-            //results.
-            return null;
+            return bytes == null ? null : Optional.of(mapper.readValue(bytes, MavenMetadata.class));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

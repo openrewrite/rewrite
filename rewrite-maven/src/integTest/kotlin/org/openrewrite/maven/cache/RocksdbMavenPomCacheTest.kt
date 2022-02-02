@@ -21,10 +21,24 @@ import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.MavenExecutionContextView
 import org.openrewrite.maven.MavenParser
+import org.openrewrite.maven.internal.MavenPomDownloader
 import org.openrewrite.maven.mavenResolutionResult
+import org.openrewrite.maven.tree.GroupArtifactVersion
 import java.nio.file.Path
 
 class RocksdbMavenPomCacheTest {
+
+    @Test
+    fun rocksCacheSerialization(@TempDir tempDir: Path) {
+        val ctx = MavenExecutionContextView.view(InMemoryExecutionContext());
+        ctx.pomCache = RocksdbMavenPomCache(tempDir.resolve("rewrite-cache"))
+
+        val downloader = MavenPomDownloader(emptyMap(), ctx)
+        val gav = GroupArtifactVersion("org.springframework.cloud", "spring-cloud-dataflow-build", "2.9.0");
+
+        downloader.download(gav, "", null, emptyList())
+        downloader.download(gav, "", null, emptyList())
+    }
 
     @Test
     fun rocksCache(@TempDir tempDir: Path) {
