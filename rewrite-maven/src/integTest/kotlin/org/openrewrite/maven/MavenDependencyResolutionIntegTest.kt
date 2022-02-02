@@ -385,7 +385,7 @@ class MavenDependencyResolutionIntegTest {
         // Maven says that the correct version is org.slf4j:slf4j-api:1.7.30, but aether says org.slf4j:slf4j-api:1.7.25
         // This asserts that the versions match Maven's expectation
         val expected = javaClass.getResource("/springBootParentExpected.txt")!!.readText()
-        assertThat(printTreeRecursive(parse(pom).mavenResolutionResult().dependencies[Scope.Test]!!, false))
+        assertThat(printTreeRecursive(parse(pom).mavenResolutionResult().dependencies[Scope.Test]!!))
             .isEqualTo(expected)
     }
 
@@ -481,7 +481,7 @@ class MavenDependencyResolutionIntegTest {
         // Maven says that the correct version is org.slf4j:slf4j-api:1.7.30, but aether says org.slf4j:slf4j-api:1.7.25
         // This asserts that the versions match Maven's expectation
         val importDependenciesExpected = javaClass.getResource("/importDependenciesExpected.txt")!!.readText()
-        assertThat(printTreeRecursive(parse(pom).mavenResolutionResult().dependencies[Scope.Test]!!, false))
+        assertThat(printTreeRecursive(parse(pom).mavenResolutionResult().dependencies[Scope.Test]!!))
             .isEqualTo(importDependenciesExpected)
     }
 
@@ -979,15 +979,15 @@ class MavenDependencyResolutionIntegTest {
         .parse(executionContext, pom)
         .first()
 
-    private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String, ignoreScopes: Boolean = false) {
+    private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String) {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
         val pomAst = parse(pom)
-        val rewriteResult = printTreeRecursive(pomAst.mavenResolutionResult().dependencies[Scope.Test]!!, ignoreScopes)
-        val aetherResult = MavenAetherParser().dependencyTree(pomFile, ignoreScopes)
+        val rewriteResult = printTreeRecursive(pomAst.mavenResolutionResult().dependencies[Scope.Test]!!)
+        val aetherResult = MavenAetherParser().dependencyTree(pomFile)
         assertThat(rewriteResult).isEqualTo(aetherResult)
     }
 
-    private fun printTreeRecursive(deps: List<ResolvedDependency>, ignoreScopes: Boolean): String {
+    private fun printTreeRecursive(deps: List<ResolvedDependency>): String {
         return deps
             .filterNot { it.isOptional }
             .sortedWith { d1, d2 ->
@@ -997,7 +997,7 @@ class MavenDependencyResolutionIntegTest {
                     d1.groupId.compareTo(d2.groupId)
             }
             .joinToString("\n") { dep ->
-                dependencyString(dep) + printTreeRecursive(dep.dependencies, ignoreScopes)
+                dependencyString(dep) + printTreeRecursive(dep.dependencies)
                     .let { if (it.isBlank()) "" else "\n${it.prependIndent(" ")}" }
             }
     }
@@ -1023,7 +1023,7 @@ class MavenDependencyResolutionIntegTest {
         private val repositories =
             listOf(RemoteRepository.Builder("local", "default", localRepository.toURI().toString()).build())
 
-        fun dependencyTree(pom: File, ignoreScopes: Boolean): String {
+        fun dependencyTree(pom: File): String {
             val modelBuilder = DefaultModelBuilderFactory().newInstance()
 
             val modelBuildingRequest = DefaultModelBuildingRequest()
@@ -1057,15 +1057,14 @@ class MavenDependencyResolutionIntegTest {
             }
 
             val collectResult = repositorySystem.collectDependencies(repositorySystemSession, collectRequest)
-            return printTreeRecursive(collectResult.root, ignoreScopes).trimIndent()
+            return printTreeRecursive(collectResult.root).trimIndent()
         }
 
         private fun printTreeRecursive(
             node: DependencyNode,
-            ignoreScopes: Boolean,
             originalScope: String = "compile"
         ): String =
-            dependencyString(node, ignoreScopes, originalScope) + (node.children
+            dependencyString(node) + (node.children
                 .filter { n -> n.dependency.scope != "system" }
                 .sortedWith { n1, n2 ->
                     val d1 = n1.dependency.artifact
@@ -1083,15 +1082,14 @@ class MavenDependencyResolutionIntegTest {
 
                     printTreeRecursive(
                         it.data["conflict.winner"] as DefaultDependencyNode?
-                            ?: it, ignoreScopes, scope
+                            ?: it
                     )
                 }
                 .let { if (it.isBlank()) "" else "\n${it.prependIndent(" ")}" })
 
-        private fun dependencyString(node: DependencyNode, ignoreScopes: Boolean, originalScope: String): String =
+        private fun dependencyString(node: DependencyNode): String =
             node.dependency?.run {
                 artifact.run { "$groupId:$artifactId:$version${if (classifier.isNotBlank()) ":${classifier}" else ""}" } +
-                        (if (ignoreScopes) "" else "[$originalScope]") +
                         " https://repo1.maven.org/maven2/${
                             artifact.run {
                                 "${

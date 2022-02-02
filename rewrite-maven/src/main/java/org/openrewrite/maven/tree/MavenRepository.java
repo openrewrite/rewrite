@@ -52,7 +52,7 @@ public class MavenRepository {
     boolean snapshots;
 
     @NonFinal
-    boolean knownToExist = false;
+    boolean knownToExist;
 
     // Prevent user credentials from being inadvertently serialized
     @With
