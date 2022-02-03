@@ -24,11 +24,14 @@ import org.assertj.core.api.Assertions.assertThat
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Parser
+import org.openrewrite.maven.cache.CompositeMavenPomCache
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.cache.MavenPomCache
+import org.openrewrite.maven.cache.RocksdbMavenPomCache
 import org.openrewrite.maven.tree.License
 import org.openrewrite.maven.tree.Scope
 import java.nio.file.Paths

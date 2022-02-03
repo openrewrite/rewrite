@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
@@ -105,9 +104,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
     private final RocksCache cache;
 
-    public RocksdbMavenPomCache(@Nullable Path workspace) {
-        assert workspace != null;
-
+    public RocksdbMavenPomCache(Path workspace) {
         File pomCacheDir = new File(workspace.toFile(), ".rewrite-cache");
         if (!pomCacheDir.exists() && !pomCacheDir.mkdirs()) {
             throw new IllegalStateException("Unable to find or create maven pom cache at " + pomCacheDir);

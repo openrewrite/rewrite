@@ -28,7 +28,6 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.xml.XmlFactory;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
-import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 
 import javax.xml.stream.XMLInputFactory;
@@ -51,7 +50,6 @@ public class MavenXmlMapper {
                     .defaultUseWrapper(false)
                     .build()
                     .registerModule(new ParameterNamesModule())
-                    .registerModule(new KotlinModule())
                     .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
                     .disable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
                     .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
