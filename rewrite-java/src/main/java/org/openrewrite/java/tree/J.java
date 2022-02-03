@@ -93,7 +93,7 @@ public interface J extends Tree {
     default String print() {
         PrintOutputCapture<Integer> outputCapture = new PrintOutputCapture<>(0);
         new JavaPrinter<Integer>().visit(this, outputCapture);
-        return outputCapture.out.toString();
+        return outputCapture.getOut();
     }
 
     /**

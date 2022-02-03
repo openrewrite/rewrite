@@ -160,7 +160,7 @@ public interface Javadoc extends Tree {
         public String printComment() {
             PrintOutputCapture<Integer> print = new PrintOutputCapture<>(0);
             new JavadocPrinter<Integer>().visit(this, print);
-            return print.out.toString();
+            return print.getOut();
         }
     }
 

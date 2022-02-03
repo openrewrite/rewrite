@@ -1,0 +1,768 @@
+digraph "resolution" {
+"org.springframework.security\nspring-security-rsa\n1.0.10.RELEASE\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/security/spring-security-rsa/1.0.10.RELEASE/spring-security-rsa-1.0.10.RELEASE.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-commons-dependencies/3.1.0/spring-cloud-commons-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-commons\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-commons/3.1.0/spring-cloud-commons-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-context\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-context/3.1.0/spring-cloud-context-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-loadbalancer\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-loadbalancer/3.1.0/spring-cloud-loadbalancer-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter/3.1.0/spring-cloud-starter-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-bootstrap\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-bootstrap/3.1.0/spring-cloud-starter-bootstrap-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-loadbalancer\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-loadbalancer/3.1.0/spring-cloud-starter-loadbalancer-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-test-support\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-test-support/3.1.0/spring-cloud-test-support-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#deefee","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-dependencies-parent/3.1.0/spring-cloud-dependencies-parent-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-dependencies/2021.0.0/spring-cloud-dependencies-2021.0.0.pom"]
+"org.springframework.cloud\nspring-cloud-netflix-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-netflix-dependencies/3.1.0/spring-cloud-netflix-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-netflix-eureka-client\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-netflix-eureka-client/3.1.0/spring-cloud-netflix-eureka-client-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-netflix-eureka-client\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-netflix-eureka-client/3.1.0/spring-cloud-starter-netflix-eureka-client-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-netflix-eureka-server\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-netflix-eureka-server/3.1.0/spring-cloud-starter-netflix-eureka-server-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-netflix-eureka-server\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-netflix-eureka-server/3.1.0/spring-cloud-netflix-eureka-server-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"com.netflix.eureka\neureka-client\n1.10.17\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/com/netflix/eureka/eureka-client/1.10.17/eureka-client-1.10.17.pom","style"="filled","color"="#d6d6de"]
+"com.netflix.eureka\neureka-core\n1.10.17\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/com/netflix/eureka/eureka-core/1.10.17/eureka-core-1.10.17.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-stream-dependencies/3.2.1/spring-cloud-stream-dependencies-3.2.1.pom"]
+"org.springframework.cloud\nspring-cloud-stream\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-stream/3.2.1/spring-cloud-stream-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-stream-binder-test\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-stream-binder-test/3.2.1/spring-cloud-stream-binder-test-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-stream-test-support\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-stream-test-support/3.2.1/spring-cloud-stream-test-support-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-stream-binder-kafka\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-stream-binder-kafka/3.2.1/spring-cloud-stream-binder-kafka-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-stream-binder-kafka-streams\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-stream-binder-kafka-streams/3.2.1/spring-cloud-stream-binder-kafka-streams-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-stream-binder-kafka-core\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-stream-binder-kafka-core/3.2.1/spring-cloud-stream-binder-kafka-core-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-stream-kafka\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-stream-kafka/3.2.1/spring-cloud-starter-stream-kafka-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-stream-binder-rabbit\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-stream-binder-rabbit/3.2.1/spring-cloud-stream-binder-rabbit-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-stream-binder-rabbit-core\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-stream-binder-rabbit-core/3.2.1/spring-cloud-stream-binder-rabbit-core-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-stream-rabbit\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-stream-rabbit/3.2.1/spring-cloud-starter-stream-rabbit-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-stream-binder-rabbit-test-support\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-stream-binder-rabbit-test-support/3.2.1/spring-cloud-stream-binder-rabbit-test-support-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-task-dependencies\n2.4.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-task-dependencies/2.4.0/spring-cloud-task-dependencies-2.4.0.pom"]
+"org.springframework.cloud\nspring-cloud-starter-task\n2.4.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-task/2.4.0/spring-cloud-starter-task-2.4.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-task-core\n2.4.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-task-core/2.4.0/spring-cloud-task-core-2.4.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-task-batch\n2.4.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-task-batch/2.4.0/spring-cloud-task-batch-2.4.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-task-stream\n2.4.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-task-stream/2.4.0/spring-cloud-task-stream-2.4.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-circuitbreaker-dependencies\n2.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-circuitbreaker-dependencies/2.1.0/spring-cloud-circuitbreaker-dependencies-2.1.0.pom"]
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-bom/1.7.0/resilience4j-bom-1.7.0.pom"]
+"io.github.resilience4j\nresilience4j-core\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-core/1.7.0/resilience4j-core-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-ratelimiter\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-ratelimiter/1.7.0/resilience4j-ratelimiter-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-cache\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-cache/1.7.0/resilience4j-cache-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-retry\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-retry/1.7.0/resilience4j-retry-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-circuitbreaker\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-circuitbreaker/1.7.0/resilience4j-circuitbreaker-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-bulkhead\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-bulkhead/1.7.0/resilience4j-bulkhead-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-all\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-all/1.7.0/resilience4j-all-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-circularbuffer\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-circularbuffer/1.7.0/resilience4j-circularbuffer-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-metrics\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-metrics/1.7.0/resilience4j-metrics-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-consumer\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-consumer/1.7.0/resilience4j-consumer-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-vertx\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-vertx/1.7.0/resilience4j-vertx-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-annotations\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-annotations/1.7.0/resilience4j-annotations-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-spring\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-spring/1.7.0/resilience4j-spring-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-spring-boot2\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-spring-boot2/1.7.0/resilience4j-spring-boot2-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-spring-cloud2\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-spring-cloud2/1.7.0/resilience4j-spring-cloud2-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-retrofit\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-retrofit/1.7.0/resilience4j-retrofit-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-feign\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-feign/1.7.0/resilience4j-feign-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-ratpack\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-ratpack/1.7.0/resilience4j-ratpack-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-prometheus\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-prometheus/1.7.0/resilience4j-prometheus-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-timelimiter\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-timelimiter/1.7.0/resilience4j-timelimiter-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-rxjava2\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-rxjava2/1.7.0/resilience4j-rxjava2-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-rxjava3\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-rxjava3/1.7.0/resilience4j-rxjava3-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-reactor\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-reactor/1.7.0/resilience4j-reactor-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-micrometer\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-micrometer/1.7.0/resilience4j-micrometer-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.resilience4j\nresilience4j-kotlin\n1.7.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/resilience4j/resilience4j-kotlin/1.7.0/resilience4j-kotlin-1.7.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-circuitbreaker-resilience4j\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-circuitbreaker-resilience4j/2.1.0/spring-cloud-circuitbreaker-resilience4j-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-circuitbreaker-spring-retry\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-circuitbreaker-spring-retry/2.1.0/spring-cloud-circuitbreaker-spring-retry-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-circuitbreaker-resilience4j\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-circuitbreaker-resilience4j/2.1.0/spring-cloud-starter-circuitbreaker-resilience4j-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-circuitbreaker-reactor-resilience4j\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-circuitbreaker-reactor-resilience4j/2.1.0/spring-cloud-starter-circuitbreaker-reactor-resilience4j-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-config-dependencies/3.1.0/spring-cloud-config-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-starter-config\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-config/3.1.0/spring-cloud-starter-config-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-config-client\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-config-client/3.1.0/spring-cloud-config-client-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-config-server\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-config-server/3.1.0/spring-cloud-config-server-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-config-monitor\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-config-monitor/3.1.0/spring-cloud-config-monitor-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.vault\nspring-vault-core\n2.3.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/vault/spring-vault-core/2.3.2/spring-vault-core-2.3.2.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.credhub\nspring-credhub-core\n2.1.1.RELEASE\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/credhub/spring-credhub-core/2.1.1.RELEASE/spring-credhub-core-2.1.1.RELEASE.pom","style"="filled","color"="#d6d6de"]
+"org.eclipse.jgit\norg.eclipse.jgit\n5.12.0.202106070339-r\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/eclipse/jgit/org.eclipse.jgit/5.12.0.202106070339-r/org.eclipse.jgit-5.12.0.202106070339-r.pom","style"="filled","color"="#d6d6de"]
+"org.eclipse.jgit\norg.eclipse.jgit.junit.http\n5.12.0.202106070339-r\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/eclipse/jgit/org.eclipse.jgit.junit.http/5.12.0.202106070339-r/org.eclipse.jgit.junit.http-5.12.0.202106070339-r.pom","style"="filled","color"="#d6d6de"]
+"org.eclipse.jgit\norg.eclipse.jgit.http.apache\n5.12.0.202106070339-r\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/eclipse/jgit/org.eclipse.jgit.http.apache/5.12.0.202106070339-r/org.eclipse.jgit.http.apache-5.12.0.202106070339-r.pom","style"="filled","color"="#d6d6de"]
+"org.eclipse.jgit\norg.eclipse.jgit.ssh.jsch\n5.12.0.202106070339-r\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/eclipse/jgit/org.eclipse.jgit.ssh.jsch/5.12.0.202106070339-r/org.eclipse.jgit.ssh.jsch-5.12.0.202106070339-r.pom","style"="filled","color"="#d6d6de"]
+"com.jcraft\njsch\n0.1.55\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/com/jcraft/jsch/0.1.55/jsch-0.1.55.pom","style"="filled","color"="#d6d6de"]
+"org.tmatesoft.svnkit\nsvnkit\n1.10.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/tmatesoft/svnkit/svnkit/1.10.1/svnkit-1.10.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-dependencies/3.2.1/spring-cloud-function-dependencies-3.2.1.pom"]
+"org.springframework.cloud\nspring-cloud-function-context\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-context/3.2.1/spring-cloud-function-context-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-core\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-core/3.2.1/spring-cloud-function-core-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-web\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-web/3.2.1/spring-cloud-function-web-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-function-web\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-function-web/3.2.1/spring-cloud-starter-function-web-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-function-webflux\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-function-webflux/3.2.1/spring-cloud-starter-function-webflux-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-deployer\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-deployer/3.2.1/spring-cloud-function-deployer-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-adapter-aws\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-adapter-aws/3.2.1/spring-cloud-function-adapter-aws-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-adapter-azure\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-adapter-azure/3.2.1/spring-cloud-function-adapter-azure-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-adapter-gcp\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-adapter-gcp/3.2.1/spring-cloud-function-adapter-gcp-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-adapter-openwhisk\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-adapter-openwhisk/3.2.1/spring-cloud-function-adapter-openwhisk-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-kotlin\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-kotlin/3.2.1/spring-cloud-function-kotlin-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-rsocket\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-rsocket/3.2.1/spring-cloud-function-rsocket-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-grpc\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-grpc/3.2.1/spring-cloud-function-grpc-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-function-grpc-cloudevent-ext\n3.2.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-function-grpc-cloudevent-ext/3.2.1/spring-cloud-function-grpc-cloudevent-ext-3.2.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-gateway-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-gateway-dependencies/3.1.0/spring-cloud-gateway-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-gateway-webflux\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-gateway-webflux/3.1.0/spring-cloud-gateway-webflux-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-gateway-mvc\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-gateway-mvc/3.1.0/spring-cloud-gateway-mvc-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-gateway-server\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-gateway-server/3.1.0/spring-cloud-gateway-server-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-gateway\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-gateway/3.1.0/spring-cloud-starter-gateway-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-consul-dependencies/3.1.0/spring-cloud-consul-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-consul-core\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-consul-core/3.1.0/spring-cloud-consul-core-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-consul-binder\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-consul-binder/3.1.0/spring-cloud-consul-binder-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-consul-config\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-consul-config/3.1.0/spring-cloud-consul-config-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-consul-discovery\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-consul-discovery/3.1.0/spring-cloud-consul-discovery-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-consul\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-consul/3.1.0/spring-cloud-starter-consul-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-consul-bus\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-consul-bus/3.1.0/spring-cloud-starter-consul-bus-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-consul-config\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-consul-config/3.1.0/spring-cloud-starter-consul-config-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-consul-discovery\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-consul-discovery/3.1.0/spring-cloud-starter-consul-discovery-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-consul-all\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-consul-all/3.1.0/spring-cloud-starter-consul-all-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"com.ecwid.consul\nconsul-api\n1.4.5\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/com/ecwid/consul/consul-api/1.4.5/consul-api-1.4.5.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-sleuth-dependencies/3.1.0/spring-cloud-sleuth-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-sleuth-autoconfigure\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-sleuth-autoconfigure/3.1.0/spring-cloud-sleuth-autoconfigure-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-sleuth-api\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-sleuth-api/3.1.0/spring-cloud-sleuth-api-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-sleuth-instrumentation\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-sleuth-instrumentation/3.1.0/spring-cloud-sleuth-instrumentation-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-sleuth-brave\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-sleuth-brave/3.1.0/spring-cloud-sleuth-brave-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-sleuth-zipkin\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-sleuth-zipkin/3.1.0/spring-cloud-sleuth-zipkin-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-sleuth\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-sleuth/3.1.0/spring-cloud-starter-sleuth-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-sleuth-tests-common\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-sleuth-tests-common/3.1.0/spring-cloud-sleuth-tests-common-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-bom/5.13.2/brave-bom-5.13.2.pom"]
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-reporter-bom/2.16.1/zipkin-reporter-bom-2.16.1.pom"]
+"io.zipkin.zipkin2\nzipkin\n2.23.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/zipkin2/zipkin/2.23.0/zipkin-2.23.0.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.proto3\nzipkin-proto3\n1.0.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/proto3/zipkin-proto3/1.0.0/zipkin-proto3-1.0.0.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-reporter\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-reporter/2.16.1/zipkin-reporter-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-sender-okhttp3\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-sender-okhttp3/2.16.1/zipkin-sender-okhttp3-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-sender-libthrift\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-sender-libthrift/2.16.1/zipkin-sender-libthrift-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-sender-urlconnection\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-sender-urlconnection/2.16.1/zipkin-sender-urlconnection-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-sender-kafka08\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-sender-kafka08/2.16.1/zipkin-sender-kafka08-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-sender-kafka\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-sender-kafka/2.16.1/zipkin-sender-kafka-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-sender-amqp-client\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-sender-amqp-client/2.16.1/zipkin-sender-amqp-client-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-sender-activemq-client\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-sender-activemq-client/2.16.1/zipkin-sender-activemq-client-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-reporter-spring-beans\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-reporter-spring-beans/2.16.1/zipkin-reporter-spring-beans-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-reporter-brave\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-reporter-brave/2.16.1/zipkin-reporter-brave-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.reporter2\nzipkin-reporter-metrics-micrometer\n2.16.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/reporter2/zipkin-reporter-metrics-micrometer/2.16.1/zipkin-reporter-metrics-micrometer-2.16.1.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave/5.13.2/brave-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-tests\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-tests/5.13.2/brave-tests-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-context-jfr\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-context-jfr/5.13.2/brave-context-jfr-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-context-log4j2\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-context-log4j2/5.13.2/brave-context-log4j2-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-context-log4j12\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-context-log4j12/5.13.2/brave-context-log4j12-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-context-slf4j\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-context-slf4j/5.13.2/brave-context-slf4j-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-context-rxjava2\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-context-rxjava2/5.13.2/brave-context-rxjava2-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-dubbo\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-dubbo/5.13.2/brave-instrumentation-dubbo-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-dubbo-rpc\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-dubbo-rpc/5.13.2/brave-instrumentation-dubbo-rpc-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-grpc\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-grpc/5.13.2/brave-instrumentation-grpc-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-http\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-http/5.13.2/brave-instrumentation-http-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-http-tests\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-http-tests/5.13.2/brave-instrumentation-http-tests-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-httpasyncclient\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-httpasyncclient/5.13.2/brave-instrumentation-httpasyncclient-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-httpclient\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-httpclient/5.13.2/brave-instrumentation-httpclient-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-jaxrs2\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-jaxrs2/5.13.2/brave-instrumentation-jaxrs2-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-jersey-server\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-jersey-server/5.13.2/brave-instrumentation-jersey-server-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-jms\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-jms/5.13.2/brave-instrumentation-jms-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-kafka-clients\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-kafka-clients/5.13.2/brave-instrumentation-kafka-clients-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-kafka-streams\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-kafka-streams/5.13.2/brave-instrumentation-kafka-streams-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-messaging\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-messaging/5.13.2/brave-instrumentation-messaging-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-mongodb\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-mongodb/5.13.2/brave-instrumentation-mongodb-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-mysql\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-mysql/5.13.2/brave-instrumentation-mysql-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-mysql6\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-mysql6/5.13.2/brave-instrumentation-mysql6-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-mysql8\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-mysql8/5.13.2/brave-instrumentation-mysql8-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-netty-codec-http\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-netty-codec-http/5.13.2/brave-instrumentation-netty-codec-http-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-okhttp3\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-okhttp3/5.13.2/brave-instrumentation-okhttp3-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-p6spy\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-p6spy/5.13.2/brave-instrumentation-p6spy-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-rpc\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-rpc/5.13.2/brave-instrumentation-rpc-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-servlet\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-servlet/5.13.2/brave-instrumentation-servlet-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-sparkjava\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-sparkjava/5.13.2/brave-instrumentation-sparkjava-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-spring-rabbit\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-spring-rabbit/5.13.2/brave-instrumentation-spring-rabbit-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-spring-web\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-spring-web/5.13.2/brave-instrumentation-spring-web-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-spring-webmvc\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-spring-webmvc/5.13.2/brave-instrumentation-spring-webmvc-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-instrumentation-vertx-web\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-instrumentation-vertx-web/5.13.2/brave-instrumentation-vertx-web-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.zipkin.brave\nbrave-spring-beans\n5.13.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/zipkin/brave/brave-spring-beans/5.13.2/brave-spring-beans-5.13.2.pom","style"="filled","color"="#d6d6de"]
+"io.opentracing.brave\nbrave-opentracing\n0.37.4\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/opentracing/brave/brave-opentracing/0.37.4/brave-opentracing-0.37.4.pom","style"="filled","color"="#d6d6de"]
+"io.github.lognet\ngrpc-spring-boot-starter\n4.2.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/lognet/grpc-spring-boot-starter/4.2.2/grpc-spring-boot-starter-4.2.2.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-vault-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-vault-dependencies/3.1.0/spring-cloud-vault-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-vault-config\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-vault-config/3.1.0/spring-cloud-vault-config-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-vault-config-aws\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-vault-config-aws/3.1.0/spring-cloud-vault-config-aws-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-vault-config-consul\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-vault-config-consul/3.1.0/spring-cloud-vault-config-consul-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-vault-config-databases\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-vault-config-databases/3.1.0/spring-cloud-vault-config-databases-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-vault-config-rabbitmq\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-vault-config-rabbitmq/3.1.0/spring-cloud-vault-config-rabbitmq-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-vault-config\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-vault-config/3.1.0/spring-cloud-starter-vault-config-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-zookeeper-dependencies/3.1.0/spring-cloud-zookeeper-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-zookeeper-core\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-zookeeper-core/3.1.0/spring-cloud-zookeeper-core-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-zookeeper-config\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-zookeeper-config/3.1.0/spring-cloud-zookeeper-config-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-zookeeper-discovery\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-zookeeper-discovery/3.1.0/spring-cloud-zookeeper-discovery-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-zookeeper\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-zookeeper/3.1.0/spring-cloud-starter-zookeeper-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-zookeeper-all\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-zookeeper-all/3.1.0/spring-cloud-starter-zookeeper-all-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-zookeeper-config\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-zookeeper-config/3.1.0/spring-cloud-starter-zookeeper-config-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-zookeeper-discovery\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-zookeeper-discovery/3.1.0/spring-cloud-starter-zookeeper-discovery-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.apache.curator\ncurator-framework\n5.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/apache/curator/curator-framework/5.1.0/curator-framework-5.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.apache.curator\ncurator-recipes\n5.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/apache/curator/curator-recipes/5.1.0/curator-recipes-5.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.apache.curator\ncurator-x-discovery\n5.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/apache/curator/curator-x-discovery/5.1.0/curator-x-discovery-5.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.apache.curator\ncurator-test\n5.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/apache/curator/curator-test/5.1.0/curator-test-5.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-cloudfoundry-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-cloudfoundry-dependencies/3.1.0/spring-cloud-cloudfoundry-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-cloudfoundry-discovery\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-cloudfoundry-discovery/3.1.0/spring-cloud-cloudfoundry-discovery-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-cloudfoundry-commons\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-cloudfoundry-commons/3.1.0/spring-cloud-cloudfoundry-commons-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-cloudfoundry-web\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-cloudfoundry-web/3.1.0/spring-cloud-cloudfoundry-web-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-cloudfoundry\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-cloudfoundry/3.1.0/spring-cloud-starter-cloudfoundry-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-bus-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-bus-dependencies/3.1.0/spring-cloud-bus-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-starter-bus-amqp\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-bus-amqp/3.1.0/spring-cloud-starter-bus-amqp-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-bus-kafka\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-bus-kafka/3.1.0/spring-cloud-starter-bus-kafka-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-bus-stream\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-bus-stream/3.1.0/spring-cloud-starter-bus-stream-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-bus\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-bus/3.1.0/spring-cloud-bus-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-bus-rsocket\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-bus-rsocket/3.1.0/spring-cloud-bus-rsocket-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-dependencies/3.1.0/spring-cloud-contract-dependencies-3.1.0.pom"]
+"org.springframework.cloud\nspring-cloud-contract-wiremock\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-wiremock/3.1.0/spring-cloud-contract-wiremock-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-spec\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-spec/3.1.0/spring-cloud-contract-spec-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-spec-java\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-spec-java/3.1.0/spring-cloud-contract-spec-java-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-spec-groovy\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-spec-groovy/3.1.0/spring-cloud-contract-spec-groovy-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-spec-kotlin\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-spec-kotlin/3.1.0/spring-cloud-contract-spec-kotlin-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-verifier\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-verifier/3.1.0/spring-cloud-contract-verifier-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-converters\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-converters/3.1.0/spring-cloud-contract-converters-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-pact\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-pact/3.1.0/spring-cloud-contract-pact-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-stub-runner\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-stub-runner/3.1.0/spring-cloud-contract-stub-runner-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-stub-runner-boot\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-stub-runner-boot/3.1.0/spring-cloud-contract-stub-runner-boot-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-shade\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-shade/3.1.0/spring-cloud-contract-shade-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-contract-verifier\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-contract-verifier/3.1.0/spring-cloud-starter-contract-verifier-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-contract-stub-runner\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-contract-stub-runner/3.1.0/spring-cloud-starter-contract-stub-runner-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-contract-stub-runner-jetty\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-contract-stub-runner-jetty/3.1.0/spring-cloud-starter-contract-stub-runner-jetty-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-maven-plugin\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-maven-plugin/3.1.0/spring-cloud-contract-maven-plugin-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-contract-gradle-plugin\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-contract-gradle-plugin/3.1.0/spring-cloud-contract-gradle-plugin-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"com.github.tomakehurst\nwiremock-jre8-standalone\n2.31.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-jre8-standalone/2.31.0/wiremock-jre8-standalone-2.31.0.pom","style"="filled","color"="#d6d6de"]
+"com.toomuchcoding.jsonassert\njsonassert\n0.6.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/com/toomuchcoding/jsonassert/jsonassert/0.6.1/jsonassert-0.6.1.pom","style"="filled","color"="#d6d6de"]
+"com.toomuchcoding.jsonassert\njsonassert-shade\n0.6.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/com/toomuchcoding/jsonassert/jsonassert-shade/0.6.1/jsonassert-shade-0.6.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-openfeign-dependencies\n3.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-openfeign-dependencies/3.1.0/spring-cloud-openfeign-dependencies-3.1.0.pom"]
+"org.springframework.security.oauth.boot\nspring-security-oauth2-autoconfigure\n2.1.2.RELEASE\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/security/oauth/boot/spring-security-oauth2-autoconfigure/2.1.2.RELEASE/spring-security-oauth2-autoconfigure-2.1.2.RELEASE.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-openfeign-core\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-openfeign-core/3.1.0/spring-cloud-openfeign-core-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-openfeign\n3.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-openfeign/3.1.0/spring-cloud-starter-openfeign-3.1.0.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-bom\n11.7\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-bom/11.7/feign-bom-11.7.pom"]
+"io.github.openfeign\nfeign-core\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-core/11.7/feign-core-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-gson\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-gson/11.7/feign-gson-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-jaxrs\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-jaxrs/11.7/feign-jaxrs-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-httpclient\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-httpclient/11.7/feign-httpclient-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-jaxrs2\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-jaxrs2/11.7/feign-jaxrs2-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-hc5\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-hc5/11.7/feign-hc5-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-hystrix\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-hystrix/11.7/feign-hystrix-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-jackson\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-jackson/11.7/feign-jackson-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-jackson-jaxb\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-jackson-jaxb/11.7/feign-jackson-jaxb-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-jackson-jr\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-jackson-jr/11.7/feign-jackson-jr-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-jaxb\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-jaxb/11.7/feign-jaxb-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-mock\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-mock/11.7/feign-mock-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-json\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-json/11.7/feign-json-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-okhttp\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-okhttp/11.7/feign-okhttp-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-googlehttpclient\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-googlehttpclient/11.7/feign-googlehttpclient-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-ribbon\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-ribbon/11.7/feign-ribbon-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-sax\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-sax/11.7/feign-sax-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-slf4j\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-slf4j/11.7/feign-slf4j-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-spring4\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-spring4/11.7/feign-spring4-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-soap\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-soap/11.7/feign-soap-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-reactive-wrappers\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-reactive-wrappers/11.7/feign-reactive-wrappers-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-micrometer\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-micrometer/11.7/feign-micrometer-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-dropwizard-metrics4\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-dropwizard-metrics4/11.7/feign-dropwizard-metrics4-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-dropwizard-metrics5\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-dropwizard-metrics5/11.7/feign-dropwizard-metrics5-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign\nfeign-annotation-error-decoder\n11.7\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/feign-annotation-error-decoder/11.7/feign-annotation-error-decoder-11.7.pom","style"="filled","color"="#d6d6de"]
+"io.github.openfeign.form\nfeign-form-spring\n3.8.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/github/openfeign/form/feign-form-spring/3.8.0/feign-form-spring-3.8.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-dependencies/2.1.0/spring-cloud-kubernetes-dependencies-2.1.0.pom"]
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" ["shape"="rectangle","style"="filled","color"="#e6eaff","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-client-bom/5.9.0/kubernetes-client-bom-5.9.0.pom"]
+"io.fabric8\nkubernetes-model-common\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-common/5.9.0/kubernetes-model-common-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nmodel-annotator\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/model-annotator/5.9.0/model-annotator-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-core\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-core/5.9.0/kubernetes-model-core-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-rbac\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-rbac/5.9.0/kubernetes-model-rbac-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-admissionregistration\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-admissionregistration/5.9.0/kubernetes-model-admissionregistration-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-apps\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-apps/5.9.0/kubernetes-model-apps-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-autoscaling\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-autoscaling/5.9.0/kubernetes-model-autoscaling-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-apiextensions\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-apiextensions/5.9.0/kubernetes-model-apiextensions-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-batch\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-batch/5.9.0/kubernetes-model-batch-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-certificates\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-certificates/5.9.0/kubernetes-model-certificates-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-coordination\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-coordination/5.9.0/kubernetes-model-coordination-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-discovery\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-discovery/5.9.0/kubernetes-model-discovery-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-events\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-events/5.9.0/kubernetes-model-events-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-extensions\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-extensions/5.9.0/kubernetes-model-extensions-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-networking\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-networking/5.9.0/kubernetes-model-networking-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-metrics\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-metrics/5.9.0/kubernetes-model-metrics-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-policy\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-policy/5.9.0/kubernetes-model-policy-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-scheduling\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-scheduling/5.9.0/kubernetes-model-scheduling-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-storageclass\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-storageclass/5.9.0/kubernetes-model-storageclass-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model/5.9.0/openshift-model-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model/5.9.0/kubernetes-model-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-jsonschema2pojo\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-jsonschema2pojo/5.9.0/kubernetes-model-jsonschema2pojo-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-flowcontrol\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-flowcontrol/5.9.0/kubernetes-model-flowcontrol-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-model-node\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-model-node/5.9.0/kubernetes-model-node-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-clusterautoscaling\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-clusterautoscaling/5.9.0/openshift-model-clusterautoscaling-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-operator\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-operator/5.9.0/openshift-model-operator-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-operatorhub\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-operatorhub/5.9.0/openshift-model-operatorhub-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-machine\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-machine/5.9.0/openshift-model-machine-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-monitoring\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-monitoring/5.9.0/openshift-model-monitoring-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-console\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-console/5.9.0/openshift-model-console-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-machineconfig\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-machineconfig/5.9.0/openshift-model-machineconfig-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-tuned\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-tuned/5.9.0/openshift-model-tuned-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-whereabouts\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-whereabouts/5.9.0/openshift-model-whereabouts-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-storageversionmigrator\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-storageversionmigrator/5.9.0/openshift-model-storageversionmigrator-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-model-miscellaneous\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-model-miscellaneous/5.9.0/openshift-model-miscellaneous-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-client\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-client/5.9.0/kubernetes-client-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-server-mock\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-server-mock/5.9.0/kubernetes-server-mock-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-client\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-client/5.9.0/openshift-client-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nknative-model\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/knative-model/5.9.0/knative-model-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nknative-client\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/knative-client/5.9.0/knative-client-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nknative-mock\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/knative-mock/5.9.0/knative-mock-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nknative-examples\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/knative-examples/5.9.0/knative-examples-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nknative-tests\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/knative-tests/5.9.0/knative-tests-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ntekton-model-v1alpha1\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/tekton-model-v1alpha1/5.9.0/tekton-model-v1alpha1-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ntekton-model-v1beta1\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/tekton-model-v1beta1/5.9.0/tekton-model-v1beta1-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ntekton-model-triggers\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/tekton-model-triggers/5.9.0/tekton-model-triggers-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ntekton-client\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/tekton-client/5.9.0/tekton-client-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ntekton-mock\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/tekton-mock/5.9.0/tekton-mock-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ntekton-examples\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/tekton-examples/5.9.0/tekton-examples-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ntekton-tests\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/tekton-tests/5.9.0/tekton-tests-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nservicecatalog-model\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/servicecatalog-model/5.9.0/servicecatalog-model-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nservicecatalog-client\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/servicecatalog-client/5.9.0/servicecatalog-client-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nservicecatalog-server-mock\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/servicecatalog-server-mock/5.9.0/servicecatalog-server-mock-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nservice-catalog-examples\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/service-catalog-examples/5.9.0/service-catalog-examples-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nservicecatalog-tests\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/servicecatalog-tests/5.9.0/servicecatalog-tests-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nvolumesnapshot-model\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/volumesnapshot-model/5.9.0/volumesnapshot-model-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nvolumesnapshot-client\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/volumesnapshot-client/5.9.0/volumesnapshot-client-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nvolumesnapshot-server-mock\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/volumesnapshot-server-mock/5.9.0/volumesnapshot-server-mock-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nvolumesnapshot-examples\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/volumesnapshot-examples/5.9.0/volumesnapshot-examples-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nvolumesnapshot-tests\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/volumesnapshot-tests/5.9.0/volumesnapshot-tests-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nchaosmesh-model\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/chaosmesh-model/5.9.0/chaosmesh-model-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nchaosmesh-client\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/chaosmesh-client/5.9.0/chaosmesh-client-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nchaosmesh-server-mock\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/chaosmesh-server-mock/5.9.0/chaosmesh-server-mock-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nchaosmesh-examples\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/chaosmesh-examples/5.9.0/chaosmesh-examples-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nchaosmesh-tests\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/chaosmesh-tests/5.9.0/chaosmesh-tests-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncamel-k-model-v1\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/camel-k-model-v1/5.9.0/camel-k-model-v1-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncamel-k-model-v1alpha1\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/camel-k-model-v1alpha1/5.9.0/camel-k-model-v1alpha1-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncamel-k-client\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/camel-k-client/5.9.0/camel-k-client-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncamel-k-mock\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/camel-k-mock/5.9.0/camel-k-mock-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncamel-k-tests\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/camel-k-tests/5.9.0/camel-k-tests-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncertmanager-model-v1alpha2\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/certmanager-model-v1alpha2/5.9.0/certmanager-model-v1alpha2-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncertmanager-model-v1alpha3\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/certmanager-model-v1alpha3/5.9.0/certmanager-model-v1alpha3-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncertmanager-model-v1beta1\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/certmanager-model-v1beta1/5.9.0/certmanager-model-v1beta1-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncertmanager-model-v1\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/certmanager-model-v1/5.9.0/certmanager-model-v1-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncertmanager-client\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/certmanager-client/5.9.0/certmanager-client-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncertmanager-server-mock\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/certmanager-server-mock/5.9.0/certmanager-server-mock-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncertmanager-examples\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/certmanager-examples/5.9.0/certmanager-examples-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncertmanager-tests\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/certmanager-tests/5.9.0/certmanager-tests-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nopenshift-server-mock\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/openshift-server-mock/5.9.0/openshift-server-mock-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-examples\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-examples/5.9.0/kubernetes-examples-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8.kubernetes\nkubernetes-karaf\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes/kubernetes-karaf/5.9.0/kubernetes-karaf-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8.kubernetes\nkubernetes-karaf-itests\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes/kubernetes-karaf-itests/5.9.0/kubernetes-karaf-itests-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncrd-generator-api\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/crd-generator-api/5.9.0/crd-generator-api-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\ncrd-generator-apt\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/crd-generator-apt/5.9.0/crd-generator-apt-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-test\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-test/5.9.0/kubernetes-test-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.fabric8\nkubernetes-openshift-uberjar\n5.9.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/fabric8/kubernetes-openshift-uberjar/5.9.0/kubernetes-openshift-uberjar-5.9.0.pom","style"="filled","color"="#d6d6de"]
+"io.kubernetes\nclient-java\n13.0.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/kubernetes/client-java/13.0.0/client-java-13.0.0.pom","style"="filled","color"="#d6d6de"]
+"io.kubernetes\nclient-java-extended\n13.0.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/kubernetes/client-java-extended/13.0.0/client-java-extended-13.0.0.pom","style"="filled","color"="#d6d6de"]
+"io.kubernetes\nclient-java-spring-integration\n13.0.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/kubernetes/client-java-spring-integration/13.0.0/client-java-spring-integration-13.0.0.pom","style"="filled","color"="#d6d6de"]
+"me.snowdrop\nistio-client\n1.7.7.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/me/snowdrop/istio-client/1.7.7.1/istio-client-1.7.7.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.retry\nspring-retry\n1.3.1\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/retry/spring-retry/1.3.1/spring-retry-1.3.1.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-fabric8-autoconfig\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-fabric8-autoconfig/2.1.0/spring-cloud-kubernetes-fabric8-autoconfig-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-fabric8-config\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-fabric8-config/2.1.0/spring-cloud-kubernetes-fabric8-config-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-client-config\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-client-config/2.1.0/spring-cloud-kubernetes-client-config-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-client-discovery\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-client-discovery/2.1.0/spring-cloud-kubernetes-client-discovery-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-fabric8-discovery\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-fabric8-discovery/2.1.0/spring-cloud-kubernetes-fabric8-discovery-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-fabric8-istio\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-fabric8-istio/2.1.0/spring-cloud-kubernetes-fabric8-istio-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-fabric8-leader\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-fabric8-leader/2.1.0/spring-cloud-kubernetes-fabric8-leader-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-commons\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-commons/2.1.0/spring-cloud-kubernetes-commons-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-client-autoconfig\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-client-autoconfig/2.1.0/spring-cloud-kubernetes-client-autoconfig-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-fabric8-loadbalancer\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-fabric8-loadbalancer/2.1.0/spring-cloud-kubernetes-fabric8-loadbalancer-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-client-loadbalancer\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-client-loadbalancer/2.1.0/spring-cloud-kubernetes-client-loadbalancer-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-discovery\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-discovery/2.1.0/spring-cloud-kubernetes-discovery-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-kubernetes-fabric8\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-kubernetes-fabric8/2.1.0/spring-cloud-starter-kubernetes-fabric8-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-kubernetes-client\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-kubernetes-client/2.1.0/spring-cloud-starter-kubernetes-client-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-kubernetes-fabric8-config\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-kubernetes-fabric8-config/2.1.0/spring-cloud-starter-kubernetes-fabric8-config-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-kubernetes-client-config\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-kubernetes-client-config/2.1.0/spring-cloud-starter-kubernetes-client-config-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-kubernetes-fabric8-loadbalancer\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-kubernetes-fabric8-loadbalancer/2.1.0/spring-cloud-starter-kubernetes-fabric8-loadbalancer-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-kubernetes-client-loadbalancer\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-kubernetes-client-loadbalancer/2.1.0/spring-cloud-starter-kubernetes-client-loadbalancer-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-kubernetes-fabric8-all\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-kubernetes-fabric8-all/2.1.0/spring-cloud-starter-kubernetes-fabric8-all-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-kubernetes-client-all\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-kubernetes-client-all/2.1.0/spring-cloud-starter-kubernetes-client-all-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-starter-kubernetes-discoveryclient\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-starter-kubernetes-discoveryclient/2.1.0/spring-cloud-starter-kubernetes-discoveryclient-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.jboss.arquillian.junit\narquillian-junit-standalone\n1.6.0.Final\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/jboss/arquillian/junit/arquillian-junit-standalone/1.6.0.Final/arquillian-junit-standalone-1.6.0.Final.pom","style"="filled","color"="#d6d6de"]
+"org.arquillian.cube\narquillian-cube-requirement\n1.15.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/arquillian/cube/arquillian-cube-requirement/1.15.2/arquillian-cube-requirement-1.15.2.pom","style"="filled","color"="#d6d6de"]
+"org.arquillian.cube\narquillian-cube-kubernetes\n1.15.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/arquillian/cube/arquillian-cube-kubernetes/1.15.2/arquillian-cube-kubernetes-1.15.2.pom","style"="filled","color"="#d6d6de"]
+"org.arquillian.cube\narquillian-cube-openshift\n1.15.2\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/arquillian/cube/arquillian-cube-openshift/1.15.2/arquillian-cube-openshift-1.15.2.pom","style"="filled","color"="#d6d6de"]
+"io.specto\nhoverfly-java-junit5\n0.13.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/specto/hoverfly-java-junit5/0.13.0/hoverfly-java-junit5-0.13.0.pom","style"="filled","color"="#d6d6de"]
+"io.specto\nhoverfly-java\n0.13.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/io/specto/hoverfly-java/0.13.0/hoverfly-java-0.13.0.pom","style"="filled","color"="#d6d6de"]
+"com.github.tomakehurst\nwiremock-jre8\n2.26.3\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/com/github/tomakehurst/wiremock-jre8/2.26.3/wiremock-jre8-2.26.3.pom","style"="filled","color"="#d6d6de"]
+"org.springframework.cloud\nspring-cloud-kubernetes-test-support\n2.1.0\n" ["shape"="rectangle","URL"="https://repo1.maven.org/maven2/org/springframework/cloud/spring-cloud-kubernetes-test-support/2.1.0/spring-cloud-kubernetes-test-support-2.1.0.pom","style"="filled","color"="#d6d6de"]
+"org.openrewrite\ndependency-viz\n0.0.1\n" ["shape"="rectangle","style"="filled","color"="#f9a91b","URL"="https://repo1.maven.org/maven2/org/openrewrite/dependency-viz/0.0.1/dependency-viz-0.0.1.pom"]
+"org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" -> "org.springframework.security\nspring-security-rsa\n1.0.10.RELEASE\n" ["label"="dependencyManagement"]
+"org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-commons\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-context\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-loadbalancer\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-bootstrap\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-loadbalancer\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-test-support\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed","label"="parent"]
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-commons-dependencies\n3.1.0\n" ["label"="dependency"]
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-netflix-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-task-dependencies\n2.4.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-circuitbreaker-dependencies\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-gateway-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-vault-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-cloudfoundry-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-bus-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-openfeign-dependencies\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-netflix-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-netflix-eureka-client\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-netflix-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-netflix-eureka-client\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-netflix-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-netflix-eureka-server\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-netflix-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-netflix-eureka-server\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-netflix-dependencies\n3.1.0\n" -> "com.netflix.eureka\neureka-client\n1.10.17\n"
+"org.springframework.cloud\nspring-cloud-netflix-dependencies\n3.1.0\n" -> "com.netflix.eureka\neureka-core\n1.10.17\n"
+"org.springframework.cloud\nspring-cloud-netflix-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-stream\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-stream-binder-test\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-stream-test-support\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-stream-binder-kafka\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-stream-binder-kafka-streams\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-stream-binder-kafka-core\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-starter-stream-kafka\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-stream-binder-rabbit\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-stream-binder-rabbit-core\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-starter-stream-rabbit\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-stream-binder-rabbit-test-support\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-stream-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-task-dependencies\n2.4.0\n" -> "org.springframework.cloud\nspring-cloud-starter-task\n2.4.0\n"
+"org.springframework.cloud\nspring-cloud-task-dependencies\n2.4.0\n" -> "org.springframework.cloud\nspring-cloud-task-core\n2.4.0\n"
+"org.springframework.cloud\nspring-cloud-task-dependencies\n2.4.0\n" -> "org.springframework.cloud\nspring-cloud-task-batch\n2.4.0\n"
+"org.springframework.cloud\nspring-cloud-task-dependencies\n2.4.0\n" -> "org.springframework.cloud\nspring-cloud-task-stream\n2.4.0\n"
+"org.springframework.cloud\nspring-cloud-task-dependencies\n2.4.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-circuitbreaker-dependencies\n2.1.0\n" -> "io.github.resilience4j\nresilience4j-bom\n1.7.0\n"
+"org.springframework.cloud\nspring-cloud-circuitbreaker-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-circuitbreaker-resilience4j\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-circuitbreaker-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-circuitbreaker-spring-retry\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-circuitbreaker-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-circuitbreaker-resilience4j\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-circuitbreaker-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-circuitbreaker-reactor-resilience4j\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-circuitbreaker-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-core\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-ratelimiter\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-cache\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-retry\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-circuitbreaker\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-bulkhead\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-all\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-circularbuffer\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-metrics\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-consumer\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-vertx\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-annotations\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-spring\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-spring-boot2\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-spring-cloud2\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-retrofit\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-feign\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-ratpack\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-prometheus\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-timelimiter\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-rxjava2\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-rxjava3\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-reactor\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-micrometer\n1.7.0\n"
+"io.github.resilience4j\nresilience4j-bom\n1.7.0\n" -> "io.github.resilience4j\nresilience4j-kotlin\n1.7.0\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-config\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-config-client\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-config-server\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-config-monitor\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.springframework.vault\nspring-vault-core\n2.3.2\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.springframework.credhub\nspring-credhub-core\n2.1.1.RELEASE\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.eclipse.jgit\norg.eclipse.jgit\n5.12.0.202106070339-r\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.eclipse.jgit\norg.eclipse.jgit.junit.http\n5.12.0.202106070339-r\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.eclipse.jgit\norg.eclipse.jgit.http.apache\n5.12.0.202106070339-r\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.eclipse.jgit\norg.eclipse.jgit.ssh.jsch\n5.12.0.202106070339-r\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "com.jcraft\njsch\n0.1.55\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.tmatesoft.svnkit\nsvnkit\n1.10.1\n"
+"org.springframework.cloud\nspring-cloud-config-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-context\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-core\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-web\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-starter-function-web\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-starter-function-webflux\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-deployer\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-adapter-aws\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-adapter-azure\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-adapter-gcp\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-adapter-openwhisk\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-kotlin\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-rsocket\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-grpc\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-function-grpc-cloudevent-ext\n3.2.1\n"
+"org.springframework.cloud\nspring-cloud-function-dependencies\n3.2.1\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-gateway-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-gateway-webflux\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-gateway-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-gateway-mvc\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-gateway-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-gateway-server\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-gateway-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-gateway\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-gateway-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-consul-core\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-consul-binder\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-consul-config\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-consul-discovery\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-consul\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-consul-bus\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-consul-config\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-consul-discovery\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-consul-all\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "com.ecwid.consul\nconsul-api\n1.4.5\n"
+"org.springframework.cloud\nspring-cloud-consul-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-sleuth-autoconfigure\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-sleuth-api\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-sleuth-instrumentation\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-sleuth-brave\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-sleuth-zipkin\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-sleuth\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-sleuth-tests-common\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "io.zipkin.brave\nbrave-bom\n5.13.2\n"
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "io.opentracing.brave\nbrave-opentracing\n0.37.4\n"
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "io.github.lognet\ngrpc-spring-boot-starter\n4.2.2\n"
+"org.springframework.cloud\nspring-cloud-sleuth-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.zipkin2\nzipkin\n2.23.0\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-tests\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-context-jfr\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-context-log4j2\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-context-log4j12\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-context-slf4j\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-context-rxjava2\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-dubbo\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-dubbo-rpc\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-grpc\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-http\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-http-tests\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-httpasyncclient\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-httpclient\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-jaxrs2\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-jersey-server\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-jms\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-kafka-clients\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-kafka-streams\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-messaging\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-mongodb\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-mysql\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-mysql6\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-mysql8\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-netty-codec-http\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-okhttp3\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-p6spy\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-rpc\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-servlet\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-sparkjava\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-spring-rabbit\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-spring-web\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-spring-webmvc\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-instrumentation-vertx-web\n5.13.2\n"
+"io.zipkin.brave\nbrave-bom\n5.13.2\n" -> "io.zipkin.brave\nbrave-spring-beans\n5.13.2\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.zipkin2\nzipkin\n2.23.0\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.proto3\nzipkin-proto3\n1.0.0\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-reporter\n2.16.1\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-sender-okhttp3\n2.16.1\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-sender-libthrift\n2.16.1\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-sender-urlconnection\n2.16.1\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-sender-kafka08\n2.16.1\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-sender-kafka\n2.16.1\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-sender-amqp-client\n2.16.1\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-sender-activemq-client\n2.16.1\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-reporter-spring-beans\n2.16.1\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-reporter-brave\n2.16.1\n"
+"io.zipkin.reporter2\nzipkin-reporter-bom\n2.16.1\n" -> "io.zipkin.reporter2\nzipkin-reporter-metrics-micrometer\n2.16.1\n"
+"org.springframework.cloud\nspring-cloud-vault-dependencies\n3.1.0\n" -> "org.springframework.vault\nspring-vault-core\n2.3.2\n"
+"org.springframework.cloud\nspring-cloud-vault-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-vault-config\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-vault-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-vault-config-aws\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-vault-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-vault-config-consul\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-vault-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-vault-config-databases\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-vault-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-vault-config-rabbitmq\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-vault-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-vault-config\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-vault-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-zookeeper-core\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-zookeeper-config\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-zookeeper-discovery\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-zookeeper\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-zookeeper-all\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-zookeeper-config\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-zookeeper-discovery\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.apache.curator\ncurator-framework\n5.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.apache.curator\ncurator-recipes\n5.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.apache.curator\ncurator-x-discovery\n5.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.apache.curator\ncurator-test\n5.1.0\n"
+"org.springframework.cloud\nspring-cloud-zookeeper-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-cloudfoundry-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-cloudfoundry-discovery\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-cloudfoundry-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-cloudfoundry-commons\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-cloudfoundry-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-cloudfoundry-web\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-cloudfoundry-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-cloudfoundry\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-cloudfoundry-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-bus-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-bus-amqp\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-bus-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-bus-kafka\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-bus-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-bus-stream\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-bus-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-bus\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-bus-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-bus-rsocket\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-bus-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-wiremock\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-spec\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-spec-java\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-spec-groovy\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-spec-kotlin\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-verifier\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-converters\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-pact\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-stub-runner\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-stub-runner-boot\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-shade\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-contract-verifier\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-contract-stub-runner\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-contract-stub-runner-jetty\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-maven-plugin\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-contract-gradle-plugin\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "com.github.tomakehurst\nwiremock-jre8-standalone\n2.31.0\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "com.toomuchcoding.jsonassert\njsonassert\n0.6.1\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "com.toomuchcoding.jsonassert\njsonassert-shade\n0.6.1\n"
+"org.springframework.cloud\nspring-cloud-contract-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"org.springframework.cloud\nspring-cloud-openfeign-dependencies\n3.1.0\n" -> "org.springframework.security.oauth.boot\nspring-security-oauth2-autoconfigure\n2.1.2.RELEASE\n"
+"org.springframework.cloud\nspring-cloud-openfeign-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-openfeign-core\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-openfeign-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-openfeign\n3.1.0\n"
+"org.springframework.cloud\nspring-cloud-openfeign-dependencies\n3.1.0\n" -> "io.github.openfeign\nfeign-bom\n11.7\n"
+"org.springframework.cloud\nspring-cloud-openfeign-dependencies\n3.1.0\n" -> "io.github.openfeign.form\nfeign-form-spring\n3.8.0\n"
+"org.springframework.cloud\nspring-cloud-openfeign-dependencies\n3.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-core\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-gson\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-jaxrs\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-httpclient\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-jaxrs2\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-hc5\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-hystrix\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-jackson\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-jackson-jaxb\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-jackson-jr\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-jaxb\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-mock\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-json\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-okhttp\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-googlehttpclient\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-ribbon\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-sax\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-slf4j\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-spring4\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-soap\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-reactive-wrappers\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-micrometer\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-dropwizard-metrics4\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-dropwizard-metrics5\n11.7\n"
+"io.github.openfeign\nfeign-bom\n11.7\n" -> "io.github.openfeign\nfeign-annotation-error-decoder\n11.7\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "io.fabric8\nkubernetes-client-bom\n5.9.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "io.kubernetes\nclient-java\n13.0.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "io.kubernetes\nclient-java-extended\n13.0.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "io.kubernetes\nclient-java-spring-integration\n13.0.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "me.snowdrop\nistio-client\n1.7.7.1\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.retry\nspring-retry\n1.3.1\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-fabric8-autoconfig\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-fabric8-config\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-client-config\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-client-discovery\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-fabric8-discovery\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-fabric8-istio\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-fabric8-leader\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-commons\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-client-autoconfig\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-fabric8-loadbalancer\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-client-loadbalancer\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-discovery\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-kubernetes-fabric8\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-kubernetes-client\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-kubernetes-fabric8-config\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-kubernetes-client-config\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-kubernetes-fabric8-loadbalancer\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-kubernetes-client-loadbalancer\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-kubernetes-fabric8-all\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-kubernetes-client-all\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-starter-kubernetes-discoveryclient\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.jboss.arquillian.junit\narquillian-junit-standalone\n1.6.0.Final\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.arquillian.cube\narquillian-cube-requirement\n1.15.2\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.arquillian.cube\narquillian-cube-kubernetes\n1.15.2\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.arquillian.cube\narquillian-cube-openshift\n1.15.2\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "io.specto\nhoverfly-java-junit5\n0.13.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "io.specto\nhoverfly-java\n0.13.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "com.github.tomakehurst\nwiremock-jre8\n2.26.3\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-kubernetes-test-support\n2.1.0\n"
+"org.springframework.cloud\nspring-cloud-kubernetes-dependencies\n2.1.0\n" -> "org.springframework.cloud\nspring-cloud-dependencies-parent\n3.1.0\n" ["style"="dashed"]
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-common\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nmodel-annotator\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-core\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-rbac\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-admissionregistration\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-apps\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-autoscaling\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-apiextensions\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-batch\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-certificates\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-coordination\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-discovery\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-events\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-extensions\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-networking\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-metrics\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-policy\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-scheduling\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-storageclass\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-jsonschema2pojo\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-flowcontrol\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-model-node\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-clusterautoscaling\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-operator\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-operatorhub\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-machine\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-monitoring\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-console\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-machineconfig\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-tuned\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-whereabouts\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-storageversionmigrator\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-model-miscellaneous\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-client\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-server-mock\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-client\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nknative-model\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nknative-client\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nknative-mock\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nknative-examples\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nknative-tests\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ntekton-model-v1alpha1\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ntekton-model-v1beta1\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ntekton-model-triggers\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ntekton-client\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ntekton-mock\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ntekton-examples\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ntekton-tests\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nservicecatalog-model\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nservicecatalog-client\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nservicecatalog-server-mock\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nservice-catalog-examples\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nservicecatalog-tests\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nvolumesnapshot-model\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nvolumesnapshot-client\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nvolumesnapshot-server-mock\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nvolumesnapshot-examples\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nvolumesnapshot-tests\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nchaosmesh-model\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nchaosmesh-client\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nchaosmesh-server-mock\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nchaosmesh-examples\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nchaosmesh-tests\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncamel-k-model-v1\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncamel-k-model-v1alpha1\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncamel-k-client\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncamel-k-mock\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncamel-k-tests\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncertmanager-model-v1alpha2\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncertmanager-model-v1alpha3\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncertmanager-model-v1beta1\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncertmanager-model-v1\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncertmanager-client\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncertmanager-server-mock\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncertmanager-examples\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncertmanager-tests\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nopenshift-server-mock\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-examples\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8.kubernetes\nkubernetes-karaf\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8.kubernetes\nkubernetes-karaf-itests\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncrd-generator-api\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\ncrd-generator-apt\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-test\n5.9.0\n"
+"io.fabric8\nkubernetes-client-bom\n5.9.0\n" -> "io.fabric8\nkubernetes-openshift-uberjar\n5.9.0\n"
+"org.openrewrite\ndependency-viz\n0.0.1\n" -> "org.springframework.cloud\nspring-cloud-dependencies\n2021.0.0\n"
+}

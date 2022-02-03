@@ -432,6 +432,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UseStaticImportTck : UseStaticImportTest
 
     @Nested
+    inner class UpdateSourcePositionsTck : UpdateSourcePositionsTest
+
+    @Nested
     inner class UsesTypeTck : UsesTypeTest
 
     @Nested

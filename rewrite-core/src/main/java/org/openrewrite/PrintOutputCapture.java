@@ -15,6 +15,8 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.internal.lang.Nullable;
+
 public class PrintOutputCapture<P> {
     private final P p;
     public final StringBuilder out = new StringBuilder();
@@ -25,5 +27,22 @@ public class PrintOutputCapture<P> {
 
     public P getContext() {
         return p;
+    }
+
+    public String getOut() {
+        return out.toString();
+    }
+
+    public PrintOutputCapture<P> append(@Nullable String text) {
+        if(text == null) {
+            return this;
+        }
+        out.append(text);
+        return this;
+    }
+
+    public PrintOutputCapture<P> append(char c) {
+        out.append(c);
+        return this;
     }
 }

@@ -537,6 +537,10 @@ class Java8UseStaticImportTest : Java8Test, UseStaticImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UpdateSourcePositionsTest : Java8Test, UpdateSourcePositionsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UseCollectionInterfacesTest : Java8Test, UseCollectionInterfacesTest
 
 @DebugOnly
