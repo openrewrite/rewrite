@@ -17,8 +17,10 @@
 package org.openrewrite.maven.tree;
 
 import lombok.Value;
+import lombok.With;
 
 @Value
+@With
 public class GroupArtifact {
     String groupId;
     String artifactId;

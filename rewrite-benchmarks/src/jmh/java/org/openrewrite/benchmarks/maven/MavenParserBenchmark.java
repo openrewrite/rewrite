@@ -27,6 +27,8 @@ import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.cache.CompositeMavenPomCache;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.RocksdbMavenPomCache;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
@@ -35,8 +37,13 @@ import java.util.concurrent.TimeUnit;
 @Measurement(iterations = 2)
 @Warmup(iterations = 1)
 @BenchmarkMode(Mode.SampleTime)
-@OutputTimeUnit(TimeUnit.SECONDS)
+@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@State(Scope.Benchmark)
 public class MavenParserBenchmark {
+    CompositeMavenPomCache pomCache = new CompositeMavenPomCache(
+            new InMemoryMavenPomCache(),
+            new RocksdbMavenPomCache(Paths.get(System.getProperty("user.dir")))
+    );
 
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
@@ -49,12 +56,9 @@ public class MavenParserBenchmark {
     @Benchmark
     public void parse() {
         MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-        ctx.setPomCache(new CompositeMavenPomCache(
-            new InMemoryMavenPomCache(),
-            new RocksdbMavenPomCache(Paths.get(System.getProperty("user.dir")))
-        ));
+        ctx.setPomCache(pomCache);
 
-        /*Xml.Document maven = */MavenParser.builder().build().parse(ctx, "" +
+        Xml.Document maven = MavenParser.builder().build().parse(ctx, "" +
                 "<project>" +
                 "  <parent>" +
                 "    <groupId>org.springframework.boot</groupId>" +
@@ -69,9 +73,14 @@ public class MavenParserBenchmark {
                 "      <groupId>org.springframework.boot</groupId>" +
                 "      <artifactId>spring-boot-starter-webflux</artifactId>" +
                 "    </dependency>" +
+                "    <dependency>" +
+                "      <groupId>org.springframework.cloud</groupId>" +
+                "      <artifactId>spring-cloud-dataflow-tasklauncher</artifactId>" +
+                "      <version>2.9.2</version>" +
+                "    </dependency>" +
                 "  </dependencies>" +
                 "</project>"
-        );//.get(0);
+        ).get(0);
 
 //        System.out.println(maven.getMarkers().findFirst(MavenResolutionResult.class).get().getDependencies()
 //                .get(org.openrewrite.maven.tree.Scope.Compile).size());

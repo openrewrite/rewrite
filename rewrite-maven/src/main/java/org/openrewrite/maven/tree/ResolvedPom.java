@@ -23,21 +23,24 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.VersionRequirement;
+import org.openrewrite.maven.tree.ManagedDependency.Defined;
+import org.openrewrite.maven.tree.ManagedDependency.Imported;
 
 import java.util.*;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Getter
-public class ResolvedPom implements DependencyManagementDependency {
+public class ResolvedPom {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
@@ -57,7 +60,7 @@ public class ResolvedPom implements DependencyManagementDependency {
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<DependencyManagementDependency> dependencyManagement, List<MavenRepository> repositories, List<Dependency> requestedDependencies) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, List<MavenRepository> repositories, List<Dependency> requestedDependencies) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
@@ -70,7 +73,7 @@ public class ResolvedPom implements DependencyManagementDependency {
     Map<String, String> properties;
 
     @NonFinal
-    List<DependencyManagementDependency> dependencyManagement;
+    List<ResolvedManagedDependency> dependencyManagement;
 
     @NonFinal
     List<MavenRepository> repositories;
@@ -106,7 +109,7 @@ public class ResolvedPom implements DependencyManagementDependency {
             }
         }
 
-        List<DependencyManagementDependency> resolvedDependencyManagement = resolved.getDependencyManagement();
+        List<ResolvedManagedDependency> resolvedDependencyManagement = resolved.getDependencyManagement();
         if (dependencyManagement.size() != resolvedDependencyManagement.size()) {
             return resolved;
         }
@@ -155,11 +158,6 @@ public class ResolvedPom implements DependencyManagementDependency {
         return requested.getDatedSnapshotVersion();
     }
 
-    @Override
-    public <D extends DependencyManagementDependency> D withVersion(String version) {
-        throw new UnsupportedOperationException("Call withVersion on the requested DependencyManagement.Import instead.");
-    }
-
     @Nullable
     public String getPackaging() {
         return requested.getPackaging();
@@ -204,17 +202,9 @@ public class ResolvedPom implements DependencyManagementDependency {
 
     @Nullable
     public String getManagedVersion(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
-        for (DependencyManagementDependency dep : dependencyManagement) {
-            if (dep instanceof ResolvedPom) {
-                String version = ((ResolvedPom) dep).getManagedVersion(groupId, artifactId, type, classifier);
-                if (version != null) {
-                    return version;
-                }
-            } else if (dep instanceof DependencyManagementDependency.Defined) {
-                DependencyManagementDependency.Defined dm = (DependencyManagementDependency.Defined) dep;
-                if (dm.matches(groupId, artifactId, type, classifier)) {
-                    return getValue(dm.getVersion());
-                }
+        for (ResolvedManagedDependency dm : dependencyManagement) {
+            if (dm.matches(groupId, artifactId, type, classifier)) {
+                return getValue(dm.getVersion());
             }
         }
 
@@ -222,18 +212,10 @@ public class ResolvedPom implements DependencyManagementDependency {
     }
 
     @Nullable
-    public String getManagedScope(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
-        for (DependencyManagementDependency dep : dependencyManagement) {
-            if (dep instanceof ResolvedPom) {
-                String scope = ((ResolvedPom) dep).getManagedScope(groupId, artifactId, type, classifier);
-                if (scope != null) {
-                    return scope;
-                }
-            } else if (dep instanceof DependencyManagementDependency.Defined) {
-                DependencyManagementDependency.Defined dm = (DependencyManagementDependency.Defined) dep;
-                if (dm.matches(groupId, artifactId, type, classifier)) {
-                    return getValue(dm.getScope());
-                }
+    public Scope getManagedScope(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
+        for (ResolvedManagedDependency dm : dependencyManagement) {
+            if (dm.matches(groupId, artifactId, type, classifier)) {
+                return dm.getScope();
             }
         }
 
@@ -244,6 +226,11 @@ public class ResolvedPom implements DependencyManagementDependency {
         return gav.withGroupId(getValue(gav.getGroupId()))
                 .withArtifactId(getValue(gav.getArtifactId()))
                 .withVersion(getValue(gav.getVersion()));
+    }
+
+    public GroupArtifact getValues(GroupArtifact ga) {
+        return ga.withGroupId(getValue(ga.getGroupId()))
+                .withArtifactId(getValue(ga.getArtifactId()));
     }
 
     @Value
@@ -379,69 +366,37 @@ public class ResolvedPom implements DependencyManagementDependency {
             }
         }
 
-        private void mergeDependencyManagement(List<DependencyManagementDependency> incomingDependencyManagement, Pom pom) {
+        private void mergeDependencyManagement(List<ManagedDependency> incomingDependencyManagement, Pom pom) {
             if (!incomingDependencyManagement.isEmpty()) {
                 if (dependencyManagement == null || dependencyManagement.isEmpty()) {
                     dependencyManagement = new ArrayList<>();
                 }
-                for (DependencyManagementDependency d : incomingDependencyManagement) {
+                for (ManagedDependency d : incomingDependencyManagement) {
                     if (d instanceof Imported) {
                         ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, null, repositories)
                                 .resolve(activeProfiles, downloader, ctx);
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
                                 .bomImport(bom.getGav(), pom);
-                        dependencyManagement.addAll(getImportedManageDependencies(bom));
+                        dependencyManagement.addAll(ListUtils.map(bom.getDependencyManagement(), dm -> dm.withBom(d)));
                     } else if (d instanceof Defined) {
                         Defined defined = (Defined) d;
                         defined = defined.withGav(getValues(defined.getGav()));
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
                                 .dependencyManagement(defined, pom);
-                        dependencyManagement.add(defined);
+                        dependencyManagement.add(new ResolvedManagedDependency(
+                                defined.getGav(),
+                                Scope.fromName(getValue(defined.getScope())),
+                                getValue(defined.getType()),
+                                getValue(defined.getClassifier()),
+                                ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
+                                defined,
+                                null
+                        ));
                     }
                 }
             }
-        }
-
-        /**
-         * When importing a bom, any property placeholders should be resolved relative to the importedBom.This method
-         * returns a list of dependency management dependencies with all property placeholders resolved.
-         *
-         * @param importedBom The bom that is being imported.
-         * @return List of dependency management dependencies with all placeholders resolved
-         */
-        @SuppressWarnings("ConstantConditions")
-        private List<DependencyManagementDependency> getImportedManageDependencies(ResolvedPom importedBom) {
-            return ListUtils.map(importedBom.getDependencyManagement(), d -> {
-                if (d instanceof Defined) {
-                    Defined defined = (Defined) d;
-                    defined = defined.withGav(defined.getGav().withGroupId(importedBom.getValue(defined.getGav().getGroupId())));
-                    defined = defined.withGav(defined.getGav().withArtifactId(importedBom.getValue(defined.getGav().getArtifactId())));
-                    defined = defined.withVersion(importedBom.getValue(defined.getVersion()));
-                    defined = defined.withScope(importedBom.getValue(defined.getScope()));
-                    defined = defined.withType(importedBom.getValue(defined.getType()));
-                    defined = defined.withClassifier(importedBom.getValue(defined.getClassifier()));
-                    defined = defined.withExclusions(ListUtils.map(defined.getExclusions(), e -> {
-                        String groupId = importedBom.getValue(getGroupId());
-                        String artifactId = importedBom.getValue(e.getArtifactId());
-
-                        if (!e.getArtifactId().equals(artifactId) || !e.getGroupId().equals(groupId)) {
-                            return new GroupArtifact(groupId, artifactId);
-                        } else {
-                            return e;
-                        }
-                    }));
-                    return defined;
-                } else if (d instanceof Imported) {
-                    Imported imported = (Imported) d;
-                    imported = imported.withGav(imported.getGav().withGroupId(importedBom.getValue(imported.getGav().getGroupId())));
-                    imported = imported.withGav(imported.getGav().withArtifactId(importedBom.getValue(imported.getGav().getArtifactId())));
-                    imported = imported.withVersion(importedBom.getValue(imported.getVersion()));
-                    return imported;
-                }
-                return d;
-            });
         }
     }
 
@@ -468,7 +423,10 @@ public class ResolvedPom implements DependencyManagementDependency {
 
             for (DependencyAndDependent dd : dependenciesAtDepth) {
                 Dependency d = dd.getDefinedIn().getValues(dd.getDependency(), depth);
-                assert d.getVersion() != null;
+
+                if(d.getVersion() == null) {
+                    throw new MavenParsingException("No version provided for dependency " + d.getGroupId() + ":" + d.getArtifactId());
+                }
 
                 if (d.getType() != null && !"jar".equals(d.getType())) {
                     continue;
@@ -589,9 +547,13 @@ public class ResolvedPom implements DependencyManagementDependency {
             }
         }
 
-        String scope = d.getScope() == null ?
-                getManagedScope(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier()) :
-                getValue(d.getScope());
+        String scope;
+        if (d.getScope() == null) {
+            Scope parsedScope = getManagedScope(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
+            scope = parsedScope == null ? null : parsedScope.toString().toLowerCase();
+        } else {
+            scope = getValue(d.getScope());
+        }
 
         return d
                 .withGav(d.getGav().withVersion(version))

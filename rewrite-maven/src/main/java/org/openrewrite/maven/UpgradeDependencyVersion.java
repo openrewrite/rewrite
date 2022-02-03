@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 /**
@@ -123,7 +122,7 @@ public class UpgradeDependencyVersion extends Recipe {
                     }
 
                     if (newerVersion == null) {
-                        for (DependencyManagementDependency dm : module.getPom().getRequested().getDependencyManagement()) {
+                        for (ManagedDependency dm : module.getPom().getRequested().getDependencyManagement()) {
                             if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
                                 //noinspection ConstantConditions
                                 newerVersion = findNewerVersion(dm.getGroupId(), dm.getArtifactId(),

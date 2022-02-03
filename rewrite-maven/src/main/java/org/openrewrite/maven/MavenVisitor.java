@@ -147,8 +147,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     @Nullable
-    public DependencyManagementDependency findManagedDependency(Xml.Tag tag) {
-        for (DependencyManagementDependency d : getResolutionResult().getPom().getDependencyManagement()) {
+    public ResolvedManagedDependency findManagedDependency(Xml.Tag tag) {
+        for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
             if (tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()).equals(d.getGroupId()) &&
                     tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
                 return d;

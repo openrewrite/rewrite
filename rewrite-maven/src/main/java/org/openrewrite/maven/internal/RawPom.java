@@ -326,8 +326,8 @@ public class RawPom {
         return pomRepositories;
     }
 
-    private List<DependencyManagementDependency> mapDependencyManagement(@Nullable DependencyManagement rawDependencyManagement) {
-        List<DependencyManagementDependency> dependencyManagementDependencies = emptyList();
+    private List<ManagedDependency> mapDependencyManagement(@Nullable DependencyManagement rawDependencyManagement) {
+        List<ManagedDependency> dependencyManagementDependencies = emptyList();
         if (rawDependencyManagement != null && rawDependencyManagement.getDependencies() != null) {
             List<Dependency> unmappedDependencies = rawDependencyManagement.getDependencies().getDependencies();
             if (unmappedDependencies != null) {
@@ -335,9 +335,9 @@ public class RawPom {
                 for (Dependency d : unmappedDependencies) {
                     GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
                     if ("import".equals(d.getScope())) {
-                        dependencyManagementDependencies.add(new DependencyManagementDependency.Imported(dGav));
+                        dependencyManagementDependencies.add(new ManagedDependency.Imported(dGav));
                     } else {
-                        dependencyManagementDependencies.add(new DependencyManagementDependency.Defined(dGav, d.getScope(), d.getType(), d.getClassifier(), d.getExclusions()));
+                        dependencyManagementDependencies.add(new ManagedDependency.Defined(dGav, d.getScope(), d.getType(), d.getClassifier(), d.getExclusions()));
                     }
                 }
             }

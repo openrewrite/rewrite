@@ -38,7 +38,7 @@ public class Profile {
 
     Map<String, String> properties;
     List<Dependency> dependencies;
-    List<DependencyManagementDependency> dependencyManagement;
+    List<ManagedDependency> dependencyManagement;
     List<MavenRepository> repositories;
 
     public boolean isActive(Iterable<String> activeProfiles) {

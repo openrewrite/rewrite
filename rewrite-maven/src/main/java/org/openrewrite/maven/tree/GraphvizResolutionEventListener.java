@@ -102,7 +102,7 @@ public class GraphvizResolutionEventListener implements ResolutionEventListener 
     }
 
     @Override
-    public void dependencyManagement(DependencyManagementDependency dependencyManagement, Pom containing) {
+    public void dependencyManagement(ManagedDependency dependencyManagement, Pom containing) {
         if (!showManagedDependencies) {
             return;
         }

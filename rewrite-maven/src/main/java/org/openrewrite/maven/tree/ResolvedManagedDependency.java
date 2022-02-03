@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,51 +20,48 @@ import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 @Value
-public class Dependency {
+@With
+public class ResolvedManagedDependency {
     GroupArtifactVersion gav;
 
-    @With
-    @Nullable
-    String classifier;
+    Scope scope;
 
-    @With
     @Nullable
     String type;
 
-    @With
-    String scope;
+    @Nullable
+    String classifier;
 
-    @With
     List<GroupArtifact> exclusions;
 
-    @With
-    boolean optional;
+    ManagedDependency requested;
 
     @Nullable
+    ManagedDependency bom;
+
+    public String getType() {
+        return type == null ? "jar" : type;
+    }
+
     public String getGroupId() {
-        return gav.getGroupId();
+        return requested.getGroupId();
     }
 
     public String getArtifactId() {
-        return gav.getArtifactId();
+        return requested.getArtifactId();
     }
 
-    @Nullable
     public String getVersion() {
-        return gav.getVersion();
+        return requested.getVersion();
     }
 
-    public Dependency withGav(GroupArtifactVersion gav) {
-        if(gav == this.gav) {
-            return this;
-        }
-        return new Dependency(gav, classifier, type, scope, exclusions, optional);
-    }
-
-    @Override
-    public String toString() {
-        return gav.toString();
+    public boolean matches(String groupId, String artifactId,
+                           @Nullable String type, @Nullable String classifier) {
+        return groupId.equals(gav.getGroupId()) && artifactId.equals(gav.getArtifactId()) &&
+                (type == null ? "jar" : type).equals(this.type == null ? "jar" : this.type) &&
+                Objects.equals(classifier, this.classifier);
     }
 }

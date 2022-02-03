@@ -30,7 +30,7 @@ import java.util.Map;
  * The minimum information required about a POM to resolve it.
  * The data model here is the cacheable representation of POMs.
  * <p>
- * A POM serves as a {@link DependencyManagementDependency} when
+ * A POM serves as a {@link ManagedDependency} when
  * it is used as a BOM import.
  */
 @Value
@@ -54,7 +54,7 @@ public class Pom {
     String packaging;
 
     Map<String, String> properties;
-    List<DependencyManagementDependency> dependencyManagement;
+    List<ManagedDependency> dependencyManagement;
     List<Dependency> dependencies;
     List<MavenRepository> repositories;
     List<License> licenses;

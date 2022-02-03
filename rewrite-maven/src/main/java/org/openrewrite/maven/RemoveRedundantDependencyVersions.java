@@ -65,8 +65,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             private boolean matchesScope(ResolvedDependency d, Xml.Tag dependencyTag) {
                 return Objects.equals(
                         Scope.fromName(dependencyTag.getChildValue("scope").orElse(null)),
-                        Scope.fromName(getResolutionResult().getPom().getManagedScope(d.getGroupId(), d.getArtifactId(), d.getRequested().getType(),
-                                d.getRequested().getClassifier())));
+                        getResolutionResult().getPom().getManagedScope(d.getGroupId(), d.getArtifactId(), d.getRequested().getType(),
+                                d.getRequested().getClassifier()));
             }
         };
     }

@@ -23,7 +23,6 @@ import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Dependency management sections contain a combination of single dependency definitions and imports of
@@ -31,10 +30,10 @@ import java.util.Objects;
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public interface DependencyManagementDependency {
+public interface ManagedDependency {
     @Value
     @With
-    class Defined implements DependencyManagementDependency {
+    class Defined implements ManagedDependency {
         GroupArtifactVersion gav;
 
         @Nullable
@@ -66,18 +65,11 @@ public interface DependencyManagementDependency {
         public Defined withVersion(String version) {
             return withGav(gav.withVersion(version));
         }
-
-        public boolean matches(String groupId, String artifactId,
-                               @Nullable String type, @Nullable String classifier) {
-            return groupId.equals(gav.getGroupId()) && artifactId.equals(gav.getArtifactId()) &&
-                    (type == null ? "jar" : type).equals(this.type == null ? "jar" : this.type) &&
-                    Objects.equals(classifier, this.classifier);
-        }
     }
 
     @Value
     @With
-    class Imported implements DependencyManagementDependency {
+    class Imported implements ManagedDependency {
         GroupArtifactVersion gav;
 
         public String getGroupId() {
@@ -106,5 +98,5 @@ public interface DependencyManagementDependency {
 
     String getVersion();
 
-    <D extends DependencyManagementDependency> D withVersion(String version);
+    <D extends ManagedDependency> D withVersion(String version);
 }
