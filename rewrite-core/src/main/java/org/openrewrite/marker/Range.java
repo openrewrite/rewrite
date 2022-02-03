@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,26 @@ import lombok.With;
 
 import java.util.UUID;
 
+/**
+ * @author Alex Boyko
+ */
 @Value
 @With
-public class Position implements Marker {
+public class Range implements Marker {
+
+    @Value
+    @With
+    public static class Position {
+        int offset;
+        int line;
+        int column;
+    }
+
     UUID id;
-    int startPosition;
-    int length;
+    Position start;
+    Position end;
+
+    public int length() {
+        return end.offset - start.offset;
+    }
 }

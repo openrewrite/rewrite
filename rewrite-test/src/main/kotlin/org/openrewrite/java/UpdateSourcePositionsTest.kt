@@ -19,7 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.PrintOutputCapture
 import org.openrewrite.marker.Marker
-import org.openrewrite.marker.Position
+import org.openrewrite.marker.Range
 
 interface UpdateSourcePositionsTest : JavaRecipeTest {
 
@@ -38,24 +38,45 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
 
         val after = UpdateSourcePositions().run(cu)[0].after!!
 
-        val withPositions = after.print(
+        val withOffsetAndLength = after.print(
             object : JavaPrinter<Int>() {
                 override fun <M : Marker> visitMarker(marker: Marker, p: PrintOutputCapture<Int>): M {
-                    if (marker is Position) {
-                        p.append("[${marker.startPosition},${marker.length}]")
+                    if (marker is Range) {
+                        p.append("[${marker.start.offset},${marker.length()}]")
                     }
                     return super.visitMarker(marker, p)
                 }
             }
         )
 
-        assertThat(withPositions).isEqualTo("""
-          [0,54][0,54]class [6,4]Test [11,43]{
-              [17,5][17,3]int [21,1][21,1]n;
-              
-              [33,19][33,4]void [38,4]test([43,0]) [45,7]{
-              }
-          }
+        assertThat(withOffsetAndLength).isEqualTo("""
+            [0,54][0,54]class [6,4]Test [11,43]{
+                [17,5][17,3]int [21,1][21,1]n;
+                
+                [33,19][33,4]void [38,4]test([43,0]) [45,7]{
+                }
+            }
         """.trimIndent())
+
+        val withLineAndColumn = after.print(
+            object : JavaPrinter<Int>() {
+                override fun <M : Marker> visitMarker(marker: Marker, p: PrintOutputCapture<Int>): M {
+                    if (marker is Range) {
+                        p.append("[(${marker.start.line}, ${marker.start.column}), (${marker.end.line}, ${marker.end.column})]")
+                    }
+                    return super.visitMarker(marker, p)
+                }
+            }
+        )
+
+        assertThat(withLineAndColumn).isEqualTo("""
+            [(0, 0), (4, 7)][(0, 0), (4, 7)]class [(0, 6), (0, 10)]Test [(0, 11), (4, 7)]{
+                [(1, 4), (1, 9)][(1, 4), (1, 7)]int [(1, 8), (1, 9)][(1, 8), (1, 9)]n;
+                
+                [(3, 4), (4, 5)][(3, 4), (3, 8)]void [(3, 9), (3, 13)]test([(3, 14), (3, 14)]) [(3, 16), (4, 5)]{
+                }
+            }
+        """.trimIndent())
+
     }
 }
