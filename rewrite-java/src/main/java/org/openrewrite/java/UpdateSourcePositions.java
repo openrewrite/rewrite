@@ -19,7 +19,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Position;
+import org.openrewrite.marker.Range;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -40,11 +40,11 @@ public class UpdateSourcePositions extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        Map<Tree, Position> positionMap = new IdentityHashMap<>();
+        Map<Tree, Range> positionMap = new IdentityHashMap<>();
         PositionPrintOutputCapture ppoc = new PositionPrintOutputCapture();
 
         JavaPrinter<ExecutionContext> printer = new JavaPrinter<ExecutionContext>() {
-            final JavaPrinter<Integer> spacePrinter = new JavaPrinter<>();
+            final JavaPrinter<ExecutionContext> spacePrinter = new JavaPrinter<>();
 
             @Override
             public @Nullable J visit(@Nullable Tree tree, PrintOutputCapture<ExecutionContext> outputCapture) {
@@ -54,13 +54,13 @@ public class UpdateSourcePositions extends Recipe {
 
                 J t = (J) tree;
 
-                PrintOutputCapture<Integer> prefix = new PrintOutputCapture<>(0);
+                PositionPrintOutputCapture prefix = new PositionPrintOutputCapture(ppoc.pos, ppoc.line, ppoc.column);
                 spacePrinter.visitSpace(t.getPrefix(), Space.Location.ANY, prefix);
 
-                int startPosition = ppoc.pos + prefix.getOut().length();
+                Range.Position startPosition = new Range.Position(prefix.pos, prefix.line, prefix.column);
                 t = super.visit(tree, outputCapture);
-                int length = ppoc.pos - startPosition;
-                positionMap.put(t, new Position(randomId(), startPosition, length));
+                Range.Position endPosition = new Range.Position(ppoc.pos, ppoc.line, ppoc.column);
+                positionMap.put(t, new Range(randomId(), startPosition, endPosition));
 
                 return t;
             }
@@ -79,8 +79,8 @@ public class UpdateSourcePositions extends Recipe {
                     firstVisit = false;
                 }
 
-                Position pos = positionMap.get(tree);
-                J t = ((J) tree).withMarkers(((J) tree).getMarkers().add(pos));
+                Range range = positionMap.get(tree);
+                J t = ((J) tree).withMarkers(((J) tree).getMarkers().add(range));
                 return super.visit(t, ctx);
             }
         };
@@ -88,14 +88,34 @@ public class UpdateSourcePositions extends Recipe {
 
     private static class PositionPrintOutputCapture extends PrintOutputCapture<ExecutionContext> {
         int pos;
+        int line;
+        int column;
+        private boolean lineBoundary;
 
         public PositionPrintOutputCapture() {
             super(new InMemoryExecutionContext());
         }
 
+        public PositionPrintOutputCapture(int pos, int line, int column) {
+            this();
+            this.pos = pos;
+            this.line = line;
+            this.column = column;
+        }
+
         @Override
         public PrintOutputCapture<ExecutionContext> append(char c) {
             pos++;
+            if (lineBoundary) {
+                line++;
+                column = 0;
+                lineBoundary = false;
+            } else {
+                column++;
+            }
+            if (c == '\n') {
+                lineBoundary = true;
+            }
             return super.append(c);
         }
 
@@ -103,6 +123,13 @@ public class UpdateSourcePositions extends Recipe {
         public PrintOutputCapture<ExecutionContext> append(@Nullable String text) {
             if (text != null) {
                 pos += text.length();
+                String[] lines = text.split("\n");
+                if (lines.length > 1) {
+                    line += lines.length - 1;
+                    column = lines[lines.length - 1].length();
+                } else {
+                    column += text.length();
+                }
             }
             return super.append(text);
         }
