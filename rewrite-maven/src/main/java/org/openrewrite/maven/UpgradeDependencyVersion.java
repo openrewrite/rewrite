@@ -217,6 +217,7 @@ public class UpgradeDependencyVersion extends Recipe {
                                     doAfterVisit(new ChangeProperty<>(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion));
                                     return t;
                                 }
+                                t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(t.getChild("version").get(), newerVersion).visitNonNull(t, 0, getCursor());
                             }
                         }
                     }

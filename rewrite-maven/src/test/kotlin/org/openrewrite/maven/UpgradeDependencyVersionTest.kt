@@ -614,7 +614,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
-    fun upgradeDependencyHandlesDependencyManagement() = assertChanged(
+    fun upgradeBomImport() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "io.micronaut",
             "micronaut-bom",
@@ -623,45 +623,43 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             null
         ),
         before = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <packaging>pom</packaging>
-                  <groupId>org.openrewrite.example</groupId>
-                  <artifactId>my-app-server</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>io.micronaut</groupId>
-                        <artifactId>micronaut-bom</artifactId>
-                        <version>2.5.11</version>
-                        <type>pom</type>
-                        <scope>import</scope>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                </project>
-            """,
+            <project>
+              <packaging>pom</packaging>
+              <groupId>org.openrewrite.example</groupId>
+              <artifactId>my-app-server</artifactId>
+              <version>1</version>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.micronaut</groupId>
+                    <artifactId>micronaut-bom</artifactId>
+                    <version>2.5.11</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+        """,
         after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <packaging>pom</packaging>
-                  <groupId>org.openrewrite.example</groupId>
-                  <artifactId>my-app-server</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>io.micronaut</groupId>
-                        <artifactId>micronaut-bom</artifactId>
-                        <version>3.0.0-M5</version>
-                        <type>pom</type>
-                        <scope>import</scope>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                </project>
-            """
+            <project>
+              <packaging>pom</packaging>
+              <groupId>org.openrewrite.example</groupId>
+              <artifactId>my-app-server</artifactId>
+              <version>1</version>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.micronaut</groupId>
+                    <artifactId>micronaut-bom</artifactId>
+                    <version>3.0.0-M5</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+        """
     )
 
     @Test
