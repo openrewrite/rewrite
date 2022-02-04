@@ -47,15 +47,17 @@ public class ResolvedManagedDependency {
     }
 
     public String getGroupId() {
-        return requested.getGroupId();
+        assert gav.getGroupId() != null;
+        return gav.getGroupId();
     }
 
     public String getArtifactId() {
-        return requested.getArtifactId();
+        return gav.getArtifactId();
     }
 
     public String getVersion() {
-        return requested.getVersion();
+        assert gav.getVersion() != null;
+        return gav.getVersion();
     }
 
     public boolean matches(String groupId, String artifactId,
