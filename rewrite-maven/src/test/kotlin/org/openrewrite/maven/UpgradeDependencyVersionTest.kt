@@ -249,7 +249,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
-    fun handlesPropertiesInDependencyGroupIdAndArtifactId() = assertChanged(
+    fun propertiesInDependencyGroupIdAndArtifactId() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "com.google.guava",
             "*",
@@ -259,18 +259,14 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         ),
         before = """
             <project>
-                <modelVersion>4.0.0</modelVersion>
-
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-
                 <properties>
                     <dependency.group-id>com.google.guava</dependency.group-id>
                     <dependency.artifact-id>guava</dependency.artifact-id>
                     <dependency.version>13.0</dependency.version>
                 </properties>
-
                 <dependencies>
                     <dependency>
                         <groupId>${'$'}{dependency.group-id}</groupId>
@@ -282,18 +278,14 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         """,
         after = """
             <project>
-                <modelVersion>4.0.0</modelVersion>
-
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-
                 <properties>
                     <dependency.group-id>com.google.guava</dependency.group-id>
                     <dependency.artifact-id>guava</dependency.artifact-id>
                     <dependency.version>13.0.1</dependency.version>
                 </properties>
-
                 <dependencies>
                     <dependency>
                         <groupId>${'$'}{dependency.group-id}</groupId>

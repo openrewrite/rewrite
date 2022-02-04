@@ -102,44 +102,38 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean hasGroupAndArtifact(String groupId, @Nullable String artifactId) {
-        return hasGroupId(groupId) && hasArtifactId(artifactId);
-    }
-
-    private boolean hasGroupId(String groupId) {
         Xml.Tag tag = getCursor().getValue();
-        boolean isGroupIdFound = matchesGlob(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()), groupId);
-        if (!isGroupIdFound && getResolutionResult().getPom().getProperties() != null) {
-            if (tag.getChildValue("groupId").isPresent() && tag.getChildValue("groupId").get().trim().startsWith("${")) {
-                String propertyKey = tag.getChildValue("groupId").get().trim();
-                String value = getResolutionResult().getPom().getValue(propertyKey);
-                isGroupIdFound = value != null && matchesGlob(value, groupId);
+        Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
+        for (Scope scope : Scope.values()) {
+            if (dependencies.containsKey(scope)) {
+                for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
+                    Dependency req = resolvedDependency.getRequested();
+                    String reqGroup = req.getGroupId();
+                    return (reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
+                            req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                            scope == Scope.fromName(tag.getChildValue("scope").orElse("compile"));
+                }
             }
         }
-        return isGroupIdFound;
-    }
-
-    private boolean hasArtifactId(@Nullable String artifactId) {
-        Xml.Tag tag = getCursor().getValue();
-        boolean isArtifactIdFound = tag.getChildValue("artifactId")
-                .map(a -> matchesGlob(a, artifactId))
-                .orElse(artifactId == null);
-        if (!isArtifactIdFound && artifactId != null && getResolutionResult().getPom().getProperties() != null) {
-            if (tag.getChildValue("artifactId").isPresent() && tag.getChildValue("artifactId").get().trim().startsWith("${")) {
-                String propertyKey = tag.getChildValue("artifactId").get().trim();
-                String value = getResolutionResult().getPom().getValue(propertyKey);
-                isArtifactIdFound = value != null && matchesGlob(value, artifactId);
-            }
-        }
-        return isArtifactIdFound;
+        return false;
     }
 
     @Nullable
     public ResolvedDependency findDependency(Xml.Tag tag) {
-        for (List<ResolvedDependency> scope : getResolutionResult().getDependencies().values()) {
-            for (ResolvedDependency d : scope) {
-                if (tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()).equals(d.getGroupId()) &&
-                        tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
-                    return d;
+        Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
+        for (Scope scope : Scope.values()) {
+            if (dependencies.containsKey(scope)) {
+                for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
+                    Dependency req = resolvedDependency.getRequested();
+                    String reqGroup = req.getGroupId();
+                    String reqVersion = req.getVersion();
+                    if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
+                            req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                            (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null))) &&
+                            (req.getClassifier() == null || req.getClassifier().equals(tag.getChildValue("classifier").orElse(null))) &&
+                            scope == Scope.fromName(tag.getChildValue("scope").orElse("compile"))) {
+                        return resolvedDependency;
+                    }
                 }
             }
         }
