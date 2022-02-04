@@ -193,6 +193,28 @@ public class UpgradeDependencyVersion extends Recipe {
                             }
                         }
                     }
+                } else if (isManagedDependencyTag(groupId, artifactId)) {
+                    for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
+                        if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
+                            String requestedVersion = dm.getRequested().getVersion();
+                            String newerVersion = findNewerVersion(dm.getGroupId(), dm.getArtifactId(), dm.getVersion(), ctx);
+                            if (requestedVersion.startsWith("${")) {
+                                doAfterVisit(new ChangeProperty<>(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion));
+                                return t;
+                            }
+                        } else if(dm.getBomGav() != null) {
+                            ResolvedGroupArtifactVersion bom = dm.getBomGav();
+                            if (matchesGlob(bom.getGroupId(), groupId) && matchesGlob(bom.getArtifactId(), artifactId)) {
+                                //noinspection ConstantConditions
+                                String requestedVersion = dm.getRequestedBom().getVersion();
+                                String newerVersion = findNewerVersion(bom.getGroupId(), bom.getArtifactId(), bom.getVersion(), ctx);
+                                if (requestedVersion.startsWith("${")) {
+                                    doAfterVisit(new ChangeProperty<>(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion));
+                                    return t;
+                                }
+                            }
+                        }
+                    }
                 }
                 return t;
             }
