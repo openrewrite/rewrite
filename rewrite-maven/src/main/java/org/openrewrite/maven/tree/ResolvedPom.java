@@ -16,6 +16,8 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Getter;
 import lombok.Value;
 import lombok.With;
@@ -39,6 +41,7 @@ import java.util.function.UnaryOperator;
 import static java.util.Collections.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @Getter
 public class ResolvedPom {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
@@ -86,7 +89,7 @@ public class ResolvedPom {
      * @return This POM after deduplication.
      */
     @SuppressWarnings("UnnecessaryLocalVariable")
-    public ResolvedPom dedup() {
+    public ResolvedPom deduplicate() {
         Set<UniqueDependencyKey> uniqueManagedDependencies = new HashSet<>(dependencyManagement.size());
 
         List<ResolvedManagedDependency> dedupMd = ListUtils.map(dependencyManagement, dm -> uniqueManagedDependencies.add(new UniqueDependencyKey(dm.getGav(), dm.getType(), dm.getClassifier(), dm.getScope())) ?

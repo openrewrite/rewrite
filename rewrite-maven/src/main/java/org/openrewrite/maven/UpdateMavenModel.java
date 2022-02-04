@@ -39,13 +39,6 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         d = d.withMarkers(d.getMarkers().computeByType(getResolutionResult(), (resolutionResult, ignored) -> {
             Pom requested = resolutionResult.getPom().getRequested();
 
-            Map<Path, Pom> projectPoms = new HashMap<>();
-            projectPoms.put(requested.getSourcePath(), requested);
-            for (MavenResolutionResult module : resolutionResult.getModules()) {
-                projectPoms.put(module.getPom().getRequested().getSourcePath(),
-                        module.getPom().getRequested());
-            }
-
             Optional<Xml.Tag> dependencies = document.getRoot().getChild("dependencies");
             if (dependencies.isPresent()) {
                 List<Xml.Tag> eachDependency = dependencies.get().getChildren("dependency");
@@ -94,7 +87,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 }
             }
 
-            return updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)), projectPoms);
+            return updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
+                    resolutionResult.getProjectPoms());
         }));
 
         return d;

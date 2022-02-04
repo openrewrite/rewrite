@@ -93,7 +93,7 @@ public class MavenParser implements Parser<Xml.Document> {
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
-            MavenResolutionResult model = new MavenResolutionResult(randomId(), resolvedPom, emptyList(), emptyMap())
+            MavenResolutionResult model = new MavenResolutionResult(randomId(), resolvedPom, emptyList(), null, emptyMap())
                     .resolveDependencies(downloader, ctx);
             parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
         }
@@ -105,6 +105,9 @@ public class MavenParser implements Parser<Xml.Document> {
 
             List<MavenResolutionResult> modules = new ArrayList<>(0);
             for (Xml.Document possibleModule : parsed) {
+                if(possibleModule == maven) {
+                    continue;
+                }
                 MavenResolutionResult moduleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class)
                         .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
                 Parent parent = moduleResolutionResult.getPom().getRequested().getParent();
@@ -112,6 +115,7 @@ public class MavenParser implements Parser<Xml.Document> {
                         parent.getGroupId().equals(resolutionResult.getPom().getGroupId()) &&
                         parent.getArtifactId().equals(resolutionResult.getPom().getArtifactId()) &&
                         parent.getVersion().equals(resolutionResult.getPom().getVersion())) {
+                    moduleResolutionResult.unsafeSetParent(resolutionResult);
                     modules.add(moduleResolutionResult);
                 }
             }

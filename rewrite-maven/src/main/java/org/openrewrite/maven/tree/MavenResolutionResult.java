@@ -18,13 +18,14 @@ package org.openrewrite.maven.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,10 @@ public class MavenResolutionResult implements Marker {
     @With
     List<MavenResolutionResult> modules;
 
+    @Nullable
+    @NonFinal
+    MavenResolutionResult parent;
+
     @With
     Map<Scope, List<ResolvedDependency>> dependencies;
 
@@ -64,6 +69,10 @@ public class MavenResolutionResult implements Marker {
         return null;
     }
 
+    public void unsafeSetParent(MavenResolutionResult parent) {
+        this.parent = parent;
+    }
+
     @Incubating(since = "7.18.0")
     @Nullable
     public ResolvedManagedDependency getResolvedManagedDependency(ManagedDependency dependency) {
@@ -74,7 +83,7 @@ public class MavenResolutionResult implements Marker {
         }
         return null;
     }
-    
+
     public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) {
         Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
         dependencies.put(Scope.Compile, pom.resolveDependencies(Scope.Compile, downloader, ctx));
@@ -82,5 +91,22 @@ public class MavenResolutionResult implements Marker {
         dependencies.put(Scope.Runtime, pom.resolveDependencies(Scope.Runtime, downloader, ctx));
         dependencies.put(Scope.Provided, pom.resolveDependencies(Scope.Provided, downloader, ctx));
         return withDependencies(dependencies);
+    }
+
+    public Map<Path, Pom> getProjectPoms() {
+        return getProjectPomsRecursive(new HashMap<>());
+    }
+
+    private Map<Path, Pom> getProjectPomsRecursive(Map<Path, Pom> projectPoms) {
+        projectPoms.put(pom.getRequested().getSourcePath(), pom.getRequested());
+        if (parent != null) {
+            parent.getProjectPomsRecursive(projectPoms);
+        }
+        for (MavenResolutionResult module : modules) {
+            if (!projectPoms.containsKey(module.getPom().getRequested().getSourcePath())) {
+                module.getProjectPomsRecursive(projectPoms);
+            }
+        }
+        return projectPoms;
     }
 }

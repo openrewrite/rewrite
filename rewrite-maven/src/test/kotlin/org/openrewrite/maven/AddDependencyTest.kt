@@ -368,14 +368,14 @@ class AddDependencyTest {
             //language=xml
             """
                 <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
                     <parent>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-parent</artifactId>
                         <version>1</version>
                     </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
                     <dependencies>
                         <dependency>
                             <groupId>com.google.guava</groupId>
