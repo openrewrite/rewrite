@@ -417,12 +417,11 @@ public class ResolvedPom {
                         dependencyManagement.addAll(ListUtils.map(bom.getDependencyManagement(), dm -> dm.withBom(d)));
                     } else if (d instanceof Defined) {
                         Defined defined = (Defined) d;
-                        defined = defined.withGav(getValues(defined.getGav()));
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
-                                .dependencyManagement(defined, pom);
+                                .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
                         dependencyManagement.add(new ResolvedManagedDependency(
-                                defined.getGav(),
+                                getValues(defined.getGav()),
                                 Scope.fromName(getValue(defined.getScope())),
                                 getValue(defined.getType()),
                                 getValue(defined.getClassifier()),

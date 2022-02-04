@@ -28,7 +28,7 @@ import java.util.*;
  * GAV coordinates, SCM, properties, but before plugins.
  * "After" ordering preference takes priority over "before".
  */
-class MavenTagInsertionComparator implements Comparator<Xml.Tag> {
+public class MavenTagInsertionComparator implements Comparator<Xml.Tag> {
     private static final List<String> canonicalOrdering = Arrays.asList(
             "modelVersion",
             "parent",
@@ -64,7 +64,7 @@ class MavenTagInsertionComparator implements Comparator<Xml.Tag> {
 
     private final Map<Xml.Tag, Integer> existingIndices = new IdentityHashMap<>();
 
-    MavenTagInsertionComparator(List<Xml.Tag> existingTags) {
+    public MavenTagInsertionComparator(List<Xml.Tag> existingTags) {
         for (int i = 0; i < existingTags.size(); i++) {
             existingIndices.put(existingTags.get(i), i);
         }

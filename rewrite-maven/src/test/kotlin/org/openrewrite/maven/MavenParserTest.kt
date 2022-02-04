@@ -23,6 +23,7 @@ import okhttp3.Credentials
 import org.assertj.core.api.Assertions.assertThat
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
@@ -819,6 +820,7 @@ class MavenParserTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/376")
+    @Disabled
     @Test
     fun dependencyManagementPropagatesToDependencies() {
         // a depends on b

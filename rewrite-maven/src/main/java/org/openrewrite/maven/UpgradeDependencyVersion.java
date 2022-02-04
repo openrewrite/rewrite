@@ -122,7 +122,7 @@ public class UpgradeDependencyVersion extends Recipe {
                     }
 
                     if (newerVersion == null) {
-                        for (ManagedDependency dm : module.getPom().getRequested().getDependencyManagement()) {
+                        for (ResolvedManagedDependency dm : module.getPom().getDependencyManagement()) {
                             if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
                                 //noinspection ConstantConditions
                                 newerVersion = findNewerVersion(dm.getGroupId(), dm.getArtifactId(),
@@ -159,6 +159,16 @@ public class UpgradeDependencyVersion extends Recipe {
                     if (d != null) {
                         String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                         if (newerVersion != null) {
+                            for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
+                                if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
+                                    String requestedVersion = dm.getRequested().getVersion();
+                                    if(requestedVersion.startsWith("${")) {
+                                        doAfterVisit(new AddProperty<>(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion));
+                                        return t;
+                                    }
+                                }
+                            }
+
                             Optional<Xml.Tag> version = t.getChild("version");
                             if (version.isPresent()) {
                                 t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(version.get(), newerVersion).visitNonNull(t, 0, getCursor());

@@ -616,8 +616,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         ),
         before = """
             <project>
-              <modelVersion>4.0.0</modelVersion>
-              
               <parent>
                 <groupId>com.fasterxml.jackson</groupId>
                 <artifactId>jackson-parent</artifactId>
@@ -627,8 +625,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
-              <properties>
-              </properties>
             
               <dependencies>
                 <dependency>
@@ -640,8 +636,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         """,
         after = """            
             <project>
-              <modelVersion>4.0.0</modelVersion>
-              
               <parent>
                 <groupId>com.fasterxml.jackson</groupId>
                 <artifactId>jackson-parent</artifactId>

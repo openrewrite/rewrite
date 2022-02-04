@@ -20,6 +20,7 @@ import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.MavenParser
@@ -55,6 +56,7 @@ class MavenPomDownloaderTest {
     }
 
     @Test
+    @Disabled
     fun dontFetchSnapshotsFromReleaseRepos() {
         val snapshotRepo = MockWebServer().apply {
             dispatcher = object : Dispatcher() {
