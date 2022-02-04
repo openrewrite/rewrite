@@ -16,13 +16,17 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
+import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.marker.JavaProject
 import org.openrewrite.java.tree.J
+import java.nio.file.Path
 
 class AddDependencyTest {
     private val mavenParser = MavenParser.builder().build()
@@ -258,6 +262,7 @@ class AddDependencyTest {
                 )
             )[0].after!!.printAllTrimmed()
         ).isEqualTo(
+            //language=xml
             """
                 <project>
                     <groupId>com.mycompany.app</groupId>
@@ -306,46 +311,61 @@ class AddDependencyTest {
     }
 
     @Test
-    fun useManaged() {
+    fun useManaged(@TempDir tempDir: Path) {
+        val parent = tempDir.resolve("pom.xml")
+        val child = tempDir.resolve("server/pom.xml")
+        child.toFile().parentFile.mkdirs()
+
+        parent.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-parent</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>28.0-jre</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """
+        )
+
+        child.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """.trimIndent()
+        )
+
         assertThat(
             addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath").run(
-                javaParser.parseWithProvenance("main", usingGuavaIntMath) + mavenParser.parseWithProvenance(
-                    """
-                        <project>
-                            <groupId>com.mycompany.app</groupId>
-                            <artifactId>my-parent</artifactId>
-                            <version>1</version>
-                            <dependencyManagement>
-                                <dependencies>
-                                    <dependency>
-                                        <groupId>com.google.guava</groupId>
-                                        <artifactId>guava</artifactId>
-                                        <version>28.0-jre</version>
-                                    </dependency>
-                                </dependencies>
-                            </dependencyManagement>
-                        </project>
-                    """.trimIndent(),
-                    """
-                        <project>
-                            <groupId>com.mycompany.app</groupId>
-                            <artifactId>my-app</artifactId>
-                            <version>1</version>
-                            <parent>
-                                <groupId>com.mycompany.app</groupId>
-                                <artifactId>my-parent</artifactId>
-                                <version>1</version>
-                            </parent>
-                        </project>
-                    """.trimIndent()
-                ).mapIndexed { n, maven ->
-                    if (n == 0) {
-                        // give the parent a different java project
-                        maven.withMarkers(maven.markers.compute(javaProject) { j, _ -> j.withId(randomId()) })
-                    } else maven
-                }
+                javaParser.parseWithProvenance("main", usingGuavaIntMath) +
+                        mavenParser.parse(listOf(parent, child), tempDir, InMemoryExecutionContext())
+                            .map { j -> j.withMarkers(j.markers.addIfAbsent(javaProject)) }
+                            .mapIndexed { n, maven ->
+                                if (n == 0) {
+                                    // give the parent a different java project
+                                    maven.withMarkers(maven.markers.compute(javaProject) { j, _ -> j.withId(randomId()) })
+                                } else maven
+                            }
             )[0].after!!.printAllTrimmed()
         ).isEqualTo(
+            //language=xml
             """
                 <project>
                     <groupId>com.mycompany.app</groupId>
@@ -402,6 +422,7 @@ class AddDependencyTest {
                 )
             )[0].after!!.printAllTrimmed()
         ).isEqualTo(
+            //language=xml
             """
                 <project>
                     <groupId>com.mycompany.app</groupId>
@@ -432,9 +453,10 @@ class AddDependencyTest {
         return parse(*javaSources).map { j -> j.withMarkers(j.markers.addIfAbsent(javaProject)) }
     }
 
-    private fun MavenParser.parseWithProvenance(vararg pomSources: String) = parse(*pomSources).map { j ->
-        j.withMarkers(j.markers.addIfAbsent(javaProject))
-    }
+    private fun MavenParser.parseWithProvenance(@Language("xml") vararg pomSources: String) =
+        parse(*pomSources).map { j ->
+            j.withMarkers(j.markers.addIfAbsent(javaProject))
+        }
 
     private fun addDependency(gav: String, onlyIfUsing: String): AddDependency {
         val (group, artifact, version) = gav.split(":")
