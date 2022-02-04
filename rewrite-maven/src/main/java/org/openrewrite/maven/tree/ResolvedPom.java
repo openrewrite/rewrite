@@ -82,6 +82,42 @@ public class ResolvedPom {
     List<Dependency> requestedDependencies;
 
     /**
+     * Deduplicate dependencies and dependency management dependencies
+     * @return This POM after deduplication.
+     */
+    @SuppressWarnings("UnnecessaryLocalVariable")
+    public ResolvedPom dedup() {
+        Set<UniqueDependencyKey> uniqueManagedDependencies = new HashSet<>(dependencyManagement.size());
+
+        List<ResolvedManagedDependency> dedupMd = ListUtils.map(dependencyManagement, dm -> uniqueManagedDependencies.add(new UniqueDependencyKey(dm.getGav(), dm.getType(), dm.getClassifier(), dm.getScope())) ?
+                dm : null);
+//        System.out.println("dm:" + dedupMd.size() + "/" + dependencyManagement.size() + "=" +
+//                (dependencyManagement.size() == 0 ? 0 : 100*(dedupMd.size() / dependencyManagement.size())));
+        dependencyManagement = dedupMd;
+
+        uniqueManagedDependencies.clear();
+        List<Dependency> dedupD = ListUtils.map(requestedDependencies, d -> uniqueManagedDependencies.add(new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())) ?
+                d : null);
+//        System.out.println("d:" + dedupD.size() + "/" + requestedDependencies.size() + "=" +
+//                (requestedDependencies.size() == 0 ? 0 : 100*(dedupD.size() / requestedDependencies.size())));
+        requestedDependencies = dedupD;
+        return this;
+    }
+
+    @Value
+    private static class UniqueDependencyKey {
+        GroupArtifactVersion gav;
+
+        @Nullable
+        String type;
+
+        @Nullable
+        String classifier;
+
+        Object scope;
+    }
+
+    /**
      * Whenever a change is made that may affect the effective properties, dependency management,
      * dependencies, etc. of a POM, this can be called to re-resolve the POM.
      *
@@ -424,7 +460,7 @@ public class ResolvedPom {
             for (DependencyAndDependent dd : dependenciesAtDepth) {
                 Dependency d = dd.getDefinedIn().getValues(dd.getDependency(), depth);
 
-                if(d.getVersion() == null) {
+                if (d.getVersion() == null) {
                     throw new MavenParsingException("No version provided for dependency " + d.getGroupId() + ":" + d.getArtifactId());
                 }
 

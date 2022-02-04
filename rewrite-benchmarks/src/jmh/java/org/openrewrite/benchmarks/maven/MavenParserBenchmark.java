@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 public class MavenParserBenchmark {
     CompositeMavenPomCache pomCache = new CompositeMavenPomCache(
             new InMemoryMavenPomCache(),
-            new RocksdbMavenPomCache(Paths.get(System.getProperty("user.dir")))
+            new RocksdbMavenPomCache(Paths.get(System.getProperty("user.home")))
     );
 
     public static void main(String[] args) throws RunnerException {
