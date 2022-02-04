@@ -79,7 +79,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             //language=xml
             """
                 <project>
-                    <modelVersion>4.0.0</modelVersion>
                     <packaging>pom</packaging>
                     <groupId>com.mycompany</groupId>
                     <artifactId>my-parent</artifactId>
@@ -101,8 +100,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             //language=xml
             """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
                   <parent>
                     <groupId>com.mycompany</groupId>
                     <artifactId>my-parent</artifactId>

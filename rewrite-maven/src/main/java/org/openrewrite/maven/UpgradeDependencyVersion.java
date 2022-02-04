@@ -151,8 +151,7 @@ public class UpgradeDependencyVersion extends Recipe {
                     }
 
                     if (newerVersion != null) {
-                        assert requestedVersion != null;
-                        if (requestedVersion.contains("${")) {
+                        if (requestedVersion != null && requestedVersion.contains("${")) {
                             m = (Xml.Document) new ChangePropertyValue(requestedVersion, newerVersion, false).getVisitor()
                                     .visitNonNull(m, ctx, getCursor());
                             break;
