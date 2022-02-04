@@ -449,6 +449,10 @@ class Java8ReorderMethodArgumentsTest : Java8Test, ReorderMethodArgumentsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ReplaceConstantTest : Java8Test, ReplaceConstantTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ResultOfMethodCallIgnoredTest : Java8Test, ResultOfMethodCallIgnoredTest
 
 @DebugOnly

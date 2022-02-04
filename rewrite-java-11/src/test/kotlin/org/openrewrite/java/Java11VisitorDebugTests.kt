@@ -453,6 +453,10 @@ class Java11ReorderMethodArgumentsTest : Java11Test, ReorderMethodArgumentsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ReplaceConstantTest : Java11Test, ReplaceConstantTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ResultOfMethodCallIgnoredTest : Java11Test, ResultOfMethodCallIgnoredTest
 
 @DebugOnly

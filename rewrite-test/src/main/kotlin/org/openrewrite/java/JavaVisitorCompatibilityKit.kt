@@ -357,6 +357,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ReorderMethodArgumentsTck : ReorderMethodArgumentsTest
 
     @Nested
+    inner class ReplaceConstantTck : ReplaceConstantTest
+
+    @Nested
     inner class ResultOfMethodCallIgnoredTck : ResultOfMethodCallIgnoredTest
 
     @Nested

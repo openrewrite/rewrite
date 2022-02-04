@@ -465,4 +465,17 @@ public class StringUtils {
         }
         return s2.length() < s1.length() ? s2.toString() : s1.toString();
     }
+
+    public static boolean isNumeric(String str) {
+        if (str == null) {
+            return false;
+        }
+        int sz = str.length();
+        for (int i = 0; i < sz; i++) {
+            if (!Character.isDigit(str.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
