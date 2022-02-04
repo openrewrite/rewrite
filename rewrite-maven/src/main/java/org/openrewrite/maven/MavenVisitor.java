@@ -17,7 +17,9 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.AddImport;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
@@ -121,6 +123,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             }
         }
         return false;
+    }
+
+    public void maybeUpdateModel() {
+        for (TreeVisitor<Xml, P> afterVisit : getAfterVisit()) {
+            if(afterVisit instanceof UpdateMavenModel) {
+                return;
+            }
+        }
+        doAfterVisit(new UpdateMavenModel<>());
     }
 
     public boolean isPluginTag() {

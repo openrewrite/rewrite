@@ -76,7 +76,7 @@ public class RemoveDependency extends Recipe {
                 ResolvedDependency dependency = findDependency(tag, checkScope);
                 if (dependency != null) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true));
-                    doAfterVisit(new UpdateMavenModel());
+                    maybeUpdateModel();
                 }
             }
 

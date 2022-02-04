@@ -161,7 +161,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
                 if (m != document) {
                     Pom requestedPom = getResolutionResult().getPom().getRequested();
-                    doAfterVisit(new UpdateMavenModel());
+                    maybeUpdateModel();
                     doAfterVisit(new RemoveRedundantDependencyVersions());
                 }
 

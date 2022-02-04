@@ -126,7 +126,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
                 doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
                         new InsertDependencyComparator(tag.getChildren(), dependencyTag)));
-                doAfterVisit(new UpdateMavenModel());
+                maybeUpdateModel();
 
                 return tag;
             }

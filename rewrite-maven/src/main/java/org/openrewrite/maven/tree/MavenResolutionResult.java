@@ -18,10 +18,14 @@ package org.openrewrite.maven.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.maven.cache.MavenPomCache;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -69,5 +73,14 @@ public class MavenResolutionResult implements Marker {
             }
         }
         return null;
+    }
+    
+    public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) {
+        Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
+        dependencies.put(Scope.Compile, pom.resolveDependencies(Scope.Compile, downloader, ctx));
+        dependencies.put(Scope.Test, pom.resolveDependencies(Scope.Test, downloader, ctx));
+        dependencies.put(Scope.Runtime, pom.resolveDependencies(Scope.Runtime, downloader, ctx));
+        dependencies.put(Scope.Provided, pom.resolveDependencies(Scope.Provided, downloader, ctx));
+        return withDependencies(dependencies);
     }
 }

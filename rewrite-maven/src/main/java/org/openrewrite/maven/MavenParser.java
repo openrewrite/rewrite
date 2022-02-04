@@ -34,8 +34,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 public class MavenParser implements Parser<Xml.Document> {
@@ -94,14 +93,8 @@ public class MavenParser implements Parser<Xml.Document> {
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
-
-            Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
-            dependencies.put(Scope.Compile, resolvedPom.resolveDependencies(Scope.Compile, downloader, ctx));
-            dependencies.put(Scope.Test, resolvedPom.resolveDependencies(Scope.Test, downloader, ctx));
-            dependencies.put(Scope.Runtime, resolvedPom.resolveDependencies(Scope.Runtime, downloader, ctx));
-            dependencies.put(Scope.Provided, resolvedPom.resolveDependencies(Scope.Provided, downloader, ctx));
-
-            MavenResolutionResult model = new MavenResolutionResult(randomId(), resolvedPom, emptyList(), dependencies);
+            MavenResolutionResult model = new MavenResolutionResult(randomId(), resolvedPom, emptyList(), emptyMap())
+                    .resolveDependencies(downloader, ctx);
             parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
         }
 
