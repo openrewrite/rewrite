@@ -159,33 +159,37 @@ interface JavaTypeMappingTest {
         assertThat(clazz.fullyQualifiedName).isEqualTo("org.openrewrite.java.C${"$"}Inner")
     }
 
-    @Disabled
+    @Disabled("ClassGraphTypeMapping does not return the correct type, and the type mapping is being removed.")
+    @Test
+    fun inheritedJavaTypeGoat() {
+        val clazz = firstMethodParameter("inheritedJavaTypeGoat") as JavaType.Parameterized
+        assertThat(clazz.typeParameters[0].toString()).isEqualTo("Generic{T}")
+        assertThat(clazz.typeParameters[1].toString()).isEqualTo("Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}")
+        assertThat(clazz.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}InheritedJavaTypeGoat<Generic{T}, Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}>")
+    }
+
+    @Disabled("ClassGraphTypeMapping does not handle intersection type generics with a super type bounds, and the mapping is being removed.")
+    @Issue("https://github.com/openrewrite/rewrite/pull/1365")
+    @Test
+    fun genericIntersectionType() {
+        val clazz = firstMethodParameter("genericIntersection") as JavaType.GenericTypeVariable
+        assertThat(clazz.bounds[0].toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}TypeA")
+        assertThat(clazz.bounds[1].toString()).isEqualTo("org.openrewrite.java.PT<Generic{U extends org.openrewrite.java.JavaTypeGoat${"$"}TypeA & org.openrewrite.java.C}>")
+        assertThat(clazz.bounds[2].toString()).isEqualTo("org.openrewrite.java.C")
+        assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat${"$"}TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}")
+    }
+
+    @Disabled("Temporarily disabled: JavaReflection returns the implicit constructor that is added by the compiler, and ClassgraphTypeMapping returns the wrong type.")
     @Issue("https://github.com/openrewrite/rewrite/issues/1349")
     @Test
     fun enumType() {
         val clazz = firstMethodParameter("enumType") as JavaType.Class
-        val type = clazz.methods.find { it.name == "<constructor>" } // note: JavaReflectionTypeMapping will return a constructor with 2 params.
+        val type = clazz.methods.find { it.name == "<constructor>" }
         assertThat(type).isNull()
 
         val supertype = clazz.supertype
         assertThat(supertype).isNotNull
-        assertThat(supertype!!.toString()).isEqualTo("java.lang.Enum") // temporary signature to show Javac and Classgraph generate different types.
-    }
-
-    @Disabled
-    @Issue("https://github.com/openrewrite/rewrite/issues/1349")
-    @Test
-    fun implementedPT() {
-        val clazz = firstMethodParameter("implementedPT") as JavaType
-        if (clazz is JavaType.Parameterized) {
-            val pt = clazz as JavaType.Parameterized // Classgraph returns ParameterizedType
-            val ptInterface = pt.type.interfaces[0]
-            assertThat(ptInterface!!.toString()).isEqualTo("org.openrewrite.java.PT<Generic{T}>")
-        } else {
-            val c = clazz as JavaType.Class // TypeMapping returns a Class
-            val cInterface = c.interfaces[0]
-            assertThat(cInterface!!.toString()).isEqualTo("org.openrewrite.java.PT<Generic{T}>")
-        }
+        assertThat(supertype!!.toString()).isEqualTo("java.lang.Enum<org.openrewrite.java.JavaTypeGoat${"$"}EnumType>")
     }
 
     @Test

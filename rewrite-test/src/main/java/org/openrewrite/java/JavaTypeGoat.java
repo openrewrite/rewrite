@@ -37,8 +37,8 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public enum EnumType {
     }
 
-    public static abstract class ImplementedPT implements PT<Object> {  // explicitly bounded to Object
-    }
+    public static abstract class TypeA {}
+    public static abstract class TypeB {}
 
     @AnnotationWithRuntimeRetention
     @AnnotationWithSourceRetention
@@ -46,7 +46,6 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public abstract void primitive(int n);
     public abstract void array(C[][] n);
     public abstract PT<C> parameterized(PT<C> n);
-    public abstract void implementedPT(ImplementedPT n);
     public abstract PT<PT<C>> parameterizedRecursive(PT<PT<C>> n);
     public abstract PT<? extends C> generic(PT<? extends C> n);
     public abstract PT<? super C> genericContravariant(PT<? super C> n);
@@ -55,7 +54,8 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public abstract void genericArray(PT<C>[] n);
     public abstract void inner(C.Inner n);
     public abstract void enumType(EnumType enumType);
-    public abstract<U extends PT<U> & C> InheritedJavaTypeGoat<T, U> inheritedJavaTypeGoat(InheritedJavaTypeGoat<T, U> inheritedJavaTypeGoat);
+    public abstract <U extends PT<U> & C> InheritedJavaTypeGoat<T, U> inheritedJavaTypeGoat(InheritedJavaTypeGoat<T, U> inheritedJavaTypeGoat);
+    public abstract <U extends TypeA & PT<U> & C> U genericIntersection(U genericIntersection);
     public abstract T genericT(T n); // remove after signatures are common.
 }
 

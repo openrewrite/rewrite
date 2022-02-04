@@ -125,16 +125,14 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         List<JavaType> bounds = null;
         if (type.getUpperBound() instanceof Type.IntersectionClassType) {
             Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
-            if (intersectionBound.interfaces_field.length() > 0) {
-                bounds = new ArrayList<>(intersectionBound.interfaces_field.length());
-                for (Type bound : intersectionBound.interfaces_field) {
-                    bounds.add(type(bound));
-                }
-            } else if (intersectionBound.supertype_field != null) {
-                JavaType mappedBound = type(intersectionBound.supertype_field);
-                if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
-                    bounds = singletonList(mappedBound);
-                }
+            boolean isIntersectionSuperType = !intersectionBound.supertype_field.tsym.getQualifiedName().toString().equals("java.lang.Object");
+            bounds = new ArrayList<>((isIntersectionSuperType ? 1 : 0) + intersectionBound.interfaces_field.length());
+
+            if (isIntersectionSuperType) {
+                bounds.add(type(intersectionBound.supertype_field));
+            }
+            for (Type bound : intersectionBound.interfaces_field) {
+                bounds.add(type(bound));
             }
         } else if (type.getUpperBound() != null) {
             JavaType mappedBound = type(type.getUpperBound());

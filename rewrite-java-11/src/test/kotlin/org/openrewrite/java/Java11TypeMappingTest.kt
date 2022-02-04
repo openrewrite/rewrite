@@ -15,8 +15,7 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
-import org.junit.jupiter.api.Disabled
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
@@ -62,7 +61,7 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
             .body!!.statements[0] as J.If)
             .ifCondition.tree as J.InstanceOf).expression as J.Identifier)
             .type as JavaType.Parameterized
-        Assertions.assertThat(pt).isNotNull
+        assertThat(pt).isNotNull
     }
 
     @Test
@@ -80,7 +79,7 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
             .logCompilationWarningsAndErrors(false)
             .build()
             .parse(InMemoryExecutionContext { t -> fail(t) }, source)
-        Assertions.assertThat(cu).isNotNull
+        assertThat(cu).isNotNull
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1318")
@@ -115,6 +114,6 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
             .logCompilationWarningsAndErrors(true)
             .build()
             .parse(InMemoryExecutionContext { t -> fail(t) }, source)
-        Assertions.assertThat(cu).isNotNull
+        assertThat(cu).isNotNull
     }
 }
