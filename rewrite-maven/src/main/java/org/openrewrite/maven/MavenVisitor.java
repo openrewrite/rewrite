@@ -78,30 +78,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public boolean isDependencyTag(String groupId, @Nullable String artifactId) {
-        return isDependencyTag() && hasGroupAndArtifact(groupId, artifactId);
-    }
-
-    public boolean isManagedDependencyTag() {
-        return MANAGED_DEPENDENCY_MATCHER.matches(getCursor());
-    }
-
-    public boolean isManagedDependencyTag(String groupId, @Nullable String artifactId) {
-        return isManagedDependencyTag() && hasGroupAndArtifact(groupId, artifactId);
-    }
-
-    public boolean isPluginTag() {
-        return PLUGIN_MATCHER.matches(getCursor());
-    }
-
-    public boolean isPluginTag(String groupId, @Nullable String artifactId) {
-        return isPluginTag() && hasGroupAndArtifact(groupId, artifactId);
-    }
-
-    public boolean isParentTag() {
-        return PARENT_MATCHER.matches(getCursor());
-    }
-
-    public boolean hasGroupAndArtifact(String groupId, @Nullable String artifactId) {
+        if (!isDependencyTag()) {
+            return false;
+        }
         Xml.Tag tag = getCursor().getValue();
         Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
         for (Scope scope : Scope.values()) {
@@ -116,6 +95,73 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             }
         }
         return false;
+    }
+
+    public boolean isManagedDependencyTag() {
+        return MANAGED_DEPENDENCY_MATCHER.matches(getCursor());
+    }
+
+    public boolean isManagedDependencyTag(String groupId, @Nullable String artifactId) {
+        if (!isManagedDependencyTag()) {
+            return false;
+        }
+        Xml.Tag tag = getCursor().getValue();
+        for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
+            ManagedDependency req = dm.getRequested();
+            String reqGroup = req.getGroupId();
+            if(reqGroup.equals(tag.getChildValue("groupId").orElse(null)) &&
+                    req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                    dm.getScope() == Scope.fromName(tag.getChildValue("scope").orElse("compile"))) {
+                return true;
+            } else if(dm.getBomGav() != null) {
+                ManagedDependency requestedBom = dm.getRequestedBom();
+                //noinspection ConstantConditions
+                return requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
+                        requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null));
+            }
+        }
+        return false;
+    }
+
+    public boolean isPluginTag() {
+        return PLUGIN_MATCHER.matches(getCursor());
+    }
+
+    public boolean isPluginTag(String groupId, @Nullable String artifactId) {
+        return isPluginTag() && hasPluginGroupId(groupId) && hasPluginArtifactId(artifactId);
+    }
+
+    private boolean hasPluginGroupId(String groupId) {
+        Xml.Tag tag = getCursor().getValue();
+        boolean isGroupIdFound = matchesGlob(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()), groupId);
+        if (!isGroupIdFound && getResolutionResult().getPom().getProperties() != null) {
+            if (tag.getChildValue("groupId").isPresent() && tag.getChildValue("groupId").get().trim().startsWith("${")) {
+                String propertyKey = tag.getChildValue("groupId").get().trim();
+                String value = getResolutionResult().getPom().getValue(propertyKey);
+                isGroupIdFound = value != null && matchesGlob(value, groupId);
+            }
+        }
+        return isGroupIdFound;
+    }
+
+    private boolean hasPluginArtifactId(@Nullable String artifactId) {
+        Xml.Tag tag = getCursor().getValue();
+        boolean isArtifactIdFound = tag.getChildValue("artifactId")
+                .map(a -> matchesGlob(a, artifactId))
+                .orElse(artifactId == null);
+        if (!isArtifactIdFound && artifactId != null && getResolutionResult().getPom().getProperties() != null) {
+            if (tag.getChildValue("artifactId").isPresent() && tag.getChildValue("artifactId").get().trim().startsWith("${")) {
+                String propertyKey = tag.getChildValue("artifactId").get().trim();
+                String value = getResolutionResult().getPom().getValue(propertyKey);
+                isArtifactIdFound = value != null && matchesGlob(value, artifactId);
+            }
+        }
+        return isArtifactIdFound;
+    }
+
+
+    public boolean isParentTag() {
+        return PARENT_MATCHER.matches(getCursor());
     }
 
     @Nullable
