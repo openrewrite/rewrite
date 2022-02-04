@@ -27,10 +27,7 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
@@ -79,7 +76,14 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return DEPENDENCY_MATCHER.matches(getCursor());
     }
 
-    public boolean isDependencyTag(String groupId, @Nullable String artifactId) {
+    /**
+     * Is a tag a dependency that matches the group and artifact?
+     *
+     * @param groupId The group ID glob expression to compare the tag against.
+     * @param artifactId The artifact ID glob expression to compare the tag against.
+     * @return true if the tag matches.
+     */
+    public boolean isDependencyTag(String groupId, String artifactId) {
         if (!isDependencyTag()) {
             return false;
         }
@@ -88,11 +92,13 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         for (Scope scope : Scope.values()) {
             if (dependencies.containsKey(scope)) {
                 for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
-                    Dependency req = resolvedDependency.getRequested();
-                    String reqGroup = req.getGroupId();
-                    return (reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                            req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                            scope == Scope.fromName(tag.getChildValue("scope").orElse("compile"));
+                    if (matchesGlob(resolvedDependency.getGroupId(), groupId) && matchesGlob(resolvedDependency.getArtifactId(), artifactId)) {
+                        Dependency req = resolvedDependency.getRequested();
+                        String reqGroup = req.getGroupId();
+                        return (reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
+                                req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                                scope == Scope.fromName(tag.getChildValue("scope").orElse("compile"));
+                    }
                 }
             }
         }
@@ -103,23 +109,35 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return MANAGED_DEPENDENCY_MATCHER.matches(getCursor());
     }
 
-    public boolean isManagedDependencyTag(String groupId, @Nullable String artifactId) {
+    /**
+     * Is a tag a managed dependency that matches the group and artifact?
+     *
+     * @param groupId The group ID glob expression to compare the tag against.
+     * @param artifactId The artifact ID glob expression to compare the tag against.
+     * @return true if the tag matches.
+     */
+    public boolean isManagedDependencyTag(String groupId, String artifactId) {
         if (!isManagedDependencyTag()) {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
         for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
-            ManagedDependency req = dm.getRequested();
-            String reqGroup = req.getGroupId();
-            if(reqGroup.equals(tag.getChildValue("groupId").orElse(null)) &&
-                    req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                    dm.getScope() == Scope.fromName(tag.getChildValue("scope").orElse("compile"))) {
-                return true;
-            } else if(dm.getBomGav() != null) {
-                ManagedDependency requestedBom = dm.getRequestedBom();
-                //noinspection ConstantConditions
-                return requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
-                        requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null));
+            if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
+                ManagedDependency req = dm.getRequested();
+                String reqGroup = req.getGroupId();
+                if (reqGroup.equals(tag.getChildValue("groupId").orElse(null)) &&
+                        req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                        dm.getScope() == Scope.fromName(tag.getChildValue("scope").orElse("compile"))) {
+                    return true;
+                }
+            }
+            if (dm.getBomGav() != null) {
+                if (matchesGlob(dm.getBomGav().getGroupId(), groupId) && matchesGlob(dm.getBomGav().getArtifactId(), artifactId)) {
+                    ManagedDependency requestedBom = dm.getRequestedBom();
+                    //noinspection ConstantConditions
+                    return requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
+                            requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null));
+                }
             }
         }
         return false;
