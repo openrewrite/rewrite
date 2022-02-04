@@ -711,7 +711,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
-    fun upgradeDependencyHandlesDependencyManagementResolvedFromProperty(@TempDir tempDir: Path) {
+    fun dependencyManagementResolvedFromProperty(@TempDir tempDir: Path) {
         val parent = tempDir.resolve("pom.xml")
         val server = tempDir.resolve("server/pom.xml")
         server.toFile().parentFile.mkdirs()
@@ -719,15 +719,12 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             //language=xml
             """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
                   <packaging>pom</packaging>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
                     <micronaut.version>2.5.11</micronaut.version>
-                    <spring.version>5.3.9</spring.version>
-                    <spring.artifact-id>spring-jdbc</spring.artifact-id>
                   </properties>
                 </project>
             """.trimIndent()
@@ -736,17 +733,13 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             //language=xml
             """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
-
                   <parent>
                     <groupId>org.openrewrite.example</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
                   </parent>
 
-                  <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app-server</artifactId>
-                  <version>1</version>
 
                   <dependencyManagement>
                     <dependencies>
@@ -759,14 +752,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                       </dependency>
                     </dependencies>
                   </dependencyManagement>
-
-                  <dependencies>
-                    <dependency>
-                        <groupId>org.springframework</groupId>
-                        <artifactId>${'$'}{spring.artifact-id}</artifactId>
-                        <version>${'$'}{spring.version}</version>
-                    </dependency>
-                  </dependencies>
                 </project>
             """.trimIndent()
         )
@@ -783,15 +768,12 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             before = parent.toFile(),
             after = """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
                   <packaging>pom</packaging>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
                     <micronaut.version>3.0.0-M5</micronaut.version>
-                    <spring.version>5.3.9</spring.version>
-                    <spring.artifact-id>spring-jdbc</spring.artifact-id>
                   </properties>
                 </project>
             """

@@ -40,7 +40,10 @@ public class ResolvedManagedDependency {
     ManagedDependency requested;
 
     @Nullable
-    ManagedDependency bom;
+    ManagedDependency requestedBom;
+
+    @Nullable
+    ResolvedGroupArtifactVersion bomGav;
 
     public String getType() {
         return type == null ? "jar" : type;
@@ -60,7 +63,7 @@ public class ResolvedManagedDependency {
         return gav.getVersion();
     }
 
-    public boolean matches(String groupId, String artifactId,
+    boolean matches(String groupId, String artifactId,
                            @Nullable String type, @Nullable String classifier) {
         return groupId.equals(gav.getGroupId()) && artifactId.equals(gav.getArtifactId()) &&
                 (type == null ? "jar" : type).equals(this.type == null ? "jar" : this.type) &&

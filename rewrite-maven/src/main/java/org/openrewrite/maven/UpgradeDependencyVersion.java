@@ -112,11 +112,29 @@ public class UpgradeDependencyVersion extends Recipe {
 
                     for (Dependency requestedDependency : module.getPom().getRequestedDependencies()) {
                         ResolvedDependency resolved = module.getResolvedDependency(requestedDependency);
-                        if(resolved != null) {
+                        if (resolved != null) {
                             if (matchesGlob(resolved.getGroupId(), groupId) && matchesGlob(resolved.getArtifactId(), artifactId)) {
                                 newerVersion = findNewerVersion(resolved.getGroupId(), resolved.getArtifactId(),
                                         resolved.getVersion(), ctx);
                                 requestedVersion = requestedDependency.getVersion();
+                            }
+                        }
+                    }
+
+                    for (ManagedDependency dm : module.getPom().getRequested().getDependencyManagement()) {
+                        ResolvedManagedDependency resolved = module.getResolvedManagedDependency(dm);
+                        if (resolved != null) {
+                            if (matchesGlob(resolved.getGroupId(), groupId) && matchesGlob(resolved.getArtifactId(), artifactId)) {
+                                newerVersion = findNewerVersion(resolved.getGroupId(), resolved.getArtifactId(),
+                                        resolved.getVersion(), ctx);
+                                requestedVersion = dm.getVersion();
+                            } else if (resolved.getBomGav() != null) {
+                                ResolvedGroupArtifactVersion bom = resolved.getBomGav();
+                                if (matchesGlob(bom.getGroupId(), groupId) && matchesGlob(bom.getArtifactId(), artifactId)) {
+                                    newerVersion = findNewerVersion(bom.getGroupId(), bom.getArtifactId(),
+                                            bom.getVersion(), ctx);
+                                    requestedVersion = dm.getVersion();
+                                }
                             }
                         }
                     }
@@ -154,7 +172,7 @@ public class UpgradeDependencyVersion extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if(isDependencyTag(groupId, artifactId)) {
+                if (isDependencyTag(groupId, artifactId)) {
                     ResolvedDependency d = findDependency(tag);
                     if (d != null) {
                         String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
@@ -162,7 +180,7 @@ public class UpgradeDependencyVersion extends Recipe {
                             for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
                                 if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
                                     String requestedVersion = dm.getRequested().getVersion();
-                                    if(requestedVersion.startsWith("${")) {
+                                    if (requestedVersion.startsWith("${")) {
                                         doAfterVisit(new ChangeProperty<>(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion));
                                         return t;
                                     }

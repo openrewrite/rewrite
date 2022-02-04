@@ -414,7 +414,9 @@ public class ResolvedPom {
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
                                 .bomImport(bom.getGav(), pom);
-                        dependencyManagement.addAll(ListUtils.map(bom.getDependencyManagement(), dm -> dm.withBom(d)));
+                        dependencyManagement.addAll(ListUtils.map(bom.getDependencyManagement(), dm -> dm
+                                .withRequestedBom(d)
+                                .withBomGav(bom.getGav())));
                     } else if (d instanceof Defined) {
                         Defined defined = (Defined) d;
                         MavenExecutionContextView.view(ctx)
@@ -427,6 +429,7 @@ public class ResolvedPom {
                                 getValue(defined.getClassifier()),
                                 ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
                                 defined,
+                                null,
                                 null
                         ));
                     }

@@ -49,12 +49,23 @@ public class MavenResolutionResult implements Marker {
     public ResolvedDependency getResolvedDependency(Dependency dependency) {
         for (int i = Scope.values().length - 1; i >= 0; i--) {
             Scope scope = Scope.values()[i];
-            if(dependencies.containsKey(scope)) {
+            if (dependencies.containsKey(scope)) {
                 for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
                     if (resolvedDependency.getRequested() == dependency) {
                         return resolvedDependency;
                     }
                 }
+            }
+        }
+        return null;
+    }
+
+    @Incubating(since = "7.18.0")
+    @Nullable
+    public ResolvedManagedDependency getResolvedManagedDependency(ManagedDependency dependency) {
+        for (ResolvedManagedDependency dm : pom.getDependencyManagement()) {
+            if (dm.getRequested() == dependency || dm.getRequestedBom() == dependency) {
+                return dm;
             }
         }
         return null;
