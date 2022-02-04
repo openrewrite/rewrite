@@ -79,8 +79,7 @@ public class InMemoryMavenPomCache implements MavenPomCache {
 
     @Override
     public void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved) {
-        resolved.deduplicate();
-        dependencyCache.put(dependency, resolved);
+        dependencyCache.put(dependency, resolved.deduplicate());
     }
 
     @Nullable
