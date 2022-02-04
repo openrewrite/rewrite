@@ -163,7 +163,7 @@ public class UpgradeDependencyVersion extends Recipe {
                                 if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
                                     String requestedVersion = dm.getRequested().getVersion();
                                     if(requestedVersion.startsWith("${")) {
-                                        doAfterVisit(new AddProperty<>(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion));
+                                        doAfterVisit(new ChangeProperty<>(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion));
                                         return t;
                                     }
                                 }

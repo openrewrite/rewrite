@@ -18,9 +18,9 @@ package org.openrewrite.maven
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 
-class AddPropertyTest: MavenRecipeTest {
+class ChangePropertyTest: MavenRecipeTest {
     override val recipe: Recipe
-        get() = toRecipe { AddProperty("key", "value") }
+        get() = toRecipe { ChangeProperty("key", "value") }
 
     @Test
     fun addFirstProperty() = assertChanged(

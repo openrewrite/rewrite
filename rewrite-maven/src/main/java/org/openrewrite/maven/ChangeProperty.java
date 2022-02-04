@@ -28,7 +28,7 @@ import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AddProperty<P> extends XmlVisitor<P> {
+public class ChangeProperty<P> extends XmlVisitor<P> {
     String key;
     String value;
 
