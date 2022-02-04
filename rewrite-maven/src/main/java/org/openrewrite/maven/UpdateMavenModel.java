@@ -37,13 +37,15 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         ExecutionContext ctx = (ExecutionContext) p;
 
         d = d.withMarkers(d.getMarkers().computeByType(getResolutionResult(), (resolutionResult, ignored) -> {
+            Pom requested = resolutionResult.getPom().getRequested();
+
             Map<Path, Pom> projectPoms = new HashMap<>();
+            projectPoms.put(requested.getSourcePath(), requested);
             for (MavenResolutionResult module : resolutionResult.getModules()) {
                 projectPoms.put(module.getPom().getRequested().getSourcePath(),
                         module.getPom().getRequested());
             }
 
-            Pom requested = resolutionResult.getPom().getRequested();
             Optional<Xml.Tag> dependencies = document.getRoot().getChild("dependencies");
             if (dependencies.isPresent()) {
                 List<Xml.Tag> eachDependency = dependencies.get().getChildren("dependency");

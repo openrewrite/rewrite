@@ -212,11 +212,13 @@ public class UpgradeDependencyVersion extends Recipe {
                                 //noinspection ConstantConditions
                                 String requestedVersion = dm.getRequestedBom().getVersion();
                                 String newerVersion = findNewerVersion(bom.getGroupId(), bom.getArtifactId(), bom.getVersion(), ctx);
-                                if (requestedVersion.startsWith("${")) {
-                                    doAfterVisit(new ChangeProperty<>(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion));
-                                    return t;
+                                if(newerVersion != null) {
+                                    if (requestedVersion.startsWith("${")) {
+                                        doAfterVisit(new ChangeProperty<>(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion));
+                                        return t;
+                                    }
+                                    t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(t.getChild("version").get(), newerVersion).visitNonNull(t, 0, getCursor());
                                 }
-                                t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(t.getChild("version").get(), newerVersion).visitNonNull(t, 0, getCursor());
                             }
                         }
                     }
