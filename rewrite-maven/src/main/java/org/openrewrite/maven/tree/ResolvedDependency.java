@@ -31,6 +31,10 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @With
 public class ResolvedDependency {
+    /**
+     * This will be {@code null} when this is a project dependency.
+     */
+    @Nullable
     MavenRepository repository;
 
     ResolvedGroupArtifactVersion gav;
