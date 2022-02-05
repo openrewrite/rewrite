@@ -227,9 +227,13 @@ public class MavenPomDownloader {
 
                     try {
                         File f = new File(uri);
-                        if (!f.exists()) {
+
+                        // if the jar isn't there alongside the POM in the local cache, we won't have the artifact later,
+                        // so better to just get both from a remote repository
+                        if (!f.exists() || !new File(f.getParentFile(), gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar").exists()) {
                             continue;
                         }
+
                         try (FileInputStream fis = new FileInputStream(f)) {
                             RawPom rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
@@ -340,6 +344,11 @@ public class MavenPomDownloader {
             String originalUrl = repository.getUri();
             result = mavenCache.getNormalizedRepository(repository);
             if (result == null) {
+                if(!repository.getUri().toLowerCase().startsWith("http")) {
+                    // can be s3 among potentially other types for which there is a maven wagon implementation
+                    return null;
+                }
+
                 // Always prefer to use https, fallback to http only if https isn't available
                 // URLs are case-sensitive after the domain name, so it can be incorrect to lowerCase() a whole URL
                 // This regex accepts any capitalization of the letters in "http"
