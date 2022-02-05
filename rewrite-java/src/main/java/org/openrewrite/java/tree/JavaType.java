@@ -603,10 +603,6 @@ public interface JavaType {
         Integer managedReference;
 
         @With
-        @Getter
-        String name;
-
-        @With
         @NonFinal
         @Getter
         Variance variance;
@@ -615,9 +611,8 @@ public interface JavaType {
         @Nullable
         List<JavaType> bounds;
 
-        public GenericTypeVariable(@Nullable Integer managedReference, String name, Variance variance, @Nullable List<JavaType> bounds) {
+        public GenericTypeVariable(@Nullable Integer managedReference, Variance variance, @Nullable List<JavaType> bounds) {
             this.managedReference = managedReference;
-            this.name = name;
             this.variance = variance;
             this.bounds = nullIfEmpty(bounds);
         }
@@ -633,7 +628,7 @@ public interface JavaType {
             if (bounds == this.bounds) {
                 return this;
             }
-            return new GenericTypeVariable(managedReference, name, variance, bounds);
+            return new GenericTypeVariable(managedReference, variance, bounds);
         }
 
         @Override
@@ -654,7 +649,7 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             GenericTypeVariable that = (GenericTypeVariable) o;
             assert bounds != null;
-            return name.equals(that.name) && variance == that.variance && bounds.equals(that.bounds);
+            return variance == that.variance && bounds.equals(that.bounds);
         }
 
         @Override

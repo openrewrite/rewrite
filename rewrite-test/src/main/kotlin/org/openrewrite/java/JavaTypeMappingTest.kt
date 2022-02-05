@@ -94,7 +94,6 @@ interface JavaTypeMappingTest {
     fun generic() {
         val generic =
             firstMethodParameter("generic").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
-        assertThat(generic.name).isEqualTo("?")
         assertThat(generic.variance).isEqualTo(COVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
@@ -103,7 +102,6 @@ interface JavaTypeMappingTest {
     fun genericContravariant() {
         val generic =
             firstMethodParameter("genericContravariant").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
-        assertThat(generic.name).isEqualTo("?")
         assertThat(generic.variance).isEqualTo(CONTRAVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
     }
@@ -111,7 +109,6 @@ interface JavaTypeMappingTest {
     @Test
     fun genericMultipleBounds() {
         val generic = goatType().typeParameters.last().asGeneric()!!
-        assertThat(generic.name).isEqualTo("S")
         assertThat(generic.variance).isEqualTo(COVARIANT)
         assertThat(generic.bounds[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.PT")
         assertThat(generic.bounds[1].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.java.C")
@@ -121,7 +118,6 @@ interface JavaTypeMappingTest {
     fun genericUnbounded() {
         val generic =
             firstMethodParameter("genericUnbounded").asParameterized()!!.typeParameters[0] as JavaType.GenericTypeVariable
-        assertThat(generic.name).isEqualTo("U")
         assertThat(generic.variance).isEqualTo(INVARIANT)
         assertThat(generic.bounds).isEmpty()
     }
@@ -131,12 +127,10 @@ interface JavaTypeMappingTest {
         val param = firstMethodParameter("genericRecursive")
         val typeParam = param.asParameterized()!!.typeParameters[0]
         val generic = typeParam as JavaType.GenericTypeVariable
-        assertThat(generic.name).isEqualTo("?")
         assertThat(generic.variance).isEqualTo(COVARIANT)
         assertThat(generic.bounds[0].asArray()).isNotNull
 
         val elemType = generic.bounds[0].asArray()!!.elemType.asGeneric()!!
-        assertThat(elemType.name).isEqualTo("U")
         assertThat(elemType.variance).isEqualTo(COVARIANT)
         assertThat(elemType.bounds).hasSize(1)
     }
@@ -162,9 +156,9 @@ interface JavaTypeMappingTest {
     @Test
     fun inheritedJavaTypeGoat() {
         val clazz = firstMethodParameter("inheritedJavaTypeGoat") as JavaType.Parameterized
-        assertThat(clazz.typeParameters[0].toString()).isEqualTo("Generic{T}")
-        assertThat(clazz.typeParameters[1].toString()).isEqualTo("Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}")
-        assertThat(clazz.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}InheritedJavaTypeGoat<Generic{T}, Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}>")
+        assertThat(clazz.typeParameters[0].toString()).isEqualTo("Generic{}")
+        assertThat(clazz.typeParameters[1].toString()).isEqualTo("Generic{extends org.openrewrite.java.PT<Generic{}> & org.openrewrite.java.C}")
+        assertThat(clazz.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}InheritedJavaTypeGoat<Generic{}, Generic{extends org.openrewrite.java.PT<Generic{}> & org.openrewrite.java.C}>")
     }
 
     @Disabled("Disabled until Classgraph is removed.")
@@ -173,9 +167,9 @@ interface JavaTypeMappingTest {
     fun genericIntersectionType() {
         val clazz = firstMethodParameter("genericIntersection") as JavaType.GenericTypeVariable
         assertThat(clazz.bounds[0].toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}TypeA")
-        assertThat(clazz.bounds[1].toString()).isEqualTo("org.openrewrite.java.PT<Generic{U extends org.openrewrite.java.JavaTypeGoat${"$"}TypeA & org.openrewrite.java.C}>")
+        assertThat(clazz.bounds[1].toString()).isEqualTo("org.openrewrite.java.PT<Generic{extends org.openrewrite.java.JavaTypeGoat${"$"}TypeA & org.openrewrite.java.C}>")
         assertThat(clazz.bounds[2].toString()).isEqualTo("org.openrewrite.java.C")
-        assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat${"$"}TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}")
+        assertThat(clazz.toString()).isEqualTo("Generic{extends org.openrewrite.java.JavaTypeGoat${"$"}TypeA & org.openrewrite.java.PT<Generic{}> & org.openrewrite.java.C}")
     }
 
     @Disabled("Temporarily disabled: JavaReflection returns the implicit constructor that is added by the compiler, and ClassgraphTypeMapping returns the wrong type.")

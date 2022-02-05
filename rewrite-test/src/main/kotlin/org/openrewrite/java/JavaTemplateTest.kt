@@ -1705,9 +1705,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             assertThat(paramTypes[1])
                 .`as`("The method declaration's type's genericSignature second argument should have type 'U' with bound 'java.lang.Object'")
                 .matches { uType ->
-                    uType is JavaType.GenericTypeVariable &&
-                            uType.name == "U" &&
-                            uType.bounds.isEmpty()
+                    uType is JavaType.GenericTypeVariable && uType.bounds.isEmpty()
                 }
         }
     )

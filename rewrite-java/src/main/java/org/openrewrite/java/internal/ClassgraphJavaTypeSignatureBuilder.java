@@ -115,7 +115,7 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             try {
                 return signature(typeVariableSignature.resolve()); // resolves to a TypeParameter
             } catch (IllegalArgumentException ignored) {
-                return "Generic{" + typeVariableSignature.getName() + "}";
+                return "Generic{}";
             }
         } else if (type instanceof TypeArgument) {
             return generic((TypeArgument) type);
@@ -135,23 +135,23 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
             case EXTENDS: {
                 String bound = signature(typeArgument.getTypeSignature());
                 if (bound.equals("java.lang.Object")) {
-                    s.append("Generic{?}");
+                    s.append("Generic{}");
                 } else {
-                    s.append("Generic{? extends ").append(bound).append('}');
+                    s.append("Generic{extends ").append(bound).append('}');
                 }
                 break;
             }
             case SUPER: {
                 String bound = signature(typeArgument.getTypeSignature());
                 if (bound.equals("java.lang.Object")) {
-                    s.append("Generic{?}");
+                    s.append("Generic{}");
                 } else {
-                    s.append("Generic{? super ").append(bound).append('}');
+                    s.append("Generic{super ").append(bound).append('}');
                 }
                 break;
             }
             case ANY:
-                s.append("Generic{?}");
+                s.append("Generic{}");
         }
 
         return s.toString();
@@ -183,12 +183,12 @@ public class ClassgraphJavaTypeSignatureBuilder implements JavaTypeSignatureBuil
 
             String boundsStr = bounds.toString();
             if (boundsStr.isEmpty()) {
-                return "Generic{" + typeParameter.getName() + "}";
+                return "Generic{}";
             }
-            return "Generic{" + typeParameter.getName() + " extends " + boundsStr + "}";
+            return "Generic{extends " + boundsStr + "}";
         }
 
-        return "Generic{" + name + "}";
+        return "Generic{}";
     }
 
     @Override

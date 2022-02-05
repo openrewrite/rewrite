@@ -92,12 +92,12 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
                 typeVariableNameStack = new HashSet<>();
             }
 
-            StringBuilder s = new StringBuilder("Generic{" + name);
+            StringBuilder s = new StringBuilder("Generic{");
             if (typeVariableNameStack.add(name)) {
                 if (typeVar.getBounds().length > 0) {
                     String boundsStr = genericBounds(typeVar.getBounds());
                     if (!boundsStr.isEmpty()) {
-                        s.append(" extends ").append(boundsStr);
+                        s.append("extends ").append(boundsStr);
                     }
                 }
             }
@@ -108,17 +108,17 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
             return s.toString();
         } else if (type instanceof WildcardType) {
             WildcardType wildcard = (WildcardType) type;
-            StringBuilder s = new StringBuilder("Generic{?");
+            StringBuilder s = new StringBuilder("Generic{");
 
             if (wildcard.getLowerBounds().length > 0) {
                 String boundsStr = genericBounds(wildcard.getLowerBounds());
                 if (!boundsStr.isEmpty()) {
-                    s.append(" super ").append(boundsStr);
+                    s.append("super ").append(boundsStr);
                 }
             } else if (wildcard.getUpperBounds().length > 0) {
                 String boundsStr = genericBounds(wildcard.getUpperBounds());
                 if (!boundsStr.isEmpty()) {
-                    s.append(" extends ").append(boundsStr);
+                    s.append("extends ").append(boundsStr);
                 }
             }
 

@@ -98,10 +98,10 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
             // if the type expression is null, it implies the types on the lambda arguments are implicit.
-            if (multiVariable.getTypeExpression() == null && getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Lambda) {
+            if (multiVariable.getTypeExpression() == null && getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Lambda &&
+                    !(multiVariable.getVariables().get(0).getType() instanceof JavaType.GenericTypeVariable)) {
                 J.VariableDeclarations.NamedVariable nv = multiVariable.getVariables().get(0);
-                String name = nv.getType() instanceof JavaType.GenericTypeVariable ?
-                        ((JavaType.GenericTypeVariable) nv.getType()).getName() : buildName(nv.getType());
+                String name = buildName(nv.getType());
                 if (name != null) {
                     multiVariable = multiVariable.withTypeExpression(
                             new J.Identifier(Tree.randomId(),

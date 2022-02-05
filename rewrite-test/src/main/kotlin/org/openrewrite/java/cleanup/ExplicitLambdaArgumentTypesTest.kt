@@ -341,43 +341,6 @@ interface ExplicitLambdaArgumentTypesTest : JavaRecipeTest {
     )
 
     @Test
-    fun threeArgumentsWithBlockGeneric(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
-            class Test {
-                static <T> void run(TriConsumer<T> tc) {
-                }
-
-                static void method() {
-                    run((a, b, c) -> {
-                        return a.toString();
-                    });
-                }
-
-                private interface TriConsumer<T> {
-                    T method(T a, T b, T c);
-                }
-            }
-        """,
-        after = """
-            class Test {
-                static <T> void run(TriConsumer<T> tc) {
-                }
-
-                static void method() {
-                    run((Object a, Object b, Object c) -> {
-                        return a.toString();
-                    });
-                }
-
-                private interface TriConsumer<T> {
-                    T method(T a, T b, T c);
-                }
-            }
-        """
-    )
-
-    @Test
     fun noArguments(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
@@ -417,33 +380,6 @@ interface ExplicitLambdaArgumentTypesTest : JavaRecipeTest {
                 static void method(String[] arr) {
                     Arrays.sort(arr, (String a, String b) -> {
                         return a.length() - b.length();
-                    });
-                }
-            }
-        """
-    )
-
-    @Test
-    fun arraysSortExampleWithGeneric(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
-            import java.util.Arrays;
-
-            class Test {
-                static <T> void method(T[] arr) {
-                    Arrays.sort(arr, (a, b) -> {
-                        return a.toString().length() - b.toString().length();
-                    });
-                }
-            }
-        """,
-        after = """
-            import java.util.Arrays;
-
-            class Test {
-                static <T> void method(T[] arr) {
-                    Arrays.sort(arr, (T a, T b) -> {
-                        return a.toString().length() - b.toString().length();
                     });
                 }
             }

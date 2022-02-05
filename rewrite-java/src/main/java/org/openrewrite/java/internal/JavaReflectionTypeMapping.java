@@ -48,7 +48,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         String signature = signatureBuilder.signature(type);
-        JavaType existing = (JavaType) typeCache.get(signature);
+        JavaType existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -94,7 +94,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         JavaType.FullyQualified mappedClazz = classTypeWithoutParameters(clazz);
 
         if (clazz.getTypeParameters().length > 0) {
-            JavaType existing = (JavaType) typeCache.get(signature);
+            JavaType existing = typeCache.get(signature);
             if (existing != null) {
                 return existing;
             }
@@ -116,7 +116,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
     private JavaType.FullyQualified classTypeWithoutParameters(Class<?> clazz) {
         String className = clazz.getName();
-        JavaType.Class mappedClazz = (JavaType.Class) typeCache.get(className);
+        JavaType.Class mappedClazz = typeCache.get(className);
 
         if (mappedClazz == null) {
             JavaType.Class.Kind kind;
@@ -208,8 +208,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType generic(TypeVariable<?> typeParameter, String signature) {
-        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, typeParameter.getName(),
-                INVARIANT, null);
+        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, INVARIANT, null);
         typeCache.put(signature, gtv);
 
         List<JavaType> bounds = genericBounds(typeParameter.getBounds());
@@ -218,8 +217,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType.GenericTypeVariable generic(WildcardType wildcard, String signature) {
-        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, "?",
-                INVARIANT, null);
+        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, INVARIANT, null);
         typeCache.put(signature, gtv);
 
         JavaType.GenericTypeVariable.Variance variance = INVARIANT;
@@ -274,7 +272,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
     private JavaType.Variable field(Field field) {
         String signature = signatureBuilder.variableSignature(field);
-        JavaType.Variable existing = (JavaType.Variable) typeCache.get(signature);
+        JavaType.Variable existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -311,7 +309,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     private JavaType.Method method(Constructor<?> method, JavaType.FullyQualified declaringType) {
         String signature = signatureBuilder.methodSignature(method, declaringType.getFullyQualifiedName());
 
-        JavaType.Method existing = (JavaType.Method) typeCache.get(signature);
+        JavaType.Method existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -369,7 +367,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     private JavaType.Method method(Method method, JavaType.FullyQualified declaringType) {
         String signature = signatureBuilder.methodSignature(method, declaringType.getFullyQualifiedName());
 
-        JavaType.Method existing = (JavaType.Method) typeCache.get(signature);
+        JavaType.Method existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }

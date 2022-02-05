@@ -25,7 +25,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
     public static final DefaultJavaTypeSignatureBuilder TO_STRING = new DefaultJavaTypeSignatureBuilder();
 
     @Nullable
-    private Set<String> typeVariableNameStack;
+    private Set<JavaType> typeVariableStack;
 
     @Nullable
     private Set<JavaType> parameterizedStack;
@@ -68,27 +68,25 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
     @Override
     public String genericSignature(Object type) {
         JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) type;
-        StringBuilder s = new StringBuilder("Generic{" + gtv.getName());
+        StringBuilder s = new StringBuilder("Generic{");
 
-        if (typeVariableNameStack == null) {
-            typeVariableNameStack = new LinkedHashSet<>();
+        if (typeVariableStack == null) {
+            typeVariableStack = Collections.newSetFromMap(new IdentityHashMap<>());
         }
-        if (!gtv.getName().equals("?") && !typeVariableNameStack.add(gtv.getName())) {
+
+        if (!typeVariableStack.add(gtv)) {
             s.append('}');
             return s.toString();
         }
-
-//        System.out.println((gtv.getName() + " | " + (typeVariableNameStack == null ? "[]" : typeVariableNameStack.stream()
-//                .collect(Collectors.joining("->", "[", "]")))).toLowerCase());
 
         switch (gtv.getVariance()) {
             case INVARIANT:
                 break;
             case COVARIANT:
-                s.append(" extends ");
+                s.append("extends ");
                 break;
             case CONTRAVARIANT:
-                s.append(" super ");
+                s.append("super ");
                 break;
         }
 
@@ -100,7 +98,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         }
 
         s.append(bounds).append('}');
-        typeVariableNameStack.remove(gtv.getName());
+        typeVariableStack.remove(gtv);
 
         return s.toString();
     }
@@ -116,8 +114,6 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
 
         String baseType = signature(pt.getType());
         StringBuilder s = new StringBuilder(baseType);
-
-//        System.out.println(baseType + "|" + System.identityHashCode(type));
 
         StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
         for (JavaType typeParameter : pt.getTypeParameters()) {

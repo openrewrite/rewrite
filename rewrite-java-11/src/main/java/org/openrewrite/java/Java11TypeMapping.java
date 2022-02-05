@@ -83,7 +83,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature) {
-        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, "?", INVARIANT, null);
+        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, INVARIANT, null);
         typeCache.put(signature, gtv);
 
         JavaType.GenericTypeVariable.Variance variance;
@@ -115,9 +115,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType generic(Type.TypeVar type, String signature) {
-        String name = type.tsym.name.toString();
-        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
-                name, INVARIANT, null);
+        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, INVARIANT, null);
         typeCache.put(signature, gtv);
 
         List<JavaType> bounds = null;
@@ -590,7 +588,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                     continue;
                 }
                 Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if(retention != null && retention.value() == RetentionPolicy.SOURCE) {
+                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
                     continue;
                 }
                 annotations.add(annotType);

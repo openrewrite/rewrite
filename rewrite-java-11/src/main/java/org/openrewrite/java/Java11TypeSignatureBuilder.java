@@ -55,12 +55,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof Type.ArrayType) {
             return arraySignature(type);
         } else if (type instanceof Type.WildcardType) {
-            Type.WildcardType wildcard = (Type.WildcardType) type;
-            StringBuilder s = new StringBuilder("Generic{" + wildcard.kind.toString());
-            if (!type.isUnbound()) {
-                s.append(signature(wildcard.type));
-            }
-            return s.append("}").toString();
+            return wildcardSignature(type);
         } else if (type instanceof Type.JCNoType) {
             return "{none}";
         }
@@ -97,6 +92,16 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return sym.flatName().toString();
     }
 
+    private String wildcardSignature(Object type) {
+        Type.WildcardType wildcard = (Type.WildcardType) type;
+        String wildcardKind = wildcard.isUnbound() ? "" : wildcard.kind.toString().substring(wildcard.kind.toString().indexOf('?') + 2);
+        StringBuilder s = new StringBuilder("Generic{" + wildcardKind);
+        if (!wildcard.isUnbound()) {
+            s.append(signature(wildcard.type));
+        }
+        return s.append("}").toString();
+    }
+
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
@@ -107,10 +112,10 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         if (!typeVariableNameStack.add(name)) {
-            return "Generic{" + name + "}";
+            return "Generic{}";
         }
 
-        StringBuilder s = new StringBuilder("Generic{").append(name);
+        StringBuilder s = new StringBuilder("Generic{");
 
         StringJoiner boundSigs = new StringJoiner(" & ");
         if (generic.getUpperBound() instanceof Type.IntersectionClassType) {
@@ -133,7 +138,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
         String boundSigStr = boundSigs.toString();
         if (!boundSigStr.isEmpty()) {
-            s.append(" extends ").append(boundSigStr);
+            s.append("extends ").append(boundSigStr);
         }
 
         typeVariableNameStack.remove(name);
@@ -187,7 +192,6 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String methodSignature(Type selectType, Symbol.MethodSymbol symbol) {
-        Type genericType = symbol.type;
         String s = classSignature(symbol.owner.type);
         if (symbol.isConstructor()) {
             s += "{name=<constructor>,return=" + s;
@@ -200,7 +204,6 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String methodSignature(Symbol.MethodSymbol symbol) {
-        Type genericType = symbol.type;
         String s = classSignature(symbol.owner.type);
 
         String returnType;

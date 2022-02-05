@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
@@ -48,6 +49,7 @@ class Java11TypeMappingTest : JavaTypeMappingTest {
         return type.get()!!
     }
 
+    @Disabled("Move to JavaTypeGoat")
     @Issue("https://github.com/openrewrite/rewrite/issues/1318")
     @Test
     fun methodInvocationOnUnknownType() {

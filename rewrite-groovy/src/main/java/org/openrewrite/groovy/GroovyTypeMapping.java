@@ -165,7 +165,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
 
         JavaType.GenericTypeVariable.Variance variance = INVARIANT;
 
-        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, g.getName(), variance, null);
+        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, variance, null);
         typeCache.put(signature, gtv);
 
         List<JavaType> bounds = null;

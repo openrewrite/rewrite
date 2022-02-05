@@ -43,18 +43,18 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
 
     @AnnotationWithRuntimeRetention
     @AnnotationWithSourceRetention
-    public abstract void clazz(C n);
-    public abstract void primitive(int n);
-    public abstract void array(C[][] n);
+    public abstract C clazz(C n);
+    public abstract int primitive(int n);
+    public abstract C[][] array(C[][] n);
     public abstract PT<C> parameterized(PT<C> n);
     public abstract PT<PT<C>> parameterizedRecursive(PT<PT<C>> n);
     public abstract PT<? extends C> generic(PT<? extends C> n);
     public abstract PT<? super C> genericContravariant(PT<? super C> n);
     public abstract <U extends JavaTypeGoat<U, ?>> JavaTypeGoat<? extends U[], ?> genericRecursive(JavaTypeGoat<? extends U[], ?> n);
     public abstract <U> PT<U> genericUnbounded(PT<U> n);
-    public abstract void genericArray(PT<C>[] n);
-    public abstract void inner(C.Inner n);
-    public abstract void enumType(EnumType n);
+    public abstract PT<C>[] genericArray(PT<C>[] n);
+    public abstract C.Inner inner(C.Inner n);
+    public abstract EnumType enumType(EnumType n);
     public abstract <U extends PT<U> & C> InheritedJavaTypeGoat<T, U> inheritedJavaTypeGoat(InheritedJavaTypeGoat<T, U> n);
     public abstract <U extends TypeA & PT<U> & C> U genericIntersection(U n);
     public abstract T genericT(T n); // remove after signatures are common.
