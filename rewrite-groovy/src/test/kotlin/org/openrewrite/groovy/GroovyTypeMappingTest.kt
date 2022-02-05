@@ -33,6 +33,8 @@ class GroovyTypeMappingTest : JavaTypeMappingTest {
             .bufferedReader().readText()
     }
 
+    override fun classType(fqn: String): JavaType.FullyQualified = TODO()
+
     override fun goatType(): JavaType.Parameterized = GroovyParser.builder()
         .logCompilationWarningsAndErrors(true)
         .build()

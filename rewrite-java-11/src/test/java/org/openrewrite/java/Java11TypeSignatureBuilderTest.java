@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.VariableTree;
@@ -121,6 +122,26 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
                 }
                 //noinspection ConstantConditions
                 return null;
+            }
+
+            @Nullable
+            @Override
+            public Type reduce(@Nullable Type r1, @Nullable Type r2) {
+                return r1 == null ? r2 : r1;
+            }
+        }.scan(cu, 0);
+    }
+
+    @Override
+    public Object innerClassSignature(String innerClassSimpleName) {
+        return new TreeScanner<Type, Integer>() {
+            @Override
+            public Type visitClass(ClassTree node, Integer integer) {
+                JCTree.JCClassDecl clazz = (JCTree.JCClassDecl) node;
+                if(innerClassSimpleName.equals(clazz.getSimpleName().toString())) {
+                    return clazz.type;
+                }
+                return super.visitClass(node, integer);
             }
 
             @Nullable

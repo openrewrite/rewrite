@@ -27,10 +27,9 @@ import org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*
  * Based on type attribution mappings of [JavaTypeGoat].
  */
 interface JavaTypeMappingTest {
-    /**
-     * Type attribution for the [JavaTypeGoat] class.
-     */
-    fun goatType(): JavaType.Parameterized
+    fun classType(fqn: String): JavaType.FullyQualified
+
+    fun goatType(): JavaType.Parameterized = classType("org.openrewrite.java.JavaTypeGoat").asParameterized()!!
 
     fun methodType(methodName: String): JavaType.Method {
         val type = goatType().methods.find { it.name == methodName }!!
@@ -159,7 +158,7 @@ interface JavaTypeMappingTest {
         assertThat(clazz.fullyQualifiedName).isEqualTo("org.openrewrite.java.C${"$"}Inner")
     }
 
-    @Disabled("ClassGraphTypeMapping does not return the correct type, and the type mapping is being removed.")
+    @Disabled("Disabled until Classgraph is removed.")
     @Test
     fun inheritedJavaTypeGoat() {
         val clazz = firstMethodParameter("inheritedJavaTypeGoat") as JavaType.Parameterized
@@ -168,7 +167,7 @@ interface JavaTypeMappingTest {
         assertThat(clazz.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}InheritedJavaTypeGoat<Generic{T}, Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}>")
     }
 
-    @Disabled("ClassGraphTypeMapping does not handle intersection type generics with a super type bounds, and the mapping is being removed.")
+    @Disabled("Disabled until Classgraph is removed.")
     @Issue("https://github.com/openrewrite/rewrite/pull/1365")
     @Test
     fun genericIntersectionType() {

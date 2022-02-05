@@ -37,6 +37,9 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public enum EnumType {
     }
 
+    public abstract class ExtendsJavaTypeGoat extends JavaTypeGoat<T, S> {
+    }
+
     public static abstract class TypeA {}
     public static abstract class TypeB {}
 

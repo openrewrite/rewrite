@@ -27,4 +27,8 @@ class JavaReflectionTypeMappingTest : JavaTypeMappingTest {
     }
 
     override fun goatType(): JavaType.Parameterized = goat
+
+    override fun classType(fqn: String): JavaType.FullyQualified {
+        return typeMapping.type(Class.forName(fqn)) as JavaType.FullyQualified
+    }
 }

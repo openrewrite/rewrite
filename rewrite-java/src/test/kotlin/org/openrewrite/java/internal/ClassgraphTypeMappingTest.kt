@@ -21,29 +21,28 @@ import org.junit.jupiter.api.Test
 import org.openjdk.jol.info.GraphStats
 import org.openrewrite.java.JavaTypeMappingTest
 import org.openrewrite.java.asParameterized
+import org.openrewrite.java.tree.JavaType
 import kotlin.math.ln
 import kotlin.math.pow
 
 class ClassgraphTypeMappingTest : JavaTypeMappingTest {
     companion object {
         private val typeMapping = ClassgraphTypeMapping(JavaTypeCache(), mapOf())
-
-        private val goat = typeMapping.type(
-            ClassGraph()
-                .filterClasspathElements { e -> e.contains("rewrite") }
-                .enableAnnotationInfo()
-                .enableMemoryMapping()
-                .enableClassInfo()
-                .enableFieldInfo()
-                .enableMethodInfo()
-                .ignoreClassVisibility()
-                .acceptClasses("org.openrewrite.java.*")
-                .scan()
-                .getClassInfo("org.openrewrite.java.JavaTypeGoat")
-        ).asParameterized()!!
     }
 
-    override fun goatType() = goat
+    override fun classType(fqn: String): JavaType.FullyQualified = typeMapping.type(
+        ClassGraph()
+            .filterClasspathElements { e -> e.contains("rewrite") }
+            .enableAnnotationInfo()
+            .enableMemoryMapping()
+            .enableClassInfo()
+            .enableFieldInfo()
+            .enableMethodInfo()
+            .ignoreClassVisibility()
+            .acceptClasses("org.openrewrite.java.*")
+            .scan()
+            .getClassInfo(fqn)
+    )
 
     @Test
     fun eclipsePersistenceRecursiveParameterizedTypeDefinition() {

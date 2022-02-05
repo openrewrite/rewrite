@@ -40,9 +40,9 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return "{undefined}";
         } else if (type instanceof Type.ClassType) {
             try {
-                return type.isParameterized() ? parameterizedSignature(type) : classSignature(type);
+                return (type.isParameterized() && ((Type.ClassType) type).typarams_field.length() > 0) ? parameterizedSignature(type) : classSignature(type);
             } catch (Symbol.CompletionFailure ignored) {
-                return type.isParameterized() ? parameterizedSignature(type) : classSignature(type);
+                return (type.isParameterized() && ((Type.ClassType) type).typarams_field.length() > 0) ? parameterizedSignature(type) : classSignature(type);
             }
         } else if (type instanceof Type.CapturedType) { // CapturedType must be evaluated before TypeVar
             return signature(((Type.CapturedType) type).wildcard);

@@ -33,6 +33,9 @@ class JavaReflectionTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
         .first { it.name == methodName }
         .genericParameterTypes[0]
 
+    override fun innerClassSignature(innerClassSimpleName: String): Type = JavaTypeGoat::class.java.declaredClasses
+        .first { it.simpleName == innerClassSimpleName }
+
     override fun lastClassTypeParameter(): Any =
         JavaTypeGoat::class.java.typeParameters.last()
 

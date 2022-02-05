@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import org.codehaus.groovy.ast.GenericsType;
+import org.codehaus.groovy.ast.InnerClassNode;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
@@ -23,6 +24,7 @@ import org.openrewrite.java.JavaTypeSignatureBuilderTest;
 
 import java.io.ByteArrayInputStream;
 import java.nio.file.Paths;
+import java.util.Iterator;
 
 import static java.util.Collections.singletonList;
 
@@ -69,5 +71,17 @@ public class GroovyTypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
     @Override
     public GroovyAstTypeSignatureBuilder signatureBuilder() {
         return new GroovyAstTypeSignatureBuilder();
+    }
+
+    @Override
+    public Object innerClassSignature(String innerClassSimpleName) {
+        Iterator<InnerClassNode> innerClasses = cu.getModule().getClasses().get(0).getInnerClasses();
+        while(innerClasses.hasNext()) {
+            InnerClassNode clazz = innerClasses.next();
+            if(clazz.getNameWithoutPackage().equals(innerClassSimpleName)) {
+                return clazz.getGenericsTypes()[0];
+            }
+        }
+        throw new IllegalArgumentException("Unable to find inner class of name " + innerClassSimpleName);
     }
 }

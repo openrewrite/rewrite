@@ -47,6 +47,10 @@ class ClassgraphJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     override fun firstMethodParameter(methodName: String): TypeSignature = goat.getMethodInfo(methodName)[0]
         .parameterInfo[0].run { typeSignature ?: typeDescriptor }
 
+    override fun innerClassSignature(innerClassSimpleName: String): ClassTypeSignature = goat.innerClasses
+        .first { it.simpleName == innerClassSimpleName }
+        .typeSignature
+
     override fun lastClassTypeParameter(): TypeParameter = (goat.typeSignature as ClassTypeSignature).typeParameters.last()
 
     override fun signatureBuilder(): ClassgraphJavaTypeSignatureBuilder = ClassgraphJavaTypeSignatureBuilder(emptyMap())

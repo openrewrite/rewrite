@@ -31,25 +31,32 @@ class DefaultJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
             .logCompilationWarningsAndErrors(true)
             .build()
             .parse(goat)[0]
+
+        private val goatCuType = goatCu
             .classes[0]
             .type
             .asParameterized()!!
     }
 
-    override fun fieldSignature(field: String): String = signatureBuilder().variableSignature(goatCu.type.members
+    override fun fieldSignature(field: String): String = signatureBuilder().variableSignature(goatCuType.type.members
         .first { it.name == field })
 
-    override fun methodSignature(methodName: String): String = signatureBuilder().methodSignature(goatCu.type.methods
+    override fun methodSignature(methodName: String): String = signatureBuilder().methodSignature(goatCuType.type.methods
         .first { it.name == methodName })
 
-    override fun constructorSignature(): String = signatureBuilder().methodSignature(goatCu.type.methods
+    override fun constructorSignature(): String = signatureBuilder().methodSignature(goatCuType.type.methods
         .first { it.name == "<constructor>" })
 
-    override fun firstMethodParameter(methodName: String): JavaType = goatCu.type.methods
+    override fun firstMethodParameter(methodName: String): JavaType = goatCuType.type.methods
         .first { it.name == methodName }
         .parameterTypes[0]
 
-    override fun lastClassTypeParameter(): JavaType = goatCu.typeParameters.last()
+    override fun innerClassSignature(innerClassSimpleName: String): JavaType = goatCu.classes[0].body.statements
+        .filterIsInstance(J.ClassDeclaration::class.java)
+        .first { it.type!!.fullyQualifiedName.endsWith("${'$'}$innerClassSimpleName") }
+        .type!!
+
+    override fun lastClassTypeParameter(): JavaType = goatCuType.typeParameters.last()
 
     override fun signatureBuilder(): DefaultJavaTypeSignatureBuilder = DefaultJavaTypeSignatureBuilder()
 }
