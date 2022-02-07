@@ -167,15 +167,6 @@ public interface JavaTypeSignatureBuilderTest {
 
     @Disabled("Disabled until Classgraph is removed.")
     @Test
-    default void recursiveCapturedType() {
-        assertThat(signatureBuilder().signature(firstMethodParameter("recursiveCapturedType")))
-                .isEqualTo("org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat<Generic{?}, Generic{?}>");
-        assertThat(methodSignature("recursiveCapturedType"))
-                .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=recursiveCapturedType,return=void,parameters=[org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat<Generic{?}, Generic{?}>]}");
-    }
-
-    @Disabled("Disabled until Classgraph is removed.")
-    @Test
     default void genericIntersection() {
         assertThat(signatureBuilder().signature(firstMethodParameter("genericIntersection")))
                 .isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}");
