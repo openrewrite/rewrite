@@ -15,17 +15,10 @@
  */
 package org.openrewrite.maven
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.maven.cache.InMemoryMavenPomCache
 
 class ManageDependenciesTest : MavenRecipeTest {
-    companion object {
-        val mavenCache = InMemoryMavenPomCache()
-    }
-
     override val parser: MavenParser = MavenParser.builder()
-        .cache(mavenCache)
         .build()
 
     @Test
@@ -162,18 +155,4 @@ class ManageDependenciesTest : MavenRecipeTest {
             </project>
         """
     )
-
-    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
-    @Test
-    fun checkValidation() {
-        var recipe = ManageDependencies(null, null, null)
-        var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
-        assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("groupPattern")
-
-        recipe = ManageDependencies("org.openrewrite", "rewrite-maven", "7.0.0")
-        valid = recipe.validate()
-        assertThat(valid.isValid).isTrue()
-    }
 }

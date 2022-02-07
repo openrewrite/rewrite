@@ -76,9 +76,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         child.toFile().parentFile.mkdirs()
 
         parent.toFile().writeText(
+            //language=xml
             """
                 <project>
-                    <modelVersion>4.0.0</modelVersion>
                     <packaging>pom</packaging>
                     <groupId>com.mycompany</groupId>
                     <artifactId>my-parent</artifactId>
@@ -97,10 +97,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         )
 
         child.toFile().writeText(
+            //language=xml
             """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
                   <parent>
                     <groupId>com.mycompany</groupId>
                     <artifactId>my-parent</artifactId>
@@ -146,7 +145,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         ),
         before = """
             <project>
-                <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -154,41 +152,22 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                     <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
                     <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
                     <quarkus.platform.version>1.11.7.Final</quarkus.platform.version>
-                    <jboss.groupId>org.jboss.resteasy</jboss.groupId>
-                    <jboss.artifactId>resteasy-jaxrs</jboss.artifactId>
                 </properties>
                 <dependencyManagement>
                     <dependencies>
                         <dependency>
-                            <groupId>io.quarkus</groupId>
-                            <artifactId>quarkus-universe-bom</artifactId>
-                            <version>${"$"}{quarkus.platform.version}</version>
+                            <groupId>${'$'}{quarkus.platform.group-id}</groupId>
+                            <artifactId>${'$'}{quarkus.platform.artifact-id}</artifactId>
+                            <version>${'$'}{quarkus.platform.version}</version>
                             <type>pom</type>
                             <scope>import</scope>
                         </dependency>
                     </dependencies>
                 </dependencyManagement>
-                <dependencies>
-                    <dependency>
-                        <groupId>io.quarkus</groupId>
-                        <artifactId>quarkus-arc</artifactId>
-                    </dependency>
-                    <dependency>
-                        <groupId>${"$"}{jboss.groupId}</groupId>
-                        <artifactId>${"$"}{jboss.artifactId}</artifactId>
-                        <version>3.0.24.Final</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.mindrot</groupId>
-                        <artifactId>jbcrypt</artifactId>
-                        <version>0.4</version>
-                    </dependency>
-                </dependencies>
             </project>
         """,
         after = """
             <project>
-                <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -196,36 +175,18 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                     <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
                     <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
                     <quarkus.platform.version>1.13.7.Final</quarkus.platform.version>
-                    <jboss.groupId>org.jboss.resteasy</jboss.groupId>
-                    <jboss.artifactId>resteasy-jaxrs</jboss.artifactId>
                 </properties>
                 <dependencyManagement>
                     <dependencies>
                         <dependency>
-                            <groupId>io.quarkus</groupId>
-                            <artifactId>quarkus-universe-bom</artifactId>
-                            <version>${"$"}{quarkus.platform.version}</version>
+                            <groupId>${'$'}{quarkus.platform.group-id}</groupId>
+                            <artifactId>${'$'}{quarkus.platform.artifact-id}</artifactId>
+                            <version>${'$'}{quarkus.platform.version}</version>
                             <type>pom</type>
                             <scope>import</scope>
                         </dependency>
                     </dependencies>
                 </dependencyManagement>
-                <dependencies>
-                    <dependency>
-                        <groupId>io.quarkus</groupId>
-                        <artifactId>quarkus-arc</artifactId>
-                    </dependency>
-                    <dependency>
-                        <groupId>${"$"}{jboss.groupId}</groupId>
-                        <artifactId>${"$"}{jboss.artifactId}</artifactId>
-                        <version>3.0.24.Final</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.mindrot</groupId>
-                        <artifactId>jbcrypt</artifactId>
-                        <version>0.4</version>
-                    </dependency>
-                </dependencies>
             </project>
         """
     )
@@ -285,7 +246,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
-    fun handlesPropertiesInDependencyGroupIdAndArtifactId() = assertChanged(
+    fun propertiesInDependencyGroupIdAndArtifactId() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "com.google.guava",
             "*",
@@ -295,18 +256,14 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         ),
         before = """
             <project>
-                <modelVersion>4.0.0</modelVersion>
-
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-
                 <properties>
                     <dependency.group-id>com.google.guava</dependency.group-id>
                     <dependency.artifact-id>guava</dependency.artifact-id>
                     <dependency.version>13.0</dependency.version>
                 </properties>
-
                 <dependencies>
                     <dependency>
                         <groupId>${'$'}{dependency.group-id}</groupId>
@@ -318,18 +275,14 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         """,
         after = """
             <project>
-                <modelVersion>4.0.0</modelVersion>
-
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-
                 <properties>
                     <dependency.group-id>com.google.guava</dependency.group-id>
                     <dependency.artifact-id>guava</dependency.artifact-id>
                     <dependency.version>13.0.1</dependency.version>
                 </properties>
-
                 <dependencies>
                     <dependency>
                         <groupId>${'$'}{dependency.group-id}</groupId>
@@ -368,22 +321,22 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             </project>
         """,
         after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>28.0-android</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>28.0-android</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """
     )
 
     @Test
@@ -393,6 +346,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         server.toFile().parentFile.mkdirs()
 
         parent.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -410,6 +364,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         )
 
         server.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -469,6 +424,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         val server = tempDir.resolve("server/pom.xml")
         server.toFile().parentFile.mkdirs()
         parent.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -485,6 +441,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             """.trimIndent()
         )
         server.toFile().writeText(
+            //language=xml
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -571,7 +528,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent(),
+        """,
         after = """            
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -596,7 +553,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent()
+        """
     )
 
     @Test
@@ -610,8 +567,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
         ),
         before = """
             <project>
-              <modelVersion>4.0.0</modelVersion>
-              
               <parent>
                 <groupId>com.fasterxml.jackson</groupId>
                 <artifactId>jackson-parent</artifactId>
@@ -621,8 +576,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
-              <properties>
-              </properties>
             
               <dependencies>
                 <dependency>
@@ -631,11 +584,9 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent(),
+        """,
         after = """            
             <project>
-              <modelVersion>4.0.0</modelVersion>
-              
               <parent>
                 <groupId>com.fasterxml.jackson</groupId>
                 <artifactId>jackson-parent</artifactId>
@@ -656,11 +607,11 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent()
+        """
     )
 
     @Test
-    fun upgradeDependencyHandlesDependencyManagement() = assertChanged(
+    fun upgradeBomImport() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "io.micronaut",
             "micronaut-bom",
@@ -669,82 +620,75 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             null
         ),
         before = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <packaging>pom</packaging>
-                  <groupId>org.openrewrite.example</groupId>
-                  <artifactId>my-app-server</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>io.micronaut</groupId>
-                        <artifactId>micronaut-bom</artifactId>
-                        <version>2.5.11</version>
-                        <type>pom</type>
-                        <scope>import</scope>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                </project>
-            """,
+            <project>
+              <packaging>pom</packaging>
+              <groupId>org.openrewrite.example</groupId>
+              <artifactId>my-app-server</artifactId>
+              <version>1</version>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.micronaut</groupId>
+                    <artifactId>micronaut-bom</artifactId>
+                    <version>2.5.11</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+        """,
         after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <packaging>pom</packaging>
-                  <groupId>org.openrewrite.example</groupId>
-                  <artifactId>my-app-server</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>io.micronaut</groupId>
-                        <artifactId>micronaut-bom</artifactId>
-                        <version>3.0.0-M5</version>
-                        <type>pom</type>
-                        <scope>import</scope>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                </project>
-            """
+            <project>
+              <packaging>pom</packaging>
+              <groupId>org.openrewrite.example</groupId>
+              <artifactId>my-app-server</artifactId>
+              <version>1</version>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.micronaut</groupId>
+                    <artifactId>micronaut-bom</artifactId>
+                    <version>3.0.0-M5</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+        """
     )
 
     @Test
-    fun upgradeDependencyHandlesDependencyManagementResolvedFromProperty(@TempDir tempDir: Path) {
+    fun dependencyManagementResolvedFromProperty(@TempDir tempDir: Path) {
         val parent = tempDir.resolve("pom.xml")
         val server = tempDir.resolve("server/pom.xml")
         server.toFile().parentFile.mkdirs()
         parent.toFile().writeText(
+            //language=xml
             """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
                   <packaging>pom</packaging>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
                     <micronaut.version>2.5.11</micronaut.version>
-                    <spring.version>5.3.9</spring.version>
-                    <spring.artifact-id>spring-jdbc</spring.artifact-id>
                   </properties>
                 </project>
             """.trimIndent()
         )
         server.toFile().writeText(
+            //language=xml
             """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
-
                   <parent>
                     <groupId>org.openrewrite.example</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
                   </parent>
 
-                  <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app-server</artifactId>
-                  <version>1</version>
 
                   <dependencyManagement>
                     <dependencies>
@@ -757,17 +701,10 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                       </dependency>
                     </dependencies>
                   </dependencyManagement>
-
-                  <dependencies>
-                    <dependency>
-                        <groupId>org.springframework</groupId>
-                        <artifactId>${'$'}{spring.artifact-id}</artifactId>
-                        <version>${'$'}{spring.version}</version>
-                    </dependency>
-                  </dependencies>
                 </project>
             """.trimIndent()
         )
+
         assertChanged(
             recipe = UpgradeDependencyVersion(
                 "io.micronaut",
@@ -780,15 +717,12 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             before = parent.toFile(),
             after = """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
                   <packaging>pom</packaging>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
                     <micronaut.version>3.0.0-M5</micronaut.version>
-                    <spring.version>5.3.9</spring.version>
-                    <spring.artifact-id>spring-jdbc</spring.artifact-id>
                   </properties>
                 </project>
             """
@@ -867,7 +801,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent(),
+        """,
         after = """            
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -883,6 +817,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 </dependency>
               </dependencies>
             </project>
-        """.trimIndent()
+        """
     )
 }

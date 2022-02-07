@@ -19,14 +19,9 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.Version;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -34,15 +29,11 @@ import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.List;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.*;
-
 @RequiredArgsConstructor
-public class AddDependencyVisitor extends MavenVisitor {
+public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     private static final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
 
     private final String groupId;
@@ -77,15 +68,15 @@ public class AddDependencyVisitor extends MavenVisitor {
     private String resolvedVersion;
 
     @Override
-    public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-        Maven m = super.visitMaven(maven, ctx);
+    public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+        Xml.Document maven = super.visitDocument(document, executionContext);
 
         Validated versionValidation = Semver.validate(version, versionPattern);
         if (versionValidation.isValid()) {
             versionComparator = versionValidation.getValue();
         }
 
-        Xml.Tag root = m.getRoot();
+        Xml.Tag root = maven.getRoot();
         if (!root.getChild("dependencies").isPresent()) {
             doAfterVisit(new AddToTagVisitor<>(root, Xml.Tag.build("<dependencies/>"),
                     new MavenTagInsertionComparator(root.getChildren())));
@@ -93,51 +84,11 @@ public class AddDependencyVisitor extends MavenVisitor {
 
         doAfterVisit(new InsertDependencyInOrder(scope));
 
-        List<Pom.Dependency> dependencies = new ArrayList<>(model.getDependencies());
-        String packaging = (type == null) ? "jar" : type;
-
-        String dependencyVersion = findVersionToUse(groupId, artifactId, ctx);
-        dependencies.add(
-                new Pom.Dependency(
-                        null,
-                        Scope.fromName(scope),
-                        classifier,
-                        type,
-                        optional != null && optional,
-                        Pom.build(groupId, artifactId, dependencyVersion, null, null, null, packaging, classifier,
-                                null, emptyList(), Pom.DependencyManagement.empty(), emptyList(), emptyList(), emptyMap(),
-                                emptyMap(), true),
-                        dependencyVersion,
-                        emptySet()
-                )
-        );
-
-        return m.withModel(m.getModel().withDependencies(dependencies));
-    }
-
-    private String findVersionToUse(String groupId, String artifactId, ExecutionContext ctx) {
-        if (resolvedVersion == null) {
-
-            if (versionComparator == null) {
-                resolvedVersion = version;
-            } else {
-
-                MavenMetadata mavenMetadata = new MavenPomDownloader(MavenPomCache.NOOP,
-                        emptyMap(), ctx).downloadMetadata(groupId, artifactId, emptyList());
-
-                LatestRelease latest = new LatestRelease(versionPattern);
-                resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(v -> versionComparator.isValid(null, v))
-                        .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
-                        .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-                        .orElse(version);
-            }
-        }
-        return resolvedVersion;
+        return maven;
     }
 
     @RequiredArgsConstructor
-    private class InsertDependencyInOrder extends MavenVisitor {
+    private class InsertDependencyInOrder extends MavenVisitor<ExecutionContext> {
 
         @Nullable
         private final String scope;
@@ -147,11 +98,11 @@ public class AddDependencyVisitor extends MavenVisitor {
             if (DEPENDENCIES_MATCHER.matches(getCursor())) {
                 String versionToUse = null;
 
-                if (model.getManagedVersion(groupId, artifactId) == null) {
+                if (getResolutionResult().getPom().getManagedVersion(groupId, artifactId, type, classifier) == null) {
                     if (familyRegex != null) {
                         versionToUse = findDependencies(d -> familyRegex.matcher(d.getGroupId()).matches()).stream()
                                 .max(Comparator.comparing(d -> new Version(d.getVersion())))
-                                .map(Pom.Dependency::getRequestedVersion)
+                                .map(d -> d.getRequested().getVersion())
                                 .orElse(null);
                     }
                     if (versionToUse == null) {
@@ -175,11 +126,31 @@ public class AddDependencyVisitor extends MavenVisitor {
 
                 doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
                         new InsertDependencyComparator(tag.getChildren(), dependencyTag)));
+                maybeUpdateModel();
 
                 return tag;
             }
 
             return super.visitTag(tag, ctx);
+        }
+
+        private String findVersionToUse(String groupId, String artifactId, ExecutionContext ctx) {
+            if (resolvedVersion == null) {
+
+                if (versionComparator == null) {
+                    resolvedVersion = version;
+                } else {
+                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                    LatestRelease latest = new LatestRelease(versionPattern);
+                    resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
+                            .filter(v -> versionComparator.isValid(null, v))
+                            .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                            .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                            .orElse(version);
+                }
+            }
+
+            return resolvedVersion;
         }
     }
 }

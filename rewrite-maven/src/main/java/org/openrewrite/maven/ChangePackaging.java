@@ -21,9 +21,11 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -38,14 +40,12 @@ public class ChangePackaging extends Recipe {
 
     @Option(displayName = "Group",
             description = "The groupId of the project whose packaging should be changed. Accepts glob patterns.",
-            example = "org.openrewrite.*"
-    )
+            example = "org.openrewrite.*")
     String groupId;
 
     @Option(displayName = "Group",
             description = "The artifactId of the project whose packaging should be changed. Accepts glob patterns.",
-            example = "rewrite-*"
-    )
+            example = "rewrite-*")
     String artifactId;
 
     @Option(displayName = "Packaging",
@@ -63,23 +63,29 @@ public class ChangePackaging extends Recipe {
         return "Sets the packaging type of Maven projects. Either adds the packaging tag if it is missing or changes its context if present.";
     }
 
-    public MavenVisitor getVisitor() {
-        return new MavenVisitor() {
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new MavenVisitor<ExecutionContext>() {
             @Override
-            public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-                Pom pom = maven.getModel();
-                if(!(matchesGlob(pom.getGroupId(), groupId) && matchesGlob(pom.getArtifactId(), artifactId))) {
-                    return maven;
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+                ResolvedPom pom = getResolutionResult().getPom();
+                if (!(matchesGlob(pom.getGroupId(), groupId) && matchesGlob(pom.getArtifactId(), artifactId))) {
+                    return document;
                 }
-                maven = maven.withModel(pom.withPackaging(packaging));
-                return super.visitMaven(maven, ctx);
+                document = document.withMarkers(document.getMarkers().withMarkers(ListUtils.map(document.getMarkers().getMarkers(), m -> {
+                    if(m instanceof MavenResolutionResult) {
+                        return getResolutionResult().withPom(pom.withRequested(pom.getRequested().withPackaging(packaging)));
+                    }
+                    return m;
+                })));
+                return super.visitDocument(document, ctx);
             }
 
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
-                if(PROJECT_MATCHER.matches(getCursor())) {
-                    if(packaging == null) {
+                if (PROJECT_MATCHER.matches(getCursor())) {
+                    if (packaging == null) {
                         t = filterTagChildren(t, it -> !"packaging".equals(it.getName()));
                     } else {
                         t = addOrUpdateChild(t, Xml.Tag.build("\n<packaging>" + packaging + "</packaging>"), getCursor().getParentOrThrow());

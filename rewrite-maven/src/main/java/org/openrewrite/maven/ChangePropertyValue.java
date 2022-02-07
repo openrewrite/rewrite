@@ -21,8 +21,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.AutoFormatVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -61,52 +59,41 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangePropertyValueVisitor();
-    }
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new MavenIsoVisitor<ExecutionContext>() {
+            final String key = ChangePropertyValue.this.key.replace("${", "").replace("}", "");
 
-    public ChangePropertyValue(String key, String newValue, @Nullable Boolean addIfMissing) {
-        //Customizing lombok constructor to replace the property markers.
-        //noinspection ConstantConditions
-        if (key != null) {
-            key = key.replace("${", "").replace("}", "");
-        }
-        this.key = key;
-        this.newValue = newValue;
-        this.addIfMissing = addIfMissing != null && addIfMissing;
-    }
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml.Document m = super.visitDocument(document, ctx);
 
-    private class ChangePropertyValueVisitor extends MavenVisitor {
+                if (addIfMissing) {
+                    Xml.Tag root = m.getRoot();
+                    Optional<Xml.Tag> properties = root.getChild("properties");
+                    if (!properties.isPresent()) {
+                        Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + newValue + "</" + key + ">\n</properties>");
+                        doAfterVisit(new AddToTagVisitor<>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())));
+                        doAfterVisit(new AutoFormatVisitor<>(propertiesTag));
 
-        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            Maven m = super.visitMaven(maven, ctx);
+                    } else if (!properties.get().getChildValue(key).isPresent()) {
+                        Xml.Tag propertyTag = Xml.Tag.build("<" + key + ">" + newValue + "</" + key + ">");
+                        doAfterVisit(new AddToTagVisitor<>(properties.get(), propertyTag,
+                                new MavenTagInsertionComparator(properties.get().getChildren())));
+                        doAfterVisit(new AutoFormatVisitor<>(propertyTag));
+                    }
 
-            if (addIfMissing) {
-                Xml.Tag root = m.getRoot();
-                Optional<Xml.Tag> properties = root.getChild("properties");
-                if (!properties.isPresent()) {
-                    Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + newValue + "</" + key + ">\n</properties>");
-                    doAfterVisit(new AddToTagVisitor<>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())));
-                    doAfterVisit(new AutoFormatVisitor<>(propertiesTag));
-
-                } else if (!properties.get().getChildValue(key).isPresent()) {
-                    Xml.Tag propertyTag = Xml.Tag.build("<" + key + ">" + newValue + "</" + key + ">");
-                    doAfterVisit(new AddToTagVisitor<>(properties.get(), propertyTag,
-                            new MavenTagInsertionComparator(properties.get().getChildren())));
-                    doAfterVisit(new AutoFormatVisitor<>(propertyTag));
                 }
-
+                return m;
             }
-            return m;
-        }
 
-        @Override
-        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isPropertyTag() && key.equals(tag.getName()) &&
-                    !newValue.equals(tag.getValue().orElse(null))) {
-                doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (isPropertyTag() && key.equals(tag.getName()) &&
+                        !newValue.equals(tag.getValue().orElse(null))) {
+                    doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+                }
+                return super.visitTag(tag, ctx);
             }
-            return super.visitTag(tag, ctx);
-        }
+        };
     }
 }

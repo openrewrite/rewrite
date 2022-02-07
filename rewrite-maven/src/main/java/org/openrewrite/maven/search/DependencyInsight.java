@@ -18,17 +18,12 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.MavenVisitor;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -37,7 +32,6 @@ import static org.openrewrite.Tree.randomId;
  * either match or transitively include a dependency matching {@link #groupIdPattern} and
  * {@link #artifactIdPattern}.
  */
-@Incubating(since = "7.0.0")
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class DependencyInsight extends Recipe {
@@ -86,27 +80,22 @@ public class DependencyInsight extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        Pattern groupIdMatcher = Pattern.compile(groupIdPattern.replace(".", "\\.")
-                .replace("*", ".*"));
-        Pattern artifactIdMatcher = Pattern.compile(artifactIdPattern.replace(".", "\\.")
-                .replace("*", ".*"));
         Scope aScope = Scope.fromName(scope);
 
-        return new MavenVisitor() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext context) {
+                Xml.Tag t = super.visitTag(tag, context);
 
                 if (isDependencyTag()) {
-                    Pom.Dependency dependency = findDependency(t);
+                    ResolvedDependency dependency = findDependency(t);
                     if (dependency != null) {
-                        Set<Pom.Dependency> dependencies = model.getDependencies(dependency, aScope);
-                        Optional<Pom.Dependency> match = dependencies.stream().filter(this::dependencyMatches).findFirst();
-                        if (match.isPresent()) {
-                            if (dependencyMatches(dependency)) {
+                        ResolvedDependency match = dependency.findDependency(groupIdPattern, artifactIdPattern);
+                        if (match != null) {
+                            if (match == dependency) {
                                 t = t.withMarkers(t.getMarkers().searchResult());
                             } else {
-                                t = t.withMarkers(t.getMarkers().searchResult(match.get().getCoordinates()));
+                                t = t.withMarkers(t.getMarkers().searchResult(match.getGav().toString()));
                             }
                         }
                     }
@@ -114,26 +103,6 @@ public class DependencyInsight extends Recipe {
 
                 return t;
             }
-
-            private boolean dependencyMatches(Pom.Dependency d) {
-                return groupIdMatcher.matcher(d.getGroupId()).matches() &&
-                        artifactIdMatcher.matcher(d.getArtifactId()).matches();
-            }
         };
-    }
-
-    /**
-     * This method will search the Maven tree for a dependency (including any transitive references) and return
-     * true if the dependency is found.
-     *
-     * @param maven             The maven tree to search.
-     * @param groupIdPattern    The artifact's group ID
-     * @param artifactIdPattern The artifact's ID
-     * @param scope             An optional scope.
-     * @return true if the dependency is found.
-     */
-    public static boolean isDependencyPresent(Maven maven, String groupIdPattern, String artifactIdPattern, @Nullable String scope) {
-        DependencyInsight insight = new DependencyInsight(groupIdPattern, artifactIdPattern, scope);
-        return insight.getVisitor().visit(maven, new InMemoryExecutionContext()) != maven;
     }
 }

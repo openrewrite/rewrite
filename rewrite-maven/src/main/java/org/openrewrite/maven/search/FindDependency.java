@@ -18,8 +18,7 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.maven.MavenVisitor;
-import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
@@ -39,11 +38,11 @@ public class FindDependency extends Recipe {
             example = "guava")
     String artifactId;
 
-    public static Set<Xml.Tag> find(Maven maven, String groupId, String artifactId) {
+    public static Set<Xml.Tag> find(Xml.Document maven, String groupId, String artifactId) {
         Set<Xml.Tag> ds = new HashSet<>();
-        new MavenVisitor() {
+        new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext context) {
                 if (isDependencyTag(groupId, artifactId)) {
                     ds.add(tag);
                 }
@@ -65,13 +64,13 @@ public class FindDependency extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new MavenVisitor() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId)) {
                     return tag.withMarkers(tag.getMarkers().searchResult());
                 }
-                return super.visitTag(tag, context);
+                return super.visitTag(tag, ctx);
             }
         };
     }

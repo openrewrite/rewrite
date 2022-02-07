@@ -20,15 +20,9 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.cache.InMemoryMavenPomCache;
-import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.internal.RawMaven;
-import org.openrewrite.maven.internal.RawMavenResolver;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.MavenModel;
-import org.openrewrite.maven.tree.Modules;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.internal.RawPom;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
@@ -37,35 +31,30 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.toMap;
+import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
-public class MavenParser implements Parser<Maven> {
-    private final MavenPomCache mavenPomCache;
+public class MavenParser implements Parser<Xml.Document> {
     private final Collection<String> activeProfiles;
-    private final boolean resolveOptional;
 
     /**
-     * @param mavenPomCache   The cache to be used to speed up dependency resolution
      * @param activeProfiles  The maven profile names set to be active. Profiles are typically defined in the settings.xml
-     * @param resolveOptional When set to 'true' resolve dependencies marked as optional
      */
-    private MavenParser(MavenPomCache mavenPomCache,
-                        Collection<String> activeProfiles,
-                        boolean resolveOptional) {
-        this.mavenPomCache = mavenPomCache;
+    private MavenParser(Collection<String> activeProfiles) {
         this.activeProfiles = activeProfiles;
-        this.resolveOptional = resolveOptional;
     }
 
     @Override
-    public List<Maven> parse(@Language("xml") String... sources) {
+    public List<Xml.Document> parse(@Language("xml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
+    }
+
+    @Override
+    public List<Xml.Document> parse(ExecutionContext ctx, @Language("xml") String... sources) {
+        return Parser.super.parse(ctx, sources);
     }
 
     private static class MavenXmlParser extends XmlParser {
@@ -76,53 +65,63 @@ public class MavenParser implements Parser<Maven> {
     }
 
     @Override
-    public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
+    public List<Xml.Document> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                    ExecutionContext ctx) {
-        Map<RawMaven, Xml.Document> projectPoms = new LinkedHashMap<>();
+        Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
+        Map<Path, Pom> projectPomsByPath = new HashMap<>();
         for (Input source : sources) {
-            projectPoms.put(
-                    RawMaven.parse(source, relativeTo, null, ctx),
-                    new MavenXmlParser()
-                            .parseInputs(singletonList(source), relativeTo, ctx)
-                            .iterator().next()
-            );
-        }
-
-        MavenPomDownloader downloader = new MavenPomDownloader(mavenPomCache,
-                projectPoms.keySet().stream().collect(toMap(RawMaven::getSourcePath, Function.identity())), ctx);
-
-        List<Maven> parsed = new ArrayList<>();
-        Map<String, String> effectiveProperties = new HashMap<>();
-        if (relativeTo != null) {
-            effectiveProperties.put("project.basedir", relativeTo.toString());
-            effectiveProperties.put("basedir", relativeTo.toString());
-        }
-
-        for (Map.Entry<RawMaven, Xml.Document> rawToDoc : projectPoms.entrySet()) {
-            RawMaven raw = rawToDoc.getKey().withProjectPom(true);
-            MavenModel model = new RawMavenResolver(downloader, activeProfiles, resolveOptional, ctx)
-                    .resolve(raw, effectiveProperties);
-            if (model != null) {
-                parsed.add(new Maven(rawToDoc.getValue().withMarkers(rawToDoc.getValue().getMarkers()
-                        .compute(model, (old, n) -> n))));
+            Pom pom = RawPom.parse(source.getSource(), null).toPom(source.getPath(), null);
+            if (relativeTo != null) {
+                if (pom.getProperties() == null || pom.getProperties().isEmpty()) {
+                    pom = pom.withProperties(new LinkedHashMap<>());
+                }
+                pom.getProperties().put("project.basedir", relativeTo.toString());
+                pom.getProperties().put("basedir", relativeTo.toString());
             }
+
+            Xml.Document xml = new MavenXmlParser()
+                    .parseInputs(singletonList(source), relativeTo, ctx)
+                    .iterator().next();
+
+            projectPoms.put(xml, pom);
+            projectPomsByPath.put(source.getPath(), pom);
+        }
+
+        List<Xml.Document> parsed = new ArrayList<>();
+
+        MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
+
+        for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
+            ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
+            MavenResolutionResult model = new MavenResolutionResult(randomId(), resolvedPom, emptyList(), null, emptyMap())
+                    .resolveDependencies(downloader, ctx);
+            parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
         }
 
         for (int i = 0; i < parsed.size(); i++) {
-            Maven maven = parsed.get(i);
-            List<Pom> modules = new ArrayList<>(0);
-            for (Maven possibleModule : parsed) {
-                Pom parent = possibleModule.getModel().getParent();
+            Xml.Document maven = parsed.get(i);
+            MavenResolutionResult resolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class)
+                    .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
+
+            List<MavenResolutionResult> modules = new ArrayList<>(0);
+            for (Xml.Document possibleModule : parsed) {
+                if(possibleModule == maven) {
+                    continue;
+                }
+                MavenResolutionResult moduleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class)
+                        .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
+                Parent parent = moduleResolutionResult.getPom().getRequested().getParent();
                 if (parent != null &&
-                        parent.getGroupId().equals(maven.getModel().getGroupId()) &&
-                        parent.getArtifactId().equals(maven.getModel().getArtifactId()) &&
-                        parent.getVersion().equals(maven.getModel().getVersion())) {
-                    modules.add(possibleModule.getModel());
+                        parent.getGroupId().equals(resolutionResult.getPom().getGroupId()) &&
+                        parent.getArtifactId().equals(resolutionResult.getPom().getArtifactId()) &&
+                        parent.getVersion().equals(resolutionResult.getPom().getVersion())) {
+                    moduleResolutionResult.unsafeSetParent(resolutionResult);
+                    modules.add(moduleResolutionResult);
                 }
             }
 
             if (!modules.isEmpty()) {
-                parsed.set(i, maven.withMarkers(maven.getMarkers().compute(new Modules(randomId(), modules), (old, n) -> n)));
+                parsed.set(i, maven.withMarkers(maven.getMarkers().computeByType(resolutionResult.withModules(modules), (old, n) -> n)));
             }
         }
 
@@ -139,18 +138,7 @@ public class MavenParser implements Parser<Maven> {
     }
 
     public static class Builder {
-        private MavenPomCache mavenPomCache = new InMemoryMavenPomCache();
         private final Collection<String> activeProfiles = new HashSet<>();
-        private boolean resolveOptional = false;
-
-        /**
-         * @deprecated When we are confident in optional dependency resolution in general, we can remove this flag and
-         * all its effects.
-         */
-        Builder resolveOptional(@Nullable Boolean optional) {
-            this.resolveOptional = optional == null || optional;
-            return this;
-        }
 
         public Builder activeProfiles(@Nullable String... profiles) {
             //noinspection ConstantConditions
@@ -176,13 +164,8 @@ public class MavenParser implements Parser<Maven> {
             return this;
         }
 
-        public Builder cache(MavenPomCache cache) {
-            this.mavenPomCache = cache;
-            return this;
-        }
-
         public MavenParser build() {
-            return new MavenParser(mavenPomCache, activeProfiles, resolveOptional);
+            return new MavenParser(activeProfiles);
         }
     }
 }

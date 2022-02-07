@@ -19,15 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.List;
-
-import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -73,37 +68,19 @@ public class RemoveDependency extends Recipe {
                 scope, s -> !Scope.Invalid.equals(Scope.fromName(s))));
     }
 
-    private class RemoveDependencyVisitor extends MavenVisitor {
-
+    private class RemoveDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
         @Override
-        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependencyTag(groupId, artifactId)) {
-                Pom.Dependency dependency = findDependency(tag);
+                Scope checkScope = scope != null ? Scope.fromName(scope) : null;
+                ResolvedDependency dependency = findDependency(tag, checkScope);
                 if (dependency != null) {
-                    Scope checkScope = scope != null ? Scope.fromName(scope) : null;
-                    if (checkScope == null || checkScope == dependency.getScope() ||
-                            (dependency.getScope() != null && dependency.getScope().isInClasspathOf(checkScope))) {
-                        doAfterVisit(new RemoveContentVisitor<>(tag, true));
-                    }
+                    doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                    maybeUpdateModel();
                 }
             }
 
             return super.visitTag(tag, ctx);
-        }
-
-        @Override
-        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            model = maven.getModel();
-            Maven m = super.visitMaven(maven, ctx);
-
-            if (model.getDependencies().stream().anyMatch(dep -> (dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))) {
-                List<Pom.Dependency> dependencies = model.getDependencies().stream()
-                        .filter(dep -> !(dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))
-                        .collect(toList());
-                return m.withModel(model.withDependencies(dependencies));
-            } else {
-                return m;
-            }
         }
     }
 }

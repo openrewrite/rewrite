@@ -9,6 +9,8 @@ dependencies {
 
     jmh(project(":rewrite-core"))
     jmh(project(":rewrite-java-11"))
+    jmh(project(":rewrite-maven"))
+    jmh("org.rocksdb:rocksdbjni:latest.release")
     jmh("org.openjdk.jmh:jmh-core:latest.release")
 
     // Nebula doesn't like having jmhAnnotationProcessor without jmh so we just add it twice.

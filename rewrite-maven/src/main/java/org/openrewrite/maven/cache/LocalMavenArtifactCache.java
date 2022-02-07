@@ -18,7 +18,7 @@ package org.openrewrite.maven.cache;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,14 +43,14 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
 
     @Override
     @Nullable
-    public Path getArtifact(Pom.Dependency dependency) {
+    public Path getArtifact(ResolvedDependency dependency) {
         Path path = dependencyPath(dependency);
         return path.toFile().exists() ? path : null;
     }
 
     @Override
     @Nullable
-    public Path putArtifact(Pom.Dependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
+    public Path putArtifact(ResolvedDependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
         Path path = dependencyPath(dependency);
         try (InputStream is = artifactInputStream;
              OutputStream out = Files.newOutputStream(path)) {
@@ -69,7 +69,7 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
         return path;
     }
 
-    private Path dependencyPath(Pom.Dependency dependency) {
+    private Path dependencyPath(ResolvedDependency dependency) {
         Path resolvedPath = cache.resolve(Paths.get(dependency.getGroupId().replace('.', '/'),
                 dependency.getArtifactId(),
                 dependency.getVersion()));
@@ -86,7 +86,7 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
 
         return resolvedPath.resolve(dependency.getArtifactId() + "-" +
                 (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                (dependency.getClassifier() == null ? "" : dependency.getClassifier()) +
+                (dependency.getRequested().getClassifier() == null ? "" : dependency.getRequested().getClassifier()) +
                 ".jar");
     }
 }

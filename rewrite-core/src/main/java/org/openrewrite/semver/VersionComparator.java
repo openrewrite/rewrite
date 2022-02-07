@@ -42,10 +42,19 @@ public interface VersionComparator extends Comparator<String> {
     int compare(@Nullable String currentVersion, String v1, String v2);
 
     default Optional<String> upgrade(String currentVersion, Collection<String> availableVersions) {
-        return availableVersions.stream()
-                .filter(v -> isValid(currentVersion, v))
-                .filter(v -> compare(currentVersion, currentVersion, v) <= 0)
-                .max((v1, v2) -> compare(currentVersion, v1, v2))
+        boolean seen = false;
+        String best = null;
+        for (String availableVersion : availableVersions) {
+            if (isValid(currentVersion, availableVersion)) {
+                if (compare(currentVersion, currentVersion, availableVersion) <= 0) {
+                    if (!seen || compare(currentVersion, availableVersion, best) > 0) {
+                        seen = true;
+                        best = availableVersion;
+                    }
+                }
+            }
+        }
+        return (seen ? Optional.of(best) : Optional.<String>empty())
                 .filter(v -> !v.equals(currentVersion));
     }
 }

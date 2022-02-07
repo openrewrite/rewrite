@@ -16,23 +16,24 @@
 
 package org.openrewrite.maven.tree;
 
-import lombok.EqualsAndHashCode;
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 
 @Value
+@With
 public class GroupArtifactVersion {
+    @Nullable
     String groupId;
+
     String artifactId;
 
-    @EqualsAndHashCode.Exclude
-    String requestedVersion;
+    @Nullable
     String version;
 
-    /**
-     * In the form "${version}-${timestamp}-${buildNumber}", e.g. for the artifact rewrite-testing-frameworks-1.7.0-20210614.172805-1.jar,
-     * the dated snapshot version is "1.7.0-20210614.172805-1".
-     */
-    @Nullable
-    String datedSnapshotVersion;
+    @Override
+    public String toString() {
+        return (groupId == null ? "" : groupId) + ':' + artifactId +
+                (version == null ? "" : ":" + version);
+    }
 }

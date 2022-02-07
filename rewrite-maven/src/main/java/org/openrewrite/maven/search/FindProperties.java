@@ -56,8 +56,7 @@ public class FindProperties extends Recipe {
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern propertyMatcher = Pattern.compile(propertyPattern.replace(".", "\\.")
                 .replace("*", ".*"));
-        return new MavenVisitor() {
-
+        return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
@@ -68,7 +67,7 @@ public class FindProperties extends Recipe {
                 Optional<String> value = tag.getValue();
                 if (t.getContent() != null && value.isPresent() && value.get().contains("${")) {
                     t = t.withContent(ListUtils.mapFirst(t.getContent(), v ->
-                            v.withMarkers(v.getMarkers().searchResult(model.getValue(value.get())))));
+                            v.withMarkers(v.getMarkers().searchResult(getResolutionResult().getPom().getValue(value.get())))));
                 }
                 return t;
             }

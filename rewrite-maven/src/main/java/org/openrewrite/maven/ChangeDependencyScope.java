@@ -67,30 +67,27 @@ public class ChangeDependencyScope extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangeDependencyScopeVisitor();
-    }
-
-    private class ChangeDependencyScopeVisitor extends MavenVisitor {
-
-        @Override
-        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isDependencyTag()) {
-                if (groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
-                        artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
-                    Optional<Xml.Tag> scope = tag.getChild("scope");
-                    if (scope.isPresent()) {
-                        if (newScope == null) {
-                            doAfterVisit(new RemoveContentVisitor<>(scope.get(), false));
-                        } else if (!newScope.equals(scope.get().getValue().orElse(null))) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(scope.get(), newScope));
+        return new MavenVisitor<ExecutionContext>() {
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (isDependencyTag()) {
+                    if (groupId.equals(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId())) &&
+                            artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
+                        Optional<Xml.Tag> scope = tag.getChild("scope");
+                        if (scope.isPresent()) {
+                            if (newScope == null) {
+                                doAfterVisit(new RemoveContentVisitor<>(scope.get(), false));
+                            } else if (!newScope.equals(scope.get().getValue().orElse(null))) {
+                                doAfterVisit(new ChangeTagValueVisitor<>(scope.get(), newScope));
+                            }
+                        } else if (newScope != null) {
+                            doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<scope>" + newScope + "</scope>")));
                         }
-                    } else if (newScope != null) {
-                        doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<scope>" + newScope + "</scope>")));
                     }
                 }
-            }
 
-            return super.visitTag(tag, ctx);
-        }
+                return super.visitTag(tag, ctx);
+            }
+        };
     }
 }

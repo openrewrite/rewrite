@@ -13,21 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.tree;
+package org.openrewrite.maven
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import lombok.With;
-import org.openrewrite.marker.Marker;
+import org.openrewrite.maven.tree.MavenResolutionResult
+import org.openrewrite.xml.tree.Xml
 
-import java.util.UUID;
-
-@Value
-public class MavenModel implements Marker {
-    @EqualsAndHashCode.Include
-    @With
-    UUID id;
-
-    @With
-    Pom pom;
-}
+fun Xml.Document.mavenResolutionResult(): MavenResolutionResult =
+    markers.findFirst(MavenResolutionResult::class.java).orElseThrow()

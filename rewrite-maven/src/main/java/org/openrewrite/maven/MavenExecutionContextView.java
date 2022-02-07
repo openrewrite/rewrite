@@ -18,13 +18,12 @@ package org.openrewrite.maven;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.maven.tree.MavenRepositoryCredentials;
-import org.openrewrite.maven.tree.MavenRepositoryMirror;
+import org.openrewrite.maven.tree.*;
 
-import java.net.URI;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -33,13 +32,32 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 
 public class MavenExecutionContextView extends DelegatingExecutionContext {
+    private static final MavenPomCache DEFAULT_POM_CACHE = new InMemoryMavenPomCache();
+
     private static final String MAVEN_MIRRORS = "org.openrewrite.maven.mirrors";
     private static final String MAVEN_CREDENTIALS = "org.openrewrite.maven.auth";
     private static final String MAVEN_REPOSITORIES = "org.openrewrite.maven.repos";
     private static final String MAVEN_PINNED_SNAPSHOT_VERSIONS = "org.openrewrite.maven.pinnedSnapshotVersions";
+    private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
+    private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
+    }
+
+    public static MavenExecutionContextView view(ExecutionContext ctx) {
+        if(ctx instanceof MavenExecutionContextView) {
+            return (MavenExecutionContextView) ctx;
+        }
+        return new MavenExecutionContextView(ctx);
+    }
+
+    public void setResoutionListener(ResolutionEventListener listener) {
+        putMessage(MAVEN_RESOLUTION_LISTENER, listener);
+    }
+
+    public ResolutionEventListener getResolutionListener() {
+        return getMessage(MAVEN_RESOLUTION_LISTENER, ResolutionEventListener.NOOP);
     }
 
     public void setMirrors(Collection<MavenRepositoryMirror> mirrors) {
@@ -58,6 +76,14 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_CREDENTIALS, emptyList());
     }
 
+    public void setPomCache(MavenPomCache pomCache) {
+        putMessage(MAVEN_POM_CACHE, pomCache);
+    }
+
+    public MavenPomCache getPomCache() {
+        return getMessage(MAVEN_POM_CACHE, DEFAULT_POM_CACHE);
+    }
+
     public void setRepositories(List<MavenRepository> repositories) {
         putMessage(MAVEN_REPOSITORIES, repositories);
     }
@@ -72,11 +98,11 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      *
      * @param pinnedSnapshotVersions A set of group:artifact:version and the dated snapshot version to pin them to.
      */
-    public void setPinnedSnapshotVersions(Collection<GroupArtifactVersion> pinnedSnapshotVersions) {
+    public void setPinnedSnapshotVersions(Collection<ResolvedGroupArtifactVersion> pinnedSnapshotVersions) {
         putMessage(MAVEN_PINNED_SNAPSHOT_VERSIONS, pinnedSnapshotVersions);
     }
 
-    public Collection<GroupArtifactVersion> getPinnedSnapshotVersions() {
+    public Collection<ResolvedGroupArtifactVersion> getPinnedSnapshotVersions() {
         return getMessage(MAVEN_PINNED_SNAPSHOT_VERSIONS, emptyList());
     }
 
@@ -97,12 +123,12 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                     .collect(Collectors.toList()));
         }
 
-        setRepositories(settings.getActiveRepositories(activeProfiles).stream()
+        setRepositories(settings.getActiveRepositories(Arrays.asList(activeProfiles)).stream()
                 .map(repo -> {
                     try {
                         return new MavenRepository(
                                 repo.getId(),
-                                URI.create(repo.getUrl()),
+                                repo.getUrl(),
                                 repo.getReleases() == null || repo.getReleases().isEnabled(),
                                 repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
                                 null,

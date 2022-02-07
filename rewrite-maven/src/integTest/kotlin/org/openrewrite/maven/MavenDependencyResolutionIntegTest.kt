@@ -32,16 +32,14 @@ import org.eclipse.aether.graph.DependencyNode
 import org.eclipse.aether.graph.Exclusion
 import org.eclipse.aether.internal.impl.DefaultRemoteRepositoryManager
 import org.eclipse.aether.repository.RemoteRepository
-import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
-import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.internal.MavenParsingException
-import org.openrewrite.maven.tree.Pom
+import org.openrewrite.maven.tree.ResolvedDependency
 import org.openrewrite.maven.tree.Scope
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -56,7 +54,6 @@ class MavenDependencyResolutionIntegTest {
     @Suppress("unused")
     companion object {
         private val meterRegistry = Metrics.globalRegistry
-        private val mavenCache = InMemoryMavenPomCache()
         private val executionContext: ExecutionContext
             get() = InMemoryExecutionContext { t ->
                 if (t is MavenParsingException) {
@@ -73,12 +70,6 @@ class MavenDependencyResolutionIntegTest {
                 Level.INFO
 
             meterRegistry.config().meterFilter(MeterFilter.ignoreTags("artifact.id"))
-        }
-
-        @JvmStatic
-        @AfterAll
-        fun afterAll() {
-            mavenCache.close()
         }
     }
 
@@ -225,20 +216,19 @@ class MavenDependencyResolutionIntegTest {
                 <dependency>
                     <groupId>org.openrewrite</groupId>
                     <artifactId>rewrite-core</artifactId>
-                    <version>6.1.0-SNAPSHOT</version>
+                    <version>7.10.0-SNAPSHOT</version>
                 </dependency>
               </dependencies>
             </project>
         """.trimIndent()
 
         val maven = MavenParser.builder()
-            .cache(mavenCache)
             .build()
             .parse(pom)
             .first()
 
-        assertThat(maven.model.dependencies.first().version).isEqualTo("7.10.0-SNAPSHOT")
-        assertThat(maven.model.dependencies.first().model.datedSnapshotVersion).startsWith("7.10.0")
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]!!.first().version).isEqualTo("7.10.0-SNAPSHOT")
+        assertThat(maven.mavenResolutionResult().dependencies[Scope.Compile]!!.first().datedSnapshotVersion).startsWith("7.10.0")
     }
 
     @Issue("#166")
@@ -394,8 +384,8 @@ class MavenDependencyResolutionIntegTest {
 
         // Maven says that the correct version is org.slf4j:slf4j-api:1.7.30, but aether says org.slf4j:slf4j-api:1.7.25
         // This asserts that the versions match Maven's expectation
-        val expected = javaClass.getResource("/springBootParentExpected.txt").readText()
-        assertThat(printTreeRecursive(parse(pom).model, false))
+        val expected = javaClass.getResource("/springBootParentExpected.txt")!!.readText()
+        assertThat(printTreeRecursive(parse(pom).mavenResolutionResult().dependencies[Scope.Test]!!))
             .isEqualTo(expected)
     }
 
@@ -490,8 +480,8 @@ class MavenDependencyResolutionIntegTest {
 
         // Maven says that the correct version is org.slf4j:slf4j-api:1.7.30, but aether says org.slf4j:slf4j-api:1.7.25
         // This asserts that the versions match Maven's expectation
-        val importDependenciesExpected = javaClass.getResource("/importDependenciesExpected.txt").readText()
-        assertThat(printTreeRecursive(parse(pom).model, false))
+        val importDependenciesExpected = javaClass.getResource("/importDependenciesExpected.txt")!!.readText()
+        assertThat(printTreeRecursive(parse(pom).mavenResolutionResult().dependencies[Scope.Test]!!))
             .isEqualTo(importDependenciesExpected)
     }
 
@@ -969,37 +959,36 @@ class MavenDependencyResolutionIntegTest {
 
         val mavenParser = MavenParser.builder().build()
         val mavens = mavenParser.parse(pomSource)
-        val maven = mavens.get(0)
-        val dependencies = maven.getModel().getDependencies()
+        val maven = mavens[0]
+        val dependencies = maven.mavenResolutionResult().dependencies[Scope.Test]
 
         assertThat(dependencies).hasSize(4)
         assertThat(dependencies).anyMatch {
-            it.groupId == "org.junit.jupiter" && it.artifactId == "junit-jupiter" && it.version == "5.7.1" && it.scope == Scope.Test
+            it.groupId == "org.junit.jupiter" && it.artifactId == "junit-jupiter" && it.version == "5.7.1"
         }.anyMatch {
-            it.groupId == "org.junit.jupiter" && it.artifactId == "junit-jupiter-api" && it.version == "5.6.3" && it.scope == Scope.Test
+            it.groupId == "org.junit.jupiter" && it.artifactId == "junit-jupiter-api" && it.version == "5.6.3"
         }.anyMatch {
-            it.groupId == "org.mockito" && it.artifactId == "mockito-core" && it.version == "3.7.7" && it.scope == Scope.Provided
+            it.groupId == "org.mockito" && it.artifactId == "mockito-core" && it.version == "3.7.7"
         }.anyMatch {
             it.groupId == "org.apache.tomee" && it.artifactId == "openejb-core-hibernate" && it.version == "8.0.5" && it.type == "pom"
         }
     }
 
-    fun parse(pom: String) = MavenParser.builder()
-        .cache(mavenCache)
+    private fun parse(pom: String) = MavenParser.builder()
         .build()
         .parse(executionContext, pom)
         .first()
 
-    private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String, ignoreScopes: Boolean = false) {
+    private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String) {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
         val pomAst = parse(pom)
-        val rewriteResult = printTreeRecursive(pomAst.model, ignoreScopes)
-        val aetherResult = MavenAetherParser().dependencyTree(pomFile, ignoreScopes)
+        val rewriteResult = printTreeRecursive(pomAst.mavenResolutionResult().dependencies[Scope.Test]!!)
+        val aetherResult = MavenAetherParser().dependencyTree(pomFile)
         assertThat(rewriteResult).isEqualTo(aetherResult)
     }
 
-    private fun printTreeRecursive(maven: Pom, ignoreScopes: Boolean): String {
-        return maven.dependencies
+    private fun printTreeRecursive(deps: List<ResolvedDependency>): String {
+        return deps
             .filterNot { it.isOptional }
             .sortedWith { d1, d2 ->
                 if (d1.groupId == d2.groupId)
@@ -1008,14 +997,13 @@ class MavenDependencyResolutionIntegTest {
                     d1.groupId.compareTo(d2.groupId)
             }
             .joinToString("\n") { dep ->
-                dependencyString(dep, ignoreScopes) + printTreeRecursive(dep.model, ignoreScopes)
+                dependencyString(dep) + printTreeRecursive(dep.dependencies)
                     .let { if (it.isBlank()) "" else "\n${it.prependIndent(" ")}" }
             }
     }
 
-    private fun dependencyString(dep: Pom.Dependency, ignoreScopes: Boolean): String =
+    private fun dependencyString(dep: ResolvedDependency): String =
         dep.run { "$groupId:$artifactId:$version${if (classifier?.isNotBlank() == true) ":${classifier}" else ""}" } +
-                (if (ignoreScopes) "" else "[${dep.scope.toString().lowercase()}]") +
                 dep.run {
                     " https://repo1.maven.org/maven2/${
                         groupId.replace(
@@ -1035,7 +1023,7 @@ class MavenDependencyResolutionIntegTest {
         private val repositories =
             listOf(RemoteRepository.Builder("local", "default", localRepository.toURI().toString()).build())
 
-        fun dependencyTree(pom: File, ignoreScopes: Boolean): String {
+        fun dependencyTree(pom: File): String {
             val modelBuilder = DefaultModelBuilderFactory().newInstance()
 
             val modelBuildingRequest = DefaultModelBuildingRequest()
@@ -1069,15 +1057,14 @@ class MavenDependencyResolutionIntegTest {
             }
 
             val collectResult = repositorySystem.collectDependencies(repositorySystemSession, collectRequest)
-            return printTreeRecursive(collectResult.root, ignoreScopes).trimIndent()
+            return printTreeRecursive(collectResult.root).trimIndent()
         }
 
         private fun printTreeRecursive(
             node: DependencyNode,
-            ignoreScopes: Boolean,
             originalScope: String = "compile"
         ): String =
-            dependencyString(node, ignoreScopes, originalScope) + (node.children
+            dependencyString(node) + (node.children
                 .filter { n -> n.dependency.scope != "system" }
                 .sortedWith { n1, n2 ->
                     val d1 = n1.dependency.artifact
@@ -1095,15 +1082,14 @@ class MavenDependencyResolutionIntegTest {
 
                     printTreeRecursive(
                         it.data["conflict.winner"] as DefaultDependencyNode?
-                            ?: it, ignoreScopes, scope
+                            ?: it
                     )
                 }
                 .let { if (it.isBlank()) "" else "\n${it.prependIndent(" ")}" })
 
-        private fun dependencyString(node: DependencyNode, ignoreScopes: Boolean, originalScope: String): String =
+        private fun dependencyString(node: DependencyNode): String =
             node.dependency?.run {
                 artifact.run { "$groupId:$artifactId:$version${if (classifier.isNotBlank()) ":${classifier}" else ""}" } +
-                        (if (ignoreScopes) "" else "[$originalScope]") +
                         " https://repo1.maven.org/maven2/${
                             artifact.run {
                                 "${

@@ -18,18 +18,19 @@ package org.openrewrite.maven.cache;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.RawMaven;
-import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.*;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -37,11 +38,16 @@ import org.rocksdb.WriteOptions;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Implementation of the maven cache that leverages Rocksdb. The keys and values are serialized to/from byte arrays
@@ -59,8 +65,8 @@ import java.util.*;
  * <li> Rocksdb computes checksums for all of its files, normally it checks those on startup, this has been disabled as
  * well.</li>
  */
+@SuppressWarnings("OptionalAssignedToNull")
 public class RocksdbMavenPomCache implements MavenPomCache {
-
     static ObjectMapper mapper;
 
     //The RocksDB instance is thread safe, the first call to create a database for a workspace will open the database
@@ -71,7 +77,9 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     static {
         SmileFactory f = new SmileFactory();
         f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
-        ObjectMapper m = new ObjectMapper(f)
+        ObjectMapper m = JsonMapper.builder(f)
+                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                .build()
                 .registerModule(new ParameterNamesModule())
                 .registerModule(new Jdk8Module())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
@@ -94,28 +102,9 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         return cacheMap.computeIfAbsent(pomCacheDir, RocksCache::new);
     }
 
-    //This is a two-layer cache, The first layer stores cache entries in memory, the second layer stores cache entries
-    //on disk using rocksdb. Without the in-memory cache, each cache entry would be deserialized into a separate instance
-    //which can quickly consume all memory when there are a lot of duplicate maven depenencies.
-    private final Map<PomKey, CacheResult<RawMaven>> l1PomCache = new HashMap<>();
-    private final Map<MetadataKey, CacheResult<MavenMetadata>> l1MavenMetadataCache = new HashMap<>();
-    private final Map<MavenRepository, CacheResult<MavenRepository>> l1RepositoryCache = new HashMap<>();
-
     private final RocksCache cache;
-    private final long releaseTimeToLiveMilliseconds;
-    private final long snapshotTimeToLiveMilliseconds;
 
-    public RocksdbMavenPomCache(@Nullable Path workspace) {
-        //Default ttl is one minute for snapshot artifacts and an hour for release artifacts.
-        this(workspace, 60_000 * 60, 60_000);
-    }
-
-    public RocksdbMavenPomCache(@Nullable Path workspace, long releaseTimeToLiveMilliseconds, long snapshotTimeToLiveMilliseconds) {
-        this.releaseTimeToLiveMilliseconds = releaseTimeToLiveMilliseconds;
-        this.snapshotTimeToLiveMilliseconds = snapshotTimeToLiveMilliseconds;
-
-        assert workspace != null;
-
+    public RocksdbMavenPomCache(Path workspace) {
         File pomCacheDir = new File(workspace.toFile(), ".rewrite-cache");
         if (!pomCacheDir.exists() && !pomCacheDir.mkdirs()) {
             throw new IllegalStateException("Unable to find or create maven pom cache at " + pomCacheDir);
@@ -131,93 +120,69 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         cache = getCache(pomCacheDir.getAbsolutePath());
     }
 
-    @Override
     @Nullable
-    public CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key) {
-        CacheResult<MavenMetadata> metadata = l1MavenMetadataCache.get(key);
+    @Override
+    public ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
+        return null;
+    }
+
+    @Override
+    public void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved) {
+    }
+
+    @Nullable
+    @Override
+    public Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+        try {
+            return deserializeMavenMetadata(cache.get(serialize((repo.toString() + "/" + gav).getBytes(StandardCharsets.UTF_8))));
+        } catch (RocksDBException e) {
+            throw new MavenDownloadingException(e);
+        }
+    }
+
+    @Override
+    public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
         if (metadata == null) {
-            try {
-                metadata = deserializeMavenMetadata(cache.get(serialize(key)));
-            } catch (RocksDBException e) {
-                e.printStackTrace();
-            }
+            return;
         }
-        return filterExpired(metadata);
+
+        try {
+            cache.put(serialize((repo.toString() + "/" + gav).getBytes(StandardCharsets.UTF_8)), serialize(metadata));
+        } catch (RocksDBException e) {
+            throw new MavenDownloadingException(e);
+        }
     }
 
     @Override
-    public CacheResult<MavenMetadata> setMavenMetadata(MetadataKey key, MavenMetadata metadata, boolean isSnapshot) {
-        long ttl = calculateExpiration(isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
-        CacheResult<MavenMetadata> cached = new CacheResult<>(CacheResult.State.Cached, metadata, ttl);
-        l1MavenMetadataCache.put(key, cached);
+    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) {
         try {
-            cache.put(serialize(key), serialize(cached));
+            return deserializePom(cache.get(serialize(gav.toString().getBytes(StandardCharsets.UTF_8))));
+        } catch (RocksDBException e) {
+            throw new MavenDownloadingException(e);
+        }
+    }
+
+    @Override
+    public void putPom(ResolvedGroupArtifactVersion gav, Pom pom) {
+        if (pom == null) {
+            return;
+        }
+
+        try {
+            cache.put(serialize(gav.toString().getBytes(StandardCharsets.UTF_8)), serialize(pom));
         } catch (RocksDBException e) {
             e.printStackTrace();
         }
-        return new CacheResult<>(CacheResult.State.Updated, metadata, ttl);
     }
 
     @Override
     @Nullable
-    public CacheResult<RawMaven> getMaven(PomKey key) {
-        CacheResult<RawMaven> rawMavenEntry = l1PomCache.get(key);
-        if (rawMavenEntry == null) {
-            byte[] rocksKey = serialize(key);
-            try {
-                rawMavenEntry = deserializeRawMaven(cache.get(rocksKey));
-            } catch (RocksDBException e) {
-                e.printStackTrace();
-            }
-        }
-        return filterExpired(rawMavenEntry);
+    public Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+        return null;
     }
 
     @Override
-    public CacheResult<RawMaven> setMaven(PomKey key, RawMaven maven, boolean isSnapshot) {
-        long ttl = calculateExpiration(isSnapshot ? snapshotTimeToLiveMilliseconds : releaseTimeToLiveMilliseconds);
-        CacheResult<RawMaven> cached = new CacheResult<>(CacheResult.State.Cached, maven, ttl);
-        l1PomCache.put(key, cached);
-        try {
-            cache.put(serialize(key), serialize(cached));
-        } catch (RocksDBException e) {
-            e.printStackTrace();
-        }
-        return new CacheResult<>(CacheResult.State.Updated, maven, ttl);
-    }
-
-    @Override
-    @Nullable
-    public CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository) {
-        CacheResult<MavenRepository> repositoryCacheResult = l1RepositoryCache.get(repository);
-        if (repositoryCacheResult == null) {
-            try {
-                repositoryCacheResult = deserializeMavenRepository(cache.get(serialize(repository)));
-            } catch (RocksDBException e) {
-                e.printStackTrace();
-            }
-        }
-        return filterExpired(repositoryCacheResult);
-    }
-
-    @Override
-    public CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
-        long ttl = calculateExpiration(normalized == null ? 60_000 : 60_000 * 60);
-        CacheResult<MavenRepository> cached = new CacheResult<>(CacheResult.State.Cached, normalized, ttl);
-        l1RepositoryCache.put(repository, cached);
-        try {
-            cache.put(serialize(repository), serialize(cached));
-        } catch (RocksDBException e) {
-            e.printStackTrace();
-        }
-        return new CacheResult<>(CacheResult.State.Updated, normalized, ttl);
-    }
-
-    @Override
-    public void clear() {
-        l1PomCache.clear();
-        l1MavenMetadataCache.clear();
-        l1RepositoryCache.clear();
+    public void putNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
     }
 
     static <T> byte[] serialize(T object) {
@@ -231,51 +196,29 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
     }
 
-    static CacheResult<MavenRepository> deserializeMavenRepository(byte[] bytes) {
-        if (bytes == null) {
-            return null;
-        }
+    static Optional<MavenRepository> deserializeMavenRepository(byte[] bytes) {
         try {
-            return mapper.readValue(bytes, new TypeReference<CacheResult<MavenRepository>>() {
-            });
-        } catch (Exception e) {
-            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
-            //results.
-            return null;
+            return bytes == null ? null : Optional.of(mapper.readValue(bytes, MavenRepository.class));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
-    static CacheResult<RawMaven> deserializeRawMaven(byte[] bytes) {
-        if (bytes == null) {
-            return null;
-        }
+    @Nullable
+    static Optional<Pom> deserializePom(byte[] bytes) {
         try {
-            return mapper.readValue(bytes, new TypeReference<CacheResult<RawMaven>>() {
-            });
-        } catch (Exception e) {
-            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
-            //results.
-            return null;
+            return bytes == null ? null : Optional.of(mapper.readValue(bytes, Pom.class));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
-    static CacheResult<MavenMetadata> deserializeMavenMetadata(byte[] bytes) {
-        if (bytes == null) {
-            return null;
-        }
+    static Optional<MavenMetadata> deserializeMavenMetadata(byte[] bytes) {
         try {
-            return mapper.readValue(bytes, new TypeReference<CacheResult<MavenMetadata>>() {
-            });
-        } catch (Exception e) {
-            //Treat deserialization errors as a cache miss, this will force rewrite to re-download and re-cache the
-            //results.
-            return null;
+            return bytes == null ? null : Optional.of(mapper.readValue(bytes, MavenMetadata.class));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-    }
-
-    @Override
-    public void close() throws Exception {
-        //Do nothing implementation because the rocksdb is managed at the statically.
     }
 
     /**
@@ -290,7 +233,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         private final RocksDB database;
         private final Options options;
         private final WriteOptions writeOptions;
-
+        private final String cacheFolder;
         RocksCache(String pomCacheDir) {
             try {
                 options = new Options();
@@ -308,6 +251,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
                 writeOptions = new WriteOptions();
                 writeOptions.setDisableWAL(true);
                 database = RocksDB.open(options, pomCacheDir);
+                cacheFolder = pomCacheDir;
             } catch (RocksDBException exception) {
                 throw new IllegalStateException("Unable to create cache database." + exception.getMessage(), exception);
             }
@@ -347,10 +291,13 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             //Called by a shutdown hook, this will flush any in-memory memtables to disk and free up resources held
             //by the underlying C++ code. The worse case scenario is that this is not called because the system exits
             //abnormally, in which case, the data in-memory is simply not saved to the cache.
-            database.close();
             writeOptions.close();
             options.close();
+            if (Files.exists(Paths.get(cacheFolder))) {
+                //Attempting to close the database if the file has been deleted underneath it prevents the process
+                //from exiting.
+                database.close();
+            }
         }
     }
-
 }

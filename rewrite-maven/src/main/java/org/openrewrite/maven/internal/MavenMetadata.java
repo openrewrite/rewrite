@@ -19,11 +19,13 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
+import lombok.Value;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlParser;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -70,6 +72,14 @@ public class MavenMetadata {
         }
     }
 
+    public static MavenMetadata parse(InputStream document) {
+        try {
+            return MavenXmlMapper.readMapper().readValue(document, MavenMetadata.class);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     public static MavenMetadata parse(byte[] document) {
         try {
             return MavenXmlMapper.readMapper().readValue(document, MavenMetadata.class);
@@ -78,15 +88,13 @@ public class MavenMetadata {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     public static class Snapshot {
         String timestamp;
         String buildNumber;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     public static class SnapshotVersion {
         String extension;
         String value;

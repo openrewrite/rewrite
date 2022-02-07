@@ -28,7 +28,6 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.xml.XmlFactory;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
-import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 
 import javax.xml.stream.XMLInputFactory;
@@ -40,7 +39,7 @@ public class MavenXmlMapper {
 
     static {
         // disable namespace handling, as some POMs contain undefined namespaces like Xlint in
-        // https://repo.maven.apache.org/maven2/com/sun/istack/istack-commons/3.0.11/istack-commons-3.0.11.pom
+        // https://repo.maven.apache.org/maven/com/sun/istack/istack-commons/3.0.11/istack-commons-3.0.11.pom
         XMLInputFactory input = new WstxInputFactory();
         input.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
         input.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, false);
@@ -51,7 +50,6 @@ public class MavenXmlMapper {
                     .defaultUseWrapper(false)
                     .build()
                     .registerModule(new ParameterNamesModule())
-                    .registerModule(new KotlinModule())
                     .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
                     .disable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
                     .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);

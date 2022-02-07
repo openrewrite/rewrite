@@ -29,13 +29,8 @@ class OrderPomElementsTest : MavenRecipeTest {
         before = """
             <project>
                 <modelVersion>4.0.0</modelVersion>
-                <parent>
-                    <groupId>org.example</groupId>
-                    <artifactId>parent-pom-test</artifactId>
-                    <version>1.0-SNAPSHOT</version>
-                </parent>
 
-                <groupId>my.org.proejct</groupId>
+                <groupId>my.org.project</groupId>
                 <artifactId>my-project</artifactId>
                 <version>4.3.0</version>
                 
@@ -71,9 +66,9 @@ class OrderPomElementsTest : MavenRecipeTest {
         before = """
             <project>
                 <parent>
-                    <groupId>org.example</groupId>
-                    <artifactId>parent-pom-test</artifactId>
-                    <version>1.0-SNAPSHOT</version>
+                    <groupId>jpl</groupId>
+                    <artifactId>jpl</artifactId>
+                    <version>7.4.0</version>
                 </parent>
                 <!-- modelVersion1 -->
                 
@@ -122,9 +117,9 @@ class OrderPomElementsTest : MavenRecipeTest {
                 <!-- modelVersion2 -->
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
-                    <groupId>org.example</groupId>
-                    <artifactId>parent-pom-test</artifactId>
-                    <version>1.0-SNAPSHOT</version>
+                    <groupId>jpl</groupId>
+                    <artifactId>jpl</artifactId>
+                    <version>7.4.0</version>
                 </parent>
                 <groupId>my.org.project</groupId>
                 <artifactId>my-project</artifactId>
@@ -170,9 +165,9 @@ class OrderPomElementsTest : MavenRecipeTest {
         before = """
             <project>
                 <parent>
-                    <groupId>org.example</groupId>
-                    <artifactId>parent-pom-test</artifactId>
-                    <version>1.0-SNAPSHOT</version>
+                    <groupId>jpl</groupId>
+                    <artifactId>jpl</artifactId>
+                    <version>7.4.0</version>
                 </parent>
                 
                 <!-- model version comment -->
@@ -226,9 +221,9 @@ class OrderPomElementsTest : MavenRecipeTest {
                 <modelVersion>4.0.0</modelVersion>
                 
                 <parent>
-                    <groupId>org.example</groupId>
-                    <artifactId>parent-pom-test</artifactId>
-                    <version>1.0-SNAPSHOT</version>
+                    <groupId>jpl</groupId>
+                    <artifactId>jpl</artifactId>
+                    <version>7.4.0</version>
                 </parent>
                 
                 <groupId>my.org.project</groupId>

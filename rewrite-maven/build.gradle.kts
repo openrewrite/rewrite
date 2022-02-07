@@ -14,6 +14,8 @@ dependencies {
 
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
+    implementation("com.github.ben-manes.caffeine:caffeine:latest.release")
+
     implementation("org.antlr:antlr4:latest.release")
     // FIXME: switch to `latest.release`
     // when https://github.com/resilience4j/resilience4j/issues/1472 is resolved
@@ -28,8 +30,9 @@ dependencies {
     // needed by AddDependency
     implementation(project(":rewrite-java"))
 
+    implementation("guru.nidi:graphviz-java:latest.release")
+
     compileOnly("org.rocksdb:rocksdbjni:latest.release")
-    compileOnly("org.mapdb:mapdb:latest.release")
     compileOnly(project(":rewrite-yaml"))
     compileOnly(project(":rewrite-properties"))
 
@@ -62,6 +65,7 @@ dependencies {
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-11"))
+    testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {

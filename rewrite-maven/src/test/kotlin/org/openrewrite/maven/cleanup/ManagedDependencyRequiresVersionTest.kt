@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.maven.MavenRecipeTest
 
-class DependencyManagementDependencyRequiresVersionTest : MavenRecipeTest {
+class ManagedDependencyRequiresVersionTest : MavenRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1084")
     @Test

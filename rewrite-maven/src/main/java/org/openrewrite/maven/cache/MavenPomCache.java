@@ -15,115 +15,32 @@
  */
 package org.openrewrite.maven.cache;
 
-import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.RawMaven;
-import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.*;
 
 import java.net.URI;
+import java.util.Optional;
 
-/**
- * A cache used to store the pom, it's metadata, and normalized maven repositories. A cache implementation can decide
- * to use "time-to-live" semantics on the cache results and should expire keys once they have aged past their TTL.
- */
-public interface MavenPomCache extends AutoCloseable {
+public interface MavenPomCache {
 
-    CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key);
-    CacheResult<MavenMetadata> setMavenMetadata(MetadataKey key, MavenMetadata metadata, boolean isSnapshot);
-
-    CacheResult<RawMaven> getMaven(PomKey key);
-    CacheResult<RawMaven> setMaven(PomKey key, RawMaven maven, boolean isSnapshot);
-
-    CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository);
-    CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized);
-
-    void clear();
-
-    /**
-     * Given a time-to-live value in milliseconds, this method will calculate the time at which a cache entry should
-     * be expired. A negative ttl indicates that the entry should never expire.
-     *
-     * @param ttl Time-to-live in milliseconds.
-     * @return The current time in milliseconds plus the TTL value.
-     */
-    default long calculateExpiration(long ttl) {
-        return ttl < 0 ? -1 : System.currentTimeMillis() + ttl;
-    }
-
-    /**
-     * Checks a cache result's ttl value and if the result is expired, returns null.
-     *
-     * @param result A cache result with a TTL value.
-     * @param <T> The tye of cached data.
-     * @return result or null depending on if the cache result has expired.
-     */
     @Nullable
-    default <T> CacheResult<T> filterExpired(CacheResult<T> result) {
-        if (result != null && result.getTtl() > 0 && result.getTtl() < System.currentTimeMillis()) {
-            return null;
-        }
-        return result;
-    }
+    ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency);
 
-    MavenPomCache NOOP = new MavenPomCache() {
+    void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved);
 
-        @Override
-        @Nullable
-        public CacheResult<MavenMetadata> getMavenMetadata(MetadataKey key) {
-            return null;
-        }
+    @Nullable
+    Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav);
 
-        @Override
-        public CacheResult<MavenMetadata> setMavenMetadata(MetadataKey key, MavenMetadata metadata, boolean isSnapshot) {
-            return new CacheResult<>(CacheResult.State.Updated, metadata, -1);
-        }
+    void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata);
 
-        @Override
-        @Nullable
-        public CacheResult<RawMaven> getMaven(PomKey key) {
-            return null;
-        }
+    @Nullable
+    Optional<Pom> getPom(ResolvedGroupArtifactVersion gav);
 
-        @Override
-        public CacheResult<RawMaven> setMaven(PomKey key, RawMaven maven, boolean isSnapshot) {
-            return new CacheResult<>(CacheResult.State.Updated, maven, -1);
-        }
+    void putPom(ResolvedGroupArtifactVersion gav, @Nullable Pom pom);
 
-        @Override
-        @Nullable
-        public CacheResult<MavenRepository> getNormalizedRepository(MavenRepository repository) {
-            return null;
-        }
+    @Nullable
+    Optional<MavenRepository> getNormalizedRepository(MavenRepository repository);
 
-        @Override
-        public CacheResult<MavenRepository> setNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
-            return new CacheResult<>(CacheResult.State.Updated, normalized, -1);
-        }
-
-        @Override
-        public void clear() {
-        }
-
-        @Override
-        public void close() {
-        }
-    };
-
-    @Value
-    class PomKey {
-        URI repo;
-        String groupId;
-        String artifactId;
-        String version;
-    }
-
-    @Value
-    class MetadataKey {
-        URI repo;
-        String groupId;
-        String artifactId;
-        @Nullable
-        String version;
-    }
+    void putNormalizedRepository(MavenRepository repository, MavenRepository normalized);
 }

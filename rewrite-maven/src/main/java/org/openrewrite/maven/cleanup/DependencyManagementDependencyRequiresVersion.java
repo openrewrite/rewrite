@@ -18,7 +18,7 @@ package org.openrewrite.maven.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.maven.MavenVisitor;
+import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -36,9 +36,9 @@ public class DependencyManagementDependencyRequiresVersion extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new MavenVisitor() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isManagedDependencyTag() && tag.getChildValue("version").orElse(null) == null) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true));
                 }

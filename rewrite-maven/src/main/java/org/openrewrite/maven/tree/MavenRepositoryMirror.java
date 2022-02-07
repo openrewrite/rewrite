@@ -21,6 +21,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -62,9 +63,8 @@ public class MavenRepositoryMirror {
     }
 
     public MavenRepository apply(MavenRepository repo) {
-        URI uri = URI.create(url);
-        if (matches(repo) && !(repo.getUri().equals(uri) && repo.getId().equals(id))) {
-            return repo.withUri(uri)
+        if (matches(repo) && !(repo.getUri().equals(url) && id.equals(repo.getId()))) {
+            return repo.withUri(url)
                     .withId(id)
                     .withReleases(!Boolean.FALSE.equals(releases))
                     .withSnapshots(Boolean.TRUE.equals(snapshots));
@@ -114,10 +114,15 @@ public class MavenRepositoryMirror {
     }
 
     private boolean isInternal(MavenRepository repo) {
-        if (repo.getUri().getScheme().startsWith("file")) {
+        if (repo.getUri().toLowerCase().startsWith("file:")) {
             return true;
         }
-        // Best-effort basis, by no means a full guarantee of detecting all possible local URIs
-        return repo.getUri().getHost().equals("localhost") || repo.getUri().getHost().equals("127.0.0.1");
+        try {
+            URI uri = new URI(repo.getUri());
+            return uri.getHost().equals("localhost") || uri.getHost().equals("127.0.0.1");
+        } catch (URISyntaxException ignored) {
+            // might be a property reference
+        }
+        return false;
     }
 }

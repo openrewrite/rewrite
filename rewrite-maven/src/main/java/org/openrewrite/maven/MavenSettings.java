@@ -23,8 +23,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
-import org.openrewrite.maven.internal.ProfileActivation;
 import org.openrewrite.maven.internal.RawRepositories;
+import org.openrewrite.maven.tree.ProfileActivation;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -63,7 +63,7 @@ public class MavenSettings {
         }
     }
 
-    public List<RawRepositories.Repository> getActiveRepositories(String... activeProfiles) {
+    public List<RawRepositories.Repository> getActiveRepositories(Iterable<String> activeProfiles) {
         List<RawRepositories.Repository> activeRepositories = new ArrayList<>();
 
         if (profiles != null) {

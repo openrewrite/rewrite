@@ -116,7 +116,7 @@ class RemoveDependencyTest : MavenRecipeTest {
 
     @Test
     fun shouldRemoveScopedDependency() = assertChanged(
-        recipe = RemoveDependency("org.junit.jupiter","junit-jupiter", "test"),
+        recipe = RemoveDependency("org.junit.jupiter","junit-jupiter", "compile"),
         before = """
             <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -129,7 +129,6 @@ class RemoveDependencyTest : MavenRecipeTest {
                             <groupId>org.junit.jupiter</groupId>
                             <artifactId>junit-jupiter</artifactId>
                             <version>5.7.1</version>
-                            <scope>test</scope>
                         </dependency>
                     </dependencies>
                 </dependencyManagement>
@@ -137,6 +136,11 @@ class RemoveDependencyTest : MavenRecipeTest {
                     <dependency>
                         <groupId>org.junit.jupiter</groupId>
                         <artifactId>junit-jupiter</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter</artifactId>
+                        <scope>test</scope>
                     </dependency>
                     <dependency>
                         <groupId>org.junit.jupiter</groupId>
@@ -159,11 +163,15 @@ class RemoveDependencyTest : MavenRecipeTest {
                             <groupId>org.junit.jupiter</groupId>
                             <artifactId>junit-jupiter</artifactId>
                             <version>5.7.1</version>
-                            <scope>test</scope>
                         </dependency>
                     </dependencies>
                 </dependencyManagement>
                 <dependencies>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter</artifactId>
+                        <scope>test</scope>
+                    </dependency>
                     <dependency>
                         <groupId>org.junit.jupiter</groupId>
                         <artifactId>junit-jupiter-api</artifactId>

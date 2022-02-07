@@ -15,46 +15,20 @@
  */
 package org.openrewrite.maven.internal;
 
-/**
- * Represents problems that can arise during parsing Maven poms into their Rewrite AST.
- */
 public class MavenParsingException extends RuntimeException {
-
-    private final Severity severity;
-
     public MavenParsingException(String message) {
-        this(message, Severity.Error);
-    }
-
-    public MavenParsingException(String message, Object ... args) {
-        this(String.format(message, args), Severity.Error);
-    }
-
-    public MavenParsingException(String message, Throwable cause, Object ... args) {
-        this(String.format(message, args), Severity.Error, cause);
-    }
-
-    public MavenParsingException(String message, Severity severity) {
         super(message);
-        this.severity = severity;
     }
 
-    public MavenParsingException(String message, Severity severity, Object ... args) {
+    public MavenParsingException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    public MavenParsingException(String message, Object... args) {
         super(String.format(message, args));
-        this.severity = severity;
     }
 
-    public MavenParsingException(String message, Severity severity, Throwable cause, Object ... args) {
-        super(String.format(message, args), cause);
-        this.severity = severity;
-    }
-
-    public Severity getSeverity() {
-        return severity;
-    }
-
-    public enum Severity {
-        Error,
-        Info
+    public MavenParsingException(Throwable throwable) {
+        super(throwable);
     }
 }

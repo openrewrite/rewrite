@@ -15,35 +15,50 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.io.File;
 import java.net.URI;
 
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
 @RequiredArgsConstructor
 public class MavenRepository {
+    public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), true, true, true, null, null);
+    public static final MavenRepository MAVEN_LOCAL = new MavenRepository("local", new File(System.getProperty("user.home") + "/.m2/repository").toURI().toString(), true, true, true, null, null);
+    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", true, false, true, null, null);
+
     @EqualsAndHashCode.Include
     @With
+    @Nullable
     String id;
 
+    /**
+     * Not a {@link URI} because this could be a property reference.
+     */
+    @EqualsAndHashCode.Include
     @With
-    URI uri;
+    String uri;
 
+    @EqualsAndHashCode.Include
     @With
     boolean releases;
 
+    @EqualsAndHashCode.Include
     @With
     boolean snapshots;
 
     @NonFinal
-    boolean knownToExist = false;
+    boolean knownToExist;
 
     // Prevent user credentials from being inadvertently serialized
     @With
@@ -57,7 +72,7 @@ public class MavenRepository {
     String password;
 
     @JsonIgnore
-    public MavenRepository(String id, URI uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password) {
+    public MavenRepository(@Nullable String id, String uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password) {
         this.id = id;
         this.uri = uri;
         this.releases = releases;
@@ -70,7 +85,7 @@ public class MavenRepository {
     public boolean acceptsVersion(String version) {
         if (version.endsWith("-SNAPSHOT")) {
             return snapshots;
-        } else if (uri.toString().equalsIgnoreCase("https://repo.spring.io/milestone")) {
+        } else if (uri.equalsIgnoreCase("https://repo.spring.io/milestone")) {
             // special case this repository since it will be so commonly used
             return version.matches(".*(M|RC)\\d+$");
         }
