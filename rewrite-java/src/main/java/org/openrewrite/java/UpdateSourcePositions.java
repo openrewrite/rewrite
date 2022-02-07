@@ -64,6 +64,22 @@ public class UpdateSourcePositions extends Recipe {
 
                 return t;
             }
+
+            @Override
+            protected void visitModifier(J.Modifier modifier, PrintOutputCapture<ExecutionContext> p) {
+                if (modifier == null) {
+                    return;
+                }
+
+                PositionPrintOutputCapture prefix = new PositionPrintOutputCapture(ppoc.pos, ppoc.line, ppoc.column);
+                spacePrinter.visitSpace(modifier.getPrefix(), Space.Location.ANY, prefix);
+
+                Range.Position startPosition = new Range.Position(prefix.pos, prefix.line, prefix.column);
+                super.visitModifier(modifier, p);
+                Range.Position endPosition = new Range.Position(ppoc.pos, ppoc.line, ppoc.column);
+                positionMap.put(modifier, new Range(randomId(), startPosition, endPosition));
+            }
+
         };
 
         return new JavaVisitor<ExecutionContext>() {
@@ -75,7 +91,7 @@ public class UpdateSourcePositions extends Recipe {
                     return null;
                 }
                 if (firstVisit) {
-                    printer.visit(tree, ppoc);
+                    tree = printer.visit(tree, ppoc);
                     firstVisit = false;
                 }
 
@@ -87,9 +103,9 @@ public class UpdateSourcePositions extends Recipe {
     }
 
     private static class PositionPrintOutputCapture extends PrintOutputCapture<ExecutionContext> {
-        int pos;
-        int line;
-        int column;
+        int pos = 0;
+        int line = 1;
+        int column = 0;
         private boolean lineBoundary;
 
         public PositionPrintOutputCapture() {
@@ -122,11 +138,16 @@ public class UpdateSourcePositions extends Recipe {
         @Override
         public PrintOutputCapture<ExecutionContext> append(@Nullable String text) {
             if (text != null) {
+                if (lineBoundary) {
+                    line++;
+                    column = 0;
+                    lineBoundary = false;
+                }
                 pos += text.length();
-                String[] lines = text.split("\n");
-                if (lines.length > 1) {
-                    line += lines.length - 1;
-                    column = lines[lines.length - 1].length();
+                long numberOfLines = text.chars().filter(c -> c == '\n').count();
+                if (numberOfLines > 0) {
+                    line += numberOfLines;
+                    column = text.length() - text.lastIndexOf('\n');
                 } else {
                     column += text.length();
                 }
