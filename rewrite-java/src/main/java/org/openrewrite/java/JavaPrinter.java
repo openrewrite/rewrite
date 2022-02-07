@@ -81,53 +81,51 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         }
     }
 
-    protected void visitModifiers(Iterable<Modifier> modifiers, PrintOutputCapture<P> p) {
-        for (Modifier mod : modifiers) {
-            visit(mod.getAnnotations(), p);
-            String keyword = "";
-            switch (mod.getType()) {
-                case Default:
-                    keyword = "default";
-                    break;
-                case Public:
-                    keyword = "public";
-                    break;
-                case Protected:
-                    keyword = "protected";
-                    break;
-                case Private:
-                    keyword = "private";
-                    break;
-                case Abstract:
-                    keyword = "abstract";
-                    break;
-                case Static:
-                    keyword = "static";
-                    break;
-                case Final:
-                    keyword = "final";
-                    break;
-                case Native:
-                    keyword = "native";
-                    break;
-                case Strictfp:
-                    keyword = "strictfp";
-                    break;
-                case Synchronized:
-                    keyword = "synchronized";
-                    break;
-                case Transient:
-                    keyword = "transient";
-                    break;
-                case Volatile:
-                    keyword = "volatile";
-                    break;
-            }
-            visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p);
-            visitMarkers(mod.getMarkers(), p);
-
-            p.append(keyword);
+    protected void visitModifier(Modifier mod, PrintOutputCapture<P> p) {
+        visit(mod.getAnnotations(), p);
+        String keyword = "";
+        switch (mod.getType()) {
+            case Default:
+                keyword = "default";
+                break;
+            case Public:
+                keyword = "public";
+                break;
+            case Protected:
+                keyword = "protected";
+                break;
+            case Private:
+                keyword = "private";
+                break;
+            case Abstract:
+                keyword = "abstract";
+                break;
+            case Static:
+                keyword = "static";
+                break;
+            case Final:
+                keyword = "final";
+                break;
+            case Native:
+                keyword = "native";
+                break;
+            case Strictfp:
+                keyword = "strictfp";
+                break;
+            case Synchronized:
+                keyword = "synchronized";
+                break;
+            case Transient:
+                keyword = "transient";
+                break;
+            case Volatile:
+                keyword = "volatile";
+                break;
         }
+        visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p);
+        visitMarkers(mod.getMarkers(), p);
+
+        p.append(keyword);
     }
 
     @Override
@@ -431,7 +429,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitMarkers(classDecl.getMarkers(), p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(classDecl.getLeadingAnnotations(), p);
-        visitModifiers(classDecl.getModifiers(), p);
+        classDecl.getModifiers().forEach(m -> visitModifier(m, p));
         visit(classDecl.getAnnotations().getKind().getAnnotations(), p);
         visitSpace(classDecl.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
         p.append(kind);
@@ -682,7 +680,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitMarkers(method.getMarkers(), p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(method.getLeadingAnnotations(), p);
-        visitModifiers(method.getModifiers(), p);
+        method.getModifiers().forEach(m -> visitModifier(m, p));
         TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
         if (typeParameters != null) {
             visit(typeParameters.getAnnotations(), p);
@@ -727,7 +725,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitMarkers(multiVariable.getMarkers(), p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(multiVariable.getLeadingAnnotations(), p);
-        visitModifiers(multiVariable.getModifiers(), p);
+        multiVariable.getModifiers().forEach(m -> visitModifier(m, p));
         visit(multiVariable.getTypeExpression(), p);
         for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
             visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
