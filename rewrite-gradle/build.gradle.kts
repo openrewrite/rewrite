@@ -29,7 +29,7 @@ dependencies {
     compileOnly("org.gradle:gradle-testing-base:latest.release")
     compileOnly("org.gradle:gradle-testing-jvm:latest.release")
 
-    implementation("com.squareup.okhttp3:okhttp:latest.release")
+    implementation("com.squareup.okhttp3:okhttp:4.+")
 
     // FIXME: switch to `latest.release`
     // when https://github.com/resilience4j/resilience4j/issues/1472 is resolved

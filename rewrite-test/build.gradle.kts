@@ -14,7 +14,7 @@ dependencies {
 
     compileOnly("io.micrometer:micrometer-registry-prometheus:latest.release")
 
-    implementation("com.squareup.okhttp3:okhttp:latest.release")
+    implementation("com.squareup.okhttp3:okhttp:4.+")
 
     api("org.junit.jupiter:junit-jupiter-api:latest.release")
     api("org.junit.jupiter:junit-jupiter-params:latest.release")
