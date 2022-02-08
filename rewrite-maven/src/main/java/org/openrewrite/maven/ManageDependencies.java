@@ -23,7 +23,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
-import org.openrewrite.maven.internal.Version;
+import org.openrewrite.maven.tree.Version;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.xml.AddToTagVisitor;

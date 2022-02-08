@@ -22,7 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.internal.MavenMetadata;
+import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -32,8 +32,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
-import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = true)

@@ -26,7 +26,9 @@ import org.openrewrite.maven.internal.grammar.VersionRangeLexer;
 import org.openrewrite.maven.internal.grammar.VersionRangeParser;
 import org.openrewrite.maven.internal.grammar.VersionRangeParserBaseVisitor;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +36,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.function.Supplier;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor

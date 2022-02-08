@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.internal;
+package org.openrewrite.maven.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
