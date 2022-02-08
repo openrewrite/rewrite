@@ -21,7 +21,8 @@ import org.junit.jupiter.api.Test
 class ScopeTest {
     @Test
     fun isInClasspathOf() {
-        assertThat(Scope.Runtime.isInClasspathOf(Scope.Test)).isTrue()
-        assertThat(Scope.Runtime.isInClasspathOf(Scope.Compile)).isFalse()
+        assertThat(Scope.Runtime.isInClasspathOf(Scope.Test)).isTrue
+        assertThat(Scope.Runtime.isInClasspathOf(Scope.Compile)).isTrue
+        assertThat(Scope.Test.isInClasspathOf(Scope.Compile)).isFalse
     }
 }
