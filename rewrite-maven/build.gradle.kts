@@ -14,7 +14,8 @@ dependencies {
 
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
-    implementation("com.github.ben-manes.caffeine:caffeine:latest.release")
+    // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
+    implementation("com.github.ben-manes.caffeine:caffeine:2.+")
 
     implementation("org.antlr:antlr4:latest.release")
     // FIXME: switch to `latest.release`
