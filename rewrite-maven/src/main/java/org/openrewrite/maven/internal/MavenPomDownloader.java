@@ -320,12 +320,22 @@ public class MavenPomDownloader {
                                                                        @Nullable String acceptsVersion) {
         Set<MavenRepository> normalizedRepositories = new LinkedHashSet<>();
         normalizedRepositories.add(MavenRepository.MAVEN_LOCAL);
+
         for (MavenRepository repo : repositories) {
             MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
             if (normalizedRepo != null && (acceptsVersion == null || normalizedRepo.acceptsVersion(acceptsVersion))) {
                 normalizedRepositories.add(normalizedRepo);
             }
         }
+
+        // repositories from maven settings
+        for (MavenRepository repo : ctx.getRepositories()) {
+            MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
+            if (normalizedRepo != null && (acceptsVersion == null || normalizedRepo.acceptsVersion(acceptsVersion))) {
+                normalizedRepositories.add(normalizedRepo);
+            }
+        }
+
         normalizedRepositories.add(normalizeRepository(MavenRepository.MAVEN_CENTRAL, containingPom));
         return normalizedRepositories;
     }

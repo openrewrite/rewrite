@@ -94,7 +94,7 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Type",
             description = "The type of dependency to add. If omitted Maven defaults to assuming the type is \"jar\".",
-            valid = {"jar", "pom"},
+            valid = {"jar", "pom", "war"},
             example = "jar",
             required = false)
     @Nullable
