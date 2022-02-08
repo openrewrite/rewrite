@@ -429,7 +429,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitMarkers(classDecl.getMarkers(), p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(classDecl.getLeadingAnnotations(), p);
-        classDecl.getModifiers().forEach(m -> visitModifier(m, p));
+        for (Modifier m : classDecl.getModifiers()) {
+            visitModifier(m, p);
+        }
         visit(classDecl.getAnnotations().getKind().getAnnotations(), p);
         visitSpace(classDecl.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
         p.append(kind);
@@ -680,7 +682,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitMarkers(method.getMarkers(), p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(method.getLeadingAnnotations(), p);
-        method.getModifiers().forEach(m -> visitModifier(m, p));
+        for (Modifier m : method.getModifiers()) {
+            visitModifier(m, p);
+        }
         TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
         if (typeParameters != null) {
             visit(typeParameters.getAnnotations(), p);
@@ -725,7 +729,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitMarkers(multiVariable.getMarkers(), p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(multiVariable.getLeadingAnnotations(), p);
-        multiVariable.getModifiers().forEach(m -> visitModifier(m, p));
+        for (Modifier m : multiVariable.getModifiers()) {
+            visitModifier(m, p);
+        }
         visit(multiVariable.getTypeExpression(), p);
         for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
             visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
@@ -769,7 +775,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitPackage(J.Package pkg, PrintOutputCapture<P> p) {
-        pkg.getAnnotations().forEach(a -> visitAnnotation(a, p));
+        for (Annotation a : pkg.getAnnotations()) {
+            visitAnnotation(a, p);
+        }
         visitSpace(pkg.getPrefix(), Space.Location.PACKAGE_PREFIX, p);
         visitMarkers(pkg.getMarkers(), p);
         p.append("package");
