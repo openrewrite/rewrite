@@ -36,7 +36,6 @@ dependencies {
         isTransitive = false
     }
     testImplementation(project(":rewrite-test"))
-    testImplementation("org.openjdk.jol:jol-core:latest.release")
 
     // For use in ClassGraphTypeMappingTest
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")

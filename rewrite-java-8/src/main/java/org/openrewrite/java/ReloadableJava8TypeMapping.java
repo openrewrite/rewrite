@@ -221,7 +221,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
             // NOTE because of completion that happens when building the base type,
             // the signature may shift from when it was first calculated.
-            JavaType.Parameterized pt = typeCache.get(signatureBuilder.signature(classType));
+            JavaType.Parameterized pt = typeCache.get(signature);
             if (pt == null) {
                 pt = new JavaType.Parameterized(null, null, null);
                 typeCache.put(signature, pt);

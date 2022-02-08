@@ -46,12 +46,12 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
 
     public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
-            type instanceof NullType) {
+                type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
         String signature = signatureBuilder.signature(type);
-        JavaType existing = (JavaType) typeCache.get(signature);
+        JavaType existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -147,7 +147,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) classType.tsym;
         Type.ClassType symType = (Type.ClassType) sym.type;
 
-        JavaType.FullyQualified fq = (JavaType.FullyQualified) typeCache.get(sym.flatName().toString());
+        JavaType.FullyQualified fq = typeCache.get(sym.flatName().toString());
         JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
         if (clazz == null) {
             if (!sym.completer.isTerminal()) {
@@ -220,7 +220,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
-            JavaType.Parameterized pt = (JavaType.Parameterized) typeCache.get(signature);
+            JavaType.Parameterized pt = typeCache.get(signature);
             if (pt == null) {
                 pt = new JavaType.Parameterized(null, null, null);
                 typeCache.put(signature, pt);
@@ -322,7 +322,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         String signature = signatureBuilder.variableSignature(symbol);
-        JavaType.Variable existing = (JavaType.Variable) typeCache.get(signature);
+        JavaType.Variable existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -376,7 +376,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         String signature = signatureBuilder.methodSignature(selectType, methodSymbol);
-        JavaType.Method existing = (JavaType.Method) typeCache.get(signature);
+        JavaType.Method existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -470,7 +470,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
 
         if (methodSymbol != null) {
             String signature = signatureBuilder.methodSignature(methodSymbol);
-            JavaType.Method existing = (JavaType.Method) typeCache.get(signature);
+            JavaType.Method existing = typeCache.get(signature);
             if (existing != null) {
                 return existing;
             }

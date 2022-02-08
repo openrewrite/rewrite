@@ -13,43 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.internal
+package org.openrewrite.java.marker
 
-import io.github.classgraph.ClassGraph
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
+import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTypeGoat
 import org.openrewrite.java.JavaTypeVisitor
+import org.openrewrite.java.internal.JavaReflectionTypeMapping
+import org.openrewrite.java.internal.JavaTypeCache
 import org.openrewrite.java.tree.JavaType
 import java.util.*
 
-class TypeMappingUniquenessTest {
-    private val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
+interface JavaSourceSetTest {
 
     @Test
-    fun noMoreTypesAdded() {
+    fun doesNotDuplicateTypesInCache() {
         val typeCache = JavaTypeCache()
+        val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
+        val reflectiveGoat = JavaReflectionTypeMapping(typeCache).type(JavaTypeGoat::class.java)
+        newUniqueTypes(uniqueTypes, reflectiveGoat)
 
-        val reflection = JavaReflectionTypeMapping(typeCache).type(JavaTypeGoat::class.java)
-        newUniqueTypes(reflection)
+        val classpathGoat = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeCache, InMemoryExecutionContext() )
+            .classpath
+            .find { "JavaTypeGoat" == it.className }!!
 
-        val classgraph = ClassgraphTypeMapping(typeCache, emptyMap()).type(
-            ClassGraph()
-                .filterClasspathElements { e -> !e.endsWith(".jar") }
-                .enableAnnotationInfo()
-                .enableMemoryMapping()
-                .enableClassInfo()
-                .enableFieldInfo()
-                .enableMethodInfo()
-                .ignoreClassVisibility()
-                .acceptClasses("org.openrewrite.java.*")
-                .scan()
-                .getClassInfo("org.openrewrite.java.JavaTypeGoat")
-        )
-        newUniqueTypes(classgraph, true)
+        newUniqueTypes(uniqueTypes, classpathGoat, true)
     }
 
-    private fun newUniqueTypes(root: JavaType, report: Boolean = false) {
+    private fun newUniqueTypes(uniqueTypes: MutableSet<JavaType>, root: JavaType, report: Boolean = false) {
         var newUnique = false
         object : JavaTypeVisitor<Int>() {
             override fun visit(javaType: JavaType?, p: Int): JavaType? {
