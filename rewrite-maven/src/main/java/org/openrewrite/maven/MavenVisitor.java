@@ -232,6 +232,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     @Nullable
     public ResolvedDependency findDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
+        Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
+        if (tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
+            return null;
+        }
         for (Map.Entry<Scope, List<ResolvedDependency>> scope : getResolutionResult().getDependencies().entrySet()) {
             if (inClasspathOf == null || scope.getKey() == inClasspathOf || scope.getKey().isInClasspathOf(inClasspathOf)) {
                 for (ResolvedDependency d : scope.getValue()) {
