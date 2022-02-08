@@ -19,6 +19,7 @@ import guru.nidi.graphviz.engine.Format
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.tree.GraphvizResolutionEventListener
+import org.openrewrite.maven.tree.MavenResolutionResult
 import org.openrewrite.maven.tree.Scope
 import java.net.URL
 import java.nio.file.Path
@@ -101,9 +102,9 @@ fun visualize(
     }
 }
 
-fun parse(gav: String, ctx: ExecutionContext = InMemoryExecutionContext { t -> throw t }) {
+fun parse(gav: String, ctx: ExecutionContext = InMemoryExecutionContext { t -> throw t }): MavenResolutionResult {
     val (group, artifact, version) = gav.split(":")
-    MavenParser.builder().build().parse(
+    val maven = MavenParser.builder().build().parse(
         ctx, """
             <project>
                 <groupId>org.openrewrite</groupId>
@@ -118,5 +119,7 @@ fun parse(gav: String, ctx: ExecutionContext = InMemoryExecutionContext { t -> t
                 </dependencies>
             </project>
         """
-    )
+    )[0]
+
+    return maven.mavenResolutionResult()
 }

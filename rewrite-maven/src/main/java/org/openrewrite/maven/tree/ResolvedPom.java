@@ -257,7 +257,6 @@ public class ResolvedPom {
                 return dm.getScope();
             }
         }
-
         return null;
     }
 
@@ -454,7 +453,7 @@ public class ResolvedPom {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
             if (dScope == scope || dScope.isInClasspathOf(scope)) {
-                dependenciesAtDepth.add(new DependencyAndDependent(requestedDependency, null, this));
+                dependenciesAtDepth.add(new DependencyAndDependent(requestedDependency, Scope.Compile, null, this));
             }
         }
 
@@ -514,7 +513,6 @@ public class ResolvedPom {
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
 
-                    Scope dScope = Scope.fromName(d.getScope());
                     ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
                             resolvedPom.getGav(), dd.getDependency(), emptyList(),
                             resolvedPom.getRequested().getLicenses());
@@ -534,7 +532,6 @@ public class ResolvedPom {
 
                     dependencies.add(resolved);
 
-                    // FIXME if you have more than one dependency of the same group and artifact, the LAST one wins.
                     nextDependency:
                     for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
                         if (d2.getGroupId() == null) {
@@ -545,14 +542,16 @@ public class ResolvedPom {
                         }
                         if (d.getExclusions() != null) {
                             for (GroupArtifact exclusion : d.getExclusions()) {
-                                if (matchesGlob(d2.getGroupId(), getValue(exclusion.getGroupId())) &&
-                                        matchesGlob(d2.getArtifactId(), getValue(exclusion.getArtifactId()))) {
+                                if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
+                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
                                     continue nextDependency;
                                 }
                             }
                         }
-                        if (Scope.fromName(d2.getScope()).isInClasspathOf(dScope)) {
-                            dependenciesAtNextDepth.add(new DependencyAndDependent(d2, resolved, resolvedPom));
+
+                        Scope d2Scope = getDependencyScope(d2, resolvedPom);
+                        if (d2Scope.isInClasspathOf(dd.getScope())) {
+                            dependenciesAtNextDepth.add(new DependencyAndDependent(d2, d2Scope, resolved, resolvedPom));
                         }
                     }
                 } catch (MavenDownloadingException e) {
@@ -565,6 +564,22 @@ public class ResolvedPom {
         }
 
         return dependencies;
+    }
+
+    private Scope getDependencyScope(Dependency d2, ResolvedPom containingPom) {
+        if (d2.getScope() == null) {
+            // project POM's dependency management overrules the dependency's dependencyManagement
+            //noinspection ConstantConditions
+            Scope s = getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
+                    getValue(d2.getClassifier()));
+            if(s == null) {
+                //noinspection ConstantConditions
+                s = containingPom.getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
+                        getValue(d2.getClassifier()));
+            }
+            return s == null ? Scope.Compile : s;
+        }
+        return Scope.fromName(getValue(d2.getScope()));
     }
 
     private GroupArtifact groupArtifact(Dependency dependency) {
@@ -604,6 +619,7 @@ public class ResolvedPom {
     @Value
     private static class DependencyAndDependent {
         Dependency dependency;
+        Scope scope;
         ResolvedDependency dependent;
         ResolvedPom definedIn;
     }

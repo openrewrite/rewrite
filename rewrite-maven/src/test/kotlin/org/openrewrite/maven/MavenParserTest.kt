@@ -25,14 +25,11 @@ import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Parser
-import org.openrewrite.maven.cache.CompositeMavenPomCache
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.cache.MavenPomCache
-import org.openrewrite.maven.cache.RocksdbMavenPomCache
 import org.openrewrite.maven.tree.License
 import org.openrewrite.maven.tree.Scope
 import java.nio.file.Paths
@@ -79,6 +76,12 @@ class MavenParserTest {
     @Test
     fun guava25() {
         parse("com.google.guava:guava:25.0-android")
+    }
+
+    @Test
+    fun rewriteCircleci() {
+        val rr = parse("org.openrewrite.recipe:rewrite-circleci:1.1.0")
+        assertThat(rr.dependencies[Scope.Runtime]!!.map { it.artifactId }).contains("rewrite-yaml")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")

@@ -31,7 +31,7 @@ public enum Scope {
      * @return If a dependency in this scope would be in the classpath of the tested scope.
      */
     public boolean isInClasspathOf(@Nullable Scope scope) {
-        return this.transitiveOf(scope) == scope;
+        return this.transitiveOf(scope) != null;
     }
 
     /**
