@@ -1243,4 +1243,21 @@ interface JavadocTest : JavaTreeTest {
                 "}"
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1374")
+    @Test
+    fun tagAfterBlankLineWithMarginAfterText(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /**
+                 * Text
+                 
+                 * @return void
+                 */
+                void method() {
+                }
+            }
+        """.trimIndent()
+    )
 }

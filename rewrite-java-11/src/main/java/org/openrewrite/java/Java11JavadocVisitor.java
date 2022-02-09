@@ -127,6 +127,11 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                         String prevNewLine = i > 1 && sourceArr[i - 2] == '\r' ? "\r\n" : "\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevNewLine, Markers.EMPTY));
                     }
+                    if (marginBuilder != null) {
+                        String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
+                        marginBuilder.append(newLine);
+                        continue;
+                    }
                     javadocContent.append(c);
                 }
                 String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
