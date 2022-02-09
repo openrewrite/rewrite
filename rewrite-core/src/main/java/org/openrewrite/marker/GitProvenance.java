@@ -47,11 +47,21 @@ public class GitProvenance implements Marker {
         if(origin == null) {
             return null;
         }
+        String path;
         if (origin.startsWith("git")) {
-            return origin.substring(origin.indexOf(':') + 1, origin.indexOf('/'));
+            path = origin.substring(origin.indexOf(':') + 1);
         } else {
-            String path = URI.create(origin).getPath();
-            return path.substring(1, path.indexOf('/', 1));
+            path = URI.create(origin).getPath().substring(1);
+        }
+        int firstSlashPos = path.lastIndexOf('/');
+        int secondSlashPos = path.lastIndexOf('/', firstSlashPos - 1);
+
+        if (secondSlashPos > -1) {
+            return path.substring(secondSlashPos + 1, firstSlashPos);
+        } else if (firstSlashPos > -1 ){
+            return path.substring(0, firstSlashPos);
+        } else {
+            return "";
         }
     }
 
