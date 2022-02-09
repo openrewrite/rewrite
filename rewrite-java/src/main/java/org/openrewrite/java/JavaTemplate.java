@@ -441,7 +441,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 expected, substitutedTemplate, loc));
                         if (gen.size() != 1) {
                             throw new IllegalArgumentException("Expected a template that would generate exactly one " +
-                                    "statement to replace one statement, but generated " + gen.size());
+                                    "statement to replace one statement, but generated " + gen.size() +
+                                    ". Template:\n" + substitutedTemplate);
                         }
                         return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p, getCursor().getParentOrThrow());
                     }
