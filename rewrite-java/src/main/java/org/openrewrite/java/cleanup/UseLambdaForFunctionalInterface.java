@@ -89,7 +89,7 @@ public class UseLambdaForFunctionalInterface extends Recipe {
 
                         JavaType returnType = sam.getReturnType();
                         if (!JavaType.Primitive.Void.equals(returnType)) {
-                            templateBuilder.append("return ").append(valueOfType(returnType)).append('.');
+                            templateBuilder.append("return ").append(valueOfType(returnType)).append(';');
                         }
                         templateBuilder.append('}');
 
