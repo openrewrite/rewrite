@@ -226,8 +226,10 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
-        for (Symbol.VarSymbol parameter : sym.getParameters()) {
-            genericArgumentTypes.add(signature(parameter.type));
+        if (sym.type != null) {
+            for (Symbol.VarSymbol parameter : sym.getParameters()) {
+                genericArgumentTypes.add(signature(parameter.type));
+            }
         }
         return genericArgumentTypes.toString();
     }
