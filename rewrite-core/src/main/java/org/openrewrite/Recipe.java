@@ -65,6 +65,21 @@ public abstract class Recipe {
         }
     };
 
+    @Incubating(since = "7.18.0")
+    public static Recipe noop() {
+        return new Recipe() {
+            @Override
+            public String getDisplayName() {
+                return "Do nothing";
+            }
+
+            @Override
+            protected TreeVisitor<?, ExecutionContext> getVisitor() {
+                return NOOP;
+            }
+        };
+    }
+
     /**
      * A human-readable display name for the recipe, initial capped with no period.
      * For example, "Find text". The display name can be assumed to be rendered in
