@@ -16,9 +16,7 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.Issue
 import org.openrewrite.PrintOutputCapture
 import org.openrewrite.marker.Marker
 import org.openrewrite.marker.Range
@@ -82,9 +80,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
 
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1379")
     @Test
-    @Disabled
     fun updateSourcePositions2(jp : JavaParser) {
         val source = """
             package org.test;
@@ -92,9 +88,9 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
             import org.springframework.context.annotation.Bean;
             import org.springframework.context.annotation.Scope;
             
-            @Scope(value)
+            @Scope(value=)
             public class TestScopeCompletion {
-                
+            
                 @Bean
                 @Scope("onMethod")
                 public Object myBean() {
@@ -107,7 +103,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
 
         val after = UpdateSourcePositions().run(cu)[0].after!!
 
-//        assertThat(after.printAll()).isEqualTo(source);
+        assertThat(after.printAll()).isEqualTo(source);
 
 
         val withOffsetAndLength = after.print(
@@ -121,22 +117,22 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
             }
         )
 
-//        assertThat(withOffsetAndLength).isEqualTo("""
-//            [0,270][0,16]package [8,8][8,3]org.[12,4]test;
-//
-//            [19,50]import [26,43][26,38][26,27][26,19][26,3]org.[30,15]springframework.[46,7]context.[54,10]annotation.[65,4]Bean;
-//            [71,51]import [78,44][78,38][78,27][78,19][78,3]org.[82,15]springframework.[98,7]context.[106,10]annotation.[117,5]Scope;
-//
-//            [125,145][125,14]@[126,5]Scope([132,6][132,5]value=)
-//            [140,6]public class [153,19]TestScopeCompletion [173,97]{
-//
-//                [184,84][184,5]@[185,4]Bean
-//                [194,18]@[195,5]Scope([201,10]"onMethod")
-//                [217,6]public [224,6]Object [231,6]myBean([238,0]) [240,28]{
-//                    [250,11]return [257,4]null;
-//                }
-//            }
-//        """.trimIndent())
+        assertThat(withOffsetAndLength).isEqualTo("""
+            [0,266][0,16]package [8,8][8,3]org.[12,4]test;
+            
+            [19,50]import [26,43][26,38][26,27][26,19][26,3]org.[30,15]springframework.[46,7]context.[54,10]annotation.[65,4]Bean;
+            [71,51]import [78,44][78,38][78,27][78,19][78,3]org.[82,15]springframework.[98,7]context.[106,10]annotation.[117,5]Scope;
+            
+            [125,141][125,14]@[126,5]Scope([132,6][132,5]value=)
+            [140,6]public class [153,19]TestScopeCompletion [173,93]{
+            
+                [180,84][180,5]@[181,4]Bean
+                [190,18]@[191,5]Scope([197,10]"onMethod")
+                [213,6]public [220,6]Object [227,6]myBean([234,0]) [236,28]{
+                    [246,11]return [253,4]null;
+                }
+            }
+        """.trimIndent())
 
         val withLineAndColumn = after.print(
             object : JavaPrinter<Int>() {
@@ -149,23 +145,23 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
             }
         )
 
-//        assertThat(withLineAndColumn).isEqualTo("""
-//            [(1, 0), (14, 2)][(1, 0), (1, 16)]package [(1, 8), (1, 16)][(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
-//
-//            [(3, 1), (3, 51)]import [(3, 8), (3, 51)][(3, 8), (3, 46)][(3, 8), (3, 35)][(3, 8), (3, 27)][(3, 8), (3, 11)]org.[(3, 12), (3, 27)]springframework.[(3, 28), (3, 35)]context.[(3, 36), (3, 46)]annotation.[(3, 47), (3, 51)]Bean;
-//            [(4, 1), (4, 52)]import [(4, 8), (4, 52)][(4, 8), (4, 46)][(4, 8), (4, 35)][(4, 8), (4, 27)][(4, 8), (4, 11)]org.[(4, 12), (4, 27)]springframework.[(4, 28), (4, 35)]context.[(4, 36), (4, 46)]annotation.[(4, 47), (4, 52)]Scope;
-//
-//            [(6, 1), (14, 2)][(6, 1), (6, 15)]@[(6, 2), (6, 7)]Scope([(6, 8), (6, 14)][(6, 8), (6, 13)]value=)
-//            [(7, 1), (7, 7)]public class [(7, 14), (7, 33)]TestScopeCompletion [(7, 34), (14, 2)]{
-//
-//                [(9, 5), (13, 6)][(9, 5), (9, 10)]@[(9, 6), (9, 10)]Bean
-//                [(10, 5), (10, 23)]@[(10, 6), (10, 11)]Scope([(10, 12), (10, 22)]"onMethod")
-//                [(11, 5), (11, 11)]public [(11, 12), (11, 18)]Object [(11, 19), (11, 25)]myBean([(11, 26), (11, 26)]) [(11, 28), (13, 6)]{
-//                    [(12, 9), (12, 20)]return [(12, 16), (12, 20)]null;
-//                }
-//            }
-//        """.trimIndent()
-//        );
+        assertThat(withLineAndColumn).isEqualTo("""
+            [(1, 0), (14, 2)][(1, 0), (1, 16)]package [(1, 8), (1, 16)][(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
+
+            [(3, 1), (3, 51)]import [(3, 8), (3, 51)][(3, 8), (3, 46)][(3, 8), (3, 35)][(3, 8), (3, 27)][(3, 8), (3, 11)]org.[(3, 12), (3, 27)]springframework.[(3, 28), (3, 35)]context.[(3, 36), (3, 46)]annotation.[(3, 47), (3, 51)]Bean;
+            [(4, 1), (4, 52)]import [(4, 8), (4, 52)][(4, 8), (4, 46)][(4, 8), (4, 35)][(4, 8), (4, 27)][(4, 8), (4, 11)]org.[(4, 12), (4, 27)]springframework.[(4, 28), (4, 35)]context.[(4, 36), (4, 46)]annotation.[(4, 47), (4, 52)]Scope;
+
+            [(6, 1), (14, 2)][(6, 1), (6, 15)]@[(6, 2), (6, 7)]Scope([(6, 8), (6, 14)][(6, 8), (6, 13)]value=)
+            [(7, 1), (7, 7)]public class [(7, 14), (7, 33)]TestScopeCompletion [(7, 34), (14, 2)]{
+
+                [(9, 5), (13, 6)][(9, 5), (9, 10)]@[(9, 6), (9, 10)]Bean
+                [(10, 5), (10, 23)]@[(10, 6), (10, 11)]Scope([(10, 12), (10, 22)]"onMethod")
+                [(11, 5), (11, 11)]public [(11, 12), (11, 18)]Object [(11, 19), (11, 25)]myBean([(11, 26), (11, 26)]) [(11, 28), (13, 6)]{
+                    [(12, 9), (12, 20)]return [(12, 16), (12, 20)]null;
+                }
+            }
+        """.trimIndent()
+        );
     }
 
     @Test

@@ -31,7 +31,7 @@ interface JavaParserTest : JavaRecipeTest {
 
        val source =
        """
-           @Deprecated(since)
+           @Deprecated(since=)
            public class A {}
        """.trimIndent();
 
