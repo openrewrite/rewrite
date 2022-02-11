@@ -15,8 +15,7 @@
  */
 package org.openrewrite.xml.internal.grammar;
 
-// Generated from /Users/pat/dev/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLLexer.g4 by ANTLR 4.9.2
-
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.9.2
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.*;
@@ -32,7 +31,7 @@ public class XMLParser extends Parser {
 			new PredictionContextCache();
 	public static final int
 			COMMENT=1, CDATA=2, ParamEntityRef=3, EntityRef=4, CharRef=5, SEA_WS=6,
-			UTF_8_BOM=7, SPECIAL_OPEN_XML=8, OPEN=9, SPECIAL_OPEN=10, DTD_OPEN=11,
+			UTF_ENCODING_BOM=7, SPECIAL_OPEN_XML=8, OPEN=9, SPECIAL_OPEN=10, DTD_OPEN=11,
 			TEXT=12, DTD_CLOSE=13, DTD_SUBSET_OPEN=14, DTD_S=15, DOCTYPE=16, DTD_SUBSET_CLOSE=17,
 			MARKUP_OPEN=18, DTS_SUBSET_S=19, MARK_UP_CLOSE=20, MARKUP_S=21, MARKUP_TEXT=22,
 			MARKUP_SUBSET=23, PI_S=24, PI_TEXT=25, CLOSE=26, SPECIAL_CLOSE=27, SLASH_CLOSE=28,
@@ -53,16 +52,16 @@ public class XMLParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-				null, null, null, null, null, null, null, "'\uFEFF'", null, "'<'", null,
-				null, null, null, null, null, "'DOCTYPE'", null, null, null, null, null,
-				null, null, null, null, null, "'?>'", "'/>'", null, "'/'", "'='"
+				null, null, null, null, null, null, null, null, null, "'<'", null, null,
+				null, null, null, null, "'DOCTYPE'", null, null, null, null, null, null,
+				null, null, null, null, "'?>'", "'/>'", null, "'/'", "'='"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
 				null, "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef", "SEA_WS",
-				"UTF_8_BOM", "SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN", "DTD_OPEN",
+				"UTF_ENCODING_BOM", "SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN", "DTD_OPEN",
 				"TEXT", "DTD_CLOSE", "DTD_SUBSET_OPEN", "DTD_S", "DOCTYPE", "DTD_SUBSET_CLOSE",
 				"MARKUP_OPEN", "DTS_SUBSET_S", "MARK_UP_CLOSE", "MARKUP_S", "MARKUP_TEXT",
 				"MARKUP_SUBSET", "PI_S", "PI_TEXT", "CLOSE", "SPECIAL_CLOSE", "SLASH_CLOSE",
@@ -127,7 +126,7 @@ public class XMLParser extends Parser {
 		public ElementContext element() {
 			return getRuleContext(ElementContext.class,0);
 		}
-		public TerminalNode UTF_8_BOM() { return getToken(XMLParser.UTF_8_BOM, 0); }
+		public TerminalNode UTF_ENCODING_BOM() { return getToken(XMLParser.UTF_ENCODING_BOM, 0); }
 		public DocumentContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -157,10 +156,10 @@ public class XMLParser extends Parser {
 				setState(31);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-				if (_la==UTF_8_BOM) {
+				if (_la==UTF_ENCODING_BOM) {
 					{
 						setState(30);
-						match(UTF_8_BOM);
+						match(UTF_ENCODING_BOM);
 					}
 				}
 
