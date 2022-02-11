@@ -25,6 +25,8 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.tree.Properties;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +47,7 @@ public class PropertiesParser implements Parser<Properties.File> {
 
     @Override
     public List<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     Timer.Builder timer = Timer.builder("rewrite.parse")
@@ -54,6 +57,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                     try (InputStream is = sourceFile.getSource()) {
                         Properties.File file = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
+                        parsingListener.parsed(sourceFile, file);
                         return file;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));

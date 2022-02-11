@@ -40,6 +40,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import javax.tools.*;
 import java.io.*;
@@ -142,6 +144,8 @@ class ReloadableJava8Parser implements JavaParser {
 
     @Override
     public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+
         if (classpath != null) { // override classpath
             if (context.get(JavaFileManager.class) != pfm) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
@@ -204,6 +208,7 @@ class ReloadableJava8Parser implements JavaParser {
                                                 .tag("file.type", "Java")
                                                 .tag("step", "(3) Map to Rewrite AST"))
                                 .register(Metrics.globalRegistry));
+                        parsingListener.parsed(input, cu);
                         return cu;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(

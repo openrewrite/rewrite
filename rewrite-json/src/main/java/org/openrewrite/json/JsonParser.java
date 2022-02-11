@@ -29,6 +29,8 @@ import org.openrewrite.json.internal.JsonParserVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Lexer;
 import org.openrewrite.json.internal.grammar.JSON5Parser;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -40,6 +42,7 @@ import static java.util.stream.Collectors.toList;
 public class JsonParser implements Parser<Json.Document> {
     @Override
     public List<Json.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     Timer.Builder timer = Timer.builder("rewrite.parse")
@@ -58,6 +61,7 @@ public class JsonParser implements Parser<Json.Document> {
                                 StringUtils.readFully(sourceFile.getSource())
                         ).visitJson5(parser.json5());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
+                        parsingListener.parsed(sourceFile, document);
                         return document;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));

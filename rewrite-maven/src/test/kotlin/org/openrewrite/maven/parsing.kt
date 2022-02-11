@@ -36,7 +36,7 @@ fun <T> visualize(
     runnable: () -> T
 ) {
     val viz = GraphvizResolutionEventListener(scope, showProperties, showManagedDependencies)
-    MavenExecutionContextView(ctx).setResoutionListener(viz)
+    MavenExecutionContextView(ctx).setResolutionListener(viz)
     try {
         runnable()
     } finally {

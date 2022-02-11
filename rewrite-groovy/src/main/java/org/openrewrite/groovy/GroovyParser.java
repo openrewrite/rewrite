@@ -33,6 +33,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -91,6 +93,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
     @Override
     public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         List<CompiledGroovySource> compilerCus = parseInputsToCompilerAst(sources, relativeTo, ctx);
         List<G.CompilationUnit> cus = new ArrayList<>(compilerCus.size());
 
@@ -102,7 +105,9 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                         typeCache,
                         ctx
                 );
-                cus.add(mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule()));
+                G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
+                cus.add(gcu);
+                parsingListener.parsed(compiled.getInput(), gcu);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
             }

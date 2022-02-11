@@ -41,6 +41,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
@@ -153,6 +155,7 @@ public class Java11Parser implements JavaParser {
 
     @Override
     public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
 
         List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
@@ -176,6 +179,7 @@ public class Java11Parser implements JavaParser {
                                                 .tag("file.type", "Java")
                                                 .tag("step", "(3) Map to Rewrite AST"))
                                 .register(Metrics.globalRegistry));
+                        parsingListener.parsed(input, cu);
                         return cu;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(
