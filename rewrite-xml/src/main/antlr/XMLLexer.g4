@@ -39,16 +39,23 @@ CharRef           :  '&#' DIGIT+ ';'
                   |  '&#x' HEXDIGIT+ ';'
                   ;
 
-SEA_WS            :  (' '|'\t'|'\r'? '\n')+       -> skip ;
-UTF_8_BOM         : '\uFEFF'                      -> skip ;
-SPECIAL_OPEN_XML  :  '<?xml' S                    -> pushMode(INSIDE) ;
-OPEN              :  '<'                          -> pushMode(INSIDE) ;
+SEA_WS            :  (' '|'\t'|'\r'? '\n')+        -> skip ;
+UTF_ENCODING_BOM  :  (UTF_8_BOM_CHARS | UTF_8_BOM) -> skip ;
 
-SPECIAL_OPEN      :  '<?'Name                     -> pushMode(INSIDE_PROCESS_INSTRUCTION) ;
+SPECIAL_OPEN_XML  :  '<?xml' S                     -> pushMode(INSIDE) ;
+OPEN              :  '<'                           -> pushMode(INSIDE) ;
 
-DTD_OPEN          :  '<!'                         -> pushMode(INSIDE_DTD) ;
+SPECIAL_OPEN      :  '<?'Name                      -> pushMode(INSIDE_PROCESS_INSTRUCTION) ;
+
+DTD_OPEN          :  '<!'                          -> pushMode(INSIDE_DTD) ;
 
 TEXT              :  ~[<&]+ ;  // match any 16 bit char other than < and &
+
+fragment
+UTF_8_BOM_CHARS   : '\u00EF''\u00BB''\u00BF' ; // chars for UTF-8 read from a byte array.
+
+fragment
+UTF_8_BOM         : '\uFEFF' ; // UTF-8 char if the source is already a String.
 
 // INSIDE of DTD ------------------------------------------
 mode INSIDE_DTD;

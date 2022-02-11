@@ -171,4 +171,20 @@ class XmlParserTest {
             </execution>
         """.trimIndent()
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1382")
+    @Test
+    fun utf8BOMCharacters() = assertUnchanged(
+        before = """
+            ï»¿<?xml version="1.0" encoding="UTF-8"?>
+                <test></test>
+            <tag></tag>
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1382")
+    @Test
+    fun utf8BOM() = assertUnchanged(
+        before = "\\uFEFF<?xml version=\"1.0\" encoding=\"UTF-8\"?><test></test>"
+    )
 }

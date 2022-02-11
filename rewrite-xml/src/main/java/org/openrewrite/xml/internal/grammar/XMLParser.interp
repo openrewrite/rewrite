@@ -6,7 +6,7 @@ null
 null
 null
 null
-'\uFEFF'
+null
 null
 '<'
 null
@@ -42,7 +42,7 @@ ParamEntityRef
 EntityRef
 CharRef
 SEA_WS
-UTF_8_BOM
+UTF_ENCODING_BOM
 SPECIAL_OPEN_XML
 OPEN
 SPECIAL_OPEN
