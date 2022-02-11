@@ -29,6 +29,8 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -47,6 +49,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
 
     @Override
     public List<Hcl.ConfigFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     Timer.Builder timer = Timer.builder("rewrite.parse")
@@ -70,6 +73,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
                         configFile = configFile.withMarkers(Markers.build(styles));
 
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
+                        parsingListener.parsed(sourceFile, configFile);
                         return configFile;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));

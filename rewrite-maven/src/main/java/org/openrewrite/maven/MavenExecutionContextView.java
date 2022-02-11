@@ -52,7 +52,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return new MavenExecutionContextView(ctx);
     }
 
-    public void setResoutionListener(ResolutionEventListener listener) {
+    public void setResolutionListener(ResolutionEventListener listener) {
         putMessage(MAVEN_RESOLUTION_LISTENER, listener);
     }
 

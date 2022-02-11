@@ -26,6 +26,8 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.yaml.tree.Yaml;
 import org.yaml.snakeyaml.events.*;
 import org.yaml.snakeyaml.parser.Parser;
@@ -56,6 +58,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
     @Override
     public List<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     Timer.Builder timer = Timer.builder("rewrite.parse")
@@ -65,6 +68,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     try (InputStream is = sourceFile.getSource()) {
                         Yaml.Documents yaml = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
+                        parsingListener.parsed(sourceFile, yaml);
                         return yaml;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
