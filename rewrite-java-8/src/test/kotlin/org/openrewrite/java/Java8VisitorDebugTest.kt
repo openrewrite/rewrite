@@ -101,6 +101,10 @@ class Java8ChangeMethodAccessLevelTest : Java8Test, ChangeMethodAccessLevelTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ChangeMethodInvocationParametersTest : Java8Test, ChangeMethodInvocationParametersTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ChangeMethodNameTest : Java8Test, ChangeMethodNameTest
 
 @DebugOnly

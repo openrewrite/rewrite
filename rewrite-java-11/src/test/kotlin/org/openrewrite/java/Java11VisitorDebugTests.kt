@@ -101,6 +101,10 @@ class Java11ChangeMethodAccessLevelTest : Java11Test, ChangeMethodAccessLevelTes
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ChangeMethodInvocationParametersTest : Java11Test, ChangeMethodInvocationParametersTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ChangeMethodNameTest : Java11Test, ChangeMethodNameTest
 
 @DebugOnly
