@@ -27,6 +27,7 @@ import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class SimplifyConsecutiveAssignments extends Recipe {
@@ -38,6 +39,11 @@ public class SimplifyConsecutiveAssignments extends Recipe {
     @Override
     public String getDescription() {
         return "Combine consecutive assignments into a single statement where possible.";
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(1);
     }
 
     @Override
