@@ -372,6 +372,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class SimplifyBooleanReturnTck : SimplifyBooleanReturnTest
 
     @Nested
+    inner class SimplifyConsecutiveAssignmentsTck : SimplifyConsecutiveAssignmentsTest
+
+    @Nested
     inner class SimplifyMethodChainTck : SimplifyMethodChainTest
 
     @Nested

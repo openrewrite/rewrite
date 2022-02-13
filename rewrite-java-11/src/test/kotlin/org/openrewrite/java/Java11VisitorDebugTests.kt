@@ -589,4 +589,8 @@ class Java11SameClassNameTest : Java11Test, SameClassNameTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11SimplifyConsecutiveAssignmentsTest : Java11Test, SimplifyConsecutiveAssignmentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11SimplifyMethodChainTest : Java11Test, SimplifyMethodChainTest

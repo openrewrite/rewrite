@@ -796,6 +796,10 @@ public interface JavaType {
         public String toString() {
             return getKeyword();
         }
+
+        public boolean isNumeric() {
+            return this == Double || this == Int || this == Float || this == Long || this == Short;
+        }
     }
 
     @Getter
