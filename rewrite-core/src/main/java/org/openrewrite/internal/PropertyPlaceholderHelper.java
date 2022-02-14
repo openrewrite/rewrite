@@ -66,7 +66,7 @@ public class PropertyPlaceholderHelper {
 
     protected String parseStringValue(String value, Function<String, String> placeholderResolver,
                                       @Nullable Set<String> visitedPlaceholders) {
-        int startIndex = value.indexOf(this.placeholderPrefix);
+        int startIndex = value.indexOf(placeholderPrefix);
         if (startIndex == -1) {
             return value;
         }
@@ -75,7 +75,7 @@ public class PropertyPlaceholderHelper {
         while (startIndex != -1) {
             int endIndex = findPlaceholderEndIndex(result, startIndex);
             if (endIndex != -1) {
-                String placeholder = result.substring(startIndex + this.placeholderPrefix.length(), endIndex);
+                String placeholder = result.substring(startIndex + placeholderPrefix.length(), endIndex);
                 String originalPlaceholder = placeholder;
                 if (visitedPlaceholders == null) {
                     visitedPlaceholders = new HashSet<>(4);
@@ -88,11 +88,11 @@ public class PropertyPlaceholderHelper {
                 placeholder = parseStringValue(placeholder, placeholderResolver, visitedPlaceholders);
                 // Now obtain the value for the fully resolved key...
                 String propVal = placeholderResolver.apply(placeholder);
-                if (propVal == null && this.valueSeparator != null) {
-                    int separatorIndex = placeholder.indexOf(this.valueSeparator);
+                if (propVal == null && valueSeparator != null) {
+                    int separatorIndex = placeholder.indexOf(valueSeparator);
                     if (separatorIndex != -1) {
                         String actualPlaceholder = placeholder.substring(0, separatorIndex);
-                        String defaultValue = placeholder.substring(separatorIndex + this.valueSeparator.length());
+                        String defaultValue = placeholder.substring(separatorIndex + valueSeparator.length());
                         propVal = placeholderResolver.apply(actualPlaceholder);
                         if (propVal == null) {
                             propVal = defaultValue;
@@ -103,15 +103,15 @@ public class PropertyPlaceholderHelper {
                     // Recursive invocation, parsing placeholders contained in the
                     // previously resolved placeholder value.
                     propVal = parseStringValue(propVal, placeholderResolver, visitedPlaceholders);
-                    result.replace(startIndex, endIndex + this.placeholderSuffix.length(), propVal);
+                    result.replace(startIndex, endIndex + placeholderSuffix.length(), propVal);
 
-                    if(propVal.length() < placeholderPrefix.length() + placeholderSuffix.length()) {
-                        endIndex -= (placeholderPrefix.length() + placeholderSuffix.length()) - propVal.length() - 1;
+                    if (propVal.length() < endIndex - startIndex + 1) {
+                        endIndex = startIndex + propVal.length();
                     }
                 }
 
                 // Proceed with unprocessed value.
-                startIndex = result.indexOf(this.placeholderPrefix, endIndex + this.placeholderSuffix.length());
+                startIndex = result.indexOf(placeholderPrefix, endIndex + placeholderSuffix.length());
                 visitedPlaceholders.remove(originalPlaceholder);
             } else {
                 startIndex = -1;
@@ -121,19 +121,19 @@ public class PropertyPlaceholderHelper {
     }
 
     private int findPlaceholderEndIndex(CharSequence buf, int startIndex) {
-        int index = startIndex + this.placeholderPrefix.length();
+        int index = startIndex + placeholderPrefix.length();
         int withinNestedPlaceholder = 0;
         while (index < buf.length()) {
-            if (substringMatch(buf, index, this.placeholderSuffix)) {
+            if (substringMatch(buf, index, placeholderSuffix)) {
                 if (withinNestedPlaceholder > 0) {
                     withinNestedPlaceholder--;
-                    index = index + this.placeholderSuffix.length();
+                    index = index + placeholderSuffix.length();
                 } else {
                     return index;
                 }
-            } else if (substringMatch(buf, index, this.simplePrefix)) {
+            } else if (substringMatch(buf, index, simplePrefix)) {
                 withinNestedPlaceholder++;
-                index = index + this.simplePrefix.length();
+                index = index + simplePrefix.length();
             } else {
                 index++;
             }
@@ -152,5 +152,4 @@ public class PropertyPlaceholderHelper {
         }
         return true;
     }
-
 }
