@@ -655,9 +655,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             for (char c : valueSourceArr) {
                 p.append(c);
                 if (surrogate != null && surrogate.getValueSourceIndex() == ++i) {
-                    p.append("\\u").append(surrogate.getCodePoint());
-                    if (surrogateIter.hasNext()) {
-                        surrogate = surrogateIter.next();
+                    while (surrogate != null && surrogate.getValueSourceIndex() == i) {
+                        p.append("\\u").append(surrogate.getCodePoint());
+                        surrogate = surrogateIter.hasNext() ? surrogateIter.next() : null;
                     }
                 }
             }

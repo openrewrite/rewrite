@@ -106,6 +106,16 @@ interface LiteralTest : JavaTreeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1387")
+    @Test
+    fun multipleUnicodeEscapeCharactersAtValueSourceIndex(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            String s1 = "A\ud83c\udf09";
+            String s2 = "B\ud83c\udf09\ud83c\udf09";
+            String s3 = "C\uDfFf D \ud83c\udf09\ud83c\udf09";
+        """
+    )
+
     @Test
     fun transformString(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
