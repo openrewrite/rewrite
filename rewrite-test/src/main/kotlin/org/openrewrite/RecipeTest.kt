@@ -39,6 +39,7 @@ interface RecipeTest<T : SourceFile> {
     fun assertChangedBase(
         parser: Parser<T> = this.parser!!,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         before: String,
         dependsOn: Array<String> = emptyArray(),
         after: String,
@@ -53,13 +54,14 @@ interface RecipeTest<T : SourceFile> {
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
 
-        assertChangedBase(recipe, sources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        assertChangedBase(recipe, executionContext, sources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     @Suppress("UNCHECKED_CAST")
     fun assertChangedBase(
         parser: Parser<T> = this.parser!!,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         before: File,
         relativeTo: Path? = null,
         dependsOn: Array<File> = emptyArray(),
@@ -78,12 +80,13 @@ interface RecipeTest<T : SourceFile> {
             .`as`("The parser was provided with $inputSize inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputSize)
 
-        assertChangedBase(recipe, sources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        assertChangedBase(recipe, executionContext, sources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     @Suppress("UNCHECKED_CAST")
     private fun assertChangedBase(
-        recipe: Recipe = this.recipe!!,
+        recipe: Recipe,
+        executionContext: ExecutionContext,
         sources: List<SourceFile>,
         after: String,
         cycles: Int = 2,
@@ -130,6 +133,7 @@ interface RecipeTest<T : SourceFile> {
     fun assertUnchangedBase(
         parser: Parser<T> = this.parser!!,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         before: String,
         dependsOn: Array<String> = emptyArray()
     ) {
@@ -140,12 +144,13 @@ interface RecipeTest<T : SourceFile> {
             .`as`("The parser was provided with ${inputs.size} inputs which it parsed into ${sources.size} SourceFiles. The parser likely encountered an error.")
             .isEqualTo(inputs.size)
 
-        assertUnchangedBase(recipe, sources)
+        assertUnchangedBase(recipe,  executionContext, sources)
     }
 
     fun assertUnchangedBase(
         parser: Parser<T> = this.parser!!,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         before: File,
         relativeTo: Path? = null,
         dependsOn: Array<File> = emptyArray()
@@ -156,11 +161,12 @@ interface RecipeTest<T : SourceFile> {
             executionContext
         )
 
-        assertUnchangedBase(recipe, sources)
+        assertUnchangedBase(recipe, executionContext, sources)
     }
 
     private fun assertUnchangedBase(
-        recipe: Recipe = this.recipe!!,
+        recipe: Recipe,
+        executionContext: ExecutionContext,
         sources: List<SourceFile>,
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull

@@ -16,6 +16,7 @@
 package org.openrewrite.properties
 
 import org.intellij.lang.annotations.Language
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.properties.tree.Properties
@@ -30,6 +31,7 @@ interface PropertiesRecipeTest : RecipeTest<Properties.File> {
     fun assertChanged(
         parser: PropertiesParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("properties") before: String,
         @Language("properties") dependsOn: Array<String> = emptyArray(),
         @Language("properties") after: String,
@@ -37,12 +39,13 @@ interface PropertiesRecipeTest : RecipeTest<Properties.File> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Properties.File) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, executionContext, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertChanged(
         parser: PropertiesParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("properties") before: File,
         relativeTo: Path? = null,
         @Language("properties") dependsOn: Array<File> = emptyArray(),
@@ -51,25 +54,27 @@ interface PropertiesRecipeTest : RecipeTest<Properties.File> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Properties.File) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(
         parser: PropertiesParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("properties") before: String,
         @Language("properties") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
     }
 
     fun assertUnchanged(
         parser: PropertiesParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("properties") before: File,
         relativeTo: Path? = null,
         @Language("properties") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
+        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
     }
 }

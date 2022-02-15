@@ -23,13 +23,6 @@ import org.openrewrite.style.NamedStyles
 
 interface AddImportTest : JavaRecipeTest {
 
-    override val executionContext: ExecutionContext
-        get() {
-            val ctx = super.executionContext
-            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, false)
-            return ctx
-        }
-
     fun addImports(vararg adds: () -> TreeVisitor<*, ExecutionContext>): Recipe = adds
         .map { add -> toRecipe(add) }
         .reduce { r1, r2 -> return r1.doNext(r2) }
@@ -826,6 +819,7 @@ interface AddImportTest : JavaRecipeTest {
     fun doNotFoldNormalImportWithNamespaceConflict(jp: JavaParser) = assertChanged(
         jp,
         recipe = addImports({ AddImport("java.util.List", null, false) }),
+        executionContext = executionContext.apply {putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, false)},
         before = """
             import java.awt.*; // contains a List class
             import java.util.Collection;

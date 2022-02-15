@@ -16,9 +16,7 @@
 package org.openrewrite.groovy
 
 import org.intellij.lang.annotations.Language
-import org.openrewrite.Parser
-import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
+import org.openrewrite.*
 import org.openrewrite.groovy.tree.G
 import java.io.File
 import java.nio.file.Path
@@ -31,6 +29,7 @@ interface GroovyRecipeTest : RecipeTest<G.CompilationUnit> {
     fun assertChanged(
         parser: Parser<G.CompilationUnit> = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("groovy") before: String,
         @Language("groovy") dependsOn: Array<String> = emptyArray(),
         @Language("groovy") after: String,
@@ -38,12 +37,13 @@ interface GroovyRecipeTest : RecipeTest<G.CompilationUnit> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (G.CompilationUnit) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, executionContext, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertChanged(
         parser: Parser<G.CompilationUnit> = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("groovy") before: File,
         relativeTo: Path? = null,
         @Language("groovy") dependsOn: Array<File> = emptyArray(),
@@ -52,25 +52,27 @@ interface GroovyRecipeTest : RecipeTest<G.CompilationUnit> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (G.CompilationUnit) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(
         parser: Parser<G.CompilationUnit> = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("groovy") before: String,
         @Language("groovy") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
     }
 
     fun assertUnchanged(
         parser: Parser<G.CompilationUnit> = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("groovy") before: File,
         relativeTo: Path? = null,
         @Language("groovy") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
+        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
     }
 }
