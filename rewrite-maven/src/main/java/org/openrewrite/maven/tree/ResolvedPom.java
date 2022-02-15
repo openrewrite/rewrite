@@ -197,9 +197,8 @@ public class ResolvedPom {
         return requested.getDatedSnapshotVersion();
     }
 
-    @Nullable
     public String getPackaging() {
-        return requested.getPackaging();
+        return requested.getPackaging() == null ? "jar" : requested.getPackaging();
     }
 
     @Nullable
