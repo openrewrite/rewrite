@@ -21,6 +21,7 @@ import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.LoggingMeterRegistry
@@ -61,6 +62,7 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
     fun assertChanged(
         parser: MavenParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("xml") before: String,
         @Language("xml") dependsOn: Array<String> = emptyArray(),
         @Language("xml") after: String,
@@ -71,6 +73,7 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
         super.assertChangedBase(
             parser,
             recipe,
+            executionContext,
             before,
             dependsOn,
             after,
@@ -83,6 +86,7 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
     fun assertChanged(
         parser: MavenParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("xml") before: File,
         relativeTo: Path? = null,
         @Language("xml") dependsOn: Array<File> = emptyArray(),
@@ -94,6 +98,7 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
         super.assertChangedBase(
             parser,
             recipe,
+            executionContext,
             before,
             relativeTo,
             dependsOn,
@@ -107,19 +112,21 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
     fun assertUnchanged(
         parser: MavenParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("xml") before: String,
         @Language("xml") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
     }
 
     fun assertUnchanged(
         parser: MavenParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("xml") before: File,
         relativeTo: Path? = null,
         @Language("xml") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
+        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
     }
 }

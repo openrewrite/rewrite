@@ -16,6 +16,7 @@
 package org.openrewrite.json
 
 import org.intellij.lang.annotations.Language
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.json.tree.Json
@@ -30,6 +31,7 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
     fun assertChanged(
         parser: JsonParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("json5") before: String,
         @Language("json5") dependsOn: Array<String> = emptyArray(),
         @Language("json5") after: String,
@@ -37,12 +39,13 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Json.Document) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, executionContext, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertChanged(
         parser: JsonParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("json5") before: File,
         relativeTo: Path? = null,
         @Language("json5") dependsOn: Array<File> = emptyArray(),
@@ -51,25 +54,27 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Json.Document) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        super.assertChangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
     fun assertUnchanged(
         parser: JsonParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("json5") before: String,
         @Language("json5") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
     }
 
     fun assertUnchanged(
         parser: JsonParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("json5") before: File,
         relativeTo: Path? = null,
         @Language("json5") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
+        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
     }
 }

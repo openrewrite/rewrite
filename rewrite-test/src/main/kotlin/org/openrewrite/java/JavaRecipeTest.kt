@@ -49,6 +49,7 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     fun assertChanged(
         parser: JavaParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("java") before: String,
         @Language("java") dependsOn: Array<String> = emptyArray(),
         @Language("java") after: String,
@@ -65,6 +66,7 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         super.assertChangedBase(
             parser,
             recipe,
+            executionContext,
             before,
             dependsOn,
             after,
@@ -77,6 +79,7 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     fun assertChanged(
         parser: JavaParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("java") before: File,
         relativeTo: Path? = null,
         @Language("java") dependsOn: Array<File> = emptyArray(),
@@ -93,6 +96,7 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         super.assertChangedBase(
             parser,
             recipe,
+            executionContext,
             before,
             relativeTo,
             dependsOn,
@@ -106,19 +110,21 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
     fun assertUnchanged(
         parser: JavaParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("java") before: String,
         @Language("java") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, dependsOn)
+        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
     }
 
     fun assertUnchanged(
         parser: JavaParser = this.parser,
         recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
         @Language("java") before: File,
         relativeTo: Path? = null,
         @Language("java") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, before, relativeTo, dependsOn)
+        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
     }
 }
