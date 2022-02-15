@@ -101,6 +101,14 @@ public class Markers implements Tree {
         return withMarkers(!updated.get() ? ListUtils.concat(markers, identity) : markers);
     }
 
+    public Markers removeByType(Class<? extends Marker> type) {
+        return withMarkers(ListUtils.map(this.markers, m -> type.equals(m.getClass()) ? null : m));
+    }
+
+    public <M extends Marker> Markers setByType(M m) {
+        return computeByType(m, (replacement, existing) -> replacement);
+    }
+
     /**
      * Add a new marker or update some existing marker.
      *

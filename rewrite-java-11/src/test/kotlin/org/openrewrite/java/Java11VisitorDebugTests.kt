@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
+import org.openrewrite.java.dataflow.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.recipes.ExecutionContextParameterNameTest
 import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
@@ -300,6 +301,18 @@ class Java11JavaVisitorTest : Java11Test, JavaVisitorTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11LambdaBlockToExpressionTest : Java11Test, LambdaBlockToExpressionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UpdateGuardedByTest : Java11Test, UpdateGuardedByTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UpdateLastReadTest : Java11Test, UpdateLastReadTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UpdateLastWriteTest : Java11Test, UpdateLastWriteTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

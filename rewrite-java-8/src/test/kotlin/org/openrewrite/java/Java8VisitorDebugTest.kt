@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
+import org.openrewrite.java.dataflow.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.recipes.ExecutionContextParameterNameTest
 import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
@@ -556,6 +557,18 @@ class Java8UnnecessaryThrowsTest : Java8Test, UnnecessaryThrowsTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8UnwrapParenthesesTest : Java8Test, UnwrapParenthesesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8UpdateGuardedByTest : Java8Test, UpdateGuardedByTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8UpdateLastReadTest : Java8Test, UpdateLastReadTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8UpdateLastWriteTest : Java8Test, UpdateLastWriteTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

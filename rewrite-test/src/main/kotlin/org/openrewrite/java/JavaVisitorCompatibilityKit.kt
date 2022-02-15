@@ -22,6 +22,7 @@ import org.openrewrite.java.format.*
 import org.openrewrite.java.recipes.ExecutionContextParameterNameTest
 import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
 import org.openrewrite.java.search.*
+import org.openrewrite.java.dataflow.*
 import org.openrewrite.java.style.AutodetectTest
 import org.openrewrite.java.tree.TypeTreeTest
 
@@ -149,6 +150,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FinalizeLocalVariablesTck : FinalizeLocalVariablesTest
 
     @Nested
+    inner class FindAnnotationsTck : FindAnnotationsTest
+
+    @Nested
     inner class FixSerializableFieldsTck : FixSerializableFieldsTest
 
     @Nested
@@ -158,7 +162,13 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ForLoopIncrementInUpdateTck : ForLoopIncrementInUpdateTest
 
     @Nested
-    inner class FindAnnotationsTck : FindAnnotationsTest
+    inner class UpdateGuardedByTck : UpdateGuardedByTest
+
+    @Nested
+    inner class UpdateLastReadTck : UpdateLastReadTest
+
+    @Nested
+    inner class UpdateLastWriteTck : UpdateLastWriteTest
 
     @Nested
     inner class FindDeprecatedClassesTck : FindDeprecatedClassesTest

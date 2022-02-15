@@ -25,6 +25,11 @@ packageName: org.openrewrite.java.cleanup
 description: Format and cleanup Java code to ensure a consistent style is used.
 ---
 type: specs.openrewrite.org/v1beta/category
+name: Dataflow analysis
+packageName: org.openrewrite.java.dataflow
+description: Analysis that helps recipes understand the flow of data across a codebase.
+---
+type: specs.openrewrite.org/v1beta/category
 name: OpenRewrite best practices
 packageName: org.openrewrite.java.recipes
 description: Apply best practices to OpenRewrite recipes.
