@@ -363,4 +363,18 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1357")
+    @Test
+    fun forLoopVariablesIgnored(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.concurrent.FutureTask;
+            
+            class A {
+                void f() {
+                    for(FutureTask<?> future; (future = new FutureTask<>(() -> "hello world")) != null;) { }
+                }
+            }
+        """
+    )
 }

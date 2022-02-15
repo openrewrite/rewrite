@@ -75,6 +75,10 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
             return mv;
         }
 
+        if(isDeclaredInForLoopControl()) {
+            return mv;
+        }
+
         // ignore fields (aka "instance variable" or "class variable")
         if (mv.getVariables().stream().anyMatch(v -> v.isField(getCursor()) || isField(getCursor()))) {
             return mv;
@@ -103,6 +107,12 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
         return getCursor()
                 .dropParentUntil(J.class::isInstance) // maybe J.MethodDeclaration
                 .getValue() instanceof J.MethodDeclaration;
+    }
+
+    private boolean isDeclaredInForLoopControl() {
+        return getCursor()
+                .dropParentUntil(J.class::isInstance)
+                .getValue() instanceof J.ForLoop.Control;
     }
 
     private boolean isDeclaredInForEachLoop() {
