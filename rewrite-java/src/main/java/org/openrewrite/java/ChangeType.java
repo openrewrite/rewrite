@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -28,32 +29,27 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Stack;
 
-/**
- * NOTE: Does not currently transform all possible type references, and accomplishing this would be non-trivial.
- * For example, a method invocation select might refer to field `A a` whose type has now changed to `A2`, and so the type
- * on the select should change as well. But how do we identify the set of all method selects which refer to `a`? Suppose
- * it were prefixed like `this.a`, or `MyClass.this.a`, or indirectly via a separate method call like `getA()` where `getA()`
- * is defined on the super class.
- */
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeType extends Recipe {
 
-    /**
-     * Fully-qualified class name of the original type.
-     */
     @Option(displayName = "Old fully-qualified type name",
             description = "Fully-qualified class name of the original type.",
             example = "org.junit.Assume")
     String oldFullyQualifiedTypeName;
 
-    /**
-     * Fully-qualified class name of the replacement type, the replacement type can also defined as a primitive.
-     */
     @Option(displayName = "New fully-qualified type name",
             description = "Fully-qualified class name of the replacement type, or the name of a primitive such as \"int\".",
             example = "org.junit.jupiter.api.Assumptions")
     String newFullyQualifiedTypeName;
+
+    @Option(displayName = "Ignore type definition",
+            description = "When set to `false` the definition of the old type will be left untouched. " +
+                    "This is useful when you're replacing usage of a class but don't want to rename it.",
+            example = "true",
+            required = false)
+    @Nullable
+    Boolean ignoreDefinition;
 
     @Override
     public String getDisplayName() {
@@ -81,7 +77,12 @@ public class ChangeType extends Recipe {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 for (J.ClassDeclaration it : cu.getClasses()) {
-                    if (TypeUtils.isOfClassType(it.getType(), oldFullyQualifiedTypeName)) {
+                    if (!TypeUtils.isOfClassType(it.getType(), oldFullyQualifiedTypeName)) {
+                        continue;
+                    }
+                    if(Boolean.TRUE.equals(ignoreDefinition)) {
+                        return cu;
+                    } else {
                         return cu.withMarkers(cu.getMarkers().searchResult());
                     }
                 }

@@ -93,7 +93,7 @@ public class ChangePackage extends Recipe {
         private static final String RENAME_TO_KEY = "renameTo";
         private static final String RENAME_FROM_KEY = "renameFrom";
 
-        private final JavaType.Class newPackageType = JavaType.Class.build(newPackageName);
+        private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
 
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {

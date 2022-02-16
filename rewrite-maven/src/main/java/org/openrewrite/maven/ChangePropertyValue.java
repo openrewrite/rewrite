@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.AutoFormatVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -46,6 +47,7 @@ public class ChangePropertyValue extends Recipe {
             description = "Add the property if it is missing from the pom file.",
             required = false,
             example = "false")
+    @Nullable
     Boolean addIfMissing;
 
     @Override
@@ -67,7 +69,7 @@ public class ChangePropertyValue extends Recipe {
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Document m = super.visitDocument(document, ctx);
 
-                if (addIfMissing) {
+                if (Boolean.TRUE.equals(addIfMissing)) {
                     Xml.Tag root = m.getRoot();
                     Optional<Xml.Tag> properties = root.getChild("properties");
                     if (!properties.isPresent()) {

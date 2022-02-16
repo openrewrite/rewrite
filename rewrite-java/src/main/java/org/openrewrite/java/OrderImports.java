@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.style.ImportLayoutStyle;
@@ -49,7 +50,8 @@ public class OrderImports extends Recipe {
             description = "Remove unnecessary imports.",
             required = false,
             example = "true")
-    boolean removeUnused;
+    @Nullable
+    Boolean removeUnused;
 
     @Override
     public String getDisplayName() {
@@ -67,9 +69,10 @@ public class OrderImports extends Recipe {
     }
 
     private static class OrderImportsVisitor<P> extends JavaIsoVisitor<P> {
-        private final boolean removeUnused;
+        @Nullable
+        private final Boolean removeUnused;
 
-        OrderImportsVisitor(boolean removeUnused) {
+        OrderImportsVisitor(@Nullable Boolean removeUnused) {
             this.removeUnused = removeUnused;
         }
 
@@ -100,7 +103,7 @@ public class OrderImports extends Recipe {
                 }
             }
 
-            if (removeUnused) {
+            if (Boolean.TRUE.equals(removeUnused)) {
                 doAfterVisit(new RemoveUnusedImports());
             } else if (changed) {
                 doAfterVisit(new FormatFirstClassPrefix<>());
