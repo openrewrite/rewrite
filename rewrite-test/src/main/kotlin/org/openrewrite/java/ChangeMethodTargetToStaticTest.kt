@@ -37,7 +37,7 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
             """
         ),
         recipe = ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null)
-            .doNext(ChangeMethodName("b.B nonStatic()", "foo", null)),
+            .doNext(ChangeMethodName("b.B nonStatic()", "foo", null, null)),
         before = """
             import a.*;
             class C {

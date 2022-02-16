@@ -47,7 +47,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
                 public void singleArg(String s) {}
             }
         """.trimIndent()),
-        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar", true),
+        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar", true, null),
         before = """
             package com.abc;
             class A {
@@ -82,7 +82,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @Suppress("MethodMayBeStatic", "RedundantOperationOnEmptyContainer")
     fun changeMethodNameForOverriddenMethodMatchOverridesFalse() = assertChanged(
-        recipe = ChangeMethodName("com.abc.Parent method(String)", "changed", false),
+        recipe = ChangeMethodName("com.abc.Parent method(String)", "changed", false, null),
         before = """
             package com.abc;
             class Parent {
@@ -113,7 +113,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     fun changeMethodNameForMethodWithSingleArgDeclarative(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar", null),
+        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null),
         before = """
             package com.abc;
             class A {
@@ -139,7 +139,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     fun changeMethodNameForMethodWithSingleArg(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar", null),
+        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null),
         before = """
             package com.abc;
             class A {
@@ -162,7 +162,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     fun changeMethodNameForMethodWithArrayArg(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName("com.abc.B arrArg(String[])", "bar", null),
+        recipe = ChangeMethodName("com.abc.B arrArg(String[])", "bar", null, null),
         before = """
             package com.abc;
             class A {
@@ -185,7 +185,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     fun changeMethodNameForMethodWithVarargArg(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName("com.abc.B varargArg(String...)", "bar", null),
+        recipe = ChangeMethodName("com.abc.B varargArg(String...)", "bar", null, null),
         before = """
             package com.abc;
             class A {
@@ -216,7 +216,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodName("com.abc.B error()", "foo", null),
+        recipe = ChangeMethodName("com.abc.B error()", "foo", null, null),
         before = """
             package com.abc;
             class A {
@@ -239,7 +239,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     fun changeMethodDeclarationForMethodWithSingleArg(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName("com.abc.A foo(String)", "bar", null),
+        recipe = ChangeMethodName("com.abc.A foo(String)", "bar", null, null),
         before = """
             package com.abc;
             class A {
@@ -257,10 +257,23 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     )
 
     @Test
+    fun doNotChangeMethodNameOnDeclaringClass(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = ChangeMethodName("com.abc.A foo(String)", "bar", null, true),
+        before = """
+            package com.abc;
+            class A {
+               public void foo(String s) {
+               }
+            }
+        """
+    )
+
+    @Test
     fun changeStaticMethodTest(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName("com.abc.B static1(String)", "static2", null),
+        recipe = ChangeMethodName("com.abc.B static1(String)", "static2", null, null),
         before = """
             package com.abc;
             class A {
@@ -283,7 +296,7 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     fun changeStaticImportTest(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName("com.abc.B static1(String)", "static2", null),
+        recipe = ChangeMethodName("com.abc.B static1(String)", "static2", null, null),
         before = """
             package com.abc;
             import static com.abc.B.static1;
@@ -307,20 +320,20 @@ interface ChangeMethodNameTest : JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ChangeMethodName(null, null, null)
+        var recipe = ChangeMethodName(null, null, null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
         assertThat(valid.failures()[1].property).isEqualTo("newMethodName")
 
-        recipe = ChangeMethodName(null, "hello", null)
+        recipe = ChangeMethodName(null, "hello", null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
-        recipe = ChangeMethodName("java.util.String emptyString(..)", null, null)
+        recipe = ChangeMethodName("java.util.String emptyString(..)", null, null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
