@@ -880,7 +880,11 @@ public interface JavaType {
         }
 
         public FullyQualified getDeclaringType() {
-            assert declaringType != null;
+            // After construction the declaring type will never be null in a well-formed AST
+            // But the AST might be missing type information if an annotation processor like lombok is in use
+            // see: https://github.com/openrewrite/rewrite/issues/1362
+
+            //noinspection ConstantConditions
             return declaringType;
         }
 
