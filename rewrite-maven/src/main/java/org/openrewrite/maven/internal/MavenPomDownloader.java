@@ -33,6 +33,7 @@ import org.openrewrite.maven.tree.*;
 import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -102,13 +103,21 @@ public class MavenPomDownloader {
             try {
                 Optional<MavenMetadata> result = mavenCache.getMavenMetadata(URI.create(repo.getUri()), gav);
                 if (result == null) {
-                    if(!URI.create(repo.getUri()).getScheme().equals("file")) {
-                        String uri = repo.getUri() + "/" +
-                                gav.getGroupId().replace('.', '/') + '/' +
-                                gav.getArtifactId() + '/' +
-                                (gav.getVersion() == null ? "" : gav.getVersion() + '/') +
-                                "maven-metadata.xml";
 
+                    String scheme = URI.create(repo.getUri()).getScheme();
+                    String uri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
+                            gav.getGroupId().replace('.', '/') + '/' +
+                            gav.getArtifactId() + '/' +
+                            (gav.getVersion() == null ? "" : gav.getVersion() + '/') +
+                            "maven-metadata.xml";
+
+                    if (scheme.equals("file")) {
+                        // A maven repository can be expressed as a URI with a file scheme
+                        Path path = Paths.get(URI.create(uri));
+                        if (Files.exists(path)) {
+                            result = Optional.of(MavenMetadata.parse(Files.readAllBytes(path)));
+                        }
+                    } else {
                         Request.Builder request = applyAuthenticationToRequest(repo, new Request.Builder().url(uri).get());
                         try (Response response = sendRequest.apply(request.build())) {
                             if (response.isSuccessful() && response.body() != null) {
@@ -135,7 +144,7 @@ public class MavenPomDownloader {
                     }
                 }
             } catch (Exception ignored) {
-                // any download failure
+                // any download or marshaling failure
             }
         }
 
@@ -216,7 +225,7 @@ public class MavenPomDownloader {
                     repo.getUri(), gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), versionMaybeDatedSnapshot);
             Optional<Pom> result = mavenCache.getPom(resolvedGav);
             if (result == null) {
-                URI uri = URI.create(repo.getUri() + "/" +
+                URI uri = URI.create(repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
                         gav.getGroupId().replace('.', '/') + '/' +
                         gav.getArtifactId() + '/' +
                         gav.getVersion() + '/' +
@@ -352,6 +361,9 @@ public class MavenPomDownloader {
                 return repository;
             }
             String originalUrl = repository.getUri();
+            if (URI.create(originalUrl).getScheme().equals("file")) {
+                return repository;
+            }
             result = mavenCache.getNormalizedRepository(repository);
             if (result == null) {
                 if(!repository.getUri().toLowerCase().startsWith("http")) {
