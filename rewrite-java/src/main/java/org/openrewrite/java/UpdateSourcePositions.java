@@ -96,8 +96,11 @@ public class UpdateSourcePositions extends Recipe {
                 }
 
                 Range range = positionMap.get(tree);
-                J t = ((J) tree).withMarkers(((J) tree).getMarkers().add(range));
-                return super.visit(t, ctx);
+                if (range != null) {
+                    J t = ((J) tree).withMarkers(((J) tree).getMarkers().add(range));
+                    return super.visit(t, ctx);
+                }
+                return super.visit(tree, ctx);
             }
         };
     }

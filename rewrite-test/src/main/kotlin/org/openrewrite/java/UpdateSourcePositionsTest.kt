@@ -24,6 +24,57 @@ import org.openrewrite.marker.Range
 interface UpdateSourcePositionsTest : JavaRecipeTest {
 
     @Test
+    fun lamdaParameter(jp : JavaParser) {
+        val cu = jp.parse(
+            """
+                package org.test;
+                              
+                import java.util.function.Consumer;
+                                
+                public class Application {
+                
+                    public Consumer<String> demo() {
+                        return (args) -> {
+                            log.info("");
+                        };
+                    }
+                
+                }
+            """.trimIndent()
+        );
+
+        val after = UpdateSourcePositions().run(cu)[0].after!!
+
+        val withLineAndColumn = after.print(
+            object : JavaPrinter<Int>() {
+                override fun <M : Marker> visitMarker(marker: Marker, p: PrintOutputCapture<Int>): M {
+                    if (marker is Range) {
+                        p.append("[(${marker.start.line}, ${marker.start.column}), (${marker.end.line}, ${marker.end.column})]")
+                    }
+                    return super.visitMarker(marker, p)
+                }
+            }
+        )
+
+        assertThat(withLineAndColumn).isEqualTo("""
+            [(1, 0), (13, 2)][(1, 0), (1, 16)]package [(1, 8), (1, 16)][(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
+                          
+            [(3, 1), (3, 35)]import [(3, 8), (3, 35)][(3, 8), (3, 26)][(3, 8), (3, 17)][(3, 8), (3, 12)]java.[(3, 13), (3, 17)]util.[(3, 18), (3, 26)]function.[(3, 27), (3, 35)]Consumer;
+                            
+            [(5, 1), (13, 2)][(5, 1), (5, 7)]public class [(5, 14), (5, 25)]Application [(5, 26), (13, 2)]{
+            
+                [(7, 5), (11, 6)][(7, 5), (7, 11)]public [(7, 12), (7, 28)][(7, 12), (7, 20)]Consumer<[(7, 21), (7, 27)]String> [(7, 29), (7, 33)]demo([(7, 34), (7, 34)]) [(7, 36), (11, 6)]{
+                    [(8, 9), (10, 10)]return [(8, 16), (10, 10)]([(8, 17), (8, 21)][(8, 17), (8, 21)][(8, 17), (8, 21)]args) -> [(8, 26), (10, 10)]{
+                        [(9, 13), (9, 25)][(9, 13), (9, 16)]log.[(9, 17), (9, 21)]info([(9, 22), (9, 24)]"");
+                    };
+                }
+            
+            }
+        """.trimIndent())
+
+    }
+
+    @Test
     fun updateSourcePositions(jp: JavaParser) {
         val cu = jp.parse(
             """ 
