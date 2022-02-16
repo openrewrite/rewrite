@@ -63,6 +63,7 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/631")
     @Test
     fun necessaryThrowsFromCloseable(jp: JavaParser) = assertUnchanged(
+        jp,
         before = """
             import java.io.IOException;
             import java.net.URL;
@@ -80,6 +81,7 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
 
     @Test
     fun necessaryThrows(jp: JavaParser) = assertUnchanged(
+        jp,
         before = """
             import java.io.IOException;
             
@@ -95,6 +97,7 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/519")
     @Test
     fun interfaces(jp: JavaParser) = assertUnchanged(
+        jp,
         before = """
             import java.io.IOException;
             
@@ -107,6 +110,7 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/519")
     @Test
     fun abstractMethods(jp: JavaParser) = assertUnchanged(
+        jp,
         before = """
             import java.io.IOException;
             
@@ -119,6 +123,7 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1059")
     @Test
     fun necessaryThrowsFromStaticMethod(jp: JavaParser) = assertUnchanged(
+        jp,
         before = """
             import javax.xml.datatype.DatatypeFactory;
             
@@ -133,6 +138,7 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/897")
     @Test
     fun necessaryThrowsOnInterfaceWithExplicitOverride(jp: JavaParser) = assertUnchanged(
+        jp,
         dependsOn = arrayOf("""
             public interface Foo {
                 void bar() throws Exception;
@@ -150,6 +156,7 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
 
     @Test
     fun necessaryThrowsOnInterfaceWithImplicitOverride(jp: JavaParser) = assertUnchanged(
+        jp,
         dependsOn = arrayOf("""
             public interface Foo {
                 void bar() throws Exception;
@@ -166,6 +173,7 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
 
     @Test
     fun doNotRemoveDocumentedExceptions(jp: JavaParser) = assertUnchanged(
+        jp,
         before = """
             public class ParentFoo {
                 /**
@@ -179,6 +187,23 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
                 @Override
                 public void bar() throws Exception {
                     // no-op
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1298")
+    @Test
+    fun doNotRemoveExceptionCoveringOtherExceptions(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            package com.yourorg;
+            
+            import java.io.IOException;
+            
+            class A {
+                void foo() throws Exception {
+                    throw new IOException("");
                 }
             }
         """
