@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy;
 
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.groovy.tree.GContainer;
@@ -29,7 +28,7 @@ import org.openrewrite.java.tree.*;
 public class GroovyVisitor<P> extends JavaVisitor<P> {
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
         return sourceFile instanceof G.CompilationUnit;
     }
 

@@ -50,8 +50,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-        return super.isAcceptable(sourceFile, ctx) &&
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
+        return super.isAcceptable(sourceFile, p) &&
                 sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent();
     }
 
