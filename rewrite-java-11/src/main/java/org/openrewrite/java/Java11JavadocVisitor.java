@@ -123,14 +123,13 @@ public class Java11JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
                     firstPrefix = firstPrefixBuilder.toString();
                     inFirstPrefix = false;
                 } else {
-                    if (i > 0 && sourceArr[i - 1] == '\n') {
-                        String prevNewLine = i > 1 && sourceArr[i - 2] == '\r' ? "\r\n" : "\n";
-                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevNewLine, Markers.EMPTY));
-                    }
-                    if (marginBuilder != null) {
+                    if ((sourceArr[i - 1] == '\n' || sourceArr[i - 1] == '\r' && sourceArr[i -2] == '\n')) {
+                        String prevLineLine = sourceArr[i - 1] == '\n' ? "\n" : "\r\n";
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
+                    } else if (marginBuilder != null) { // Javadoc contains a new line that only contains whitespace.
                         String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
-                        marginBuilder.append(newLine);
-                        continue;
+                        lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), newLine, Markers.EMPTY));
+                        javadocContent.append(marginBuilder.substring(marginBuilder.indexOf("\n") + 1));
                     }
                     javadocContent.append(c);
                 }

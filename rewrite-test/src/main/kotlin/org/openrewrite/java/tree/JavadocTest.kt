@@ -1245,18 +1245,37 @@ interface JavadocTest : JavaTreeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1374")
     @Test
-    fun tagAfterBlankLineWithMarginAfterText(jp: JavaParser) = assertParsePrintAndProcess(
+    fun tagAfterBlankNewLines(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         """
             class Test {
                 /**
-                 * Text
+                 * New lines with whitespace followed by a param.
+                 
                  
                  * @return void
                  */
                 void method() {
                 }
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1397")
+    @Test
+    fun textWithBlankNewLines(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /**
+                * JavaDocs treats whitespace differently when new lines exist
+                
+                
+                * with whitespace that is contained in pure text.
+                */
+                void method() {}
             }
         """.trimIndent()
     )
