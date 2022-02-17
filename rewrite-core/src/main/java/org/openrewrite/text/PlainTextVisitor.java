@@ -15,14 +15,13 @@
  */
 package org.openrewrite.text;
 
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 
 public class PlainTextVisitor<P> extends TreeVisitor<PlainText, P> {
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
         return sourceFile instanceof PlainText;
     }
 

@@ -72,7 +72,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             .tag("visitor.class", getClass().getName())
             .register(Metrics.globalRegistry);
 
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
         return true;
     }
 
@@ -190,7 +190,8 @@ public abstract class TreeVisitor<T extends Tree, P> {
         setCursor(new Cursor(cursor, tree));
 
         T t = null;
-        boolean isAcceptable = tree.isAcceptable(this, p);
+        // Do you visitor take tree and do you tree take visitor?
+        boolean isAcceptable = tree.isAcceptable(this, p) && (!(tree instanceof SourceFile) || isAcceptable((SourceFile) tree, p));
         if (isAcceptable) {
             //noinspection unchecked
             t = preVisit((T) tree, p);

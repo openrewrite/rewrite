@@ -32,7 +32,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     private JavadocVisitor<P> javadocVisitor;
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
         return sourceFile instanceof JavaSourceFile;
     }
 

@@ -16,7 +16,6 @@
 package org.openrewrite.yaml;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -28,7 +27,7 @@ import org.openrewrite.yaml.tree.Yaml;
 public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
         return sourceFile instanceof Yaml.Documents;
     }
 

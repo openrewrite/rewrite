@@ -26,9 +26,11 @@ import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.marker.JavaProject
 import org.openrewrite.java.tree.J
+import org.openrewrite.xml.XmlParser
 import java.nio.file.Path
 
 class AddDependencyTest {
+    private val xmlParser = XmlParser()
     private val mavenParser = MavenParser.builder().build()
     private val javaParser = JavaParser.fromJavaVersion()
         .classpath("junit-jupiter-api", "guava", "jackson-databind")
@@ -58,6 +60,14 @@ class AddDependencyTest {
         assertThat(
             addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing).run(
                 javaParser.parseWithProvenance("test", usingGuavaIntMath) + mavenParser.parseWithProvenance(
+                    """
+                        <project>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>my-app</artifactId>
+                            <version>1</version>
+                        </project>
+                    """.trimIndent()
+                ) + xmlParser.parseWithProvenance(
                     """
                         <project>
                             <groupId>com.mycompany.app</groupId>
@@ -454,6 +464,11 @@ class AddDependencyTest {
     }
 
     private fun MavenParser.parseWithProvenance(@Language("xml") vararg pomSources: String) =
+        parse(*pomSources).map { j ->
+            j.withMarkers(j.markers.addIfAbsent(javaProject))
+        }
+
+    private fun XmlParser.parseWithProvenance(@Language("xml") vararg pomSources: String) =
         parse(*pomSources).map { j ->
             j.withMarkers(j.markers.addIfAbsent(javaProject))
         }

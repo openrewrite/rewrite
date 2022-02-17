@@ -16,7 +16,6 @@
 package org.openrewrite.json;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -29,7 +28,7 @@ import org.openrewrite.json.tree.Space;
 public class JsonVisitor<P> extends TreeVisitor<Json, P> {
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
         return sourceFile instanceof Json.Document;
     }
 
