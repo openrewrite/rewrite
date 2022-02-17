@@ -14,7 +14,7 @@ plugins {
 
     id("com.github.johnrengelman.shadow") version "7.1.2" apply false
     id("com.github.hierynomus.license") version "0.16.1" apply false
-    id("org.jetbrains.kotlin.jvm") version "1.6.10" apply false
+    id("org.jetbrains.kotlin.jvm") version "1.5.21" apply false
     id("org.gradle.test-retry") version "1.2.1" apply false
     id("com.github.jk1.dependency-license-report") version "2.0" apply false
     id("org.owasp.dependencycheck") version "6.5.3" apply false

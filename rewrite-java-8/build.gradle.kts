@@ -32,15 +32,9 @@ java {
     }
 }
 
-kotlin {
-    jvmToolchain {
-        this as JavaToolchainSpec
-        languageVersion.set(JavaLanguageVersion.of(8))
-    }
-}
-
 tasks.withType<KotlinCompile>().configureEach {
     kotlinOptions {
+        jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
         jvmTarget = "1.8"
     }
 }
