@@ -39,7 +39,7 @@ public class ChangeType extends Recipe {
     String oldFullyQualifiedTypeName;
 
     @Option(displayName = "New fully-qualified type name",
-            description = "Fully-qualified class name of the replacement type, or the name of a primitive such as \"int\".",
+            description = "Fully-qualified class name of the replacement type, or the name of a primitive such as \"int\". The `OuterClassName$NestedClassName` naming convention should be used for nested classes.",
             example = "org.junit.jupiter.api.Assumptions")
     String newFullyQualifiedTypeName;
 
@@ -94,7 +94,7 @@ public class ChangeType extends Recipe {
 
     private class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType targetType;
-        private final JavaType.Class originalType = JavaType.Class.build(oldFullyQualifiedTypeName);
+        private final JavaType.Class originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
 
         private ChangeTypeVisitor(String targetType) {
             this.targetType = JavaType.buildType(targetType);
@@ -187,7 +187,7 @@ public class ChangeType extends Recipe {
                         break;
                     }
                 }
-                JavaType.Class oldType = JavaType.Class.build(oldFullyQualifiedTypeName);
+                JavaType.Class oldType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
                 if (maybeClass.toString().equals(oldType.getClassName())) {
                     maybeRemoveImport(oldType.getOwningClass());
                     Expression e = updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
