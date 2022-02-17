@@ -69,7 +69,9 @@ public interface Tree {
      * @param <P> the visitor's context argument
      * @return 'true' if the arguments to this function would be valid arguments to accept()
      */
-    <P> boolean isAcceptable(TreeVisitor<?, P> v, P p);
+    default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+        return v.isAcceptable(this, p);
+    }
 
     default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
         return cursor.firstEnclosingOrThrow(SourceFile.class).printer(cursor);

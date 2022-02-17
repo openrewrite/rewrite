@@ -72,7 +72,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             .tag("visitor.class", getClass().getName())
             .register(Metrics.globalRegistry);
 
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+    public boolean isAcceptable(Tree tree, P p) {
         return true;
     }
 

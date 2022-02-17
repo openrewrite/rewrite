@@ -53,7 +53,7 @@ public interface J extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof JavaVisitor;
+        return v instanceof JavaVisitor && v.isAcceptable(this, p);
     }
 
     @Nullable

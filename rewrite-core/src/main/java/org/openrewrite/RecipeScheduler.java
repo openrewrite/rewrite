@@ -107,6 +107,7 @@ public interface RecipeScheduler {
                     boolean isChanged = !original.getSourcePath().equals(s.getSourcePath());
                     if (!isChanged) {
                         TreeVisitor<Tree, PrintOutputCapture<ExecutionContext>> markerIdPrinter = new TreeVisitor<Tree, PrintOutputCapture<ExecutionContext>>() {
+
                             @Override
                             public Tree visit(@Nullable Tree tree, PrintOutputCapture<ExecutionContext> p) {
                                 if (tree instanceof Markers) {

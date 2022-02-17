@@ -64,7 +64,7 @@ public interface Polyglot extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof PolyglotVisitor;
+        return v instanceof PolyglotVisitor && v.isAcceptable(this, p);
     }
 
     interface Member extends Polyglot {

@@ -39,7 +39,7 @@ public interface Javadoc extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof JavadocVisitor;
+        return v instanceof JavadocVisitor && v.isAcceptable(this, p);
     }
 
     @Nullable

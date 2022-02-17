@@ -45,7 +45,7 @@ public interface Json extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof JsonVisitor;
+        return v instanceof JsonVisitor  && v.isAcceptable(this, p);
     }
 
     Space getPrefix();

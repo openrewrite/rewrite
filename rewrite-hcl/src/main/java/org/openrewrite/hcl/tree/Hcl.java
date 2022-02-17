@@ -49,7 +49,7 @@ public interface Hcl extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof HclVisitor;
+        return v instanceof HclVisitor && v.isAcceptable(this, p);
     }
 
     Space getPrefix();

@@ -24,6 +24,11 @@ import org.openrewrite.internal.lang.Nullable;
 public class PolyglotVisitor<T> extends TreeVisitor<Polyglot, T> {
 
     @Override
+    public boolean isAcceptable(Tree tree, T t) {
+        return t instanceof Polyglot;
+    }
+
+    @Override
     public @Nullable Polyglot visit(@Nullable Tree tree, T ctx) {
         if (tree instanceof Polyglot.Instantiable) {
             return visitInstantiable((Polyglot.Instantiable) tree, ctx);

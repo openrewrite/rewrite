@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.MavenMetadata;
@@ -50,9 +51,12 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-        return super.isAcceptable(sourceFile, ctx) &&
-                sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent();
+    public boolean isAcceptable(Tree tree, P p) {
+        if (tree instanceof SourceFile) {
+            return super.isAcceptable(tree, p) && ((SourceFile) tree).getMarkers().findFirst(MavenResolutionResult.class).isPresent();
+        } else {
+            return super.isAcceptable(tree, p);
+        }
     }
 
     protected MavenResolutionResult getResolutionResult() {

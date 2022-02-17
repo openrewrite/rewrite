@@ -44,7 +44,7 @@ public interface Yaml extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof YamlVisitor;
+        return v instanceof YamlVisitor && v.isAcceptable(this, p);
     }
 
     @Nullable

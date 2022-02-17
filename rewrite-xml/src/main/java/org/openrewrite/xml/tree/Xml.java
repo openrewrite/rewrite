@@ -58,7 +58,7 @@ public interface Xml extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof XmlVisitor;
+        return v instanceof XmlVisitor && v.isAcceptable(this, p);
     }
 
     String getPrefix();

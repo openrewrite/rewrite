@@ -16,8 +16,8 @@
 package org.openrewrite.hcl;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.format.AutoFormatVisitor;
 import org.openrewrite.hcl.tree.*;
@@ -43,8 +43,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
     }
 
     @Override
-    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-        return sourceFile instanceof Hcl.ConfigFile;
+    public boolean isAcceptable(Tree tree, P p) {
+        return tree instanceof Hcl;
     }
 
     @Override

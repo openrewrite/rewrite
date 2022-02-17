@@ -41,7 +41,7 @@ public interface Properties extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof PropertiesVisitor;
+        return v instanceof PropertiesVisitor && v.isAcceptable(this, p);
     }
 
     @Nullable

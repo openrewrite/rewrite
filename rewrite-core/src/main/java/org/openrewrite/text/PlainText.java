@@ -41,7 +41,7 @@ public class PlainText implements SourceFile, Tree {
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof PlainTextVisitor;
+        return v instanceof PlainTextVisitor && v.isAcceptable(this, p);
     }
 
     @SuppressWarnings("unchecked")
