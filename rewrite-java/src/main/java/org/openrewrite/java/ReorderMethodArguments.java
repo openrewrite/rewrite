@@ -22,11 +22,9 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +67,14 @@ public class ReorderMethodArguments extends Recipe {
     @Nullable
     String[] oldParameterNames;
 
+    @Option(displayName = "Ignore type definition",
+            description = "When set to `true` the definition of the old type will be left untouched. " +
+                    "This is useful when you're replacing usage of a class but don't want to rename it.",
+            example = "true",
+            required = false)
+    @Nullable
+    Boolean ignoreDefinition;
+
     @JsonPOJOBuilder(withPrefix = "")
     public static class Builder {
     }
@@ -85,7 +91,18 @@ public class ReorderMethodArguments extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern);
+        return new JavaVisitor<ExecutionContext>() {
+            @Override
+            public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+                if(Boolean.TRUE.equals(ignoreDefinition)) {
+                    J j = new DeclaresMethod<>(methodPattern, true).visitNonNull(cu, ctx);
+                    if(cu != j) {
+                        return cu;
+                    }
+                }
+                return new UsesMethod<>(methodPattern).visitNonNull(cu, ctx);
+            }
+        };
     }
 
     @Override

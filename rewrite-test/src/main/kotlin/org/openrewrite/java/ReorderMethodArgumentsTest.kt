@@ -27,7 +27,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
     @Test
     fun reorderArguments(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments("a.A foo(String, Integer, Integer)", arrayOf("n", "m", "s"), null)
+        recipe = ReorderMethodArguments("a.A foo(String, Integer, Integer)", arrayOf("n", "m", "s"), null, null)
             .doNext(
                 object : TestRecipe() {
                     override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
@@ -84,7 +84,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
     @Test
     fun reorderArgumentsWithNoSourceAttachment(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("s", "n"), arrayOf("n", "s")),
+        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("s", "n"), arrayOf("n", "s"), null),
         dependsOn = arrayOf(
             """
                 package a;
@@ -119,7 +119,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
     @Test
     fun reorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("s", "o", "n"), null),
+        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("s", "o", "n"), null, null),
         dependsOn = arrayOf(
             """
                 package a;
@@ -154,7 +154,7 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
     @Test
     fun reorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("o", "s"), null),
+        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("o", "s"), null, null),
         dependsOn = arrayOf(
             """
                 package a;
@@ -176,27 +176,27 @@ interface ReorderMethodArgumentsTest : JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var cm = ReorderMethodArguments(null, null, null)
+        var cm = ReorderMethodArguments(null, null, null, null)
         var valid = cm.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
         assertThat(valid.failures()[1].property).isEqualTo("newParameterNames")
 
-        cm = ReorderMethodArguments(null, null, arrayOf("a"))
+        cm = ReorderMethodArguments(null, null, arrayOf("a"), null)
         valid = cm.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
         assertThat(valid.failures()[1].property).isEqualTo("newParameterNames")
 
-        cm = ReorderMethodArguments(null, arrayOf("a"), null)
+        cm = ReorderMethodArguments(null, arrayOf("a"), null, null)
         valid = cm.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
-        cm = ReorderMethodArguments("b.B foo()", null, null)
+        cm = ReorderMethodArguments("b.B foo()", null, null, null)
         valid = cm.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
