@@ -32,6 +32,8 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Comparator;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
+
 @RequiredArgsConstructor
 public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     private static final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
@@ -79,7 +81,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
         Xml.Tag root = maven.getRoot();
         if (!root.getChild("dependencies").isPresent()) {
             doAfterVisit(new AddToTagVisitor<>(root, Xml.Tag.build("<dependencies/>"),
-                    new MavenTagInsertionComparator(root.getChildren())));
+                    new MavenTagInsertionComparator(root.getContent() == null ? emptyList() : root.getContent())));
         }
 
         doAfterVisit(new InsertDependencyInOrder(scope));
@@ -125,7 +127,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                 );
 
                 doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
-                        new InsertDependencyComparator(tag.getChildren(), dependencyTag)));
+                        new InsertDependencyComparator(tag.getContent() == null ? emptyList() : tag.getContent(), dependencyTag)));
                 maybeUpdateModel();
 
                 return tag;

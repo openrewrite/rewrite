@@ -36,6 +36,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -111,7 +112,7 @@ public class ManageDependencies extends Recipe {
                         Xml.Tag root = document.getRoot();
                         if (!root.getChild("dependencyManagement").isPresent()) {
                             doAfterVisit(new AddToTagVisitor<>(root, Xml.Tag.build("<dependencyManagement>\n<dependencies/>\n</dependencyManagement>"),
-                                    new MavenTagInsertionComparator(root.getChildren())));
+                                    new MavenTagInsertionComparator(root.getContent())));
                         }
 
                         for (GroupArtifact ga : requiresDependencyManagement) {
@@ -165,7 +166,7 @@ public class ManageDependencies extends Recipe {
                 );
 
                 doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
-                        new InsertDependencyComparator(tag.getChildren(), dependencyTag)));
+                        new InsertDependencyComparator(tag.getContent() == null ? emptyList() : tag.getContent(), dependencyTag)));
 
                 return tag;
             }

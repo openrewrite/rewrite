@@ -16,27 +16,28 @@
 package org.openrewrite.maven.internal;
 
 import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
-public class InsertDependencyComparator implements Comparator<Xml.Tag> {
-    private final Map<Xml.Tag, Float> positions = new HashMap<>();
+public class InsertDependencyComparator implements Comparator<Content> {
+    private final Map<Content, Float> positions = new HashMap<>();
 
-    public InsertDependencyComparator(List<Xml.Tag> existingDependencies, Xml.Tag dependencyTag) {
+    public InsertDependencyComparator(List<? extends Content> existingDependencies, Xml.Tag dependencyTag) {
         for (int i = 0, existingDependenciesSize = existingDependencies.size(); i < existingDependenciesSize; i++) {
             positions.put(existingDependencies.get(i), (float) i);
         }
 
         // if everything were ideally sorted, which dependency would the addable dependency
         // come after?
-        List<Xml.Tag> ideallySortedDependencies = new ArrayList<>(existingDependencies);
+        List<Content> ideallySortedDependencies = new ArrayList<>(existingDependencies);
         ideallySortedDependencies.add(dependencyTag);
         ideallySortedDependencies.sort(dependencyComparator);
 
-        Xml.Tag afterDependency = null;
+        Content afterDependency = null;
         for (int i = 0; i < ideallySortedDependencies.size(); i++) {
-            Xml.Tag d = ideallySortedDependencies.get(i);
+            Content d = ideallySortedDependencies.get(i);
             if (dependencyTag == d) {
                 if (i > 0) {
                     afterDependency = ideallySortedDependencies.get(i - 1);
@@ -50,31 +51,37 @@ public class InsertDependencyComparator implements Comparator<Xml.Tag> {
     }
 
     @Override
-    public int compare(Xml.Tag o1, Xml.Tag o2) {
+    public int compare(Content o1, Content o2) {
         return positions.get(o1).compareTo(positions.get(o2));
     }
 
-    private static final Comparator<Xml.Tag> dependencyComparator = (d1, d2) -> {
-        Scope scope1 = Scope.fromName(d1.getChildValue("scope").orElse(null));
-        Scope scope2 = Scope.fromName(d2.getChildValue("scope").orElse(null));
+    private static final Comparator<Content> dependencyComparator = (d1, d2) -> {
+        if (!(d1 instanceof Xml.Tag) || !(d2 instanceof Xml.Tag)) {
+            return 1;
+        }
+
+        Xml.Tag t1 = (Xml.Tag) d1;
+        Xml.Tag t2 = (Xml.Tag) d2;
+        Scope scope1 = Scope.fromName(t1.getChildValue("scope").orElse(null));
+        Scope scope2 = Scope.fromName(t2.getChildValue("scope").orElse(null));
         if (!scope1.equals(scope2)) {
             return scope1.compareTo(scope2);
         }
 
-        String groupId1 = d1.getChildValue("groupId").orElse("");
-        String groupId2 = d2.getChildValue("groupId").orElse("");
+        String groupId1 = t1.getChildValue("groupId").orElse("");
+        String groupId2 = t2.getChildValue("groupId").orElse("");
         if (!groupId1.equals(groupId2)) {
             return comparePartByPart(groupId1, groupId2);
         }
 
-        String artifactId1 = d1.getChildValue("artifactId").orElse("");
-        String artifactId2 = d2.getChildValue("artifactId").orElse("");
+        String artifactId1 = t1.getChildValue("artifactId").orElse("");
+        String artifactId2 = t2.getChildValue("artifactId").orElse("");
         if (!artifactId1.equals(artifactId2)) {
             return comparePartByPart(artifactId1, artifactId2);
         }
 
-        String classifier1 = d1.getChildValue("classifier").orElse(null);
-        String classifier2 = d2.getChildValue("classifier").orElse(null);
+        String classifier1 = t1.getChildValue("classifier").orElse(null);
+        String classifier2 = t2.getChildValue("classifier").orElse(null);
 
         if (classifier1 == null && classifier2 != null) {
             return -1;
@@ -89,8 +96,8 @@ public class InsertDependencyComparator implements Comparator<Xml.Tag> {
 
         // in every case imagined so far, group and artifact comparison are enough,
         // so this is just for completeness
-        return d1.getChildValue("version").orElse("")
-                .compareTo(d2.getChildValue("version").orElse(""));
+        return t1.getChildValue("version").orElse("")
+                .compareTo(t2.getChildValue("version").orElse(""));
     };
 
     private static int comparePartByPart(String d1, String d2) {

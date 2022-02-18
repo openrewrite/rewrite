@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -28,7 +29,7 @@ import java.util.*;
  * GAV coordinates, SCM, properties, but before plugins.
  * "After" ordering preference takes priority over "before".
  */
-public class MavenTagInsertionComparator implements Comparator<Xml.Tag> {
+public class MavenTagInsertionComparator implements Comparator<Content> {
     private static final List<String> canonicalOrdering = Arrays.asList(
             "modelVersion",
             "parent",
@@ -62,16 +63,22 @@ public class MavenTagInsertionComparator implements Comparator<Xml.Tag> {
             "profiles"
     );
 
-    private final Map<Xml.Tag, Integer> existingIndices = new IdentityHashMap<>();
+    private final Map<Content, Integer> existingIndices = new IdentityHashMap<>();
 
-    public MavenTagInsertionComparator(List<Xml.Tag> existingTags) {
+    public MavenTagInsertionComparator(List<? extends Content> existingTags) {
         for (int i = 0; i < existingTags.size(); i++) {
             existingIndices.put(existingTags.get(i), i);
         }
     }
 
     @Override
-    public int compare(Xml.Tag t1, Xml.Tag t2) {
+    public int compare(Content c1,Content c2) {
+        if (!(c1 instanceof Xml.Tag) || !(c2 instanceof Xml.Tag)) {
+            return 1;
+        }
+
+        Xml.Tag t1 = (Xml.Tag) c1;
+        Xml.Tag t2 = (Xml.Tag) c2;
         int i1 = existingIndices.getOrDefault(t1, -1);
         int i2 = existingIndices.getOrDefault(t2, -1);
 
