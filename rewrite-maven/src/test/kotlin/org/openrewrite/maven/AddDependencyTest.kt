@@ -21,7 +21,9 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.marker.JavaProject
@@ -35,6 +37,13 @@ class AddDependencyTest {
     private val javaParser = JavaParser.fromJavaVersion()
         .classpath("junit-jupiter-api", "guava", "jackson-databind")
         .build()
+
+    private val executionContext: ExecutionContext
+        get() {
+            val ctx = InMemoryExecutionContext()
+            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true)
+            return ctx
+        }
 
     private val javaProject = JavaProject(randomId(), "myproject", null)
 
@@ -296,6 +305,61 @@ class AddDependencyTest {
         )
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1392")
+    @Test
+    fun preserveNonTagContent() {
+        assertThat(
+            addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath").run(
+                javaParser.parseWithProvenance("test", usingGuavaIntMath) + mavenParser.parseWithProvenance(
+                    """
+                        <project>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>my-app</artifactId>
+                            <version>1</version>
+                            <!-- comment 1 -->
+                            <?processing instruction1?>
+                            <dependencies>
+                                <!-- comment 2 -->
+                                <?processing instruction2?>
+                                <dependency>
+                                    <groupId>commons-lang</groupId>
+                                    <artifactId>commons-lang</artifactId>
+                                    <version>1.0</version>
+                                </dependency>
+                            </dependencies>
+                        </project>
+                    """.trimIndent()
+                )
+            )[0].after!!.printAllTrimmed()
+        ).isEqualTo(
+            //language=xml
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <!-- comment 1 -->
+                    <?processing instruction1?>
+                    <dependencies>
+                        <!-- comment 2 -->
+                        <?processing instruction2?>
+                        <dependency>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """.trimIndent()
+        )
+    }
+
     @Test
     fun addDependencyDoesntAddWhenExistingDependency() {
         assertThat(
@@ -460,7 +524,7 @@ class AddDependencyTest {
 
     private fun JavaParser.parseWithProvenance(sourceSet: String, vararg javaSources: String): List<J.CompilationUnit> {
         setSourceSet(sourceSet)
-        return parse(*javaSources).map { j -> j.withMarkers(j.markers.addIfAbsent(javaProject)) }
+        return parse(executionContext, *javaSources).map { j -> j.withMarkers(j.markers.addIfAbsent(javaProject)) }
     }
 
     private fun MavenParser.parseWithProvenance(@Language("xml") vararg pomSources: String) =

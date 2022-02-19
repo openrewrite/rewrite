@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
@@ -30,13 +31,13 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
     private final Xml.Tag tagToAdd;
 
     @Nullable
-    private final Comparator<Xml.Tag> tagComparator;
+    private final Comparator<Content> tagComparator;
 
     public AddToTagVisitor(Xml.Tag scope, Xml.Tag tagToAdd) {
         this(scope, tagToAdd, null);
     }
 
-    public AddToTagVisitor(Xml.Tag scope, Xml.Tag tagToAdd, @Nullable Comparator<Xml.Tag> tagComparator) {
+    public AddToTagVisitor(Xml.Tag scope, Xml.Tag tagToAdd, @Nullable Comparator<Content> tagComparator) {
         this.scope = scope;
         this.tagToAdd = tagToAdd;
         this.tagComparator = tagComparator;
@@ -64,7 +65,7 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
                 formattedTagToAdd = formattedTagToAdd.withPrefix("\n");
             }
 
-            List<Xml.Tag> content = t.getContent() == null ? new ArrayList<>() : new ArrayList<>(t.getChildren());
+            List<Content> content = t.getContent() == null ? new ArrayList<>() : new ArrayList<>(t.getContent());
             content.add(formattedTagToAdd);
 
             if (tagComparator != null) {

@@ -19,6 +19,7 @@ package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.xml.tree.Xml
 
 class AddToTagTest : XmlRecipeTest {
@@ -114,7 +115,7 @@ class AddToTagTest : XmlRecipeTest {
                     if (x.root.children.find { it.name == "apple" } == null) {
                         doAfterVisit(AddToTagVisitor(
                             x.root, Xml.Tag.build("""<apple/>"""),
-                            Comparator.comparing(Xml.Tag::getName)
+                            TagNameComparator()
                         ))
                     }
                     return super.visitDocument(x, p)
@@ -128,6 +129,40 @@ class AddToTagTest : XmlRecipeTest {
         """,
         after = """
             <beans >
+                <apple/>
+                <banana/>
+            </beans>
+        """,
+        cycles = 2
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1392")
+    @Test
+    fun preserveNonTagContent() = assertChanged(
+        recipe = toRecipe {
+            object : XmlVisitor<ExecutionContext>() {
+                override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
+                    if (x.root.children.find { it.name == "apple" } == null) {
+                        doAfterVisit(AddToTagVisitor(
+                            x.root, Xml.Tag.build("""<apple/>"""),
+                            TagNameComparator()
+                        ))
+                    }
+                    return super.visitDocument(x, p)
+                }
+            }
+        },
+        before = """
+            <beans>
+                <!-- comment -->
+                <?processing instruction?>
+                <banana/>
+            </beans>
+        """,
+        after = """
+            <beans>
+                <!-- comment -->
+                <?processing instruction?>
                 <apple/>
                 <banana/>
             </beans>

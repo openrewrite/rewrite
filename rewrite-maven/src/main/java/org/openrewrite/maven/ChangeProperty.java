@@ -17,13 +17,9 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.XmlParser;
-import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.*;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Comparator;
 import java.util.Optional;
 
 @Value
@@ -46,13 +42,13 @@ public class ChangeProperty<P> extends XmlVisitor<P> {
                     new MavenTagInsertionComparator(document.getRoot().getChildren())
             ).visitNonNull(document, p);
         } else {
-            if(!props.get().getChild(key).isPresent()) {
+            if (!props.get().getChild(key).isPresent()) {
                 Xml.Tag prop = new XmlParser().parse("<" + key + ">" + value + "</" + key + ">")
                         .get(0).getRoot();
                 document = (Xml.Document) new AddToTagVisitor<P>(
                         props.get(),
                         prop,
-                        Comparator.comparing(Xml.Tag::getName)
+                        new TagNameComparator()
                 ).visitNonNull(document, p);
             } else {
                 document = (Xml.Document) new ChangeTagValueVisitor<P>(props.get().getChild(key).get(), value)
