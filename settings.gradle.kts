@@ -16,6 +16,7 @@ include(
     "rewrite-json",
     "rewrite-maven",
     "rewrite-properties",
+    "rewrite-protobuf",
     "rewrite-xml",
     "rewrite-yaml",
     "rewrite-test",

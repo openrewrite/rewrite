@@ -6,9 +6,10 @@ dependencies {
     api(project(":rewrite-java"))
     api(project(":rewrite-json"))
     api(project(":rewrite-maven"))
+    api(project(":rewrite-properties"))
+    api(project(":rewrite-protobuf"))
     api(project(":rewrite-xml"))
     api(project(":rewrite-yaml"))
-    api(project(":rewrite-properties"))
 
     api("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
