@@ -39,6 +39,16 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         d = d.withMarkers(d.getMarkers().computeByType(getResolutionResult(), (resolutionResult, ignored) -> {
             Pom requested = resolutionResult.getPom().getRequested();
 
+            Optional<Xml.Tag> parent = document.getRoot().getChild("parent");
+            if (parent.isPresent()) {
+                Parent updatedParent = new Parent(new GroupArtifactVersion(
+                        parent.get().getChildValue("groupId").orElse(null),
+                        parent.get().getChildValue("artifactId").orElseThrow(() -> new IllegalStateException("GAV must have artifactId")),
+                        parent.get().getChildValue("version").orElse(null)
+                ), parent.get().getChildValue("relativePath").orElse(null));
+                requested = requested.withParent(updatedParent);
+            }
+
             Optional<Xml.Tag> dependencies = document.getRoot().getChild("dependencies");
             if (dependencies.isPresent()) {
                 List<Xml.Tag> eachDependency = dependencies.get().getChildren("dependency");
