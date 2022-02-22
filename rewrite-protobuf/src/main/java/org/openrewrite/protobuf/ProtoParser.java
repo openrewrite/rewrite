@@ -46,8 +46,8 @@ public class ProtoParser implements Parser<Proto.Document> {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     Timer.Builder timer = Timer.builder("rewrite.parse")
-                            .description("The time spent parsing an Json file")
-                            .tag("file.type", "Json");
+                            .description("The time spent parsing a Protobuf file")
+                            .tag("file.type", "Proto");
                     Timer.Sample sample = Timer.start();
                     try (InputStream sourceStream = sourceFile.getSource()) {
                         Protobuf2Parser parser = new Protobuf2Parser(new CommonTokenStream(new Protobuf2Lexer(
@@ -74,13 +74,13 @@ public class ProtoParser implements Parser<Proto.Document> {
     }
 
     @Override
-    public List<Proto.Document> parse(@Language("Json") String... sources) {
+    public List<Proto.Document> parse(@Language("protobuf") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".json");
+        return path.toString().endsWith(".proto");
     }
 
     private static class ForwardingErrorListener extends BaseErrorListener {
