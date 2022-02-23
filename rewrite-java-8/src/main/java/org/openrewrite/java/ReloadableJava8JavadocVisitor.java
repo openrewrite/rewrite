@@ -123,10 +123,11 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     firstPrefix = firstPrefixBuilder.toString();
                     inFirstPrefix = false;
                 } else {
+                    // Handle consecutive new lines.
                     if ((sourceArr[i - 1] == '\n' || sourceArr[i - 1] == '\r' && sourceArr[i -2] == '\n')) {
                         String prevLineLine = sourceArr[i - 1] == '\n' ? "\n" : "\r\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
-                    } else if (marginBuilder != null) { // Javadoc contains a new line that only contains whitespace.
+                    } else if (marginBuilder != null) { // A new line that only contains whitespace.
                         String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), newLine, Markers.EMPTY));
                         javadocContent.append(marginBuilder.substring(marginBuilder.indexOf("\n") + 1));
@@ -199,7 +200,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             beforeEqual = new ArrayList<>();
             value = new ArrayList<>();
             Javadoc.LineBreak lineBreak;
-            while ((lineBreak = lineBreaks.remove(cursor)) != null) {
+            while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
                 cursor++;
                 beforeEqual.add(lineBreak);
             }
@@ -885,7 +886,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 }
                 space = new StringBuilder();
 
-                lineBreak = lineBreaks.remove(cursor);
+                lineBreak = lineBreaks.remove(cursor + 1);
                 assert lineBreak != null;
                 whitespace.add(lineBreak);
             } else {
