@@ -754,26 +754,6 @@ interface JavadocTest : JavaTreeTest {
     )
 
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1094")
-    @Disabled
-    fun trailingWhitespaceWithWhitespaceOnEmptyLine(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        //language=java
-        """
-            class Test {
-                /**
-                 * Text with trailing whitespace.    
-                 * 
-                 * @param arg more trailing whitespace    
-                 */
-                void method(String arg) {
-                }
-            }
-        """.trimIndent()
-    )
-
-    @Test
     fun methodReferenceNoParameters(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
@@ -807,12 +787,30 @@ interface JavadocTest : JavaTreeTest {
     fun paramWithMultilineHtmlAttribute(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
+        // language=java
         """
             interface Test {
                 /**
                  * @param contentType <a href=
                  *                    "https://www...">
                  *                    label</a>
+                 */
+                boolean test(int contentType);
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1409")
+    @Test
+    fun paramWithMultilineHtmlAttributeNewLineBeforeEquals(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        // language=java
+        """
+            interface Test {
+                /**
+                 * @param contentType <a href
+                 *= "https://www..."> label</a>
                  */
                 boolean test(int contentType);
             }
@@ -1276,6 +1274,25 @@ interface JavadocTest : JavaTreeTest {
                 * with whitespace that is contained in pure text.
                 */
                 void method() {}
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1409")
+    @Test
+    fun trailingWhitespaceWithWhitespaceOnEmptyLine(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        //language=java
+        """
+            class Test {
+                /**
+                 * Text with trailing whitespace.    
+                 * 
+                 * @param arg desc
+                 */
+                void method(String arg) {
+                }
             }
         """.trimIndent()
     )
