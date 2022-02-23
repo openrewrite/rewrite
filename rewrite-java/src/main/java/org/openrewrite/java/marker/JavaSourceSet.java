@@ -46,8 +46,14 @@ public class JavaSourceSet implements Marker {
 
     List<JavaType.FullyQualified> classpath;
 
+    /**
+     * Extract type information from the provided classpath.
+     *
+     * @param fullTypeInformation when false classpath will be filled with shallow types (effectively just fully-qualified names).
+     *                            when true a much more memory-intensive, time-consuming approach will extract full type information
+     */
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath,
-                                      JavaTypeCache typeCache, ExecutionContext ctx) {
+                                      JavaTypeCache typeCache, boolean fullTypeInformation) {
         List<JavaType.FullyQualified> types;
         // Load JRE-provided types
         try (ScanResult scanResult = new ClassGraph()
@@ -56,7 +62,7 @@ public class JavaSourceSet implements Marker {
                 .acceptPackages("java")
                 .ignoreClassVisibility()
                 .scan()) {
-            types = typesFrom(packagesToTypeDeclarations(scanResult), typeCache, Collections.emptyList());
+            types = typesFrom(packagesToTypeDeclarations(scanResult), typeCache, Collections.emptyList(), fullTypeInformation);
         }
         if (classpath.iterator().hasNext()) {
             // Load types from the classpath
@@ -66,7 +72,7 @@ public class JavaSourceSet implements Marker {
                     .enableClassInfo()
                     .ignoreClassVisibility()
                     .scan()) {
-                types.addAll(typesFrom(packagesToTypeDeclarations(scanResult), typeCache, classpath));
+                types.addAll(typesFrom(packagesToTypeDeclarations(scanResult), typeCache, classpath, fullTypeInformation));
             }
         }
 
@@ -106,25 +112,38 @@ public class JavaSourceSet implements Marker {
     }
 
     private static List<JavaType.FullyQualified> typesFrom(
-            Map<String, List<String>> packagesToTypes, JavaTypeCache typeCache, Collection<Path> classpath) {
-        @Language("java")
-        String[] typeStubs = typeStubsFor(packagesToTypes);
-
-        ExecutionContext noRecursiveJavaSourceSet = new InMemoryExecutionContext();
-        noRecursiveJavaSourceSet.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+            Map<String, List<String>> packagesToTypes,
+            JavaTypeCache typeCache,
+            Collection<Path> classpath,
+            boolean fullTypeInformation
+    ) {
         List<JavaType.FullyQualified> types = new ArrayList<>();
+        if (fullTypeInformation) {
 
-        JavaParser jp = JavaParser.fromJavaVersion()
-                .typeCache(typeCache)
-                .classpath(classpath)
-                .build();
+            @Language("java")
+            String[] typeStubs = typeStubsFor(packagesToTypes);
 
-        List<J.CompilationUnit> cus = jp.parse(noRecursiveJavaSourceSet, typeStubs);
-        for (J.CompilationUnit cu : cus) {
-            for (Statement s : cu.getClasses().get(0).getBody().getStatements()) {
-                JavaType type = ((J.MethodDeclaration) s).getType();
-                if (type instanceof JavaType.FullyQualified) {
-                    types.add((JavaType.FullyQualified) type);
+            ExecutionContext noRecursiveJavaSourceSet = new InMemoryExecutionContext();
+            noRecursiveJavaSourceSet.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+
+            JavaParser jp = JavaParser.fromJavaVersion()
+                    .typeCache(typeCache)
+                    .classpath(classpath)
+                    .build();
+
+            List<J.CompilationUnit> cus = jp.parse(noRecursiveJavaSourceSet, typeStubs);
+            for (J.CompilationUnit cu : cus) {
+                for (Statement s : cu.getClasses().get(0).getBody().getStatements()) {
+                    JavaType type = ((J.MethodDeclaration) s).getType();
+                    if (type instanceof JavaType.FullyQualified) {
+                        types.add((JavaType.FullyQualified) type);
+                    }
+                }
+            }
+        } else {
+            for (Map.Entry<String, List<String>> packageToTypes : packagesToTypes.entrySet()) {
+                for (String className : packageToTypes.getValue()) {
+                    types.add(JavaType.ShallowClass.build(packageToTypes.getKey() + "." + className));
                 }
             }
         }

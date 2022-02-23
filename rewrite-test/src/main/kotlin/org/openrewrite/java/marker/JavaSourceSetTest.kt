@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.marker
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
@@ -29,13 +30,23 @@ import java.util.*
 interface JavaSourceSetTest {
 
     @Test
+    fun shallowTypes() {
+        val typeCache = JavaTypeCache()
+
+        val classpath = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeCache, false)
+            .classpath
+        assertThat(classpath).isNotEmpty
+        assertThat(classpath[0]).isInstanceOf(JavaType.ShallowClass::class.java)
+    }
+
+    @Test
     fun doesNotDuplicateTypesInCache() {
         val typeCache = JavaTypeCache()
         val uniqueTypes: MutableSet<JavaType> = Collections.newSetFromMap(IdentityHashMap())
         val reflectiveGoat = JavaReflectionTypeMapping(typeCache).type(JavaTypeGoat::class.java)
         newUniqueTypes(uniqueTypes, reflectiveGoat)
 
-        val classpathGoat = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeCache, InMemoryExecutionContext() )
+        val classpathGoat = JavaSourceSet.build("main", JavaParser.runtimeClasspath(), typeCache, true)
             .classpath
             .find { "JavaTypeGoat" == it.className }!!
 
@@ -46,8 +57,7 @@ interface JavaSourceSetTest {
         var newUnique = false
         object : JavaTypeVisitor<Int>() {
             override fun visit(javaType: JavaType?, p: Int): JavaType? {
-                // temporarily suppress failing if the _only_ difference is the presence of the Unknown type
-                if (javaType is JavaType && javaType != JavaType.Unknown.getInstance()) {
+                if (javaType is JavaType) {
                     if (uniqueTypes.add(javaType)) {
                         if(report) {
                             newUnique = true

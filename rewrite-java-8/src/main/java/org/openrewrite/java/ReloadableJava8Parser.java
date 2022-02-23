@@ -269,7 +269,7 @@ class ReloadableJava8Parser implements JavaParser {
                 sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList());
             } else {
                 sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                        typeCache, ctx);
+                        typeCache, false);
             }
         }
         return sourceSetProvenance;
