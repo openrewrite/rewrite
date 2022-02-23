@@ -58,8 +58,14 @@ public class ResolvedManagedDependency {
         return gav.getArtifactId();
     }
 
+    /**
+     * Return the version of the managed dependency, this can be null if a managed dependency is used
+     * to exclude a transitive dependency vs managed a version of a group/artifact
+     *
+     * @return the version of the dependency
+     */
+    @Nullable
     public String getVersion() {
-        assert gav.getVersion() != null;
         return gav.getVersion();
     }
 

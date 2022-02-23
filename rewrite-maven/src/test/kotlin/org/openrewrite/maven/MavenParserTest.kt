@@ -87,7 +87,7 @@ class MavenParserTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")
     @Test
     fun parseDependencyManagementWithNoVersion() {
-        parser.parse(
+        val pomXml = parser.parse(
             ctx,
             """
                 <project>
@@ -108,9 +108,80 @@ class MavenParserTest {
                               </dependency>
                           </dependencies>
                     </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>14.0</version>
+                        </dependency>
+                    </dependencies>
                 </project>
             """
-        )
+        )[0]
+        assertThat(pomXml.mavenResolutionResult().findDependencies("com.google.guava", "guava", null)[0].version).isEqualTo("14.0")
+    }
+
+    @Test
+    fun parseMergeExclusions() {
+        val pomXml = parser.parse(
+            ctx,
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-dep</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>14.0</version>
+                        </dependency>
+                        <dependency>
+                          <groupId>org.slf4j</groupId>
+                          <artifactId>slf4j-api</artifactId>
+                          <version>1.7.20</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """,
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.mycompany.app</groupId>
+                                  <artifactId>my-dep</artifactId>
+                                  <exclusions>
+                                      <exclusion>
+                                          <groupId>com.google.guava</groupId>
+                                          <artifactId>guava</artifactId>
+                                      </exclusion>
+                                  </exclusions>
+                              </dependency>
+                          </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>my-dep</artifactId>
+                          <version>1</version>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>org.slf4j</groupId>
+                                  <artifactId>slf4j-api</artifactId>
+                              </exclusion>
+                          </exclusions>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        )[1]
+        //With one exclusion in the dependency and one in the managed dependency, both transitive dependencies
+        //should be excluded.
+        assertThat(pomXml.mavenResolutionResult().dependencies[Scope.Compile]?.size).isEqualTo(1)
     }
 
     @Suppress("CheckDtdRefs")

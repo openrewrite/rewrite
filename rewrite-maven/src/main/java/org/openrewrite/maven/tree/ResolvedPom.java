@@ -249,6 +249,15 @@ public class ResolvedPom {
         return null;
     }
 
+    public List<GroupArtifact> getManagedExclusions(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
+        for (ResolvedManagedDependency dm : dependencyManagement) {
+            if (dm.matches(groupId, artifactId, type, classifier)) {
+                return dm.getExclusions() == null ? emptyList() : dm.getExclusions();
+            }
+        }
+        return emptyList();
+    }
+
     @Nullable
     public Scope getManagedScope(String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
         for (ResolvedManagedDependency dm : dependencyManagement) {
@@ -608,6 +617,11 @@ public class ResolvedPom {
             scope = parsedScope == null ? null : parsedScope.toString().toLowerCase();
         } else {
             scope = getValue(d.getScope());
+        }
+
+        List<GroupArtifact> managedExclusions = getManagedExclusions(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
+        if (!managedExclusions.isEmpty()) {
+            d = d.withExclusions(ListUtils.concatAll(d.getExclusions(), managedExclusions));
         }
 
         return d
