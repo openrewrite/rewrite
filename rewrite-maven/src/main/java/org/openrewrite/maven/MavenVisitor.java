@@ -251,12 +251,14 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     /**
      * Finds dependencies in the model that match the provided group and artifact ids.
      *
+     * Note: The list may contain the same dependency multiple times, if it is present in multiple scopes.
+     *
      * @param groupId    The groupId to match
      * @param artifactId The artifactId to match.
      * @return dependencies (including transitive dependencies) with any version matching the provided group and artifact id, if any.
      */
-    public Collection<ResolvedDependency> findDependencies(String groupId, String artifactId) {
-        return findDependencies(d -> matchesGlob(d.getGroupId(), groupId) && matchesGlob(d.getArtifactId(), artifactId));
+    public List<ResolvedDependency> findDependencies(String groupId, String artifactId) {
+        return getResolutionResult().findDependencies(groupId, artifactId, null);
     }
 
     /**

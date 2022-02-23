@@ -26,10 +26,11 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.function.Predicate;
+
+import static java.util.Collections.emptyList;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 public class MavenResolutionResult implements Marker {
@@ -67,6 +68,54 @@ public class MavenResolutionResult implements Marker {
             }
         }
         return null;
+    }
+
+    /**
+     * Finds dependencies (including any transitive dependencies) in the model that match the provided group and
+     * artifact ids. The search can optionally be limited to a given scope.
+     *
+     * Note: It is possible for the same dependency to be returned multiple times if it is present in multiple scopes.
+     *
+     * @param groupId    The groupId as a glob expression
+     * @param artifactId The artifactId as a glob expression
+     * @param scope      The scope to limit the search to, or null to search all scopes
+     *
+     * @return A list of matching dependencies
+     */
+    @Incubating(since = "7.19.0")
+    public List<ResolvedDependency> findDependencies(String groupId, String artifactId, @Nullable Scope scope) {
+        return findDependencies(d -> matchesGlob(d.getGroupId(), groupId) && matchesGlob(d.getArtifactId(), artifactId), scope);
+    }
+
+    /**
+     * Finds dependencies (including any transitive dependencies) in the model that match the predicate. The search can
+     * optionally be limited to a given scope.
+     *
+     * Note: It is possible for the same dependency to be returned multiple times if it is present in multiple scopes.
+     *
+     * @param matcher The predicate to match the dependency
+     * @param scope   A scope to limit the search to, or null to search all scopes
+     *
+     * @return A list of matching dependencies
+     */
+    @Incubating(since = "7.19.0")
+    public List<ResolvedDependency> findDependencies(Predicate<ResolvedDependency> matcher, @Nullable Scope scope) {
+        List<ResolvedDependency> found = null;
+        for (Map.Entry<Scope, List<ResolvedDependency>> entry : dependencies.entrySet()) {
+            if (scope != null && entry.getKey() != scope) {
+                continue;
+            }
+
+            for (ResolvedDependency d : entry.getValue()) {
+                if (matcher.test(d)) {
+                    if (found == null) {
+                        found = new ArrayList<>();
+                    }
+                    found.add(d);
+                }
+            }
+        }
+        return found == null ? emptyList() : found;
     }
 
     public void unsafeSetParent(MavenResolutionResult parent) {
