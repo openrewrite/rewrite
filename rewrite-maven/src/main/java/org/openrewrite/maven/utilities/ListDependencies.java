@@ -16,9 +16,10 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -46,7 +47,7 @@ public class ListDependencies extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        List<String> dependencies = new ArrayList<>();
+        Set<String> dependencies = new HashSet<>();
 
         for (SourceFile sourceFile : before) {
             new MavenVisitor<ExecutionContext>() {
@@ -63,9 +64,7 @@ public class ListDependencies extends Recipe {
             }.visit(sourceFile, ctx);
         }
 
-        dependencies.sort(Comparator.naturalOrder());
-
         return ListUtils.concat(before, new PlainText(randomId(), Paths.get("dependencies.txt"), Markers.EMPTY,
-                String.join("\n", dependencies)));
+                dependencies.stream().sorted().collect(Collectors.joining("\n"))));
     }
 }
