@@ -16,6 +16,7 @@
 package org.openrewrite.java.marker
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
@@ -39,6 +40,8 @@ interface JavaSourceSetTest {
         assertThat(classpath[0]).isInstanceOf(JavaType.ShallowClass::class.java)
     }
 
+    // This test uses a lot of memory and examines a code path that we don't actually take anywhere right now
+    @Disabled
     @Test
     fun doesNotDuplicateTypesInCache() {
         val typeCache = JavaTypeCache()
