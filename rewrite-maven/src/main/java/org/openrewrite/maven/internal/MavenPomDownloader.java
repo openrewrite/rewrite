@@ -237,9 +237,8 @@ public class MavenPomDownloader {
                     try {
                         File f = new File(uri);
 
-                        // if the jar isn't there alongside the POM in the local cache, we won't have the artifact later,
-                        // so better to just get both from a remote repository
-                        if (!f.exists() || !new File(f.getParentFile(), gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar").exists()) {
+                        //NOTE: The pom may exist without a .jar artifact if the pom packaging is "pom"
+                        if (!f.exists()) {
                             continue;
                         }
 
@@ -314,7 +313,12 @@ public class MavenPomDownloader {
 
             MavenMetadata mavenMetadata;
             Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
-            mavenMetadata = downloadMetadata(gav, containingPom, repositories);
+            try {
+                mavenMetadata = downloadMetadata(gav, containingPom, repositories);
+            } catch (MavenDownloadingException e) {
+                //This can happen if the artifact only exists in the local maven cache. In this case, just return the original
+                return gav.getVersion();
+            }
             MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
             if (snapshot != null) {
                 return gav.getVersion().replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
