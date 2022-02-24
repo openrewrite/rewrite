@@ -40,8 +40,8 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public abstract class ExtendsJavaTypeGoat extends JavaTypeGoat<T, S> {
     }
 
-    public static abstract class TypeA {}
-    public static abstract class TypeB {}
+    public static class TypeA {}
+    public static class TypeB {}
 
     @AnnotationWithRuntimeRetention
     @AnnotationWithSourceRetention
