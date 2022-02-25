@@ -419,7 +419,7 @@ public class ResolvedPom {
                 }
                 for (ManagedDependency d : incomingDependencyManagement) {
                     if (d instanceof Imported) {
-                        ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, null, repositories)
+                        ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, ResolvedPom.this, repositories)
                                 .resolve(activeProfiles, downloader, ctx);
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
