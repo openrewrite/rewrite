@@ -163,8 +163,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
 
             typeCache.put(sym.flatName().toString(), clazz);
 
-            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(classType.supertype_field == null ? symType.supertype_field :
-                    classType.supertype_field));
+            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
             JavaType.FullyQualified owner = null;
             if (sym.owner instanceof Symbol.ClassSymbol) {
@@ -203,7 +202,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                         fields.add(variableType(elem, clazz));
                     } else if (elem instanceof Symbol.MethodSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                    Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                                    Flags.ANONCONSTR)) == 0) {
                         if (methods == null) {
                             methods = new ArrayList<>();
                         }
