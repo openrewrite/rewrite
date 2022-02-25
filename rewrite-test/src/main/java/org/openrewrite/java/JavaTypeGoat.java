@@ -22,8 +22,6 @@ import java.lang.annotation.RetentionPolicy;
 @AnnotationWithRuntimeRetention
 @AnnotationWithSourceRetention
 public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
-    public JavaTypeGoat() {
-    }
 
     public static final PT<String> parameterizedField = new PT<String>() {
     };
