@@ -124,10 +124,11 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     inFirstPrefix = false;
                 } else {
                     // Handle consecutive new lines.
-                    if ((sourceArr[i - 1] == '\n' || sourceArr[i - 1] == '\r' && sourceArr[i -2] == '\n')) {
+                    if ((sourceArr[i - 1] == '\n' ||
+                            sourceArr[i - 1] == '\r' && sourceArr[i -2] == '\n')) {
                         String prevLineLine = sourceArr[i - 1] == '\n' ? "\n" : "\r\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
-                    } else if (marginBuilder != null) { // A new line that only contains whitespace.
+                    } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.
                         String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), newLine, Markers.EMPTY));
                         javadocContent.append(marginBuilder.substring(marginBuilder.indexOf("\n") + 1));
@@ -152,7 +153,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                                     marginBuilder.toString(), Markers.EMPTY));
                             javadocContent.append(c);
                         } else {
-                            String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
+                            String newLine = marginBuilder.toString().startsWith("\r") ? "\r\n" : "\n";
                             lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
                                     newLine, Markers.EMPTY));
                             String margin = marginBuilder.toString();

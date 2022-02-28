@@ -1191,6 +1191,34 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1411")
+    @Test
+    fun noMarginWithCRLF(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit, "" +
+                "/**\r\n" +
+                " * Line 1.\r\n" +
+                "   Text with no margin.\r\n" +
+                " */\r\n" +
+                "public class A {\r\n" +
+                "}"
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1411")
+    @Test
+    fun emptyLinesWithCRLF(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit, "" +
+                "public class A {\r\n" +
+                "  /** Text \r\n" +
+                "         \r\n" +
+                "         \r\n" +
+                "     @param arg0 desc\r\n" +
+                "   */\r\n" +
+                "  void method(int arg0) {}\r\n" +
+                "}"
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/976")
     @Test
     fun multilineJavaDocWithCRLF(jp: JavaParser) = assertParsePrintAndProcess(
