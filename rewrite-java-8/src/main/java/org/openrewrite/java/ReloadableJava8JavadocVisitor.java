@@ -348,14 +348,12 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             body.addAll(convertMultiline(singletonList(blockTag)));
         }
 
-        if (lineBreaks.isEmpty()) {
-            if (cursor < source.length()) {
-                String trailingWhitespace = source.substring(cursor);
-                if (!trailingWhitespace.isEmpty()) {
-                    body.add(new Javadoc.Text(randomId(), Markers.EMPTY, trailingWhitespace));
-                }
-            }
-        } else {
+        if (cursor < source.length() && source.substring(cursor).contains(" ")) {
+            String trailingWhitespace = source.substring(cursor);
+            body.add(new Javadoc.Text(randomId(), Markers.EMPTY, trailingWhitespace));
+        }
+
+        if (!lineBreaks.isEmpty()) {
             body.addAll(lineBreaks.values());
         }
 

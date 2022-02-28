@@ -1091,7 +1091,6 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1094")
     @Test
     fun trailingWhitespaceAfterText(jp: JavaParser) = assertParsePrintAndProcess(
@@ -1109,7 +1108,6 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1094")
     @Test
     fun trailingWhitespaceAfterAnnotation(jp: JavaParser) = assertParsePrintAndProcess(
