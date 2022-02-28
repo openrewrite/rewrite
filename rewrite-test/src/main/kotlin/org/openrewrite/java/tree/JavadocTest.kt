@@ -57,6 +57,31 @@ interface JavadocTest : JavaTreeTest {
     )
 
     @Test
+    fun singleLineJavadocText(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**   test */
+            class Test {}
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1076")
+    @Test
+    fun javaDocWithMultipleLeadingAsterisks(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+           /** ** * First '*' characters are treated as a margin until a non '*' is parsed.
+            ** * @throws IOException validate cursor position.
+            */
+           class Test {
+           }
+        """.trimIndent()
+    )
+
+    // All blank **********************************************************
+    @Test
     fun allBlank(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
@@ -81,119 +106,25 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/965")
     @Test
-    fun singleLineParam(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**   @param <T> t */
-            class Test<T> {}
-        """.trimIndent()
-    )
-
-    @Test
-    fun noMarginJavadocFirstLineTrailingWhitespace(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**   
-               {@link int}
-            */
-            class Test {}
-        """.trimIndent()
-    )
-
-    @Test
-    fun leftMargin(jp: JavaParser) = assertParsePrintAndProcess(
+    fun emptyJavadoc(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         """
             class Test {
-                /**   
-                   {@link int}
-                */
-                String s;
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun singleLineJavadoc(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**   {@link int} */
-            class Test {}
-        """.trimIndent()
-    )
-
-    @Test
-    fun starMarginWithFirstLineLeadingSpace(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**   
-              *       Line 1
-              */
-            class Test<T> {}
-        """.trimIndent()
-    )
-
-    @Test
-    fun singleLineJavadocText(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**   test */
-            class Test {}
-        """.trimIndent()
-    )
-
-    @Test
-    fun noMarginJavadoc(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-               {@link int}
-            */
-            class Test {}
-        """.trimIndent()
-    )
-
-    @Test
-    fun javadocReturn(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            class Test {
+                /***/
+                void empty() {}
                 /**
-                 * Message
-                 * @return Line 1
-                 * Line 2
                  */
-                int test() {
-                }
+                void onlyNewLine() {}
             }
         """.trimIndent()
     )
 
-    @Test
-    fun paramWithoutMargin(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            public class Test {
-                /** Text
-                 @return No margin
-                 */
-                public int test() {
-                    return 0;
-                }
-            }
-        """.trimIndent()
-    )
+    // Javadoc Annotations **********************************************
 
+    // author
     @Test
     fun author(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
@@ -205,9 +136,22 @@ interface JavadocTest : JavaTreeTest {
             public class A {
                 void method() {}
             }
-        """
+        """.trimIndent()
     )
 
+    // code
+    @Test
+    fun code(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /** {@code int n = 1; } */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    // deprecated
     @Test
     fun deprecated(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
@@ -219,9 +163,22 @@ interface JavadocTest : JavaTreeTest {
             public class A {
                 void method() {}
             }
-        """
+        """.trimIndent()
     )
 
+    // docComment
+    @Test
+    fun htmlComment(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /** <!-- comment --> */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    // docRoot
     @Test
     fun docRoot(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
@@ -235,6 +192,143 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    // docType
+    @Test
+    fun doctype(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /** <!doctype text > test */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    // attributes (<a href>)
+    @Test
+    fun multilineAttribute(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * <a href="
+             * https://...html">
+             * label</a>.
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    // elements (<p></p> or <p/>).
+    @Issue("https://github.com/openrewrite/rewrite/issues/1026")
+    @Test
+    fun selfClosingHTMLElement(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             *<p/>
+             * text
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1047")
+    @Test
+    fun preserveWhitespaceBeforeHTMLElement(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * <p>
+             * <p/>
+             * text <br>
+             * text <br/>
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1089")
+    @Test
+    fun whitespaceBeforeSelfClosingElement(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            package org.foo;
+            
+            /**
+             * Type of an Opening Time.
+             * <ul>
+             * <li>DELIVERY (text a)</li>
+             * <li>PICKUP (text b)</li> <br />
+             * </ul>
+             */
+            public enum OpenTimeType {
+                DELIVERY,
+                PICKUP
+            }
+        """.trimIndent()
+    )
+
+
+    // erroneous
+    @Test
+    fun multipleLineErroneous(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * @see this
+             * or that
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun erroneous(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /** {@version this is an erroneous tag } */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun unknownTags(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * See the {@unknown}.
+             * @unknown uh oh
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    // entity
+    @Test
+    fun htmlEntity(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /** &amp; &amp ; &#12; */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    // exception
     @Test
     fun exception(jp: JavaParser) = assertParsePrintAndProcess(
         jp,CompilationUnit,
@@ -245,9 +339,10 @@ interface JavadocTest : JavaTreeTest {
             public class A {
                 void method() {}
             }
-        """
+        """.trimIndent()
     )
 
+    // hidden
     @Test
     fun hidden(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
@@ -259,9 +354,10 @@ interface JavadocTest : JavaTreeTest {
             public class A {
                 void method() {}
             }
-        """
+        """.trimIndent()
     )
 
+    // index
     @Test
     fun indexOnly(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
@@ -274,7 +370,7 @@ interface JavadocTest : JavaTreeTest {
             public class A {
                 void method() {}
             }
-        """
+        """.trimIndent()
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/971")
@@ -307,6 +403,7 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    // inheritDoc
     @Test
     fun inheritDoc(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
@@ -323,18 +420,54 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    // link
+    // linkplain
     @Test
-    fun literal(jp: JavaParser) = assertParsePrintAndProcess(
+    fun noMarginJavadocFirstLineTrailingWhitespace(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         """
-            public class A {
-                /**
-                 * @literal
-                 */
-                void method() {}
-            }
+            /**   
+               {@link int}
+            */
+            class Test {}
+        """.trimIndent()
+    )
+
+    @Test
+    fun leftMargin(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
         """
+            class Test {
+                /**   
+                   {@link int}
+                */
+                String s;
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun noMarginJavadoc(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+               {@link int}
+            */
+            class Test {}
+        """.trimIndent()
+    )
+
+    @Test
+    fun singleLineJavadoc(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**   {@link int} */
+            class Test {}
+        """.trimIndent()
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1274")
@@ -350,42 +483,7 @@ interface JavadocTest : JavaTreeTest {
              */
             class Test {
             }
-        """
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1274")
-    @Test
-    fun multiParameterizedType(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            import java.util.Map;
-            
-            /**
-             * {@link Map<String, Map<String, Integer>>} multiple parameterized type
-             */
-            class Test {
-            }
-        """
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1274")
-    @Test
-    fun parameterizedType(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            import java.util.List;
-            
-            class Test {
-                /**
-                 * @return - {@link List<String>} - description.
-                 * @throws Exception - exception.
-                 */
-                List<String> method() throws Exception {
-                }
-            }
-        """
+        """.trimIndent()
     )
 
     @Test
@@ -399,7 +497,7 @@ interface JavadocTest : JavaTreeTest {
             public class A {
                 void method() {}
             }
-        """
+        """.trimIndent()
     )
 
     @Test
@@ -474,280 +572,51 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1274")
     @Test
-    fun param(jp: JavaParser) = assertParsePrintAndProcess(
+    fun multiParameterizedType(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         """
-            public class A {
-                /**
-                 * @param val
-                 */
-                void method(int val) {}
-            }
-        """
-    )
-
-    @Test
-    fun provide(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            public class A {
-                /**
-                 * @provides int
-                 */
-                void method(int val) {}
-            }
-        """
-    )
-
-    @Test
-    fun returnTag(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            public class A {
-                /**
-                 * @return id
-                 */
-                int method(int val) {}
-            }
-        """
-    )
-
-    @Test
-    fun see(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * @see "Create link via quotes"
-             * @see java.lang.Comparable#compareTo(Object) label
-             * @see <a href="https://link.here">label</a>
-             */
-            public class A {
-                void method() {}
-            }
-        """
-    )
-
-    @Test
-    fun serial(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * @serial
-             */
-            public class A {
-                void method() {}
-            }
-        """
-    )
-
-
-    @Test
-    fun serialData(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * @serialData
-             */
-            public class A {
-                void method() {}
-            }
-        """
-    )
-
-    @Test
-    fun since(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /** @since 1.0 */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun summary(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /** {@summary test description } */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun value(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            class Test {
-                /**
-                 * The value of this constant is {@value}.
-                 */
-                public static final String SCRIPT_START = "<script>";
+            import java.util.Map;
             
+            /**
+             * {@link Map<String, Map<String, Integer>>} multiple parameterized type
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1274")
+    @Test
+    fun parameterizedType(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            import java.util.List;
+            
+            class Test {
                 /**
-                 * {@value Test#SCRIPT_START}
+                 * @return - {@link List<String>} - description.
+                 * @throws Exception - exception.
+                 */
+                List<String> method() throws Exception {
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun multipleReferenceParameters(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /**
+                 * {@link ListenerUtils#getExceptionFromHeader(ConsumerRecord, String, LogAccessor)}
                  */
                 void test() {
-                }
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun version(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * @version 1.0.0
-             */
-            public class A {
-                void method() {}
-            }
-        """
-    )
-
-    @Test
-    fun descriptionOnNewLine(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            public class Test {
-                 /**
-                  * @param name
-                  *            a name
-                  */
-                void test(String name) {
-                }
-            }
-        """
-    )
-
-    @Test
-    fun multipleLinesBeforeTag(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-        /**
-         * Note
-         *
-         * @see CoreJackson2Module
-         */
-        public class Test {
-        }
-    """
-    )
-
-    @Test
-    fun erroneous(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /** {@version this is an erroneous tag } */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun multipleLineErroneous(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * @see this
-             * or that
-             */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun code(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /** {@code int n = 1; } */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun whitespaceBeforeNonLeadingText(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            interface Test {
-                /**
-                 * @return <code>true</code>
-                 * <code>false</code> non-leading text.
-                 */
-                boolean test();
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun whitespaceOnBlankLineBetweenBodyAndTags(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            interface Test {
-                /**
-                 * Returns something.
-                 * 
-                 * @return true
-                 */
-                boolean test();
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1094")
-    @Disabled
-    fun trailingWhitespaceAfterText(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        //language=java
-        """
-            class Test {
-                /**
-                 * Text with trailing whitespace.    
-                 * More trailing whitespace    
-                 */
-                void method() {
-                }
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1094")
-    @Disabled
-    fun trailingWhitespaceAfterAnnotation(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        //language=java
-        """
-            class Test {
-                /**
-                 * @param arg test text.    
-                 * More trailing whitespace    
-                 */
-                void method(String arg) {
                 }
             }
         """.trimIndent()
@@ -767,6 +636,52 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/967")
+    @Test
+    fun multilineLink(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * {@link
+             * multiline}.
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/964")
+    @Test
+    fun constructorLink(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /**
+                 * {@link java.util.List()}
+                 */
+                void test() {
+                }
+            }
+        """.trimIndent()
+    )
+
+    // literal
+    @Test
+    fun literal(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            public class A {
+                /**
+                 * @literal
+                 */
+                void method() {}
+            }
+        """.trimIndent()
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/942")
     @Test
     fun nullLiteral(jp: JavaParser) = assertParsePrintAndProcess(
@@ -782,12 +697,84 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    // param
+    @Test
+    fun param(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            public class A {
+                /**
+                 * @param val
+                 */
+                void method(int val) {}
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun singleLineParam(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**   @param <T> t */
+            class Test<T> {}
+        """.trimIndent()
+    )
+
+    @Test
+    fun paramWithoutMargin(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            public class Test {
+                /** Text
+                 @return No margin
+                 */
+                public int test() {
+                    return 0;
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Disabled
+    @Test
+    fun lineBreakInParam(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            interface Test {
+                /**
+                 * @param <
+                 *   T> t hi
+                 */
+                <T> boolean test();
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1409")
+    @Test
+    fun paramWithMultilineHtmlAttributeNewLineBeforeEquals(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            interface Test {
+                /**
+                 * @param contentType <a href
+                 *= "https://www..."> label</a>
+                 */
+                boolean test(int contentType);
+            }
+        """.trimIndent()
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/941")
     @Test
     fun paramWithMultilineHtmlAttribute(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
-        // language=java
         """
             interface Test {
                 /**
@@ -800,19 +787,93 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1409")
     @Test
-    fun paramWithMultilineHtmlAttributeNewLineBeforeEquals(jp: JavaParser) = assertParsePrintAndProcess(
+    fun descriptionOnNewLine(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
-        // language=java
         """
-            interface Test {
+            public class Test {
+                 /**
+                  * @param name
+                  *            a name
+                  */
+                void test(String name) {
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/963")
+    @Test
+    fun blankLink(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * {@link}
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/968")
+    @Test
+    fun missingBracket(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * {@link missing.bracket
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    // provides
+    @Test
+    fun provide(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            public class A {
                 /**
-                 * @param contentType <a href
-                 *= "https://www..."> label</a>
+                 * @provides int
                  */
-                boolean test(int contentType);
+                void method(int val) {}
+            }
+        """.trimIndent()
+    )
+
+    // return
+    @Test
+    fun returnTag(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            public class A {
+                /**
+                 * @return id
+                 */
+                int method(int val) {}
+            }
+        """.trimIndent()
+    )
+
+    // see
+    @Test
+    fun see(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * @see "Create link via quotes"
+             * @see java.lang.Comparable#compareTo(Object) label
+             * @see <a href="https://link.here">label</a>
+             */
+            public class A {
+                void method() {}
             }
         """.trimIndent()
     )
@@ -862,21 +923,6 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
-    @Test
-    fun multipleReferenceParameters(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            class Test {
-                /**
-                 * {@link ListenerUtils#getExceptionFromHeader(ConsumerRecord, String, LogAccessor)}
-                 */
-                void test() {
-                }
-            }
-        """.trimIndent()
-    )
-
     @Issue("https://github.com/openrewrite/rewrite/issues/941")
     @Test
     fun seeWithMultilineAttribute(jp: JavaParser) = assertParsePrintAndProcess(
@@ -893,18 +939,189 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    // serial
     @Test
-    fun consecutiveLineBreaks(jp: JavaParser) = assertParsePrintAndProcess(
+    fun serial(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * @serial
+             */
+            public class A {
+                void method() {}
+            }
+        """.trimIndent()
+    )
+
+    // serialData
+    @Test
+    fun serialData(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * @serialData
+             */
+            public class A {
+                void method() {}
+            }
+        """.trimIndent()
+    )
+
+    // since
+    @Test
+    fun since(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /** @since 1.0 */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    // summary
+    @Test
+    fun summary(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /** {@summary test description } */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    // uses
+    @Test
+    fun uses(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /** @uses Test for something */
+            class Test {
+                /** @uses Test for something */
+                void method() {}
+            }
+        """.trimIndent()
+    )
+
+    // throws
+    @Test
+    fun throws(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         """
             class Test {
-                /** 
-                 * @param oboFile the file to be parsed
+                /**
+                 * @throws Exception
+                 */
+                <T> T test(String t) throws Exception {
+                    return null;
+                }
+            }
+        """.trimIndent()
+    )
+
+    // value
+    @Test
+    fun value(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /**
+                 * The value of this constant is {@value}.
+                 */
+                public static final String SCRIPT_START = "<script>";
             
-                 * @return the ontology represented as a BioJava ontology file
+                /**
+                 * {@value Test#SCRIPT_START}
                  */
                 void test() {
+                }
+            }
+        """.trimIndent()
+    )
+
+    // version
+    @Test
+    fun version(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * @version 1.0.0
+             */
+            public class A {
+                void method() {}
+            }
+        """.trimIndent()
+    )
+
+    // Whitespace
+    @Test
+    fun starMarginWithFirstLineLeadingSpace(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**   
+              *       Line 1
+              */
+            class Test<T> {}
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1409")
+    @Test
+    fun trailingWhitespaceWithWhitespaceOnEmptyLine(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /**
+                 * Text with trailing whitespace.    
+                 * 
+                 * @param arg desc
+                 */
+                void method(String arg) {
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1094")
+    @Test
+    fun trailingWhitespaceAfterText(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /**
+                 * Text with trailing whitespace.    
+                 * More trailing whitespace    
+                 */
+                void method() {
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1094")
+    @Test
+    fun trailingWhitespaceAfterAnnotation(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /**
+                 * @param arg test text.    
+                 * More trailing whitespace    
+                 */
+                void method(String arg) {
                 }
             }
         """.trimIndent()
@@ -929,43 +1146,53 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/963")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1397")
     @Test
-    fun blankLink(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * {@link}
-             */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/968")
-    @Test
-    fun missingBracket(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * {@link missing.bracket
-             */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/964")
-    @Test
-    fun constructorLink(jp: JavaParser) = assertParsePrintAndProcess(
+    fun textWithBlankNewLines(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         """
             class Test {
                 /**
-                 * {@link Constructor()}
+                * JavaDocs treats whitespace differently when new lines exist
+                
+                
+                * with whitespace that is contained in pure text.
+                */
+                void method() {}
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1374")
+    @Test
+    fun tagAfterBlankNewLines(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /**
+                 * New lines with whitespace followed by a param.
+                 
+                 
+                 * @return void
+                 */
+                void method() {
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun consecutiveLineBreaksWithNoMargin(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /** 
+                 * @param oboFile the file to be parsed
+            
+                 * @return the ontology represented as a BioJava ontology file
                  */
                 void test() {
                 }
@@ -973,222 +1200,63 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/965")
     @Test
-    fun emptyJavadoc(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /***/
-            class Test {
-                /**
-                 */
-                void test() {
-                }
-            }
-        """.trimIndent()
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/967")
-    @Test
-    fun multilineLink(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * {@link
-             * multiline}.
-             */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun doctype(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /** <!doctype text > test */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun htmlComment(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /** <!-- comment --> */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun htmlEntity(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /** &amp; &amp ; &#12; */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun multilineAttribute(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * <a href="
-             * https://...html">
-             * label</a>.
-             */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Disabled
-    @Test
-    fun lineBreakInParam(jp: JavaParser) = assertParsePrintAndProcess(
+    fun whitespaceBeforeNonLeadingText(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         """
             interface Test {
                 /**
-                 * @param <
-                 *   T> t hi
+                 * @return <code>true</code>
+                 * <code>false</code> non-leading text.
                  */
-                <T> boolean test();
+                boolean test();
             }
         """.trimIndent()
     )
 
     @Test
-    fun uses(jp: JavaParser) = assertParsePrintAndProcess(
+    fun multipleLinesBeforeTag(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         """
-            /** @uses Test for something */
-            class Test {
-            }
-        """.trimIndent()
+        /**
+         * Note
+         *
+         * @see CoreJackson2Module
+         */
+        public class Test {
+        }
+    """.trimIndent()
     )
 
     @Test
-    fun unknownTags(jp: JavaParser) = assertParsePrintAndProcess(
+    fun whitespaceOnBlankLineBetweenBodyAndTags(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
         """
-            /**
-             * See the {@unknown}.
-             * @unknown uh oh
-             */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Test
-    fun otherBlockTags(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            class Test {
+            interface Test {
                 /**
-                 * @throws Exception
-                 * @param s input
-                 * @param <T> t type
+                 * Returns something.
+                 * 
+                 * @return true
                  */
-                <T> T test(String t) throws Exception {
-                    return null;
-                }
+                boolean test();
             }
         """.trimIndent()
     )
 
+    // CRLF
     @Issue("https://github.com/openrewrite/rewrite/issues/980")
     @Test
     fun javaDocWithCRLF(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit, "" +
-              "/**\r\n" +
-              " * JavaDoc.\r\n" +
-              " */\r\n" +
-              "public class A {\r\n" +
-              "}"
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1026")
-    @Test
-    fun selfClosingHTMLTag(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             *<p/>
-             * text
-             */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1076")
-    @Test
-    fun javaDocWithMultipleLeadingAsterisks(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-           /** ** * First '*' characters are treated as a margin until a non '*' is parsed.
-            ** * @throws IOException validate cursor position.
-            */
-           class Test {
-           }
-        """.trimIndent()
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1047")
-    @Test
-    fun preserveWhitespaceBeforeHTMLTag(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * <p>
-             * <p/>
-             * text <br>
-             * text <br/>
-             */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1089")
-    @Test
-    fun whitespaceBeforeSelfClosingElement(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            package org.foo;
-            
-            /**
-             * Type of an Opening Time.
-             * <ul>
-             * <li>DELIVERY (text a)</li>
-             * <li>PICKUP (text b)</li> <br />
-             * </ul>
-             */
-            public enum OpenTimeType {
-                DELIVERY,
-                PICKUP
-            }
-        """.trimIndent()
+                "/**\r\n" +
+                " * JavaDoc.\r\n" +
+                " */\r\n" +
+                "public class A {\r\n" +
+                "}"
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1411")
@@ -1267,61 +1335,5 @@ interface JavadocTest : JavaTreeTest {
                 "     */\r\n" +
                 "    void method(String arg0) {}\r\n" +
                 "}"
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1374")
-    @Test
-    fun tagAfterBlankNewLines(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            class Test {
-                /**
-                 * New lines with whitespace followed by a param.
-                 
-                 
-                 * @return void
-                 */
-                void method() {
-                }
-            }
-        """.trimIndent()
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1397")
-    @Test
-    fun textWithBlankNewLines(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            class Test {
-                /**
-                * JavaDocs treats whitespace differently when new lines exist
-                
-                
-                * with whitespace that is contained in pure text.
-                */
-                void method() {}
-            }
-        """.trimIndent()
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1409")
-    @Test
-    fun trailingWhitespaceWithWhitespaceOnEmptyLine(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        //language=java
-        """
-            class Test {
-                /**
-                 * Text with trailing whitespace.    
-                 * 
-                 * @param arg desc
-                 */
-                void method(String arg) {
-                }
-            }
-        """.trimIndent()
     )
 }
