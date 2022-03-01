@@ -205,6 +205,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 cursor++;
                 beforeEqual.add(lineBreak);
             }
+            String whitespaceBeforeEqual = whitespaceBeforeAsString();
+            beforeEqual.add(new Javadoc.Text(randomId(), Markers.EMPTY, whitespaceBeforeEqual));
+
             sourceBefore("=");
 
             while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {

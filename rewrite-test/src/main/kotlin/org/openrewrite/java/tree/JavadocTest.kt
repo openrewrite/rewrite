@@ -754,7 +754,7 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1409")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1412")
     @Test
     fun paramWithMultilineHtmlAttributeNewLineBeforeEquals(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
@@ -763,7 +763,7 @@ interface JavadocTest : JavaTreeTest {
             interface Test {
                 /**
                  * @param contentType <a href
-                 *= "https://www..."> label</a>
+                 *    = "https://www..."> label</a>
                  */
                 boolean test(int contentType);
             }
