@@ -78,6 +78,7 @@ class JsonPathMatcherTest {
     private val appLabel = "$.metadata.labels.app"
     private val appLabelBracket = "$.metadata.labels['app']"
     private val recurseSpecContainers = "..spec.containers"
+    private val recurseForContainer = "$..containers"
     private val firstContainerSlice = "$.spec.template.spec.containers[:1]"
     private val allContainerSlices = "$.spec.template.spec.containers[*]"
     private val allSpecChildren = "$.spec.template.spec.*"
@@ -103,6 +104,12 @@ class JsonPathMatcherTest {
     @Test
     fun `must recurse to find elements`() {
         val results = visit(recurseSpecContainers, source)
+        assertThat(results).hasSize(3)
+    }
+
+    @Test
+    fun `must recurse to find sub-elements`() {
+        val results = visit(recurseForContainer, source)
         assertThat(results).hasSize(3)
     }
 
