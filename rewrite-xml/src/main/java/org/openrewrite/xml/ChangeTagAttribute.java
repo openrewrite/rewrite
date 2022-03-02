@@ -22,7 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class ChangeXMLAttribute extends Recipe {
+public class ChangeTagAttribute extends Recipe {
 
     @Override
     public String getDisplayName() {
@@ -34,8 +34,8 @@ public class ChangeXMLAttribute extends Recipe {
         return "Alters XML Attribute value within specified element.";
     }
 
-    @Option(displayName = "element name",
-            description = "The name of the element whose attribute's value is to be changed.",
+    @Option(displayName = "Element name",
+            description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath Expression.",
             example = "property")
     String elementName;
 
@@ -56,8 +56,8 @@ public class ChangeXMLAttribute extends Recipe {
     @Nullable
     String oldValue;
 
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
+    @Option(displayName = "File matcher",
+            description = "If provided only matching files will be modified. This is a glob expression.",
             required = false,
             example = "'**/application-*.xml'")
     @Nullable
@@ -73,6 +73,6 @@ public class ChangeXMLAttribute extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangeXMLAttributeVisitor<>(elementName, attributeName, oldValue, newValue);
+        return new ChangeTagAttributeVisitor<>(new XPathMatcher(elementName), attributeName, oldValue, newValue);
     }
 }

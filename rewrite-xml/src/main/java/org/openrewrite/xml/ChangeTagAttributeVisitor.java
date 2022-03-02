@@ -15,36 +15,33 @@
  */
 package org.openrewrite.xml;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
-public class ChangeXMLAttributeVisitor<P> extends XmlVisitor<P> {
+@EqualsAndHashCode(callSuper = true)
+@Value
+public class ChangeTagAttributeVisitor<P> extends XmlVisitor<P> {
 
-    private final String elementName;
-    private final String attributeName;
-    private final String oldValue;
-    private final String newValue;
+    XPathMatcher elementName;
+    String attributeName;
+    @Nullable
+    String oldValue;
+    String newValue;
 
-    public ChangeXMLAttributeVisitor(String elementName, String attributeName, String oldValue, String newValue) {
-        this.elementName = elementName;
-        this.attributeName = attributeName;
-        this.oldValue = oldValue;
-        this.newValue = newValue;
-    }
 
     @Override
     public Xml visitTag(Xml.Tag tag, P p) {
-        Xml.Tag t = tag;
-        if (t.getName().equals(elementName)) {
-            t = t.withAttributes(ListUtils.map(t.getAttributes(), a -> (Xml.Attribute)this.visitChosenElementAttribute(a, p)));
-        }
-        else {
-            t = (Xml.Tag) super.visitTag(t, p);
+        Xml.Tag t = (Xml.Tag) super.visitTag(tag, p);
+        if (elementName.matches(getCursor())) {
+            t = t.withAttributes(ListUtils.map(t.getAttributes(), a -> (Xml.Attribute)this.visitChosenElementAttribute(a)));
         }
         return t;
     }
 
-    public Xml visitChosenElementAttribute(Xml.Attribute attribute, P p) {
+    public Xml visitChosenElementAttribute(Xml.Attribute attribute) {
         if(!attribute.getKeyAsString().equals(attributeName)) {
             return attribute;
         }
@@ -52,12 +49,12 @@ public class ChangeXMLAttributeVisitor<P> extends XmlVisitor<P> {
             return attribute;
         }
         String changedValue = (oldValue != null) ? attribute.getValueAsString().replace(oldValue, newValue): newValue;
-        Xml.Attribute a = attribute;
-        return a.withValue(
+        return attribute.withValue(
                 new Xml.Attribute.Value(attribute.getId(),
-                                        "",
-                                        attribute.getMarkers(),
-                                        attribute.getValue().getQuote(),
-                                        changedValue));
+                        "",
+                        attribute.getMarkers(),
+                        attribute.getValue().getQuote(),
+                        changedValue));
     }
 }
+

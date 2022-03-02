@@ -16,14 +16,12 @@
 package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
-import org.openrewrite.xml.tree.Xml
 
-class ChangeXMLAttributeTest: XmlRecipeTest {
+class ChangeTagAttributeTest: XmlRecipeTest {
 
     @Test
     fun alterAttributeWhenElementAndAttributeMatch() = assertChanged(
-            recipe = ChangeXMLAttribute("bean","id","myBean2.subpackage","myBean.subpackage",null)
+            recipe = ChangeTagAttribute("bean", "id", "myBean2.subpackage", "myBean.subpackage", null)
             ,
             before = """
             <beans>
@@ -42,7 +40,7 @@ class ChangeXMLAttributeTest: XmlRecipeTest {
 
     @Test
     fun alterAttributeWithNullOldValue() = assertChanged(
-            recipe = ChangeXMLAttribute("bean","id","myBean2.subpackage",null,null),
+            recipe = ChangeTagAttribute("bean", "id", "myBean2.subpackage", null, null),
             before = """
             <beans>
                 <bean id='myBean.subpackage.subpackage2'/>
@@ -63,8 +61,7 @@ class ChangeXMLAttributeTest: XmlRecipeTest {
 
     @Test
     fun attributeNotMatched() = assertUnchanged(
-
-            recipe = ChangeXMLAttribute("bean","id","myBean2.subpackage","not.matched",null),
+            recipe = ChangeTagAttribute("bean", "id", "myBean2.subpackage", "not.matched", null),
             before = """
             <beans>
                 <bean id='myBean.subpackage.subpackage2'/>
