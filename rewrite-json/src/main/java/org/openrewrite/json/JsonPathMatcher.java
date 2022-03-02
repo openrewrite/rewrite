@@ -149,7 +149,7 @@ public class JsonPathMatcher {
             for (Tree path : cursorPath) {
                 JsonPathJsonVisitor v = new JsonPathJsonVisitor(cursorPath, path);
                 for (int i = 1, len = ctx.getParent().getChildCount(); i < len; i++) {
-                    result = v.visit(ctx.getParent().getChild(i));
+                    result = ctx == ctx.getParent().getChild(i) ? v.visit(ctx.getChild(i)) : v.visit(ctx.getParent().getChild(i));
                     if (result == null) {
                         break;
                     }
