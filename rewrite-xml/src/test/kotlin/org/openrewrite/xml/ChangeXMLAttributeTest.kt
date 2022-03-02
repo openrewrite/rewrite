@@ -22,27 +22,54 @@ import org.openrewrite.xml.tree.Xml
 class ChangeXMLAttributeTest: XmlRecipeTest {
 
     @Test
-    fun alterAttribute() = assertChanged(
-            recipe = toRecipe {
-                object : XmlVisitor<ExecutionContext>() {
-                    override fun visitDocument(x: Xml.Document, p: ExecutionContext): Xml {
-
-                            doAfterVisit(ChangeXMLAttributeVisitor("bean","id","myBean.subpackage","myBean2.subpackage"))
-
-                        return super.visitDocument(x, p)
-                    }
-                }
-            },
+    fun alterAttributeWhenElementAndAttributeMatch() = assertChanged(
+            recipe = ChangeXMLAttribute("bean","id","myBean2.subpackage","myBean.subpackage",null)
+            ,
             before = """
             <beans>
                 <bean id='myBean.subpackage.subpackage2'/>
+                <other id='myBean.subpackage.subpackage2'/>
             </beans>
         """,
             after = """
             <beans>
                 <bean id='myBean2.subpackage.subpackage2'/>
+                <other id='myBean.subpackage.subpackage2'/>
+            </beans>
+        """
+
+    )
+
+    @Test
+    fun alterAttributeWithNullOldValue() = assertChanged(
+            recipe = ChangeXMLAttribute("bean","id","myBean2.subpackage",null,null),
+            before = """
+            <beans>
+                <bean id='myBean.subpackage.subpackage2'/>
+                <other id='myBean.subpackage.subpackage2'/>
             </beans>
         """,
-            cycles = 2
+            after = """
+            <beans>
+                <bean id='myBean2.subpackage'/>
+                <other id='myBean.subpackage.subpackage2'/>
+            </beans>
+        """,
+            cycles = 1,
+            expectedCyclesThatMakeChanges = 1
+    )
+
+
+
+    @Test
+    fun attributeNotMatched() = assertUnchanged(
+
+            recipe = ChangeXMLAttribute("bean","id","myBean2.subpackage","not.matched",null),
+            before = """
+            <beans>
+                <bean id='myBean.subpackage.subpackage2'/>
+                <other id='myBean.subpackage.subpackage2'/>
+            </beans>
+        """
     )
 }

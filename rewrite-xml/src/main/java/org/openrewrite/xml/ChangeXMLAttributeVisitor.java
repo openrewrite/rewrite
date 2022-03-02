@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml;
 
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.xml.tree.Xml;
 
 public class ChangeXMLAttributeVisitor<P> extends XmlVisitor<P> {
@@ -34,23 +35,23 @@ public class ChangeXMLAttributeVisitor<P> extends XmlVisitor<P> {
     @Override
     public Xml visitTag(Xml.Tag tag, P p) {
         Xml.Tag t = tag;
-        if (tag.getName().equals(elementName)) {
-            t.getAttributes().forEach( a -> this.visitAttribute(a, p));
+        if (t.getName().equals(elementName)) {
+            t = t.withAttributes(ListUtils.map(t.getAttributes(), a -> (Xml.Attribute)this.visitChosenElementAttribute(a, p)));
         }
-        t = (Xml.Tag)super.visitTag(t, p);
+        else {
+            t = (Xml.Tag) super.visitTag(t, p);
+        }
         return t;
     }
 
-    @Override
-    public Xml visitAttribute(Xml.Attribute attribute, P p) {
-
+    public Xml visitChosenElementAttribute(Xml.Attribute attribute, P p) {
         if(!attribute.getKeyAsString().equals(attributeName)) {
             return attribute;
         }
-        if(!attribute.getValueAsString().startsWith(oldValue)) {
+        if(oldValue!= null && !attribute.getValueAsString().startsWith(oldValue)) {
             return attribute;
         }
-        String changedValue = attribute.getValueAsString().replace(oldValue, newValue);
+        String changedValue = (oldValue != null) ? attribute.getValueAsString().replace(oldValue, newValue): newValue;
         Xml.Attribute a = attribute;
         return a.withValue(
                 new Xml.Attribute.Value(attribute.getId(),
