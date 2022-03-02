@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
+import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
 import org.openrewrite.java.search.*
 import org.openrewrite.java.style.AutodetectTest
 import org.openrewrite.java.tree.TypeTreeTest
@@ -458,6 +459,10 @@ class Java8ResultOfMethodCallIgnoredTest : Java8Test, ResultOfMethodCallIgnoredT
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8SemanticallyEqualTest : Java8Test, SemanticallyEqualTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8SetDefaultEstimatedEffortPerOccurrenceTest : Java8Test, SetDefaultEstimatedEffortPerOccurrenceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

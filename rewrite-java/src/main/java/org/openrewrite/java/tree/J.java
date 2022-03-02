@@ -3045,6 +3045,13 @@ public interface J extends Tree {
             return allAnnotations;
         }
 
+        @Override
+        public String toString() {
+            return "MethodDeclaration{" +
+                    (getMethodType() == null ? "unknown" : getMethodType()) +
+                    "}";
+        }
+
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data

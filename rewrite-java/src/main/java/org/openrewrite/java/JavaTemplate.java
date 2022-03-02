@@ -107,7 +107,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                     return gen.get(0).withPrefix(annotation.getPrefix());
-                } else if(loc.equals(ANNOTATION_ARGUMENTS) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
+                } else if (loc.equals(ANNOTATION_ARGUMENTS) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
                         annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
                     return annotation.withArguments(gen.get(0).getArguments());
@@ -125,6 +125,23 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     new Cursor(getCursor(), insertionPoint),
                                     Statement.class,
                                     substitutedTemplate, loc));
+
+                            if (coordinates.getComparator() != null) {
+                                if (gen.size() != 1) {
+                                    throw new IllegalArgumentException("Expected a template that would generate exactly one " +
+                                            "statement to replace one statement, but generated " + gen.size() +
+                                            ". Template:\n" + substitutedTemplate);
+                                }
+
+                                return block.withStatements(
+                                        ListUtils.insertInOrder(
+                                                block.getStatements(),
+                                                autoFormat(gen.get(0).withPrefix(Space.format("\n")), p, getCursor()),
+                                                coordinates.getComparator()
+                                        )
+                                );
+                            }
+
                             return block.withStatements(
                                     ListUtils.concatAll(
                                             block.getStatements(),
@@ -387,7 +404,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                 if ((loc.equals(METHOD_INVOCATION_ARGUMENTS) || loc.equals(METHOD_INVOCATION_NAME)) && method.isScope(insertionPoint)) {
                     J.MethodInvocation m;
-                    if(loc.equals(METHOD_INVOCATION_ARGUMENTS)) {
+                    if (loc.equals(METHOD_INVOCATION_ARGUMENTS)) {
                         m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
                         m = autoFormat(m, 0, getCursor().getParentOrThrow());
                         m = method.withArguments(m.getArguments()).withMethodType(m.getMethodType());

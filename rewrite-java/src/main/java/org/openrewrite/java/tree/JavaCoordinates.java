@@ -52,8 +52,9 @@ public class JavaCoordinates implements Coordinates {
         REPLACEMENT
     }
 
-    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    @Nullable
     public <J2 extends J> Comparator<J2> getComparator() {
+        //noinspection unchecked
         return (Comparator<J2>) comparator;
     }
 }

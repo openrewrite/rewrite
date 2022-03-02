@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
+import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
 import org.openrewrite.java.search.*
 import org.openrewrite.java.style.AutodetectTest
 import org.openrewrite.java.tree.TypeTreeTest
@@ -506,6 +507,10 @@ class Java11NestedEnumsAreNotStaticTest : Java11Test, NestedEnumsAreNotStaticTes
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11NewStringBuilderBufferWithCharArgumentTest : Java11Test, NewStringBuilderBufferWithCharArgumentTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11SetDefaultEstimatedEffortPerOccurrenceTest : Java11Test, SetDefaultEstimatedEffortPerOccurrenceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
