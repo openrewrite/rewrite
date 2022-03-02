@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
+import org.openrewrite.java.recipes.ExecutionContextParameterNameTest
 import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
 import org.openrewrite.java.search.*
 import org.openrewrite.java.style.AutodetectTest
@@ -151,6 +152,10 @@ class Java11EmptyNewlineAtEndOfFileTest : Java11Test, EmptyNewlineAtEndOfFileTes
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11EqualsAvoidsNullTest : Java11Test, EqualsAvoidsNullTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11ExecutionContextParameterNameTest : Java11Test, ExecutionContextParameterNameTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

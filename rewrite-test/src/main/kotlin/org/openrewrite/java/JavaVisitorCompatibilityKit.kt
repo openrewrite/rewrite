@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
+import org.openrewrite.java.recipes.ExecutionContextParameterNameTest
 import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
 import org.openrewrite.java.search.*
 import org.openrewrite.java.style.AutodetectTest
@@ -125,6 +126,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class EqualsAvoidsNullTck : EqualsAvoidsNullTest
+
+    @Nested
+    inner class ExecutionContextParameterNameTck : ExecutionContextParameterNameTest
 
     @Nested
     inner class ExplicitInitializationTck : ExplicitInitializationTest
