@@ -491,6 +491,7 @@ public class StringUtils {
      */
     public static String aspectjNameToPattern(String name) {
         return name
+                .replace("$", "\\$")
                 .replace("[", "\\[")
                 .replace("]", "\\]")
                 .replaceAll("([^.]*)\\.([^.]*)", "$1\\.$2")
