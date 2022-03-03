@@ -15,26 +15,18 @@
  */
 package org.openrewrite.java.search;
 
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.regex.Pattern;
 
 public class UsesType<P> extends JavaIsoVisitor<P> {
-    private final String fullyQualifiedType;
-    private final List<String> fullyQualifiedTypeSegments;
+    private final Pattern typePattern;
 
     public UsesType(String fullyQualifiedType) {
-        this.fullyQualifiedType = fullyQualifiedType;
-        Scanner scanner = new Scanner(fullyQualifiedType);
-        scanner.useDelimiter("\\.");
-        this.fullyQualifiedTypeSegments = new ArrayList<>();
-        while (scanner.hasNext()) {
-            fullyQualifiedTypeSegments.add(scanner.next());
-        }
+        this.typePattern = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType));
     }
 
     @Override
@@ -74,24 +66,10 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
             return c;
         }
 
-        if (TypeUtils.isAssignableTo(fullyQualifiedType, fq)) {
+        if (TypeUtils.isAssignableTo(typePattern, fq)) {
             return c.withMarkers(c.getMarkers().searchResult());
         }
 
-        Scanner scanner = new Scanner(fq.getFullyQualifiedName());
-        scanner.useDelimiter("\\.");
-        int i = 0;
-        for (; scanner.hasNext() && i < fullyQualifiedTypeSegments.size(); i++) {
-            String segment = fullyQualifiedTypeSegments.get(i);
-            if (segment.equals("*")) {
-                break;
-            }
-            String test = scanner.next();
-            if (!segment.equals(test)) {
-                return c;
-            }
-        }
-
-        return c.withMarkers(c.getMarkers().searchResult());
+        return c;
     }
 }

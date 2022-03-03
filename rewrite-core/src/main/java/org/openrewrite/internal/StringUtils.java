@@ -478,4 +478,23 @@ public class StringUtils {
         }
         return true;
     }
+
+    /**
+     * See https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns
+     * <p>
+     * An embedded * in an identifier matches any sequence of characters, but
+     * does not match the package (or inner-type) separator ".".
+     * <p>
+     * The ".." wildcard matches any sequence of characters that start and end with a ".", so it can be used to pick out all
+     * types in any subpackage, or all inner types. e.g. <code>within(com.xerox..*)</code> picks out all join points where
+     * the code is in any declaration of a type whose name begins with "com.xerox.".
+     */
+    public static String aspectjNameToPattern(String name) {
+        return name
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+                .replaceAll("([^.]*)\\.([^.]*)", "$1\\.$2")
+                .replace("*", "[^.]*")
+                .replace("..", "\\.(.+\\.)?");
+    }
 }

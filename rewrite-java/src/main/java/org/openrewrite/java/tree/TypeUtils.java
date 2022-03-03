@@ -19,6 +19,7 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 public class TypeUtils {
     private TypeUtils() {
@@ -128,6 +129,29 @@ public class TypeUtils {
         }
         return false;
     }
+
+    public static boolean isAssignableTo(Pattern to, @Nullable JavaType from) {
+        if (from instanceof JavaType.FullyQualified) {
+            JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
+
+            return to.matcher(classFrom.getFullyQualifiedName()).matches() ||
+                    isAssignableTo(to, classFrom.getSupertype()) ||
+                    classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
+        } else if (from instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
+            for (JavaType bound : genericFrom.getBounds()) {
+                if (isAssignableTo(to, bound)) {
+                    return true;
+                }
+            }
+        } else if(from instanceof JavaType.Variable) {
+            return isAssignableTo(to, ((JavaType.Variable) from).getType());
+        } else if(from instanceof JavaType.Method) {
+            return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+        }
+        return false;
+    }
+
 
     @Nullable
     public static JavaType.Class asClass(@Nullable JavaType type) {

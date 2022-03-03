@@ -21,6 +21,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
@@ -87,7 +88,7 @@ public class MethodMatcher {
             public Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
                 targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(ctx.targetTypePattern()));
                 methodNamePattern = Pattern.compile(ctx.simpleNamePattern().children.stream()
-                        .map(c -> AspectjUtils.aspectjNameToPattern(c.toString()))
+                        .map(c -> StringUtils.aspectjNameToPattern(c.toString()))
                         .collect(joining("")));
                 argumentPattern = Pattern.compile(new FormalParameterVisitor().visitFormalParametersPattern(
                         ctx.formalParametersPattern()));
@@ -286,7 +287,7 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
     public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
         StringBuilder classNameBuilder = new StringBuilder();
         for (ParseTree c : ctx.children) {
-            classNameBuilder.append(AspectjUtils.aspectjNameToPattern(c.getText()));
+            classNameBuilder.append(StringUtils.aspectjNameToPattern(c.getText()));
         }
         String className = classNameBuilder.toString().replace("$", "[$.]");
 
@@ -397,29 +398,5 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
                 return baseType + (variableArgs ? "\\[\\]" : "");
             }
         }
-    }
-}
-
-class AspectjUtils {
-    private AspectjUtils() {
-    }
-
-    /**
-     * See https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns
-     * <p>
-     * An embedded * in an identifier matches any sequence of characters, but
-     * does not match the package (or inner-type) separator ".".
-     * <p>
-     * The ".." wildcard matches any sequence of characters that start and end with a ".", so it can be used to pick out all
-     * types in any subpackage, or all inner types. e.g. <code>within(com.xerox..*)</code> picks out all join points where
-     * the code is in any declaration of a type whose name begins with "com.xerox.".
-     */
-    public static String aspectjNameToPattern(String name) {
-        return name
-                .replace("[", "\\[")
-                .replace("]", "\\]")
-                .replaceAll("([^.])*\\.([^.])*", "$1\\.$2")
-                .replace("*", "[^.]*")
-                .replace("..", "\\.(.+\\.)?");
     }
 }
