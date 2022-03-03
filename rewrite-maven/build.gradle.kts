@@ -81,6 +81,11 @@ tasks.register<JavaExec>("generateAntlrSources") {
     classpath = sourceSets["main"].runtimeClasspath
 }
 
+tasks.withType<JavaCompile>().configureEach {
+    options.encoding = "UTF-8"
+    options.compilerArgs.add("-parameters")
+}
+
 tasks.withType<Javadoc> {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
