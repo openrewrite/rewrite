@@ -833,6 +833,63 @@ class MavenParserTest {
             )
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1427")
+    @Test
+    fun parseEmptyActivationTag() {
+        val pomXml = MavenParser.builder()
+            .build()
+            .parse(
+                ctx,
+                """
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>test</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <profiles>
+                            <profile>
+                              <id>repo-incode-work</id>
+                              <properties>
+                                <name>!skip.repo-incode-work</name>
+                              </properties>
+                              <activation/>
+                            </profile>
+                        </profiles>
+                    </project>
+                """
+            )[0]
+        assertThat(pomXml.mavenResolutionResult().pom.requested.profiles[0].activation).isNull()
+
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1427")
+    @Test
+    fun parseWithActivationTag() {
+        val pomXml = MavenParser.builder()
+            .build()
+            .parse(
+                ctx,
+                """
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>test</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <profiles>
+                            <profile>
+                              <id>repo-incode-work</id>
+                              <properties>
+                                <name>!skip.repo-incode-work</name>
+                              </properties>
+                              <activation>
+                                <activeByDefault>true</activeByDefault>
+                              </activation>
+                            </profile>
+                        </profiles>
+                    </project>
+                """
+            )[0]
+        assertThat(pomXml.mavenResolutionResult().pom.requested.profiles[0].activation!!.activeByDefault as Boolean).isTrue
+    }
+
     @Test
     fun parentPomProfileProperty() {
         val maven = MavenParser.builder()

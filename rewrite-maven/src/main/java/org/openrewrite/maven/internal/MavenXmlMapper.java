@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.xml.XmlFactory;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.fasterxml.jackson.dataformat.xml.deser.FromXmlParser;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 
@@ -47,6 +48,7 @@ public class MavenXmlMapper {
         {
             ObjectMapper m = XmlMapper.builder(xmlFactory)
                     .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                    .enable(FromXmlParser.Feature.EMPTY_ELEMENT_AS_NULL)
                     .defaultUseWrapper(false)
                     .build()
                     .registerModule(new ParameterNamesModule())
