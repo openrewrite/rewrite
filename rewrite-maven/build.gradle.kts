@@ -67,6 +67,8 @@ dependencies {
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-11"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
+    testRuntimeOnly("org.apache.logging.log4j:log4j-api:latest.release")
+    testRuntimeOnly("org.apache.logging.log4j:log4j-core:latest.release")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {
