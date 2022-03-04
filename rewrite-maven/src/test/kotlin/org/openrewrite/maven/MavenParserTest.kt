@@ -1060,4 +1060,84 @@ class MavenParserTest {
         assertThat(compileDependencies).anyMatch { it.artifactId == "b" && it.version == "0.1.0-SNAPSHOT" }
         assertThat(compileDependencies).anyMatch { it.artifactId == "d" && it.version == "0.1.0-SNAPSHOT" }
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1422")
+    @Test
+    fun managedDependencyInTransitiveAndPom() {
+        // a has a managed dependency on junit:junit:4.11
+        // a has a dependency defined for junit:junit (version is managed to 4.11)
+        // ------------------------
+        // b has a managed dependency on junit:junit (with an exclusion on hamcrest, but does NOT define version)
+        // b has a dependency on a
+        // b does NOT have a direct dependency on junit.
+        //
+        // b -> a -> junit
+        //
+        // Resolve dependencies on b should include junit:junit:4.11 but NOT hamcrest.
+        val maven = MavenParser.builder()
+            .build()
+            .parse(
+                ctx,
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.managed.test</groupId>
+                        <artifactId>a</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>jar</packaging>
+
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>junit</groupId>
+                                    <artifactId>junit</artifactId>
+                                    <version>4.11</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    
+                        <dependencies>
+                            <dependency>
+                                <groupId>junit</groupId>
+                                <artifactId>junit</artifactId>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """,
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.managed.test</groupId>
+                        <artifactId>b</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>jar</packaging>                    
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>junit</groupId>
+                                    <artifactId>junit</artifactId>
+                                    <exclusions>
+                                        <exclusion>
+                                            <groupId>org.hamcrest</groupId>
+                                            <artifactId>hamcrest-core</artifactId>
+                                        </exclusion>
+                                    </exclusions>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.managed.test</groupId>
+                                <artifactId>a</artifactId>
+                                <version>1.0.0</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            ).find { it.mavenResolutionResult().pom.artifactId == "b" }!!
+        val compileDependencies = maven.mavenResolutionResult().dependencies[Scope.Compile]
+        assertThat(compileDependencies).anyMatch { it.artifactId == "junit" && it.version == "4.11" }
+        assertThat(compileDependencies).noneMatch { it.artifactId == "hamcrest-core" }
+    }
+
 }

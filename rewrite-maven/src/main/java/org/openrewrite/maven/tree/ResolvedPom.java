@@ -370,16 +370,21 @@ public class ResolvedPom {
         private void mergeRequestedDependencies(List<Dependency> incomingRequestedDependencies) {
             if (!incomingRequestedDependencies.isEmpty()) {
                 if (requestedDependencies == null || requestedDependencies.isEmpty()) {
+                    //It is possible for the dependencies to be an empty, immutable list.
+                    //If it's empty, we ensure to create a mutable list.
                     requestedDependencies = new ArrayList<>(incomingRequestedDependencies);
+                } else {
+                    requestedDependencies.addAll(incomingRequestedDependencies);
                 }
-                requestedDependencies.addAll(incomingRequestedDependencies);
             }
         }
 
         private void mergeRepositories(List<MavenRepository> incomingRepositories) {
             if (!incomingRepositories.isEmpty()) {
                 if (repositories == null || repositories.isEmpty()) {
-                    repositories = new ArrayList<>(incomingRepositories);
+                    //It is possible for the repositories to be an empty, immutable list.
+                    //If it's empty, we ensure to create a mutable list.
+                    repositories = new ArrayList<>(incomingRepositories.size());
                 }
 
                 nextRepository:
@@ -399,7 +404,9 @@ public class ResolvedPom {
         private void mergeProperties(Map<String, String> incomingProperties, Pom pom) {
             if (!incomingProperties.isEmpty()) {
                 if (properties == null || properties.isEmpty()) {
-                    properties = new HashMap<>(incomingProperties);
+                    //It is possible for the properties to be an empty, immutable map.
+                    //If it's empty, we ensure to create a mutable map.
+                    properties = new HashMap<>(incomingProperties.size());
                 }
                 for (Map.Entry<String, String> property : incomingProperties.entrySet()) {
                     MavenExecutionContextView.view(ctx)
@@ -470,8 +477,10 @@ public class ResolvedPom {
             List<DependencyAndDependent> dependenciesAtNextDepth = new ArrayList<>();
 
             for (DependencyAndDependent dd : dependenciesAtDepth) {
+                //First get the dependency (relative to the pom it was defined in)
                 Dependency d = dd.getDefinedIn().getValues(dd.getDependency(), depth);
-
+                //The dependency may be modified by the current pom's managed dependencies
+                d = getValues(d, depth);
                 if (d.getVersion() == null) {
                     throw new MavenParsingException("No version provided for dependency " + d.getGroupId() + ":" + d.getArtifactId());
                 }
@@ -516,7 +525,7 @@ public class ResolvedPom {
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
                         resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                getDependencyManagement(), getRepositories(), emptyList());
+                                emptyList(), emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
