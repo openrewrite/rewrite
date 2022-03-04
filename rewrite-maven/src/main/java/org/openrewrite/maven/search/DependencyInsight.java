@@ -88,7 +88,7 @@ public class DependencyInsight extends Recipe {
                 Xml.Tag t = super.visitTag(tag, context);
 
                 if (isDependencyTag()) {
-                    ResolvedDependency dependency = findDependency(t);
+                    ResolvedDependency dependency = findDependency(t, aScope);
                     if (dependency != null) {
                         ResolvedDependency match = dependency.findDependency(groupIdPattern, artifactIdPattern);
                         if (match != null) {

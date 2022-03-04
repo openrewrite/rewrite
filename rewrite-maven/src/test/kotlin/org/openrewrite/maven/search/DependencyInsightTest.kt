@@ -16,9 +16,34 @@
 package org.openrewrite.maven.search
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.maven.MavenRecipeTest
 
 class DependencyInsightTest : MavenRecipeTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1418")
+    @Test
+    fun doesNotMatchTestScope() = assertUnchanged(
+        recipe = DependencyInsight("*guava*", "*", "compile"),
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """
+    )
 
     @Test
     fun findDependency() = assertChanged(
