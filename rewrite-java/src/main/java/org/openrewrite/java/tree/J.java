@@ -3360,7 +3360,7 @@ public interface J extends Tree {
 
         @Override
         public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+            return type.toString().toLowerCase();
         }
 
         /**

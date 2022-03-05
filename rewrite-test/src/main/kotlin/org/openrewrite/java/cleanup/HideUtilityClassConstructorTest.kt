@@ -77,7 +77,6 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
         """
     )
 
-
     @Test
     fun identifyUtilityClassesWithProtectedConstructor(jp: JavaParser) = assertUnchanged(
         jp,
@@ -378,7 +377,6 @@ interface HideUtilityClassConstructorTest : JavaRecipeTest {
             }
         """
     )
-
 
     @Test
     fun identifyNonUtilityClassesOnlyPublicConstructor(jp: JavaParser) = assertUnchanged(

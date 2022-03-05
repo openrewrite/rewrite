@@ -289,7 +289,7 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
         for (ParseTree c : ctx.children) {
             classNameBuilder.append(StringUtils.aspectjNameToPattern(c.getText()));
         }
-        String className = classNameBuilder.toString().replace("\\$", "[\\$.]");
+        String className = classNameBuilder.toString();
 
         if (!className.contains(".")) {
             try {

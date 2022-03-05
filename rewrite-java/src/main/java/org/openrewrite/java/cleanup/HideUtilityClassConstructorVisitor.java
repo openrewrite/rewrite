@@ -282,7 +282,4 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
             return count;
         }
     }
-
 }
-
-
