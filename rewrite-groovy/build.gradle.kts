@@ -14,7 +14,7 @@ dependencies {
 
     api("org.jetbrains:annotations:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
+    api("com.fasterxml.jackson.core:jackson-annotations:2.13.1")
 
     testImplementation(project(":rewrite-test"))
     testRuntimeOnly("org.codehaus.groovy:groovy-all:latest.release")
