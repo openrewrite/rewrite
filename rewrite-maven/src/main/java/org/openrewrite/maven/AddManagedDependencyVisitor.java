@@ -81,7 +81,7 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
             if (dependencyManagementTag == null) {
                 doc = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<dependencyManagement>\n<dependencies/>\n</dependencyManagement>"),
                         new MavenTagInsertionComparator(root.getContent())).visitNonNull(doc, ctx);
-            } else if (dependencyManagementTag.getChildren("dependencies").isEmpty()) {
+            } else if (!dependencyManagementTag.getChild("dependencies").isPresent()) {
                 doc = (Xml.Document) new AddToTagVisitor<>(dependencyManagementTag, Xml.Tag.build("\n<dependencies/>\n"),
                         new MavenTagInsertionComparator(root.getContent())).visitNonNull(doc, ctx);
             }
