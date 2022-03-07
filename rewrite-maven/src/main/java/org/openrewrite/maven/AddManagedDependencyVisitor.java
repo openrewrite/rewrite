@@ -26,8 +26,10 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.List;
 import java.util.Objects;
 
 import static java.util.Collections.emptyList;
@@ -76,18 +78,19 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
 
         Xml.Document doc = super.visitDocument(document, ctx);
         Xml.Tag root = document.getRoot();
-        if (root.getContent() != null) {
-            Xml.Tag dependencyManagementTag = root.getChild("dependencyManagement").orElse(null);
-            if (dependencyManagementTag == null) {
-                doc = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<dependencyManagement>\n<dependencies/>\n</dependencyManagement>"),
-                        new MavenTagInsertionComparator(root.getContent())).visitNonNull(doc, ctx);
-            } else if (!dependencyManagementTag.getChild("dependencies").isPresent()) {
-                doc = (Xml.Document) new AddToTagVisitor<>(dependencyManagementTag, Xml.Tag.build("\n<dependencies/>\n"),
-                        new MavenTagInsertionComparator(root.getContent())).visitNonNull(doc, ctx);
-            }
-            doc = (Xml.Document) new InsertDependencyInOrder(groupId, artifactId, versionToUse,
-                    type, scope, classifier).visitNonNull(doc, ctx);
+        List<? extends Content> rootContent = root.getContent() != null ? root.getContent() : emptyList();
+
+        Xml.Tag dependencyManagementTag = root.getChild("dependencyManagement").orElse(null);
+        if (dependencyManagementTag == null) {
+            doc = (Xml.Document) new AddToTagVisitor<>(root, Xml.Tag.build("<dependencyManagement>\n<dependencies/>\n</dependencyManagement>"),
+                    new MavenTagInsertionComparator(rootContent)).visitNonNull(doc, ctx);
+        } else if (!dependencyManagementTag.getChild("dependencies").isPresent()) {
+            doc = (Xml.Document) new AddToTagVisitor<>(dependencyManagementTag, Xml.Tag.build("\n<dependencies/>\n"),
+                    new MavenTagInsertionComparator(rootContent)).visitNonNull(doc, ctx);
         }
+
+        doc = (Xml.Document) new InsertDependencyInOrder(groupId, artifactId, versionToUse,
+                type, scope, classifier).visitNonNull(doc, ctx);
         return doc;
     }
 
