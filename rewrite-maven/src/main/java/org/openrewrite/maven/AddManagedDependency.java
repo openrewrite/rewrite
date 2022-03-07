@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class AddManagedDependency extends Recipe {
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'org.apache.logging.log4j:VERSION'.",
+            description = "The first part of a dependency coordinate 'org.apache.logging.log4j:ARTIFACT_ID:VERSION'.",
             example = "org.apache.logging.log4j")
     private final String groupId;
 

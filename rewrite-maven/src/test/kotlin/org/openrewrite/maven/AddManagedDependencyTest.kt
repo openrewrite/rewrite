@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Parser.Input
 import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.marker.JavaProject
@@ -32,7 +33,20 @@ class AddManagedDependencyTest {
     private val xmlParser = XmlParser()
     private val mavenParser = MavenParser.builder().build()
     private val javaParser = JavaParser.fromJavaVersion()
-        .classpath("log4j-api", "log4j-core")
+        .dependsOn(
+            listOf(Input.fromString("""
+                package org.apache.logging.log4j;
+                public class Logger {}
+            """),Input.fromString("""
+                    package org.apache.logging.log4j;
+                    public class LogManager {
+                        public static Logger getLogger(Class clazz) {
+                            return new Logger;
+                        }
+                    }
+            """)
+            )
+        )
         .build()
 
     private val executionContext: ExecutionContext
