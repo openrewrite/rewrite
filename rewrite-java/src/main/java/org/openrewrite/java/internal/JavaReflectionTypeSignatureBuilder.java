@@ -92,20 +92,21 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
                 typeVariableNameStack = new HashSet<>();
             }
 
+            if (!typeVariableNameStack.add(name)) {
+                return "Generic{" + name + "}";
+            }
+
             StringBuilder s = new StringBuilder("Generic{" + name);
-            if (typeVariableNameStack.add(name)) {
-                if (typeVar.getBounds().length > 0) {
-                    String boundsStr = genericBounds(typeVar.getBounds());
-                    if (!boundsStr.isEmpty()) {
-                        s.append(" extends ").append(boundsStr);
-                    }
+            if (typeVar.getBounds().length > 0) {
+                String boundsStr = genericBounds(typeVar.getBounds());
+                if (!boundsStr.isEmpty()) {
+                    s.append(" extends ").append(boundsStr);
                 }
             }
 
-            s.append('}');
-
             typeVariableNameStack.remove(name);
-            return s.toString();
+
+            return s.append('}').toString();
         } else if (type instanceof WildcardType) {
             WildcardType wildcard = (WildcardType) type;
             StringBuilder s = new StringBuilder("Generic{?");

@@ -38,6 +38,8 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public abstract class ExtendsJavaTypeGoat extends JavaTypeGoat<T, S> {
     }
 
+    public static abstract class Extension<U extends Extension<U>> {}
+
     public static class TypeA {}
     public static class TypeB {}
 
@@ -58,6 +60,7 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public abstract <U extends PT<U> & C> InheritedJavaTypeGoat<T, U> inheritedJavaTypeGoat(InheritedJavaTypeGoat<T, U> n);
     public abstract <U extends TypeA & PT<U> & C> U genericIntersection(U n);
     public abstract T genericT(T n); // remove after signatures are common.
+    public abstract <U extends JavaTypeGoat.Extension<U> & Intersection<U>> void recursiveIntersection(U n);
 }
 
 interface C {
@@ -66,6 +69,10 @@ interface C {
 }
 
 interface PT<T> {
+}
+
+interface Intersection<T extends JavaTypeGoat.Extension<T> & Intersection<T>> {
+    T getIntersectionType();
 }
 
 @Retention(RetentionPolicy.SOURCE)
