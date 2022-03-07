@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -149,7 +149,6 @@ public interface JavaTypeSignatureBuilderTest {
                 .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=inner,return=void,parameters=[org.openrewrite.java.C$Inner]}");
     }
 
-    @Disabled("Disabled until Classgraph is removed.")
     @Test
     default void inheritedJavaTypeGoat() {
         assertThat(signatureBuilder().signature(firstMethodParameter("inheritedJavaTypeGoat")))
@@ -158,19 +157,26 @@ public interface JavaTypeSignatureBuilderTest {
                 .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=inheritedJavaTypeGoat,return=org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat<Generic{T}, Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}>,parameters=[org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat<Generic{T}, Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}>]}");
     }
 
-    @Disabled("Disabled until Classgraph is removed.")
     @Test
     default void extendsJavaTypeGoat() {
         assertThat(signatureBuilder().signature(innerClassSignature("ExtendsJavaTypeGoat")))
                 .isEqualTo("org.openrewrite.java.JavaTypeGoat$ExtendsJavaTypeGoat");
     }
 
-    @Disabled("Disabled until Classgraph is removed.")
     @Test
     default void genericIntersection() {
         assertThat(signatureBuilder().signature(firstMethodParameter("genericIntersection")))
                 .isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}");
         assertThat(methodSignature("genericIntersection"))
                 .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=genericIntersection,return=Generic{U extends org.openrewrite.java.JavaTypeGoat$TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C},parameters=[Generic{U extends org.openrewrite.java.JavaTypeGoat$TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}]}");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1367")
+    @Test
+    default void recursiveIntersection() {
+        assertThat(signatureBuilder().signature(firstMethodParameter("recursiveIntersection")))
+                .isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$Extension<Generic{U}> & org.openrewrite.java.Intersection<Generic{U}>}");
+        assertThat(methodSignature("recursiveIntersection"))
+                .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=recursiveIntersection,return=void,parameters=[Generic{U extends org.openrewrite.java.JavaTypeGoat$Extension<Generic{U}> & org.openrewrite.java.Intersection<Generic{U}>}]}");
     }
 }

@@ -13,33 +13,54 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java
+
+import java.lang.annotation.Retention
+import java.lang.annotation.RetentionPolicy
 
 // Whenever this class is changed, make a corresponding change in JavaTypeGoat in the main java source set.
+@AnnotationWithRuntimeRetention
+@AnnotationWithSourceRetention
 abstract class JavaTypeGoat<T, S extends PT<S> & C> {
-    JavaTypeGoat() {
+
+    public static final PT<String> parameterizedField = new PT<String>() {
     }
 
-    static final PT<String> parameterizedField = new PT<String>() {
-    };
-
-    static abstract class InheritedJavaTypeGoat extends JavaTypeGoat {
+    static abstract class InheritedJavaTypeGoat<T, U extends PT<U> & C> extends JavaTypeGoat<T, U> {
         InheritedJavaTypeGoat() {
-            super();
+            super()
         }
     }
 
+    enum EnumType {
+    }
+
+    abstract class ExtendsJavaTypeGoat extends JavaTypeGoat<T, S> {
+    }
+
+    static abstract class Extension<U extends Extension<U>> {}
+
+    static class TypeA {}
+    static class TypeB {}
+
+    @AnnotationWithRuntimeRetention
+    @AnnotationWithSourceRetention
     abstract void clazz(C n);
     abstract void primitive(int n);
     abstract void array(C[][] n);
-    abstract void parameterized(PT<C> n);
-    abstract void parameterizedRecursive(PT<PT<C>> n);
-    abstract void generic(PT<? extends C> n);
-    abstract void genericContravariant(PT<? super C> n);
-    abstract <U extends JavaTypeGoat<U, ?>> void genericRecursive(JavaTypeGoat<? extends U[], ?> n);
-    abstract <U> void genericUnbounded(PT<U> n);
+    abstract PT<C> parameterized(PT<C> n);
+    abstract PT<PT<C>> parameterizedRecursive(PT<PT<C>> n);
+    abstract PT<? extends C> generic(PT<? extends C> n);
+    abstract PT<? super C> genericContravariant(PT<? super C> n);
+    abstract <U extends JavaTypeGoat<U, ?>> JavaTypeGoat<? extends U[], ?> genericRecursive(JavaTypeGoat<? extends U[], ?> n);
+    abstract <U> PT<U> genericUnbounded(PT<U> n);
     abstract void genericArray(PT<C>[] n);
     abstract void inner(C.Inner n);
+    abstract void enumType(EnumType n);
+    abstract <U extends PT<U> & C> InheritedJavaTypeGoat<T, U> inheritedJavaTypeGoat(InheritedJavaTypeGoat<T, U> n);
+    abstract <U extends TypeA & PT<U> & C> U genericIntersection(U n);
+    abstract T genericT(T n); // remove after signatures are common.
+    abstract <U extends Extension<U> & Intersection<U>> void recursiveIntersection(U n);
 }
 
 interface C {
@@ -49,3 +70,13 @@ interface C {
 
 interface PT<T> {
 }
+
+interface Intersection<T extends JavaTypeGoat.Extension<T> & Intersection<T>> {
+    T getIntersectionType();
+}
+
+@Retention(RetentionPolicy.SOURCE)
+@interface AnnotationWithSourceRetention {}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface AnnotationWithRuntimeRetention {}

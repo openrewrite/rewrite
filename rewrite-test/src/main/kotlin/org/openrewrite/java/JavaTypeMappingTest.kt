@@ -158,7 +158,6 @@ interface JavaTypeMappingTest {
         assertThat(clazz.fullyQualifiedName).isEqualTo("org.openrewrite.java.C${"$"}Inner")
     }
 
-    @Disabled("Disabled until Classgraph is removed.")
     @Test
     fun inheritedJavaTypeGoat() {
         val clazz = firstMethodParameter("inheritedJavaTypeGoat") as JavaType.Parameterized
@@ -167,7 +166,6 @@ interface JavaTypeMappingTest {
         assertThat(clazz.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}InheritedJavaTypeGoat<Generic{T}, Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}>")
     }
 
-    @Disabled("Disabled until Classgraph is removed.")
     @Issue("https://github.com/openrewrite/rewrite/pull/1365")
     @Test
     fun genericIntersectionType() {
@@ -178,7 +176,7 @@ interface JavaTypeMappingTest {
         assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat${"$"}TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}")
     }
 
-    @Disabled("Temporarily disabled: JavaReflection returns the implicit constructor that is added by the compiler, and ClassgraphTypeMapping returns the wrong type.")
+    @Disabled("https://github.com/openrewrite/rewrite/issues/1438")
     @Issue("https://github.com/openrewrite/rewrite/issues/1349")
     @Test
     fun enumType() {
@@ -200,5 +198,12 @@ interface JavaTypeMappingTest {
         val clazzMethod = methodType("clazz")
         assertThat(clazzMethod.annotations.size == 1)
         assertThat(clazzMethod.annotations.first().className == "AnnotationWithRuntimeRetention")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1367")
+    @Test
+    fun recursiveIntersection() {
+        val clazz = firstMethodParameter("recursiveIntersection") as JavaType.GenericTypeVariable
+        assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat${"$"}Extension<Generic{U}> & org.openrewrite.java.Intersection<Generic{U}>}")
     }
 }
