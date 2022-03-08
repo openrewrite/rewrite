@@ -136,6 +136,7 @@ public class Space {
         List<Comment> comments = new ArrayList<>();
 
         boolean inSingleLineComment = false;
+        Comment.Style inLineSlashOrHashComment = null;
         boolean inMultiLineComment = false;
 
         char last = 0;
@@ -143,28 +144,47 @@ public class Space {
         char[] charArray = formatting.toCharArray();
         for (char c : charArray) {
             switch (c) {
-                case '/':
-                    if (inSingleLineComment) {
+                case '#':
+                    if (Comment.Style.LINE_SLASH.equals(inLineSlashOrHashComment)) {
                         comment.append(c);
-                    } else if (last == '/' && !inMultiLineComment) {
-                        inSingleLineComment = true;
-                        comment = new StringBuilder();
-                    } else if (last == '*' && inMultiLineComment && comment.length() > 0) {
-                        inMultiLineComment = false;
-                        comment.setLength(comment.length() - 1); // trim the last '*'
-                        comments.add(new Comment(Comment.Style.INLINE, comment.toString(), prefix.toString(), Markers.EMPTY));
-                        prefix = new StringBuilder();
-                        comment = new StringBuilder();
-                        continue;
                     } else {
+                        if (inSingleLineComment) {
+                            comment.append(c);
+                        } else {
+                            inSingleLineComment = true;
+                            inLineSlashOrHashComment = Comment.Style.LINE_HASH;
+                            comment = new StringBuilder();
+                        }
+                    }
+                    break;
+                case '/':
+                    if (Comment.Style.LINE_HASH.equals(inLineSlashOrHashComment)) {
                         comment.append(c);
+                    } else {
+                        if (inSingleLineComment) {
+                            comment.append(c);
+                        } else if (last == '/' && !inMultiLineComment) {
+                            inSingleLineComment = true;
+                            inLineSlashOrHashComment = Comment.Style.LINE_SLASH;
+                            comment = new StringBuilder();
+                        } else if (last == '*' && inMultiLineComment && comment.length() > 0) {
+                            inMultiLineComment = false;
+                            comment.setLength(comment.length() - 1); // trim the last '*'
+                            comments.add(new Comment(Comment.Style.INLINE, comment.toString(), prefix.toString(), Markers.EMPTY));
+                            prefix = new StringBuilder();
+                            comment = new StringBuilder();
+                            continue;
+                        } else {
+                            comment.append(c);
+                        }
                     }
                     break;
                 case '\r':
                 case '\n':
                     if (inSingleLineComment) {
                         inSingleLineComment = false;
-                        comments.add(new Comment(Comment.Style.LINE_SLASH, comment.toString(), prefix.toString(), Markers.EMPTY));
+                        comments.add(new Comment(inLineSlashOrHashComment, comment.toString(), prefix.toString(), Markers.EMPTY));
+                        inLineSlashOrHashComment = null;
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
                         prefix.append(c);

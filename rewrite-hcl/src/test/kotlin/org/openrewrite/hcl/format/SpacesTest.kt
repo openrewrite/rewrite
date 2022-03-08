@@ -15,12 +15,15 @@
  */
 package org.openrewrite.hcl.format
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.hcl.HclParser
 import org.openrewrite.hcl.HclRecipeTest
 import org.openrewrite.hcl.style.SpacesStyle
+import org.openrewrite.hcl.tree.Comment
 import org.openrewrite.style.NamedStyles
 
 class SpacesTest : HclRecipeTest {
@@ -72,6 +75,40 @@ class SpacesTest : HclRecipeTest {
               size = 1
             }
         """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/974")
+    @Test
+    fun lineHashComment() = assertChanged(
+        before = """
+            # a hash comment with inline # or // is still 1 line.
+            resource{}
+        """,
+        after = """
+            # a hash comment with inline # or // is still 1 line.
+            resource {}
+        """,
+        afterConditions = { c ->
+            assertThat(c.prefix.comments.size).isEqualTo(1)
+            assertThat(c.prefix.comments[0].style).isEqualTo(Comment.Style.LINE_HASH)
+        }
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/974")
+    @Test
+    fun lineSlashComment() = assertChanged(
+        before = """
+            // a slash comment with inline # or // is still 1 line.
+            resource{}
+        """,
+        after = """
+            // a slash comment with inline # or // is still 1 line.
+            resource {}
+        """,
+        afterConditions = { c ->
+            assertThat(c.prefix.comments.size).isEqualTo(1)
+            assertThat(c.prefix.comments[0].style).isEqualTo(Comment.Style.LINE_SLASH)
+        }
     )
 
     private fun spaces(style: SpacesStyle) = listOf(
