@@ -69,7 +69,7 @@ public class ResolvedManagedDependency {
         return gav.getVersion();
     }
 
-    boolean matches(String groupId, String artifactId,
+    public boolean matches(String groupId, String artifactId,
                            @Nullable String type, @Nullable String classifier) {
         return groupId.equals(gav.getGroupId()) && artifactId.equals(gav.getArtifactId()) &&
                 (type == null ? "jar" : type).equals(this.type == null ? "jar" : this.type) &&
