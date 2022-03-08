@@ -31,6 +31,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 
@@ -66,9 +67,15 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
 
+        Xml.Document doc = super.visitDocument(document, ctx);
+
         Validated versionValidation = Semver.validate(version, versionPattern);
         if (versionValidation.isValid()) {
             versionComparator = versionValidation.getValue();
+        }
+
+        if (documentHasManagedDependency(doc, ctx)) {
+            return document;
         }
 
         String versionToUse = findVersionToUse(ctx);
@@ -76,7 +83,6 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
             return document;
         }
 
-        Xml.Document doc = super.visitDocument(document, ctx);
         Xml.Tag root = document.getRoot();
         List<? extends Content> rootContent = root.getContent() != null ? root.getContent() : emptyList();
 
@@ -94,6 +100,21 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
         return doc;
     }
 
+    private boolean documentHasManagedDependency(Xml.Document doc, ExecutionContext ctx) {
+        AtomicBoolean managedDepExists = new AtomicBoolean(false);
+        new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
+                Xml.Tag tg = super.visitTag(tag, executionContext);
+                if (isManagedDependencyTag(groupId, artifactId)) {
+                    managedDepExists.set(true);
+                }
+                return tg;
+            }
+        }.visitNonNull(doc, ctx);
+        return managedDepExists.get();
+    }
+
     @RequiredArgsConstructor
     private static class InsertDependencyInOrder extends MavenIsoVisitor<ExecutionContext> {
         private final String groupId;
@@ -108,11 +129,7 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
 
         @Override
         public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-            boolean managedDependencyExists = getResolutionResult().getPom().getDependencyManagement().stream()
-                    .anyMatch(rb -> rb.matches(groupId, artifactId, type, classifier));
-            if (managedDependencyExists) {
-                return document;
-            }
+
             return super.visitDocument(document, ctx);
         }
 
