@@ -153,7 +153,7 @@ public class AddManagedDependency extends Recipe {
                             return maven;
                         }
 
-                        if (!addToRootPom || (rootPom.get() != null && rootPom.get().equals(document))) {
+                        if (!Boolean.TRUE.equals(addToRootPom) || (rootPom.get() != null && rootPom.get().equals(document))) {
                             doAfterVisit(new AddManagedDependencyVisitor(groupId,artifactId,version,versionPattern,scope,releasesOnly,type,classifier));
                         }
 
