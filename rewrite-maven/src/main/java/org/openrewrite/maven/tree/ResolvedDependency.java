@@ -49,6 +49,8 @@ public class ResolvedDependency {
 
     List<License> licenses;
 
+    int depth;
+
     /**
      * Only used by dependency resolution to avoid unnecessary empty list allocations for leaf dependencies.
      * @param dependencies A dependency list
@@ -84,6 +86,14 @@ public class ResolvedDependency {
 
     public boolean isOptional() {
         return requested.isOptional();
+    }
+
+    public boolean isDirect() {
+        return depth == 0;
+    }
+
+    public boolean isTransitive() {
+        return depth != 0;
     }
 
     @Nullable

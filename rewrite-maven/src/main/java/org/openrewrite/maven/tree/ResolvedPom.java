@@ -532,7 +532,8 @@ public class ResolvedPom {
 
                     ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
                             resolvedPom.getGav(), dd.getDependency(), emptyList(),
-                            resolvedPom.getRequested().getLicenses());
+                            resolvedPom.getRequested().getLicenses(),
+                            depth);
 
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()

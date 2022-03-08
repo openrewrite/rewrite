@@ -181,12 +181,14 @@ public class AddDependency extends Recipe {
                         if (resolvedScope == null) {
                             return maven;
                         }
+
                         //If the dependency is already in scope, no need to continue.
                         for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
-                            if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                            if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                                 return maven;
                             }
                         }
+
                         if (resolvedScope.equals("test")) {
                             for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Test)) {
                                 if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {

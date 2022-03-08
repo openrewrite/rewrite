@@ -35,7 +35,8 @@ class AddDependencyTest {
     private val xmlParser = XmlParser()
     private val mavenParser = MavenParser.builder().build()
     private val javaParser = JavaParser.fromJavaVersion()
-        .classpath("junit-jupiter-api", "guava", "jackson-databind")
+        .logCompilationWarningsAndErrors(true)
+        .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core")
         .build()
 
     private val executionContext: ExecutionContext
@@ -522,7 +523,60 @@ class AddDependencyTest {
         )
     }
 
-    private fun JavaParser.parseWithProvenance(sourceSet: String, vararg javaSources: String): List<J.CompilationUnit> {
+    @Issue("https://github.com/openrewrite/rewrite/issues/1443")
+    @Test
+    fun addTransitiveDependencyAsDirect() {
+        val results = addDependency("com.fasterxml.jackson.core:jackson-core:2.12.0", "com.fasterxml.jackson.core.*").run(
+            javaParser.parseWithProvenance(
+                "main",
+                """
+                        public class A {
+                            com.fasterxml.jackson.core.Versioned v;
+                        }
+                    """
+            ) + mavenParser.parseWithProvenance(
+                """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.fasterxml.jackson.core</groupId>
+                                <artifactId>jackson-databind</artifactId>
+                                <version>2.12.0</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """.trimIndent()
+            )
+        )
+
+        assertThat(results[0].after!!.printAllTrimmed()).isEqualTo(
+            //language=xml
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-core</artifactId>
+                            <version>2.12.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>2.12.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """.trimIndent()
+        )
+    }
+
+    private fun JavaParser.parseWithProvenance(sourceSet: String, @Language("java") vararg javaSources: String): List<J.CompilationUnit> {
         setSourceSet(sourceSet)
         return parse(executionContext, *javaSources).map { j -> j.withMarkers(j.markers.addIfAbsent(javaProject)) }
     }
