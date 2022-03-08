@@ -20,16 +20,15 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
-import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.java.search.UsesType;
 import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Getter
 @AllArgsConstructor
@@ -52,13 +51,28 @@ public class AddManagedDependency extends Recipe {
     private final String version;
 
     @Option(displayName = "Scope",
-            description = "A scope to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
-                    "is used when adding a runtime, provided, or import dependency.",
+            description = "An optional scope to use for the dependency management tag.",
             example = "import",
             valid = {"import", "runtime", "provided", "test"},
             required = false)
     @Nullable
     private final String scope;
+
+
+    @Option(displayName = "Type",
+            description = "An optional type to use for the dependency management tag.",
+            valid = {"jar", "pom", "war"},
+            example = "pom",
+            required = false)
+    @Nullable
+    private String type;
+
+    @Option(displayName = "Classifier",
+            description = "An optional classifier to use for the dependency management tag",
+            example = "test",
+            required = false)
+    @Nullable
+    private String classifier;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
@@ -68,14 +82,6 @@ public class AddManagedDependency extends Recipe {
     @Nullable
     private String versionPattern;
 
-    @Option(displayName = "Type",
-            description = "The type of dependency to add. If omitted Maven defaults to assuming the type is \"jar\".",
-            valid = {"jar", "pom", "war"},
-            example = "pom",
-            required = false)
-    @Nullable
-    private String type;
-
     @Option(displayName = "Releases only",
             description = "Whether to exclude snapshots from consideration when using a semver selector",
             example = "true",
@@ -83,17 +89,11 @@ public class AddManagedDependency extends Recipe {
     @Nullable
     private Boolean releasesOnly;
 
-    @Option(displayName = "Only if using glob pattern",
-            description = "Used to determine if the dependency will be added and in which scope it should be placed.",
-            example = "org.apache.logging.log4j.*")
-    private String onlyIfUsing;
-
-    @Option(displayName = "Classifier",
-            description = "A Maven classifier to add. Most commonly used to select shaded or test variants of a library",
-            example = "test",
-            required = false)
+    @Option(displayName = "Only if using glob expression for group:artifact",
+            description = "Only add managed dependencies to projects having a concrete dependency matching the expression.",
+            example = "org.apache.logging.log4j:log4j*")
     @Nullable
-    private String classifier;
+    private String onlyIfUsing;
 
     @Option(displayName = "Add to the root pom",
             description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
@@ -118,29 +118,39 @@ public class AddManagedDependency extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new UsesType<>(onlyIfUsing);
+        if (!StringUtils.isNullOrEmpty(onlyIfUsing) && onlyIfUsing.contains(":")) {
+            String[] ga = onlyIfUsing.split(":");
+            return new MavenIsoVisitor<ExecutionContext>() {
+                @Override
+                public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext context) {
+                    Xml.Tag t = super.visitTag(tag, context);
+
+                    if (isDependencyTag()) {
+                        ResolvedDependency dependency = findDependency(t, null);
+                        if (dependency != null) {
+                            ResolvedDependency match = dependency.findDependency(ga[0], ga[1]);
+                            if (match != null) {
+                                t = t.withMarkers(t.getMarkers().searchResult());
+                            }
+                        }
+                    }
+
+                    return t;
+                }
+            };
+        }
+        return null;
     }
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        Map<JavaProject, Set<String>> sourceSetsByProject = new HashMap<>();
-        final AtomicReference<SourceFile> rootPom = new AtomicReference<>();
+        List<SourceFile> rootPoms = new ArrayList<>();
         for (SourceFile source : before) {
-            source.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                    source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                        if (source != new UsesType<>(onlyIfUsing).visit(source, ctx)) {
-                            sourceSetsByProject.computeIfAbsent(javaProject, v -> new HashSet<>()).add(sourceSet.getName());
-                        }
-                    }));
             source.getMarkers().findFirst(MavenResolutionResult.class).ifPresent(mavenResolutionResult -> {
-                if (rootPom.get() == null && mavenResolutionResult.getParent() == null) {
-                    rootPom.set(source);
+                if (mavenResolutionResult.getParent() == null) {
+                    rootPoms.add(source);
                 }
             });
-        }
-
-        if (sourceSetsByProject.isEmpty()) {
-            return before;
         }
 
         return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
@@ -149,11 +159,7 @@ public class AddManagedDependency extends Recipe {
                     public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
                         Xml maven = super.visitDocument(document, executionContext);
 
-                        if ("test".equals(scope) && !sourceSetsByProject.get(javaProject).contains("test")) {
-                            return maven;
-                        }
-
-                        if (!Boolean.TRUE.equals(addToRootPom) || (rootPom.get() != null && rootPom.get().equals(document))) {
+                        if (!Boolean.TRUE.equals(addToRootPom) || rootPoms.contains(document)) {
                             doAfterVisit(new AddManagedDependencyVisitor(groupId,artifactId,version,versionPattern,scope,releasesOnly,type,classifier));
                         }
 
