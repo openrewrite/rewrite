@@ -356,7 +356,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 expressions.add(new Hcl.Literal(randomId(), prefix, Markers.EMPTY, value, value));
             } else if (part.templateInterpolation() != null) {
                 Space prefix = Space.format(prefix(part.templateInterpolation()));
-                expressions.add((Expression) visit(part.templateInterpolation()).withPrefix(prefix));
+                expressions.add(visit(part.templateInterpolation()).withPrefix(prefix));
             } else {
                 throw new IllegalStateException("Unsupported terminal node");
             }
@@ -557,7 +557,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 expressions.add(new Hcl.Literal(randomId(), prefix, Markers.EMPTY, value, value));
             } else if (part.templateInterpolation() != null) {
                 Space prefix = Space.format(prefix(part.templateInterpolation()));
-                expressions.add((Expression) visit(part.templateInterpolation()).withPrefix(prefix));
+                expressions.add(visit(part.templateInterpolation()).withPrefix(prefix));
             } else {
                 throw new IllegalStateException("Unsupported terminal node");
             }
