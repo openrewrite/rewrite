@@ -22,7 +22,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.Semver;
@@ -90,7 +89,7 @@ public class AddManagedDependency extends Recipe {
     private Boolean releasesOnly;
 
     @Option(displayName = "Only if using glob expression for group:artifact",
-            description = "Only add managed dependencies to projects having a concrete dependency matching the expression.",
+            description = "Only add managed dependencies to projects having a dependency matching the expression.",
             example = "org.apache.logging.log4j:log4j*")
     @Nullable
     private String onlyIfUsing;
@@ -107,6 +106,15 @@ public class AddManagedDependency extends Recipe {
         //noinspection ConstantConditions
         if (version != null) {
             validated = validated.or(Semver.validate(version, versionPattern));
+        }
+        if (!StringUtils.isNullOrEmpty(onlyIfUsing)) {
+            validated = validated.and(Validated.test("onlyIfUsing", "invalid group:artifact glob pattern", onlyIfUsing, s -> {
+                try {
+                    return onlyIfUsing.matches("[\\w\\d]+\\*?:[\\w\\d]+\\*?");
+                } catch (Throwable t) {
+                    return false;
+                }
+            }));
         }
         return validated;
     }
@@ -153,7 +161,7 @@ public class AddManagedDependency extends Recipe {
             });
         }
 
-        return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
+        return ListUtils.map(before, s -> s.getMarkers().findFirst(MavenResolutionResult.class)
                 .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
                     @Override
                     public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {

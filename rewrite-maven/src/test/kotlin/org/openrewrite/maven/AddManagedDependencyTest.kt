@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Tree
+import org.openrewrite.Validated
 import org.openrewrite.java.marker.JavaProject
 import org.openrewrite.xml.XmlParser
 import java.nio.file.Path
@@ -30,6 +31,17 @@ class AddManagedDependencyTest {
     private val mavenParser = MavenParser.builder().build()
 
     private val javaProject = JavaProject(Tree.randomId(), "myproject", null)
+
+    @Test
+    fun `Recipe validation`()  {
+        val recipe = AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+            "pom", null, null, null, "org.apache.logging", true)
+        val validated : Validated = recipe.validate()
+        assertThat(validated).anyMatch { v ->
+            !v.elementAt(0).isValid
+        }
+
+    }
 
     @Test
     fun `Does not use type manage dependency not added`() {
