@@ -20,9 +20,10 @@ import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class InsertDependencyComparator implements Comparator<Content> {
-    private final Map<Content, Float> positions = new HashMap<>();
+    private final Map<Content, Float> positions = new LinkedHashMap<>();
 
     public InsertDependencyComparator(List<? extends Content> existingDependencies, Xml.Tag dependencyTag) {
         for (int i = 0, existingDependenciesSize = existingDependencies.size(); i < existingDependenciesSize; i++) {
@@ -31,7 +32,11 @@ public class InsertDependencyComparator implements Comparator<Content> {
 
         // if everything were ideally sorted, which dependency would the addable dependency
         // come after?
-        List<Content> ideallySortedDependencies = new ArrayList<>(existingDependencies);
+        List<Xml.Tag> ideallySortedDependencies = existingDependencies.stream()
+                .filter(c -> c instanceof Xml.Tag)
+                .map(c -> (Xml.Tag) c)
+                .collect(Collectors.toList());
+
         ideallySortedDependencies.add(dependencyTag);
         ideallySortedDependencies.sort(dependencyComparator);
 
@@ -46,8 +51,15 @@ public class InsertDependencyComparator implements Comparator<Content> {
             }
         }
 
-        positions.put(dependencyTag, afterDependency == null ? -0.5f :
-                positions.get(afterDependency) + 0.5f);
+        float insertPos = afterDependency == null ? -0.5f : 0.5f;
+        List<? extends Content> contents = new ArrayList<>(positions.keySet());
+        for (float f = afterDependency == null ? 0 : positions.get(afterDependency); f < contents.size(); f++) {
+            if (!(contents.get((int) f) instanceof Xml.Tag)) {
+                continue;
+            }
+            positions.put(dependencyTag, positions.get(contents.get((int) f)) + insertPos);
+            break;
+        }
     }
 
     @Override
@@ -55,33 +67,27 @@ public class InsertDependencyComparator implements Comparator<Content> {
         return positions.get(o1).compareTo(positions.get(o2));
     }
 
-    private static final Comparator<Content> dependencyComparator = (d1, d2) -> {
-        if (!(d1 instanceof Xml.Tag) || !(d2 instanceof Xml.Tag)) {
-            return 1;
-        }
-
-        Xml.Tag t1 = (Xml.Tag) d1;
-        Xml.Tag t2 = (Xml.Tag) d2;
-        Scope scope1 = Scope.fromName(t1.getChildValue("scope").orElse(null));
-        Scope scope2 = Scope.fromName(t2.getChildValue("scope").orElse(null));
+    private static final Comparator<Xml.Tag> dependencyComparator = (d1, d2) -> {
+        Scope scope1 = Scope.fromName(d1.getChildValue("scope").orElse(null));
+        Scope scope2 = Scope.fromName(d2.getChildValue("scope").orElse(null));
         if (!scope1.equals(scope2)) {
             return scope1.compareTo(scope2);
         }
 
-        String groupId1 = t1.getChildValue("groupId").orElse("");
-        String groupId2 = t2.getChildValue("groupId").orElse("");
+        String groupId1 = d1.getChildValue("groupId").orElse("");
+        String groupId2 = d2.getChildValue("groupId").orElse("");
         if (!groupId1.equals(groupId2)) {
             return comparePartByPart(groupId1, groupId2);
         }
 
-        String artifactId1 = t1.getChildValue("artifactId").orElse("");
-        String artifactId2 = t2.getChildValue("artifactId").orElse("");
+        String artifactId1 = d1.getChildValue("artifactId").orElse("");
+        String artifactId2 = d2.getChildValue("artifactId").orElse("");
         if (!artifactId1.equals(artifactId2)) {
             return comparePartByPart(artifactId1, artifactId2);
         }
 
-        String classifier1 = t1.getChildValue("classifier").orElse(null);
-        String classifier2 = t2.getChildValue("classifier").orElse(null);
+        String classifier1 = d1.getChildValue("classifier").orElse(null);
+        String classifier2 = d2.getChildValue("classifier").orElse(null);
 
         if (classifier1 == null && classifier2 != null) {
             return -1;
@@ -96,8 +102,8 @@ public class InsertDependencyComparator implements Comparator<Content> {
 
         // in every case imagined so far, group and artifact comparison are enough,
         // so this is just for completeness
-        return t1.getChildValue("version").orElse("")
-                .compareTo(t2.getChildValue("version").orElse(""));
+        return d1.getChildValue("version").orElse("")
+                .compareTo(d2.getChildValue("version").orElse(""));
     };
 
     private static int comparePartByPart(String d1, String d2) {

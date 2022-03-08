@@ -327,6 +327,8 @@ class AddDependencyTest {
                                     <artifactId>commons-lang</artifactId>
                                     <version>1.0</version>
                                 </dependency>
+                                <!-- comment 3 -->
+                                <?processing instruction3?>
                             </dependencies>
                         </project>
                     """.trimIndent()
@@ -355,6 +357,8 @@ class AddDependencyTest {
                             <version>29.0-jre</version>
                             <scope>test</scope>
                         </dependency>
+                        <!-- comment 3 -->
+                        <?processing instruction3?>
                     </dependencies>
                 </project>
             """.trimIndent()
