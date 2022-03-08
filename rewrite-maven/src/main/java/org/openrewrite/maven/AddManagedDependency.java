@@ -125,6 +125,11 @@ public class AddManagedDependency extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Add a managed maven dependency to a pom.xml file.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
         if (!StringUtils.isNullOrEmpty(onlyIfUsing) && onlyIfUsing.contains(":")) {
             String[] ga = onlyIfUsing.split(":");
