@@ -90,7 +90,8 @@ public class AddManagedDependency extends Recipe {
 
     @Option(displayName = "Only if using glob expression for group:artifact",
             description = "Only add managed dependencies to projects having a dependency matching the expression.",
-            example = "org.apache.logging.log4j:log4j*")
+            example = "org.apache.logging.log4j:log4j*",
+            required = false)
     @Nullable
     private String onlyIfUsing;
 
@@ -98,6 +99,7 @@ public class AddManagedDependency extends Recipe {
             description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
             example = "true",
             required = false)
+    @Nullable
     private Boolean addToRootPom;
 
     @Override
@@ -110,7 +112,7 @@ public class AddManagedDependency extends Recipe {
         if (!StringUtils.isNullOrEmpty(onlyIfUsing)) {
             validated = validated.and(Validated.test("onlyIfUsing", "invalid group:artifact glob pattern", onlyIfUsing, s -> {
                 try {
-                    return onlyIfUsing.matches("[\\w\\d]+\\*?:[\\w\\d]+\\*?");
+                    return onlyIfUsing.matches("[\\w\\d.]+\\*?:([\\w\\d]+\\*?|\\*)");
                 } catch (Throwable t) {
                     return false;
                 }
