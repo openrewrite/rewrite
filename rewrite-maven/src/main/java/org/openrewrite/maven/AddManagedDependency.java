@@ -90,7 +90,8 @@ public class AddManagedDependency extends Recipe {
 
     @Option(displayName = "Only if using glob expression for group:artifact",
             description = "Only add managed dependencies to projects having a dependency matching the expression.",
-            example = "org.apache.logging.log4j:log4j*")
+            example = "org.apache.logging.log4j:log4j*",
+            required = false)
     @Nullable
     private String onlyIfUsing;
 
