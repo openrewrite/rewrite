@@ -117,6 +117,7 @@ public class ManageDependencies extends Recipe {
 
                         for (GroupArtifact ga : requiresDependencyManagement) {
                             doAfterVisit(new InsertDependencyInOrder(ga.getGroupId(), ga.getArtifactId(), selectedVersion));
+                            maybeUpdateModel();
                         }
                     }
                 }

@@ -25,7 +25,7 @@ class ManageDependenciesTest : MavenRecipeTest {
     fun createDependencyManagementWithDependencyWhenNoneExists() = assertChanged(
         recipe = ManageDependencies(
             "org.junit.jupiter",
-            null,
+            "*",
             null),
         before = """
             <project>
@@ -71,7 +71,7 @@ class ManageDependenciesTest : MavenRecipeTest {
     fun deferToDependencyManagementWhenDependencyIsAlreadyManaged() = assertChanged(
         recipe = ManageDependencies(
             "org.junit.jupiter",
-            null,
+            "*",
             null),
         before = """
             <project>
