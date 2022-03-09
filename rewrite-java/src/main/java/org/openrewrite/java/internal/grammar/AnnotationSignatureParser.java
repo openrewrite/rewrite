@@ -1,36 +1,17 @@
-/*
- * Copyright 2021 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.9.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.9.3
 package org.openrewrite.java.internal.grammar;
-
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.ParserATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
-import org.antlr.v4.runtime.tree.ParseTreeVisitor;
-import org.antlr.v4.runtime.tree.TerminalNode;
-
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.misc.*;
+import org.antlr.v4.runtime.tree.*;
 import java.util.List;
+import java.util.Iterator;
+import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class AnnotationSignatureParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.9.2", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.9.3", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -257,6 +238,10 @@ public class AnnotationSignatureParser extends Parser {
 		public TerminalNode DOT(int i) {
 			return getToken(AnnotationSignatureParser.DOT, i);
 		}
+		public List<TerminalNode> DOTDOT() { return getTokens(AnnotationSignatureParser.DOTDOT); }
+		public TerminalNode DOTDOT(int i) {
+			return getToken(AnnotationSignatureParser.DOTDOT, i);
+		}
 		public QualifiedNameContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -288,11 +273,19 @@ public class AnnotationSignatureParser extends Parser {
 			setState(37);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while (_la==DOT) {
+			while (_la==DOT || _la==DOTDOT) {
 				{
 				{
 				setState(33);
-				match(DOT);
+				_la = _input.LA(1);
+				if ( !(_la==DOT || _la==DOTDOT) ) {
+				_errHandler.recoverInline(this);
+				}
+				else {
+					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+					_errHandler.reportMatch(this);
+					consume();
+				}
 				setState(34);
 				match(Identifier);
 				}
@@ -620,6 +613,10 @@ public class AnnotationSignatureParser extends Parser {
 		public TerminalNode DOT(int i) {
 			return getToken(AnnotationSignatureParser.DOT, i);
 		}
+		public List<TerminalNode> DOTDOT() { return getTokens(AnnotationSignatureParser.DOTDOT); }
+		public TerminalNode DOTDOT(int i) {
+			return getToken(AnnotationSignatureParser.DOTDOT, i);
+		}
 		public ClassOrInterfaceTypeContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -651,11 +648,19 @@ public class AnnotationSignatureParser extends Parser {
 			setState(71);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while (_la==DOT) {
+			while (_la==DOT || _la==DOTDOT) {
 				{
 				{
 				setState(67);
-				match(DOT);
+				_la = _input.LA(1);
+				if ( !(_la==DOT || _la==DOTDOT) ) {
+				_errHandler.recoverInline(this);
+				}
+				else {
+					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+					_errHandler.reportMatch(this);
+					consume();
+				}
 				setState(68);
 				match(Identifier);
 				}
@@ -711,7 +716,7 @@ public class AnnotationSignatureParser extends Parser {
 			{
 			setState(74);
 			_la = _input.LA(1);
-			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral))) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral))) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -739,20 +744,20 @@ public class AnnotationSignatureParser extends Parser {
 		"\n\4\f\4\16\4)\13\4\3\5\3\5\3\5\7\5.\n\5\f\5\16\5\61\13\5\3\6\3\6\3\6"+
 		"\3\6\3\7\3\7\3\b\3\b\5\b;\n\b\3\t\3\t\3\t\7\t@\n\t\f\t\16\tC\13\t\3\n"+
 		"\3\n\3\n\7\nH\n\n\f\n\16\nK\13\n\3\13\3\13\3\13\2\2\f\2\4\6\b\n\f\16\20"+
-		"\22\24\2\3\3\2\3\7\2L\2\26\3\2\2\2\4 \3\2\2\2\6\"\3\2\2\2\b*\3\2\2\2\n"+
-		"\62\3\2\2\2\f\66\3\2\2\2\16:\3\2\2\2\20<\3\2\2\2\22D\3\2\2\2\24L\3\2\2"+
-		"\2\26\27\7\24\2\2\27\36\5\4\3\2\30\33\7\b\2\2\31\34\5\b\5\2\32\34\5\f"+
-		"\7\2\33\31\3\2\2\2\33\32\3\2\2\2\33\34\3\2\2\2\34\35\3\2\2\2\35\37\7\t"+
-		"\2\2\36\30\3\2\2\2\36\37\3\2\2\2\37\3\3\2\2\2 !\5\6\4\2!\5\3\2\2\2\"\'"+
-		"\7\30\2\2#$\7\r\2\2$&\7\30\2\2%#\3\2\2\2&)\3\2\2\2\'%\3\2\2\2\'(\3\2\2"+
-		"\2(\7\3\2\2\2)\'\3\2\2\2*/\5\n\6\2+,\7\f\2\2,.\5\n\6\2-+\3\2\2\2.\61\3"+
-		"\2\2\2/-\3\2\2\2/\60\3\2\2\2\60\t\3\2\2\2\61/\3\2\2\2\62\63\7\30\2\2\63"+
-		"\64\7\16\2\2\64\65\5\f\7\2\65\13\3\2\2\2\66\67\5\16\b\2\67\r\3\2\2\28"+
-		";\5\24\13\29;\5\20\t\2:8\3\2\2\2:9\3\2\2\2;\17\3\2\2\2<A\5\22\n\2=>\7"+
-		"\n\2\2>@\7\13\2\2?=\3\2\2\2@C\3\2\2\2A?\3\2\2\2AB\3\2\2\2B\21\3\2\2\2"+
-		"CA\3\2\2\2DI\7\30\2\2EF\7\r\2\2FH\7\30\2\2GE\3\2\2\2HK\3\2\2\2IG\3\2\2"+
-		"\2IJ\3\2\2\2J\23\3\2\2\2KI\3\2\2\2LM\t\2\2\2M\25\3\2\2\2\t\33\36\'/:A"+
-		"I";
+		"\22\24\2\4\4\2\r\r\26\26\3\2\3\7\2L\2\26\3\2\2\2\4 \3\2\2\2\6\"\3\2\2"+
+		"\2\b*\3\2\2\2\n\62\3\2\2\2\f\66\3\2\2\2\16:\3\2\2\2\20<\3\2\2\2\22D\3"+
+		"\2\2\2\24L\3\2\2\2\26\27\7\24\2\2\27\36\5\4\3\2\30\33\7\b\2\2\31\34\5"+
+		"\b\5\2\32\34\5\f\7\2\33\31\3\2\2\2\33\32\3\2\2\2\33\34\3\2\2\2\34\35\3"+
+		"\2\2\2\35\37\7\t\2\2\36\30\3\2\2\2\36\37\3\2\2\2\37\3\3\2\2\2 !\5\6\4"+
+		"\2!\5\3\2\2\2\"\'\7\30\2\2#$\t\2\2\2$&\7\30\2\2%#\3\2\2\2&)\3\2\2\2\'"+
+		"%\3\2\2\2\'(\3\2\2\2(\7\3\2\2\2)\'\3\2\2\2*/\5\n\6\2+,\7\f\2\2,.\5\n\6"+
+		"\2-+\3\2\2\2.\61\3\2\2\2/-\3\2\2\2/\60\3\2\2\2\60\t\3\2\2\2\61/\3\2\2"+
+		"\2\62\63\7\30\2\2\63\64\7\16\2\2\64\65\5\f\7\2\65\13\3\2\2\2\66\67\5\16"+
+		"\b\2\67\r\3\2\2\28;\5\24\13\29;\5\20\t\2:8\3\2\2\2:9\3\2\2\2;\17\3\2\2"+
+		"\2<A\5\22\n\2=>\7\n\2\2>@\7\13\2\2?=\3\2\2\2@C\3\2\2\2A?\3\2\2\2AB\3\2"+
+		"\2\2B\21\3\2\2\2CA\3\2\2\2DI\7\30\2\2EF\t\2\2\2FH\7\30\2\2GE\3\2\2\2H"+
+		"K\3\2\2\2IG\3\2\2\2IJ\3\2\2\2J\23\3\2\2\2KI\3\2\2\2LM\t\3\2\2M\25\3\2"+
+		"\2\2\t\33\36\'/:AI";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

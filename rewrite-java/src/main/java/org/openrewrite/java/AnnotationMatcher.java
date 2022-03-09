@@ -17,12 +17,15 @@ package org.openrewrite.java;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureLexer;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.regex.Pattern;
 
 /**
  * This matcher will find all annotations matching the annotation pattern
@@ -47,10 +50,12 @@ import org.openrewrite.java.tree.TypeUtils;
  */
 public class AnnotationMatcher {
     private final AnnotationSignatureParser.AnnotationContext match;
+    private final Pattern matcher;
 
     public AnnotationMatcher(String signature) {
         this.match = new AnnotationSignatureParser(new CommonTokenStream(new AnnotationSignatureLexer(CharStreams.fromString(signature))))
                 .annotation();
+        this.matcher = Pattern.compile(StringUtils.aspectjNameToPattern(getAnnotationName()));
     }
 
     public boolean matches(J.Annotation annotation) {
@@ -61,7 +66,10 @@ public class AnnotationMatcher {
 
     private boolean matchesAnnotationName(J.Annotation annotation) {
         JavaType.FullyQualified typeAsClass = TypeUtils.asFullyQualified(annotation.getType());
-        return getAnnotationName().equals(typeAsClass == null ? null : typeAsClass.getFullyQualifiedName());
+        if (typeAsClass == null) {
+            return false;
+        }
+        return matcher.matcher(typeAsClass.getFullyQualifiedName()).matches();
     }
 
     public String getAnnotationName() {

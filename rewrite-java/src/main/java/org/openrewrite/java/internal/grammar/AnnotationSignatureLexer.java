@@ -1,31 +1,17 @@
-/*
- * Copyright 2021 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureLexer.g4 by ANTLR 4.9.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureLexer.g4 by ANTLR 4.9.3
 package org.openrewrite.java.internal.grammar;
-
+import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.LexerATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
+import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class AnnotationSignatureLexer extends Lexer {
-	static { RuntimeMetaData.checkVersion("4.9.2", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.9.3", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -166,7 +152,7 @@ public class AnnotationSignatureLexer extends Lexer {
 	}
 
 	public static final String _serializedATN =
-		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\2\30\u01c2\b\1\4\2"+
+		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\2\30\u01c5\b\1\4\2"+
 		"\t\2\4\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\4\t\t\t\4\n\t\n\4"+
 		"\13\t\13\4\f\t\f\4\r\t\r\4\16\t\16\4\17\t\17\4\20\t\20\4\21\t\21\4\22"+
 		"\t\22\4\23\t\23\4\24\t\24\4\25\t\25\4\26\t\26\4\27\t\27\4\30\t\30\4\31"+
@@ -196,33 +182,33 @@ public class AnnotationSignatureLexer extends Lexer {
 		",\3,\3,\3,\3,\3,\3,\3,\5,\u017c\n,\3-\3-\3-\3-\3-\3-\3-\3.\3.\3/\3/\3"+
 		"\60\3\60\3\61\3\61\3\62\3\62\3\63\3\63\3\64\3\64\3\65\3\65\3\66\3\66\3"+
 		"\67\3\67\38\38\39\39\39\3:\3:\3:\3;\3;\3<\3<\3<\3<\3=\3=\3=\3>\3>\3?\3"+
-		"?\7?\u01ae\n?\f?\16?\u01b1\13?\3@\3@\3@\3@\3@\3@\5@\u01b9\n@\3A\3A\3A"+
-		"\3A\3A\3A\5A\u01c1\nA\2\2B\3\3\5\2\7\2\t\2\13\2\r\2\17\2\21\2\23\2\25"+
-		"\2\27\2\31\2\33\2\35\2\37\2!\2#\2%\2\'\2)\2+\2-\2/\2\61\2\63\4\65\2\67"+
-		"\29\2;\2=\2?\2A\2C\2E\2G\2I\5K\6M\2O\7Q\2S\2U\2W\2Y\2[\2]\b_\ta\nc\13"+
-		"e\fg\ri\16k\17m\20o\21q\22s\23u\24w\25y\26{\27}\30\177\2\u0081\2\3\2\26"+
-		"\4\2NNnn\3\2\63;\4\2ZZzz\5\2\62;CHch\3\2\629\4\2DDdd\3\2\62\63\4\2GGg"+
-		"g\4\2--//\6\2FFHHffhh\4\2RRrr\4\2))^^\4\2$$^^\n\2$$))^^ddhhppttvv\3\2"+
-		"\62\65\6\2&&C\\aac|\4\2\2\u0081\ud802\udc01\3\2\ud802\udc01\3\2\udc02"+
-		"\ue001\7\2&&\62;C\\aac|\2\u01cd\2\3\3\2\2\2\2\63\3\2\2\2\2I\3\2\2\2\2"+
-		"K\3\2\2\2\2O\3\2\2\2\2]\3\2\2\2\2_\3\2\2\2\2a\3\2\2\2\2c\3\2\2\2\2e\3"+
-		"\2\2\2\2g\3\2\2\2\2i\3\2\2\2\2k\3\2\2\2\2m\3\2\2\2\2o\3\2\2\2\2q\3\2\2"+
-		"\2\2s\3\2\2\2\2u\3\2\2\2\2w\3\2\2\2\2y\3\2\2\2\2{\3\2\2\2\2}\3\2\2\2\3"+
-		"\u0087\3\2\2\2\5\u0089\3\2\2\2\7\u008d\3\2\2\2\t\u0091\3\2\2\2\13\u0095"+
-		"\3\2\2\2\r\u0099\3\2\2\2\17\u00a5\3\2\2\2\21\u00a7\3\2\2\2\23\u00b3\3"+
-		"\2\2\2\25\u00b5\3\2\2\2\27\u00b9\3\2\2\2\31\u00bc\3\2\2\2\33\u00c0\3\2"+
-		"\2\2\35\u00c4\3\2\2\2\37\u00ce\3\2\2\2!\u00d2\3\2\2\2#\u00d4\3\2\2\2%"+
-		"\u00da\3\2\2\2\'\u00e4\3\2\2\2)\u00e8\3\2\2\2+\u00ea\3\2\2\2-\u00ee\3"+
-		"\2\2\2/\u00f8\3\2\2\2\61\u00fc\3\2\2\2\63\u0100\3\2\2\2\65\u011d\3\2\2"+
-		"\2\67\u011f\3\2\2\29\u0122\3\2\2\2;\u0125\3\2\2\2=\u0129\3\2\2\2?\u012b"+
+		"?\3?\7?\u01af\n?\f?\16?\u01b2\13?\5?\u01b4\n?\3@\3@\3@\3@\3@\3@\5@\u01bc"+
+		"\n@\3A\3A\3A\3A\3A\3A\5A\u01c4\nA\2\2B\3\3\5\2\7\2\t\2\13\2\r\2\17\2\21"+
+		"\2\23\2\25\2\27\2\31\2\33\2\35\2\37\2!\2#\2%\2\'\2)\2+\2-\2/\2\61\2\63"+
+		"\4\65\2\67\29\2;\2=\2?\2A\2C\2E\2G\2I\5K\6M\2O\7Q\2S\2U\2W\2Y\2[\2]\b"+
+		"_\ta\nc\13e\fg\ri\16k\17m\20o\21q\22s\23u\24w\25y\26{\27}\30\177\2\u0081"+
+		"\2\3\2\26\4\2NNnn\3\2\63;\4\2ZZzz\5\2\62;CHch\3\2\629\4\2DDdd\3\2\62\63"+
+		"\4\2GGgg\4\2--//\6\2FFHHffhh\4\2RRrr\4\2))^^\4\2$$^^\n\2$$))^^ddhhppt"+
+		"tvv\3\2\62\65\6\2&&C\\aac|\4\2\2\u0081\ud802\udc01\3\2\ud802\udc01\3\2"+
+		"\udc02\ue001\b\2&&,,\62;C\\aac|\2\u01d1\2\3\3\2\2\2\2\63\3\2\2\2\2I\3"+
+		"\2\2\2\2K\3\2\2\2\2O\3\2\2\2\2]\3\2\2\2\2_\3\2\2\2\2a\3\2\2\2\2c\3\2\2"+
+		"\2\2e\3\2\2\2\2g\3\2\2\2\2i\3\2\2\2\2k\3\2\2\2\2m\3\2\2\2\2o\3\2\2\2\2"+
+		"q\3\2\2\2\2s\3\2\2\2\2u\3\2\2\2\2w\3\2\2\2\2y\3\2\2\2\2{\3\2\2\2\2}\3"+
+		"\2\2\2\3\u0087\3\2\2\2\5\u0089\3\2\2\2\7\u008d\3\2\2\2\t\u0091\3\2\2\2"+
+		"\13\u0095\3\2\2\2\r\u0099\3\2\2\2\17\u00a5\3\2\2\2\21\u00a7\3\2\2\2\23"+
+		"\u00b3\3\2\2\2\25\u00b5\3\2\2\2\27\u00b9\3\2\2\2\31\u00bc\3\2\2\2\33\u00c0"+
+		"\3\2\2\2\35\u00c4\3\2\2\2\37\u00ce\3\2\2\2!\u00d2\3\2\2\2#\u00d4\3\2\2"+
+		"\2%\u00da\3\2\2\2\'\u00e4\3\2\2\2)\u00e8\3\2\2\2+\u00ea\3\2\2\2-\u00ee"+
+		"\3\2\2\2/\u00f8\3\2\2\2\61\u00fc\3\2\2\2\63\u0100\3\2\2\2\65\u011d\3\2"+
+		"\2\2\67\u011f\3\2\2\29\u0122\3\2\2\2;\u0125\3\2\2\2=\u0129\3\2\2\2?\u012b"+
 		"\3\2\2\2A\u012d\3\2\2\2C\u013d\3\2\2\2E\u013f\3\2\2\2G\u0142\3\2\2\2I"+
 		"\u014d\3\2\2\2K\u0157\3\2\2\2M\u0159\3\2\2\2O\u015b\3\2\2\2Q\u0162\3\2"+
 		"\2\2S\u0168\3\2\2\2U\u016e\3\2\2\2W\u017b\3\2\2\2Y\u017d\3\2\2\2[\u0184"+
 		"\3\2\2\2]\u0186\3\2\2\2_\u0188\3\2\2\2a\u018a\3\2\2\2c\u018c\3\2\2\2e"+
 		"\u018e\3\2\2\2g\u0190\3\2\2\2i\u0192\3\2\2\2k\u0194\3\2\2\2m\u0196\3\2"+
 		"\2\2o\u0198\3\2\2\2q\u019a\3\2\2\2s\u019d\3\2\2\2u\u01a0\3\2\2\2w\u01a2"+
-		"\3\2\2\2y\u01a6\3\2\2\2{\u01a9\3\2\2\2}\u01ab\3\2\2\2\177\u01b8\3\2\2"+
-		"\2\u0081\u01c0\3\2\2\2\u0083\u0088\5\5\3\2\u0084\u0088\5\7\4\2\u0085\u0088"+
+		"\3\2\2\2y\u01a6\3\2\2\2{\u01a9\3\2\2\2}\u01b3\3\2\2\2\177\u01bb\3\2\2"+
+		"\2\u0081\u01c3\3\2\2\2\u0083\u0088\5\5\3\2\u0084\u0088\5\7\4\2\u0085\u0088"+
 		"\5\t\5\2\u0086\u0088\5\13\6\2\u0087\u0083\3\2\2\2\u0087\u0084\3\2\2\2"+
 		"\u0087\u0085\3\2\2\2\u0087\u0086\3\2\2\2\u0088\4\3\2\2\2\u0089\u008b\5"+
 		"\17\b\2\u008a\u008c\5\r\7\2\u008b\u008a\3\2\2\2\u008b\u008c\3\2\2\2\u008c"+
@@ -316,19 +302,20 @@ public class AnnotationSignatureLexer extends Lexer {
 		"\u019f\7~\2\2\u019ft\3\2\2\2\u01a0\u01a1\7B\2\2\u01a1v\3\2\2\2\u01a2\u01a3"+
 		"\7\60\2\2\u01a3\u01a4\7\60\2\2\u01a4\u01a5\7\60\2\2\u01a5x\3\2\2\2\u01a6"+
 		"\u01a7\7\60\2\2\u01a7\u01a8\7\60\2\2\u01a8z\3\2\2\2\u01a9\u01aa\7\"\2"+
-		"\2\u01aa|\3\2\2\2\u01ab\u01af\5\177@\2\u01ac\u01ae\5\u0081A\2\u01ad\u01ac"+
-		"\3\2\2\2\u01ae\u01b1\3\2\2\2\u01af\u01ad\3\2\2\2\u01af\u01b0\3\2\2\2\u01b0"+
-		"~\3\2\2\2\u01b1\u01af\3\2\2\2\u01b2\u01b9\t\21\2\2\u01b3\u01b4\n\22\2"+
-		"\2\u01b4\u01b9\6@\2\2\u01b5\u01b6\t\23\2\2\u01b6\u01b7\t\24\2\2\u01b7"+
-		"\u01b9\6@\3\2\u01b8\u01b2\3\2\2\2\u01b8\u01b3\3\2\2\2\u01b8\u01b5\3\2"+
-		"\2\2\u01b9\u0080\3\2\2\2\u01ba\u01c1\t\25\2\2\u01bb\u01bc\n\22\2\2\u01bc"+
-		"\u01c1\6A\4\2\u01bd\u01be\t\23\2\2\u01be\u01bf\t\24\2\2\u01bf\u01c1\6"+
-		"A\5\2\u01c0\u01ba\3\2\2\2\u01c0\u01bb\3\2\2\2\u01c0\u01bd\3\2\2\2\u01c1"+
-		"\u0082\3\2\2\2\61\2\u0087\u008b\u008f\u0093\u0097\u009e\u00a3\u00a5\u00ab"+
-		"\u00af\u00b3\u00b9\u00be\u00c8\u00cc\u00d2\u00d6\u00de\u00e2\u00e8\u00f2"+
-		"\u00f6\u00fc\u0100\u0105\u0108\u010b\u0110\u0113\u0118\u011d\u0125\u0130"+
-		"\u0134\u0139\u013d\u014d\u0157\u015d\u0164\u0168\u016e\u017b\u01af\u01b8"+
-		"\u01c0\2";
+		"\2\u01aa|\3\2\2\2\u01ab\u01b4\7,\2\2\u01ac\u01b0\5\177@\2\u01ad\u01af"+
+		"\5\u0081A\2\u01ae\u01ad\3\2\2\2\u01af\u01b2\3\2\2\2\u01b0\u01ae\3\2\2"+
+		"\2\u01b0\u01b1\3\2\2\2\u01b1\u01b4\3\2\2\2\u01b2\u01b0\3\2\2\2\u01b3\u01ab"+
+		"\3\2\2\2\u01b3\u01ac\3\2\2\2\u01b4~\3\2\2\2\u01b5\u01bc\t\21\2\2\u01b6"+
+		"\u01b7\n\22\2\2\u01b7\u01bc\6@\2\2\u01b8\u01b9\t\23\2\2\u01b9\u01ba\t"+
+		"\24\2\2\u01ba\u01bc\6@\3\2\u01bb\u01b5\3\2\2\2\u01bb\u01b6\3\2\2\2\u01bb"+
+		"\u01b8\3\2\2\2\u01bc\u0080\3\2\2\2\u01bd\u01c4\t\25\2\2\u01be\u01bf\n"+
+		"\22\2\2\u01bf\u01c4\6A\4\2\u01c0\u01c1\t\23\2\2\u01c1\u01c2\t\24\2\2\u01c2"+
+		"\u01c4\6A\5\2\u01c3\u01bd\3\2\2\2\u01c3\u01be\3\2\2\2\u01c3\u01c0\3\2"+
+		"\2\2\u01c4\u0082\3\2\2\2\62\2\u0087\u008b\u008f\u0093\u0097\u009e\u00a3"+
+		"\u00a5\u00ab\u00af\u00b3\u00b9\u00be\u00c8\u00cc\u00d2\u00d6\u00de\u00e2"+
+		"\u00e8\u00f2\u00f6\u00fc\u0100\u0105\u0108\u010b\u0110\u0113\u0118\u011d"+
+		"\u0125\u0130\u0134\u0139\u013d\u014d\u0157\u015d\u0164\u0168\u016e\u017b"+
+		"\u01b0\u01b3\u01bb\u01c3\2";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

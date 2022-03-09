@@ -71,6 +71,22 @@ interface FindAnnotationsTest : JavaRecipeTest {
     )
 
     @Test
+    fun matchesWildcard(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = FindAnnotations("@java.lang.*"),
+        before = "@Deprecated public class A {}",
+        after = "/*~~>*/@Deprecated public class A {}"
+    )
+
+    @Test
+    fun matchesSubpackageWildcard(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = FindAnnotations("@java..*"),
+        before = "@Deprecated public class A {}",
+        after = "/*~~>*/@Deprecated public class A {}"
+    )
+
+    @Test
     fun matchesAnnotationOnMethod(jp: JavaParser) = assertChanged(
         jp,
         recipe = FindAnnotations("@java.lang.Deprecated"),

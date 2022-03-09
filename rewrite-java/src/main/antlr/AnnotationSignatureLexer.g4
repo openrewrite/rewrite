@@ -273,7 +273,8 @@ DOTDOT          : '..';
 SPACE           : ' ';
 
 Identifier
-    :   JavaLetter JavaLetterOrDigit*
+    : '*'
+    | JavaLetter JavaLetterOrDigit*
     ;
 
 fragment
@@ -289,7 +290,7 @@ JavaLetter
 
 fragment
 JavaLetterOrDigit
-    :   [a-zA-Z0-9$_] // these are the "java letters or digits" below 0x7F
+    :   [a-zA-Z0-9$_*] // these are the "java letters or digits" below 0x7F
     |   // covers all characters above 0x7F which are not a surrogate
         ~[\u0000-\u007F\uD800-\uDBFF]
         {Character.isJavaIdentifierPart(_input.LA(-1))}?

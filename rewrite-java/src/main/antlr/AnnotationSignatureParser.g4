@@ -10,7 +10,7 @@ annotationName
     :   qualifiedName ;
 
 qualifiedName
-    :   Identifier (DOT Identifier)*
+    :   Identifier ((DOT | DOTDOT) Identifier)*
     ;
 
 elementValuePairs
@@ -35,7 +35,7 @@ type
     ;
 
 classOrInterfaceType
-    :   Identifier (DOT Identifier)*
+    :   Identifier ((DOT | DOTDOT) Identifier)*
     ;
 
 literal
