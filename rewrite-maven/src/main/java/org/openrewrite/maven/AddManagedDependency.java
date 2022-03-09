@@ -112,7 +112,7 @@ public class AddManagedDependency extends Recipe {
         if (!StringUtils.isNullOrEmpty(onlyIfUsing)) {
             validated = validated.and(Validated.test("onlyIfUsing", "invalid group:artifact glob pattern", onlyIfUsing, s -> {
                 try {
-                    return onlyIfUsing.matches("[\\w\\d]+\\*?:[\\w\\d]+\\*?");
+                    return onlyIfUsing.matches("[\\w\\d]+\\*?:([\\w\\d]+\\*?|\\*)");
                 } catch (Throwable t) {
                     return false;
                 }
