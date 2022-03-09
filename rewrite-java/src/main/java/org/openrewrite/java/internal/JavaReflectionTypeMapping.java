@@ -48,12 +48,11 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         String signature = signatureBuilder.signature(type);
-        JavaType existing = (JavaType) typeCache.get(signature);
+        JavaType existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
 
-        JavaType mapped;
         if (type instanceof Class) {
             Class<?> clazz = (Class<?>) type;
             if (clazz.isArray()) {
@@ -94,7 +93,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         JavaType.FullyQualified mappedClazz = classTypeWithoutParameters(clazz);
 
         if (clazz.getTypeParameters().length > 0) {
-            JavaType existing = (JavaType) typeCache.get(signature);
+            JavaType existing = typeCache.get(signature);
             if (existing != null) {
                 return existing;
             }
@@ -116,7 +115,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
     private JavaType.FullyQualified classTypeWithoutParameters(Class<?> clazz) {
         String className = clazz.getName();
-        JavaType.Class mappedClazz = (JavaType.Class) typeCache.get(className);
+        JavaType.Class mappedClazz = typeCache.get(className);
 
         if (mappedClazz == null) {
             JavaType.Class.Kind kind;
@@ -189,12 +188,12 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 }
             }
 
-            if(clazz.getDeclaredConstructors().length > 0) {
-                if(methods == null) {
+            if (clazz.getDeclaredConstructors().length > 0 && !mappedClazz.getKind().equals(JavaType.FullyQualified.Kind.Enum)) {
+                if (methods == null) {
                     methods = new ArrayList<>(clazz.getDeclaredConstructors().length);
                 }
                 for (Constructor<?> ctor : clazz.getDeclaredConstructors()) {
-                    if(!ctor.isSynthetic()) {
+                    if (!ctor.isSynthetic()) {
                         methods.add(method(ctor, mappedClazz));
                     }
                 }
@@ -274,7 +273,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
     private JavaType.Variable field(Field field) {
         String signature = signatureBuilder.variableSignature(field);
-        JavaType.Variable existing = (JavaType.Variable) typeCache.get(signature);
+        JavaType.Variable existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -302,7 +301,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
     public JavaType.Method method(Method method) {
         JavaType.FullyQualified type = (JavaType.FullyQualified) type(method.getDeclaringClass());
-        if(type instanceof JavaType.Parameterized) {
+        if (type instanceof JavaType.Parameterized) {
             type = ((JavaType.Parameterized) type).getType();
         }
         return method(method, type);
@@ -311,7 +310,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     private JavaType.Method method(Constructor<?> method, JavaType.FullyQualified declaringType) {
         String signature = signatureBuilder.methodSignature(method, declaringType.getFullyQualifiedName());
 
-        JavaType.Method existing = (JavaType.Method) typeCache.get(signature);
+        JavaType.Method existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
@@ -369,7 +368,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     private JavaType.Method method(Method method, JavaType.FullyQualified declaringType) {
         String signature = signatureBuilder.methodSignature(method, declaringType.getFullyQualifiedName());
 
-        JavaType.Method existing = (JavaType.Method) typeCache.get(signature);
+        JavaType.Method existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }

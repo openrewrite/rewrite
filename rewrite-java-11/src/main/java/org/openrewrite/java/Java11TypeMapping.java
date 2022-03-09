@@ -164,7 +164,9 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
 
             typeCache.put(sym.flatName().toString(), clazz);
 
-            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
+            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(
+                    JavaType.FullyQualified.Kind.Enum.equals(clazz.getKind()) && isTypeAttributedGeneric(symType.supertype_field) ?
+                            symType.supertype_field.tsym.type : symType.supertype_field));
 
             JavaType.FullyQualified owner = null;
             if (sym.owner instanceof Symbol.ClassSymbol) {
@@ -201,9 +203,9 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                             fields = new ArrayList<>();
                         }
                         fields.add(variableType(elem, clazz));
-                    } else if (elem instanceof Symbol.MethodSymbol &&
-                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                    Flags.ANONCONSTR)) == 0) {
+                    } else if ((!JavaType.FullyQualified.Kind.Enum.equals(clazz.getKind()) || !"<init>".equals(elem.name.toString())) &&
+                            elem instanceof Symbol.MethodSymbol &&
+                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
                         if (methods == null) {
                             methods = new ArrayList<>();
                         }
@@ -235,6 +237,14 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         return clazz;
+    }
+
+    private boolean isTypeAttributedGeneric(Type type) {
+        return type.tsym != null && type.tsym.type != null &&
+                type instanceof Type.ClassType &&
+                ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 &&
+                signatureBuilder.classSignature(type).equals(signatureBuilder.classSignature(type.tsym.type)) &&
+                !signatureBuilder.parameterizedSignature(type).equals(signatureBuilder.parameterizedSignature(type.tsym.type));
     }
 
     private JavaType.Class.Kind getKind(Symbol.ClassSymbol sym) {
