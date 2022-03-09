@@ -99,6 +99,7 @@ public class AddManagedDependency extends Recipe {
             description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
             example = "true",
             required = false)
+    @Nullable
     private Boolean addToRootPom;
 
     @Override
