@@ -135,7 +135,7 @@ public class ResolvedPom {
         ResolvedPom resolved = new ResolvedPom(requested, activeProfiles).resolver(ctx, downloader).resolve();
 
         for (Map.Entry<String, String> property : resolved.getProperties().entrySet()) {
-            if (!property.getValue().equals(properties.get(property.getKey()))) {
+            if (property.getValue() != null && !property.getValue().equals(properties.get(property.getKey()))) {
                 return resolved;
             }
         }

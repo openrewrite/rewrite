@@ -28,6 +28,7 @@ class FindPropertiesTest : MavenRecipeTest {
               <modelVersion>4.0.0</modelVersion>
                
               <properties>
+                <someNullProp/>
                 <guava.version>28.2-jre</guava.version>
               </properties>
               
@@ -49,6 +50,7 @@ class FindPropertiesTest : MavenRecipeTest {
               <modelVersion>4.0.0</modelVersion>
                
               <properties>
+                <someNullProp/>
                 <!--~~>--><guava.version>28.2-jre</guava.version>
               </properties>
               
