@@ -70,25 +70,42 @@ class ManageDependenciesTest : MavenRecipeTest {
     @Test
     fun deferToDependencyManagementWhenDependencyIsAlreadyManaged() = assertChanged(
         recipe = ManageDependencies(
-            "org.junit.jupiter",
-            "*",
+            "junit",
+            "junit",
             null),
+        dependsOn = arrayOf(
+            """
+                <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                            <version>4.13.2</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                </project>
+            """.trimIndent()
+        ),
         before = """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>2.4.0</version>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-parent-app</artifactId>
+                    <version>1</version>
                 </parent>
                 <dependencies>
                     <dependency>
-                        <groupId>org.junit.jupiter</groupId>
-                        <artifactId>junit-jupiter-api</artifactId>
-                        <version>5.6.2</version>
-                        <scope>test</scope>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                        <version>4.13.2</version>
                     </dependency>
                 </dependencies>
             </project>
@@ -99,15 +116,14 @@ class ManageDependenciesTest : MavenRecipeTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>2.4.0</version>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-parent-app</artifactId>
+                    <version>1</version>
                 </parent>
                 <dependencies>
                     <dependency>
-                        <groupId>org.junit.jupiter</groupId>
-                        <artifactId>junit-jupiter-api</artifactId>
-                        <scope>test</scope>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
                     </dependency>
                 </dependencies>
             </project>

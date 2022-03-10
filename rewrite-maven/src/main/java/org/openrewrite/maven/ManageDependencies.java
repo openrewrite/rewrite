@@ -127,10 +127,10 @@ public class ManageDependencies extends Recipe {
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isManagedDependencyTag() && isManagedDependencyTag(groupPattern, artifactPattern)) {
-                    tag.getChild("version").ifPresent(version -> doAfterVisit(new ChangeTagValueVisitor<>(version, selectedVersion)));
+                if (selectedVersion != null && isManagedDependencyTag() && isManagedDependencyTag(groupPattern, artifactPattern)) {
+                    tag.getChild("version").ifPresent(versionTag -> doAfterVisit(new ChangeTagValueVisitor<>(versionTag, selectedVersion)));
                 } else if (isDependencyTag() && isDependencyTag(groupPattern, artifactPattern)) {
-                    tag.getChild("version").ifPresent(version -> doAfterVisit(new RemoveContentVisitor<>(version, false)));
+                    tag.getChild("version").ifPresent(versionTag -> doAfterVisit(new RemoveContentVisitor<>(versionTag, false)));
                     return tag;
                 }
 
