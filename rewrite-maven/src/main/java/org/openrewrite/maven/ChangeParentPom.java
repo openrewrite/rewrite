@@ -155,22 +155,16 @@ public class ChangeParentPom extends Recipe {
                         tag.getChildValue("version")
                                 .flatMap(parentVersion -> findNewerDependencyVersion(targetGroupId, targetArtifactId, parentVersion, ctx))
                                 .ifPresent(newVersion -> {
-                                    boolean isGroupIdChanged = !oldGroupId.equals(targetGroupId);
-                                    if (isGroupIdChanged) {
+                                    if (!oldGroupId.equals(targetGroupId)) {
                                         doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("groupId").get(), targetGroupId));
                                     }
-                                    boolean isArtifactIdChanged = !oldArtifactId.equals(targetArtifactId);
-                                    if (isArtifactIdChanged) {
+                                    if (!oldArtifactId.equals(targetArtifactId)) {
                                         doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("artifactId").get(), targetArtifactId));
                                     }
-                                    boolean isVersionChanged = !newVersion.equals(tag.getChildValue("version").orElse(null));
-                                    if (isVersionChanged) {
+                                    if (!newVersion.equals(tag.getChildValue("version").orElse(null))) {
                                         doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("version").get(), newVersion));
                                     }
                                     doAfterVisit(new RemoveRedundantDependencyVersions());
-                                    if (isGroupIdChanged || isArtifactIdChanged || isVersionChanged) {
-                                        maybeUpdateModel();
-                                    }
                                 });
                     }
                 }
