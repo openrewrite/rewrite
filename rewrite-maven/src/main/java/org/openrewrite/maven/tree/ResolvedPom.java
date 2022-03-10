@@ -636,6 +636,12 @@ public class ResolvedPom {
             d = d.withExclusions(ListUtils.concatAll(d.getExclusions(), managedExclusions));
         }
 
+        if (d.getClassifier() != null) {
+            d = d.withClassifier(getValue(d.getClassifier()));
+        }
+        if (d.getType() != null) {
+            d = d.withType(getValue(d.getType()));
+        }
         return d
                 .withGav(d.getGav().withVersion(version))
                 .withScope(scope);
