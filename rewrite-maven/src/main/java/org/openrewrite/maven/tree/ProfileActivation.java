@@ -63,7 +63,7 @@ public class ProfileActivation {
             return true;
         }
 
-        return VersionRequirement.fromVersion(jdk, 0).resolve(() -> singletonList(version)) != null;
+        return version.equals(VersionRequirement.fromVersion(jdk, 0).resolve(() -> singletonList(version)));
     }
 
     private boolean isActiveByProperty() {

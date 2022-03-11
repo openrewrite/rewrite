@@ -1140,4 +1140,70 @@ class MavenParserTest {
         assertThat(compileDependencies).noneMatch { it.artifactId == "hamcrest-core" }
     }
 
+    @Test
+    fun profileNoJdkActivation() {
+        val maven = parser.parse(ctx,
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+
+                    <profiles>
+                        <profile>
+                            <id>old-jdk</id>
+                            <activation>
+                                <jdk>1.5</jdk>
+                            </activation>
+                            <dependencies>
+                                <dependency>
+                                      <groupId>junit</groupId>
+                                      <artifactId>junit</artifactId>
+                                      <version>4.11</version>
+                                </dependency>
+                            </dependencies>
+                        </profile>
+                    </profiles>        
+                </project>
+            """
+        ).find { it.mavenResolutionResult().pom.artifactId == "my-app" }!!
+
+        val compileDependencies = maven.mavenResolutionResult().dependencies[Scope.Compile]
+        assertThat(compileDependencies).isEmpty()
+
+    }
+
+    @Test
+    fun profileJdkSoftVersionActivation() {
+        val maven = parser.parse(ctx,
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+
+                    <profiles>
+                        <profile>
+                            <id>old-jdk</id>
+                            <activation>
+                                <jdk>11.0</jdk>
+                            </activation>
+                            <dependencies>
+                                <dependency>
+                                      <groupId>junit</groupId>
+                                      <artifactId>junit</artifactId>
+                                      <version>4.11</version>
+                                </dependency>
+                            </dependencies>
+                        </profile>
+                    </profiles>        
+                </project>
+            """
+        ).find { it.mavenResolutionResult().pom.artifactId == "my-app" }!!
+
+        val compileDependencies = maven.mavenResolutionResult().dependencies[Scope.Compile]
+        assertThat(compileDependencies).hasSize(2)
+
+    }
+
 }
