@@ -17,27 +17,15 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.internal.InsertDependencyComparator;
-import org.openrewrite.maven.tree.Version;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
-
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
+import java.util.*;
 
 /**
  * Make existing dependencies "dependency managed", moving the version to the dependencyManagement
@@ -68,11 +56,18 @@ public class ManageDependencies extends Recipe {
 
     @Option(displayName = "Version",
             description = "Version to use for the dependency in dependency management. " +
-                    "Defaults to the existing version found on the matching dependency.",
+                    "Defaults to the existing version found on the matching dependency, or the max version if multiple dependencies match the glob expression patterns.",
             example = "1.0.0",
             required = false)
     @Nullable
     String version;
+
+    @Option(displayName = "Add to the root pom",
+            description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
+            example = "true",
+            required = false)
+    @Nullable
+    Boolean addToRootPom;
 
     @Override
     public String getDisplayName() {
@@ -84,90 +79,97 @@ public class ManageDependencies extends Recipe {
         return "Make existing dependencies managed by moving their version to be specified in the dependencyManagement section of the POM.";
     }
 
-    @SuppressWarnings("ConstantConditions")
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new MavenIsoVisitor<ExecutionContext>() {
-            private String selectedVersion = version;
-
-            @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Collection<ResolvedDependency> manageableDependencies = findDependencies(groupPattern, artifactPattern);
-
-                if (!manageableDependencies.isEmpty()) {
-                    if (version == null) {
-                        selectedVersion = manageableDependencies.stream()
-                                .map(ResolvedDependency::getVersion)
-                                .max(Comparator.comparing(Version::new))
-                                .get();
+    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+        Map<GroupArtifactVersion, Collection<ResolvedDependency>> rootGavToDependencies = new HashMap<>();
+        if (Boolean.TRUE.equals(addToRootPom)) {
+            for (SourceFile source : before) {
+                new MavenIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                        Xml.Document doc = super.visitDocument(document, executionContext);
+                        Collection<ResolvedDependency> manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
+                        ResolvedGroupArtifactVersion root = findRootPom(getResolutionResult()).getPom().getGav();
+                        rootGavToDependencies.computeIfAbsent(new GroupArtifactVersion(root.getGroupId(), root.getArtifactId(), root.getVersion()), v -> new ArrayList<>()).addAll(manageableDependencies);
+                        return doc;
                     }
+                }.visit(source, ctx);
+            }
+        }
 
-                    List<GroupArtifact> requiresDependencyManagement = manageableDependencies.stream()
-                            .filter(d -> getResolutionResult().getPom().getManagedVersion(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier()) == null)
-                            .map(d -> new GroupArtifact(d.getGroupId(), d.getArtifactId()))
-                            .distinct()
-                            .collect(toList());
+        return ListUtils.map(before, s -> s.getMarkers().findFirst(MavenResolutionResult.class)
+                .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                        Xml maven = super.visitDocument(document, executionContext);
 
-                    if (!requiresDependencyManagement.isEmpty()) {
-                        Xml.Tag root = document.getRoot();
-                        if (!root.getChild("dependencyManagement").isPresent()) {
-                            doAfterVisit(new AddToTagVisitor<>(root, Xml.Tag.build("<dependencyManagement>\n<dependencies/>\n</dependencyManagement>"),
-                                    new MavenTagInsertionComparator(root.getContent())));
+                        Collection<ResolvedDependency> manageableDependencies;
+                        if (Boolean.TRUE.equals(addToRootPom)) {
+                            ResolvedPom pom = getResolutionResult().getPom();
+                            GroupArtifactVersion gav = new GroupArtifactVersion(pom.getGav().getGroupId(), pom.getGav().getArtifactId(), pom.getGav().getVersion());
+                            manageableDependencies = rootGavToDependencies.get(gav);
+                        } else {
+                            manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
                         }
 
-                        for (GroupArtifact ga : requiresDependencyManagement) {
-                            doAfterVisit(new InsertDependencyInOrder(ga.getGroupId(), ga.getArtifactId(), selectedVersion));
-                            maybeUpdateModel();
+                        if (manageableDependencies != null) {
+                            Map<GroupArtifact, GroupArtifactVersion> dependenciesToManage = new HashMap<>();
+                            String selectedVersion = version;
+
+                            for (ResolvedDependency rmd : manageableDependencies) {
+                                if (version != null) {
+                                    dependenciesToManage.putIfAbsent(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()), new GroupArtifactVersion(rmd.getGroupId(), rmd.getArtifactId(), version));
+                                } else {
+                                    if (selectedVersion == null) {
+                                        selectedVersion = rmd.getVersion();
+                                    } else {
+                                        if (new Version(rmd.getVersion()).compareTo(new Version(selectedVersion)) > 0) {
+                                            selectedVersion = rmd.getVersion();
+                                        }
+                                    }
+                                    dependenciesToManage.put(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()), new GroupArtifactVersion(rmd.getGroupId(), rmd.getArtifactId(), selectedVersion));
+                                }
+                            }
+
+                            for (GroupArtifactVersion gav : dependenciesToManage.values()) {
+                                doAfterVisit(new AddManagedDependencyVisitor(gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null, null, null, null, null));
+                            }
                         }
+
+                        doAfterVisit(new RemoveVersionTagVisitor(groupPattern, artifactPattern != null ? artifactPattern : "*"));
+                        return maven;
                     }
-                }
-
-                return super.visitDocument(document, ctx);
-            }
-
-            @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (selectedVersion != null && isManagedDependencyTag() && isManagedDependencyTag(groupPattern, artifactPattern)) {
-                    tag.getChild("version").ifPresent(versionTag -> doAfterVisit(new ChangeTagValueVisitor<>(versionTag, selectedVersion)));
-                } else if (isDependencyTag() && isDependencyTag(groupPattern, artifactPattern)) {
-                    tag.getChild("version").ifPresent(versionTag -> doAfterVisit(new RemoveContentVisitor<>(versionTag, false)));
-                    return tag;
-                }
-
-                return super.visitTag(tag, ctx);
-            }
-        };
+                }.visit(s, ctx))
+                .map(SourceFile.class::cast)
+                .orElse(s)
+        );
     }
 
-    private static class InsertDependencyInOrder extends MavenIsoVisitor<ExecutionContext> {
-        private final String groupId;
-        private final String artifactId;
-        private final String version;
+    private MavenResolutionResult findRootPom(MavenResolutionResult pom) {
+        if (pom.getParent() == null) {
+            return pom;
+        }
+        return findRootPom(pom.getParent());
+    }
 
-        private InsertDependencyInOrder(String groupId, String artifactId, String version) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.version = version;
+    private static class RemoveVersionTagVisitor extends MavenIsoVisitor<ExecutionContext> {
+        private final String groupPattern;
+        private final String artifactPattern;
+
+        public RemoveVersionTagVisitor(String groupPattern, String artifactPattern) {
+            this.groupPattern = groupPattern;
+            this.artifactPattern = artifactPattern;
         }
 
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
-                Xml.Tag dependencyTag = Xml.Tag.build(
-                        "\n<dependency>\n" +
-                                "<groupId>" + groupId + "</groupId>\n" +
-                                "<artifactId>" + artifactId + "</artifactId>\n" +
-                                "<version>" + version + "</version>\n" +
-                                "</dependency>"
-                );
-
-                doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
-                        new InsertDependencyComparator(tag.getContent() == null ? emptyList() : tag.getContent(), dependencyTag)));
-
+            if (isDependencyTag() && isDependencyTag(groupPattern, artifactPattern)) {
+                tag.getChild("version").ifPresent(versionTag -> doAfterVisit(new RemoveContentVisitor<>(versionTag, false)));
                 return tag;
             }
 
             return super.visitTag(tag, ctx);
         }
     }
+
 }

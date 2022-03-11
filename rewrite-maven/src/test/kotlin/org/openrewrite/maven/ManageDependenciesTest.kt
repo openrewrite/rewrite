@@ -15,18 +15,26 @@
  */
 package org.openrewrite.maven
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Tree
+import org.openrewrite.java.marker.JavaProject
+import java.nio.file.Path
 
 class ManageDependenciesTest : MavenRecipeTest {
     override val parser: MavenParser = MavenParser.builder()
         .build()
+    private val javaProject = JavaProject(Tree.randomId(), "myproject", null)
 
     @Test
     fun createDependencyManagementWithDependencyWhenNoneExists() = assertChanged(
         recipe = ManageDependencies(
             "org.junit.jupiter",
             "*",
-            null),
+            null,
+            false),
         before = """
             <project>
                 <groupId>com.mycompany.app</groupId>
@@ -72,11 +80,12 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "junit",
             "junit",
-            null),
+            null,
+            false),
         dependsOn = arrayOf(
             """
                 <project>
-                <groupId>com.mycompany.app</groupId>
+                <groupId>com.othercompany.app</groupId>
                 <artifactId>my-parent-app</artifactId>
                 <version>1</version>
                 <dependencyManagement>
@@ -97,7 +106,7 @@ class ManageDependenciesTest : MavenRecipeTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <parent>
-                    <groupId>com.mycompany.app</groupId>
+                    <groupId>com.othercompany.app</groupId>
                     <artifactId>my-parent-app</artifactId>
                     <version>1</version>
                 </parent>
@@ -116,7 +125,7 @@ class ManageDependenciesTest : MavenRecipeTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <parent>
-                    <groupId>com.mycompany.app</groupId>
+                    <groupId>com.othercompany.app</groupId>
                     <artifactId>my-parent-app</artifactId>
                     <version>1</version>
                 </parent>
@@ -131,26 +140,24 @@ class ManageDependenciesTest : MavenRecipeTest {
     )
 
     @Test
-    fun updateVersionIfDifferent() = assertChanged(
+    fun manageToSpecefiedVersion() = assertChanged(
         recipe = ManageDependencies(
-            "org.junit.jupiter",
-            "junit-jupiter-api",
-            "10.100"),
+            "junit",
+            "junit",
+            "4.13",
+            false),
         before = """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.junit.jupiter</groupId>
-                            <artifactId>junit-jupiter-api</artifactId>
-                            <version>5.6.2</version>
-                            <scope>test</scope>
-                        </dependency>
-                    </dependencies>
-                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                        <version>4.13.2</version>
+                    </dependency>
+                </dependencies>
             </project>
         """,
         after = """
@@ -161,14 +168,235 @@ class ManageDependenciesTest : MavenRecipeTest {
                 <dependencyManagement>
                     <dependencies>
                         <dependency>
-                            <groupId>org.junit.jupiter</groupId>
-                            <artifactId>junit-jupiter-api</artifactId>
-                            <version>10.100</version>
-                            <scope>test</scope>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                            <version>4.13</version>
                         </dependency>
                     </dependencies>
                 </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                    </dependency>
+                </dependencies>
             </project>
         """
     )
+
+    @Test
+    fun useMaxVersion() = assertChanged(
+        recipe = ManageDependencies(
+            "org.apache.logging.log4j",
+            "log4j-*",
+            null,
+            false),
+        before = """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-core</artifactId>
+                        <version>2.17.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-api</artifactId>
+                        <version>2.17.1</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-slf4j-impl</artifactId>
+                        <version>2.17.2</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                        <version>4.13.2</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-api</artifactId>
+                            <version>2.17.2</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-core</artifactId>
+                            <version>2.17.2</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-slf4j-impl</artifactId>
+                            <version>2.17.2</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-core</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-api</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-slf4j-impl</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                        <version>4.13.2</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
+
+    @Test
+    fun `Added to the root pom`(@TempDir tempDir: Path) {
+        val project = tempDir.resolve("pom.xml")
+        val serviceApi = tempDir.resolve("api/pom.xml")
+        val service = tempDir.resolve("service/pom.xml")
+        val core = tempDir.resolve("core/pom.xml")
+
+
+        serviceApi.toFile().parentFile.mkdirs()
+        service.toFile().parentFile.mkdirs()
+        core.toFile().parentFile.mkdirs()
+
+        project.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>core</module>
+                        <module>service-api</module>
+                        <module>service</module>
+                    </modules>
+                </project>
+            """.trimIndent()
+        )
+
+        serviceApi.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>project</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>service-api</artifactId>
+                    <version>1</version>
+                </project>
+            """.trimIndent()
+        )
+
+        service.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>service-api</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>service</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                            <version>4.13.2</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """.trimIndent()
+        )
+
+        core.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>core</artifactId>
+                    <version>1</version>
+                </project>
+            """.trimIndent()
+        )
+        val results = ManageDependencies("junit", "junit", null, true)
+            .run(parser.parse(listOf(project, serviceApi, service, core), tempDir, InMemoryExecutionContext())
+                .map { j -> j.withMarkers(j.markers.addIfAbsent(javaProject)) }
+                .mapIndexed { n, maven ->
+                    if (n == 0) {
+                        // give the parent a different java project
+                        maven.withMarkers(maven.markers.compute(javaProject) { j, _ -> j.withId(Tree.randomId()) })
+                    } else maven
+                }
+            )
+        Assertions.assertThat(results).hasSize(2)
+        Assertions.assertThat(results[0].after!!.printAllTrimmed()).isEqualTo(
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>core</module>
+                        <module>service-api</module>
+                        <module>service</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>junit</groupId>
+                                <artifactId>junit</artifactId>
+                                <version>4.13.2</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """.trimIndent()
+        )
+        Assertions.assertThat(results[1].after!!.printAllTrimmed()).isEqualTo(
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>service-api</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>service</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """.trimIndent()
+        )
+    }
 }

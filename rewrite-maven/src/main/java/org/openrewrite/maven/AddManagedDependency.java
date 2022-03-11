@@ -132,7 +132,7 @@ public class AddManagedDependency extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+    protected MavenIsoVisitor<ExecutionContext> getApplicableTest() {
         if (!StringUtils.isNullOrEmpty(onlyIfUsing) && onlyIfUsing.contains(":")) {
             String[] ga = onlyIfUsing.split(":");
             return new MavenIsoVisitor<ExecutionContext>() {
