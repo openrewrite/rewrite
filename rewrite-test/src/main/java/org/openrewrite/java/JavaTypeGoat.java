@@ -32,7 +32,15 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
         }
     }
 
-    public enum EnumType {
+    public enum EnumTypeA {
+    }
+
+    public enum EnumTypeB {
+        FOO("bar");
+        private String label;
+        EnumTypeB(String label) {
+            this.label = label;
+        }
     }
 
     public abstract class ExtendsJavaTypeGoat extends JavaTypeGoat<T, S> {
@@ -56,7 +64,8 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public abstract <U> PT<U> genericUnbounded(PT<U> n);
     public abstract void genericArray(PT<C>[] n);
     public abstract void inner(C.Inner n);
-    public abstract void enumType(EnumType n);
+    public abstract void enumTypeA(EnumTypeA n);
+    public abstract void enumTypeB(EnumTypeB n);
     public abstract <U extends PT<U> & C> InheritedJavaTypeGoat<T, U> inheritedJavaTypeGoat(InheritedJavaTypeGoat<T, U> n);
     public abstract <U extends TypeA & PT<U> & C> U genericIntersection(U n);
     public abstract T genericT(T n); // remove after signatures are common.

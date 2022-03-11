@@ -188,7 +188,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 }
             }
 
-            if (clazz.getDeclaredConstructors().length > 0 && !mappedClazz.getKind().equals(JavaType.FullyQualified.Kind.Enum)) {
+            if (clazz.getDeclaredConstructors().length > 0) {
                 if (methods == null) {
                     methods = new ArrayList<>(clazz.getDeclaredConstructors().length);
                 }
@@ -319,7 +319,9 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (method.getParameters().length > 0) {
             paramNames = new ArrayList<>(method.getParameters().length);
             for (Parameter p : method.getParameters()) {
-                paramNames.add(p.getName());
+                if (!p.isSynthetic()) {
+                    paramNames.add(p.getName());
+                }
             }
         }
 
@@ -356,8 +358,10 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         if (method.getParameters().length > 0) {
             parameterTypes = new ArrayList<>(method.getParameters().length);
             for (Parameter parameter : method.getParameters()) {
-                Type parameterizedType = parameter.getParameterizedType();
-                parameterTypes.add(type(parameterizedType == null ? parameter.getType() : parameterizedType));
+                if (!parameter.isSynthetic()) {
+                    Type parameterizedType = parameter.getParameterizedType();
+                    parameterTypes.add(type(parameterizedType == null ? parameter.getType() : parameterizedType));
+                }
             }
         }
 
