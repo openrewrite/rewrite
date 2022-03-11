@@ -40,6 +40,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_PINNED_SNAPSHOT_VERSIONS = "org.openrewrite.maven.pinnedSnapshotVersions";
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
+    private static final String MAVEN_FAIL_FAST = "org.openrewrite.maven.failFastOnError";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -58,6 +59,14 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public ResolutionEventListener getResolutionListener() {
         return getMessage(MAVEN_RESOLUTION_LISTENER, ResolutionEventListener.NOOP);
+    }
+
+    public boolean getFailFastOnError() {
+        return getMessage(MAVEN_FAIL_FAST, Boolean.TRUE);
+    }
+
+    public void setFailFastOnError(boolean failFast) {
+        putMessage(MAVEN_FAIL_FAST, failFast);
     }
 
     public void setMirrors(Collection<MavenRepositoryMirror> mirrors) {

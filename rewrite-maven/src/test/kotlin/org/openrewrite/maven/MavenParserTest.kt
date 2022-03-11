@@ -21,6 +21,7 @@ import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import okhttp3.Credentials
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Disabled
@@ -30,6 +31,7 @@ import org.openrewrite.Issue
 import org.openrewrite.Parser
 import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.cache.MavenPomCache
+import org.openrewrite.maven.internal.MavenParsingException
 import org.openrewrite.maven.tree.License
 import org.openrewrite.maven.tree.Scope
 import java.nio.file.Paths
@@ -1139,5 +1141,65 @@ class MavenParserTest {
         assertThat(compileDependencies).anyMatch { it.artifactId == "junit" && it.version == "4.11" }
         assertThat(compileDependencies).noneMatch { it.artifactId == "hamcrest-core" }
     }
+
+    @Test
+    fun failFastOnError() {
+        assertThatThrownBy {
+            MavenParser.builder()
+                .build()
+                .parse(
+                    ctx,
+                    """
+                        <project>
+                            <modelVersion>4.0.0</modelVersion>
+                            <groupId>com.fail.fast</groupId>
+                            <artifactId>a</artifactId>
+                            <version>1.0.0</version>
+                            <packaging>jar</packaging>
+     
+                            <dependencies>
+                                <dependency>
+                                    <groupId>junit</groupId>
+                                    <artifactId>junit</artifactId>
+                                </dependency>
+                            </dependencies>
+                        </project>
+                    """
+                )
+        }.isInstanceOf(MavenParsingException::class.java)
+    }
+
+    @Test
+    fun doNotFailFastOnError() {
+
+        val context = MavenExecutionContextView(InMemoryExecutionContext())
+            .apply {
+                pomCache = cache
+                failFastOnError= false
+            }
+
+        MavenParser.builder()
+            .build()
+            .parse(
+                context,
+                """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.fail.fast</groupId>
+                        <artifactId>a</artifactId>
+                        <version>1.0.0</version>
+                        <packaging>jar</packaging>
+ 
+                        <dependencies>
+                            <dependency>
+                                <groupId>junit</groupId>
+                                <artifactId>junit</artifactId>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+    }
+
 
 }

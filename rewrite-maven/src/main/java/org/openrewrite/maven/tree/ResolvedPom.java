@@ -484,7 +484,14 @@ public class ResolvedPom {
                 //The dependency may be modified by the current pom's managed dependencies
                 d = getValues(d, depth);
                 if (d.getVersion() == null) {
-                    throw new MavenParsingException("No version provided for dependency " + d.getGroupId() + ":" + d.getArtifactId());
+                    MavenParsingException error = new MavenParsingException("No version provided for dependency " + d.getGroupId() + ":"
+                            + d.getArtifactId() + " defined in the pom [" + dd.getDefinedIn().getGav() + "].");
+                    if (MavenExecutionContextView.view(ctx).getFailFastOnError()) {
+                        throw error;
+                    } else {
+                        MavenExecutionContextView.view(ctx).getOnError().accept(error);
+                        continue;
+                    }
                 }
 
                 if (d.getType() != null && !"jar".equals(d.getType())) {
