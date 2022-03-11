@@ -16,7 +16,6 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.tree.Flag
@@ -176,17 +175,28 @@ interface JavaTypeMappingTest {
         assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat${"$"}TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}")
     }
 
-    @Disabled("https://github.com/openrewrite/rewrite/issues/1438")
     @Issue("https://github.com/openrewrite/rewrite/issues/1349")
     @Test
-    fun enumType() {
-        val clazz = firstMethodParameter("enumType") as JavaType.Class
+    fun enumTypeA() {
+        val clazz = firstMethodParameter("enumTypeA") as JavaType.Class
         val type = clazz.methods.find { it.name == "<constructor>" }
-        assertThat(type).isNull()
+        assertThat(type.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}EnumTypeA{name=<constructor>,return=org.openrewrite.java.JavaTypeGoat${"$"}EnumTypeA,parameters=[]}")
 
         val supertype = clazz.supertype
         assertThat(supertype).isNotNull
-        assertThat(supertype!!.toString()).isEqualTo("java.lang.Enum<org.openrewrite.java.JavaTypeGoat${"$"}EnumType>")
+        assertThat(supertype!!.toString()).isEqualTo("java.lang.Enum<Generic{E extends }>")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/1453")
+    @Test
+    fun enumTypeB() {
+        val clazz = firstMethodParameter("enumTypeB") as JavaType.Class
+        val type = clazz.methods.find { it.name == "<constructor>" }
+        assertThat(type.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}EnumTypeB{name=<constructor>,return=org.openrewrite.java.JavaTypeGoat${"$"}EnumTypeB,parameters=[java.lang.String]}")
+
+        val supertype = clazz.supertype
+        assertThat(supertype).isNotNull
+        assertThat(supertype!!.toString()).isEqualTo("java.lang.Enum<Generic{E extends }>")
     }
 
     @Test
