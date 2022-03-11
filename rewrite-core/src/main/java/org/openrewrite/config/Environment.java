@@ -26,6 +26,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;
@@ -200,6 +201,22 @@ public class Environment {
         @Override
         public String getDisplayName() {
             return getName();
+        }
+
+        @Override
+        public Duration getEstimatedEffortPerOccurrence() {
+            Duration total = Duration.ofMinutes(0);
+            for (Recipe recipe : getRecipeList()) {
+                if (recipe.getEstimatedEffortPerOccurrence() != null) {
+                    total = total.plus(recipe.getEstimatedEffortPerOccurrence());
+                }
+            }
+
+            if (total.getSeconds() == 0) {
+                return Duration.ofMinutes(5);
+            }
+
+            return total;
         }
     }
 }
