@@ -15,9 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
 
+import java.nio.file.Path;
 import java.util.List;
 
 public interface JavaSourceFile extends J {
@@ -25,6 +27,8 @@ public interface JavaSourceFile extends J {
 
     @Nullable
     J.Package getPackageDeclaration();
+
+    JavaSourceFile withPackageDeclaration(J.Package pkg);
 
     List<Import> getImports();
 
@@ -35,6 +39,13 @@ public interface JavaSourceFile extends J {
     JavaSourceFile withEof(Space eof);
 
     Padding getPadding();
+
+    /**
+     * @return An absolute or relative file path.
+     */
+    Path getSourcePath();
+
+    SourceFile withSourcePath(Path path);
 
     interface Padding {
         List<JRightPadded<Import>> getImports();
