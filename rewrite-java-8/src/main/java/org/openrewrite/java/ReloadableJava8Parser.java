@@ -171,7 +171,7 @@ class ReloadableJava8Parser implements JavaParser {
                                     try {
                                         return compiler.parse(new Java8ParserInputFileObject(input));
                                     } catch (IllegalStateException e) {
-                                        if (e.getMessage().equals("endPosTable already set")) {
+                                        if ("endPosTable already set".equals(e.getMessage())) {
                                             throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
                                                     "set of source files that have some of the same fully qualified names", e);
                                         }

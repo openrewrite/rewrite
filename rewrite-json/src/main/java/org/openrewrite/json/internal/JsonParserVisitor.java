@@ -170,7 +170,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 skip(ctx.NUMERIC_LITERAL());
             }
             source.append(ctx.NUMERIC_LITERAL().getText());
-            if (ctx.NUMERIC_LITERAL().getText().equals("Infinity")) {
+            if ("Infinity".equals(ctx.NUMERIC_LITERAL().getText())) {
                 value = sign.get() == 1 ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
             } else {
                 value = Double.NaN;

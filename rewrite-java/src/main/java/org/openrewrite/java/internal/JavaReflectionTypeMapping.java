@@ -140,11 +140,11 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             typeCache.put(className, mappedClazz);
 
             JavaType.FullyQualified supertype = (JavaType.FullyQualified) (
-                    clazz.getName().equals("java.lang.Object") ?
+                    "java.lang.Object".equals(clazz.getName()) ?
                             null :
                             (clazz.getSuperclass() == null ? type(Object.class) : type(clazz.getSuperclass())));
             JavaType.FullyQualified owner = (
-                    clazz.getName().equals("java.lang.Object") ?
+                    "java.lang.Object".equals(clazz.getName()) ?
                             null :
                             (clazz.getDeclaringClass() == null ? null : (JavaType.FullyQualified) type(clazz.getDeclaringClass())));
             List<JavaType.FullyQualified> annotations = null;
@@ -170,7 +170,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 members = new ArrayList<>(clazz.getDeclaredFields().length);
                 for (Field f : clazz.getDeclaredFields()) {
                     if (!f.isSynthetic()) {
-                        if (!clazz.getName().equals("java.lang.String") || !f.getName().equals("serialPersistentFields")) {
+                        if (!"java.lang.String".equals(clazz.getName()) || !"serialPersistentFields".equals(f.getName())) {
                             JavaType.Variable field = field(f);
                             members.add(field);
                         }
@@ -246,7 +246,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
         for (Type bound : bounds) {
             JavaType mappedBound = type(bound);
-            if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
+            if (!(mappedBound instanceof JavaType.FullyQualified) || !"java.lang.Object".equals(((JavaType.FullyQualified) mappedBound).getFullyQualifiedName())) {
                 if (mappedBounds == null) {
                     mappedBounds = new ArrayList<>(bounds.length);
                 }

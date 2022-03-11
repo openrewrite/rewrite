@@ -115,7 +115,7 @@ public class AddPlugin extends Recipe {
 
                 Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
                         .filter(plugin ->
-                                plugin.getName().equals("plugin") &&
+                                "plugin".equals(plugin.getName()) &&
                                         groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
                                         artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
                         )

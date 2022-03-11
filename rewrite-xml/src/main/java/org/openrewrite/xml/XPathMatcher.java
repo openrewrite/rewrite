@@ -57,7 +57,7 @@ public class XPathMatcher {
                 if (part.startsWith("@")) {
                     if (!(cursor.getValue() instanceof Xml.Attribute &&
                             (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
-                            part.substring(1).equals("*"))) {
+                            "*".equals(part.substring(1)))) {
                         return false;
                     }
 
@@ -65,7 +65,7 @@ public class XPathMatcher {
                     continue;
                 }
 
-                if (path.size() < i + 1 || (!path.get(pathIndex).getName().equals(part) && !part.equals("*"))) {
+                if (path.size() < i + 1 || (!path.get(pathIndex).getName().equals(part) && !"*".equals(part))) {
                     return false;
                 }
             }
@@ -80,10 +80,10 @@ public class XPathMatcher {
                 if (part.startsWith("@")) {
                     return cursor.getValue() instanceof Xml.Attribute &&
                             (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
-                                    part.substring(1).equals("*"));
+                                    "*".equals(part.substring(1)));
                 }
 
-                if (path.size() < i + 1 || (!path.get(i).getName().equals(part) && !part.equals("*"))) {
+                if (path.size() < i + 1 || (!path.get(i).getName().equals(part) && !"*".equals(part))) {
                     return false;
                 }
             }

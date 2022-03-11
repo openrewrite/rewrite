@@ -41,7 +41,7 @@ public class LatestPatch implements VersionComparator {
     }
 
     public static Validated build(String toVersion, @Nullable String metadataPattern) {
-        return toVersion.equalsIgnoreCase("latest.patch") ?
+        return "latest.patch".equalsIgnoreCase(toVersion) ?
                 Validated.valid("latestPatch", new LatestPatch(metadataPattern)) :
                 Validated.invalid("latestPatch", toVersion, "not latest release");
     }

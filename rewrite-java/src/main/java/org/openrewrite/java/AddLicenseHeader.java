@@ -61,7 +61,7 @@ public class AddLicenseHeader extends Recipe {
                     PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper("${", "}", null);
                     String formattedLicenseText = "\n * " + propertyPlaceholderHelper.replacePlaceholders(licenseText,
                             k -> {
-                                if (k.equals("CURRENT_YEAR")) {
+                                if ("CURRENT_YEAR".equals(k)) {
                                     return Integer.toString(Calendar.getInstance().get(Calendar.YEAR));
                                 }
                                 return System.getProperty(k);

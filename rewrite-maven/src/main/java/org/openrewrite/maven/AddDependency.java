@@ -159,7 +159,7 @@ public class AddDependency extends Recipe {
                         if (source != new UsesType<>(onlyIfUsing).visit(source, ctx)) {
                             scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
                                     scope /* a compile scope dependency will also be available in test source set */ :
-                                    sourceSet.getName().equals("test") ? "test" : "compile"
+                                    "test".equals(sourceSet.getName()) ? "test" : "compile"
                             );
                         }
                     }));
@@ -189,7 +189,7 @@ public class AddDependency extends Recipe {
                             }
                         }
 
-                        if (resolvedScope.equals("test")) {
+                        if ("test".equals(resolvedScope)) {
                             for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Test)) {
                                 if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                                     return maven;

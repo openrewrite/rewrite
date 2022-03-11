@@ -135,7 +135,7 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
         StringJoiner boundJoiner = new StringJoiner(" & ");
         for (Type bound : bounds) {
             String boundStr = signature(bound);
-            if (!boundStr.equals("java.lang.Object")) {
+            if (!"java.lang.Object".equals(boundStr)) {
                 boundJoiner.add(boundStr);
             }
         }

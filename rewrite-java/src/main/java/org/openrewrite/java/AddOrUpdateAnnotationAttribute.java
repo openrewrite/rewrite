@@ -80,7 +80,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 String newAttributeValue = maybeQuoteStringArgument(attributeName, attributeValue, a);
                 List<Expression> currentArgs = a.getArguments();
                 if (currentArgs == null || currentArgs.isEmpty()) {
-                    if (attributeName == null || attributeName.equals("value")) {
+                    if (attributeName == null || "value".equals(attributeName)) {
                         return a.withTemplate(
                                 JavaTemplate.builder(this::getCursor, "#{}")
                                         .build(),
@@ -112,7 +112,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
                         } else if (it instanceof J.Literal) {
                             // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
-                            if (attributeName == null || attributeName.equals("value")) {
+                            if (attributeName == null || "value".equals(attributeName)) {
                                 J.Literal value = (J.Literal) it;
                                 if (newAttributeValue.equals(value.getValueSource())) {
                                     foundAttributeWithDesiredValue.set(true);

@@ -105,8 +105,8 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
                 break;
         }
 
-        if (bounds != null && bounds.get(0) instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) bounds.get(0))
-                .getFullyQualifiedName().equals("java.lang.Object")) {
+        if (bounds != null && bounds.get(0) instanceof JavaType.FullyQualified && "java.lang.Object".equals(((JavaType.FullyQualified) bounds.get(0))
+                .getFullyQualifiedName())) {
             bounds = null;
         }
 
@@ -134,7 +134,7 @@ class Java11TypeMapping implements JavaTypeMapping<Tree> {
             }
         } else if (type.getUpperBound() != null) {
             JavaType mappedBound = type(type.getUpperBound());
-            if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
+            if (!(mappedBound instanceof JavaType.FullyQualified) || !"java.lang.Object".equals(((JavaType.FullyQualified) mappedBound).getFullyQualifiedName())) {
                 bounds = singletonList(mappedBound);
             }
         }

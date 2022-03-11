@@ -278,11 +278,11 @@ public class Autodetect extends NamedStyles {
                                 }
                                 staticPos++;
                             } else {
-                                if (!containsJava && block.pattern.equals("java.*")) {
+                                if (!containsJava && "java.*".equals(block.pattern)) {
                                     containsJava = true;
                                 }
 
-                                if (!containsJavax && block.pattern.equals("javax.*")) {
+                                if (!containsJavax && "javax.*".equals(block.pattern)) {
                                     containsJavax = true;
                                 }
 
@@ -394,14 +394,14 @@ public class Autodetect extends NamedStyles {
                             }
 
                             Block block = nonStaticBlocks.get(i);
-                            if (addJavaOrJavax && block.pattern.equals("java.*")) {
+                            if (addJavaOrJavax && "java.*".equals(block.pattern)) {
                                 if (addNewLine) {
                                     builder = builder.blankLine();
                                     addNewLine = false;
                                 }
 
-                                if (!(i - 1 >= 0 && nonStaticBlocks.get(i - 1).pattern.equals("javax.*") ||
-                                        i + 1 < nonStaticBlocks.size() && nonStaticBlocks.get(i + 1).pattern.equals("javax.*"))) {
+                                if (!(i - 1 >= 0 && "javax.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
+                                        i + 1 < nonStaticBlocks.size() && "javax.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
                                     if (isJavaxBeforeJava()) {
                                         builder = builder.importPackage("javax.*");
                                         builder = builder.importPackage("java.*");
@@ -414,14 +414,14 @@ public class Autodetect extends NamedStyles {
                                 } else {
                                     builder = builder.importPackage(block.pattern);
                                 }
-                            } else if (addJavaOrJavax && block.pattern.equals("javax.*")) {
+                            } else if (addJavaOrJavax && "javax.*".equals(block.pattern)) {
                                 if (addNewLine) {
                                     builder = builder.blankLine();
                                     addNewLine = false;
                                 }
 
-                                if (!(i - 1 >= 0 && nonStaticBlocks.get(i - 1).pattern.equals("java.*") ||
-                                        i + 1 < nonStaticBlocks.size() - 1 && nonStaticBlocks.get(i + 1).pattern.equals("java.*"))) {
+                                if (!(i - 1 >= 0 && "java.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
+                                        i + 1 < nonStaticBlocks.size() - 1 && "java.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
                                     if (isJavaxBeforeJava()) {
                                         builder = builder.importPackage("javax.*");
                                         builder = builder.importPackage("java.*");
@@ -612,8 +612,8 @@ public class Autodetect extends NamedStyles {
                                 previousPkg,
                                 containsNewLine);
 
-                        javaPos = block.pattern.equals("java.*") && javaPos > blockStart ? blockStart : javaPos;
-                        javaxPos = block.pattern.equals("javax.*") && javaxPos > blockStart ? blockStart : javaxPos;
+                        javaPos = "java.*".equals(block.pattern) && javaPos > blockStart ? blockStart : javaPos;
+                        javaxPos = "javax.*".equals(block.pattern) && javaxPos > blockStart ? blockStart : javaxPos;
 
                         if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
                             blocks.remove(block);
@@ -677,8 +677,8 @@ public class Autodetect extends NamedStyles {
                     blocks.remove(block);
                 }
 
-                javaPos = block.pattern.equals("java.*") ? blockStart : javaPos;
-                javaxPos = block.pattern.equals("javax.*") ? blockStart : javaxPos;
+                javaPos = "java.*".equals(block.pattern) ? blockStart : javaPos;
+                javaxPos = "javax.*".equals(block.pattern) ? blockStart : javaxPos;
                 blocks.add(block);
             }
 

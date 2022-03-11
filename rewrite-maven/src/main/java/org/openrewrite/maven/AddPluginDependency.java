@@ -87,7 +87,7 @@ public class AddPluginDependency extends Recipe {
                 }
                 Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
                         .filter(plugin ->
-                                plugin.getName().equals("plugin") &&
+                                "plugin".equals(plugin.getName()) &&
                                         pluginGroupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
                                         pluginArtifactId.equals(plugin.getChildValue("artifactId").orElse(null))
                         )

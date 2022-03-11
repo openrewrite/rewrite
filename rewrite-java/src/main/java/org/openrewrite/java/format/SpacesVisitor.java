@@ -55,7 +55,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     <T extends J> T spaceBefore(T j, boolean spaceBefore) {
         if (spaceBefore && StringUtils.isNullOrEmpty(j.getPrefix().getWhitespace())) {
             return j.withPrefix(j.getPrefix().withWhitespace(" "));
-        } else if (!spaceBefore && j.getPrefix().getWhitespace().equals(" ") && j.getComments().isEmpty()) {
+        } else if (!spaceBefore && " ".equals(j.getPrefix().getWhitespace()) && j.getComments().isEmpty()) {
             return j.withPrefix(j.getPrefix().withWhitespace(""));
         } else {
             return j;
@@ -65,7 +65,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     <T> JContainer<T> spaceBefore(JContainer<T> container, boolean spaceBefore) {
         if (spaceBefore && StringUtils.isNullOrEmpty(container.getBefore().getWhitespace())) {
             return container.withBefore(container.getBefore().withWhitespace(" "));
-        } else if (!spaceBefore && container.getBefore().getWhitespace().equals(" ")) {
+        } else if (!spaceBefore && " ".equals(container.getBefore().getWhitespace())) {
             return container.withBefore(container.getBefore().withWhitespace(""));
         } else {
             return container;
@@ -612,7 +612,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                             operator.getBefore().withWhitespace(" ")
                     )
             );
-        } else if (!style.getAroundOperators().getAssignment() && operatorBeforeWhitespace.equals(" ")) {
+        } else if (!style.getAroundOperators().getAssignment() && " ".equals(operatorBeforeWhitespace)) {
             a = padding.withOperator(
                     operator.withBefore(
                             operator.getBefore().withWhitespace("")

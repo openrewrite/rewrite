@@ -136,7 +136,7 @@ public class MethodMatcher {
 
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
-        boolean matchesTargetType = targetTypePattern.toString().equals("[^.]*") || matchesTargetType(enclosing.getType());
+        boolean matchesTargetType = "[^.]*".equals(targetTypePattern.toString()) || matchesTargetType(enclosing.getType());
         if(!matchesTargetType) {
             return false;
         }
@@ -222,7 +222,7 @@ public class MethodMatcher {
         }
 
         if (matchOverrides) {
-            if (!type.getFullyQualifiedName().equals("java.lang.Object") && matchesTargetType(JavaType.Class.build("java.lang.Object"))) {
+            if (!"java.lang.Object".equals(type.getFullyQualifiedName()) && matchesTargetType(JavaType.Class.build("java.lang.Object"))) {
                 return true;
             }
 
@@ -296,7 +296,7 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
                 int arrInit = className.lastIndexOf("\\[");
                 String beforeArr = arrInit == -1 ? className : className.substring(0, arrInit);
                 if (JavaType.Primitive.fromKeyword(beforeArr) != null) {
-                    if (beforeArr.equals("String")) {
+                    if ("String".equals(beforeArr)) {
                         return "java.lang." + className;
                     }
                     return className;

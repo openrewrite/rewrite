@@ -95,7 +95,7 @@ public class MavenPomDownloader {
             if (version != null) {
                 if (version.endsWith("-SNAPSHOT") && !repo.isSnapshots()) {
                     continue;
-                } else if (version.equals("RELEASE") && !repo.isReleases()) {
+                } else if ("RELEASE".equals(version) && !repo.isReleases()) {
                     continue;
                 }
             }
@@ -111,7 +111,7 @@ public class MavenPomDownloader {
                             (gav.getVersion() == null ? "" : gav.getVersion() + '/') +
                             "maven-metadata.xml";
 
-                    if (scheme.equals("file")) {
+                    if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
                         Path path = Paths.get(URI.create(uri));
                         if (Files.exists(path)) {
@@ -231,7 +231,7 @@ public class MavenPomDownloader {
                         gav.getVersion() + '/' +
                         gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
 
-                if (uri.getScheme().equals("file")) {
+                if ("file".equals(uri.getScheme())) {
                     Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
 
                     try {
@@ -365,7 +365,7 @@ public class MavenPomDownloader {
                 return repository;
             }
             String originalUrl = repository.getUri();
-            if (URI.create(originalUrl).getScheme().equals("file")) {
+            if ("file".equals(URI.create(originalUrl).getScheme())) {
                 return repository;
             }
             result = mavenCache.getNormalizedRepository(repository);

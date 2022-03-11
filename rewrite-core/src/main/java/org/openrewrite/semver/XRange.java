@@ -48,7 +48,7 @@ public class XRange extends LatestRelease {
             return false;
         }
 
-        if (major.equals("*")) {
+        if ("*".equals(major)) {
             return true;
         }
 
@@ -59,13 +59,13 @@ public class XRange extends LatestRelease {
             return false;
         }
 
-        if (minor.equals("*")) {
+        if ("*".equals(minor)) {
             return true;
         } else if (gav.group(2) == null || !gav.group(2).equals(minor)) {
             return false;
         }
 
-        if (patch.equals("*")) {
+        if ("*".equals(patch)) {
             return true;
         } else if (gav.group(3) == null || !gav.group(3).equals(patch)) {
             return false;
@@ -85,11 +85,11 @@ public class XRange extends LatestRelease {
         String patch = normalizeWildcard(matcher.group(3) == null ? "0" : matcher.group(3));
         String micro = normalizeWildcard(matcher.group(4) == null ? "0" : matcher.group(4));
 
-        if (major.equals("*") && (matcher.group(2) != null || matcher.group(3) != null || matcher.group(4) != null)) {
+        if ("*".equals(major) && (matcher.group(2) != null || matcher.group(3) != null || matcher.group(4) != null)) {
             return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
-        } else if (minor.equals("*") && (matcher.group(3) != null || matcher.group(4) != null)) {
+        } else if ("*".equals(minor) && (matcher.group(3) != null || matcher.group(4) != null)) {
             return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
-        } else if (patch.equals("*") && matcher.group(4) != null) {
+        } else if ("*".equals(patch) && matcher.group(4) != null) {
             return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
         }
 
@@ -97,6 +97,6 @@ public class XRange extends LatestRelease {
     }
 
     private static String normalizeWildcard(String part) {
-        return part.equals("*") || part.equals("x") || part.equals("X") ? "*" : part;
+        return "*".equals(part) || "x".equals(part) || "X".equals(part) ? "*" : part;
     }
 }

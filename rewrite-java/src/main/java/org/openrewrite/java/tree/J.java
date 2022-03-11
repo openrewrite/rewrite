@@ -2247,7 +2247,7 @@ public interface J extends Tree {
                 if (fq == null) {
                     String possibleInnerClassFqn = getTypeName(qualid);
                     String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.indexOf('$') + 1);
-                    if (possibleInnerClassName.equals("*")) {
+                    if ("*".equals(possibleInnerClassName)) {
                         return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.indexOf('$'));
                     }
                     while (possibleInnerClassName.indexOf('$') >= 0) {

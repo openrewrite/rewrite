@@ -69,7 +69,7 @@ public class ParentModelResolver extends ProjectModelResolver {
     private static RemoteRepository httpsFallback(RemoteRepository repository) {
         RemoteRepository result = repository;
         try {
-            if (repository.getProtocol().equals("http")) {
+            if ("http".equals(repository.getProtocol())) {
                 URLConnection connection = URI.create(repository.getUrl()).toURL().openConnection();
                 if (connection instanceof HttpURLConnection) {
                     HttpURLConnection httpConnection = (HttpURLConnection) connection;

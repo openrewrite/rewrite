@@ -130,7 +130,7 @@ public class MavenParser implements Parser<Xml.Document> {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().equals("pom.xml") || path.toString().endsWith(".pom");
+        return "pom.xml".equals(path.toString()) || path.toString().endsWith(".pom");
     }
 
     public static Builder builder() {

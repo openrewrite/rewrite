@@ -77,7 +77,7 @@ public class MavenRepositoryMirror {
         if (mirrorOf == null) {
             return false;
         }
-        if (mirrorOf.equals("*")) {
+        if ("*".equals(mirrorOf)) {
             return true;
         }
 
@@ -104,10 +104,10 @@ public class MavenRepositoryMirror {
             return false;
         }
         // Named inclusion/exclusion beats wildcard inclusion/exclusion
-        if (excludedRepos.stream().anyMatch(it -> it.equals("*"))) {
+        if (excludedRepos.stream().anyMatch(it -> "*".equals(it))) {
             return includedRepos.contains(repository.getId());
         }
-        if (includedRepos.stream().anyMatch(it -> it.equals("*"))) {
+        if (includedRepos.stream().anyMatch(it -> "*".equals(it))) {
             return !excludedRepos.contains(repository.getId());
         }
         return !excludedRepos.contains(repository.getId()) && includedRepos.contains(repository.getId());
@@ -119,7 +119,7 @@ public class MavenRepositoryMirror {
         }
         try {
             URI uri = new URI(repo.getUri());
-            return uri.getHost().equals("localhost") || uri.getHost().equals("127.0.0.1");
+            return "localhost".equals(uri.getHost()) || "127.0.0.1".equals(uri.getHost());
         } catch (URISyntaxException ignored) {
             // might be a property reference
         }

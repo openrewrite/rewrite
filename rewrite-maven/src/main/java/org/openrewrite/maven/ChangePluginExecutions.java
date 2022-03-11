@@ -73,7 +73,7 @@ public class ChangePluginExecutions extends Recipe {
                 if (PLUGINS_MATCHER.matches(getCursor())) {
                     Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
                             .filter(plugin ->
-                                    plugin.getName().equals("plugin") &&
+                                    "plugin".equals(plugin.getName()) &&
                                             groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
                                             artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
                             )

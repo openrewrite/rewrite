@@ -85,7 +85,7 @@ public class MavenRepository {
     public boolean acceptsVersion(String version) {
         if (version.endsWith("-SNAPSHOT")) {
             return snapshots;
-        } else if (uri.equalsIgnoreCase("https://repo.spring.io/milestone")) {
+        } else if ("https://repo.spring.io/milestone".equalsIgnoreCase(uri)) {
             // special case this repository since it will be so commonly used
             return version.matches(".*(M|RC)\\d+$");
         }

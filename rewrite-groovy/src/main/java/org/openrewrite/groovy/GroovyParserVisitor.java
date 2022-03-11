@@ -103,7 +103,7 @@ public class GroovyParserVisitor {
         }
 
         for (ClassNode aClass : ast.getClasses()) {
-            if (aClass.getSuperClass() == null || !aClass.getSuperClass().getName().equals("groovy.lang.Script")) {
+            if (aClass.getSuperClass() == null || !"groovy.lang.Script".equals(aClass.getSuperClass().getName())) {
                 sortedByPosition.computeIfAbsent(pos(aClass), i -> new ArrayList<>()).add(aClass);
             }
         }

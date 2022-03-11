@@ -89,7 +89,7 @@ public class MergeYaml extends Recipe {
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
-                if (key.equals("$")) {
+                if ("$".equals(key)) {
                     return document.withBlock((Yaml.Block) new MergeYamlVisitor<>(document.getBlock(), yaml,
                             Boolean.TRUE.equals(acceptTheirs)).visit(document.getBlock(), ctx, getCursor()));
                 }

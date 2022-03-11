@@ -77,7 +77,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         if (dotIndex >= 0) {
             String packageName = classType.getFullyQualifiedName().substring(0, dotIndex);
             // No need to add imports if the class to import is in java.lang, or if the classes are within the same package
-            if (packageName.equals("java.lang") || (cu.getPackageDeclaration() != null &&
+            if ("java.lang".equals(packageName) || (cu.getPackageDeclaration() != null &&
                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
                 return cu;
             }
@@ -95,10 +95,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             String ending = i.getQualid().getSimpleName();
             if (statik == null) {
                 return !i.isStatic() && i.getPackageName().equals(classType.getPackageName()) &&
-                        (ending.equals(classType.getClassName()) || ending.equals("*"));
+                        (ending.equals(classType.getClassName()) || "*".equals(ending));
             }
             return i.isStatic() && i.getTypeName().equals(classType.getFullyQualifiedName()) &&
-                    (ending.equals(statik) || ending.equals("*"));
+                    (ending.equals(statik) || "*".equals(ending));
         })) {
             return cu;
         }
@@ -187,7 +187,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             if (invocation instanceof J.MethodInvocation) {
                 J.MethodInvocation mi = (J.MethodInvocation) invocation;
                 if (mi.getSelect() == null &&
-                        (statik.equals("*") || mi.getName().getSimpleName().equals(statik))) {
+                        ("*".equals(statik) || mi.getName().getSimpleName().equals(statik))) {
                     return true;
                 }
             }

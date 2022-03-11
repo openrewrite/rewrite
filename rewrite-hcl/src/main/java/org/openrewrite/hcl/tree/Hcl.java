@@ -928,7 +928,7 @@ public interface Hcl extends Tree {
         String arrow;
 
         public HeredocTemplate withArrow(String arrow) {
-            if (!arrow.equals("<<") && !arrow.equals("<<-")) {
+            if (!"<<".equals(arrow) && !"<<-".equals(arrow)) {
                 throw new IllegalArgumentException("Heredoc arrow must be one of << or <<-");
             }
             return this.arrow.equals(arrow) ? this :

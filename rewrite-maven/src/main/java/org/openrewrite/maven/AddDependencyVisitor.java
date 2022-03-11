@@ -120,7 +120,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                                         "<version>" + versionToUse + "</version>\n") +
                                 (classifier == null ? "" :
                                         "<classifier>" + classifier + "</classifier>\n") +
-                                (scope == null || scope.equals("compile") ? "" :
+                                (scope == null || "compile".equals(scope) ? "" :
                                         "<scope>" + scope + "</scope>\n") +
                                 (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +
                                 "</dependency>"

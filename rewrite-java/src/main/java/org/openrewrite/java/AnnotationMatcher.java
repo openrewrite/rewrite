@@ -109,14 +109,14 @@ public class AnnotationMatcher {
     }
 
     private boolean argumentValueMatches(String matchOnArgumentName, Expression arg, String matchText) {
-        if (matchOnArgumentName.equals("value")) {
+        if ("value".equals(matchOnArgumentName)) {
             if (arg instanceof J.Literal) {
                 String valueSource = ((J.Literal) arg).getValueSource();
                 return valueSource != null && valueSource.equals(matchText);
             }
             if (arg instanceof J.FieldAccess) {
                 J.FieldAccess fa = (J.FieldAccess) arg;
-                if (fa.getSimpleName().equals("class") && matchText.endsWith(".class")) {
+                if ("class".equals(fa.getSimpleName()) && matchText.endsWith(".class")) {
                     JavaType argType = fa.getTarget().getType();
                     if (argType instanceof JavaType.FullyQualified) {
                         String queryTypeFqn = JavaType.Class.build(matchText.replaceAll("\\.class$", "")).getFullyQualifiedName();

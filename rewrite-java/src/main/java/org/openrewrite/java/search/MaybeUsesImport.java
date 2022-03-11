@@ -64,7 +64,7 @@ public class MaybeUsesImport<P> extends JavaIsoVisitor<P> {
                     J.FieldAccess fa = (J.FieldAccess) expr;
                     if (fa.getTarget() == prior) {
                         String simpleName = fa.getSimpleName();
-                        if (!segment.equals("*") && !simpleName.equals(segment) && !simpleName.equals("*")) {
+                        if (!"*".equals(segment) && !simpleName.equals(segment) && !"*".equals(simpleName)) {
                             return false;
                         }
                         prior = fa;

@@ -117,7 +117,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) generic.getUpperBound();
             if (intersectionBound.supertype_field != null) {
                 String bound = signature(intersectionBound.supertype_field);
-                if (!bound.equals("java.lang.Object")) {
+                if (!"java.lang.Object".equals(bound)) {
                     boundSigs.add(bound);
                 }
             }
@@ -126,7 +126,7 @@ class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             }
         } else {
             String bound = signature(generic.getUpperBound());
-            if (!bound.equals("java.lang.Object")) {
+            if (!"java.lang.Object".equals(bound)) {
                 boundSigs.add(bound);
             }
         }

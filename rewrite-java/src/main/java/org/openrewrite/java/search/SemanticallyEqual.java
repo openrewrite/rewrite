@@ -99,8 +99,8 @@ public class SemanticallyEqual {
 
             // Class literals are the only kind of FieldAccess which can appear within annotations
             // Functionality to correctly determine semantic equality of other kinds of field access will come later
-            if (firstFieldAccess.getSimpleName().equals("class")) {
-                if (!secondFieldAccess.getSimpleName().equals("class")) {
+            if ("class".equals(firstFieldAccess.getSimpleName())) {
+                if (!"class".equals(secondFieldAccess.getSimpleName())) {
                     isEqual = false;
                     return null;
                 } else {

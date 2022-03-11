@@ -107,8 +107,8 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 break;
         }
 
-        if (bounds != null && bounds.get(0) instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) bounds.get(0))
-                .getFullyQualifiedName().equals("java.lang.Object")) {
+        if (bounds != null && bounds.get(0) instanceof JavaType.FullyQualified && "java.lang.Object".equals(((JavaType.FullyQualified) bounds.get(0))
+                .getFullyQualifiedName())) {
             bounds = null;
         }
 
@@ -125,7 +125,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         List<JavaType> bounds = null;
         if (type.getUpperBound() instanceof Type.IntersectionClassType) {
             Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
-            boolean isIntersectionSuperType = !intersectionBound.supertype_field.tsym.getQualifiedName().toString().equals("java.lang.Object");
+            boolean isIntersectionSuperType = !"java.lang.Object".equals(intersectionBound.supertype_field.tsym.getQualifiedName().toString());
             bounds = new ArrayList<>((isIntersectionSuperType ? 1 : 0) + intersectionBound.interfaces_field.length());
 
             if (isIntersectionSuperType) {
@@ -136,7 +136,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             }
         } else if (type.getUpperBound() != null) {
             JavaType mappedBound = type(type.getUpperBound());
-            if (!(mappedBound instanceof JavaType.FullyQualified) || !((JavaType.FullyQualified) mappedBound).getFullyQualifiedName().equals("java.lang.Object")) {
+            if (!(mappedBound instanceof JavaType.FullyQualified) || !"java.lang.Object".equals(((JavaType.FullyQualified) mappedBound).getFullyQualifiedName())) {
                 bounds = singletonList(mappedBound);
             }
         }
@@ -191,7 +191,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     if (elem instanceof Symbol.VarSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                     Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                        if (sym.flatName().toString().equals("java.lang.String") && sym.name.toString().equals("serialPersistentFields")) {
+                        if ("java.lang.String".equals(sym.flatName().toString()) && "serialPersistentFields".equals(sym.name.toString())) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
                             // serialization and is intentionally filtered to prevent errors.

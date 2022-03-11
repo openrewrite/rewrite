@@ -79,7 +79,7 @@ public class RenameMethodsNamedHashcodeEqualOrTostring extends Recipe {
                     JavaType.Method t = method.getMethodType();
                     if (equalsIgnoreCaseExclusive(sn, "hashCode") && JavaType.Primitive.Int.equals(rte) && NO_ARGS.matches(t)) {
                         doAfterVisit(new ChangeMethodName(MethodMatcher.methodPattern(method), "hashCode", true, false));
-                    } else if (sn.equalsIgnoreCase("equal") && JavaType.Primitive.Boolean.equals(rte) && OBJECT_ARG.matches(t)) {
+                    } else if ("equal".equalsIgnoreCase(sn) && JavaType.Primitive.Boolean.equals(rte) && OBJECT_ARG.matches(t)) {
                         doAfterVisit(new ChangeMethodName(MethodMatcher.methodPattern(method), "equals", true, false));
                     } else if (equalsIgnoreCaseExclusive(sn, "toString") && TypeUtils.isString(rte) && NO_ARGS.matches(t)) {
                         doAfterVisit(new ChangeMethodName(MethodMatcher.methodPattern(method), "toString", true, false));

@@ -213,7 +213,7 @@ public class StringUtils {
      */
     public static List<String> splitCStyleComments(String text) {
         List<String> result = new ArrayList<>();
-        if (text == null || text.equals("")) {
+        if (text == null || "".equals(text)) {
             result.add("");
             return result;
         }

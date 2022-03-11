@@ -74,9 +74,9 @@ public class VersionRequirement {
 
     interface VersionSpec {
         static VersionSpec build(String requested, boolean direct) {
-            if (requested.equals("LATEST")) {
+            if ("LATEST".equals(requested)) {
                 return DynamicVersion.LATEST;
-            } else if (requested.equals("RELEASE")) {
+            } else if ("RELEASE".equals(requested)) {
                 return DynamicVersion.RELEASE;
             } else if (requested.contains("[") || requested.contains("(")) {
                 // for things like the profile activation block of where the range is unclosed but maven still handles it, e.g.

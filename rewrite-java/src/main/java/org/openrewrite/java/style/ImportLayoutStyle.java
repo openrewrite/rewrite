@@ -355,7 +355,7 @@ public class ImportLayoutStyle implements JavaStyle {
                         // Classic Mac OS new line return '\r' is replaced by '\n'.
                         String newLineCharacters = whitespaceContainsCRLF ||
                                 StringUtils.isNullOrEmpty(orderedImport.getElement().getPrefix().getWhitespace()) &&
-                                        prevWhitespace.equals("\r\n") ? "\r\n" : "\n";
+                                        "\r\n".equals(prevWhitespace) ? "\r\n" : "\n";
 
                         StringBuilder newWhitespace = new StringBuilder(newLineCharacters);
                         for (int i = 0; i < extraLineSpaceCount; i++) {
@@ -820,7 +820,7 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
                 case VALUE_STRING:
                     if ("layout".equals(currentField)) {
                         String block = p.getText().trim();
-                        if (block.equals("<blank line>")) {
+                        if ("<blank line>".equals(block)) {
                             builder.blankLine();
                         } else if (block.startsWith("import ")) {
                             block = block.substring("import ".length());
@@ -829,7 +829,7 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
                                 statik = true;
                                 block = block.substring("static ".length());
                             }
-                            if (block.equals("all other imports")) {
+                            if ("all other imports".equals(block)) {
                                 if (statik) {
                                     builder.importStaticAllOthers();
                                 } else {

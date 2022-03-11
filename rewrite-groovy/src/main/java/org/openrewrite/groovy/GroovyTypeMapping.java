@@ -173,7 +173,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         if (g.getUpperBounds() != null) {
             for (ClassNode bound : g.getUpperBounds()) {
                 JavaType.FullyQualified mappedBound = TypeUtils.asFullyQualified(type(bound));
-                if (mappedBound != null && !mappedBound.getFullyQualifiedName().equals("java.lang.Object")) {
+                if (mappedBound != null && !"java.lang.Object".equals(mappedBound.getFullyQualifiedName())) {
                     if (bounds == null) {
                         bounds = new ArrayList<>(g.getUpperBounds().length);
                     }
@@ -183,7 +183,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             }
         } else if (g.getLowerBound() != null) {
             JavaType.FullyQualified mappedBound = TypeUtils.asFullyQualified(type(g.getLowerBound()));
-            if (mappedBound != null && !mappedBound.getFullyQualifiedName().equals("java.lang.Object")) {
+            if (mappedBound != null && !"java.lang.Object".equals(mappedBound.getFullyQualifiedName())) {
                 bounds = singletonList(mappedBound);
                 variance = CONTRAVARIANT;
             }

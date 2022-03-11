@@ -876,7 +876,7 @@ public interface JavaType {
         }
 
         public boolean isConstructor() {
-            return name.equals("<constructor>");
+            return "<constructor>".equals(name);
         }
 
         public FullyQualified getDeclaringType() {

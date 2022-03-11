@@ -233,7 +233,7 @@ public class JavaSourceSet implements Marker {
             StringBuilder bounds = new StringBuilder();
             if (typeParameter.getClassBound() != null) {
                 String bound = typeParameter.getClassBound().toString();
-                if (!bound.equals("java.lang.Object")) {
+                if (!"java.lang.Object".equals(bound)) {
                     bounds.append(bound);
                 }
             } else if (typeParameter.getInterfaceBounds() != null) {

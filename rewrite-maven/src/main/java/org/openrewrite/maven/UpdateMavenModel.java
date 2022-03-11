@@ -84,7 +84,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                                 dependency.getChildValue("version").orElse(null)
                         );
 
-                        if(scope.equals("import")) {
+                        if("import".equals(scope)) {
                             requestedManagedDependencies.add(new ManagedDependency.Imported(gav));
                         } else {
                             requestedManagedDependencies.add(new ManagedDependency.Defined(gav, scope,

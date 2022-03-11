@@ -56,7 +56,7 @@ public class CategoryTree<G> {
     public CategoryTree<G> getCategory(String subcategory) {
         String packageName = descriptor.getPackageName();
         synchronized (lock) {
-            if (subcategory.equals("core") && !recipesByGroup.isEmpty()) {
+            if ("core".equals(subcategory) && !recipesByGroup.isEmpty()) {
                 return syntheticCore();
             }
 
