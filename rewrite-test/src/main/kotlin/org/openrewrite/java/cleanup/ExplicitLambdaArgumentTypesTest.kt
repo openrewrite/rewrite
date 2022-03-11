@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -29,6 +30,26 @@ import org.openrewrite.java.JavaRecipeTest
 interface ExplicitLambdaArgumentTypesTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = ExplicitLambdaArgumentTypes()
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1459")
+    @Test
+    fun unknownArgumentType(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.function.Predicate;
+
+            class Test {
+                static void run(Predicate<WillyWonka> c) {
+                }
+
+                static void method() {
+                    run(a -> {
+                        return a.isEmpty();
+                    });
+                }
+            }
+        """
+    )
 
     @Test
     fun oneArgumentExistingExplicitType(jp: JavaParser) = assertUnchanged(

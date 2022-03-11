@@ -62,7 +62,7 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
         @Nullable
         private static String buildName(@Nullable JavaType type) {
             if (type != null) {
-                if (type instanceof JavaType.FullyQualified) {
+                if (type instanceof JavaType.FullyQualified && type != JavaType.Unknown.getInstance()) {
                     JavaType.FullyQualified asFQN = TypeUtils.asFullyQualified(type);
                     assert asFQN != null;
                     return asFQN.getClassName();
