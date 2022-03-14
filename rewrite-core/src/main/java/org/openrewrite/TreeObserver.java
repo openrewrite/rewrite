@@ -23,34 +23,47 @@ import java.util.function.Predicate;
 
 @Incubating(since = "7.20.0")
 public interface TreeObserver {
-    void propertyChanged(String property, Tree oldTree, Tree newTree, Object oldValue, Object newValue);
+    Tree propertyChanged(String property, Cursor cursor, Tree newTree, Object oldValue, Object newValue);
 
-    final class Registration {
+    final class Subscription {
         private final TreeObserver observer;
         private final List<Predicate<Tree>> predicates = new ArrayList<>();
 
-        public Registration(TreeObserver observer) {
+        public Subscription(TreeObserver observer) {
             this.observer = observer;
         }
 
-        public Registration register(@Nullable Tree tree) {
+        public Subscription subscribe(@Nullable Tree tree) {
             if (tree != null) {
                 predicates.add(t -> t == tree);
             }
             return this;
         }
 
-        public Registration registerType(Class<? extends Tree> treeType) {
-            predicates.add(t -> treeType.isAssignableFrom(t.getClass()));
+        public Subscription subscribeAll(Tree tree) {
+            new TreeVisitor<Tree, Integer>() {
+                @Override
+                public Tree visit(@Nullable Tree tree, Integer p) {
+                    if (tree != null) {
+                        subscribe(tree);
+                    }
+                    return super.visit(tree, p);
+                }
+            }.visit(tree, 0);
+
             return this;
         }
 
-        public Registration register(Predicate<Tree> predicate) {
+        public Subscription subscribeToType(Class<? extends Tree> treeType) {
+            return subscribe(t -> treeType.isAssignableFrom(t.getClass()));
+        }
+
+        public Subscription subscribe(Predicate<Tree> predicate) {
             predicates.add(predicate);
             return this;
         }
 
-        public boolean isObserved(@Nullable Tree tree) {
+        public boolean isSubscribed(@Nullable Tree tree) {
             if (tree == null) {
                 return false;
             }
@@ -65,19 +78,5 @@ public interface TreeObserver {
         public TreeObserver getObserver() {
             return observer;
         }
-    }
-
-    static TreeObserver.Registration observeAll(Tree tree, TreeObserver.Registration observer) {
-        new TreeVisitor<Tree, Integer>() {
-            @Override
-            public Tree visit(@Nullable Tree tree, Integer p) {
-                if (tree != null) {
-                    observer.register(tree);
-                }
-                return super.visit(tree, p);
-            }
-        }.visit(tree, 0);
-
-        return observer;
     }
 }

@@ -28,6 +28,7 @@ import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
 /**
@@ -205,20 +206,23 @@ public abstract class TreeVisitor<T extends Tree, P> {
             }
             if (t != tree && t != null && p instanceof ExecutionContext) {
                 ExecutionContext ctx = (ExecutionContext) p;
-                for (TreeObserver.Registration observer : ctx.getObservers()) {
-                    if (observer.isObserved(tree)) {
-                        Tree t2 = t;
+                for (TreeObserver.Subscription observer : ctx.getObservers()) {
+                    if (observer.isSubscribed(tree)) {
+                        AtomicReference<T> t2 = new AtomicReference<>(t);
                         DiffNode diff = ObjectDifferBuilder.buildDefault().compare(t, tree);
                         diff.visit((node, visit) -> {
                             if (!node.hasChildren()) {
-                                observer.getObserver().propertyChanged(node.getPropertyName(),
-                                        tree, t2, node.canonicalGet(tree), node.canonicalGet(t2));
+                                //noinspection unchecked
+                                t2.set((T) observer.getObserver().propertyChanged(node.getPropertyName(),
+                                        getCursor(), t2.get(), node.canonicalGet(tree), node.canonicalGet(t2.get())));
                             }
                         });
+                        t = t2.get();
                     }
                 }
             }
         }
+
         setCursor(cursor.getParent());
 
         if (topLevel) {

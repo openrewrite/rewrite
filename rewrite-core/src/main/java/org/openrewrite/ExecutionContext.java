@@ -30,14 +30,14 @@ import java.util.function.Supplier;
  */
 public interface ExecutionContext {
     @Incubating(since = "7.20.0")
-    default void addObserver(TreeObserver.Registration observer) {
+    default void addObserver(TreeObserver.Subscription observer) {
         putMessageInCollection("org.openrewrite.internal.treeObservers", observer,
                 () -> Collections.newSetFromMap(new IdentityHashMap<>()));
     }
 
     @Incubating(since = "7.20.0")
-    default Set<TreeObserver.Registration> getObservers() {
-        return getMessage("org.openrewrite.internal.treeObservers", Collections.<TreeObserver.Registration>emptySet());
+    default Set<TreeObserver.Subscription> getObservers() {
+        return getMessage("org.openrewrite.internal.treeObservers", Collections.<TreeObserver.Subscription>emptySet());
     }
 
     void putMessage(String key, Object value);
