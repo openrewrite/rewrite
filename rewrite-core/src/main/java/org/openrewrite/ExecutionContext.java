@@ -18,9 +18,7 @@ package org.openrewrite;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.time.Duration;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -31,14 +29,24 @@ import java.util.function.Supplier;
  * back to the process controlling parsing or recipe execution.
  */
 public interface ExecutionContext {
+    @Incubating(since = "7.20.0")
+    default void addObserver(TreeObserver.Registration observer) {
+        putMessageInCollection("org.openrewrite.internal.treeObservers", observer,
+                () -> Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    @Incubating(since = "7.20.0")
+    default Set<TreeObserver.Registration> getObservers() {
+        return getMessage("org.openrewrite.internal.treeObservers", Collections.<TreeObserver.Registration>emptySet());
+    }
+
     void putMessage(String key, Object value);
 
-    @Nullable
-    <T> T getMessage(String key);
+    @Nullable <T> T getMessage(String key);
 
     default <V, T> T computeMessage(String key, V value, T defaultValue, BiFunction<V, ? super T, ? extends T> remappingFunction) {
         T oldMessage = getMessage(key);
-        if(oldMessage == null) {
+        if (oldMessage == null) {
             oldMessage = defaultValue;
         }
         T newMessage = remappingFunction.apply(value, oldMessage);
@@ -64,8 +72,7 @@ public interface ExecutionContext {
         return t == null ? defaultValue : t;
     }
 
-    @Nullable
-    <T> T pollMessage(String key);
+    @Nullable <T> T pollMessage(String key);
 
     default <T> T pollMessage(String key, T defaultValue) {
         T t = pollMessage(key);
@@ -74,7 +81,7 @@ public interface ExecutionContext {
 
     Consumer<Throwable> getOnError();
 
-    BiConsumer<Throwable,ExecutionContext> getOnTimeout();
+    BiConsumer<Throwable, ExecutionContext> getOnTimeout();
 
     /**
      * @param inputs The number of inputs to the run. Allows the duration to be scaled to the number of inputs.

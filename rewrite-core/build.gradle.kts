@@ -9,6 +9,8 @@ dependencies {
     compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
     testImplementation("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
+    implementation("de.danielbechler:java-object-diff:latest.release")
+
     api("com.fasterxml.jackson.core:jackson-databind:2.13.1")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.13.1")
     api("com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.1")

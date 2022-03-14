@@ -15,6 +15,8 @@
  */
 package org.openrewrite;
 
+import de.danielbechler.diff.ObjectDifferBuilder;
+import de.danielbechler.diff.node.DiffNode;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
@@ -179,7 +181,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             topLevel = true;
             visitCount = 0;
             sample = Timer.start();
-            if(p instanceof ExecutionContext) {
+            if (p instanceof ExecutionContext) {
                 cursor.putMessage("org.openrewrite.ExecutionContext", p);
             }
             afterVisit = new ArrayList<>();
@@ -201,8 +203,20 @@ public abstract class TreeVisitor<T extends Tree, P> {
             if (t != null) {
                 t = postVisit(t, p);
             }
-            if (IS_DEBUGGING && t != tree) {
-                debugOnChange(tree, t);
+            if (t != tree && t != null && p instanceof ExecutionContext) {
+                ExecutionContext ctx = (ExecutionContext) p;
+                for (TreeObserver.Registration observer : ctx.getObservers()) {
+                    if (observer.isObserved(tree)) {
+                        Tree t2 = t;
+                        DiffNode diff = ObjectDifferBuilder.buildDefault().compare(t, tree);
+                        diff.visit((node, visit) -> {
+                            if (!node.hasChildren()) {
+                                observer.getObserver().propertyChanged(node.getPropertyName(),
+                                        tree, t2, node.canonicalGet(tree), node.canonicalGet(t2));
+                            }
+                        });
+                    }
+                }
             }
         }
         setCursor(cursor.getParent());
@@ -235,14 +249,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 visit(node, p);
             }
         }
-    }
-
-    /**
-     * A debugging probe that is only called if a tree changes and either the org.openrewrite.debug
-     * system property is set or the process is running in debug mode.
-     */
-    @Incubating(since = "7.3.0")
-    protected void debugOnChange(@Nullable Tree before, @Nullable Tree after) {
     }
 
     @SuppressWarnings("unused")
