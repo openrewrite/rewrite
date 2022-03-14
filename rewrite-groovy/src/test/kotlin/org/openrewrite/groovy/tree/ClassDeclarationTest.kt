@@ -15,7 +15,9 @@
  */
 package org.openrewrite.groovy.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.tree.J
 
 class ClassDeclarationTest : GroovyTreeTest {
 
@@ -80,5 +82,62 @@ class ClassDeclarationTest : GroovyTreeTest {
         """
             @interface A{}
         """
+    )
+
+    @Test
+    fun hasPackage() = assertParsePrintAndProcess(
+        """ 
+           package org.openrewrite
+            
+           public class A{}
+        """
+    )
+
+    @Test
+    fun implicitlyPublic() = assertParsePrintAndProcess(
+        """
+            class A{}
+        """
+    )
+
+    @Test
+    fun packagePrivate() = assertParsePrintAndProcess(
+        """
+            import groovy.transform.PackageScope
+            
+            @PackageScope 
+            class A {}
+        """,
+        withAst = { cu ->
+            val clazz = cu.classes[0]
+            assertThat(clazz.modifiers)
+                .`as`("Groovy's default visibility is public, applying @PackageScope should prevent the public modifier from being present")
+                .hasSize(0)
+            val annotations = cu.classes[0].allAnnotations
+            assertThat(annotations).hasSize(1)
+        }
+    )
+
+    @Test
+    fun typeParameters() = assertParsePrintAndProcess(
+        """
+            class A <T, S extends PT<S> & C> {
+                T t
+                S s
+            }
+            interface PT<T> {}
+            interface C {}
+        """,
+        withAst = { cu ->
+            val typeParameters = cu.classes[0].typeParameters
+            assertThat(typeParameters!!).hasSize(2)
+            val tParam = typeParameters[0]
+            assertThat(tParam.bounds).isNull()
+            val sParam = typeParameters[1]
+            assertThat(sParam.bounds).isNotNull
+            assertThat(sParam.bounds).hasSize(2)
+            val ptBound = sParam.bounds!![0]
+            assertThat(ptBound).isInstanceOf(J.ParameterizedType::class.java)
+        }
     )
 }

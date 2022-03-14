@@ -36,6 +36,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import javax.lang.model.element.Name;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -80,13 +81,10 @@ public class GroovyParserVisitor {
 
         JRightPadded<J.Package> pkg = null;
         if (ast.getPackage() != null) {
+            Space prefix = whitespace();
             cursor += "package".length();
-            String pkgName = ast.getPackage().getName();
-            if (pkgName.endsWith(".")) {
-                pkgName = pkgName.substring(0, pkgName.length() - 1);
-            }
-            pkg = JRightPadded.build(new J.Package(randomId(), EMPTY, Markers.EMPTY,
-                    buildName(pkgName), emptyList()));
+            pkg = JRightPadded.build(new J.Package(randomId(), prefix, Markers.EMPTY,
+                    typeTree(null), emptyList()));
         }
 
         for (ImportNode anImport : ast.getImports()) {
@@ -150,6 +148,16 @@ public class GroovyParserVisitor {
         @Override
         public void visitClass(ClassNode clazz) {
             Space fmt = whitespace();
+            List<J.Annotation> leadingAnnotations;
+            if (clazz.getAnnotations().isEmpty()) {
+                leadingAnnotations = emptyList();
+            } else {
+                leadingAnnotations = new ArrayList<>(clazz.getAnnotations().size());
+                for (AnnotationNode annotation : clazz.getAnnotations()) {
+                    visitAnnotation(annotation);
+                    leadingAnnotations.add(pollQueue());
+                }
+            }
             List<J.Modifier> modifiers = visitModifiers(clazz.getModifiers());
 
             Space kindPrefix = whitespace();
@@ -166,8 +174,13 @@ public class GroovyParserVisitor {
             }
             assert kindType != null;
             J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);
-
-            J.Identifier name = new J.Identifier(randomId(), sourceBefore(clazz.getName()), Markers.EMPTY, clazz.getName(), null, null);
+            Space namePrefix = whitespace();
+            String simpleName = name();
+            J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, simpleName, null, null);
+            JContainer<J.TypeParameter> typeParameterContainer = null;
+            if (clazz.isUsingGenerics()) {
+                typeParameterContainer = visitTypeParameters(clazz.getGenericsTypes());
+            }
 
             JLeftPadded<TypeTree> extendings = null;
             if (clazz.getSuperClass().getLineNumber() >= 0) {
@@ -224,11 +237,11 @@ public class GroovyParserVisitor {
                     sourceBefore("}"));
 
             queue.add(new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY,
-                    emptyList(),
+                    leadingAnnotations,
                     modifiers,
                     kind,
                     name,
-                    null,
+                    typeParameterContainer,
                     extendings,
                     implementings,
                     body,
@@ -281,27 +294,28 @@ public class GroovyParserVisitor {
             RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(annotation);
 
             String lastArgKey = annotation.getMembers().keySet().stream().reduce("", (k1, k2) -> k2);
-
-            queue.add(
-                    new J.Annotation(randomId(), sourceBefore("@"), Markers.EMPTY,
-                            visitTypeTree(annotation.getClassNode()),
-                            JContainer.build(
-                                    sourceBefore("("),
-                                    annotation.getMembers().entrySet().stream()
-                                            .map(arg -> {
-                                                Space argPrefix = sourceBefore(arg.getKey());
-                                                J.Identifier argName = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, arg.getKey(), null, null);
-                                                J.Assignment assign = new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
-                                                        argName, padLeft(sourceBefore("="), bodyVisitor.visit(arg.getValue())),
-                                                        null);
-                                                return JRightPadded.build((Expression) assign)
-                                                        .withAfter(arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","));
-                                            })
-                                            .collect(Collectors.toList()),
-                                    Markers.EMPTY
-                            )
-                    )
-            );
+            Space prefix = sourceBefore("@");
+            NameTree annotationType = visitTypeTree(annotation.getClassNode());
+            JContainer<Expression> arguments = null;
+            if (!annotation.getMembers().isEmpty()) {
+                // This doesn't handle the case where an annotation has empty arguments like @Foo(), but that is rare
+                arguments = JContainer.build(
+                        sourceBefore("("),
+                        annotation.getMembers().entrySet().stream()
+                                .map(arg -> {
+                                    Space argPrefix = sourceBefore(arg.getKey());
+                                    J.Identifier argName = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, arg.getKey(), null, null);
+                                    J.Assignment assign = new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
+                                            argName, padLeft(sourceBefore("="), bodyVisitor.visit(arg.getValue())),
+                                            null);
+                                    return JRightPadded.build((Expression) assign)
+                                            .withAfter(arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","));
+                                })
+                                .collect(Collectors.toList()),
+                        Markers.EMPTY
+                );
+            }
+            queue.add(new J.Annotation(randomId(), prefix, Markers.EMPTY, annotationType, arguments));
         }
 
         @Override
@@ -684,15 +698,7 @@ public class GroovyParserVisitor {
                 Expression expr = visit(cast.getExpression());
                 Space asPrefix = sourceBefore("as");
                 Space typePrefix = whitespace();
-                String typeIdentifierText;
-                int i = cursor;
-                char c = source.charAt(i);
-                while (Character.isJavaIdentifierPart(c)) {
-                    i++;
-                    c = source.charAt(i);
-                }
-                typeIdentifierText = source.substring(cursor, i);
-                cursor += typeIdentifierText.length();
+                String typeIdentifierText = name();
 
                 queue.add(new J.TypeCast(randomId(), prefix, new Markers(randomId(), singletonList(new AsStyleTypeCast(randomId()))),
                         new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
@@ -703,15 +709,7 @@ public class GroovyParserVisitor {
                 Space prefix = sourceBefore("(");
                 Space identifierPrefix = whitespace();
 
-                String typeIdentifierText;
-                int i = cursor;
-                char c = source.charAt(i);
-                while (Character.isJavaIdentifierPart(c)) {
-                    i++;
-                    c = source.charAt(i);
-                }
-                typeIdentifierText = source.substring(cursor, i);
-                cursor += typeIdentifierText.length();
+                String typeIdentifierText = name();
                 Space closingParenPrefix = sourceBefore(")");
 
                 queue.add(new J.TypeCast(randomId(), prefix, Markers.EMPTY,
@@ -1285,13 +1283,29 @@ public class GroovyParserVisitor {
             return JRightPadded.build(classVisitor.pollQueue());
         } else if (node instanceof ImportNode) {
             ImportNode importNode = (ImportNode) node;
-            String packageName = importNode.getPackageName();
-            if (importNode.isStar()) {
-                packageName += "*";
+            Space prefix = sourceBefore("import");
+            JLeftPadded<Boolean> statik;
+            if (importNode.isStatic()) {
+                statik = padLeft(sourceBefore("static"), true);
+            } else {
+                statik = padLeft(EMPTY, false);
             }
-            J.Import anImport = new J.Import(randomId(), sourceBefore("import"), Markers.EMPTY,
-                    padLeft(importNode.isStatic() ? sourceBefore("static") : EMPTY, importNode.isStatic()),
-                    TypeTree.build(packageName).withPrefix(sourceBefore(packageName)));
+            String packageName = importNode.getPackageName();
+            J.FieldAccess qualid;
+            if (packageName == null) {
+                // Groovy implicitly imports various packages, including java.lang, in every source file
+                // If you explicitly import one of these, or something from a subpackage that does require explicit import like java.lang.annotation.Retention
+                // then ImportNode.getPackageName() may return null
+                Space space = whitespace();
+                qualid = TypeTree.build(name()).withPrefix(space);
+            } else {
+                if (importNode.isStar()) {
+                    packageName += "*";
+                }
+                qualid = TypeTree.build(packageName).withPrefix(sourceBefore(packageName));
+            }
+
+            J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid);
             return maybeSemicolon(anImport);
         }
 
@@ -1399,10 +1413,10 @@ public class GroovyParserVisitor {
         return format(prefix);
     }
 
-    private <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
+    private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode) {
         Space prefix = whitespace();
-        cursor += fullyQualifiedName.length();
-        String[] parts = fullyQualifiedName.split("\\.");
+        String maybeFullyQualified = name();
+        String[] parts = maybeFullyQualified.split("\\.");
 
         String fullName = "";
         Expression expr = null;
@@ -1436,6 +1450,9 @@ public class GroovyParserVisitor {
         }
 
         assert expr != null;
+        if(classNode != null && classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
+            expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameters(classNode.getGenericsTypes()));
+        }
         return expr.withPrefix(prefix);
     }
 
@@ -1466,7 +1483,7 @@ public class GroovyParserVisitor {
             cursor = saveCursor;
         }
 
-        return buildName(classNode.getUnresolvedName());
+        return typeTree(classNode);
     }
 
     private List<J.Modifier> visitModifiers(int modifiers) {
@@ -1540,5 +1557,55 @@ public class GroovyParserVisitor {
         }
 
         return paddedG;
+    }
+
+    private String name() {
+        int i = cursor;
+        char c = source.charAt(i);
+        while (Character.isJavaIdentifierPart(c) || c == '.' || c == '*') {
+            i++;
+            c = source.charAt(i);
+        }
+        String result = source.substring(cursor, i);
+        cursor += i - cursor;
+        return result;
+    }
+
+    private <T extends J> JContainer<T> visitTypeParameters(GenericsType[] genericsTypes) {
+        Space prefix = sourceBefore("<");
+        List<JRightPadded<T>> typeParameters = new ArrayList<>(genericsTypes.length);
+        for (int i = 0; i < genericsTypes.length; i++) {
+            T t = visitTypeParameter(genericsTypes[i]);
+            typeParameters.add(JRightPadded.build(t)
+                    .withAfter(
+                            i < genericsTypes.length - 1 ?
+                                    sourceBefore(",") :
+                                    sourceBefore(">")
+                    ));
+        }
+        return JContainer.build(prefix, typeParameters, Markers.EMPTY);
+    }
+
+    private <T extends J> T visitTypeParameter(GenericsType genericType) {
+        Space prefix = whitespace();
+        J.Identifier name = typeTree(null);
+        JContainer<TypeTree> bounds = null;
+        if (genericType.getUpperBounds() != null) {
+            Space boundsPrefix = sourceBefore("extends");
+            ClassNode[] upperBounds = genericType.getUpperBounds();
+            List<JRightPadded<TypeTree>> convertedBounds = new ArrayList<>(upperBounds.length);
+            for (int i = 0; i < upperBounds.length; i++) {
+                convertedBounds.add(JRightPadded.build(visitTypeTree(upperBounds[i]))
+                        .withAfter(
+                                i < upperBounds.length - 1 ?
+                                        sourceBefore("&") :
+                                        EMPTY
+                        ));
+            }
+            bounds = JContainer.build(boundsPrefix, convertedBounds, Markers.EMPTY);
+        } else if (genericType.getLowerBound() != null) {
+            throw new RuntimeException("not implemented");
+        }
+        return (T) new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), name, bounds);
     }
 }
