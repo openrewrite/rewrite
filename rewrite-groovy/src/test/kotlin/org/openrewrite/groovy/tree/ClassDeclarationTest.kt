@@ -140,4 +140,14 @@ class ClassDeclarationTest : GroovyTreeTest {
             assertThat(ptBound).isInstanceOf(J.ParameterizedType::class.java)
         }
     )
+
+    @Test
+    fun innerClass() = assertParsePrintAndProcess(
+        """
+            interface C {
+                class Inner {
+                }
+            }
+        """
+    )
 }

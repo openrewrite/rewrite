@@ -114,6 +114,10 @@ public class GroovyParserVisitor {
         for (List<ASTNode> values : sortedByPosition.values()) {
             try {
                 for (ASTNode value : values) {
+                    if(value instanceof InnerClassNode) {
+                        // Inner classes will be visited as part of visiting their containing class
+                        continue;
+                    }
                     statements.add(convertTopLevelStatement(unit, value));
                 }
             } catch (Throwable t) {
@@ -214,10 +218,24 @@ public class GroovyParserVisitor {
 
             NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
             for (MethodNode method : clazz.getMethods()) {
+                if(method.isSynthetic()) {
+                    continue;
+                }
                 sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
             }
             for (FieldNode field : clazz.getFields()) {
+                if(field.isSynthetic()) {
+                    continue;
+                }
                 sortedByPosition.computeIfAbsent(pos(field), i -> new ArrayList<>()).add(field);
+            }
+            Iterator<InnerClassNode> innerClassIterator = clazz.getInnerClasses();
+            while(innerClassIterator.hasNext()) {
+                InnerClassNode icn = innerClassIterator.next();
+                if(icn.isSynthetic()) {
+                    continue;
+                }
+                sortedByPosition.computeIfAbsent(pos(icn), i -> new ArrayList<>()).add(icn);
             }
 
             J.Block body = new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY,
@@ -229,6 +247,8 @@ public class GroovyParserVisitor {
                                             visitField((FieldNode) ast);
                                         } else if (ast instanceof MethodNode) {
                                             visitMethod((MethodNode) ast);
+                                        } else if(ast instanceof ClassNode) {
+                                            visitClass((ClassNode)ast);
                                         }
                                         Statement stat = pollQueue();
                                         return maybeSemicolon(stat);
