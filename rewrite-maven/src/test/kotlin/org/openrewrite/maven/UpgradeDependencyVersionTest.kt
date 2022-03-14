@@ -23,6 +23,49 @@ import org.openrewrite.Issue
 import java.nio.file.Path
 
 class UpgradeDependencyVersionTest : MavenRecipeTest {
+
+    @Test
+    fun updateManagedDependencyVersion() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "org.junit.jupiter",
+            "junit-jupiter-api",
+            "5.7.2", null, null),
+        before = """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-api</artifactId>
+                            <version>5.6.2</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """,
+        after = """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-api</artifactId>
+                            <version>5.7.2</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """
+    )
+
     @ParameterizedTest
     @CsvSource(value = ["com.google.guava:guava", "*:*"], delimiter = ':')
     fun upgradeVersion(groupId: String, artifactId: String) = assertChanged(
