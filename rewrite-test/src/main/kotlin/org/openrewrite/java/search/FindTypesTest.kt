@@ -48,6 +48,25 @@ interface FindTypesTest : JavaRecipeTest {
         dependsOn = arrayOf(a1)
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1466")
+    @Test
+    fun wildcard(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = FindTypes("java.io..*", false),
+        before = """
+            import java.io.File;
+            public class Test {
+                File file;
+            }
+        """,
+        after = """
+            import java.io.File;
+            public class Test {
+                /*~~>*/File file;
+            }
+        """
+    )
+
     @Test
     fun fullyQualifiedName(jp: JavaParser) = assertChanged(
         jp,

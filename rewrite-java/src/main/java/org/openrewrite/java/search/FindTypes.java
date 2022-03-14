@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -31,6 +32,7 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -65,7 +67,7 @@ public class FindTypes extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        JavaType.FullyQualified fullyQualifiedType = JavaType.ShallowClass.build(fullyQualifiedTypeName);
+        Pattern fullyQualifiedType = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedTypeName));
 
         return new JavaVisitor<ExecutionContext>() {
             @Override
@@ -116,7 +118,7 @@ public class FindTypes extends Recipe {
     }
 
     private static Set<NameTree> find(boolean checkAssignability, J j, String fullyQualifiedClassName) {
-        JavaType.FullyQualified fullyQualifiedType = JavaType.ShallowClass.build(fullyQualifiedClassName);
+        Pattern fullyQualifiedType = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedClassName));
 
         JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
             @Override
@@ -158,11 +160,11 @@ public class FindTypes extends Recipe {
         return ts;
     }
 
-    private static boolean typeMatches(boolean checkAssignability, @Nullable JavaType.FullyQualified match,
+    private static boolean typeMatches(boolean checkAssignability, Pattern pattern,
                                        @Nullable JavaType.FullyQualified test) {
-        return test != null && match != null && (checkAssignability ?
-                match.isAssignableFrom(test) :
-                TypeUtils.fullyQualifiedNamesAreEqual(match.getFullyQualifiedName(), test.getFullyQualifiedName())
+        return test != null && (checkAssignability ?
+                test.isAssignableFrom(pattern) :
+                pattern.matcher(test.getFullyQualifiedName()).matches()
         );
     }
 }

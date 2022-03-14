@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.*;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
@@ -66,6 +67,32 @@ public interface JavaType {
             return primitive;
         }
         return ShallowClass.build(typeName);
+    }
+
+    default boolean isAssignableFrom(Pattern pattern) {
+        if (this instanceof FullyQualified) {
+            FullyQualified fq = (FullyQualified) this;
+            if (pattern.matcher(fq.getFullyQualifiedName()).matches()) {
+                return true;
+            }
+            if (fq.getSupertype() != null && fq.getSupertype().isAssignableFrom(pattern)) {
+                return true;
+            }
+            for (FullyQualified anInterface : fq.getInterfaces()) {
+                if (anInterface.isAssignableFrom(pattern)) {
+                    return true;
+                }
+            }
+            return false;
+        } else if (this instanceof GenericTypeVariable) {
+            GenericTypeVariable generic = (GenericTypeVariable) this;
+            for (JavaType bound : generic.getBounds()) {
+                if (bound.isAssignableFrom(pattern)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Getter
