@@ -130,6 +130,15 @@ class MappingTest: YamlParserTest {
             }
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1469")
+    @Test
+    fun emptyDocument() = assertRoundTrip(
+        source = """""",
+        afterConditions = { documents ->
+            Assertions.assertThat(documents.documents.isEmpty())
+        }
+    )
+
     @Test
     fun multiDocOnlyComments() = assertRoundTrip(
         source = """

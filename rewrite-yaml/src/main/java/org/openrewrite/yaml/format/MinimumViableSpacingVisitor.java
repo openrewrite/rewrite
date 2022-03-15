@@ -32,7 +32,7 @@ public class MinimumViableSpacingVisitor<P> extends YamlIsoVisitor<P> {
         if (!e.getPrefix().contains("\n")) {
             if(getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document) {
                 Yaml.Mapping mapping = getCursor().getParentOrThrow().getValue();
-                if(mapping.getEntries().get(0) == e) {
+                if(mapping.getEntries().isEmpty() || mapping.getEntries().get(0) == e) {
                     return e;
                 }
             }
@@ -40,7 +40,7 @@ public class MinimumViableSpacingVisitor<P> extends YamlIsoVisitor<P> {
             Yaml enclosing = getCursor().getParentOrThrow(2).getValue();
             if (enclosing instanceof Yaml.Sequence.Entry) {
                 Yaml.Mapping mapping = getCursor().getParentOrThrow().getValue();
-                if (mapping.getEntries().get(0) == entry) {
+                if (mapping.getEntries().isEmpty() || mapping.getEntries().get(0) == entry) {
                     return e;
                 }
             }

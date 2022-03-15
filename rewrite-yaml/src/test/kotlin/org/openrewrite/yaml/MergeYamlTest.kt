@@ -22,6 +22,30 @@ import org.openrewrite.Issue
 import java.nio.file.Path
 
 class MergeYamlTest : YamlRecipeTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1469")
+    @Test
+    fun emptyDocument() = assertChanged(
+        recipe = MergeYaml(
+            "$",
+            """
+                spring:
+                  application:
+                    name: update
+                    description: a description
+            """.trimIndent(),
+            false,
+            null
+        ),
+        before = "",
+        after = """
+            spring:
+              application:
+                name: update
+                description: a description
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/905")
     @Test
     fun existingMultipleEntryBlock() = assertChanged(

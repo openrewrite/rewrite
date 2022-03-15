@@ -31,9 +31,11 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
             p.out.append("---");
         }
         visit(document.getBlock(), p);
-        p.out.append(document.getEnd().getPrefix());
-        if(document.getEnd().isExplicit()) {
-            p.out.append("...");
+        if (document.getEnd() != null) {
+            p.out.append(document.getEnd().getPrefix());
+            if (document.getEnd().isExplicit()) {
+                p.out.append("...");
+            }
         }
         return document;
     }
