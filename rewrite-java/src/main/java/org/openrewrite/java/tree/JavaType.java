@@ -24,10 +24,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Iterator;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -906,6 +903,7 @@ public interface JavaType {
             return "<constructor>".equals(name);
         }
 
+        @SuppressWarnings("NullableProblems")
         public FullyQualified getDeclaringType() {
             // After construction the declaring type will never be null in a well-formed AST
             // But the AST might be missing type information if an annotation processor like lombok is in use
@@ -913,6 +911,41 @@ public interface JavaType {
 
             //noinspection ConstantConditions
             return declaringType;
+        }
+
+        public boolean isInheritedFrom(String fullyQualifiedTypeName) {
+            if (declaringType == null) {
+                return false;
+            }
+
+            Stack<FullyQualified> interfaces = new Stack<>();
+            interfaces.addAll(declaringType.getInterfaces());
+
+            while (!interfaces.isEmpty()) {
+                FullyQualified declaring = interfaces.pop();
+                interfaces.addAll(declaring.getInterfaces());
+
+                if (declaring.getFullyQualifiedName().equals(fullyQualifiedTypeName)) {
+                    continue;
+                }
+
+                nextMethod:
+                for (Method method : declaring.getMethods()) {
+                    if (method.getName().equals(name)) {
+                        List<JavaType> params = method.getParameterTypes();
+                        if (getParameterTypes().size() != method.getParameterTypes().size()) {
+                            continue;
+                        }
+                        for (int i = 0; i < params.size(); i++) {
+                            if (!TypeUtils.isOfType(getParameterTypes().get(i), params.get(i))) {
+                                continue nextMethod;
+                            }
+                        }
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         public List<String> getParameterNames() {

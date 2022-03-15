@@ -235,6 +235,10 @@ class Java11FindLiteralsTest : Java11Test, FindLiteralsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11DeimplementInterfaceTest : Java11Test, DeimplementInterfaceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ExtractInterfaceTest : Java11Test, ExtractInterfaceTest
 
 @DebugOnly

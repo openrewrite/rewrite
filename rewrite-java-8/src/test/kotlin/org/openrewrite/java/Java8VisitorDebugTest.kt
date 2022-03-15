@@ -235,6 +235,10 @@ class Java8FindLiteralsTest : Java8Test, FindLiteralsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8DeimplementInterfaceTest : Java8Test, DeimplementInterfaceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8ExtractInterfaceTest : Java8Test, ExtractInterfaceTest
 
 @DebugOnly

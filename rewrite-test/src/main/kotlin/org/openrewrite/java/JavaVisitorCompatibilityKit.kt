@@ -188,6 +188,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindMethodsTck : FindMethodsTest
 
     @Nested
+    inner class DeimplementInterfaceTck : DeimplementInterfaceTest
+
+    @Nested
     inner class ExtractInterfaceTck : ExtractInterfaceTest
 
     @Nested
