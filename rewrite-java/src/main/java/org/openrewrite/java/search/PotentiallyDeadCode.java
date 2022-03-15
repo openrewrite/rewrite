@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
@@ -26,7 +27,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.text.PlainTextParser;
 
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -76,16 +76,28 @@ public class PotentiallyDeadCode extends Recipe {
             }
         }
 
-        declared.removeAll(used);
+        Set<JavaType.Method> unused = new HashSet<>(declared);
+        unused.removeAll(used);
 
-        Path sourcePath = Paths.get("" +
-                "dead-code" +
+        declared.retainAll(used);
+
+        String sourcePath = "" +
+                "methods" +
                 (gitProvenance == null ? "" :
                         "-" + gitProvenance.getRepositoryName()) +
-                ".csv");
+                ".csv";
 
-        return ListUtils.concatAll(before, new PlainTextParser()
-                .parse(declared.stream()
+        return ListUtils.concatAll(
+                ListUtils.concatAll(before,
+                        listMethods(unused, "unused-" + sourcePath)),
+                listMethods(used, "used-" + sourcePath)
+        );
+    }
+
+    @NotNull
+    private List<SourceFile> listMethods(Set<JavaType.Method> methods, String sourcePath) {
+        return new PlainTextParser()
+                .parse(methods.stream()
                         .sorted(Comparator.comparing(JavaType.Method::toString))
                         .map(d -> d.getDeclaringType().getFullyQualifiedName() + "," +
                                 d.getName() + "(" +
@@ -94,9 +106,9 @@ public class PotentiallyDeadCode extends Recipe {
                                                 pt.toString())
                                         .collect(Collectors.joining(",")) +
                                 ")")
-                        .collect(Collectors.joining("\n", "declaring type,method\n", "")))
+                        .collect(Collectors.joining("\n", "declaring type,method\n", "\n")))
                 .stream()
-                .map(pt -> pt.withSourcePath(sourcePath))
-                .collect(Collectors.toList()));
+                .map(pt -> pt.withSourcePath(Paths.get(sourcePath)))
+                .collect(Collectors.toList());
     }
 }
