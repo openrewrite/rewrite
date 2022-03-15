@@ -110,9 +110,7 @@ public class ExtractInterface {
             JavaType.ShallowClass type = JavaType.ShallowClass.build(fullyQualifiedInterfaceName);
 
             J.Block body = classDecl.getBody();
-            return classDecl
-                    .withImplements(ListUtils.concat(classDecl.getImplements(), (TypeTree) TypeTree.build(type.getClassName())
-                            .withType(type).withPrefix(Space.format(" "))))
+            return ((J.ClassDeclaration) new ImplementInterface<>(classDecl, type).visitNonNull(classDecl, p))
                     .withBody(body.withStatements(ListUtils.map(body.getStatements(), s -> {
                         if (s instanceof J.MethodDeclaration) {
                             J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) s;

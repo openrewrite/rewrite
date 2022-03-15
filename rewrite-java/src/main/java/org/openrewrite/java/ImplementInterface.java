@@ -32,7 +32,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
     }
 
     public ImplementInterface(J.ClassDeclaration scope, String interfaze) {
-        this(scope, JavaType.Class.build(interfaze));
+        this(scope, JavaType.ShallowClass.build(interfaze));
     }
 
     @Override
@@ -40,16 +40,17 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
         if (c.isScope(scope) && (c.getImplements() == null || c.getImplements().stream()
                 .noneMatch(f -> TypeUtils.isAssignableTo(f.getType(), interfaceType)))) {
-            maybeAddImport(interfaceType);
 
-            c = c.withImplements(ListUtils.concat(c.getImplements(), new J.Identifier(
-                    randomId(),
-                    format(" "),
-                    Markers.EMPTY,
-                    interfaceType.getClassName(),
-                    interfaceType,
-                    null
-            )));
+            if(!classDecl.getSimpleName().equals(interfaceType.getClassName())) {
+                maybeAddImport(interfaceType);
+            }
+
+            TypeTree impl = TypeTree.build(classDecl.getSimpleName().equals(interfaceType.getClassName()) ?
+                            interfaceType.getFullyQualifiedName() : interfaceType.getClassName())
+                    .withType(interfaceType)
+                    .withPrefix(format(" "));
+
+            c = c.withImplements(ListUtils.concat(c.getImplements(), impl));
 
             JContainer<TypeTree> anImplements = c.getPadding().getImplements();
             assert anImplements != null;
