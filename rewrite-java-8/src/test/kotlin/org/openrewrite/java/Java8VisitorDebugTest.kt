@@ -303,6 +303,10 @@ class Java8LambdaBlockToExpressionTest : Java8Test, LambdaBlockToExpressionTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8PotentiallyDeadCodeTest : Java8Test, PotentiallyDeadCodeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8MaybeUsesImportTest : Java8Test, MaybeUsesImportTest
 
 @DebugOnly

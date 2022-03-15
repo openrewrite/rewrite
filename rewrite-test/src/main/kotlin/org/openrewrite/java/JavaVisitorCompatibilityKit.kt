@@ -245,6 +245,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class LineCounterTck : LineCounterTest
 
     @Nested
+    inner class PotentiallyDeadCodeTck : PotentiallyDeadCodeTest
+
+    @Nested
     inner class MaybeUsesImportTck : MaybeUsesImportTest
 
     @Nested

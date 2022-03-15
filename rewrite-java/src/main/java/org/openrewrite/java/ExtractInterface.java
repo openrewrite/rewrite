@@ -18,6 +18,8 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.search.FindAnnotations;
+import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -121,15 +123,19 @@ public class ExtractInterface {
                                     return s;
                                 }
 
-                                return methodDeclaration.withTemplate(
-                                        JavaTemplate.builder(this::getCursor, "@Override").build(),
-                                        methodDeclaration.getCoordinates().addAnnotation(
-                                                Comparator
-                                                        .comparing(
-                                                                J.Annotation::getSimpleName,
-                                                                new RuleBasedCollator("< Override")
-                                                        ))
-                                );
+                                if(FindAnnotations.find(methodDeclaration, "@java.lang.Override").isEmpty()) {
+                                    return methodDeclaration.withTemplate(
+                                            JavaTemplate.builder(this::getCursor, "@Override").build(),
+                                            methodDeclaration.getCoordinates().addAnnotation(
+                                                    Comparator
+                                                            .comparing(
+                                                                    J.Annotation::getSimpleName,
+                                                                    new RuleBasedCollator("< Override")
+                                                            ))
+                                    );
+                                }
+
+                                return methodDeclaration;
                             } catch (ParseException e) {
                                 throw new RuntimeException(e);
                             }

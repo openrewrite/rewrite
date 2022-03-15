@@ -307,6 +307,10 @@ class Java11LineCounterTest : Java11Test, LineCounterTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11PotentiallyDeadCodeTest : Java11Test, PotentiallyDeadCodeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11MaybeUsesImportTest : Java11Test, MaybeUsesImportTest
 
 @DebugOnly
