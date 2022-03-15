@@ -52,8 +52,8 @@ interface PotentiallyDeadCodeTest : JavaRecipeTest {
         //language=csv
         assertThat(results[0].after!!.printAll()).isEqualTo("""
             declaring type,method
-            org.openrewrite.Test,test3()
             org.openrewrite.Test,test()
+            org.openrewrite.Test,test3()
         """.trimIndent())
     }
 }

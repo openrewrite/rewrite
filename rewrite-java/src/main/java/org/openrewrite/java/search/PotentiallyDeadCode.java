@@ -28,6 +28,7 @@ import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -85,6 +86,7 @@ public class PotentiallyDeadCode extends Recipe {
 
         return ListUtils.concatAll(before, new PlainTextParser()
                 .parse(declared.stream()
+                        .sorted(Comparator.comparing(JavaType.Method::toString))
                         .map(d -> d.getDeclaringType().getFullyQualifiedName() + "," +
                                 d.getName() + "(" +
                                 d.getParameterTypes().stream()
