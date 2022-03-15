@@ -182,7 +182,7 @@ public class GroovyParserVisitor {
             String simpleName = name();
             J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, simpleName, null, null);
             JContainer<J.TypeParameter> typeParameterContainer = null;
-            if (clazz.isUsingGenerics()) {
+            if (clazz.isUsingGenerics() && clazz.getGenericsTypes() != null) {
                 typeParameterContainer = visitTypeParameters(clazz.getGenericsTypes());
             }
 
@@ -224,9 +224,6 @@ public class GroovyParserVisitor {
                 sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
             }
             for (FieldNode field : clazz.getFields()) {
-                if(field.isSynthetic()) {
-                    continue;
-                }
                 sortedByPosition.computeIfAbsent(pos(field), i -> new ArrayList<>()).add(field);
             }
             Iterator<InnerClassNode> innerClassIterator = clazz.getInnerClasses();
@@ -285,7 +282,7 @@ public class GroovyParserVisitor {
                     name.withPrefix(EMPTY),
                     emptyList(),
                     null,
-                    typeMapping.variableType(name.getSimpleName(), field.getOriginType())
+                    typeMapping.variableType(field)
             );
 
             if (field.getInitialExpression() != null) {
@@ -1255,11 +1252,16 @@ public class GroovyParserVisitor {
                         "def",
                         type, null);
             }
-            return new J.Identifier(randomId(),
-                    sourceBefore(expression.getOriginType().getUnresolvedName()),
+            Space prefix = sourceBefore(expression.getOriginType().getUnresolvedName());
+            J.Identifier ident = new J.Identifier(randomId(),
+                    EMPTY,
                     Markers.EMPTY,
                     expression.getOriginType().getUnresolvedName(),
                     type, null);
+            if(type instanceof JavaType.Parameterized) {
+                return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameters(expression.getType().getGenericsTypes()));
+            }
+            return ident.withPrefix(prefix);
         }
 
         @Override

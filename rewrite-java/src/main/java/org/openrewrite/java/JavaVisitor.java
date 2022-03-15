@@ -29,7 +29,7 @@ import java.util.Objects;
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Nullable
-    private JavadocVisitor<P> javadocVisitor;
+    protected JavadocVisitor<P> javadocVisitor;
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {

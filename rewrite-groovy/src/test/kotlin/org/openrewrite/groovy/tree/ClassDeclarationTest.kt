@@ -17,6 +17,7 @@ package org.openrewrite.groovy.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.asParameterized
 import org.openrewrite.java.tree.J
 
 class ClassDeclarationTest : GroovyTreeTest {
@@ -149,5 +150,23 @@ class ClassDeclarationTest : GroovyTreeTest {
                 }
             }
         """
+    )
+
+    @Test
+    fun parameterizedField() = assertParsePrintAndProcess(
+        """
+            class A {
+                List<String> a
+                Map<Object, Object> b
+            }
+        """,
+        withAst = { cu ->
+            val statements = cu.classes[0].body.statements
+            assertThat(statements).hasSize(2)
+            val a = (statements[0] as J.VariableDeclarations).variables[0]
+            assertThat(a.type.asParameterized()!!.toString()).isEqualTo("java.util.List<java.lang.String>")
+            val b = (statements[1] as J.VariableDeclarations).variables[0]
+            assertThat(b.type.asParameterized()!!.toString()).isEqualTo("java.util.Map<java.lang.Object, java.lang.Object>")
+        }
     )
 }

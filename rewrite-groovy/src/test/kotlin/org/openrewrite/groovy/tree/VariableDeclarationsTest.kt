@@ -18,7 +18,6 @@ package org.openrewrite.groovy.tree
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
-@Disabled
 class VariableDeclarationsTest : GroovyTreeTest {
 
     @Test
@@ -34,11 +33,13 @@ class VariableDeclarationsTest : GroovyTreeTest {
         """
     )
 
+    @Disabled
     @Test
     fun singleTypeMultipleVariableDeclaration() = assertParsePrintAndProcess(
         "def a = 1, b = 1"
     )
 
+    @Disabled
     @Test
     fun multipleTypeMultipleVariableDeclaration() = assertParsePrintAndProcess(
         "def a = 1, b = 's'"
