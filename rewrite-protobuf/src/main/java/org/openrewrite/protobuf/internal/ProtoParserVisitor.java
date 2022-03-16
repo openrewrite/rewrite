@@ -29,7 +29,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
-import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -51,6 +50,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
             Proto s = visit(statementTrees.get(i));
             statements.add(ProtoRightPadded.build(s).withAfter(
                     (s instanceof Proto.Empty ||
+                            s instanceof Proto.Field ||
                             s instanceof Proto.Import ||
                             s instanceof Proto.MapField ||
                             s instanceof Proto.OptionDeclaration ||
@@ -80,20 +80,35 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     }
 
     @Override
-    public Proto visitEnumDefinition(Protobuf2Parser.EnumDefinitionContext ctx) {
+    public Proto.Enum visitEnumDefinition(Protobuf2Parser.EnumDefinitionContext ctx) {
         return new Proto.Enum(randomId(), sourceBefore("enum"), Markers.EMPTY,
                 visitIdent(ctx.ident()),
                 visitBlock(ctx.enumBody().children));
     }
 
     @Override
-    public Proto visitEnumField(Protobuf2Parser.EnumFieldContext ctx) {
+    public Proto.EnumField visitEnumField(Protobuf2Parser.EnumFieldContext ctx) {
         Proto.Identifier name = visitIdent(ctx.ident());
         return new Proto.EnumField(randomId(), name.getPrefix(), Markers.EMPTY,
                 ProtoRightPadded.build(name.withPrefix(Space.EMPTY)).withAfter(sourceBefore("=")),
                 mapConstant(ctx.IntegerLiteral()),
                 mapOptionList(ctx.optionList())
         );
+    }
+
+    @Override
+    public Proto.Extend visitExtend(Protobuf2Parser.ExtendContext ctx) {
+        Space prefix = sourceBefore("extend");
+        Proto.FullIdentifier name = visitFullIdent(ctx.fullIdent());
+        Space blockPrefix = sourceBefore("{");
+
+        List<ProtoRightPadded<Proto>> statements = new ArrayList<>(ctx.messageField().size());
+        for(Protobuf2Parser.MessageFieldContext mfc : ctx.messageField()) {
+            statements.add(new ProtoRightPadded<>(visitMessageField(mfc), sourceBefore(";"), Markers.EMPTY));
+        }
+
+        return new Proto.Extend(randomId(), prefix, Markers.EMPTY, name,
+                new Proto.Block(randomId(), blockPrefix, Markers.EMPTY, statements, sourceBefore("}")));
     }
 
     @Override
@@ -111,6 +126,22 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     @Override
     public Proto visitFullyQualifiedType(Protobuf2Parser.FullyQualifiedTypeContext ctx) {
         return visitFullIdent(ctx.fullIdent());
+    }
+
+    @Override
+    public Proto.Import visitImportStatement(Protobuf2Parser.ImportStatementContext ctx) {
+        Space prefix = sourceBefore("import");
+        Proto.Keyword modifier = null;
+        if(ctx.WEAK() != null) {
+            modifier = new Proto.Keyword(randomId(), sourceBefore(ctx.WEAK().getText()), Markers.EMPTY, ctx.WEAK().getText());
+        } else if(ctx.PUBLIC() != null) {
+            modifier = new Proto.Keyword(randomId(), sourceBefore(ctx.PUBLIC().getText()), Markers.EMPTY, ctx.PUBLIC().getText());
+        }
+
+        Protobuf2Parser.StringLiteralContext s = ctx.stringLiteral();
+        String lit = s.getText();
+        return new Proto.Import(randomId(), prefix, Markers.EMPTY, modifier,
+                ProtoRightPadded.build(new Proto.StringLiteral(randomId(), sourceBefore(lit), Markers.EMPTY, lit.startsWith("'"), lit.substring(1, lit.length() - 1))));
     }
 
     @Override
@@ -192,7 +223,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     }
 
     @Override
-    public Proto visitOneof(Protobuf2Parser.OneofContext ctx) {
+    public Proto visitOneOf(Protobuf2Parser.OneOfContext ctx) {
         Space prefix = sourceBefore("oneof");
         Proto.Identifier ident = visitIdent(ctx.ident());
 
@@ -200,7 +231,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         List<ProtoRightPadded<Proto>> fields = new ArrayList<>(ctx.field().size());
         List<Protobuf2Parser.FieldContext> fieldContexts = ctx.field();
         for (Protobuf2Parser.FieldContext field : fieldContexts) {
-            fields.add(ProtoRightPadded.build(visitField(field)));
+            fields.add(new ProtoRightPadded<>(visitField(field), sourceBefore(";"), Markers.EMPTY));
         }
 
         return new Proto.OneOf(randomId(), prefix, Markers.EMPTY,
@@ -269,20 +300,25 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     @Override
     public Proto.Document visitProto(Protobuf2Parser.ProtoContext ctx) {
         Proto.Syntax syntax = visitSyntax(ctx.syntax());
+        List<ProtoRightPadded<Proto>> list = new ArrayList<>();
+        // The first element is the syntax, which we've already parsed
+        // The last element is a "TerminalNode" which we are uninterested in
+        for(int i = 1; i < ctx.children.size() - 1; i++) {
+            Proto s = visit(ctx.children.get(i));
+            ProtoRightPadded<Proto> protoProtoRightPadded = ProtoRightPadded.build(s).withAfter(
+                    (s instanceof Proto.Empty ||
+                            s instanceof Proto.Import ||
+                            s instanceof Proto.MapField ||
+                            s instanceof Proto.OptionDeclaration ||
+                            s instanceof Proto.Package ||
+                            s instanceof Proto.Syntax
+                    ) ? sourceBefore(";") : Space.EMPTY
+            );
+            list.add(protoProtoRightPadded);
+        }
         return new Proto.Document(randomId(), path, syntax.getPrefix(), Markers.EMPTY,
                 syntax.withPrefix(Space.EMPTY),
-                ctx.children.stream().skip(1)
-                        .map(this::visit)
-                        .map(s -> ProtoRightPadded.build(s).withAfter(
-                                (s instanceof Proto.Empty ||
-                                        s instanceof Proto.Import ||
-                                        s instanceof Proto.MapField ||
-                                        s instanceof Proto.OptionDeclaration ||
-                                        s instanceof Proto.Package ||
-                                        s instanceof Proto.Syntax
-                                ) ? sourceBefore(";") : Space.EMPTY
-                        ))
-                        .collect(Collectors.toList()),
+                list,
                 Space.format(source.substring(cursor)));
     }
 
@@ -354,9 +390,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     @Override
     public Proto.Syntax visitSyntax(Protobuf2Parser.SyntaxContext ctx) {
         String level = ctx.stringLiteral().StringLiteral().getText();
-        //noinspection ConstantConditions
-        return new Proto.Syntax(randomId(), sourceBefore("syntax"), Markers.EMPTY,
-                ProtoRightPadded.build((Void) null).withAfter(sourceBefore("=")),
+        return new Proto.Syntax(randomId(), sourceBefore("syntax"), Markers.EMPTY, sourceBefore("="),
                 ProtoRightPadded.build(new Proto.Constant(randomId(), sourceBefore(level), Markers.EMPTY,
                                 level.substring(1, level.length() - 1), level))
                         .withAfter(sourceBefore(";")));

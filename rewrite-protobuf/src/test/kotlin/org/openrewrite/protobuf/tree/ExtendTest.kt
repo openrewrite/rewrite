@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,29 +18,16 @@ package org.openrewrite.protobuf.tree
 import org.junit.jupiter.api.Test
 import org.openrewrite.protobuf.ProtoParserTest
 
-class ImportTest : ProtoParserTest() {
+class ExtendTest : ProtoParserTest() {
 
     @Test
-    fun import() = assertUnchanged(
+    fun extend() = assertUnchanged(
         before = """
             syntax = 'proto2';
-            import 'org/openrewrite.proto';
-        """
-    )
-
-    @Test
-    fun importPublic() = assertUnchanged(
-        before = """
-            syntax = 'proto2';
-            import public "org/openrewrite.proto";
-        """
-    )
-
-    @Test
-    fun importWeak() = assertUnchanged(
-        before = """
-            syntax = 'proto2';
-            import weak 'org/openrewrite.proto';
+            extend google.protobuf.FieldOptions {
+            
+              optional bool redacted = 22200;
+            }
         """
     )
 }

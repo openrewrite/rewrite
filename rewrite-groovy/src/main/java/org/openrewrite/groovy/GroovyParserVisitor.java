@@ -36,7 +36,6 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import javax.lang.model.element.Name;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;

@@ -197,90 +197,43 @@ public class StringUtils {
         return Character.toLowerCase(value.charAt(0)) + value.substring(1);
     }
 
-
-    /**
-     * Given a prefix comprised of segments that are exclusively whitespace, single line comments, or multi-line comments,
-     * return a list of each segment.
-     * <p>
-     * Operates on C-style comments:
-     * // single line
-     * /* multi-line
-     * <p>
-     * If the provided input contains anything except whitespace and c-style comments this will probably explode
-     *
-     * @param text The space to split
-     * @return A list of raw whitespace, single line comments, and multi-line comments
-     */
-    public static List<String> splitCStyleComments(String text) {
-        List<String> result = new ArrayList<>();
-        if (text == null || "".equals(text)) {
-            result.add("");
-            return result;
-        }
-        int segmentStartIndex = 0;
+    public static boolean containsOnlyWhitespaceAndComments(String text) {
+        int i = 0;
+        char[] chars = text.toCharArray();
         boolean inSingleLineComment = false;
-        boolean inMultiLineComment = false;
-        for (int i = 0; i < text.length(); i++) {
-            char current = text.charAt(i);
-            char previous = (i > 0) ? text.charAt(i - 1) : '\0';
-            if (i == text.length() - 1) {
-                result.add(text.substring(segmentStartIndex, i + 1));
-                break;
-            }
-
-            if (inSingleLineComment && current == '\n') {
-                result.add(text.substring(segmentStartIndex, i));
-                segmentStartIndex = i;
+        boolean inMultilineComment = false;
+        while(i < chars.length) {
+            char c = chars[i];
+            if(inSingleLineComment && c == '\n') {
                 inSingleLineComment = false;
-            } else if (inMultiLineComment && previous == '*' && current == '/') {
-                result.add(text.substring(segmentStartIndex, i + 1));
-                segmentStartIndex = i + 1;
-                inMultiLineComment = false;
-            } else if (!inMultiLineComment && !inSingleLineComment && previous == '/' && current == '/') {
-                inSingleLineComment = true;
-            } else if (!inMultiLineComment && !inSingleLineComment && previous == '/' && current == '*') {
-                inMultiLineComment = true;
+                continue;
             }
-        }
-        return result;
-    }
-
-    /**
-     * Return a copy of the supplied text that contains exactly the desired number of newlines appear before characters
-     * that indicate the beginning of a C-style comment, "//" and "/*".
-     * <p>
-     * If the supplied text does not contain a comment indicator then this is equivalent to calling ensureNewlineCount()
-     *
-     * @param text                Original text to add newlines to
-     * @param desiredNewlineCount The number of newlines that should be before the text
-     * @return A copy of the supplied text with the desired number of newlines
-     */
-    public static String ensureNewlineCountBeforeComment(String text, int desiredNewlineCount) {
-        StringBuilder result = new StringBuilder();
-        int prefixEndsIndex = indexOfNonWhitespace(text);
-        String suffix;
-        if (prefixEndsIndex == -1) {
-            prefixEndsIndex = text.length();
-            suffix = "";
-        } else {
-            suffix = text.substring(prefixEndsIndex);
-        }
-        int newlinesSoFar = 0;
-        for (int i = prefixEndsIndex - 1; i >= 0 && newlinesSoFar < desiredNewlineCount; i--) {
-            char current = text.charAt(i);
-            if (current == '\n') {
-                newlinesSoFar++;
+            if(i < chars.length - 1) {
+                String s = String.valueOf(c) + chars[i + 1];
+                switch(s) {
+                    case "//": {
+                        inSingleLineComment = true;
+                        i += 2;
+                        continue;
+                    }
+                    case "/*": {
+                        inMultilineComment = true;
+                        i += 2;
+                        continue;
+                    }
+                    case "*/": {
+                        inMultilineComment = false;
+                        i += 2;
+                        continue;
+                    }
+                }
             }
-            result.append(current);
+            if(!inSingleLineComment && !inMultilineComment && !Character.isWhitespace(c)) {
+                return false;
+            }
+            i++;
         }
-        while (newlinesSoFar < desiredNewlineCount) {
-            result.append('\n');
-            newlinesSoFar++;
-        }
-        // Since iterated back-to-front, reverse things back into the usual order
-        result.reverse();
-        result.append(suffix);
-        return result.toString();
+        return true;
     }
 
     public static int indexOfNonWhitespace(String text) {

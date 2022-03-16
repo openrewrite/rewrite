@@ -108,38 +108,30 @@ class StringUtilsTest {
     }
 
     @Test
-    fun splitComments() {
-        assertThat(splitCStyleComments("")).isEqualTo(listOf(""))
-        assertThat(splitCStyleComments(" ")).isEqualTo(listOf(" "))
-        assertThat(splitCStyleComments("///**/")).isEqualTo(listOf("///**/"))
-        assertThat(splitCStyleComments("/*\n//aoeu\n*/")).isEqualTo(listOf("/*\n//aoeu\n*/"))
-        val comments =
-                """
-                    
-                // aoeu 
-                /***/    // wasd
-            """.trimIndent()
-        val expected = listOf("    \n// aoeu ", "\n/***/", "    // wasd")
-        val splitComments = splitCStyleComments(comments)
-        assertThat(splitComments).isEqualTo(expected)
-    }
+    fun containsOnlyWhitespaceAndCommentsTest() {
+        assertThat(containsOnlyWhitespaceAndComments("")).isTrue
+        assertThat(containsOnlyWhitespaceAndComments(" \n\r\t")).isTrue
+        assertThat(containsOnlyWhitespaceAndComments(" // hello ")).isTrue
+        assertThat(containsOnlyWhitespaceAndComments("//")).isTrue
+        assertThat(containsOnlyWhitespaceAndComments("/**/")).isTrue
+        assertThat(containsOnlyWhitespaceAndComments("""
+            /**
+            asdf
+            */
+        """)).isTrue
 
-    @Test
-    fun desiredNewlines() {
-        assertThat(ensureNewlineCountBeforeComment("", 1)).isEqualTo("\n")
-        assertThat(ensureNewlineCountBeforeComment(" ", 1)).isEqualTo("\n ")
-        assertThat(ensureNewlineCountBeforeComment("\n", 0)).isEqualTo("")
-        assertThat(ensureNewlineCountBeforeComment("//", 2)).isEqualTo("\n\n//")
-        assertThat(ensureNewlineCountBeforeComment("//\n", 2)).isEqualTo("\n\n//\n")
-        assertThat(ensureNewlineCountBeforeComment("\n\n\n//", 2)).isEqualTo("\n\n//")
-        assertThat(ensureNewlineCountBeforeComment("\n\n\n//\n", 2)).isEqualTo("\n\n//\n")
-        assertThat(ensureNewlineCountBeforeComment("/**\n*/", 2)).isEqualTo("\n\n/**\n*/")
-        assertThat(ensureNewlineCountBeforeComment("/**\n*/\n", 2)).isEqualTo("\n\n/**\n*/\n")
-        assertThat(ensureNewlineCountBeforeComment("\n\n\n/**\n*/", 2)).isEqualTo("\n\n/**\n*/")
-        assertThat(ensureNewlineCountBeforeComment("\n\n\n/**\n*/\n", 2)).isEqualTo("\n\n/**\n*/\n")
-        assertThat(ensureNewlineCountBeforeComment("\n    //", 1)).isEqualTo("\n    //")
-        assertThat(ensureNewlineCountBeforeComment("\n    \n    //", 1)).isEqualTo("\n    //")
-        assertThat(ensureNewlineCountBeforeComment("\n\n\n    /***/", 2)).isEqualTo("\n\n    /***/")
+        assertThat(containsOnlyWhitespaceAndComments("a")).isFalse
+        assertThat(containsOnlyWhitespaceAndComments(            """
+            // hello
+            goodbye
+        """)).isFalse
+        assertThat(containsOnlyWhitespaceAndComments("a//")).isFalse
+        assertThat(containsOnlyWhitespaceAndComments(
+            """
+            /*
+            */
+            a
+        """)).isFalse
     }
 
     @Test

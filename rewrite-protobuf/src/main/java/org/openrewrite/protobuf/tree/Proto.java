@@ -263,6 +263,24 @@ public interface Proto extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Extend implements Proto {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        FullIdentifier name;
+        Block body;
+
+        @Override
+        public <P> Proto acceptProto(ProtoVisitor<P> v, P p) {
+            return v.visitExtend(this, p);
+        }
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -802,7 +820,7 @@ public interface Proto extends Tree {
             private final MapField t;
 
             public ProtoRightPadded<Keyword> getMap() {
-                return t.keyType;
+                return t.map;
             }
 
             public MapField withMap(ProtoRightPadded<Keyword> map) {
@@ -1353,7 +1371,9 @@ public interface Proto extends Tree {
         @Getter
         Markers markers;
 
-        ProtoRightPadded<Void> syntax;
+        @With
+        @Getter
+        Space keywordSuffix;
 
         ProtoRightPadded<Constant> level;
 
@@ -1393,20 +1413,12 @@ public interface Proto extends Tree {
         public static class Padding {
             private final Syntax t;
 
-            public ProtoRightPadded<Void> getSyntax() {
-                return t.syntax;
-            }
-
-            public Syntax withSyntax(ProtoRightPadded<Void> syntax) {
-                return t.syntax == syntax ? t : new Syntax(t.id, t.prefix, t.markers, syntax, t.level);
-            }
-
             public ProtoRightPadded<Constant> getLevel() {
                 return t.level;
             }
 
             public Syntax withLevel(ProtoRightPadded<Constant> level) {
-                return t.level == level ? t : new Syntax(t.id, t.prefix, t.markers, t.syntax, level);
+                return t.level == level ? t : new Syntax(t.id, t.prefix, t.markers, t.keywordSuffix, level);
             }
         }
     }

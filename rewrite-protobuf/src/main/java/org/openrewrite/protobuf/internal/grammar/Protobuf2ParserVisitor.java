@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.9.3
+// Generated from /mnt/f/Projects/openrewrite/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.9.3
 package org.openrewrite.protobuf.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -116,6 +116,12 @@ public interface Protobuf2ParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitMessageBody(Protobuf2Parser.MessageBodyContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link Protobuf2Parser#extend}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitExtend(Protobuf2Parser.ExtendContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link Protobuf2Parser#enumDefinition}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -208,11 +214,11 @@ public interface Protobuf2ParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitField(Protobuf2Parser.FieldContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link Protobuf2Parser#oneof}.
+	 * Visit a parse tree produced by {@link Protobuf2Parser#oneOf}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitOneof(Protobuf2Parser.OneofContext ctx);
+	T visitOneOf(Protobuf2Parser.OneOfContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link Protobuf2Parser#mapField}.
 	 * @param ctx the parse tree

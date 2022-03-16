@@ -7,6 +7,7 @@ BOOL            : 'bool';
 BYTES           : 'bytes';
 DOUBLE          : 'double';
 ENUM            : 'enum';
+EXTEND          : 'extend';
 FIXED32         : 'fixed32';
 FIXED64         : 'fixed64';
 FLOAT           : 'float';

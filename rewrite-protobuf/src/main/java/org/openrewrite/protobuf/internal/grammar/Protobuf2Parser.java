@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.9.3
+// Generated from /mnt/f/Projects/openrewrite/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.9.3
 package org.openrewrite.protobuf.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -32,55 +32,56 @@ public class Protobuf2Parser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		SEMI=1, COLON=2, BOOL=3, BYTES=4, DOUBLE=5, ENUM=6, FIXED32=7, FIXED64=8, 
-		FLOAT=9, IMPORT=10, INT32=11, INT64=12, MAP=13, MESSAGE=14, ONEOF=15, 
-		OPTION=16, PACKAGE=17, PUBLIC=18, REPEATED=19, REQUIRED=20, RESERVED=21, 
-		RETURNS=22, RPC=23, SERVICE=24, SFIXED32=25, SFIXED64=26, SINT32=27, SINT64=28, 
-		STREAM=29, STRING=30, SYNTAX=31, TO=32, UINT32=33, UINT64=34, WEAK=35, 
-		OPTIONAL=36, Ident=37, IntegerLiteral=38, NumericLiteral=39, FloatLiteral=40, 
-		BooleanLiteral=41, StringLiteral=42, Quote=43, LPAREN=44, RPAREN=45, LBRACE=46, 
-		RBRACE=47, LBRACK=48, RBRACK=49, LCHEVR=50, RCHEVR=51, COMMA=52, DOT=53, 
-		MINUS=54, PLUS=55, ASSIGN=56, WS=57, UTF_8_BOM=58, COMMENT=59, LINE_COMMENT=60;
+		SEMI=1, COLON=2, BOOL=3, BYTES=4, DOUBLE=5, ENUM=6, EXTEND=7, FIXED32=8, 
+		FIXED64=9, FLOAT=10, IMPORT=11, INT32=12, INT64=13, MAP=14, MESSAGE=15, 
+		ONEOF=16, OPTION=17, PACKAGE=18, PUBLIC=19, REPEATED=20, REQUIRED=21, 
+		RESERVED=22, RETURNS=23, RPC=24, SERVICE=25, SFIXED32=26, SFIXED64=27, 
+		SINT32=28, SINT64=29, STREAM=30, STRING=31, SYNTAX=32, TO=33, UINT32=34, 
+		UINT64=35, WEAK=36, OPTIONAL=37, Ident=38, IntegerLiteral=39, NumericLiteral=40, 
+		FloatLiteral=41, BooleanLiteral=42, StringLiteral=43, Quote=44, LPAREN=45, 
+		RPAREN=46, LBRACE=47, RBRACE=48, LBRACK=49, RBRACK=50, LCHEVR=51, RCHEVR=52, 
+		COMMA=53, DOT=54, MINUS=55, PLUS=56, ASSIGN=57, WS=58, UTF_8_BOM=59, COMMENT=60, 
+		LINE_COMMENT=61;
 	public static final int
 		RULE_proto = 0, RULE_stringLiteral = 1, RULE_identOrReserved = 2, RULE_syntax = 3, 
 		RULE_importStatement = 4, RULE_packageStatement = 5, RULE_optionName = 6, 
 		RULE_option = 7, RULE_optionDef = 8, RULE_optionList = 9, RULE_topLevelDef = 10, 
 		RULE_ident = 11, RULE_message = 12, RULE_messageField = 13, RULE_messageBody = 14, 
-		RULE_enumDefinition = 15, RULE_enumBody = 16, RULE_enumField = 17, RULE_service = 18, 
-		RULE_serviceBody = 19, RULE_rpc = 20, RULE_rpcInOut = 21, RULE_rpcBody = 22, 
-		RULE_reserved = 23, RULE_ranges = 24, RULE_range = 25, RULE_fieldNames = 26, 
-		RULE_type = 27, RULE_field = 28, RULE_oneof = 29, RULE_mapField = 30, 
-		RULE_keyType = 31, RULE_reservedWord = 32, RULE_fullIdent = 33, RULE_emptyStatement = 34, 
-		RULE_constant = 35;
+		RULE_extend = 15, RULE_enumDefinition = 16, RULE_enumBody = 17, RULE_enumField = 18, 
+		RULE_service = 19, RULE_serviceBody = 20, RULE_rpc = 21, RULE_rpcInOut = 22, 
+		RULE_rpcBody = 23, RULE_reserved = 24, RULE_ranges = 25, RULE_range = 26, 
+		RULE_fieldNames = 27, RULE_type = 28, RULE_field = 29, RULE_oneOf = 30, 
+		RULE_mapField = 31, RULE_keyType = 32, RULE_reservedWord = 33, RULE_fullIdent = 34, 
+		RULE_emptyStatement = 35, RULE_constant = 36;
 	private static String[] makeRuleNames() {
 		return new String[] {
 			"proto", "stringLiteral", "identOrReserved", "syntax", "importStatement", 
 			"packageStatement", "optionName", "option", "optionDef", "optionList", 
-			"topLevelDef", "ident", "message", "messageField", "messageBody", "enumDefinition", 
-			"enumBody", "enumField", "service", "serviceBody", "rpc", "rpcInOut", 
-			"rpcBody", "reserved", "ranges", "range", "fieldNames", "type", "field", 
-			"oneof", "mapField", "keyType", "reservedWord", "fullIdent", "emptyStatement", 
-			"constant"
+			"topLevelDef", "ident", "message", "messageField", "messageBody", "extend", 
+			"enumDefinition", "enumBody", "enumField", "service", "serviceBody", 
+			"rpc", "rpcInOut", "rpcBody", "reserved", "ranges", "range", "fieldNames", 
+			"type", "field", "oneOf", "mapField", "keyType", "reservedWord", "fullIdent", 
+			"emptyStatement", "constant"
 		};
 	}
 	public static final String[] ruleNames = makeRuleNames();
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "';'", "':'", "'bool'", "'bytes'", "'double'", "'enum'", "'fixed32'", 
-			"'fixed64'", "'float'", "'import'", "'int32'", "'int64'", "'map'", "'message'", 
-			"'oneof'", "'option'", "'package'", "'public'", "'repeated'", "'required'", 
-			"'reserved'", "'returns'", "'rpc'", "'service'", "'sfixed32'", "'sfixed64'", 
-			"'sint32'", "'sint64'", "'stream'", "'string'", "'syntax'", "'to'", "'uint32'", 
-			"'uint64'", "'weak'", "'optional'", null, null, null, null, null, null, 
-			null, "'('", "')'", "'{'", "'}'", "'['", "']'", "'<'", "'>'", "','", 
-			"'.'", "'-'", "'+'", "'='", null, "'\uFEFF'"
+			null, "';'", "':'", "'bool'", "'bytes'", "'double'", "'enum'", "'extend'", 
+			"'fixed32'", "'fixed64'", "'float'", "'import'", "'int32'", "'int64'", 
+			"'map'", "'message'", "'oneof'", "'option'", "'package'", "'public'", 
+			"'repeated'", "'required'", "'reserved'", "'returns'", "'rpc'", "'service'", 
+			"'sfixed32'", "'sfixed64'", "'sint32'", "'sint64'", "'stream'", "'string'", 
+			"'syntax'", "'to'", "'uint32'", "'uint64'", "'weak'", "'optional'", null, 
+			null, null, null, null, null, null, "'('", "')'", "'{'", "'}'", "'['", 
+			"']'", "'<'", "'>'", "','", "'.'", "'-'", "'+'", "'='", null, "'\uFEFF'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "SEMI", "COLON", "BOOL", "BYTES", "DOUBLE", "ENUM", "FIXED32", 
+			null, "SEMI", "COLON", "BOOL", "BYTES", "DOUBLE", "ENUM", "EXTEND", "FIXED32", 
 			"FIXED64", "FLOAT", "IMPORT", "INT32", "INT64", "MAP", "MESSAGE", "ONEOF", 
 			"OPTION", "PACKAGE", "PUBLIC", "REPEATED", "REQUIRED", "RESERVED", "RETURNS", 
 			"RPC", "SERVICE", "SFIXED32", "SFIXED64", "SINT32", "SINT64", "STREAM", 
@@ -203,45 +204,46 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(72);
+			setState(74);
 			syntax();
-			setState(80);
+			setState(82);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << SEMI) | (1L << ENUM) | (1L << IMPORT) | (1L << MESSAGE) | (1L << OPTION) | (1L << PACKAGE) | (1L << SERVICE))) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << SEMI) | (1L << ENUM) | (1L << EXTEND) | (1L << IMPORT) | (1L << MESSAGE) | (1L << OPTION) | (1L << PACKAGE) | (1L << SERVICE))) != 0)) {
 				{
-				setState(78);
+				setState(80);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 				case IMPORT:
 					{
-					setState(73);
+					setState(75);
 					importStatement();
 					}
 					break;
 				case PACKAGE:
 					{
-					setState(74);
+					setState(76);
 					packageStatement();
 					}
 					break;
 				case OPTION:
 					{
-					setState(75);
+					setState(77);
 					optionDef();
 					}
 					break;
 				case ENUM:
+				case EXTEND:
 				case MESSAGE:
 				case SERVICE:
 					{
-					setState(76);
+					setState(78);
 					topLevelDef();
 					}
 					break;
 				case SEMI:
 					{
-					setState(77);
+					setState(79);
 					emptyStatement();
 					}
 					break;
@@ -249,11 +251,11 @@ public class Protobuf2Parser extends Parser {
 					throw new NoViableAltException(this);
 				}
 				}
-				setState(82);
+				setState(84);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(83);
+			setState(85);
 			match(EOF);
 			}
 		}
@@ -295,7 +297,7 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(85);
+			setState(87);
 			match(StringLiteral);
 			}
 		}
@@ -340,13 +342,13 @@ public class Protobuf2Parser extends Parser {
 		IdentOrReservedContext _localctx = new IdentOrReservedContext(_ctx, getState());
 		enterRule(_localctx, 4, RULE_identOrReserved);
 		try {
-			setState(89);
+			setState(91);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case Ident:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(87);
+				setState(89);
 				ident();
 				}
 				break;
@@ -361,7 +363,7 @@ public class Protobuf2Parser extends Parser {
 			case WEAK:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(88);
+				setState(90);
 				reservedWord();
 				}
 				break;
@@ -412,13 +414,13 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(91);
-			match(SYNTAX);
-			setState(92);
-			match(ASSIGN);
 			setState(93);
-			stringLiteral();
+			match(SYNTAX);
 			setState(94);
+			match(ASSIGN);
+			setState(95);
+			stringLiteral();
+			setState(96);
 			match(SEMI);
 			}
 		}
@@ -467,14 +469,14 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(96);
-			match(IMPORT);
 			setState(98);
+			match(IMPORT);
+			setState(100);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==PUBLIC || _la==WEAK) {
 				{
-				setState(97);
+				setState(99);
 				_la = _input.LA(1);
 				if ( !(_la==PUBLIC || _la==WEAK) ) {
 				_errHandler.recoverInline(this);
@@ -487,9 +489,9 @@ public class Protobuf2Parser extends Parser {
 				}
 			}
 
-			setState(100);
+			setState(102);
 			stringLiteral();
-			setState(101);
+			setState(103);
 			match(SEMI);
 			}
 		}
@@ -535,11 +537,11 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(103);
-			match(PACKAGE);
-			setState(104);
-			fullIdent();
 			setState(105);
+			match(PACKAGE);
+			setState(106);
+			fullIdent();
+			setState(107);
 			match(SEMI);
 			}
 		}
@@ -599,41 +601,41 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(112);
+			setState(114);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case Ident:
 				{
-				setState(107);
+				setState(109);
 				ident();
 				}
 				break;
 			case LPAREN:
 				{
-				setState(108);
-				match(LPAREN);
-				setState(109);
-				fullIdent();
 				setState(110);
+				match(LPAREN);
+				setState(111);
+				fullIdent();
+				setState(112);
 				match(RPAREN);
 				}
 				break;
 			default:
 				throw new NoViableAltException(this);
 			}
-			setState(118);
+			setState(120);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==DOT) {
 				{
 				{
-				setState(114);
+				setState(116);
 				match(DOT);
-				setState(115);
+				setState(117);
 				identOrReserved();
 				}
 				}
-				setState(120);
+				setState(122);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
@@ -683,11 +685,11 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(121);
-			optionName();
-			setState(122);
-			match(ASSIGN);
 			setState(123);
+			optionName();
+			setState(124);
+			match(ASSIGN);
+			setState(125);
 			constant();
 			}
 		}
@@ -733,11 +735,11 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(125);
-			match(OPTION);
-			setState(126);
-			option();
 			setState(127);
+			match(OPTION);
+			setState(128);
+			option();
+			setState(129);
 			match(SEMI);
 			}
 		}
@@ -792,27 +794,27 @@ public class Protobuf2Parser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			{
-			setState(129);
+			setState(131);
 			match(LBRACK);
-			setState(130);
+			setState(132);
 			option();
-			setState(135);
+			setState(137);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(131);
+				setState(133);
 				match(COMMA);
-				setState(132);
+				setState(134);
 				option();
 				}
 				}
-				setState(137);
+				setState(139);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(138);
+			setState(140);
 			match(RBRACK);
 			}
 			}
@@ -838,6 +840,9 @@ public class Protobuf2Parser extends Parser {
 		public ServiceContext service() {
 			return getRuleContext(ServiceContext.class,0);
 		}
+		public ExtendContext extend() {
+			return getRuleContext(ExtendContext.class,0);
+		}
 		public TopLevelDefContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -861,28 +866,35 @@ public class Protobuf2Parser extends Parser {
 		TopLevelDefContext _localctx = new TopLevelDefContext(_ctx, getState());
 		enterRule(_localctx, 20, RULE_topLevelDef);
 		try {
-			setState(143);
+			setState(146);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case MESSAGE:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(140);
+				setState(142);
 				message();
 				}
 				break;
 			case ENUM:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(141);
+				setState(143);
 				enumDefinition();
 				}
 				break;
 			case SERVICE:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(142);
+				setState(144);
 				service();
+				}
+				break;
+			case EXTEND:
+				enterOuterAlt(_localctx, 4);
+				{
+				setState(145);
+				extend();
 				}
 				break;
 			default:
@@ -927,7 +939,7 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(145);
+			setState(148);
 			match(Ident);
 			}
 		}
@@ -975,11 +987,11 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(147);
+			setState(150);
 			match(MESSAGE);
-			setState(148);
+			setState(151);
 			ident();
-			setState(149);
+			setState(152);
 			messageBody();
 			}
 		}
@@ -1027,7 +1039,7 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(151);
+			setState(154);
 			_la = _input.LA(1);
 			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << REPEATED) | (1L << REQUIRED) | (1L << OPTIONAL))) != 0)) ) {
 			_errHandler.recoverInline(this);
@@ -1037,7 +1049,7 @@ public class Protobuf2Parser extends Parser {
 				_errHandler.reportMatch(this);
 				consume();
 			}
-			setState(152);
+			setState(155);
 			field();
 			}
 		}
@@ -1067,6 +1079,12 @@ public class Protobuf2Parser extends Parser {
 		public EnumDefinitionContext enumDefinition(int i) {
 			return getRuleContext(EnumDefinitionContext.class,i);
 		}
+		public List<ExtendContext> extend() {
+			return getRuleContexts(ExtendContext.class);
+		}
+		public ExtendContext extend(int i) {
+			return getRuleContext(ExtendContext.class,i);
+		}
 		public List<MessageContext> message() {
 			return getRuleContexts(MessageContext.class);
 		}
@@ -1079,11 +1097,11 @@ public class Protobuf2Parser extends Parser {
 		public OptionDefContext optionDef(int i) {
 			return getRuleContext(OptionDefContext.class,i);
 		}
-		public List<OneofContext> oneof() {
-			return getRuleContexts(OneofContext.class);
+		public List<OneOfContext> oneOf() {
+			return getRuleContexts(OneOfContext.class);
 		}
-		public OneofContext oneof(int i) {
-			return getRuleContext(OneofContext.class,i);
+		public OneOfContext oneOf(int i) {
+			return getRuleContext(OneOfContext.class,i);
 		}
 		public List<MapFieldContext> mapField() {
 			return getRuleContexts(MapFieldContext.class);
@@ -1129,63 +1147,69 @@ public class Protobuf2Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(154);
+			setState(157);
 			match(LBRACE);
-			setState(165);
+			setState(169);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << SEMI) | (1L << ENUM) | (1L << MAP) | (1L << MESSAGE) | (1L << ONEOF) | (1L << OPTION) | (1L << REPEATED) | (1L << REQUIRED) | (1L << RESERVED) | (1L << OPTIONAL))) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << SEMI) | (1L << ENUM) | (1L << EXTEND) | (1L << MAP) | (1L << MESSAGE) | (1L << ONEOF) | (1L << OPTION) | (1L << REPEATED) | (1L << REQUIRED) | (1L << RESERVED) | (1L << OPTIONAL))) != 0)) {
 				{
-				setState(163);
+				setState(167);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 				case REPEATED:
 				case REQUIRED:
 				case OPTIONAL:
 					{
-					setState(155);
+					setState(158);
 					messageField();
 					}
 					break;
 				case ENUM:
 					{
-					setState(156);
+					setState(159);
 					enumDefinition();
+					}
+					break;
+				case EXTEND:
+					{
+					setState(160);
+					extend();
 					}
 					break;
 				case MESSAGE:
 					{
-					setState(157);
+					setState(161);
 					message();
 					}
 					break;
 				case OPTION:
 					{
-					setState(158);
+					setState(162);
 					optionDef();
 					}
 					break;
 				case ONEOF:
 					{
-					setState(159);
-					oneof();
+					setState(163);
+					oneOf();
 					}
 					break;
 				case MAP:
 					{
-					setState(160);
+					setState(164);
 					mapField();
 					}
 					break;
 				case RESERVED:
 					{
-					setState(161);
+					setState(165);
 					reserved();
 					}
 					break;
 				case SEMI:
 					{
-					setState(162);
+					setState(166);
 					emptyStatement();
 					}
 					break;
@@ -1193,11 +1217,107 @@ public class Protobuf2Parser extends Parser {
 					throw new NoViableAltException(this);
 				}
 				}
-				setState(167);
+				setState(171);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(168);
+			setState(172);
+			match(RBRACE);
+			}
+		}
+		catch (RecognitionException re) {
+			_localctx.exception = re;
+			_errHandler.reportError(this, re);
+			_errHandler.recover(this, re);
+		}
+		finally {
+			exitRule();
+		}
+		return _localctx;
+	}
+
+	public static class ExtendContext extends ParserRuleContext {
+		public TerminalNode EXTEND() { return getToken(Protobuf2Parser.EXTEND, 0); }
+		public FullIdentContext fullIdent() {
+			return getRuleContext(FullIdentContext.class,0);
+		}
+		public TerminalNode LBRACE() { return getToken(Protobuf2Parser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(Protobuf2Parser.RBRACE, 0); }
+		public List<MessageFieldContext> messageField() {
+			return getRuleContexts(MessageFieldContext.class);
+		}
+		public MessageFieldContext messageField(int i) {
+			return getRuleContext(MessageFieldContext.class,i);
+		}
+		public List<EmptyStatementContext> emptyStatement() {
+			return getRuleContexts(EmptyStatementContext.class);
+		}
+		public EmptyStatementContext emptyStatement(int i) {
+			return getRuleContext(EmptyStatementContext.class,i);
+		}
+		public ExtendContext(ParserRuleContext parent, int invokingState) {
+			super(parent, invokingState);
+		}
+		@Override public int getRuleIndex() { return RULE_extend; }
+		@Override
+		public void enterRule(ParseTreeListener listener) {
+			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterExtend(this);
+		}
+		@Override
+		public void exitRule(ParseTreeListener listener) {
+			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitExtend(this);
+		}
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitExtend(this);
+			else return visitor.visitChildren(this);
+		}
+	}
+
+	public final ExtendContext extend() throws RecognitionException {
+		ExtendContext _localctx = new ExtendContext(_ctx, getState());
+		enterRule(_localctx, 30, RULE_extend);
+		int _la;
+		try {
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(174);
+			match(EXTEND);
+			setState(175);
+			fullIdent();
+			setState(176);
+			match(LBRACE);
+			setState(181);
+			_errHandler.sync(this);
+			_la = _input.LA(1);
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << SEMI) | (1L << REPEATED) | (1L << REQUIRED) | (1L << OPTIONAL))) != 0)) {
+				{
+				setState(179);
+				_errHandler.sync(this);
+				switch (_input.LA(1)) {
+				case REPEATED:
+				case REQUIRED:
+				case OPTIONAL:
+					{
+					setState(177);
+					messageField();
+					}
+					break;
+				case SEMI:
+					{
+					setState(178);
+					emptyStatement();
+					}
+					break;
+				default:
+					throw new NoViableAltException(this);
+				}
+				}
+				setState(183);
+				_errHandler.sync(this);
+				_la = _input.LA(1);
+			}
+			setState(184);
 			match(RBRACE);
 			}
 		}
@@ -1241,15 +1361,15 @@ public class Protobuf2Parser extends Parser {
 
 	public final EnumDefinitionContext enumDefinition() throws RecognitionException {
 		EnumDefinitionContext _localctx = new EnumDefinitionContext(_ctx, getState());
-		enterRule(_localctx, 30, RULE_enumDefinition);
+		enterRule(_localctx, 32, RULE_enumDefinition);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(170);
+			setState(186);
 			match(ENUM);
-			setState(171);
+			setState(187);
 			ident();
-			setState(172);
+			setState(188);
 			enumBody();
 			}
 		}
@@ -1306,36 +1426,36 @@ public class Protobuf2Parser extends Parser {
 
 	public final EnumBodyContext enumBody() throws RecognitionException {
 		EnumBodyContext _localctx = new EnumBodyContext(_ctx, getState());
-		enterRule(_localctx, 32, RULE_enumBody);
+		enterRule(_localctx, 34, RULE_enumBody);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(174);
+			setState(190);
 			match(LBRACE);
-			setState(180);
+			setState(196);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << SEMI) | (1L << OPTION) | (1L << Ident))) != 0)) {
 				{
-				setState(178);
+				setState(194);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 				case OPTION:
 					{
-					setState(175);
+					setState(191);
 					optionDef();
 					}
 					break;
 				case Ident:
 					{
-					setState(176);
+					setState(192);
 					enumField();
 					}
 					break;
 				case SEMI:
 					{
-					setState(177);
+					setState(193);
 					emptyStatement();
 					}
 					break;
@@ -1343,11 +1463,11 @@ public class Protobuf2Parser extends Parser {
 					throw new NoViableAltException(this);
 				}
 				}
-				setState(182);
+				setState(198);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(183);
+			setState(199);
 			match(RBRACE);
 			}
 		}
@@ -1394,38 +1514,38 @@ public class Protobuf2Parser extends Parser {
 
 	public final EnumFieldContext enumField() throws RecognitionException {
 		EnumFieldContext _localctx = new EnumFieldContext(_ctx, getState());
-		enterRule(_localctx, 34, RULE_enumField);
+		enterRule(_localctx, 36, RULE_enumField);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(185);
+			setState(201);
 			ident();
-			setState(186);
+			setState(202);
 			match(ASSIGN);
-			setState(188);
+			setState(204);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==MINUS) {
 				{
-				setState(187);
+				setState(203);
 				match(MINUS);
 				}
 			}
 
-			setState(190);
+			setState(206);
 			match(IntegerLiteral);
-			setState(192);
+			setState(208);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==LBRACK) {
 				{
-				setState(191);
+				setState(207);
 				optionList();
 				}
 			}
 
-			setState(194);
+			setState(210);
 			match(SEMI);
 			}
 		}
@@ -1469,15 +1589,15 @@ public class Protobuf2Parser extends Parser {
 
 	public final ServiceContext service() throws RecognitionException {
 		ServiceContext _localctx = new ServiceContext(_ctx, getState());
-		enterRule(_localctx, 36, RULE_service);
+		enterRule(_localctx, 38, RULE_service);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(196);
+			setState(212);
 			match(SERVICE);
-			setState(197);
+			setState(213);
 			ident();
-			setState(198);
+			setState(214);
 			serviceBody();
 			}
 		}
@@ -1534,36 +1654,36 @@ public class Protobuf2Parser extends Parser {
 
 	public final ServiceBodyContext serviceBody() throws RecognitionException {
 		ServiceBodyContext _localctx = new ServiceBodyContext(_ctx, getState());
-		enterRule(_localctx, 38, RULE_serviceBody);
+		enterRule(_localctx, 40, RULE_serviceBody);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(200);
+			setState(216);
 			match(LBRACE);
-			setState(206);
+			setState(222);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << SEMI) | (1L << OPTION) | (1L << RPC))) != 0)) {
 				{
-				setState(204);
+				setState(220);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 				case OPTION:
 					{
-					setState(201);
+					setState(217);
 					optionDef();
 					}
 					break;
 				case RPC:
 					{
-					setState(202);
+					setState(218);
 					rpc();
 					}
 					break;
 				case SEMI:
 					{
-					setState(203);
+					setState(219);
 					emptyStatement();
 					}
 					break;
@@ -1571,11 +1691,11 @@ public class Protobuf2Parser extends Parser {
 					throw new NoViableAltException(this);
 				}
 				}
-				setState(208);
+				setState(224);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(209);
+			setState(225);
 			match(RBRACE);
 			}
 		}
@@ -1627,32 +1747,32 @@ public class Protobuf2Parser extends Parser {
 
 	public final RpcContext rpc() throws RecognitionException {
 		RpcContext _localctx = new RpcContext(_ctx, getState());
-		enterRule(_localctx, 40, RULE_rpc);
+		enterRule(_localctx, 42, RULE_rpc);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(211);
+			setState(227);
 			match(RPC);
-			setState(212);
+			setState(228);
 			ident();
-			setState(213);
+			setState(229);
 			rpcInOut();
-			setState(214);
+			setState(230);
 			match(RETURNS);
-			setState(215);
+			setState(231);
 			rpcInOut();
-			setState(218);
+			setState(234);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case LBRACE:
 				{
-				setState(216);
+				setState(232);
 				rpcBody();
 				}
 				break;
 			case SEMI:
 				{
-				setState(217);
+				setState(233);
 				match(SEMI);
 				}
 				break;
@@ -1701,25 +1821,25 @@ public class Protobuf2Parser extends Parser {
 
 	public final RpcInOutContext rpcInOut() throws RecognitionException {
 		RpcInOutContext _localctx = new RpcInOutContext(_ctx, getState());
-		enterRule(_localctx, 42, RULE_rpcInOut);
+		enterRule(_localctx, 44, RULE_rpcInOut);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(220);
+			setState(236);
 			match(LPAREN);
-			setState(222);
+			setState(238);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,17,_ctx) ) {
+			switch ( getInterpreter().adaptivePredict(_input,19,_ctx) ) {
 			case 1:
 				{
-				setState(221);
+				setState(237);
 				match(STREAM);
 				}
 				break;
 			}
-			setState(224);
+			setState(240);
 			((RpcInOutContext)_localctx).messageType = fullIdent();
-			setState(225);
+			setState(241);
 			match(RPAREN);
 			}
 		}
@@ -1770,30 +1890,30 @@ public class Protobuf2Parser extends Parser {
 
 	public final RpcBodyContext rpcBody() throws RecognitionException {
 		RpcBodyContext _localctx = new RpcBodyContext(_ctx, getState());
-		enterRule(_localctx, 44, RULE_rpcBody);
+		enterRule(_localctx, 46, RULE_rpcBody);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(227);
+			setState(243);
 			match(LBRACE);
-			setState(232);
+			setState(248);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==SEMI || _la==OPTION) {
 				{
-				setState(230);
+				setState(246);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 				case OPTION:
 					{
-					setState(228);
+					setState(244);
 					optionDef();
 					}
 					break;
 				case SEMI:
 					{
-					setState(229);
+					setState(245);
 					emptyStatement();
 					}
 					break;
@@ -1801,11 +1921,11 @@ public class Protobuf2Parser extends Parser {
 					throw new NoViableAltException(this);
 				}
 				}
-				setState(234);
+				setState(250);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(235);
+			setState(251);
 			match(RBRACE);
 			}
 		}
@@ -1850,31 +1970,31 @@ public class Protobuf2Parser extends Parser {
 
 	public final ReservedContext reserved() throws RecognitionException {
 		ReservedContext _localctx = new ReservedContext(_ctx, getState());
-		enterRule(_localctx, 46, RULE_reserved);
+		enterRule(_localctx, 48, RULE_reserved);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(237);
+			setState(253);
 			match(RESERVED);
-			setState(240);
+			setState(256);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case IntegerLiteral:
 				{
-				setState(238);
+				setState(254);
 				ranges();
 				}
 				break;
 			case StringLiteral:
 				{
-				setState(239);
+				setState(255);
 				fieldNames();
 				}
 				break;
 			default:
 				throw new NoViableAltException(this);
 			}
-			setState(242);
+			setState(258);
 			match(SEMI);
 			}
 		}
@@ -1921,26 +2041,26 @@ public class Protobuf2Parser extends Parser {
 
 	public final RangesContext ranges() throws RecognitionException {
 		RangesContext _localctx = new RangesContext(_ctx, getState());
-		enterRule(_localctx, 48, RULE_ranges);
+		enterRule(_localctx, 50, RULE_ranges);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(244);
+			setState(260);
 			range();
-			setState(249);
+			setState(265);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(245);
+				setState(261);
 				match(COMMA);
-				setState(246);
+				setState(262);
 				range();
 				}
 				}
-				setState(251);
+				setState(267);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
@@ -1984,21 +2104,21 @@ public class Protobuf2Parser extends Parser {
 
 	public final RangeContext range() throws RecognitionException {
 		RangeContext _localctx = new RangeContext(_ctx, getState());
-		enterRule(_localctx, 50, RULE_range);
+		enterRule(_localctx, 52, RULE_range);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(252);
+			setState(268);
 			match(IntegerLiteral);
-			setState(255);
+			setState(271);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==TO) {
 				{
-				setState(253);
+				setState(269);
 				match(TO);
-				setState(254);
+				setState(270);
 				match(IntegerLiteral);
 				}
 			}
@@ -2048,26 +2168,26 @@ public class Protobuf2Parser extends Parser {
 
 	public final FieldNamesContext fieldNames() throws RecognitionException {
 		FieldNamesContext _localctx = new FieldNamesContext(_ctx, getState());
-		enterRule(_localctx, 52, RULE_fieldNames);
+		enterRule(_localctx, 54, RULE_fieldNames);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(257);
+			setState(273);
 			stringLiteral();
-			setState(262);
+			setState(278);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(258);
+				setState(274);
 				match(COMMA);
-				setState(259);
+				setState(275);
 				stringLiteral();
 				}
 				}
-				setState(264);
+				setState(280);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
@@ -2148,17 +2268,17 @@ public class Protobuf2Parser extends Parser {
 
 	public final TypeContext type() throws RecognitionException {
 		TypeContext _localctx = new TypeContext(_ctx, getState());
-		enterRule(_localctx, 54, RULE_type);
+		enterRule(_localctx, 56, RULE_type);
 		int _la;
 		try {
-			setState(267);
+			setState(283);
 			_errHandler.sync(this);
-			switch ( getInterpreter().adaptivePredict(_input,24,_ctx) ) {
+			switch ( getInterpreter().adaptivePredict(_input,26,_ctx) ) {
 			case 1:
 				_localctx = new PrimitiveTypeContext(_localctx);
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(265);
+				setState(281);
 				_la = _input.LA(1);
 				if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOL) | (1L << BYTES) | (1L << DOUBLE) | (1L << FIXED32) | (1L << FIXED64) | (1L << FLOAT) | (1L << INT32) | (1L << INT64) | (1L << SFIXED32) | (1L << SFIXED64) | (1L << SINT32) | (1L << SINT64) | (1L << STRING) | (1L << UINT32) | (1L << UINT64))) != 0)) ) {
 				_errHandler.recoverInline(this);
@@ -2174,7 +2294,7 @@ public class Protobuf2Parser extends Parser {
 				_localctx = new FullyQualifiedTypeContext(_localctx);
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(266);
+				setState(282);
 				fullIdent();
 				}
 				break;
@@ -2226,30 +2346,30 @@ public class Protobuf2Parser extends Parser {
 
 	public final FieldContext field() throws RecognitionException {
 		FieldContext _localctx = new FieldContext(_ctx, getState());
-		enterRule(_localctx, 56, RULE_field);
+		enterRule(_localctx, 58, RULE_field);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(269);
+			setState(285);
 			type();
-			setState(270);
+			setState(286);
 			((FieldContext)_localctx).fieldName = identOrReserved();
-			setState(271);
+			setState(287);
 			match(ASSIGN);
-			setState(272);
+			setState(288);
 			match(IntegerLiteral);
-			setState(274);
+			setState(290);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==LBRACK) {
 				{
-				setState(273);
+				setState(289);
 				optionList();
 				}
 			}
 
-			setState(276);
+			setState(292);
 			match(SEMI);
 			}
 		}
@@ -2264,7 +2384,7 @@ public class Protobuf2Parser extends Parser {
 		return _localctx;
 	}
 
-	public static class OneofContext extends ParserRuleContext {
+	public static class OneOfContext extends ParserRuleContext {
 		public TerminalNode ONEOF() { return getToken(Protobuf2Parser.ONEOF, 0); }
 		public IdentContext ident() {
 			return getRuleContext(IdentContext.class,0);
@@ -2283,44 +2403,44 @@ public class Protobuf2Parser extends Parser {
 		public EmptyStatementContext emptyStatement(int i) {
 			return getRuleContext(EmptyStatementContext.class,i);
 		}
-		public OneofContext(ParserRuleContext parent, int invokingState) {
+		public OneOfContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
-		@Override public int getRuleIndex() { return RULE_oneof; }
+		@Override public int getRuleIndex() { return RULE_oneOf; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOneof(this);
+			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).enterOneOf(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOneof(this);
+			if ( listener instanceof Protobuf2ParserListener ) ((Protobuf2ParserListener)listener).exitOneOf(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOneof(this);
+			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOneOf(this);
 			else return visitor.visitChildren(this);
 		}
 	}
 
-	public final OneofContext oneof() throws RecognitionException {
-		OneofContext _localctx = new OneofContext(_ctx, getState());
-		enterRule(_localctx, 58, RULE_oneof);
+	public final OneOfContext oneOf() throws RecognitionException {
+		OneOfContext _localctx = new OneOfContext(_ctx, getState());
+		enterRule(_localctx, 60, RULE_oneOf);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(278);
+			setState(294);
 			match(ONEOF);
-			setState(279);
+			setState(295);
 			ident();
-			setState(280);
+			setState(296);
 			match(LBRACE);
-			setState(285);
+			setState(301);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << SEMI) | (1L << BOOL) | (1L << BYTES) | (1L << DOUBLE) | (1L << FIXED32) | (1L << FIXED64) | (1L << FLOAT) | (1L << INT32) | (1L << INT64) | (1L << MESSAGE) | (1L << OPTION) | (1L << PACKAGE) | (1L << RPC) | (1L << SERVICE) | (1L << SFIXED32) | (1L << SFIXED64) | (1L << SINT32) | (1L << SINT64) | (1L << STREAM) | (1L << STRING) | (1L << SYNTAX) | (1L << UINT32) | (1L << UINT64) | (1L << WEAK) | (1L << Ident) | (1L << DOT))) != 0)) {
 				{
-				setState(283);
+				setState(299);
 				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 				case BOOL:
@@ -2349,13 +2469,13 @@ public class Protobuf2Parser extends Parser {
 				case Ident:
 				case DOT:
 					{
-					setState(281);
+					setState(297);
 					field();
 					}
 					break;
 				case SEMI:
 					{
-					setState(282);
+					setState(298);
 					emptyStatement();
 					}
 					break;
@@ -2363,11 +2483,11 @@ public class Protobuf2Parser extends Parser {
 					throw new NoViableAltException(this);
 				}
 				}
-				setState(287);
+				setState(303);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(288);
+			setState(304);
 			match(RBRACE);
 			}
 		}
@@ -2423,40 +2543,40 @@ public class Protobuf2Parser extends Parser {
 
 	public final MapFieldContext mapField() throws RecognitionException {
 		MapFieldContext _localctx = new MapFieldContext(_ctx, getState());
-		enterRule(_localctx, 60, RULE_mapField);
+		enterRule(_localctx, 62, RULE_mapField);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(290);
+			setState(306);
 			match(MAP);
-			setState(291);
+			setState(307);
 			match(LCHEVR);
-			setState(292);
+			setState(308);
 			keyType();
-			setState(293);
+			setState(309);
 			match(COMMA);
-			setState(294);
+			setState(310);
 			type();
-			setState(295);
+			setState(311);
 			match(RCHEVR);
-			setState(296);
+			setState(312);
 			ident();
-			setState(297);
+			setState(313);
 			match(ASSIGN);
-			setState(298);
+			setState(314);
 			match(IntegerLiteral);
-			setState(300);
+			setState(316);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==LBRACK) {
 				{
-				setState(299);
+				setState(315);
 				optionList();
 				}
 			}
 
-			setState(302);
+			setState(318);
 			match(SEMI);
 			}
 		}
@@ -2505,12 +2625,12 @@ public class Protobuf2Parser extends Parser {
 
 	public final KeyTypeContext keyType() throws RecognitionException {
 		KeyTypeContext _localctx = new KeyTypeContext(_ctx, getState());
-		enterRule(_localctx, 62, RULE_keyType);
+		enterRule(_localctx, 64, RULE_keyType);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(304);
+			setState(320);
 			_la = _input.LA(1);
 			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOL) | (1L << FIXED32) | (1L << FIXED64) | (1L << INT32) | (1L << INT64) | (1L << SFIXED32) | (1L << SFIXED64) | (1L << SINT32) | (1L << SINT64) | (1L << STRING) | (1L << UINT32) | (1L << UINT64))) != 0)) ) {
 			_errHandler.recoverInline(this);
@@ -2564,12 +2684,12 @@ public class Protobuf2Parser extends Parser {
 
 	public final ReservedWordContext reservedWord() throws RecognitionException {
 		ReservedWordContext _localctx = new ReservedWordContext(_ctx, getState());
-		enterRule(_localctx, 64, RULE_reservedWord);
+		enterRule(_localctx, 66, RULE_reservedWord);
 		int _la;
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(306);
+			setState(322);
 			_la = _input.LA(1);
 			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << MESSAGE) | (1L << OPTION) | (1L << PACKAGE) | (1L << RPC) | (1L << SERVICE) | (1L << STREAM) | (1L << STRING) | (1L << SYNTAX) | (1L << WEAK))) != 0)) ) {
 			_errHandler.recoverInline(this);
@@ -2624,41 +2744,41 @@ public class Protobuf2Parser extends Parser {
 
 	public final FullIdentContext fullIdent() throws RecognitionException {
 		FullIdentContext _localctx = new FullIdentContext(_ctx, getState());
-		enterRule(_localctx, 66, RULE_fullIdent);
+		enterRule(_localctx, 68, RULE_fullIdent);
 		int _la;
 		try {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(309);
+			setState(325);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==DOT) {
 				{
-				setState(308);
+				setState(324);
 				match(DOT);
 				}
 			}
 
-			setState(316);
+			setState(332);
 			_errHandler.sync(this);
-			_alt = getInterpreter().adaptivePredict(_input,30,_ctx);
+			_alt = getInterpreter().adaptivePredict(_input,32,_ctx);
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					setState(311);
+					setState(327);
 					identOrReserved();
-					setState(312);
+					setState(328);
 					match(DOT);
 					}
 					} 
 				}
-				setState(318);
+				setState(334);
 				_errHandler.sync(this);
-				_alt = getInterpreter().adaptivePredict(_input,30,_ctx);
+				_alt = getInterpreter().adaptivePredict(_input,32,_ctx);
 			}
-			setState(319);
+			setState(335);
 			identOrReserved();
 			}
 		}
@@ -2696,11 +2816,11 @@ public class Protobuf2Parser extends Parser {
 
 	public final EmptyStatementContext emptyStatement() throws RecognitionException {
 		EmptyStatementContext _localctx = new EmptyStatementContext(_ctx, getState());
-		enterRule(_localctx, 68, RULE_emptyStatement);
+		enterRule(_localctx, 70, RULE_emptyStatement);
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(321);
+			setState(337);
 			match(SEMI);
 			}
 		}
@@ -2744,9 +2864,9 @@ public class Protobuf2Parser extends Parser {
 
 	public final ConstantContext constant() throws RecognitionException {
 		ConstantContext _localctx = new ConstantContext(_ctx, getState());
-		enterRule(_localctx, 70, RULE_constant);
+		enterRule(_localctx, 72, RULE_constant);
 		try {
-			setState(328);
+			setState(344);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case MESSAGE:
@@ -2762,35 +2882,35 @@ public class Protobuf2Parser extends Parser {
 			case DOT:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(323);
+				setState(339);
 				fullIdent();
 				}
 				break;
 			case IntegerLiteral:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(324);
+				setState(340);
 				match(IntegerLiteral);
 				}
 				break;
 			case NumericLiteral:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(325);
+				setState(341);
 				match(NumericLiteral);
 				}
 				break;
 			case StringLiteral:
 				enterOuterAlt(_localctx, 4);
 				{
-				setState(326);
+				setState(342);
 				match(StringLiteral);
 				}
 				break;
 			case BooleanLiteral:
 				enterOuterAlt(_localctx, 5);
 				{
-				setState(327);
+				setState(343);
 				match(BooleanLiteral);
 				}
 				break;
@@ -2810,120 +2930,127 @@ public class Protobuf2Parser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3>\u014d\4\2\t\2\4"+
+		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3?\u015d\4\2\t\2\4"+
 		"\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\4\t\t\t\4\n\t\n\4\13\t"+
 		"\13\4\f\t\f\4\r\t\r\4\16\t\16\4\17\t\17\4\20\t\20\4\21\t\21\4\22\t\22"+
 		"\4\23\t\23\4\24\t\24\4\25\t\25\4\26\t\26\4\27\t\27\4\30\t\30\4\31\t\31"+
 		"\4\32\t\32\4\33\t\33\4\34\t\34\4\35\t\35\4\36\t\36\4\37\t\37\4 \t \4!"+
-		"\t!\4\"\t\"\4#\t#\4$\t$\4%\t%\3\2\3\2\3\2\3\2\3\2\3\2\7\2Q\n\2\f\2\16"+
-		"\2T\13\2\3\2\3\2\3\3\3\3\3\4\3\4\5\4\\\n\4\3\5\3\5\3\5\3\5\3\5\3\6\3\6"+
-		"\5\6e\n\6\3\6\3\6\3\6\3\7\3\7\3\7\3\7\3\b\3\b\3\b\3\b\3\b\5\bs\n\b\3\b"+
-		"\3\b\7\bw\n\b\f\b\16\bz\13\b\3\t\3\t\3\t\3\t\3\n\3\n\3\n\3\n\3\13\3\13"+
-		"\3\13\3\13\7\13\u0088\n\13\f\13\16\13\u008b\13\13\3\13\3\13\3\f\3\f\3"+
-		"\f\5\f\u0092\n\f\3\r\3\r\3\16\3\16\3\16\3\16\3\17\3\17\3\17\3\20\3\20"+
-		"\3\20\3\20\3\20\3\20\3\20\3\20\3\20\7\20\u00a6\n\20\f\20\16\20\u00a9\13"+
-		"\20\3\20\3\20\3\21\3\21\3\21\3\21\3\22\3\22\3\22\3\22\7\22\u00b5\n\22"+
-		"\f\22\16\22\u00b8\13\22\3\22\3\22\3\23\3\23\3\23\5\23\u00bf\n\23\3\23"+
-		"\3\23\5\23\u00c3\n\23\3\23\3\23\3\24\3\24\3\24\3\24\3\25\3\25\3\25\3\25"+
-		"\7\25\u00cf\n\25\f\25\16\25\u00d2\13\25\3\25\3\25\3\26\3\26\3\26\3\26"+
-		"\3\26\3\26\3\26\5\26\u00dd\n\26\3\27\3\27\5\27\u00e1\n\27\3\27\3\27\3"+
-		"\27\3\30\3\30\3\30\7\30\u00e9\n\30\f\30\16\30\u00ec\13\30\3\30\3\30\3"+
-		"\31\3\31\3\31\5\31\u00f3\n\31\3\31\3\31\3\32\3\32\3\32\7\32\u00fa\n\32"+
-		"\f\32\16\32\u00fd\13\32\3\33\3\33\3\33\5\33\u0102\n\33\3\34\3\34\3\34"+
-		"\7\34\u0107\n\34\f\34\16\34\u010a\13\34\3\35\3\35\5\35\u010e\n\35\3\36"+
-		"\3\36\3\36\3\36\3\36\5\36\u0115\n\36\3\36\3\36\3\37\3\37\3\37\3\37\3\37"+
-		"\7\37\u011e\n\37\f\37\16\37\u0121\13\37\3\37\3\37\3 \3 \3 \3 \3 \3 \3"+
-		" \3 \3 \3 \5 \u012f\n \3 \3 \3!\3!\3\"\3\"\3#\5#\u0138\n#\3#\3#\3#\7#"+
-		"\u013d\n#\f#\16#\u0140\13#\3#\3#\3$\3$\3%\3%\3%\3%\3%\5%\u014b\n%\3%\2"+
-		"\2&\2\4\6\b\n\f\16\20\22\24\26\30\32\34\36 \"$&(*,.\60\62\64\668:<>@B"+
-		"DFH\2\7\4\2\24\24%%\4\2\25\26&&\b\2\5\7\t\13\r\16\33\36  #$\b\2\5\5\t"+
-		"\n\r\16\33\36  #$\7\2\20\20\22\23\31\32\37!%%\2\u0157\2J\3\2\2\2\4W\3"+
-		"\2\2\2\6[\3\2\2\2\b]\3\2\2\2\nb\3\2\2\2\fi\3\2\2\2\16r\3\2\2\2\20{\3\2"+
-		"\2\2\22\177\3\2\2\2\24\u0083\3\2\2\2\26\u0091\3\2\2\2\30\u0093\3\2\2\2"+
-		"\32\u0095\3\2\2\2\34\u0099\3\2\2\2\36\u009c\3\2\2\2 \u00ac\3\2\2\2\"\u00b0"+
-		"\3\2\2\2$\u00bb\3\2\2\2&\u00c6\3\2\2\2(\u00ca\3\2\2\2*\u00d5\3\2\2\2,"+
-		"\u00de\3\2\2\2.\u00e5\3\2\2\2\60\u00ef\3\2\2\2\62\u00f6\3\2\2\2\64\u00fe"+
-		"\3\2\2\2\66\u0103\3\2\2\28\u010d\3\2\2\2:\u010f\3\2\2\2<\u0118\3\2\2\2"+
-		">\u0124\3\2\2\2@\u0132\3\2\2\2B\u0134\3\2\2\2D\u0137\3\2\2\2F\u0143\3"+
-		"\2\2\2H\u014a\3\2\2\2JR\5\b\5\2KQ\5\n\6\2LQ\5\f\7\2MQ\5\22\n\2NQ\5\26"+
-		"\f\2OQ\5F$\2PK\3\2\2\2PL\3\2\2\2PM\3\2\2\2PN\3\2\2\2PO\3\2\2\2QT\3\2\2"+
-		"\2RP\3\2\2\2RS\3\2\2\2SU\3\2\2\2TR\3\2\2\2UV\7\2\2\3V\3\3\2\2\2WX\7,\2"+
-		"\2X\5\3\2\2\2Y\\\5\30\r\2Z\\\5B\"\2[Y\3\2\2\2[Z\3\2\2\2\\\7\3\2\2\2]^"+
-		"\7!\2\2^_\7:\2\2_`\5\4\3\2`a\7\3\2\2a\t\3\2\2\2bd\7\f\2\2ce\t\2\2\2dc"+
-		"\3\2\2\2de\3\2\2\2ef\3\2\2\2fg\5\4\3\2gh\7\3\2\2h\13\3\2\2\2ij\7\23\2"+
-		"\2jk\5D#\2kl\7\3\2\2l\r\3\2\2\2ms\5\30\r\2no\7.\2\2op\5D#\2pq\7/\2\2q"+
-		"s\3\2\2\2rm\3\2\2\2rn\3\2\2\2sx\3\2\2\2tu\7\67\2\2uw\5\6\4\2vt\3\2\2\2"+
-		"wz\3\2\2\2xv\3\2\2\2xy\3\2\2\2y\17\3\2\2\2zx\3\2\2\2{|\5\16\b\2|}\7:\2"+
-		"\2}~\5H%\2~\21\3\2\2\2\177\u0080\7\22\2\2\u0080\u0081\5\20\t\2\u0081\u0082"+
-		"\7\3\2\2\u0082\23\3\2\2\2\u0083\u0084\7\62\2\2\u0084\u0089\5\20\t\2\u0085"+
-		"\u0086\7\66\2\2\u0086\u0088\5\20\t\2\u0087\u0085\3\2\2\2\u0088\u008b\3"+
-		"\2\2\2\u0089\u0087\3\2\2\2\u0089\u008a\3\2\2\2\u008a\u008c\3\2\2\2\u008b"+
-		"\u0089\3\2\2\2\u008c\u008d\7\63\2\2\u008d\25\3\2\2\2\u008e\u0092\5\32"+
-		"\16\2\u008f\u0092\5 \21\2\u0090\u0092\5&\24\2\u0091\u008e\3\2\2\2\u0091"+
-		"\u008f\3\2\2\2\u0091\u0090\3\2\2\2\u0092\27\3\2\2\2\u0093\u0094\7\'\2"+
-		"\2\u0094\31\3\2\2\2\u0095\u0096\7\20\2\2\u0096\u0097\5\30\r\2\u0097\u0098"+
-		"\5\36\20\2\u0098\33\3\2\2\2\u0099\u009a\t\3\2\2\u009a\u009b\5:\36\2\u009b"+
-		"\35\3\2\2\2\u009c\u00a7\7\60\2\2\u009d\u00a6\5\34\17\2\u009e\u00a6\5 "+
-		"\21\2\u009f\u00a6\5\32\16\2\u00a0\u00a6\5\22\n\2\u00a1\u00a6\5<\37\2\u00a2"+
-		"\u00a6\5> \2\u00a3\u00a6\5\60\31\2\u00a4\u00a6\5F$\2\u00a5\u009d\3\2\2"+
-		"\2\u00a5\u009e\3\2\2\2\u00a5\u009f\3\2\2\2\u00a5\u00a0\3\2\2\2\u00a5\u00a1"+
-		"\3\2\2\2\u00a5\u00a2\3\2\2\2\u00a5\u00a3\3\2\2\2\u00a5\u00a4\3\2\2\2\u00a6"+
-		"\u00a9\3\2\2\2\u00a7\u00a5\3\2\2\2\u00a7\u00a8\3\2\2\2\u00a8\u00aa\3\2"+
-		"\2\2\u00a9\u00a7\3\2\2\2\u00aa\u00ab\7\61\2\2\u00ab\37\3\2\2\2\u00ac\u00ad"+
-		"\7\b\2\2\u00ad\u00ae\5\30\r\2\u00ae\u00af\5\"\22\2\u00af!\3\2\2\2\u00b0"+
-		"\u00b6\7\60\2\2\u00b1\u00b5\5\22\n\2\u00b2\u00b5\5$\23\2\u00b3\u00b5\5"+
-		"F$\2\u00b4\u00b1\3\2\2\2\u00b4\u00b2\3\2\2\2\u00b4\u00b3\3\2\2\2\u00b5"+
-		"\u00b8\3\2\2\2\u00b6\u00b4\3\2\2\2\u00b6\u00b7\3\2\2\2\u00b7\u00b9\3\2"+
-		"\2\2\u00b8\u00b6\3\2\2\2\u00b9\u00ba\7\61\2\2\u00ba#\3\2\2\2\u00bb\u00bc"+
-		"\5\30\r\2\u00bc\u00be\7:\2\2\u00bd\u00bf\78\2\2\u00be\u00bd\3\2\2\2\u00be"+
-		"\u00bf\3\2\2\2\u00bf\u00c0\3\2\2\2\u00c0\u00c2\7(\2\2\u00c1\u00c3\5\24"+
-		"\13\2\u00c2\u00c1\3\2\2\2\u00c2\u00c3\3\2\2\2\u00c3\u00c4\3\2\2\2\u00c4"+
-		"\u00c5\7\3\2\2\u00c5%\3\2\2\2\u00c6\u00c7\7\32\2\2\u00c7\u00c8\5\30\r"+
-		"\2\u00c8\u00c9\5(\25\2\u00c9\'\3\2\2\2\u00ca\u00d0\7\60\2\2\u00cb\u00cf"+
-		"\5\22\n\2\u00cc\u00cf\5*\26\2\u00cd\u00cf\5F$\2\u00ce\u00cb\3\2\2\2\u00ce"+
-		"\u00cc\3\2\2\2\u00ce\u00cd\3\2\2\2\u00cf\u00d2\3\2\2\2\u00d0\u00ce\3\2"+
-		"\2\2\u00d0\u00d1\3\2\2\2\u00d1\u00d3\3\2\2\2\u00d2\u00d0\3\2\2\2\u00d3"+
-		"\u00d4\7\61\2\2\u00d4)\3\2\2\2\u00d5\u00d6\7\31\2\2\u00d6\u00d7\5\30\r"+
-		"\2\u00d7\u00d8\5,\27\2\u00d8\u00d9\7\30\2\2\u00d9\u00dc\5,\27\2\u00da"+
-		"\u00dd\5.\30\2\u00db\u00dd\7\3\2\2\u00dc\u00da\3\2\2\2\u00dc\u00db\3\2"+
-		"\2\2\u00dd+\3\2\2\2\u00de\u00e0\7.\2\2\u00df\u00e1\7\37\2\2\u00e0\u00df"+
-		"\3\2\2\2\u00e0\u00e1\3\2\2\2\u00e1\u00e2\3\2\2\2\u00e2\u00e3\5D#\2\u00e3"+
-		"\u00e4\7/\2\2\u00e4-\3\2\2\2\u00e5\u00ea\7\60\2\2\u00e6\u00e9\5\22\n\2"+
-		"\u00e7\u00e9\5F$\2\u00e8\u00e6\3\2\2\2\u00e8\u00e7\3\2\2\2\u00e9\u00ec"+
-		"\3\2\2\2\u00ea\u00e8\3\2\2\2\u00ea\u00eb\3\2\2\2\u00eb\u00ed\3\2\2\2\u00ec"+
-		"\u00ea\3\2\2\2\u00ed\u00ee\7\61\2\2\u00ee/\3\2\2\2\u00ef\u00f2\7\27\2"+
-		"\2\u00f0\u00f3\5\62\32\2\u00f1\u00f3\5\66\34\2\u00f2\u00f0\3\2\2\2\u00f2"+
-		"\u00f1\3\2\2\2\u00f3\u00f4\3\2\2\2\u00f4\u00f5\7\3\2\2\u00f5\61\3\2\2"+
-		"\2\u00f6\u00fb\5\64\33\2\u00f7\u00f8\7\66\2\2\u00f8\u00fa\5\64\33\2\u00f9"+
-		"\u00f7\3\2\2\2\u00fa\u00fd\3\2\2\2\u00fb\u00f9\3\2\2\2\u00fb\u00fc\3\2"+
-		"\2\2\u00fc\63\3\2\2\2\u00fd\u00fb\3\2\2\2\u00fe\u0101\7(\2\2\u00ff\u0100"+
-		"\7\"\2\2\u0100\u0102\7(\2\2\u0101\u00ff\3\2\2\2\u0101\u0102\3\2\2\2\u0102"+
-		"\65\3\2\2\2\u0103\u0108\5\4\3\2\u0104\u0105\7\66\2\2\u0105\u0107\5\4\3"+
-		"\2\u0106\u0104\3\2\2\2\u0107\u010a\3\2\2\2\u0108\u0106\3\2\2\2\u0108\u0109"+
-		"\3\2\2\2\u0109\67\3\2\2\2\u010a\u0108\3\2\2\2\u010b\u010e\t\4\2\2\u010c"+
-		"\u010e\5D#\2\u010d\u010b\3\2\2\2\u010d\u010c\3\2\2\2\u010e9\3\2\2\2\u010f"+
-		"\u0110\58\35\2\u0110\u0111\5\6\4\2\u0111\u0112\7:\2\2\u0112\u0114\7(\2"+
-		"\2\u0113\u0115\5\24\13\2\u0114\u0113\3\2\2\2\u0114\u0115\3\2\2\2\u0115"+
-		"\u0116\3\2\2\2\u0116\u0117\7\3\2\2\u0117;\3\2\2\2\u0118\u0119\7\21\2\2"+
-		"\u0119\u011a\5\30\r\2\u011a\u011f\7\60\2\2\u011b\u011e\5:\36\2\u011c\u011e"+
-		"\5F$\2\u011d\u011b\3\2\2\2\u011d\u011c\3\2\2\2\u011e\u0121\3\2\2\2\u011f"+
-		"\u011d\3\2\2\2\u011f\u0120\3\2\2\2\u0120\u0122\3\2\2\2\u0121\u011f\3\2"+
-		"\2\2\u0122\u0123\7\61\2\2\u0123=\3\2\2\2\u0124\u0125\7\17\2\2\u0125\u0126"+
-		"\7\64\2\2\u0126\u0127\5@!\2\u0127\u0128\7\66\2\2\u0128\u0129\58\35\2\u0129"+
-		"\u012a\7\65\2\2\u012a\u012b\5\30\r\2\u012b\u012c\7:\2\2\u012c\u012e\7"+
-		"(\2\2\u012d\u012f\5\24\13\2\u012e\u012d\3\2\2\2\u012e\u012f\3\2\2\2\u012f"+
-		"\u0130\3\2\2\2\u0130\u0131\7\3\2\2\u0131?\3\2\2\2\u0132\u0133\t\5\2\2"+
-		"\u0133A\3\2\2\2\u0134\u0135\t\6\2\2\u0135C\3\2\2\2\u0136\u0138\7\67\2"+
-		"\2\u0137\u0136\3\2\2\2\u0137\u0138\3\2\2\2\u0138\u013e\3\2\2\2\u0139\u013a"+
-		"\5\6\4\2\u013a\u013b\7\67\2\2\u013b\u013d\3\2\2\2\u013c\u0139\3\2\2\2"+
-		"\u013d\u0140\3\2\2\2\u013e\u013c\3\2\2\2\u013e\u013f\3\2\2\2\u013f\u0141"+
-		"\3\2\2\2\u0140\u013e\3\2\2\2\u0141\u0142\5\6\4\2\u0142E\3\2\2\2\u0143"+
-		"\u0144\7\3\2\2\u0144G\3\2\2\2\u0145\u014b\5D#\2\u0146\u014b\7(\2\2\u0147"+
-		"\u014b\7)\2\2\u0148\u014b\7,\2\2\u0149\u014b\7+\2\2\u014a\u0145\3\2\2"+
-		"\2\u014a\u0146\3\2\2\2\u014a\u0147\3\2\2\2\u014a\u0148\3\2\2\2\u014a\u0149"+
-		"\3\2\2\2\u014bI\3\2\2\2\"PR[drx\u0089\u0091\u00a5\u00a7\u00b4\u00b6\u00be"+
-		"\u00c2\u00ce\u00d0\u00dc\u00e0\u00e8\u00ea\u00f2\u00fb\u0101\u0108\u010d"+
-		"\u0114\u011d\u011f\u012e\u0137\u013e\u014a";
+		"\t!\4\"\t\"\4#\t#\4$\t$\4%\t%\4&\t&\3\2\3\2\3\2\3\2\3\2\3\2\7\2S\n\2\f"+
+		"\2\16\2V\13\2\3\2\3\2\3\3\3\3\3\4\3\4\5\4^\n\4\3\5\3\5\3\5\3\5\3\5\3\6"+
+		"\3\6\5\6g\n\6\3\6\3\6\3\6\3\7\3\7\3\7\3\7\3\b\3\b\3\b\3\b\3\b\5\bu\n\b"+
+		"\3\b\3\b\7\by\n\b\f\b\16\b|\13\b\3\t\3\t\3\t\3\t\3\n\3\n\3\n\3\n\3\13"+
+		"\3\13\3\13\3\13\7\13\u008a\n\13\f\13\16\13\u008d\13\13\3\13\3\13\3\f\3"+
+		"\f\3\f\3\f\5\f\u0095\n\f\3\r\3\r\3\16\3\16\3\16\3\16\3\17\3\17\3\17\3"+
+		"\20\3\20\3\20\3\20\3\20\3\20\3\20\3\20\3\20\3\20\7\20\u00aa\n\20\f\20"+
+		"\16\20\u00ad\13\20\3\20\3\20\3\21\3\21\3\21\3\21\3\21\7\21\u00b6\n\21"+
+		"\f\21\16\21\u00b9\13\21\3\21\3\21\3\22\3\22\3\22\3\22\3\23\3\23\3\23\3"+
+		"\23\7\23\u00c5\n\23\f\23\16\23\u00c8\13\23\3\23\3\23\3\24\3\24\3\24\5"+
+		"\24\u00cf\n\24\3\24\3\24\5\24\u00d3\n\24\3\24\3\24\3\25\3\25\3\25\3\25"+
+		"\3\26\3\26\3\26\3\26\7\26\u00df\n\26\f\26\16\26\u00e2\13\26\3\26\3\26"+
+		"\3\27\3\27\3\27\3\27\3\27\3\27\3\27\5\27\u00ed\n\27\3\30\3\30\5\30\u00f1"+
+		"\n\30\3\30\3\30\3\30\3\31\3\31\3\31\7\31\u00f9\n\31\f\31\16\31\u00fc\13"+
+		"\31\3\31\3\31\3\32\3\32\3\32\5\32\u0103\n\32\3\32\3\32\3\33\3\33\3\33"+
+		"\7\33\u010a\n\33\f\33\16\33\u010d\13\33\3\34\3\34\3\34\5\34\u0112\n\34"+
+		"\3\35\3\35\3\35\7\35\u0117\n\35\f\35\16\35\u011a\13\35\3\36\3\36\5\36"+
+		"\u011e\n\36\3\37\3\37\3\37\3\37\3\37\5\37\u0125\n\37\3\37\3\37\3 \3 \3"+
+		" \3 \3 \7 \u012e\n \f \16 \u0131\13 \3 \3 \3!\3!\3!\3!\3!\3!\3!\3!\3!"+
+		"\3!\5!\u013f\n!\3!\3!\3\"\3\"\3#\3#\3$\5$\u0148\n$\3$\3$\3$\7$\u014d\n"+
+		"$\f$\16$\u0150\13$\3$\3$\3%\3%\3&\3&\3&\3&\3&\5&\u015b\n&\3&\2\2\'\2\4"+
+		"\6\b\n\f\16\20\22\24\26\30\32\34\36 \"$&(*,.\60\62\64\668:<>@BDFHJ\2\7"+
+		"\4\2\25\25&&\4\2\26\27\'\'\b\2\5\7\n\f\16\17\34\37!!$%\b\2\5\5\n\13\16"+
+		"\17\34\37!!$%\7\2\21\21\23\24\32\33 \"&&\2\u016a\2L\3\2\2\2\4Y\3\2\2\2"+
+		"\6]\3\2\2\2\b_\3\2\2\2\nd\3\2\2\2\fk\3\2\2\2\16t\3\2\2\2\20}\3\2\2\2\22"+
+		"\u0081\3\2\2\2\24\u0085\3\2\2\2\26\u0094\3\2\2\2\30\u0096\3\2\2\2\32\u0098"+
+		"\3\2\2\2\34\u009c\3\2\2\2\36\u009f\3\2\2\2 \u00b0\3\2\2\2\"\u00bc\3\2"+
+		"\2\2$\u00c0\3\2\2\2&\u00cb\3\2\2\2(\u00d6\3\2\2\2*\u00da\3\2\2\2,\u00e5"+
+		"\3\2\2\2.\u00ee\3\2\2\2\60\u00f5\3\2\2\2\62\u00ff\3\2\2\2\64\u0106\3\2"+
+		"\2\2\66\u010e\3\2\2\28\u0113\3\2\2\2:\u011d\3\2\2\2<\u011f\3\2\2\2>\u0128"+
+		"\3\2\2\2@\u0134\3\2\2\2B\u0142\3\2\2\2D\u0144\3\2\2\2F\u0147\3\2\2\2H"+
+		"\u0153\3\2\2\2J\u015a\3\2\2\2LT\5\b\5\2MS\5\n\6\2NS\5\f\7\2OS\5\22\n\2"+
+		"PS\5\26\f\2QS\5H%\2RM\3\2\2\2RN\3\2\2\2RO\3\2\2\2RP\3\2\2\2RQ\3\2\2\2"+
+		"SV\3\2\2\2TR\3\2\2\2TU\3\2\2\2UW\3\2\2\2VT\3\2\2\2WX\7\2\2\3X\3\3\2\2"+
+		"\2YZ\7-\2\2Z\5\3\2\2\2[^\5\30\r\2\\^\5D#\2][\3\2\2\2]\\\3\2\2\2^\7\3\2"+
+		"\2\2_`\7\"\2\2`a\7;\2\2ab\5\4\3\2bc\7\3\2\2c\t\3\2\2\2df\7\r\2\2eg\t\2"+
+		"\2\2fe\3\2\2\2fg\3\2\2\2gh\3\2\2\2hi\5\4\3\2ij\7\3\2\2j\13\3\2\2\2kl\7"+
+		"\24\2\2lm\5F$\2mn\7\3\2\2n\r\3\2\2\2ou\5\30\r\2pq\7/\2\2qr\5F$\2rs\7\60"+
+		"\2\2su\3\2\2\2to\3\2\2\2tp\3\2\2\2uz\3\2\2\2vw\78\2\2wy\5\6\4\2xv\3\2"+
+		"\2\2y|\3\2\2\2zx\3\2\2\2z{\3\2\2\2{\17\3\2\2\2|z\3\2\2\2}~\5\16\b\2~\177"+
+		"\7;\2\2\177\u0080\5J&\2\u0080\21\3\2\2\2\u0081\u0082\7\23\2\2\u0082\u0083"+
+		"\5\20\t\2\u0083\u0084\7\3\2\2\u0084\23\3\2\2\2\u0085\u0086\7\63\2\2\u0086"+
+		"\u008b\5\20\t\2\u0087\u0088\7\67\2\2\u0088\u008a\5\20\t\2\u0089\u0087"+
+		"\3\2\2\2\u008a\u008d\3\2\2\2\u008b\u0089\3\2\2\2\u008b\u008c\3\2\2\2\u008c"+
+		"\u008e\3\2\2\2\u008d\u008b\3\2\2\2\u008e\u008f\7\64\2\2\u008f\25\3\2\2"+
+		"\2\u0090\u0095\5\32\16\2\u0091\u0095\5\"\22\2\u0092\u0095\5(\25\2\u0093"+
+		"\u0095\5 \21\2\u0094\u0090\3\2\2\2\u0094\u0091\3\2\2\2\u0094\u0092\3\2"+
+		"\2\2\u0094\u0093\3\2\2\2\u0095\27\3\2\2\2\u0096\u0097\7(\2\2\u0097\31"+
+		"\3\2\2\2\u0098\u0099\7\21\2\2\u0099\u009a\5\30\r\2\u009a\u009b\5\36\20"+
+		"\2\u009b\33\3\2\2\2\u009c\u009d\t\3\2\2\u009d\u009e\5<\37\2\u009e\35\3"+
+		"\2\2\2\u009f\u00ab\7\61\2\2\u00a0\u00aa\5\34\17\2\u00a1\u00aa\5\"\22\2"+
+		"\u00a2\u00aa\5 \21\2\u00a3\u00aa\5\32\16\2\u00a4\u00aa\5\22\n\2\u00a5"+
+		"\u00aa\5> \2\u00a6\u00aa\5@!\2\u00a7\u00aa\5\62\32\2\u00a8\u00aa\5H%\2"+
+		"\u00a9\u00a0\3\2\2\2\u00a9\u00a1\3\2\2\2\u00a9\u00a2\3\2\2\2\u00a9\u00a3"+
+		"\3\2\2\2\u00a9\u00a4\3\2\2\2\u00a9\u00a5\3\2\2\2\u00a9\u00a6\3\2\2\2\u00a9"+
+		"\u00a7\3\2\2\2\u00a9\u00a8\3\2\2\2\u00aa\u00ad\3\2\2\2\u00ab\u00a9\3\2"+
+		"\2\2\u00ab\u00ac\3\2\2\2\u00ac\u00ae\3\2\2\2\u00ad\u00ab\3\2\2\2\u00ae"+
+		"\u00af\7\62\2\2\u00af\37\3\2\2\2\u00b0\u00b1\7\t\2\2\u00b1\u00b2\5F$\2"+
+		"\u00b2\u00b7\7\61\2\2\u00b3\u00b6\5\34\17\2\u00b4\u00b6\5H%\2\u00b5\u00b3"+
+		"\3\2\2\2\u00b5\u00b4\3\2\2\2\u00b6\u00b9\3\2\2\2\u00b7\u00b5\3\2\2\2\u00b7"+
+		"\u00b8\3\2\2\2\u00b8\u00ba\3\2\2\2\u00b9\u00b7\3\2\2\2\u00ba\u00bb\7\62"+
+		"\2\2\u00bb!\3\2\2\2\u00bc\u00bd\7\b\2\2\u00bd\u00be\5\30\r\2\u00be\u00bf"+
+		"\5$\23\2\u00bf#\3\2\2\2\u00c0\u00c6\7\61\2\2\u00c1\u00c5\5\22\n\2\u00c2"+
+		"\u00c5\5&\24\2\u00c3\u00c5\5H%\2\u00c4\u00c1\3\2\2\2\u00c4\u00c2\3\2\2"+
+		"\2\u00c4\u00c3\3\2\2\2\u00c5\u00c8\3\2\2\2\u00c6\u00c4\3\2\2\2\u00c6\u00c7"+
+		"\3\2\2\2\u00c7\u00c9\3\2\2\2\u00c8\u00c6\3\2\2\2\u00c9\u00ca\7\62\2\2"+
+		"\u00ca%\3\2\2\2\u00cb\u00cc\5\30\r\2\u00cc\u00ce\7;\2\2\u00cd\u00cf\7"+
+		"9\2\2\u00ce\u00cd\3\2\2\2\u00ce\u00cf\3\2\2\2\u00cf\u00d0\3\2\2\2\u00d0"+
+		"\u00d2\7)\2\2\u00d1\u00d3\5\24\13\2\u00d2\u00d1\3\2\2\2\u00d2\u00d3\3"+
+		"\2\2\2\u00d3\u00d4\3\2\2\2\u00d4\u00d5\7\3\2\2\u00d5\'\3\2\2\2\u00d6\u00d7"+
+		"\7\33\2\2\u00d7\u00d8\5\30\r\2\u00d8\u00d9\5*\26\2\u00d9)\3\2\2\2\u00da"+
+		"\u00e0\7\61\2\2\u00db\u00df\5\22\n\2\u00dc\u00df\5,\27\2\u00dd\u00df\5"+
+		"H%\2\u00de\u00db\3\2\2\2\u00de\u00dc\3\2\2\2\u00de\u00dd\3\2\2\2\u00df"+
+		"\u00e2\3\2\2\2\u00e0\u00de\3\2\2\2\u00e0\u00e1\3\2\2\2\u00e1\u00e3\3\2"+
+		"\2\2\u00e2\u00e0\3\2\2\2\u00e3\u00e4\7\62\2\2\u00e4+\3\2\2\2\u00e5\u00e6"+
+		"\7\32\2\2\u00e6\u00e7\5\30\r\2\u00e7\u00e8\5.\30\2\u00e8\u00e9\7\31\2"+
+		"\2\u00e9\u00ec\5.\30\2\u00ea\u00ed\5\60\31\2\u00eb\u00ed\7\3\2\2\u00ec"+
+		"\u00ea\3\2\2\2\u00ec\u00eb\3\2\2\2\u00ed-\3\2\2\2\u00ee\u00f0\7/\2\2\u00ef"+
+		"\u00f1\7 \2\2\u00f0\u00ef\3\2\2\2\u00f0\u00f1\3\2\2\2\u00f1\u00f2\3\2"+
+		"\2\2\u00f2\u00f3\5F$\2\u00f3\u00f4\7\60\2\2\u00f4/\3\2\2\2\u00f5\u00fa"+
+		"\7\61\2\2\u00f6\u00f9\5\22\n\2\u00f7\u00f9\5H%\2\u00f8\u00f6\3\2\2\2\u00f8"+
+		"\u00f7\3\2\2\2\u00f9\u00fc\3\2\2\2\u00fa\u00f8\3\2\2\2\u00fa\u00fb\3\2"+
+		"\2\2\u00fb\u00fd\3\2\2\2\u00fc\u00fa\3\2\2\2\u00fd\u00fe\7\62\2\2\u00fe"+
+		"\61\3\2\2\2\u00ff\u0102\7\30\2\2\u0100\u0103\5\64\33\2\u0101\u0103\58"+
+		"\35\2\u0102\u0100\3\2\2\2\u0102\u0101\3\2\2\2\u0103\u0104\3\2\2\2\u0104"+
+		"\u0105\7\3\2\2\u0105\63\3\2\2\2\u0106\u010b\5\66\34\2\u0107\u0108\7\67"+
+		"\2\2\u0108\u010a\5\66\34\2\u0109\u0107\3\2\2\2\u010a\u010d\3\2\2\2\u010b"+
+		"\u0109\3\2\2\2\u010b\u010c\3\2\2\2\u010c\65\3\2\2\2\u010d\u010b\3\2\2"+
+		"\2\u010e\u0111\7)\2\2\u010f\u0110\7#\2\2\u0110\u0112\7)\2\2\u0111\u010f"+
+		"\3\2\2\2\u0111\u0112\3\2\2\2\u0112\67\3\2\2\2\u0113\u0118\5\4\3\2\u0114"+
+		"\u0115\7\67\2\2\u0115\u0117\5\4\3\2\u0116\u0114\3\2\2\2\u0117\u011a\3"+
+		"\2\2\2\u0118\u0116\3\2\2\2\u0118\u0119\3\2\2\2\u01199\3\2\2\2\u011a\u0118"+
+		"\3\2\2\2\u011b\u011e\t\4\2\2\u011c\u011e\5F$\2\u011d\u011b\3\2\2\2\u011d"+
+		"\u011c\3\2\2\2\u011e;\3\2\2\2\u011f\u0120\5:\36\2\u0120\u0121\5\6\4\2"+
+		"\u0121\u0122\7;\2\2\u0122\u0124\7)\2\2\u0123\u0125\5\24\13\2\u0124\u0123"+
+		"\3\2\2\2\u0124\u0125\3\2\2\2\u0125\u0126\3\2\2\2\u0126\u0127\7\3\2\2\u0127"+
+		"=\3\2\2\2\u0128\u0129\7\22\2\2\u0129\u012a\5\30\r\2\u012a\u012f\7\61\2"+
+		"\2\u012b\u012e\5<\37\2\u012c\u012e\5H%\2\u012d\u012b\3\2\2\2\u012d\u012c"+
+		"\3\2\2\2\u012e\u0131\3\2\2\2\u012f\u012d\3\2\2\2\u012f\u0130\3\2\2\2\u0130"+
+		"\u0132\3\2\2\2\u0131\u012f\3\2\2\2\u0132\u0133\7\62\2\2\u0133?\3\2\2\2"+
+		"\u0134\u0135\7\20\2\2\u0135\u0136\7\65\2\2\u0136\u0137\5B\"\2\u0137\u0138"+
+		"\7\67\2\2\u0138\u0139\5:\36\2\u0139\u013a\7\66\2\2\u013a\u013b\5\30\r"+
+		"\2\u013b\u013c\7;\2\2\u013c\u013e\7)\2\2\u013d\u013f\5\24\13\2\u013e\u013d"+
+		"\3\2\2\2\u013e\u013f\3\2\2\2\u013f\u0140\3\2\2\2\u0140\u0141\7\3\2\2\u0141"+
+		"A\3\2\2\2\u0142\u0143\t\5\2\2\u0143C\3\2\2\2\u0144\u0145\t\6\2\2\u0145"+
+		"E\3\2\2\2\u0146\u0148\78\2\2\u0147\u0146\3\2\2\2\u0147\u0148\3\2\2\2\u0148"+
+		"\u014e\3\2\2\2\u0149\u014a\5\6\4\2\u014a\u014b\78\2\2\u014b\u014d\3\2"+
+		"\2\2\u014c\u0149\3\2\2\2\u014d\u0150\3\2\2\2\u014e\u014c\3\2\2\2\u014e"+
+		"\u014f\3\2\2\2\u014f\u0151\3\2\2\2\u0150\u014e\3\2\2\2\u0151\u0152\5\6"+
+		"\4\2\u0152G\3\2\2\2\u0153\u0154\7\3\2\2\u0154I\3\2\2\2\u0155\u015b\5F"+
+		"$\2\u0156\u015b\7)\2\2\u0157\u015b\7*\2\2\u0158\u015b\7-\2\2\u0159\u015b"+
+		"\7,\2\2\u015a\u0155\3\2\2\2\u015a\u0156\3\2\2\2\u015a\u0157\3\2\2\2\u015a"+
+		"\u0158\3\2\2\2\u015a\u0159\3\2\2\2\u015bK\3\2\2\2$RT]ftz\u008b\u0094\u00a9"+
+		"\u00ab\u00b5\u00b7\u00c4\u00c6\u00ce\u00d2\u00de\u00e0\u00ec\u00f0\u00f8"+
+		"\u00fa\u0102\u010b\u0111\u0118\u011d\u0124\u012d\u012f\u013e\u0147\u014e"+
+		"\u015a";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

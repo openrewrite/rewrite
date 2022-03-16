@@ -34,7 +34,7 @@ optionName
 option
   : optionName ASSIGN constant
   ;
-  
+
 optionDef
   : OPTION option SEMI
   ;
@@ -47,8 +47,9 @@ topLevelDef
   : message
   | enumDefinition
   | service
+  | extend
   ;
- 
+
 ident
   : Ident
   ;
@@ -62,7 +63,11 @@ messageField
   ;
 
 messageBody
-  : LBRACE (messageField | enumDefinition | message | optionDef | oneof | mapField | reserved | emptyStatement)* RBRACE
+  : LBRACE (messageField | enumDefinition | extend | message | optionDef | oneOf | mapField | reserved | emptyStatement)* RBRACE
+  ;
+
+extend
+  : EXTEND fullIdent LBRACE ( messageField | emptyStatement )* RBRACE
   ;
 
 enumDefinition
@@ -136,7 +141,7 @@ field
   : type fieldName=identOrReserved ASSIGN IntegerLiteral optionList? SEMI
   ;
 
-oneof
+oneOf
   : ONEOF ident LBRACE (field | emptyStatement)* RBRACE
   ;
 

@@ -84,6 +84,16 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Proto visitExtend(Proto.Extend extend, PrintOutputCapture<P> p) {
+        visitSpace(extend.getPrefix(), p);
+        visitMarkers(extend.getMarkers(), p);
+        p.out.append("extend");
+        visitFullIdentifier(extend.getName(), p);
+        visitBlock(extend.getBody(), p);
+        return extend;
+    }
+
+    @Override
     public Proto visitExtensionName(Proto.ExtensionName extensionName, PrintOutputCapture<P> p) {
         visitSpace(extensionName.getPrefix(), p);
         visitMarkers(extensionName.getMarkers(), p);
@@ -133,7 +143,6 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
         p.out.append("import");
         visit(anImport.getModifier(), p);
         visitRightPadded(anImport.getPadding().getName(), p);
-        p.out.append(';');
         return anImport;
     }
 
@@ -292,7 +301,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
         visitSpace(syntax.getPrefix(), p);
         visitMarkers(syntax.getMarkers(), p);
         p.out.append("syntax");
-        visitSpace(syntax.getPadding().getSyntax().getAfter(), p);
+        visitSpace(syntax.getKeywordSuffix(), p);
         p.out.append('=');
         visitRightPadded(syntax.getPadding().getLevel(), p);
         p.out.append(';');
@@ -373,6 +382,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
 
         Proto s = paddedStat.getElement();
         if (s instanceof Proto.Empty ||
+                s instanceof Proto.Field ||
                 s instanceof Proto.Import ||
                 s instanceof Proto.MapField ||
                 s instanceof Proto.OptionDeclaration ||

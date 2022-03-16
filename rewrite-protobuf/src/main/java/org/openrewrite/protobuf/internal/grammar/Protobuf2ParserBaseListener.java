@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.9.3
+// Generated from /mnt/f/Projects/openrewrite/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.9.3
 package org.openrewrite.protobuf.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -211,6 +211,18 @@ public class Protobuf2ParserBaseListener implements Protobuf2ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterExtend(Protobuf2Parser.ExtendContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitExtend(Protobuf2Parser.ExtendContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterEnumDefinition(Protobuf2Parser.EnumDefinitionContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -391,13 +403,13 @@ public class Protobuf2ParserBaseListener implements Protobuf2ParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterOneof(Protobuf2Parser.OneofContext ctx) { }
+	@Override public void enterOneOf(Protobuf2Parser.OneOfContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitOneof(Protobuf2Parser.OneofContext ctx) { }
+	@Override public void exitOneOf(Protobuf2Parser.OneOfContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

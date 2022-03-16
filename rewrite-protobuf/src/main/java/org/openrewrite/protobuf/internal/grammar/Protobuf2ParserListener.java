@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.9.3
+// Generated from /mnt/f/Projects/openrewrite/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.9.3
 package org.openrewrite.protobuf.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -173,6 +173,16 @@ public interface Protobuf2ParserListener extends ParseTreeListener {
 	 */
 	void exitMessageBody(Protobuf2Parser.MessageBodyContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link Protobuf2Parser#extend}.
+	 * @param ctx the parse tree
+	 */
+	void enterExtend(Protobuf2Parser.ExtendContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link Protobuf2Parser#extend}.
+	 * @param ctx the parse tree
+	 */
+	void exitExtend(Protobuf2Parser.ExtendContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link Protobuf2Parser#enumDefinition}.
 	 * @param ctx the parse tree
 	 */
@@ -327,15 +337,15 @@ public interface Protobuf2ParserListener extends ParseTreeListener {
 	 */
 	void exitField(Protobuf2Parser.FieldContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link Protobuf2Parser#oneof}.
+	 * Enter a parse tree produced by {@link Protobuf2Parser#oneOf}.
 	 * @param ctx the parse tree
 	 */
-	void enterOneof(Protobuf2Parser.OneofContext ctx);
+	void enterOneOf(Protobuf2Parser.OneOfContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link Protobuf2Parser#oneof}.
+	 * Exit a parse tree produced by {@link Protobuf2Parser#oneOf}.
 	 * @param ctx the parse tree
 	 */
-	void exitOneof(Protobuf2Parser.OneofContext ctx);
+	void exitOneOf(Protobuf2Parser.OneOfContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link Protobuf2Parser#mapField}.
 	 * @param ctx the parse tree

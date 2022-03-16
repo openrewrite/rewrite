@@ -45,6 +45,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withSyntax((Proto.Syntax) visitSyntax(d.getSyntax(), p));
+        d = d.getPadding().withBody(ListUtils.map(d.getPadding().getBody(), it -> visitRightPadded(it, p)));
         return d;
     }
 
@@ -74,6 +75,15 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
         return f;
     }
 
+    public Proto visitExtend(Proto.Extend extend, P p) {
+        Proto.Extend e = extend;
+        e = e.withPrefix(visitSpace(e.getPrefix(), p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withName((Proto.FullIdentifier) visitFullIdentifier(e.getName(), p));
+        e = e.withBody((Proto.Block) visit(e.getBody(), p));
+        return e;
+    }
+
     public Proto visitExtensionName(Proto.ExtensionName extensionName, P p) {
         Proto.ExtensionName e = extensionName;
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
@@ -87,7 +97,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
         f = f.withPrefix(visitSpace(f.getPrefix(), p));
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
         f = f.withLabel((Proto.Keyword) visit(f.getLabel(), p));
-        f = f.withType((Proto.FullIdentifier) visit(f.getType(), p));
+        f = f.withType((TypeTree) visit(f.getType(), p));
         f = f.getPadding().withName(visitRightPadded(f.getPadding().getName(), p));
         f = f.withNumber((Proto.Constant) visit(f.getNumber(), p));
         f = f.getPadding().withOptions(visitContainer(f.getPadding().getOptions(), p));
@@ -247,7 +257,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
         Proto.Syntax s = syntax;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        s = s.getPadding().withSyntax(visitRightPadded(s.getPadding().getSyntax(), p));
+        s = s.withKeywordSuffix(visitSpace(s.getKeywordSuffix(), p));
         s = s.getPadding().withLevel(visitRightPadded(s.getPadding().getLevel(), p));
         return s;
     }
@@ -273,7 +283,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
                 container :
                 ProtoContainer.build(before, ps, container.getMarkers());
     }
-    
+
     public <T> ProtoLeftPadded<T> visitLeftPadded(ProtoLeftPadded<T> left, P p) {
         setCursor(new Cursor(getCursor(), left));
 
