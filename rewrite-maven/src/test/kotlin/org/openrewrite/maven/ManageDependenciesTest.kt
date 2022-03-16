@@ -24,8 +24,6 @@ import org.openrewrite.java.marker.JavaProject
 import java.nio.file.Path
 
 class ManageDependenciesTest : MavenRecipeTest {
-    override val parser: MavenParser = MavenParser.builder()
-        .build()
     private val javaProject = JavaProject(Tree.randomId(), "myproject", null)
 
     @Test
@@ -399,4 +397,133 @@ class ManageDependenciesTest : MavenRecipeTest {
             """.trimIndent()
         )
     }
+
+    @Test
+    fun externalParent() = assertChanged(
+        recipe = ManageDependencies(
+            "org.apache.logging.log4j",
+            "log4j-*",
+            null,
+            true),
+        before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.managed.test</groupId>
+                <artifactId>a</artifactId>
+                <version>1.0.0</version>
+                <parent>
+                    <groupId>com.fasterxml.jackson</groupId>
+                    <artifactId>jackson-parent</artifactId>
+                    <version>2.9.1</version>
+                </parent>
+            </project>
+        """,
+        dependsOn= arrayOf(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.managed.test</groupId>
+                    <artifactId>b</artifactId>
+                    <version>1.0.0</version>
+                    <parent>
+                        <groupId>com.managed.test</groupId>
+                        <artifactId>a</artifactId>
+                        <version>1.0.0</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                            <version>4.11</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-api</artifactId>
+                            <version>2.17.2</version>
+                        </dependency>
+                    </dependencies>
+                </project>            
+            """
+        ),
+        after="""
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.managed.test</groupId>
+                <artifactId>a</artifactId>
+                <version>1.0.0</version>
+                <parent>
+                    <groupId>com.fasterxml.jackson</groupId>
+                    <artifactId>jackson-parent</artifactId>
+                    <version>2.9.1</version>
+                </parent>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-api</artifactId>
+                            <version>2.17.2</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """
+    )
+
+    @Test
+    fun externalManagedDependencyOverride() = assertChanged(
+        recipe = ManageDependencies(
+            "junit",
+            "junit",
+            null,
+            true),
+        before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.managed.test</groupId>
+                <artifactId>a</artifactId>
+                <version>1.0.0</version>
+                <parent>
+                    <groupId>com.fasterxml.jackson</groupId>
+                    <artifactId>jackson-parent</artifactId>
+                    <version>2.9.1</version>
+                </parent>
+                <dependencies>
+                    <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                        <version>4.11</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.managed.test</groupId>
+                <artifactId>a</artifactId>
+                <version>1.0.0</version>
+                <parent>
+                    <groupId>com.fasterxml.jackson</groupId>
+                    <artifactId>jackson-parent</artifactId>
+                    <version>2.9.1</version>
+                </parent>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>junit</groupId>
+                            <artifactId>junit</artifactId>
+                            <version>4.11</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
+
 }
