@@ -88,7 +88,7 @@ interface UpdateLastWriteTest : JavaRecipeTest {
         after = """
             class Test {
                 void test() {
-                    int n = 0;
+                    int n = /*~~(write of 1)~~>*/0;
                     if((n = /*~~(write of 1)~~>*/1) == 1) {
                         n = /*~~(write of 1)~~>*/2;
                         int n;
