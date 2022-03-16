@@ -143,7 +143,7 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
                                 "<version>" + version + "</version>\n" +
                                 (classifier == null ? "" :
                                         "<classifier>" + classifier + "</classifier>\n") +
-                                (type == null ? "" :
+                                (type == null || type.equals("jar") ? "" :
                                         "<type>" + type + "</type>\n") +
                                 (scope == null || "compile".equals(scope) ? "" :
                                         "<scope>" + scope + "</scope>\n") +

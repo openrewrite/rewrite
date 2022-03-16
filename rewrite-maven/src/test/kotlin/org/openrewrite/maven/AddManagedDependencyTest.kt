@@ -40,7 +40,6 @@ class AddManagedDependencyTest {
         assertThat(validated).anyMatch { v ->
             !v.elementAt(0).isValid
         }
-
     }
 
     @Test
@@ -70,7 +69,7 @@ class AddManagedDependencyTest {
     }
 
     @Test
-    fun `Only added when using is define and has dependency`() {
+    fun `Only added when using is defined and has dependency`() {
         val results = addManagedDependency(false, "org.apache.logging.log4j:*")
                 .run(mavenParser.parseWithProvenance(
                         """
