@@ -66,10 +66,19 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
             }
 
             List<Content> content = t.getContent() == null ? new ArrayList<>() : new ArrayList<>(t.getContent());
-            content.add(formattedTagToAdd);
-
             if (tagComparator != null) {
-                content.sort(tagComparator);
+                int i = 0;
+                for (; i < content.size(); i++) {
+                    if (tagComparator.compare(content.get(i), formattedTagToAdd) > 0) {
+                        content.add(i, formattedTagToAdd);
+                        break;
+                    }
+                }
+                if (i == content.size()) {
+                    content.add(formattedTagToAdd);
+                }
+            } else {
+                content.add(formattedTagToAdd);
             }
 
             t = t.withContent(content);

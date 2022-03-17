@@ -383,6 +383,70 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
+    fun addProperty() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "junit",
+            "junit",
+            "4.13",
+            null,
+            null
+        ),
+        before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.managed.test</groupId>
+                <artifactId>a</artifactId>
+                <version>1.0.0</version>
+                <parent>
+                    <groupId>com.fasterxml.jackson</groupId>
+                    <artifactId>jackson-parent</artifactId>
+                    <version>2.9.1</version>
+                </parent>
+
+                <properties>
+                    <c>hello</c>
+                    <b>there</b>
+                    <a>friends</a>
+                </properties>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.managed.test</groupId>
+                <artifactId>a</artifactId>
+                <version>1.0.0</version>
+                <parent>
+                    <groupId>com.fasterxml.jackson</groupId>
+                    <artifactId>jackson-parent</artifactId>
+                    <version>2.9.1</version>
+                </parent>
+
+                <properties>
+                    <c>hello</c>
+                    <b>there</b>
+                    <a>friends</a>
+                    <version.junit>4.13</version.junit>
+                </properties>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1334")
     fun upgradeGuavaWithExplicitBlankVersionPattern() = assertChanged(
             recipe = UpgradeDependencyVersion(
