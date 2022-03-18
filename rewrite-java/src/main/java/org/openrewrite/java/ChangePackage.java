@@ -78,7 +78,11 @@ public class ChangePackage extends Recipe {
                         return cu.withMarkers(cu.getMarkers().searchResult());
                     }
                 }
-                doAfterVisit(new UsesType<>(oldPackageName + ".*"));
+                if (recursive != null && recursive) {
+                    doAfterVisit(new UsesType<>(oldPackageName + "..*"));
+                } else {
+                    doAfterVisit(new UsesType<>(oldPackageName + ".*"));
+                }
                 return cu;
             }
         };
