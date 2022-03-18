@@ -50,7 +50,7 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
             assert getCursor().getParent() != null;
             if (t.getClosing() == null) {
                 t = t.withClosing(new Xml.Tag.Closing(Tree.randomId(), "\n",
-                        Markers.EMPTY, t.getName(), ""))
+                                Markers.EMPTY, t.getName(), ""))
                         .withBeforeTagDelimiterPrefix("");
                 formatParent = true;
             }
@@ -82,15 +82,9 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
             }
 
             t = t.withContent(content);
-
-            if(formatParent) {
-                t = (Xml.Tag) new AutoFormatVisitor<>(t).visit(t, p, getCursor().getParent());
-            } else {
-                t = (Xml.Tag) new AutoFormatVisitor<>(formattedTagToAdd).visit(t, p, getCursor().getParent());
-            }
+            t = autoFormat(t, formatParent ? null : formattedTagToAdd, p, getCursor().getParent());
         }
 
-        assert t != null;
         return super.visitTag(t, p);
     }
 

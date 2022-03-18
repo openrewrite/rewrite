@@ -40,13 +40,13 @@ class AddToTagTest : XmlRecipeTest {
         },
         before = """
             <beans>
-                <bean id="myBean"/>
+              <bean id="myBean"/>
             </beans>
         """,
         after = """
             <beans>
-                <bean id="myBean"/>
-                <bean id="myBean2"/>
+              <bean id="myBean"/>
+              <bean id="myBean2"/>
             </beans>
         """,
         cycles = 2
@@ -71,14 +71,14 @@ class AddToTagTest : XmlRecipeTest {
         },
         before = """
             <beans >
-                <bean id="myBean" />
+              <bean id="myBean" />
             </beans>
         """,
         after = """
             <beans >
-                <bean id="myBean">
-                    <property name="myprop" ref="collaborator"/>
-                </bean>
+              <bean id="myBean">
+                <property name="myprop" ref="collaborator"/>
+              </bean>
             </beans>
         """,
         cycles = 2
@@ -101,7 +101,7 @@ class AddToTagTest : XmlRecipeTest {
         """,
         after = """
             <beans>
-                <bean id="myBean"/>
+              <bean id="myBean"/>
             </beans>
         """,
         cycles = 2
@@ -124,13 +124,13 @@ class AddToTagTest : XmlRecipeTest {
         },
         before = """
             <beans >
-                <banana/>
+              <banana/>
             </beans>
         """,
         after = """
             <beans >
-                <apple/>
-                <banana/>
+              <apple/>
+              <banana/>
             </beans>
         """,
         cycles = 2
@@ -154,17 +154,16 @@ class AddToTagTest : XmlRecipeTest {
         },
         before = """
             <beans>
-                <!-- comment -->
-                <?processing instruction?>
-                <banana/>
+              <!-- comment -->
+              <?processing instruction?>
+              <banana/>
             </beans>
         """,
         after = """
             <beans>
-                <apple/>
-                <!-- comment -->
-                <?processing instruction?>
-                <banana/>
+              <apple/>
+              <?processing instruction?>
+              <banana/>
             </beans>
         """,
         cycles = 2

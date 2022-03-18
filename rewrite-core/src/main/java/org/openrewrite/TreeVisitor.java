@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import de.danielbechler.diff.ObjectDifferBuilder;
+import de.danielbechler.diff.differ.DifferDispatcher;
 import de.danielbechler.diff.node.DiffNode;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
@@ -23,6 +24,8 @@ import io.micrometer.core.instrument.Timer;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
@@ -30,6 +33,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+import java.util.logging.Logger;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -208,10 +212,11 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 ExecutionContext ctx = (ExecutionContext) p;
                 for (TreeObserver.Subscription observer : ctx.getObservers()) {
                     if (observer.isSubscribed(tree)) {
+                        observer.getObserver().treeChanged(getCursor(), t);
                         AtomicReference<T> t2 = new AtomicReference<>(t);
                         DiffNode diff = ObjectDifferBuilder.buildDefault().compare(t, tree);
                         diff.visit((node, visit) -> {
-                            if (!node.hasChildren()) {
+                            if (!node.hasChildren() && node.getPropertyName() != null) {
                                 //noinspection unchecked
                                 t2.set((T) observer.getObserver().propertyChanged(node.getPropertyName(),
                                         getCursor(), t2.get(), node.canonicalGet(tree), node.canonicalGet(t2.get())));

@@ -13,27 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml;
+@NonNullApi
+@NonNullFields
+package org.openrewrite.xml.format;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-
-public class AutoFormat extends Recipe {
-
-    @Override
-    public String getDisplayName() {
-        return "Format XML";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Indents XML using the most common indentation size and tabs or space choice in use in the file.";
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AutoFormatVisitor<>();
-    }
-
-}
+import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.internal.lang.NonNullFields;

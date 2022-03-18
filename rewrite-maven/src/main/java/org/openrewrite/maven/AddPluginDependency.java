@@ -22,7 +22,6 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.AutoFormatVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -99,7 +98,7 @@ public class AddPluginDependency extends Recipe {
                 Optional<Xml.Tag> maybeDependencies = plugin.getChild("dependencies");
                 Xml.Tag dependencies;
                 boolean formatAllDependencies = false;
-                if(maybeDependencies.isPresent()) {
+                if (maybeDependencies.isPresent()) {
                     dependencies = maybeDependencies.get();
                 } else {
                     formatAllDependencies = true;
@@ -107,21 +106,21 @@ public class AddPluginDependency extends Recipe {
                     plugins = addToTag(plugins, plugin, dependencies, getCursor());
                 }
                 Xml.Tag newDependencyTag = Xml.Tag.build("<dependency>\n<groupId>" + groupId + "</groupId>\n<artifactId>"
-                        + artifactId +"</artifactId>" + ((version == null) ? "\n" : "\n<version>" +  version + "</version>\n") + "</dependency>")
+                                + artifactId + "</artifactId>" + ((version == null) ? "\n" : "\n<version>" + version + "</version>\n") + "</dependency>")
                         .withPrefix("\n");
 
                 // The dependency being added may already exist and may or may not need its version updated
-                Optional<Xml.Tag> maybeExistingDependency  = dependencies.getChildren()
+                Optional<Xml.Tag> maybeExistingDependency = dependencies.getChildren()
                         .stream()
                         .filter(it -> groupId.equals(it.getChildValue("groupId").orElse(null))
                                 && artifactId.equals(it.getChildValue("artifactId").orElse(null)))
                         .findAny();
-                if(maybeExistingDependency.isPresent() && areEqual(newDependencyTag, maybeExistingDependency.get())) {
+                if (maybeExistingDependency.isPresent() && areEqual(newDependencyTag, maybeExistingDependency.get())) {
                     return plugins;
                 }
-                if(maybeExistingDependency.isPresent()) {
+                if (maybeExistingDependency.isPresent()) {
                     plugins = mapTagChildren(plugins, dependencies, it -> {
-                        if(it == maybeExistingDependency.get()) {
+                        if (it == maybeExistingDependency.get()) {
                             return newDependencyTag;
                         }
                         return it;
@@ -129,12 +128,10 @@ public class AddPluginDependency extends Recipe {
                 } else {
                     plugins = addToTag(plugins, dependencies, newDependencyTag, getCursor());
                 }
-                if(formatAllDependencies) {
-                    plugins = (Xml.Tag) new AutoFormatVisitor<ExecutionContext>(dependencies)
-                            .visitNonNull(plugins, ctx, getCursor().getParentOrThrow());
+                if (formatAllDependencies) {
+                    plugins = autoFormat(plugins, dependencies, ctx, getCursor().getParentOrThrow());
                 } else {
-                    plugins = (Xml.Tag) new AutoFormatVisitor<ExecutionContext>(newDependencyTag)
-                            .visitNonNull(plugins, ctx, getCursor().getParentOrThrow());
+                    plugins = autoFormat(plugins, newDependencyTag, ctx, getCursor().getParentOrThrow());
                 }
                 return plugins;
             }

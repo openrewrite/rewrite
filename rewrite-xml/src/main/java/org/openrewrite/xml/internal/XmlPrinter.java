@@ -106,15 +106,15 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi, PrintOutputCapture<P> p) {
-        p.out.append(pi.getPrefix());
-        visitMarkers(pi.getMarkers(), p);
+    public Xml visitProcessingInstruction(Xml.ProcessingInstruction processingInstruction, PrintOutputCapture<P> p) {
+        p.out.append(processingInstruction.getPrefix());
+        visitMarkers(processingInstruction.getMarkers(), p);
         p.out.append("<?")
-                .append(pi.getName());
-        visit(pi.getProcessingInstructions(), p);
-        p.out.append(pi.getBeforeTagDelimiterPrefix())
+                .append(processingInstruction.getName());
+        visit(processingInstruction.getProcessingInstructions(), p);
+        p.out.append(processingInstruction.getBeforeTagDelimiterPrefix())
                 .append("?>");
-        return pi;
+        return processingInstruction;
     }
 
     @Override

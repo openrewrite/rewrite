@@ -15,11 +15,7 @@
  */
 package org.openrewrite.xml.tree;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
@@ -28,6 +24,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlListMarkersVisitor;
 import org.openrewrite.xml.internal.XmlPrinter;
 
@@ -65,6 +62,14 @@ public interface Xml extends Tree {
 
     Xml withPrefix(String prefix);
 
+    /**
+     * @param prefix The new prefix
+     * @return An XML AST with the new prefix set, even if the old and new prefix pass a
+     * string equality check. The receiver is unchanged if the old and new prefix pass a
+     * referential equality check.
+     */
+    Xml withPrefixUnsafe(String prefix);
+
     <T extends Xml> T withMarkers(Markers markers);
 
     Markers getMarkers();
@@ -82,11 +87,7 @@ public interface Xml extends Tree {
         return trees;
     }
 
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    @JsonIgnoreProperties(value = "styles")
+    @Value
     class Document implements Xml, SourceFile {
         @EqualsAndHashCode.Include
         UUID id;
@@ -95,7 +96,15 @@ public interface Xml extends Tree {
         Path sourcePath;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public Document withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+        
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
@@ -106,8 +115,14 @@ public interface Xml extends Tree {
         @With
         Tag root;
 
-        @With
         String eof;
+
+        public Document withEof(String eof) {
+            if(this.eof.equals(eof)) {
+                return this;
+            }
+            return new Document(id, sourcePath, prefixUnsafe, markers, prolog, root, eof);
+        }
 
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
@@ -128,7 +143,15 @@ public interface Xml extends Tree {
         UUID id;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public Prolog withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
@@ -154,7 +177,15 @@ public interface Xml extends Tree {
         UUID id;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public XmlDecl withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
@@ -185,7 +216,15 @@ public interface Xml extends Tree {
         UUID id;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public ProcessingInstruction withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
@@ -216,7 +255,15 @@ public interface Xml extends Tree {
         UUID id;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public Tag withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
@@ -231,7 +278,7 @@ public interface Xml extends Tree {
         }
 
         public Tag withName(String name) {
-            return new Tag(id, prefix, markers, name, attributes, content,
+            return new Tag(id, prefixUnsafe, markers, name, attributes, content,
                     closing == null ? null : closing.withName(name),
                     beforeTagDelimiterPrefix);
         }
@@ -336,13 +383,13 @@ public interface Xml extends Tree {
                 return this;
             }
 
-            Tag tag = new Tag(id, prefix, markers, name, attributes, content, closing,
+            Tag tag = new Tag(id, prefixUnsafe, markers, name, attributes, content, closing,
                     beforeTagDelimiterPrefix);
 
             if (closing == null) {
                 if (content != null && !content.isEmpty()) {
                     // TODO test this
-                    String indentedClosingTagPrefix = prefix.substring(Math.max(0, prefix.lastIndexOf('\n')));
+                    String indentedClosingTagPrefix = prefixUnsafe.substring(Math.max(0, prefixUnsafe.lastIndexOf('\n')));
 
                     if (content.get(0) instanceof CharData) {
                         return tag.withClosing(new Closing(randomId(),
@@ -378,8 +425,8 @@ public interface Xml extends Tree {
 
         @Override
         public String toString() {
-            return "<" + name + attributes.stream().map(a -> a.getKey() + "=...")
-                    .collect(Collectors.joining(" ")) + ">";
+            return "<" + name + attributes.stream().map(a -> " " + a.getKey().getName() + "=\"" + a.getValueAsString() + "\"")
+                    .collect(Collectors.joining("")) + ">";
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -390,7 +437,15 @@ public interface Xml extends Tree {
             UUID id;
 
             @With
-            String prefix;
+            String prefixUnsafe;
+
+            public Closing withPrefix(String prefix) {
+                return WithPrefix.onlyIfNotEqual(this, prefix);
+            }
+
+            public String getPrefix() {
+                return prefixUnsafe;
+            }
 
             @With
             Markers markers;
@@ -414,7 +469,15 @@ public interface Xml extends Tree {
         UUID id;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public Attribute withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
@@ -445,7 +508,15 @@ public interface Xml extends Tree {
             UUID id;
 
             @With
-            String prefix;
+            String prefixUnsafe;
+
+            public Value withPrefix(String prefix) {
+                return WithPrefix.onlyIfNotEqual(this, prefix);
+            }
+
+            public String getPrefix() {
+                return prefixUnsafe;
+            }
 
             @With
             Markers markers;
@@ -474,7 +545,15 @@ public interface Xml extends Tree {
         UUID id;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public CharData withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
@@ -502,7 +581,15 @@ public interface Xml extends Tree {
         UUID id;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public Comment withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
@@ -524,7 +611,15 @@ public interface Xml extends Tree {
         UUID id;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public DocTypeDecl withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
@@ -556,7 +651,15 @@ public interface Xml extends Tree {
             UUID id;
 
             @With
-            String prefix;
+            String prefixUnsafe;
+
+            public ExternalSubsets withPrefix(String prefix) {
+                return WithPrefix.onlyIfNotEqual(this, prefix);
+            }
+
+            public String getPrefix() {
+                return prefixUnsafe;
+            }
 
             @With
             Markers markers;
@@ -579,7 +682,15 @@ public interface Xml extends Tree {
         UUID id;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public Element withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
@@ -607,7 +718,15 @@ public interface Xml extends Tree {
         UUID id;
 
         @With
-        String prefix;
+        String prefixUnsafe;
+
+        public Ident withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
 
         @With
         Markers markers;
