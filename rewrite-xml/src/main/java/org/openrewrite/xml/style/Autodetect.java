@@ -75,9 +75,9 @@ public class Autodetect extends NamedStyles {
                 if (sample.getKey() == 0) {
                     continue;
                 }
-                if (i1 == null || i1.getValue() < sample.getValue()) {
+                if (i1 == null || (i1.getValue() < sample.getValue() && sample.getKey() % i1.getKey() != 0)) {
                     i1 = sample;
-                } else if (i2 == null || i2.getValue() < sample.getValue()) {
+                } else if (i2 == null || (i2.getValue() < sample.getValue() && sample.getKey() % i2.getKey() != 0)) {
                     i2 = sample;
                 }
             }

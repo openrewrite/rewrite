@@ -52,6 +52,7 @@ class AddDependencyTest {
         import com.google.common.math.IntMath;
         public class A {
             boolean getMap() {
+                //noinspection UnstableApiUsage
                 return IntMath.isPrime(5);
             }
         }
