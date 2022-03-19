@@ -15,26 +15,12 @@
  */
 package org.openrewrite.xml.format
 
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger
 import org.junit.jupiter.api.Test
-import org.openrewrite.*
+import org.openrewrite.Issue
+import org.openrewrite.Recipe
 import org.openrewrite.xml.XmlRecipeTest
-import org.slf4j.LoggerFactory
 
 class AutoFormatTest : XmlRecipeTest {
-    init {
-        (LoggerFactory.getLogger("de.danielbechler") as Logger).level = Level.WARN
-    }
-
-    override val executionContext: ExecutionContext
-        get() = InMemoryExecutionContext()
-            .addObserver(TreeObserver.Subscription(object: TreeObserver {
-                override fun treeChanged(cursor: Cursor, newTree: Tree): Tree {
-                    return super.treeChanged(cursor, newTree)
-                }
-            }).subscribeAll())
-
     override val recipe: Recipe
         get() = AutoFormat()
 
