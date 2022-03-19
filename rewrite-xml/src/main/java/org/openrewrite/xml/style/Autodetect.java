@@ -82,7 +82,7 @@ public class Autodetect extends NamedStyles {
                 }
             }
 
-            int indent1 = i1 == null ? 4 : i1.getKey();
+            int indent1 = i1 == null ? 2 : i1.getKey();
             int indent2 = i2 == null ? indent1 : i2.getKey();
 
             int indent = Math.min(indent1, indent2);

@@ -162,6 +162,7 @@ class AddToTagTest : XmlRecipeTest {
         after = """
             <beans>
               <apple/>
+              <!-- comment -->
               <?processing instruction?>
               <banana/>
             </beans>
