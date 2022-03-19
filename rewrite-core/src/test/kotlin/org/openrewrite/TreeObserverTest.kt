@@ -35,12 +35,20 @@ class TreeObserverTest {
         val observed = AtomicInteger(0)
 
         val ctx = InMemoryExecutionContext()
-        ctx.addObserver(TreeObserver.Subscription { property, _, newTree, _, _ ->
-            if (property == "text") {
-                observed.incrementAndGet()
+        ctx.addObserver(TreeObserver.Subscription(object : TreeObserver {
+            override fun propertyChanged(
+                property: String,
+                cursor: Cursor,
+                newTree: Tree,
+                oldValue: Any,
+                newValue: Any
+            ): Tree {
+                if (property == "text") {
+                    observed.incrementAndGet()
+                }
+                return newTree
             }
-            newTree
-        }.subscribeToType(PlainText::class.java))
+        }).subscribeToType(PlainText::class.java))
 
         object : Recipe() {
             override fun getDisplayName(): String = "Change hello"

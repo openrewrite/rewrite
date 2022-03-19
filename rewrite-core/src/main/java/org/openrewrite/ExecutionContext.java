@@ -30,9 +30,10 @@ import java.util.function.Supplier;
  */
 public interface ExecutionContext {
     @Incubating(since = "7.20.0")
-    default void addObserver(TreeObserver.Subscription observer) {
+    default ExecutionContext addObserver(TreeObserver.Subscription observer) {
         putMessageInCollection("org.openrewrite.internal.treeObservers", observer,
                 () -> Collections.newSetFromMap(new IdentityHashMap<>()));
+        return this;
     }
 
     @Incubating(since = "7.20.0")

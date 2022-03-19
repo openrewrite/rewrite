@@ -36,17 +36,17 @@ public class AddOrUpdateChild<P> extends XmlVisitor<P> {
         Xml.Tag t = (Xml.Tag) super.visitTag(tag, p);
         if (scope.isScope(tag)) {
             Optional<Xml.Tag> maybeChild = scope.getChild(child.getName());
-            if(maybeChild.isPresent()) {
-                if(areEqual(maybeChild.get(), child)) {
+            if (maybeChild.isPresent()) {
+                if (areEqual(maybeChild.get(), child)) {
                     return t;
                 }
                 t = mapChildren(t, it -> {
-                    if(it == maybeChild.get()) {
+                    if (it == maybeChild.get()) {
                         return child.withPrefix(maybeChild.get().getPrefix());
                     }
                     return it;
                 });
-                t = (Xml.Tag) new AutoFormatVisitor<P>(t).visit(t, p, getCursor().getParentOrThrow());
+                t = autoFormat(t, p, getCursor().getParentOrThrow());
             } else {
                 t = addToTag(t, child, getCursor().getParentOrThrow());
             }

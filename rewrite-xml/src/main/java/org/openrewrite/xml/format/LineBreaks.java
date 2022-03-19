@@ -13,5 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml
+package org.openrewrite.xml.format;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+
+public class LineBreaks extends Recipe {
+    @Override
+    public String getDisplayName() {
+        return "Blank lines";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Add line breaks at appropriate places between XML syntax elements.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new LineBreaksVisitor<>();
+    }
+}

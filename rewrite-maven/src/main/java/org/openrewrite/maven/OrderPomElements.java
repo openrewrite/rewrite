@@ -17,7 +17,6 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.xml.AutoFormatVisitor;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
@@ -157,7 +156,7 @@ public class OrderPomElements extends Recipe {
                     if (foundChange) {
                         root = root.withContent(updatedOrder);
                         mvn = mvn.withRoot(root);
-                        mvn = (Xml.Document) new AutoFormatVisitor<>().visitNonNull(mvn, ctx);
+                        mvn = autoFormat(mvn, ctx);
                     }
                 }
                 return mvn;

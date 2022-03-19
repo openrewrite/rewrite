@@ -102,7 +102,9 @@ class ChangePluginExecutionsTest : MavenRecipeTest {
                             <executions>
                                 <execution>
                                     <phase>validate</phase>
-                                    <goals><goal>dryRun</goal></goals>
+                                    <goals>
+                                        <goal>dryRun</goal>
+                                    </goals>
                                 </execution>
                             </executions>
                         </plugin>
@@ -151,7 +153,9 @@ class ChangePluginExecutionsTest : MavenRecipeTest {
                             <executions>
                                 <execution>
                                     <phase>validate</phase>
-                                    <goals><goal>dryRun</goal></goals>
+                                    <goals>
+                                        <goal>dryRun</goal>
+                                    </goals>
                                 </execution>
                             </executions>
                         </plugin>

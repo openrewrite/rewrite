@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven;
+package org.openrewrite.xml;
 
 import org.openrewrite.xml.tree.Xml;
 
-public class MavenIsoVisitor<P> extends MavenVisitor<P> {
+public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     @Override
     public Xml.Document visitDocument(Xml.Document document, P p) {
         return (Xml.Document) super.visitDocument(document, p);

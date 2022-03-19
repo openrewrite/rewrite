@@ -23,7 +23,13 @@ import java.util.function.Predicate;
 
 @Incubating(since = "7.20.0")
 public interface TreeObserver {
-    Tree propertyChanged(String property, Cursor cursor, Tree newTree, Object oldValue, Object newValue);
+    default Tree treeChanged(Cursor cursor, Tree newTree) {
+        return newTree;
+    }
+
+    default Tree propertyChanged(String property, Cursor cursor, Tree newTree, Object oldValue, Object newValue) {
+        return newTree;
+    }
 
     final class Subscription {
         private final TreeObserver observer;
@@ -37,6 +43,12 @@ public interface TreeObserver {
             if (tree != null) {
                 predicates.add(t -> t == tree);
             }
+            return this;
+        }
+
+        public Subscription subscribeAll() {
+            predicates.clear();
+            predicates.add(t -> true);
             return this;
         }
 
