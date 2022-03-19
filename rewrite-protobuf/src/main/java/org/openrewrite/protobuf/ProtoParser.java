@@ -56,9 +56,14 @@ public class ProtoParser implements Parser<Proto.Document> {
                         parser.removeErrorListeners();
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
+                        String source = StringUtils.readFully(sourceFile.getSource());
+                        if(source.contains("proto3")) {
+                            return null;
+                        }
+
                         Proto.Document document = new ProtoParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
-                                StringUtils.readFully(sourceFile.getSource())
+                                source
                         ).visitProto(parser.proto());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, document);
