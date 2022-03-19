@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.asParameterized
 import org.openrewrite.java.tree.J
@@ -147,6 +148,29 @@ class ClassDeclarationTest : GroovyTreeTest {
         """
             interface C {
                 class Inner {
+                }
+            }
+        """
+    )
+
+    @Disabled
+    @Test
+    fun enum() = assertParsePrintAndProcess(
+        """
+            enum A {
+                B, C,
+                D;
+            }
+        """
+    )
+
+    @Disabled
+    @Test
+    fun innerEnum() = assertParsePrintAndProcess(
+        """
+            class A {
+                enum B {
+                    C
                 }
             }
         """

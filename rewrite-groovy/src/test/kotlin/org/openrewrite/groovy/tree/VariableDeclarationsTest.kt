@@ -35,6 +35,22 @@ class VariableDeclarationsTest : GroovyTreeTest {
 
     @Disabled
     @Test
+    fun typeParamWithUpperBound() = assertParsePrintAndProcess(
+        """
+            List<? extends String> l
+        """
+    )
+
+    @Disabled
+    @Test
+    fun typeParamWithLowerBound() = assertParsePrintAndProcess(
+        """
+            List<? super String> l
+            """
+    )
+
+    @Disabled
+    @Test
     fun singleTypeMultipleVariableDeclaration() = assertParsePrintAndProcess(
         "def a = 1, b = 1"
     )
