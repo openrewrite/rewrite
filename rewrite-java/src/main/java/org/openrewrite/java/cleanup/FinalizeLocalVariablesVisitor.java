@@ -26,9 +26,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.function.Predicate;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * FinalizeLocalVariables will add the "final" modifier keyword to local variables which are not being reassigned.
@@ -60,18 +58,8 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
             return mv;
         }
 
-        // we don't try to finalize method parameter variables
-        if (isMethodParameterVariable()) {
-            return mv;
-        }
-
-        // we don't want to add a "final" keyword to a lambda parameter variable declaration
-        if (isDeclaredInLambda()) {
-            return mv;
-        }
-
-        // do not add a "final" keyword to a catch block
-        if (isDeclaredInCatch()) {
+        // consider uninitialized local variables non-final
+        if (mv.getVariables().stream().anyMatch(nv -> nv.getInitializer() == null)) {
             return mv;
         }
 
@@ -84,16 +72,8 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
             return mv;
         }
 
-        Predicate<J.VariableDeclarations.NamedVariable> hasReassignment;
-        if (isDeclaredInForEachLoop()) {
-            // ForEach loops (aka "enhanced for-loop") will always have the variable initialized
-            hasReassignment = v -> !FindAssignmentReferencesToVariable.find(getCursor().firstEnclosingOrThrow(J.ForEachLoop.class), v).isEmpty();
-        } else {
-            // off-sets number of acceptable "reassignments" depending on whether there's an initializer at declaration
-            hasReassignment = v -> FindAssignmentReferencesToVariable.find(getCursor().dropParentUntil(J.class::isInstance).getValue(), v).size() + (v.getInitializer() == null ? -1 : 0) > 0;
-        }
-
-        if (mv.getVariables().stream().noneMatch(hasReassignment)) {
+        if (mv.getVariables().stream()
+                .noneMatch(v -> FindAssignmentReferencesToVariable.find(getCursor().dropParentUntil(J.class::isInstance).getValue(), v).get())) {
             mv = maybeAutoFormat(mv,
                     mv.withModifiers(
                             ListUtils.concat(mv.getModifiers(), new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Final, Collections.emptyList()))
@@ -102,37 +82,11 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
 
         return mv;
     }
-
-    private boolean isMethodParameterVariable() {
-        return getCursor()
-                .dropParentUntil(J.class::isInstance) // maybe J.MethodDeclaration
-                .getValue() instanceof J.MethodDeclaration;
-    }
-
+    
     private boolean isDeclaredInForLoopControl() {
         return getCursor()
                 .dropParentUntil(J.class::isInstance)
                 .getValue() instanceof J.ForLoop.Control;
-    }
-
-    private boolean isDeclaredInForEachLoop() {
-        return getCursor()
-                .dropParentUntil(J.class::isInstance) // maybe J.ForEachLoop.Control
-                .dropParentUntil(J.class::isInstance) // maybe J.ForEachLoop
-                .getValue() instanceof J.ForEachLoop;
-    }
-
-    private boolean isDeclaredInLambda() {
-        return getCursor()
-                .dropParentUntil(J.class::isInstance) // maybe J.Lambda
-                .getValue() instanceof J.Lambda;
-    }
-
-    private boolean isDeclaredInCatch() {
-        return getCursor()
-                .dropParentUntil(J.class::isInstance) // maybe J.ControlParentheses
-                .dropParentUntil(J.class::isInstance) // maybe J.Try.Catch
-                .getValue() instanceof J.Try.Catch;
     }
 
     private boolean isField(Cursor cursor) {
@@ -155,39 +109,51 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
          * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for any reassignment calls.
          * @return A set of {@link NameTree} locations of reassignment calls to this variable.
          */
-        private static Set<NameTree> find(J j, J.VariableDeclarations.NamedVariable variable) {
-            JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
+        private static AtomicBoolean find(J j, J.VariableDeclarations.NamedVariable variable) {
+            JavaIsoVisitor<AtomicBoolean> findVisitor = new JavaIsoVisitor<AtomicBoolean>() {
+
                 @Override
-                public J.Assignment visitAssignment(J.Assignment assignment, Set<NameTree> ctx) {
-                    J.Assignment a = super.visitAssignment(assignment, ctx);
+                public J.Assignment visitAssignment(J.Assignment assignment, AtomicBoolean hasAssignment) {
+                    if (hasAssignment.get()) {
+                        return assignment;
+                    }
+                    J.Assignment a = super.visitAssignment(assignment, hasAssignment);
                     if (a.getVariable() instanceof J.Identifier) {
                         J.Identifier i = (J.Identifier) a.getVariable();
                         if (i.getSimpleName().equals(variable.getSimpleName())) {
-                            ctx.add(i);
+                            hasAssignment.set(true);
                         }
                     }
                     return a;
                 }
 
                 @Override
-                public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, Set<NameTree> ctx) {
-                    J.AssignmentOperation a = super.visitAssignmentOperation(assignOp, ctx);
+                public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, AtomicBoolean hasAssignment) {
+                    if (hasAssignment.get()) {
+                        return assignOp;
+                    }
+
+                    J.AssignmentOperation a = super.visitAssignmentOperation(assignOp, hasAssignment);
                     if (a.getVariable() instanceof J.Identifier) {
                         J.Identifier i = (J.Identifier) a.getVariable();
                         if (i.getSimpleName().equals(variable.getSimpleName())) {
-                            ctx.add(i);
+                            hasAssignment.set(true);
                         }
                     }
                     return a;
                 }
 
                 @Override
-                public J.Unary visitUnary(J.Unary unary, Set<NameTree> ctx) {
-                    J.Unary u = super.visitUnary(unary, ctx);
+                public J.Unary visitUnary(J.Unary unary, AtomicBoolean hasAssignment) {
+                    if (hasAssignment.get()) {
+                        return unary;
+                    }
+
+                    J.Unary u = super.visitUnary(unary, hasAssignment);
                     if (u.getExpression() instanceof J.Identifier) {
                         J.Identifier i = (J.Identifier) u.getExpression();
                         if (i.getSimpleName().equals(variable.getSimpleName())) {
-                            ctx.add(i);
+                            hasAssignment.set(true);
                         }
                     }
                     return u;
@@ -195,9 +161,9 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
 
             };
 
-            Set<NameTree> refs = new HashSet<>();
-            findVisitor.visit(j, refs);
-            return refs;
+            AtomicBoolean hasAssignment = new AtomicBoolean(false);
+            findVisitor.visit(j, hasAssignment);
+            return hasAssignment;
         }
     }
 }
