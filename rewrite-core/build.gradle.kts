@@ -11,10 +11,10 @@ dependencies {
 
     implementation("de.danielbechler:java-object-diff:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-databind:2.13.1")
-    api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.13.1")
-    api("com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.1")
-    api("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1")
+    api("com.fasterxml.jackson.core:jackson-databind:latest.release")
+    api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
+    api("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")
+    api("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 
     implementation("org.graalvm.sdk:graal-sdk:latest.release")
     testImplementation("org.graalvm.sdk:graal-sdk:latest.release")
