@@ -13,4 +13,3 @@ updates:
       interval: daily
     commit-message:
       prefix: "chore(ci)"
-    open-pull-requests-limit: 0
