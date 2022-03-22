@@ -29,6 +29,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
+@Incubating(since = "7.20.0")
 @Getter
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)

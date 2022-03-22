@@ -35,6 +35,7 @@ import java.util.*;
  * align-able to the same version (either the version provided to this visitor or the maximum matching
  * version if none is provided).
  */
+@Incubating(since = "7.19.0")
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ManageDependencies extends Recipe {
