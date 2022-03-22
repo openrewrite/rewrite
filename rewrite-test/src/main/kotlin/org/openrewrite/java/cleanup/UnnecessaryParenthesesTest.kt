@@ -497,7 +497,6 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
     @Test
     fun unwrapMinusReturnExpression(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
-            withMinusAssign(true)
             withExpr(true)
         }).build(),
         before = """
