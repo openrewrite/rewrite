@@ -861,6 +861,38 @@ class MavenParserTest {
 
     }
 
+    @Suppress("CheckTagEmptyBody")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1427")
+    @Test
+    fun parseEmptyValueActivationTag() {
+        val pomXml = MavenParser.builder()
+            .build()
+            .parse(
+                ctx,
+                """
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>test</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <profiles>
+                            <profile>
+                              <id>repo-incode-work</id>
+                              <properties>
+                                <name>!skip.repo-incode-work</name>
+                              </properties>
+                              <activation></activation>
+                            </profile>
+                        </profiles>
+                    </project>
+                """
+            )[0]
+        @Suppress("USELESS_CAST")
+        assertThat(pomXml.mavenResolutionResult().pom.requested.profiles[0].activation?.activeByDefault as Boolean?).isNull()
+        assertThat(pomXml.mavenResolutionResult().pom.requested.profiles[0].activation?.jdk).isNull()
+        assertThat(pomXml.mavenResolutionResult().pom.requested.profiles[0].activation?.property).isNull()
+
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1427")
     @Test
     fun parseWithActivationTag() {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
@@ -34,6 +35,19 @@ public class ProfileActivation {
 
     @Nullable
     Property property;
+
+    public ProfileActivation() {
+        this.activeByDefault = null;
+        this.jdk = null;
+        this.property = null;
+    }
+
+    @JsonCreator
+    public ProfileActivation(@Nullable Boolean activeByDefault, @Nullable String jdk, @Nullable Property property) {
+        this.activeByDefault = activeByDefault;
+        this.jdk = jdk;
+        this.property = property;
+    }
 
     public static boolean isActive(@Nullable String id, Iterable<String> activeProfiles,
                                    @Nullable ProfileActivation activation) {
