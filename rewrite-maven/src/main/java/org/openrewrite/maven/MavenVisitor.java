@@ -18,8 +18,8 @@ package org.openrewrite.maven;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.XPathMatcher;
@@ -94,7 +94,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                     if (matchesGlob(resolvedDependency.getGroupId(), groupId) && matchesGlob(resolvedDependency.getArtifactId(), artifactId)) {
                         Dependency req = resolvedDependency.getRequested();
                         String reqGroup = req.getGroupId();
-                        if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
+                        if  ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
                                 req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
                                 scope == Scope.fromName(tag.getChildValue("scope").orElse("compile"))) {
                             return true;
@@ -136,7 +136,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 if (matchesGlob(dm.getBomGav().getGroupId(), groupId) && matchesGlob(dm.getBomGav().getArtifactId(), artifactId)) {
                     ManagedDependency requestedBom = dm.getRequestedBom();
                     //noinspection ConstantConditions
-                    if (requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
+                    if  (requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
                             requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null))) {
                         return true;
                     }
@@ -148,7 +148,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     public void maybeUpdateModel() {
         for (TreeVisitor<Xml, P> afterVisit : getAfterVisit()) {
-            if (afterVisit instanceof UpdateMavenModel) {
+            if(afterVisit instanceof UpdateMavenModel) {
                 return;
             }
         }
@@ -285,81 +285,5 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     public MavenMetadata downloadMetadata(String groupId, String artifactId, ExecutionContext ctx) {
         return new MavenPomDownloader(emptyMap(), ctx)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), null, getResolutionResult().getPom().getRepositories());
-    }
-
-    public static List<SourceFile> visitPomsInReactorOrder(List<SourceFile> before, ExecutionContext ctx, InOrderPomIterator pomIterator) {
-        List<Xml.Document> mavens = new ArrayList<>();
-        for (SourceFile sourceFile : before) {
-            if (sourceFile instanceof Xml.Document && sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent()) {
-                mavens.add((Xml.Document) sourceFile);
-            }
-        }
-        mavens = sortInReactorOrder(mavens);
-
-        List<Xml.Document> visited = new ArrayList<>();
-        for (Xml.Document pom : pomIterator) {
-            visited.add(pom);
-        }
-
-        for (int i = 0; i < mavens.size(); i++) {
-            Xml.Document beforeMaven = mavens.get(i);
-            if (visited.get(i) != beforeMaven) {
-                return ListUtils.map(before, sourceFile -> {
-                    if (sourceFile instanceof Xml.Document) {
-                        for (Xml.Document afterMaven : visited) {
-                            if (sourceFile.isScope(afterMaven)) {
-                                return afterMaven;
-                            }
-                        }
-                    }
-                    return sourceFile;
-                });
-            }
-        }
-
-        return before;
-    }
-
-    private static List<Xml.Document> sortInReactorOrder(List<Xml.Document> mavens) {
-        // the value is the set of maven projects that depend on the key
-        Map<Xml.Document, Set<Xml.Document>> byDependedOn = new HashMap<>();
-
-        for (Xml.Document maven : mavens) {
-            byDependedOn.computeIfAbsent(maven, m -> new HashSet<>());
-            MavenResolutionResult mavenResolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class)
-                    .orElseThrow(() -> new IllegalStateException("Maven AST without a MavenResolutionResult marker"));
-
-            for (List<ResolvedDependency> dependencies : mavenResolutionResult.getDependencies().values()) {
-                for (ResolvedDependency dependency : dependencies) {
-                    for (Xml.Document test : mavens) {
-                        MavenResolutionResult testMavenResolutionResult = test.getMarkers().findFirst(MavenResolutionResult.class)
-                                .orElseThrow(() -> new IllegalStateException("Maven AST without a MavenResolutionResult marker"));
-
-                        if (testMavenResolutionResult.getPom().getGroupId().equals(dependency.getGroupId()) &&
-                                testMavenResolutionResult.getPom().getArtifactId().equals(dependency.getArtifactId())) {
-                            byDependedOn.get(maven).add(test);
-                        }
-                    }
-                }
-            }
-        }
-
-        List<Xml.Document> sorted = new ArrayList<>(mavens.size());
-        next:
-        while (!byDependedOn.isEmpty()) {
-            for (Map.Entry<Xml.Document, Set<Xml.Document>> mavenAndDependencies : byDependedOn.entrySet()) {
-                if (mavenAndDependencies.getValue().isEmpty()) {
-                    Xml.Document maven = mavenAndDependencies.getKey();
-                    byDependedOn.remove(maven);
-                    sorted.add(maven);
-                    for (Set<Xml.Document> dependencies : byDependedOn.values()) {
-                        dependencies.remove(maven);
-                    }
-                    continue next;
-                }
-            }
-        }
-
-        return sorted;
     }
 }
