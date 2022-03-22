@@ -1,71 +1,117 @@
 lexer grammar JsonPathLexer;
 
-StringLiteral
-   : '"' (EscapeSequence | SAFECODEPOINT)*? '"'
-   | '\'' (EscapeSequence | SAFECODEPOINT)*? '\''
-   ;
+WS : [ \t\n\r\u000C]+ -> skip;
+UTF_8_BOM : '\uFEFF' -> skip;
 
-fragment EscapeSequence
-    : '\\' [nrt"\\]
-    | '\\' HexDigit HexDigit HexDigit HexDigit
-    | '\\' HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit
-    ;
+MATCHES_REGEX_OPEN : MATCHES [ \t]? TICK -> pushMode(MATCHES_REGEX) ;
 
-fragment UNICODE
-   : 'u' HexDigit HexDigit HexDigit HexDigit
-   ;
+// Delimiters
+LBRACE : '{';
+RBRACE : '}';
 
-fragment HexDigit
-    : [0-9a-fA-F]
-    ;
+LBRACK : '[';
+RBRACK : ']';
 
-fragment SAFECODEPOINT
-   : ~ ["\\\u0000-\u001F]
-   ;
+LPAREN : '(';
+RPAREN : ')';
 
-NumericLiteral
-    : '-'? [0-9]+ ExponentPart?
-    ;
-
-fragment ExponentPart
-    : [eE] [+\-]? [0-9]+
-    ;
-
+// Operators
 AT : '@';
-DOT_DOT : '..';
 DOT : '.';
+DOT_DOT : '..';
 ROOT : '$';
 WILDCARD : '*';
+COLON : ':';
+QUESTION : '?';
 
+Identifier
+    : [_A-Za-z] [_A-Za-z0-9-]*
+    ;
+
+StringLiteral
+    : QUOTE (ESCAPE_SEQUENCE | SAFE_CODE_POINT)*? QUOTE
+    | TICK (ESCAPE_SEQUENCE | SAFE_CODE_POINT)*? TICK
+    ;
+
+PositiveNumber
+    : [0-9]+
+    ;
+
+NegativeNumber
+    : MINUS PositiveNumber
+    ;
+
+NumericLiteral
+    : MINUS? PositiveNumber EXPONENT_PART?
+    ;
+
+COMMA : ',' -> skip;
+
+TICK : '\'' ;
+QUOTE: '"' ;
+
+// Operators
+MATCHES: '=~';
+
+LOGICAL_OPERATOR: (AND | OR) ;
 AND : '&&';
+OR : '||';
+//NOT : '!';
+
+EQUALITY_OPERATOR: (EQ | NE) ;
 EQ : '==';
+NE : '!=';
+
+// Note: if possible, distinguish long from int for positive and negative numbers if comparisions are implemented.
 //GE : '>=';
 //GT : '>';
 //LE : '<=';
 //LT : '<';
-NE : '!=';
-MATCHES: '=~';
-//NOT : '!';
-//OR : '||';
+
+// Operations
+//IN : 'in'
+//NIN : 'nin'
+//SUBSET : 'subset'
+//CONTAINS : 'contains'
+//SIZE : 'size'
 
 TRUE : 'true';
 FALSE : 'false';
 NULL : 'null';
 
-LBRACE : '{';
-RBRACE : '}';
-LBRACK : '[';
-RBRACK : ']';
-COLON : ':';
-COMMA : ',';
-LPAREN : '(';
-RPAREN : ')';
-QUESTION : '?';
+fragment
+ESCAPE_SEQUENCE
+    : '\\' [nrt"\\]
+    | '\\' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
+    | '\\' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
+    ;
 
-Identifier
-   : [_A-Za-z] [_A-Za-z0-9-]*
+fragment
+UNICODE
+   : 'u' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
    ;
 
-WS : [ \t\n\r\u000C] + -> skip;
+fragment
+HEX_DIGIT
+    : [0-9a-fA-F]
+    ;
 
-UTF_8_BOM : '\uFEFF' -> skip;
+fragment
+SAFE_CODE_POINT
+   : ~["\\\u0000-\u001F]
+   ;
+
+fragment
+EXPONENT_PART
+    : [eE] [+\-]? [0-9]+
+    ;
+
+fragment
+MINUS
+    : '-'
+    ;
+
+mode MATCHES_REGEX;
+MATCHES_REGEX_CLOSE : TICK -> popMode ;
+S : [ \t]+ -> skip ;
+REGEX : ~[']+ ;
