@@ -93,9 +93,8 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
                 (style.getPlusAssign() && op == J.AssignmentOperation.Type.Addition) ||
                 (style.getStarAssign() && op == J.AssignmentOperation.Type.Multiplication) ||
                 (style.getModAssign() && op == J.AssignmentOperation.Type.Modulo))) {
-            a = (J.AssignmentOperation) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
+            a = (J.AssignmentOperation) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visitNonNull(a, p, getCursor());
         }
-        assert a != null;
         return a;
     }
 
@@ -103,19 +102,26 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public J visitAssignment(J.Assignment assignment, P p) {
         J.Assignment a = visitAndCast(assignment, p, super::visitAssignment);
         if (style.getAssign() && a.getAssignment() instanceof J.Parentheses) {
-            a = (J.Assignment) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
+            a = (J.Assignment) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visitNonNull(a, p, getCursor());
         }
-        assert a != null;
         return a;
+    }
+
+    @Override
+    public J visitReturn(J.Return retrn, P p) {
+        J.Return rtn = visitAndCast(retrn, p, super::visitReturn);
+        if (style.getExpr() && rtn.getExpression() instanceof J.Parentheses) {
+            rtn = (J.Return) new UnwrapParentheses<>((J.Parentheses<?>) rtn.getExpression()).visitNonNull(rtn, p, getCursor());
+        }
+        return rtn;
     }
 
     @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         J.VariableDeclarations.NamedVariable v = visitAndCast(variable, p, super::visitVariable);
         if (style.getAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
-            v = (J.VariableDeclarations.NamedVariable) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visit(v, p, getCursor());
+            v = (J.VariableDeclarations.NamedVariable) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visitNonNull(v, p, getCursor());
         }
-        assert v != null;
         return v;
     }
 

@@ -493,6 +493,31 @@ interface UnnecessaryParenthesesTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1486")
+    @Test
+    fun unwrapMinusReturnExpression(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(unnecessaryParentheses {
+            withMinusAssign(true)
+            withExpr(true)
+        }).build(),
+        before = """
+            class T {
+                int getInt() {
+                    return (4 - 5);
+                }
+            }
+        """,
+        after = """
+            class T {
+                int getInt() {
+                    return 4 - 5;
+                }
+            }
+        """
+    )
+
+
+
     @Test
     fun unwrapModAssign(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
