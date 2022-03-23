@@ -33,6 +33,7 @@ abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     }
 
     enum EnumTypeA {
+        FOO, BAR
     }
 
     enum EnumTypeB {
