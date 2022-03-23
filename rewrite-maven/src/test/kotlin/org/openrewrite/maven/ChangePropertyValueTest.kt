@@ -49,6 +49,98 @@ class ChangePropertyValueTest : MavenRecipeTest {
             </project>
         """
     )
+    @Test
+    fun addFirstProperty() = assertChanged(
+        recipe = ChangePropertyValue("key", "value", true),
+        before = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            
+              <dependencies>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+                <key>value</key>
+              </properties>
+            
+              <dependencies>
+              </dependencies>
+            </project>
+        """
+    )
+
+    @Test
+    fun changeExistingProperty() = assertChanged(
+        recipe = ChangePropertyValue("key", "value", true),
+        before = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+                <key>v</key>
+              </properties>
+            
+              <dependencies>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+                <key>value</key>
+              </properties>
+            
+              <dependencies>
+              </dependencies>
+            </project>
+        """
+    )
+
+    @Test
+    fun addPropertyInOrder() = assertChanged(
+        recipe = ChangePropertyValue("key", "value", true),
+        before = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+                <abc>value</abc>
+                <other>value</other>
+              </properties>
+            
+              <dependencies>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+                <abc>value</abc>
+                <key>value</key>
+                <other>value</other>
+              </properties>
+            
+              <dependencies>
+              </dependencies>
+            </project>
+        """
+    )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
