@@ -17,7 +17,7 @@ Follow us on [Twitter](https://twitter.com/moderneinc) and [LinkedIn](https://ww
 
 ## Refactoring at Scale
 
-[![Moderne](./doc/video_preview.png)](https://youtu.be/BCWyMm7WFCI)
+[![Moderne](./doc/video_preview.png)](https://www.youtube.com/watch?v=ndU2GKXQAH0)
 
 Try it yourself at https://app.moderne.io, now in open beta.
 
