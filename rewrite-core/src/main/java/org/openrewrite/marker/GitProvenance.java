@@ -19,6 +19,9 @@ package org.openrewrite.marker;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.NameRevCommand;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.*;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
@@ -27,6 +30,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
@@ -80,10 +84,23 @@ public class GitProvenance implements Marker {
 
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir) {
         try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
-            return new GitProvenance(randomId(), getOrigin(repository), repository.getBranch(), getChangeset(repository));
+            String branch = repository.getBranch();
+            String changeset = getChangeset(repository);
+
+            if(branch.equals(changeset)) {
+                Git git = Git.open(repository.getDirectory());
+                ObjectId commit = repository.resolve(Constants.HEAD);
+                Map<ObjectId, String> branchesByCommit = git.nameRev().addPrefix("refs/heads/").add(commit).call();
+                branch = branchesByCommit.get(commit);
+                if(branch.contains("^")) {
+                    branch = branch.substring(0, branch.indexOf('^'));
+                }
+            }
+
+            return new GitProvenance(randomId(), getOrigin(repository), branch, changeset);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | GitAPIException e) {
             return null;
         }
     }
