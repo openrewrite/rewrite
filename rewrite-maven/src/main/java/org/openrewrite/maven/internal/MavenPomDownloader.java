@@ -58,9 +58,21 @@ public class MavenPomDownloader {
 
     private static final Retry mavenDownloaderRetry = retryRegistry.retry("MavenDownloader");
 
-    private static final CheckedFunction1<Request, Response> sendRequest = Retry.decorateCheckedFunction(
+    private static final CheckedFunction1<Request, byte[]> sendRequest = Retry.decorateCheckedFunction(
             mavenDownloaderRetry,
-            request -> httpClient.newCall(request).execute());
+            request -> {
+                try (Response response = httpClient.newCall(request).execute()) {
+                    if (response.isSuccessful()) {
+                        //noinspection ConstantConditions
+                        return response.body().bytes();
+                    } else if (response.code() >= 400 && response.code() <= 404) {
+                        //Throw a different exception for client-side failures to allow downstream callers to handle those
+                        //differently.
+                        throw new MavenClientSideException("Failed to download " + request.url() + ": " + response.code() + " " + response.message());
+                    }
+                    throw new MavenDownloadingException("Failed to download " + request.url() + ": " + response.code() + " " + response.message());
+                }
+            });
 
     private final MavenPomCache mavenCache;
     private final Map<Path, Pom> projectPoms;
@@ -119,17 +131,14 @@ public class MavenPomDownloader {
                         }
                     } else {
                         Request.Builder request = applyAuthenticationToRequest(repo, new Request.Builder().url(uri).get());
-                        try (Response response = sendRequest.apply(request.build())) {
-                            if (response.isSuccessful() && response.body() != null) {
-                                @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
-                                        .bytes();
-                                result = Optional.of(MavenMetadata.parse(responseBody));
-                                mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, result.get());
-                            } else if (response.code() >= 400 && response.code() <= 404){
-                                //got a response back that was not successful, if the response code is a common client-side
-                                //error, cache a null result, as this is likely to continue to occur.
-                                mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, null);
-                            }
+                        try {
+                            byte[] responseBody = sendRequest.apply(request.build());
+                            result = Optional.of(MavenMetadata.parse(responseBody));
+                            mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, result.get());
+                        } catch (MavenClientSideException exception) {
+                            // If the request resulted in a common client-side error, cache a null result, as this is
+                            // likely to continue to occur.
+                            mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, null);
                         } catch (Throwable ignored) {
                             // various kinds of connection failures
                         }
@@ -263,26 +272,23 @@ public class MavenPomDownloader {
                 }
 
                 Request.Builder request = applyAuthenticationToRequest(repo, new Request.Builder().url(uri.toString()).get());
-                try (Response response = sendRequest.apply(request.build())) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        //noinspection ConstantConditions
-                        byte[] responseBody = response.body().bytes();
+                try {
+                    byte[] responseBody = sendRequest.apply(request.build());
 
-                        Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
-                        RawPom rawPom = RawPom.parse(
-                                new ByteArrayInputStream(responseBody),
-                                Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
-                        );
-                        Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
-                        if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
-                            pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
-                        }
-                        mavenCache.putPom(resolvedGav, pom);
-                        sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
-                        return pom;
-                    } else {
-                        mavenCache.putPom(resolvedGav, null);
+                    Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
+                    RawPom rawPom = RawPom.parse(
+                            new ByteArrayInputStream(responseBody),
+                            Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
+                    );
+                    Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
+                    if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
+                        pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                     }
+                    mavenCache.putPom(resolvedGav, pom);
+                    sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
+                    return pom;
+                } catch (MavenClientSideException exception) {
+                    mavenCache.putPom(resolvedGav, null);
                 } catch (Throwable ignored) {
                     // various kinds of connection failures
                 }
@@ -312,7 +318,6 @@ public class MavenPomDownloader {
             }
 
             MavenMetadata mavenMetadata;
-            Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
             try {
                 mavenMetadata = downloadMetadata(gav, containingPom, repositories);
             } catch (MavenDownloadingException e) {
@@ -385,11 +390,25 @@ public class MavenPomDownloader {
                 Request.Builder request = applyAuthenticationToRequest(repository, new Request.Builder()
                         .url(httpsUri).get());
                 MavenRepository normalized = null;
-                try (Response ignored = sendRequest.apply(request.build())) {
+                try {
+                    sendRequest.apply(request.build());
+                    normalized = repository.withUri(httpsUri);
+                } catch (MavenDownloadingException exception) {
+                    //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
                     normalized = repository.withUri(httpsUri);
                 } catch (Throwable t) {
                     if (!httpsUri.equals(originalUrl)) {
-                        try (Response ignored = sendRequest.apply(request.url(originalUrl).build())) {
+                        try {
+                            sendRequest.apply(request.url(originalUrl).build());
+                            normalized = new MavenRepository(
+                                    repository.getId(),
+                                    originalUrl,
+                                    repository.isReleases(),
+                                    repository.isSnapshots(),
+                                    repository.getUsername(),
+                                    repository.getPassword());
+                        } catch (MavenDownloadingException exception) {
+                            //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
                             normalized = new MavenRepository(
                                     repository.getId(),
                                     originalUrl,
