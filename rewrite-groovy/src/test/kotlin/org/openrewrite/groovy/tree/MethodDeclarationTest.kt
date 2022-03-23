@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 class MethodDeclarationTest : GroovyTreeTest {
@@ -31,8 +32,8 @@ class MethodDeclarationTest : GroovyTreeTest {
     fun primitiveReturn() = assertParsePrintAndProcess(
         """
             static int accept(Map m) {
-                List l;
-                return 0;
+                List l
+                return 0
             }
         """.trimIndent()
     )
@@ -50,5 +51,43 @@ class MethodDeclarationTest : GroovyTreeTest {
             def foo(int a) throws Exception , RuntimeException {
             }
         """
+    )
+
+    @Disabled
+    @Test
+    fun typeParamWithUpperBound() = assertParsePrintAndProcess(
+        """
+            def foo(List<? extends String> l) {
+            }
+        """
+    )
+
+    @Disabled
+    @Test
+    fun typeParamWithLowerBound() = assertParsePrintAndProcess(
+        """
+            def foo(List<? super String> l) {
+            }
+            """
+    )
+
+    @Disabled
+    @Test
+    fun returnTypeParamWithUpperBound() = assertParsePrintAndProcess(
+        """
+            static List<? extends String> foo() {
+                return null
+            }
+        """
+    )
+
+    @Disabled
+    @Test
+    fun returnTypeParamWithLowerBound() = assertParsePrintAndProcess(
+        """
+            static List<? super String> foo() {
+                return null
+            }
+            """
     )
 }
