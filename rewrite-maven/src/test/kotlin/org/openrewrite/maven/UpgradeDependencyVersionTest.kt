@@ -16,11 +16,9 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.openrewrite.Issue
-import java.nio.file.Path
 
 class UpgradeDependencyVersionTest : MavenRecipeTest {
 
@@ -113,68 +111,70 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
-    fun trustParent(@TempDir tempDir: Path) {
-        val parent = tempDir.resolve("pom.xml")
-        val child = tempDir.resolve("server/pom.xml")
-        child.toFile().parentFile.mkdirs()
-
-        parent.toFile().writeText(
-            //language=xml
-            """
-                <project>
-                    <packaging>pom</packaging>
+    fun overrideManagedDependency() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "com.google.guava",
+            "guava",
+            "14.0",
+            "",
+            true
+        ),
+        dependsOn = arrayOf("""
+            <project>
+                <packaging>pom</packaging>
+                <groupId>com.mycompany</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>13.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """
+        ),
+        before = """
+            <project>
+                <parent>
                     <groupId>com.mycompany</groupId>
                     <artifactId>my-parent</artifactId>
                     <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>13.0.1</version>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
-            """.trimIndent()
-        )
-
-        child.toFile().writeText(
-            //language=xml
-            """
-                <project>
-                  <parent>
-                    <groupId>com.mycompany</groupId>
-                    <artifactId>my-parent</artifactId>
-                    <version>1</version>
-                  </parent>
-                
-                  <groupId>com.mycompany</groupId>
-                  <artifactId>my-child</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
+                </parent>
+                <groupId>com.mycompany</groupId>
+                <artifactId>my-child</artifactId>
+                <version>1</version>
+                <dependencies>
                     <dependency>
                         <groupId>com.google.guava</groupId>
                         <artifactId>guava</artifactId>
                     </dependency>
-                  </dependencies>
-                </project>
-            """.trimIndent()
-        )
-
-        assertUnchanged(
-            recipe = UpgradeDependencyVersion(
-                "com.google.guava",
-                "guava",
-                "14.0",
-                "",
-                true
-            ),
-            dependsOn = arrayOf(parent.toFile()),
-            before = child.toFile()
-        )
-    }
+                </dependencies>
+            </project>
+            """,
+        after = """
+            <project>
+                <parent>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>my-parent</artifactId>
+                    <version>1</version>
+                </parent>
+                <groupId>com.mycompany</groupId>
+                <artifactId>my-child</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>14.0</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/739")
@@ -383,70 +383,6 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
-    fun addProperty() = assertChanged(
-        recipe = UpgradeDependencyVersion(
-            "junit",
-            "junit",
-            "4.13",
-            null,
-            null
-        ),
-        before = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.managed.test</groupId>
-                <artifactId>a</artifactId>
-                <version>1.0.0</version>
-                <parent>
-                    <groupId>com.fasterxml.jackson</groupId>
-                    <artifactId>jackson-parent</artifactId>
-                    <version>2.9.1</version>
-                </parent>
-
-                <properties>
-                    <c>hello</c>
-                    <b>there</b>
-                    <a>friends</a>
-                </properties>
-
-                <dependencies>
-                    <dependency>
-                        <groupId>junit</groupId>
-                        <artifactId>junit</artifactId>
-                    </dependency>
-                </dependencies>
-            </project>
-        """,
-        after = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.managed.test</groupId>
-                <artifactId>a</artifactId>
-                <version>1.0.0</version>
-                <parent>
-                    <groupId>com.fasterxml.jackson</groupId>
-                    <artifactId>jackson-parent</artifactId>
-                    <version>2.9.1</version>
-                </parent>
-
-                <properties>
-                    <c>hello</c>
-                    <b>there</b>
-                    <a>friends</a>
-                    <version.junit>4.13</version.junit>
-                </properties>
-
-                <dependencies>
-                    <dependency>
-                        <groupId>junit</groupId>
-                        <artifactId>junit</artifactId>
-                    </dependency>
-                </dependencies>
-            </project>
-        """
-    )
-
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1334")
     fun upgradeGuavaWithExplicitBlankVersionPattern() = assertChanged(
             recipe = UpgradeDependencyVersion(
@@ -493,273 +429,154 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
-    fun upgradeGuavaInParent(@TempDir tempDir: Path) {
-        val parent = tempDir.resolve("pom.xml")
-        val server = tempDir.resolve("server/pom.xml")
-        server.toFile().parentFile.mkdirs()
-
-        parent.toFile().writeText(
-            //language=xml
-            """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                
-                  <packaging>pom</packaging>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <properties>
-                    <guava.version>25.0-jre</guava.version>
-                  </properties>
-                </project>
-            """.trimIndent()
+    fun upgradeManagedInParent() {
+        val upgradeRecipe = UpgradeDependencyVersion(
+            "com.google.guava",
+            "*",
+            "25-28",
+            "-jre",
+            false
         )
-
-        server.toFile().writeText(
-            //language=xml
-            """
+        val parent = """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <parent>
+                    <modelVersion>4.0.0</modelVersion>
+                    
+                    <packaging>pom</packaging>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
-                  </parent>
-                
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app-server</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>${'$'}{guava.version}</version>
-                    </dependency>
-                  </dependencies>
+                    <properties>
+                        <guava.version>25.0-jre</guava.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>${'$'}{guava.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
                 </project>
             """.trimIndent()
-        )
+        val child = """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app-server</artifactId>
+                    <version>1</version>
+                
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+        """.trimIndent()
 
+        //Parent should be upgraded
         assertChanged(
-            recipe = UpgradeDependencyVersion(
-                "com.google.guava",
-                "*",
-                "25-28",
-                "-jre",
-                null
-            ),
-            dependsOn = arrayOf(server.toFile()),
-            before = parent.toFile(),
+            recipe = upgradeRecipe,
+            dependsOn = arrayOf(child),
+            before = parent,
             after = """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
-                
-                  <packaging>pom</packaging>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <properties>
-                    <guava.version>28.0-jre</guava.version>
-                  </properties>
+                    <modelVersion>4.0.0</modelVersion>
+                    
+                    <packaging>pom</packaging>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <guava.version>28.0-jre</guava.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>${'$'}{guava.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
                 </project>
             """
+        )
+        //Child should be left alone.
+        assertUnchanged(
+            recipe = upgradeRecipe,
+            dependsOn = arrayOf(parent),
+            before = child,
         )
     }
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/891")
-    fun upgradeDependencyOnlyTargetsSpecificDependencyProperty(@TempDir tempDir: Path) {
-        val parent = tempDir.resolve("pom.xml")
-        val server = tempDir.resolve("server/pom.xml")
-        server.toFile().parentFile.mkdirs()
-        parent.toFile().writeText(
-            //language=xml
-            """
+    fun upgradeDependencyOnlyTargetsSpecificDependencyProperty() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "com.google.guava",
+            "*",
+            "25-28",
+            "-jre",
+            null
+        ),
+        before = """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <packaging>pom</packaging>
-                  <groupId>org.openrewrite.example</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <properties>
-                    <guava.version>25.0-jre</guava.version>
-                    <spring.version>5.3.9</spring.version>
-                    <spring.artifact-id>spring-jdbc</spring.artifact-id>
-                  </properties>
-                </project>
-            """.trimIndent()
-        )
-        server.toFile().writeText(
-            //language=xml
-            """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-
-                  <parent>
+                    <modelVersion>4.0.0</modelVersion>
+                    <packaging>pom</packaging>
                     <groupId>org.openrewrite.example</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
-                  </parent>
-
-                  <groupId>org.openrewrite.example</groupId>
-                  <artifactId>my-app-server</artifactId>
-                  <version>1</version>
-
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>${'$'}{guava.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.springframework</groupId>
-                        <artifactId>${'$'}{spring.artifact-id}</artifactId>
-                        <version>${'$'}{spring.version}</version>
-                    </dependency>
-                  </dependencies>
+                    <properties>
+                        <guava.version>25.0-jre</guava.version>
+                        <spring.version>5.3.9</spring.version>
+                        <spring.artifact-id>spring-jdbc</spring.artifact-id>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>${'$'}{guava.version}</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.springframework</groupId>
+                            <artifactId>${'$'}{spring.artifact-id}</artifactId>
+                            <version>${'$'}{spring.version}</version>
+                        </dependency>
+                    </dependencies>
                 </project>
-            """.trimIndent()
-        )
-        assertChanged(
-            recipe = UpgradeDependencyVersion(
-                "com.google.guava",
-                "*",
-                "25-28",
-                "-jre",
-                null
-            ),
-            dependsOn = arrayOf(server.toFile()),
-            before = parent.toFile(),
-            after = """
+            """,
+        after = """
                 <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <packaging>pom</packaging>
-                  <groupId>org.openrewrite.example</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <properties>
-                    <guava.version>28.0-jre</guava.version>
-                    <spring.version>5.3.9</spring.version>
-                    <spring.artifact-id>spring-jdbc</spring.artifact-id>
-                  </properties>
+                    <modelVersion>4.0.0</modelVersion>
+                    <packaging>pom</packaging>
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <guava.version>28.0-jre</guava.version>
+                        <spring.version>5.3.9</spring.version>
+                        <spring.artifact-id>spring-jdbc</spring.artifact-id>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>${'$'}{guava.version}</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.springframework</groupId>
+                            <artifactId>${'$'}{spring.artifact-id}</artifactId>
+                            <version>${'$'}{spring.version}</version>
+                        </dependency>
+                    </dependencies>
                 </project>
-            """
-        )
-    }
-
-    @Test
-    fun upgradeAddsPropertySectionToOverrideManagedDependencyPropertyVersion() = assertChanged(
-        recipe = UpgradeDependencyVersion(
-            "junit",
-            "junit",
-            "4.x",
-            null,
-            false
-        ),
-        before = """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <parent>
-                <groupId>com.fasterxml.jackson</groupId>
-                <artifactId>jackson-parent</artifactId>
-                <version>2.12</version>
-              </parent>
-            
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-            
-              <dependencies>
-                <dependency>
-                  <groupId>junit</groupId>
-                  <artifactId>junit</artifactId>
-                </dependency>
-              </dependencies>
-            </project>
-        """,
-        after = """            
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <parent>
-                <groupId>com.fasterxml.jackson</groupId>
-                <artifactId>jackson-parent</artifactId>
-                <version>2.12</version>
-              </parent>
-            
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              <properties>
-                <version.junit>4.13.2</version.junit>
-              </properties>
-            
-              <dependencies>
-                <dependency>
-                  <groupId>junit</groupId>
-                  <artifactId>junit</artifactId>
-                </dependency>
-              </dependencies>
-            </project>
-        """
-    )
-
-    @Test
-    fun upgradeAddsPropertyToOverrideManagedDependencyPropertyVersion() = assertChanged(
-        recipe = UpgradeDependencyVersion(
-            "junit",
-            "junit",
-            "4.x",
-            null,
-            false
-        ),
-        before = """
-            <project>
-              <parent>
-                <groupId>com.fasterxml.jackson</groupId>
-                <artifactId>jackson-parent</artifactId>
-                <version>2.12</version>
-              </parent>
-            
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-            
-              <dependencies>
-                <dependency>
-                  <groupId>junit</groupId>
-                  <artifactId>junit</artifactId>
-                </dependency>
-              </dependencies>
-            </project>
-        """,
-        after = """            
-            <project>
-              <parent>
-                <groupId>com.fasterxml.jackson</groupId>
-                <artifactId>jackson-parent</artifactId>
-                <version>2.12</version>
-              </parent>
-            
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              <properties>
-                <version.junit>4.13.2</version.junit>
-              </properties>
-
-              <dependencies>
-                <dependency>
-                  <groupId>junit</groupId>
-                  <artifactId>junit</artifactId>
-                </dependency>
-              </dependencies>
-            </project>
         """
     )
 
@@ -813,35 +630,21 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
-    fun dependencyManagementResolvedFromProperty(@TempDir tempDir: Path) {
-        val parent = tempDir.resolve("pom.xml")
-        val server = tempDir.resolve("server/pom.xml")
-        server.toFile().parentFile.mkdirs()
-        parent.toFile().writeText(
-            //language=xml
-            """
+    fun dependencyManagementResolvedFromProperty() = assertChanged(
+            recipe = UpgradeDependencyVersion(
+                "io.micronaut",
+                "micronaut-bom",
+                "3.0.0-M5",
+                null,
+                null
+            ),
+            before = """
                 <project>
-                  <packaging>pom</packaging>
-                  <groupId>org.openrewrite.example</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
+                  <artifactId>my-app-server</artifactId>
+
                   <properties>
                     <micronaut.version>2.5.11</micronaut.version>
                   </properties>
-                </project>
-            """.trimIndent()
-        )
-        server.toFile().writeText(
-            //language=xml
-            """
-                <project>
-                  <parent>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </parent>
-
-                  <artifactId>my-app-server</artifactId>
 
                   <dependencyManagement>
                     <dependencies>
@@ -855,32 +658,29 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                     </dependencies>
                   </dependencyManagement>
                 </project>
-            """.trimIndent()
-        )
-
-        assertChanged(
-            recipe = UpgradeDependencyVersion(
-                "io.micronaut",
-                "micronaut-bom",
-                "3.0.0-M5",
-                null,
-                null
-            ),
-            dependsOn = arrayOf(server.toFile()),
-            before = parent.toFile(),
+            """.trimIndent(),
             after = """
                 <project>
-                  <packaging>pom</packaging>
-                  <groupId>org.openrewrite.example</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
+                  <artifactId>my-app-server</artifactId>
+
                   <properties>
                     <micronaut.version>3.0.0-M5</micronaut.version>
                   </properties>
+
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>io.micronaut</groupId>
+                        <artifactId>micronaut-bom</artifactId>
+                        <version>${'$'}{micronaut.version}</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
                 </project>
             """
-        )
-    }
+    )
 
     @Test
     fun upgradeToExactVersion() = assertChanged(
