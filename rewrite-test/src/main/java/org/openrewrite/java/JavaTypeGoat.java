@@ -23,7 +23,7 @@ import java.lang.annotation.RetentionPolicy;
 @AnnotationWithSourceRetention
 public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
 
-    public static final PT<String> parameterizedField = new PT<String>() {
+    public static final PT<TypeA> parameterizedField = new PT<TypeA>() {
     };
 
     public static abstract class InheritedJavaTypeGoat<T, U extends PT<U> & C> extends JavaTypeGoat<T, U> {
@@ -33,13 +33,15 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     }
 
     public enum EnumTypeA {
-        FOO, BAR
+        FOO, BAR(),
+        @AnnotationWithRuntimeRetention
+        FUZ
     }
 
     public enum EnumTypeB {
-        FOO("bar");
-        private String label;
-        EnumTypeB(String label) {
+        FOO(null);
+        private TypeA label;
+        EnumTypeB(TypeA label) {
             this.label = label;
         }
     }

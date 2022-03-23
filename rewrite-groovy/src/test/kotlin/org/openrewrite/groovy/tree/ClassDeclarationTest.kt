@@ -155,23 +155,14 @@ class ClassDeclarationTest : GroovyTreeTest {
 
     @Disabled
     @Test
-    fun enum() = assertParsePrintAndProcess(
+    fun newParameterizedConstructor() = assertParsePrintAndProcess(
         """
-            enum A {
-                B, C,
-                D;
-            }
-        """
-    )
-
-    @Disabled
-    @Test
-    fun innerEnum() = assertParsePrintAndProcess(
-        """
-            class A {
-                enum B {
-                    C
+            class Outer {
+                PT<TypeA> parameterizedField = new PT<TypeA>() {
                 }
+            }
+            interface TypeA {}
+            interface PT<T> {
             }
         """
     )

@@ -192,7 +192,7 @@ interface JavaTypeMappingTest {
     fun enumTypeB() {
         val clazz = firstMethodParameter("enumTypeB") as JavaType.Class
         val type = clazz.methods.find { it.name == "<constructor>" }
-        assertThat(type.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}EnumTypeB{name=<constructor>,return=org.openrewrite.java.JavaTypeGoat${"$"}EnumTypeB,parameters=[java.lang.String]}")
+        assertThat(type.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat${"$"}EnumTypeB{name=<constructor>,return=org.openrewrite.java.JavaTypeGoat${"$"}EnumTypeB,parameters=[org.openrewrite.java.JavaTypeGoat${'$'}TypeA]}")
 
         val supertype = clazz.supertype
         assertThat(supertype).isNotNull
