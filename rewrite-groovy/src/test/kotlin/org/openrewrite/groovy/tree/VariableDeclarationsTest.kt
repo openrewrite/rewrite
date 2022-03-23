@@ -33,20 +33,18 @@ class VariableDeclarationsTest : GroovyTreeTest {
         """
     )
 
-    @Disabled
     @Test
-    fun typeParamWithUpperBound() = assertParsePrintAndProcess(
+    fun wildcardWithUpperBound() = assertParsePrintAndProcess(
         """
             List<? extends String> l
         """
     )
 
-    @Disabled
     @Test
-    fun typeParamWithLowerBound() = assertParsePrintAndProcess(
+    fun wildcardWithLowerBound() = assertParsePrintAndProcess(
         """
             List<? super String> l
-            """
+        """
     )
 
     @Disabled

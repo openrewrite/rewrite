@@ -1596,7 +1596,7 @@ public class GroovyParserVisitor {
         Space prefix = sourceBefore("<");
         List<JRightPadded<T>> typeParameters = new ArrayList<>(genericsTypes.length);
         for (int i = 0; i < genericsTypes.length; i++) {
-            T t = visitTypeParameter(genericsTypes[i]);
+            T t = "?".equals(genericsTypes[i].getName()) ? visitWildcard(genericsTypes[i]) : visitTypeParameter(genericsTypes[i]);
             typeParameters.add(JRightPadded.build(t)
                     .withAfter(
                             i < genericsTypes.length - 1 ?
@@ -1607,9 +1607,11 @@ public class GroovyParserVisitor {
         return JContainer.build(prefix, typeParameters, Markers.EMPTY);
     }
 
+    @SuppressWarnings("unchecked")
     private <T extends J> T visitTypeParameter(GenericsType genericType) {
         Space prefix = whitespace();
-        J.Identifier name = typeTree(null);
+        J.Identifier name = genericType.getName() != null ?
+                new J.Identifier(randomId(), sourceBefore(genericType.getName()), Markers.EMPTY, genericType.getName(), null, null) : typeTree(null);
         JContainer<TypeTree> bounds = null;
         if (genericType.getUpperBounds() != null) {
             Space boundsPrefix = sourceBefore("extends");
@@ -1625,8 +1627,34 @@ public class GroovyParserVisitor {
             }
             bounds = JContainer.build(boundsPrefix, convertedBounds, Markers.EMPTY);
         } else if (genericType.getLowerBound() != null) {
-            throw new RuntimeException("not implemented");
+            Space boundsPrefix = sourceBefore("super");
+            ClassNode lowerBound = genericType.getLowerBound();
+            List<JRightPadded<TypeTree>> convertedBounds = new ArrayList<>(1);
+                convertedBounds.add(JRightPadded.build(visitTypeTree(lowerBound))
+                        .withAfter(EMPTY));
+            bounds = JContainer.build(boundsPrefix, convertedBounds, Markers.EMPTY);
         }
         return (T) new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), name, bounds);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends J> T visitWildcard(GenericsType genericType) {
+        Space namePrefix = sourceBefore("?");
+
+        JLeftPadded<J.Wildcard.Bound> bound;
+        NameTree boundedType;
+        if (genericType.getUpperBounds() != null) {
+            bound = padLeft(sourceBefore("extends"), J.Wildcard.Bound.Extends);
+            boundedType = visitTypeTree(genericType.getUpperBounds()[0]);
+        } else if (genericType.getLowerBound() != null) {
+            bound = padLeft(sourceBefore("super"), J.Wildcard.Bound.Super);
+            boundedType = visitTypeTree(genericType.getLowerBound());
+        } else {
+            bound = null;
+            System.out.println("check bounded type");
+            boundedType = null;
+        }
+
+        return (T) new J.Wildcard(randomId(), namePrefix, Markers.EMPTY, bound, boundedType);
     }
 }
