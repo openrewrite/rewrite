@@ -16,6 +16,8 @@ dependencies {
     api("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")
     api("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 
+    implementation("net.java.dev.jna:jna-platform:latest.release")
+
     implementation("org.graalvm.sdk:graal-sdk:latest.release")
     testImplementation("org.graalvm.sdk:graal-sdk:latest.release")
     implementation("commons-io:commons-io:latest.release")
