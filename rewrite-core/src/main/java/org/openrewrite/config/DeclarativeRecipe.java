@@ -71,7 +71,7 @@ public class DeclarativeRecipe extends Recipe {
                 validation = validation.and(
                         invalid(name + ".recipeList[" + i + "] (in " + source + ")",
                                 nextName,
-                                "refers to a recipe that doesn't exist.",
+                                "recipe '" + nextName + "' does not exist.",
                                 null));
             }
         }
