@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 class BinaryTest : GroovyTreeTest {
@@ -25,5 +26,32 @@ class BinaryTest : GroovyTreeTest {
             int n = 0;
             boolean b = n == 0;
         """
+    )
+
+    @Disabled
+    @Test
+    fun regexMatches() = assertParsePrintAndProcess(
+        """
+            def UNSTABLE = /^([\d.-]+(alpha|beta|rc|m)[\d.-]+(groovy[\d.-]+)?|20030203.000550|20031129.200437|2004-03-19)${'$'}/
+            tasks.named("dependencyUpdates")?.configure {
+            gradleReleaseChannel = 'current'
+                rejectVersionIf {
+                    !(it.currentVersion.toLowerCase() ==~ UNSTABLE) && it.candidate.version.toLowerCase() ==~ UNSTABLE
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Disabled
+    @Test
+    fun notOperatorAndBinaryExpression() = assertParsePrintAndProcess(
+        """
+            tasks.named("dependencyUpdates")?.configure {
+            gradleReleaseChannel = 'current'
+                rejectVersionIf {
+                    !(it.currentVersion.toLowerCase() == false) && it.candidate.version.toLowerCase() == false
+                }
+            }
+        """.trimIndent()
     )
 }

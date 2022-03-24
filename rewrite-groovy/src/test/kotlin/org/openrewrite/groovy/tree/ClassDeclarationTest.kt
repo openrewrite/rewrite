@@ -23,6 +23,21 @@ import org.openrewrite.java.tree.J
 
 class ClassDeclarationTest : GroovyTreeTest {
 
+    @Disabled
+    @Test
+    fun blockComment() = assertParsePrintAndProcess(
+        """
+            if (!JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_16)) {
+                logger.lifecycle '''
+            ************************************* WARNING ***********************************************
+            ****  You're running the build with an older JDK. NEVER try to release with an old JDK!  ****
+            ****  You must use a JDK 16+ in order to compile all features of the language.           ****
+            *********************************************************************************************
+            '''
+            }
+        """.trimIndent()
+    )
+
     @Test
     fun multipleClassDeclarationsInOneCompilationUnit() = assertParsePrintAndProcess(
         """
