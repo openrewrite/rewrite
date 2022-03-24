@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,245 +14,222 @@
  * limitations under the License.
  */
 package org.openrewrite.yaml.internal.grammar;
-// Generated from /Users/pat/dev/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPath.g4 by ANTLR 4.9.2
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPathParser.g4 by ANTLR 4.9.2
+
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 /**
- * This class provides an empty implementation of {@link JsonPathListener},
+ * This class provides an empty implementation of {@link JsonPathParserListener},
  * which can be extended to create a listener which only needs to handle a subset
  * of the available methods.
  */
-public class JsonPathBaseListener implements JsonPathListener {
+public class JsonPathParserBaseListener implements JsonPathParserListener {
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterJsonpath(JsonPath.JsonpathContext ctx) { }
+	@Override public void enterJsonPath(JsonPathParser.JsonPathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitJsonpath(JsonPath.JsonpathContext ctx) { }
+	@Override public void exitJsonPath(JsonPathParser.JsonPathContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterBracketOperator(JsonPath.BracketOperatorContext ctx) { }
+	@Override public void enterExpression(JsonPathParser.ExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitBracketOperator(JsonPath.BracketOperatorContext ctx) { }
+	@Override public void exitExpression(JsonPathParser.ExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterDotOperator(JsonPath.DotOperatorContext ctx) { }
+	@Override public void enterDotOperator(JsonPathParser.DotOperatorContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitDotOperator(JsonPath.DotOperatorContext ctx) { }
+	@Override public void exitDotOperator(JsonPathParser.DotOperatorContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterRecursiveDescent(JsonPath.RecursiveDescentContext ctx) { }
+	@Override public void enterRecursiveDecent(JsonPathParser.RecursiveDecentContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitRecursiveDescent(JsonPath.RecursiveDescentContext ctx) { }
+	@Override public void exitRecursiveDecent(JsonPathParser.RecursiveDecentContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterUnionOperator(JsonPath.UnionOperatorContext ctx) { }
+	@Override public void enterBracketOperator(JsonPathParser.BracketOperatorContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitUnionOperator(JsonPath.UnionOperatorContext ctx) { }
+	@Override public void exitBracketOperator(JsonPathParser.BracketOperatorContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterRangeOperator(JsonPath.RangeOperatorContext ctx) { }
+	@Override public void enterFilter(JsonPathParser.FilterContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitRangeOperator(JsonPath.RangeOperatorContext ctx) { }
+	@Override public void exitFilter(JsonPathParser.FilterContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterRangeOp(JsonPath.RangeOpContext ctx) { }
+	@Override public void enterFilterExpression(JsonPathParser.FilterExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitRangeOp(JsonPath.RangeOpContext ctx) { }
+	@Override public void exitFilterExpression(JsonPathParser.FilterExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterStart(JsonPath.StartContext ctx) { }
+	@Override public void enterBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitStart(JsonPath.StartContext ctx) { }
+	@Override public void exitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterEnd(JsonPath.EndContext ctx) { }
+	@Override public void enterRegexExpression(JsonPathParser.RegexExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitEnd(JsonPath.EndContext ctx) { }
+	@Override public void exitRegexExpression(JsonPathParser.RegexExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterParentheticalExpression(JsonPath.ParentheticalExpressionContext ctx) { }
+	@Override public void enterUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitParentheticalExpression(JsonPath.ParentheticalExpressionContext ctx) { }
+	@Override public void exitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterIdentifier(JsonPath.IdentifierContext ctx) { }
+	@Override public void enterLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitIdentifier(JsonPath.IdentifierContext ctx) { }
+	@Override public void exitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterAndExpression(JsonPath.AndExpressionContext ctx) { }
+	@Override public void enterProperty(JsonPathParser.PropertyContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitAndExpression(JsonPath.AndExpressionContext ctx) { }
+	@Override public void exitProperty(JsonPathParser.PropertyContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterPathExpression(JsonPath.PathExpressionContext ctx) { }
+	@Override public void enterWildcard(JsonPathParser.WildcardContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitPathExpression(JsonPath.PathExpressionContext ctx) { }
+	@Override public void exitWildcard(JsonPathParser.WildcardContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterScopedPathExpression(JsonPath.ScopedPathExpressionContext ctx) { }
+	@Override public void enterSlice(JsonPathParser.SliceContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitScopedPathExpression(JsonPath.ScopedPathExpressionContext ctx) { }
+	@Override public void exitSlice(JsonPathParser.SliceContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterBinaryExpression(JsonPath.BinaryExpressionContext ctx) { }
+	@Override public void enterStart(JsonPathParser.StartContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitBinaryExpression(JsonPath.BinaryExpressionContext ctx) { }
+	@Override public void exitStart(JsonPathParser.StartContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterLiteralExpression(JsonPath.LiteralExpressionContext ctx) { }
+	@Override public void enterEnd(JsonPathParser.EndContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitLiteralExpression(JsonPath.LiteralExpressionContext ctx) { }
+	@Override public void exitEnd(JsonPathParser.EndContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterWildcardExpression(JsonPath.WildcardExpressionContext ctx) { }
+	@Override public void enterIndexes(JsonPathParser.IndexesContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitWildcardExpression(JsonPath.WildcardExpressionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterFilterExpression(JsonPath.FilterExpressionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitFilterExpression(JsonPath.FilterExpressionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterLitExpression(JsonPath.LitExpressionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitLitExpression(JsonPath.LitExpressionContext ctx) { }
+	@Override public void exitIndexes(JsonPathParser.IndexesContext ctx) { }
 
 	/**
 	 * {@inheritDoc}

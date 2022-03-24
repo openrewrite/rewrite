@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,149 +14,136 @@
  * limitations under the License.
  */
 package org.openrewrite.yaml.internal.grammar;
-// Generated from /Users/pat/dev/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPath.g4 by ANTLR 4.9.2
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPathParser.g4 by ANTLR 4.9.2
+
 import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
 
 /**
- * This class provides an empty implementation of {@link JsonPathVisitor},
+ * This class provides an empty implementation of {@link JsonPathParserVisitor},
  * which can be extended to create a visitor which only needs to handle a subset
  * of the available methods.
  *
  * @param <T> The return type of the visit operation. Use {@link Void} for
  * operations with no return type.
  */
-public class JsonPathBaseVisitor<T> extends AbstractParseTreeVisitor<T> implements JsonPathVisitor<T> {
+public class JsonPathParserBaseVisitor<T> extends AbstractParseTreeVisitor<T> implements JsonPathParserVisitor<T> {
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitJsonpath(JsonPath.JsonpathContext ctx) { return visitChildren(ctx); }
+	@Override public T visitJsonPath(JsonPathParser.JsonPathContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitBracketOperator(JsonPath.BracketOperatorContext ctx) { return visitChildren(ctx); }
+	@Override public T visitExpression(JsonPathParser.ExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDotOperator(JsonPath.DotOperatorContext ctx) { return visitChildren(ctx); }
+	@Override public T visitDotOperator(JsonPathParser.DotOperatorContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitRecursiveDescent(JsonPath.RecursiveDescentContext ctx) { return visitChildren(ctx); }
+	@Override public T visitRecursiveDecent(JsonPathParser.RecursiveDecentContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitUnionOperator(JsonPath.UnionOperatorContext ctx) { return visitChildren(ctx); }
+	@Override public T visitBracketOperator(JsonPathParser.BracketOperatorContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitRangeOperator(JsonPath.RangeOperatorContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFilter(JsonPathParser.FilterContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitRangeOp(JsonPath.RangeOpContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFilterExpression(JsonPathParser.FilterExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitStart(JsonPath.StartContext ctx) { return visitChildren(ctx); }
+	@Override public T visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnd(JsonPath.EndContext ctx) { return visitChildren(ctx); }
+	@Override public T visitRegexExpression(JsonPathParser.RegexExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitParentheticalExpression(JsonPath.ParentheticalExpressionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitIdentifier(JsonPath.IdentifierContext ctx) { return visitChildren(ctx); }
+	@Override public T visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAndExpression(JsonPath.AndExpressionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitProperty(JsonPathParser.PropertyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitPathExpression(JsonPath.PathExpressionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitWildcard(JsonPathParser.WildcardContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitScopedPathExpression(JsonPath.ScopedPathExpressionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitSlice(JsonPathParser.SliceContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitBinaryExpression(JsonPath.BinaryExpressionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitStart(JsonPathParser.StartContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitLiteralExpression(JsonPath.LiteralExpressionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitEnd(JsonPathParser.EndContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitWildcardExpression(JsonPath.WildcardExpressionContext ctx) { return visitChildren(ctx); }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation returns the result of calling
-	 * {@link #visitChildren} on {@code ctx}.</p>
-	 */
-	@Override public T visitFilterExpression(JsonPath.FilterExpressionContext ctx) { return visitChildren(ctx); }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation returns the result of calling
-	 * {@link #visitChildren} on {@code ctx}.</p>
-	 */
-	@Override public T visitLitExpression(JsonPath.LitExpressionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitIndexes(JsonPathParser.IndexesContext ctx) { return visitChildren(ctx); }
 }
