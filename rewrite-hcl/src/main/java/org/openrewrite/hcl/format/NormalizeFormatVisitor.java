@@ -152,7 +152,7 @@ public class NormalizeFormatVisitor<P> extends HclIsoVisitor<P> {
     public Hcl.Index visitIndex(Hcl.Index index, P p) {
         Hcl.Index i = super.visitIndex(index, p);
 
-        if(i.getIndexed().getPrefix() != Space.EMPTY) {
+        if (i.getIndexed().getPrefix() != Space.EMPTY) {
             i = concatenateSpace(i, i.getIndexed().getPrefix());
             i = i.withIndexed(i.getIndexed().withPrefix(Space.EMPTY));
         }
@@ -164,7 +164,7 @@ public class NormalizeFormatVisitor<P> extends HclIsoVisitor<P> {
     public Hcl.Unary visitUnary(Hcl.Unary unary, P p) {
         Hcl.Unary u = super.visitUnary(unary, p);
 
-        if(u.getExpression().getPrefix() != Space.EMPTY) {
+        if (u.getExpression().getPrefix() != Space.EMPTY) {
             u = concatenateSpace(u, u.getExpression().getPrefix());
             u = u.withExpression(u.getExpression().withPrefix(Space.EMPTY));
         }
@@ -176,7 +176,7 @@ public class NormalizeFormatVisitor<P> extends HclIsoVisitor<P> {
     public Hcl.VariableExpression visitVariableExpression(Hcl.VariableExpression variableExpression, P p) {
         Hcl.VariableExpression v = super.visitVariableExpression(variableExpression, p);
 
-        if(v.getName().getPrefix() != Space.EMPTY) {
+        if (v.getName().getPrefix() != Space.EMPTY) {
             v = concatenateSpace(v, v.getName().getPrefix());
             v = v.withName(v.getName().withPrefix(Space.EMPTY));
         }

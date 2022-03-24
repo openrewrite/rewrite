@@ -49,9 +49,10 @@ public class SpacesVisitor<P> extends HclIsoVisitor<P> {
     public Expression visitExpression(Expression expression, P p) {
         Expression e = super.visitExpression(expression, p);
 
-        Hcl parent = getCursor().getParentOrThrow().getValue();
-        if(parent instanceof Hcl.Attribute && ((Hcl.Attribute) parent).getValue() == expression) {
-            if(e.getPrefix().getWhitespace().isEmpty()) {
+        Hcl parent = getCursor().getParentOrThrow().getValue() instanceof Hcl ?
+                getCursor().getParentOrThrow().getValue() : null;
+        if (parent instanceof Hcl.Attribute && ((Hcl.Attribute) parent).getValue() == expression) {
+            if (e.getPrefix().getWhitespace().isEmpty()) {
                 e = e.withPrefix(e.getPrefix().withWhitespace(" "));
             }
         }
