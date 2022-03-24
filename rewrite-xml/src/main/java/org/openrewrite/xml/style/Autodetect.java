@@ -57,7 +57,8 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class IndentStatistics {
-        private final Map<Integer, Long> indentFrequencies = new HashMap<>();
+        private final Map<Integer, Long> spaceIndentFrequencies = new HashMap<>();
+        private final Map<Integer, Long> tabIndentFrequencies = new HashMap<>();
         private int linesWithSpaceIndents = 0;
         private int linesWithTabIndents = 0;
 
@@ -71,21 +72,30 @@ public class Autodetect extends NamedStyles {
             Map.Entry<Integer, Long> i1 = null;
             Map.Entry<Integer, Long> i2 = null;
 
-            for (Map.Entry<Integer, Long> sample : indentFrequencies.entrySet()) {
-                if (sample.getKey() == 0) {
+            int indent = 2;
+            long indentCount = 0;
+
+            Map<Integer, Long> indentFrequencies = useTabs ? tabIndentFrequencies : spaceIndentFrequencies;
+            for (Map.Entry<Integer, Long> current : indentFrequencies.entrySet()) {
+                if (current.getKey() == 0) {
                     continue;
                 }
-                if (i1 == null || (i1.getValue() < sample.getValue() && sample.getKey() % i1.getKey() != 0)) {
-                    i1 = sample;
-                } else if (i2 == null || (i2.getValue() < sample.getValue() && sample.getKey() % i2.getKey() != 0)) {
-                    i2 = sample;
+                long currentCount = 0;
+                for (Map.Entry<Integer, Long> candidate : indentFrequencies.entrySet()) {
+                    if  (candidate.getKey() == 0) {
+                        continue;
+                    }
+                    if (candidate.getKey() % current.getKey() == 0) {
+                        currentCount += candidate.getValue();
+                    }
+                }
+                if (currentCount > indentCount) {
+                    indent = current.getKey();
+                    indentCount = currentCount;
+                } else if (currentCount == indentCount) {
+                    indent = Math.min(indent, current.getKey());
                 }
             }
-
-            int indent1 = i1 == null ? 2 : i1.getKey();
-            int indent2 = i2 == null ? indent1 : i2.getKey();
-
-            int indent = Math.min(indent1, indent2);
 
             return new TabsAndIndentsStyle(
                     useTabs,
@@ -131,19 +141,41 @@ public class Autodetect extends NamedStyles {
                         return takeWhile.get();
                     })
                     .count() > 0) {
-                int indent = 0;
+                int tabIndent = 0;
+                int spaceIndent = 0;
+                boolean mixed = false;
                 char[] chars = prefix.toCharArray();
                 for (char c : chars) {
                     if (c == '\n' || c == '\r') {
-                        indent = 0;
+                        tabIndent = 0;
+                        spaceIndent = 0;
+                        mixed = false;
                         continue;
                     }
-                    if (Character.isWhitespace(c)) {
-                        indent++;
+                    if (mixed) {
+                        continue;
+                    }
+                    if (c == ' ') {
+                        if (tabIndent > 0) {
+                            tabIndent = 0;
+                            spaceIndent = 0;
+                            mixed = true;
+                            continue;
+                        }
+                        spaceIndent++;
+                    } else if (Character.isWhitespace(c)) {
+                        if (spaceIndent > 0) {
+                            tabIndent = 0;
+                            spaceIndent = 0;
+                            mixed = true;
+                            break;
+                        }
+                        tabIndent++;
                     }
                 }
 
-                stats.indentFrequencies.merge(indent, 1L, Long::sum);
+                stats.spaceIndentFrequencies.merge(spaceIndent, 1L, Long::sum);
+                stats.tabIndentFrequencies.merge(tabIndent, 1L, Long::sum);
 
                 AtomicBoolean dropWhile = new AtomicBoolean(false);
                 takeWhile.set(true);

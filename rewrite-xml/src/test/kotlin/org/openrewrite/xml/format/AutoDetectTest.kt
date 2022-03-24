@@ -53,7 +53,6 @@ class AutoDetectTest  {
         assertThat(tabsAndIndents.useTabCharacter).isFalse
     }
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1498")
     @Test
     fun autoDetectQuarkus() {
