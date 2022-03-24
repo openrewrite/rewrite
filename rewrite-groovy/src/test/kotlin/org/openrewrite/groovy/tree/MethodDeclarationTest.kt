@@ -15,9 +15,27 @@
  */
 package org.openrewrite.groovy.tree
 
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.tree.J
 
 class MethodDeclarationTest : GroovyTreeTest {
+
+    @Disabled
+    @Test
+    fun methodDeclarationDeclaringType() = assertParsePrintAndProcess(
+        """
+            class A {
+                void method() {}
+            }
+        """.trimIndent(),
+        withAst = { cu ->
+            val method = (cu.classes[0].body.statements[0] as J.MethodDeclaration)
+            assertThat(method.methodType).isNotNull
+            assertThat(method.methodType?.declaringType?.fullyQualifiedName).isEqualTo("A")
+        }
+    )
 
     @Test
     fun methodDeclaration() = assertParsePrintAndProcess(

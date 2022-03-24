@@ -266,6 +266,20 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitField(FieldNode field) {
+            if ((field.getModifiers() & Opcodes.ACC_ENUM) != 0) {
+                visitEnumField(field);
+            } else {
+                visitVariableField(field);
+            }
+        }
+
+        private void visitEnumField(FieldNode fieldNode) {
+            // Requires refactoring visitClass to use a similar pattern as Java11ParserVisitor.
+            // Currently, each field is visited one at a time, so we cannot construct the EnumValueSet.
+            throw new UnsupportedOperationException("enum fields are not implemented.");
+        }
+
+        private void visitVariableField(FieldNode field) {
             RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field);
 
             List<J.Modifier> modifiers = visitModifiers(field.getModifiers());
