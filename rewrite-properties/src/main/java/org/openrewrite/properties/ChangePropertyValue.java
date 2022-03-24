@@ -60,7 +60,7 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change properties file property value";
+        return "Change property value";
     }
 
     @Override
