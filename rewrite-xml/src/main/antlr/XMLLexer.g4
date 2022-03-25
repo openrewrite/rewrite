@@ -42,7 +42,7 @@ CharRef           :  '&#' DIGIT+ ';'
 SEA_WS            :  (' '|'\t'|'\r'? '\n')+        -> skip ;
 UTF_ENCODING_BOM  :  (UTF_8_BOM_CHARS | UTF_8_BOM) -> skip ;
 
-SPECIAL_OPEN_XML  :  '<?xml' S                     -> pushMode(INSIDE) ;
+SPECIAL_OPEN_XML  :  '<?xml'                       -> pushMode(INSIDE) ;
 OPEN              :  '<'                           -> pushMode(INSIDE) ;
 
 SPECIAL_OPEN      :  '<?'Name                      -> pushMode(INSIDE_PROCESS_INSTRUCTION) ;

@@ -36,6 +36,15 @@ class AutoFormatTest : XmlRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1503")
+    @Test
+    fun autoFormatXmlDecl() = assertUnchanged(
+        before = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <tag>required tag</tag>
+        """
+    )
+
     @Test
     fun autoFormatTag() = assertChanged(
         before = """
