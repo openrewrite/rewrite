@@ -116,6 +116,7 @@ public class ExcludeDependency extends Recipe {
                                 "</exclusion>\n" +
                                 "</exclusions>")));
                     }
+                    maybeUpdateModel();
                 }
             }
 

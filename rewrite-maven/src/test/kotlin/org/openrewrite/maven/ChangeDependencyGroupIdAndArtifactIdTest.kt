@@ -18,16 +18,23 @@ package org.openrewrite.maven
 import org.junit.jupiter.api.Test
 
 class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
+
     override val recipe: ChangeDependencyGroupIdAndArtifactId
         get() = ChangeDependencyGroupIdAndArtifactId(
             "org.openrewrite.recipe",
             "rewrite-testing-frameworks",
-            "corp.internal.openrewrite.recipe",
-            "rewrite-testing-frameworks-internal"
+            "org.openrewrite.recipe",
+            "rewrite-migrate-java"
         )
 
     @Test
     fun changeDependencyGroupIdAndArtifactId() = assertChanged(
+        recipe =  ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api"
+        ),
         before = """
             <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -36,11 +43,24 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                 <version>1</version>
                 <dependencies>
                     <dependency>
-                        <groupId>org.openrewrite.recipe</groupId>
-                        <artifactId>rewrite-testing-frameworks</artifactId>
-                        <version>1.13.1</version>
+                        <groupId>javax.activation</groupId>
+                        <artifactId>javax.activation-api</artifactId>
                     </dependency>
                 </dependencies>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>1.2.1</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
             </project>
         """,
         after = """
@@ -51,11 +71,24 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                 <version>1</version>
                 <dependencies>
                     <dependency>
-                        <groupId>corp.internal.openrewrite.recipe</groupId>
-                        <artifactId>rewrite-testing-frameworks-internal</artifactId>
-                        <version>1.13.1</version>
+                        <groupId>jakarta.activation</groupId>
+                        <artifactId>jakarta.activation-api</artifactId>
                     </dependency>
                 </dependencies>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>1.2.1</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
             </project>
         """
     )
@@ -63,10 +96,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
     @Test
     fun changeOnlyArtifactId() = assertChanged(
         recipe = ChangeDependencyGroupIdAndArtifactId(
-            "org.openrewrite.recipe",
-            "rewrite-testing-frameworks",
-            "org.openrewrite.recipe",
-            "rewrite-testing-frameworks-internal"
+            "org.openrewrite",
+            "rewrite-java-8",
+            "org.openrewrite",
+            "rewrite-java-11"
         ),
         before = """
             <project>
@@ -76,9 +109,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                 <version>1</version>
                 <dependencies>
                     <dependency>
-                        <groupId>org.openrewrite.recipe</groupId>
-                        <artifactId>rewrite-testing-frameworks</artifactId>
-                        <version>1.13.1</version>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-java-8</artifactId>
+                        <version>7.20.0</version>
                     </dependency>
                 </dependencies>
             </project>
@@ -91,49 +124,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                 <version>1</version>
                 <dependencies>
                     <dependency>
-                        <groupId>org.openrewrite.recipe</groupId>
-                        <artifactId>rewrite-testing-frameworks-internal</artifactId>
-                        <version>1.13.1</version>
-                    </dependency>
-                </dependencies>
-            </project>
-        """
-    )
-
-    @Test
-    fun changeOnlyGroupId() = assertChanged(
-        recipe = ChangeDependencyGroupIdAndArtifactId(
-            "org.openrewrite.recipe",
-            "rewrite-testing-frameworks",
-            "corp.internal.openrewrite.recipe",
-            "rewrite-testing-frameworks"
-        ),
-        before = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.openrewrite.recipe</groupId>
-                        <artifactId>rewrite-testing-frameworks</artifactId>
-                        <version>1.13.1</version>
-                    </dependency>
-                </dependencies>
-            </project>
-        """,
-        after = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>corp.internal.openrewrite.recipe</groupId>
-                        <artifactId>rewrite-testing-frameworks</artifactId>
-                        <version>1.13.1</version>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-java-11</artifactId>
+                        <version>7.20.0</version>
                     </dependency>
                 </dependencies>
             </project>
