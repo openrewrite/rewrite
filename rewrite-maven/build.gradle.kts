@@ -12,7 +12,7 @@ dependencies {
     api(project(":rewrite-xml"))
     api("org.jetbrains:annotations:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
+    api("com.fasterxml.jackson.core:jackson-annotations:2.13.2")
 
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
@@ -21,10 +21,10 @@ dependencies {
     // FIXME: switch to `latest.release`
     // when https://github.com/resilience4j/resilience4j/issues/1472 is resolved
     implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:latest.release")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
-    implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations:latest.release")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:latest.release")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.13.2")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.13.2")
+    implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.13.2")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2")
 
     implementation("org.slf4j:slf4j-api:1.7.+")
 
