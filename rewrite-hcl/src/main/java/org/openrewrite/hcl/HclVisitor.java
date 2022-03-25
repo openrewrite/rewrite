@@ -88,7 +88,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
             b = (Hcl.Binary) temp;
         }
         b = b.withLeft((Expression) visit(b.getLeft(), p));
-        b = b.getPadding().withOperator(b.getPadding().getOperator().withBefore(visitSpace(b.getPrefix(), Space.Location.BINARY_OPERATOR, p)));
+        b = b.getPadding().withOperator(b.getPadding().getOperator().withBefore(visitSpace(b.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p)));
         b = b.withRight((Expression) visit(b.getRight(), p));
         return b;
     }

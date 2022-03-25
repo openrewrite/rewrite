@@ -16,6 +16,7 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class HclBlockTest : HclTreeTest {
 
@@ -38,6 +39,16 @@ class HclBlockTest : HclTreeTest {
             resource azurerm_monitor_log_profile "logging_profile" {
               device_name = "/dev/sdh"
             }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1506")
+    @Test
+    fun binaryOperator() = assertParsePrintAndProcess(
+        """
+           create_vnic_details {
+             assign_public_ip = (var.instance_visibility == "Private") ? false : true
+           }
         """.trimIndent()
     )
 

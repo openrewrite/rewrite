@@ -51,7 +51,7 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
                 .orElse(TabsAndIndentsStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        if(t instanceof Hcl.ConfigFile) {
+        if (t instanceof Hcl.ConfigFile) {
             t = visitConfigFile((Hcl.ConfigFile) t, p);
         }
 

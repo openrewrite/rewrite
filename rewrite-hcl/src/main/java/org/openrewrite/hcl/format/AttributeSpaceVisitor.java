@@ -47,7 +47,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         if (parent instanceof Hcl.Block) {
             Hcl.Block block = (Hcl.Block) parent;
 
-            if(attribute.getType().equals(Hcl.Attribute.Type.Assignment)) {
+            if (attribute.getType().equals(Hcl.Attribute.Type.Assignment)) {
                 HclLeftPadded<Hcl.Attribute.Type> type = a.getPadding().getType();
 
                 if (Boolean.TRUE.equals(style.getBodyContent().getColumnarAlignment())) {
