@@ -15,23 +15,32 @@
  */
 package org.openrewrite.maven;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
+
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.ManagedDependency;
+import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.*;
-import java.util.function.Predicate;
-
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
-import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class MavenVisitor<P> extends XmlVisitor<P> {
@@ -246,6 +255,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             }
         }
         return null;
+    }
+
+    @Nullable
+    public ResolvedManagedDependency findManagedDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
+        Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
+        if (inClasspathOf != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
+            return null;
+        }
+        return findManagedDependency(tag);
     }
 
     /**
