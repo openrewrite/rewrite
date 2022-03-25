@@ -108,7 +108,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
     private List<GroupArtifact> mapExclusions(Xml.Tag tag) {
         return tag.getChild("exclusions")
                 .map(exclusions -> {
-                    List<Xml.Tag> eachExclusion = tag.getChildren("exclusion");
+                    List<Xml.Tag> eachExclusion = exclusions.getChildren("exclusion");
                     List<GroupArtifact> requestedExclusions = new ArrayList<>(eachExclusion.size());
                     for (Xml.Tag exclusion : eachExclusion) {
                         requestedExclusions.add(new GroupArtifact(

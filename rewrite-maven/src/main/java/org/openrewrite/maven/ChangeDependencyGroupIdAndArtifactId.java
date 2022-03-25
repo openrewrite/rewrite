@@ -66,12 +66,18 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(oldGroupId, oldArtifactId)) {
                     Optional<Xml.Tag> groupIdTag = tag.getChild("groupId");
+                    boolean changed = false;
                     if (groupIdTag.isPresent() && !newGroupId.equals(groupIdTag.get().getValue().orElse(null))) {
                         doAfterVisit(new ChangeTagValueVisitor<>(groupIdTag.get(), newGroupId));
+                        changed = true;
                     }
                     Optional<Xml.Tag> artifactIdTag = tag.getChild("artifactId");
                     if (artifactIdTag.isPresent() && !newArtifactId.equals(artifactIdTag.get().getValue().orElse(null))) {
                         doAfterVisit(new ChangeTagValueVisitor<>(artifactIdTag.get(), newArtifactId));
+                        changed = true;
+                    }
+                    if (changed) {
+                        maybeUpdateModel();
                     }
                 }
 
