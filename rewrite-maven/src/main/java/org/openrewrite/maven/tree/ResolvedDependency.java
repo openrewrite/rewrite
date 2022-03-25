@@ -106,9 +106,19 @@ public class ResolvedDependency {
         if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
             return this;
         }
+        outer:
         for (ResolvedDependency dependency : dependencies) {
+
             ResolvedDependency found = dependency.findDependency(groupId, artifactId);
             if (found != null) {
+                if (getRequested().getExclusions() != null) {
+                    for (GroupArtifact exclusion : getRequested().getExclusions()) {
+                        if (matchesGlob(found.getGroupId(), exclusion.getGroupId()) &&
+                                matchesGlob(found.getArtifactId(), exclusion.getArtifactId())) {
+                            continue outer;
+                        }
+                    }
+                }
                 return found;
             }
         }
