@@ -15,16 +15,18 @@
  */
 package org.openrewrite.maven;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import java.util.Optional;
+
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Optional;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -49,14 +51,21 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             example = "rewrite-testing-frameworks")
     String newArtifactId;
 
+    @Option(displayName = "New version",
+            description = "The new version to use.",
+            example = "2.0.0",
+            required = false)
+    @Nullable
+    String newVersion;
+
     @Override
     public String getDisplayName() {
-        return "Change Maven dependency groupId and artifactId";
+        return "Change Maven dependency groupId, artifactId and optionally the version";
     }
 
     @Override
     public String getDescription() {
-        return "Change the groupId and artifactId of a specified Maven dependency.";
+        return "Change the groupId, artifactId and optionally the version of a specified Maven dependency.";
     }
 
     @Override
@@ -72,6 +81,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     Optional<Xml.Tag> artifactIdTag = tag.getChild("artifactId");
                     if (artifactIdTag.isPresent() && !newArtifactId.equals(artifactIdTag.get().getValue().orElse(null))) {
                         doAfterVisit(new ChangeTagValueVisitor<>(artifactIdTag.get(), newArtifactId));
+                    }
+                    if (newVersion != null) {
+                        Optional<Xml.Tag> versionTag = tag.getChild("version");
+                        if (versionTag.isPresent() && !newVersion.equals(versionTag.get().getValue().orElse(null))) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
+                        }
                     }
                 }
 
