@@ -19,8 +19,8 @@ import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.vavr.CheckedFunction1;
-import okhttp3.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.internal.MavenDownloadingException;
@@ -28,15 +28,12 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -49,23 +46,21 @@ public class MavenArtifactDownloader {
 
     private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
 
-    private static final OkHttpClient httpClient = new OkHttpClient.Builder()
-            .connectionSpecs(Arrays.asList(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))
-            .build();
-
     private static final Retry mavenDownloaderRetry = retryRegistry.retry("MavenDownloader");
 
-    private static final CheckedFunction1<Request, Response> sendRequest = Retry.decorateCheckedFunction(
-            mavenDownloaderRetry,
-            request -> httpClient.newCall(request).execute());
 
     private final MavenArtifactCache mavenArtifactCache;
     private final Map<String, MavenSettings.Server> serverIdToServer;
     private final Consumer<Throwable> onError;
+    private final HttpSender httpSender;
+    private final CheckedFunction1<HttpSender.Request, HttpSender.Response> sendRequest;
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
+                                   HttpSender httpSender,
                                    Consumer<Throwable> onError) {
+        this.httpSender = httpSender;
+        this.sendRequest = Retry.decorateCheckedFunction(mavenDownloaderRetry, httpSender::send);
         this.mavenArtifactCache = mavenArtifactCache;
         this.onError = onError;
         this.serverIdToServer = settings == null || settings.getServers() == null ?
@@ -96,41 +91,22 @@ public class MavenArtifactDownloader {
                         (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
                         ".jar";
 
-                AtomicReference<Response> response = new AtomicReference<>();
                 InputStream bodyStream;
 
-                if(uri.startsWith("~/")) {
+                if (uri.startsWith("~/")) {
                     bodyStream = new FileInputStream(System.getProperty("user.home") + uri.substring(1));
                 } else {
-                    Request.Builder request = applyAuthentication(dependency.getRepository(),
-                            new Request.Builder().url(uri).get());
-
-                    response.set(sendRequest.apply(request.build()));
-                    ResponseBody body = response.get().body();
-
-                    if (!response.get().isSuccessful() || body == null) {
+                    HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
+                    HttpSender.Response response = sendRequest.apply(request.build());
+                    bodyStream = response.getBody();
+                    if (!response.isSuccessful() || bodyStream == null) {
                         onError.accept(new MavenDownloadingException("Unable to download dependency %s:%s:%s. Response was %s",
-                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), Integer.toString(response.get().code())));
-                        response.get().close();
+                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), Integer.toString(response.getCode())));
                         return null;
                     }
-                    bodyStream = body.byteStream();
                 }
 
-                return new InputStream() {
-                    @Override
-                    public int read() throws IOException {
-                        return bodyStream.read();
-                    }
-
-                    @Override
-                    public void close() throws IOException {
-                        bodyStream.close();
-                        if(response.get() != null) {
-                            response.get().close();
-                        }
-                    }
-                };
+                return bodyStream;
             } catch (Throwable t) {
                 onError.accept(t);
             }
@@ -138,14 +114,12 @@ public class MavenArtifactDownloader {
         }, onError);
     }
 
-    private Request.Builder applyAuthentication(MavenRepository repository, Request.Builder request) {
+    private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
-            String credentials = Credentials.basic(authInfo.getUsername(), authInfo.getPassword());
-            request.header("Authorization", credentials);
+            return request.withBasicAuthentication(authInfo.getUsername(), authInfo.getPassword());
         } else if (repository.getUsername() != null && repository.getPassword() != null) {
-            String credentials = Credentials.basic(repository.getUsername(), repository.getPassword());
-            request.header("Authorization", credentials);
+            return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
         }
         return request;
     }

@@ -20,12 +20,13 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.format.AutoFormatVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;

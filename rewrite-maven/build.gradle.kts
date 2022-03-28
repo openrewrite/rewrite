@@ -39,10 +39,6 @@ dependencies {
 
     implementation("io.micrometer:micrometer-core:latest.release")
 
-    // Pinning okhttp while waiting on 5.0.0
-    // https://github.com/openrewrite/rewrite/issues/1479
-    implementation("com.squareup.okhttp3:okhttp:4.9.3")
-
     implementation("org.apache.commons:commons-text:latest.release")
 
     integTestImplementation("org.eclipse.aether:aether-api:latest.release")

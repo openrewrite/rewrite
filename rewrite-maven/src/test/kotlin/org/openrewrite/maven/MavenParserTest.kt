@@ -19,7 +19,7 @@ import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
-import okhttp3.Credentials
+import okio.ByteString.Companion.encode
 import org.assertj.core.api.Assertions.assertThat
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.BeforeEach
@@ -32,6 +32,7 @@ import org.openrewrite.maven.cache.InMemoryMavenPomCache
 import org.openrewrite.maven.cache.MavenPomCache
 import org.openrewrite.maven.tree.License
 import org.openrewrite.maven.tree.Scope
+import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 
 class MavenParserTest {
@@ -49,7 +50,8 @@ class MavenParserTest {
 
     @Test
     fun rangeVersion() {
-        parser.parse(ctx,
+        parser.parse(
+            ctx,
             """
                 <project>
                   <groupId>com.mycompany.app</groupId>
@@ -118,7 +120,9 @@ class MavenParserTest {
                 </project>
             """
         )[0]
-        assertThat(pomXml.mavenResolutionResult().findDependencies("com.google.guava", "guava", null)[0].version).isEqualTo("14.0")
+        assertThat(
+            pomXml.mavenResolutionResult().findDependencies("com.google.guava", "guava", null)[0].version
+        ).isEqualTo("14.0")
     }
 
     @Test
@@ -531,10 +535,8 @@ class MavenParserTest {
             dispatcher = object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
                     if (request.headers.find {
-                            it.first == "Authorization" && it.second == Credentials.basic(
-                                username,
-                                password
-                            )
+                            it.first == "Authorization" && it.second == "Basic " +
+                                    "$username:$password".encode(StandardCharsets.ISO_8859_1).base64()
                         } == null) {
                         return MockResponse().apply {
                             setResponseCode(401)
@@ -1174,7 +1176,8 @@ class MavenParserTest {
 
     @Test
     fun profileNoJdkActivation() {
-        val maven = parser.parse(ctx,
+        val maven = parser.parse(
+            ctx,
             """
                 <project>
                     <groupId>com.mycompany.app</groupId>
@@ -1207,7 +1210,8 @@ class MavenParserTest {
 
     @Test
     fun profileJdkSoftVersionActivation() {
-        val maven = parser.parse(ctx,
+        val maven = parser.parse(
+            ctx,
             """
                 <project>
                     <groupId>com.mycompany.app</groupId>

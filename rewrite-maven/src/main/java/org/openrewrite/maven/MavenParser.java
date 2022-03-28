@@ -20,9 +20,14 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawPom;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.Parent;
+import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
@@ -38,12 +43,14 @@ import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 public class MavenParser implements Parser<Xml.Document> {
+    private final HttpSender httpSender;
     private final Collection<String> activeProfiles;
 
     /**
      * @param activeProfiles  The maven profile names set to be active. Profiles are typically defined in the settings.xml
      */
-    private MavenParser(Collection<String> activeProfiles) {
+    private MavenParser(HttpSender httpSender, Collection<String> activeProfiles) {
+        this.httpSender = httpSender;
         this.activeProfiles = activeProfiles;
     }
 
@@ -89,7 +96,7 @@ public class MavenParser implements Parser<Xml.Document> {
 
         List<Xml.Document> parsed = new ArrayList<>();
 
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
+        MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, httpSender, ctx);
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
@@ -139,12 +146,18 @@ public class MavenParser implements Parser<Xml.Document> {
 
     public static class Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
+        private HttpSender httpSender = new HttpUrlConnectionSender();
 
         public Builder activeProfiles(@Nullable String... profiles) {
             //noinspection ConstantConditions
             if (profiles != null) {
                 Collections.addAll(this.activeProfiles, profiles);
             }
+            return this;
+        }
+
+        public Builder httpSender(HttpSender httpSender) {
+            this.httpSender = httpSender;
             return this;
         }
 
@@ -165,7 +178,7 @@ public class MavenParser implements Parser<Xml.Document> {
         }
 
         public MavenParser build() {
-            return new MavenParser(activeProfiles);
+            return new MavenParser(httpSender, activeProfiles);
         }
     }
 }

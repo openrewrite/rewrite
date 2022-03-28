@@ -21,11 +21,12 @@ import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import io.vavr.CheckedFunction1;
-import okhttp3.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.*;
@@ -44,7 +45,6 @@ import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("OptionalAssignedToNull")
 public class MavenPomDownloader {
-
     private static final RetryConfig retryConfig = RetryConfig.custom()
             .retryOnException(throwable -> throwable instanceof SocketTimeoutException ||
                     throwable instanceof TimeoutException)
@@ -52,34 +52,35 @@ public class MavenPomDownloader {
 
     private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
 
-    private static final OkHttpClient httpClient = new OkHttpClient.Builder()
-            .connectionSpecs(Arrays.asList(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))
-            .build();
-
     private static final Retry mavenDownloaderRetry = retryRegistry.retry("MavenDownloader");
-
-    private static final CheckedFunction1<Request, byte[]> sendRequest = Retry.decorateCheckedFunction(
-            mavenDownloaderRetry,
-            request -> {
-                try (Response response = httpClient.newCall(request).execute()) {
-                    if (response.isSuccessful()) {
-                        //noinspection ConstantConditions
-                        return response.body().bytes();
-                    } else if (response.code() >= 400 && response.code() <= 404) {
-                        //Throw a different exception for client-side failures to allow downstream callers to handle those
-                        //differently.
-                        throw new MavenClientSideException("Failed to download " + request.url() + ": " + response.code() + " " + response.message());
-                    }
-                    throw new MavenDownloadingException("Failed to download " + request.url() + ": " + response.code() + " " + response.message());
-                }
-            });
 
     private final MavenPomCache mavenCache;
     private final Map<Path, Pom> projectPoms;
     private final MavenExecutionContextView ctx;
+    private final HttpSender httpSender;
+
+    private final CheckedFunction1<HttpSender.Request, byte[]> sendRequest;
 
     public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx) {
+        this(projectPoms, new HttpUrlConnectionSender(), ctx);
+    }
+
+    public MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
         this.projectPoms = projectPoms;
+        this.httpSender = httpSender;
+        this.sendRequest = Retry.decorateCheckedFunction(
+                mavenDownloaderRetry,
+                request -> {
+                    HttpSender.Response response = httpSender.send(request);
+                    if (response.isSuccessful()) {
+                        return response.getBodyAsBytes();
+                    } else if (response.getCode() >= 400 && response.getCode() <= 404) {
+                        //Throw a different exception for client-side failures to allow downstream callers to handle those
+                        //differently.
+                        throw new MavenClientSideException("Failed to download " + request.getUrl() + ": " + response.getCode());
+                    }
+                    throw new MavenDownloadingException("Failed to download " + request.getUrl() + ": " + response.getCode());
+                });
         this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenCache = this.ctx.getPomCache();
     }
@@ -130,7 +131,7 @@ public class MavenPomDownloader {
                             result = Optional.of(MavenMetadata.parse(Files.readAllBytes(path)));
                         }
                     } else {
-                        Request.Builder request = applyAuthenticationToRequest(repo, new Request.Builder().url(uri).get());
+                        HttpSender.Request.Builder request = applyAuthenticationToRequest(repo, httpSender.get(uri));
                         try {
                             byte[] responseBody = sendRequest.apply(request.build());
                             result = Optional.of(MavenMetadata.parse(responseBody));
@@ -271,7 +272,7 @@ public class MavenPomDownloader {
                     }
                 }
 
-                Request.Builder request = applyAuthenticationToRequest(repo, new Request.Builder().url(uri.toString()).get());
+                HttpSender.Request.Builder request = applyAuthenticationToRequest(repo, httpSender.get(uri.toString()));
                 try {
                     byte[] responseBody = sendRequest.apply(request.build());
 
@@ -375,7 +376,7 @@ public class MavenPomDownloader {
             }
             result = mavenCache.getNormalizedRepository(repository);
             if (result == null) {
-                if(!repository.getUri().toLowerCase().startsWith("http")) {
+                if (!repository.getUri().toLowerCase().startsWith("http")) {
                     // can be s3 among potentially other types for which there is a maven wagon implementation
                     return null;
                 }
@@ -387,8 +388,7 @@ public class MavenPomDownloader {
                         repository.getUri().replaceFirst("[hH][tT][tT][pP]://", "https://") :
                         repository.getUri();
 
-                Request.Builder request = applyAuthenticationToRequest(repository, new Request.Builder()
-                        .url(httpsUri).get());
+                HttpSender.Request.Builder request = applyAuthenticationToRequest(repository, httpSender.get(httpsUri));
                 MavenRepository normalized = null;
                 try {
                     sendRequest.apply(request.build());
@@ -442,10 +442,9 @@ public class MavenPomDownloader {
     /**
      * Returns a request builder with Authorization header set if the provided repository specifies credentials
      */
-    private Request.Builder applyAuthenticationToRequest(MavenRepository repository, Request.Builder request) {
+    private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
         if (repository.getUsername() != null && repository.getPassword() != null) {
-            String credentials = Credentials.basic(repository.getUsername(), repository.getPassword());
-            request.header("Authorization", credentials);
+            return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
         }
         return request;
     }
