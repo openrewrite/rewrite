@@ -18,12 +18,16 @@ package org.openrewrite.maven;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
 
@@ -73,7 +77,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             Optional<Xml.Tag> dependencyManagement = document.getRoot().getChild("dependencyManagement");
             if (dependencyManagement.isPresent()) {
                 dependencies = dependencyManagement.get().getChild("dependencies");
-                if(dependencies.isPresent()) {
+                if (dependencies.isPresent()) {
                     List<Xml.Tag> eachDependency = dependencies.get().getChildren("dependency");
                     List<ManagedDependency> requestedManagedDependencies = new ArrayList<>(eachDependency.size());
                     for (Xml.Tag dependency : eachDependency) {
@@ -84,7 +88,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                                 dependency.getChildValue("version").orElse(null)
                         );
 
-                        if("import".equals(scope)) {
+                        if ("import".equals(scope)) {
                             requestedManagedDependencies.add(new ManagedDependency.Imported(gav));
                         } else {
                             requestedManagedDependencies.add(new ManagedDependency.Defined(gav, scope,
@@ -122,7 +126,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
     }
 
     private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) {
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx);
+        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, new HttpUrlConnectionSender(), ctx);
         ResolvedPom resolved = resolutionResult.getPom().resolve(ctx, downloader);
         return resolutionResult
                 .withPom(resolved)

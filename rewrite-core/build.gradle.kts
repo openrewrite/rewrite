@@ -18,6 +18,10 @@ dependencies {
 
     implementation("net.java.dev.jna:jna-platform:latest.release")
 
+    // Pinning okhttp while waiting on 5.0.0
+    // https://github.com/openrewrite/rewrite/issues/1479
+    compileOnly("com.squareup.okhttp3:okhttp:4.9.3")
+
     implementation("org.graalvm.sdk:graal-sdk:latest.release")
     testImplementation("org.graalvm.sdk:graal-sdk:latest.release")
     implementation("commons-io:commons-io:latest.release")

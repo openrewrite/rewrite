@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
@@ -283,7 +284,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId, ExecutionContext ctx) {
-        return new MavenPomDownloader(emptyMap(), ctx)
+        return new MavenPomDownloader(emptyMap(), new HttpUrlConnectionSender(), ctx)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), null, getResolutionResult().getPom().getRepositories());
     }
 }
