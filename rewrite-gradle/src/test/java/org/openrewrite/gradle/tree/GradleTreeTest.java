@@ -16,7 +16,6 @@
 package org.openrewrite.gradle.tree;
 
 import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.Disabled;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.groovy.GroovyParser;
@@ -28,7 +27,6 @@ import org.openrewrite.java.tree.J;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Disabled("Temporarily disabled while working on Groovy parser")
 public interface GradleTreeTest {
     default void assertParsePrintAndProcess(@Language("groovy") String code) {
         assertParsePrintAndProcess(code, true);
@@ -48,7 +46,7 @@ public interface GradleTreeTest {
 
         assertThat(cu.printAll()).as("Prints back to the original code").isEqualTo(trimmed);
 
-        if(validateTypes) {
+        if (validateTypes) {
             //noinspection ConstantConditions
             G.CompilationUnit missingTypes = (G.CompilationUnit) new FindMissingTypes().getVisitor().visitNonNull(cu, null);
             assertThat(missingTypes.printAll()).as("All functions should have type attribution").isEqualTo(cu.printAll());
