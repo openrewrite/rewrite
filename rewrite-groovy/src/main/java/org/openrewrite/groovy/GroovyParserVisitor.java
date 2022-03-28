@@ -1665,7 +1665,6 @@ public class GroovyParserVisitor {
             boundedType = visitTypeTree(genericType.getLowerBound());
         } else {
             bound = null;
-            System.out.println("check bounded type");
             boundedType = null;
         }
 
