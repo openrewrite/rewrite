@@ -641,4 +641,47 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1509")
+    @Test
+    fun removeImportsForSamePackage(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(
+            """
+            package com.google.gson.annotations;
+            
+            import java.lang.annotation.Documented;
+            import java.lang.annotation.ElementType;
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+            import java.lang.annotation.Target;
+
+            @Documented
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target({ElementType.FIELD, ElementType.METHOD})
+            public @interface SerializedName {
+                String value();
+            }
+        """
+        ),
+        before = """
+            package com.google.gson.annotations;
+
+            import com.google.gson.annotations.SerializedName;
+            
+            public enum PKIState {
+                @SerializedName("active") ACTIVE,
+                @SerializedName("dismissed") DISMISSED
+            }
+        """,
+        after = """
+            package com.google.gson.annotations;
+            
+            public enum PKIState {
+                @SerializedName("active") ACTIVE,
+                @SerializedName("dismissed") DISMISSED
+            }
+        """
+
+    )
 }

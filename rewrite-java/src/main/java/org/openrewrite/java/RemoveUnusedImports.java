@@ -74,7 +74,8 @@ public class RemoveUnusedImports extends Recipe {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                     .orElse(IntelliJ.importLayout());
-
+            String sourcePackage = cu.getPackageDeclaration() == null ? "" :
+                    cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
             Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
             Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
 
@@ -184,7 +185,7 @@ public class RemoveUnusedImports extends Recipe {
                     }
                 } else {
                     Set<JavaType.FullyQualified> types = typesByPackage.get(elem.getPackageName());
-                    if (types == null) {
+                    if (types == null || sourcePackage.equals(elem.getPackageName())) {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
