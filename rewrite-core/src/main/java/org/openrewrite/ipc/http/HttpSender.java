@@ -289,11 +289,6 @@ public interface HttpSender {
                 return bos.toByteArray();
             }
 
-            public final Builder print() {
-                System.out.println(new Request(url, entity, method, requestHeaders));
-                return this;
-            }
-
             public final Builder url(String url) {
                 try {
                     this.url = URI.create(url).toURL();
