@@ -15,11 +15,9 @@
  */
 package org.openrewrite.gradle
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 
-@Disabled
 class DependencyUseMapNotationTest: GradleRecipeTest {
     override val recipe: Recipe
         get() = DependencyUseMapNotation()

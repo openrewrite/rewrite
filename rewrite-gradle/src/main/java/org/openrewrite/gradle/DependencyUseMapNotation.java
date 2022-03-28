@@ -50,7 +50,7 @@ public class DependencyUseMapNotation extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(*)");
+        final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         return new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
@@ -98,20 +98,20 @@ public class DependencyUseMapNotation extends Recipe {
                 // Supporting all possible GString interpolations is impossible
                 // Supporting all probable GString interpolations is difficult
                 // This focuses on the most common case: When only the version number is interpolated
-                if(g.getStrings().size() != 2 || !(g.getStrings().get(0) instanceof J.Literal)
+                if (g.getStrings().size() != 2 || !(g.getStrings().get(0) instanceof J.Literal)
                         || !(g.getStrings().get(1) instanceof G.GString.Value)) {
                     return m;
                 }
                 J.Literal arg1 = (J.Literal)g.getStrings().get(0);
-                if(arg1.getType() != JavaType.Primitive.String || arg1.getValue() == null) {
+                if (arg1.getType() != JavaType.Primitive.String || arg1.getValue() == null) {
                     return m;
                 }
                 String[] ga = ((String) arg1.getValue()).split(":");
-                if(ga.length != 2) {
+                if (ga.length != 2) {
                     return m;
                 }
                 G.GString.Value arg2 = (G.GString.Value)g.getStrings().get(1);
-                if(!(arg2.getTree() instanceof Expression)) {
+                if (!(arg2.getTree() instanceof Expression)) {
                     return m;
                 }
                 G.MapEntry groupEntry = mapEntry("group", ga[0])
@@ -131,7 +131,7 @@ public class DependencyUseMapNotation extends Recipe {
                 if (mtype == null) {
                     return m;
                 }
-                mtype = mtype.withParameterTypes(singletonList(JavaType.Class.build("java.util.Map")));
+                mtype = mtype.withParameterTypes(singletonList(JavaType.ShallowClass.build("java.util.Map")));
                 return m.withMethodType(mtype);
             }
         };
