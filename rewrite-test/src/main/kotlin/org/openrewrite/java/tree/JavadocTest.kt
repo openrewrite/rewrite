@@ -1334,4 +1334,16 @@ interface JavadocTest : JavaTreeTest {
                 "    void method(String arg0) {}\r\n" +
                 "}"
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1494")
+    @Test
+    fun trailingWhitespaceWithLF(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit, "" +
+                "/**\n" +
+                " * Text followed by trailing whitespace with CRLF.\n" +
+                " * \n" +
+                " */\n" +
+                "class A {}"
+    )
 }

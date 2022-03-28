@@ -35,10 +35,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -353,6 +350,13 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
         if (cursor < source.length() && source.substring(cursor).contains(" ")) {
             String trailingWhitespace = source.substring(cursor);
+            // The last line of the javadoc was a new line that only contained whitespace.
+            if (trailingWhitespace.contains("\n")) {
+                int pos = Collections.min(lineBreaks.keySet());
+                body.add(lineBreaks.get(pos));
+                lineBreaks.remove(pos);
+                trailingWhitespace = trailingWhitespace.replace("\n", "");
+            }
             body.add(new Javadoc.Text(randomId(), Markers.EMPTY, trailingWhitespace));
         }
 
