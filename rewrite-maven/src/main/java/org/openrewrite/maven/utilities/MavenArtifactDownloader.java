@@ -21,6 +21,7 @@ import io.github.resilience4j.retry.RetryRegistry;
 import io.vavr.CheckedFunction1;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.internal.MavenDownloadingException;
@@ -54,6 +55,12 @@ public class MavenArtifactDownloader {
     private final Consumer<Throwable> onError;
     private final HttpSender httpSender;
     private final CheckedFunction1<HttpSender.Request, HttpSender.Response> sendRequest;
+
+    public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
+                                   @Nullable MavenSettings settings,
+                                   Consumer<Throwable> onError) {
+        this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError);
+    }
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
