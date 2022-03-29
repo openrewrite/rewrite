@@ -113,7 +113,7 @@ public class GroovyParserVisitor {
         for (List<ASTNode> values : sortedByPosition.values()) {
             try {
                 for (ASTNode value : values) {
-                    if(value instanceof InnerClassNode) {
+                    if (value instanceof InnerClassNode) {
                         // Inner classes will be visited as part of visiting their containing class
                         continue;
                     }
@@ -217,7 +217,7 @@ public class GroovyParserVisitor {
 
             NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
             for (MethodNode method : clazz.getMethods()) {
-                if(method.isSynthetic()) {
+                if (method.isSynthetic()) {
                     continue;
                 }
                 sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
@@ -226,9 +226,9 @@ public class GroovyParserVisitor {
                 sortedByPosition.computeIfAbsent(pos(field), i -> new ArrayList<>()).add(field);
             }
             Iterator<InnerClassNode> innerClassIterator = clazz.getInnerClasses();
-            while(innerClassIterator.hasNext()) {
+            while (innerClassIterator.hasNext()) {
                 InnerClassNode icn = innerClassIterator.next();
-                if(icn.isSynthetic()) {
+                if (icn.isSynthetic()) {
                     continue;
                 }
                 sortedByPosition.computeIfAbsent(pos(icn), i -> new ArrayList<>()).add(icn);
@@ -243,7 +243,7 @@ public class GroovyParserVisitor {
                                             visitField((FieldNode) ast);
                                         } else if (ast instanceof MethodNode) {
                                             visitMethod((MethodNode) ast);
-                                        } else if(ast instanceof ClassNode) {
+                                        } else if (ast instanceof ClassNode) {
                                             visitClass((ClassNode)ast);
                                         }
                                         Statement stat = pollQueue();

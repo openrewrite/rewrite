@@ -59,7 +59,7 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String arraySignature(Object type) {
         ClassNode clazz = (ClassNode) type;
         String component;
-        if(clazz.getComponentType().isUsingGenerics()) {
+        if (clazz.getComponentType().isUsingGenerics()) {
             component = genericSignature(clazz.getComponentType().getGenericsTypes()[0]);
         } else {
             component = signature(clazz.getComponentType());
@@ -70,7 +70,7 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String classSignature(Object type) {
         ClassNode clazz = (ClassNode) type;
-        return ((ClassNode) type).getName();
+        return clazz.getName();
     }
 
     @Override
@@ -121,7 +121,7 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
         StringBuilder s = new StringBuilder(classSignature(type));
         StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
-        if(classNode.getGenericsTypes() != null) {
+        if (classNode.getGenericsTypes() != null) {
             for (GenericsType genericsType : classNode.getGenericsTypes()) {
                 typeParameters.add(signature(genericsType));
             }

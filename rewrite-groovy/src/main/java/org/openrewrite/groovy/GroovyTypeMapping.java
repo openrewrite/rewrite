@@ -94,7 +94,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             List<JavaType.Variable> fields = null;
             for (FieldNode field : node.getFields()) {
                 fields = new ArrayList<>(node.getFields().size());
-                if(!field.isSynthetic()) {
+                if (!field.isSynthetic()) {
                     fields.add(variableType(field));
                 }
             }
@@ -102,7 +102,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             List<JavaType.Method> methods = null;
             for (MethodNode method : node.getAllDeclaredMethods()) {
                 methods = new ArrayList<>(node.getAllDeclaredMethods().size());
-                if(!method.isSynthetic()) {
+                if (!method.isSynthetic()) {
                     methods.add(methodType(method));
                 }
             }
