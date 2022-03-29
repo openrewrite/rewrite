@@ -84,6 +84,25 @@ class JsonPathMatcherTest {
         before = simple
     )
 
+    @Disabled("Requires detecting the last json path operation, and returning the value. Note: the scope is being reduced to the match by the binary expression.")
+    @Test
+    fun findScopeOfObject() = assertMatched(
+        jsonPath = "$.object[?(@.literal == '$.object.literal')]",
+        before = simple,
+        after = arrayOf("""
+            object:
+            literal: $.object.literal
+        """.trimIndent())
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1514")
+    @Test
+    fun findLiteralInObject() = assertMatched(
+        jsonPath = "$.object[?(@.literal == '$.object.literal')].literal",
+        before = simple,
+        after = arrayOf("literal: $.object.literal")
+    )
+
     @Test
     fun wildcardAtRoot() = assertMatched(
         jsonPath = "$.*",

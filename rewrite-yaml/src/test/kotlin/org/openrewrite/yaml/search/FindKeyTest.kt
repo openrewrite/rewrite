@@ -16,6 +16,7 @@
 package org.openrewrite.yaml.search
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.yaml.YamlRecipeTest
 
 class FindKeyTest : YamlRecipeTest {
@@ -37,4 +38,19 @@ class FindKeyTest : YamlRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1514")
+    @Test
+    fun findKeyWithSpecificName() = assertChanged(
+        recipe = FindKey("$.metadata[?(@.name == 'container')].name"),
+        before = """
+            metadata:
+              name: container
+              namespace: container
+        """.trimIndent(),
+        after = """
+            metadata:
+              ~~>name: container
+              namespace: container
+        """.trimIndent(),
+    )
 }

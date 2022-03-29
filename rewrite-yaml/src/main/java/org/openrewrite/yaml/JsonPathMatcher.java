@@ -515,6 +515,12 @@ public class JsonPathMatcher {
                             return mapping;
                         }
                     }
+                } else if (lhs instanceof Yaml.Mapping.Entry) {
+                    Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) lhs;
+                    if (entry.getValue() instanceof Yaml.Scalar &&
+                            checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), rhs, operator)) {
+                        return entry;
+                    }
                 }
             }
             return null;
