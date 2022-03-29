@@ -25,7 +25,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
@@ -115,7 +115,7 @@ public class AddDependencyNoQuestionsAsked extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
+        return ListUtils.map(before, s -> s.getMarkers().findFirst(MavenResolutionResult.class)
                 .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
                     @Override
                     public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {

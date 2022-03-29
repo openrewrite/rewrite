@@ -88,7 +88,6 @@ public class AddDependencyNoQuestionsAskedVisitor extends MavenIsoVisitor<Execut
 
                 doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
                         new InsertDependencyComparator(tag.getContent() == null ? emptyList() : tag.getContent(), dependencyTag)));
-                maybeUpdateModel();
 
                 return tag;
             }
