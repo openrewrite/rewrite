@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 class LiteralTest : GroovyTreeTest {
@@ -96,5 +97,20 @@ class LiteralTest : GroovyTreeTest {
             def a = []
             def b = [   ]
         """
+    )
+
+    @Disabled
+    @Test
+    fun multilineString() = assertParsePrintAndProcess(
+        """
+            if (!JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_16)) {
+                logger.lifecycle '''
+            ************************************* WARNING ***********************************************
+            ****  You're running the build with an older JDK. NEVER try to release with an old JDK!  ****
+            ****  You must use a JDK 16+ in order to compile all features of the language.           ****
+            *********************************************************************************************
+            '''
+            }
+        """.trimIndent()
     )
 }
