@@ -29,7 +29,7 @@ import java.util.Optional;
 
 public class InMemoryMavenPomCache implements MavenPomCache {
     @Value
-    private static class MetadataKey {
+    public static class MetadataKey {
         URI repository;
         GroupArtifactVersion gav;
     }
