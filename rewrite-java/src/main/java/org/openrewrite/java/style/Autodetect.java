@@ -21,10 +21,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
@@ -47,25 +44,47 @@ public class Autodetect extends NamedStyles {
                 emptySet(), styles);
     }
 
-    public static Autodetect detect(List<J.CompilationUnit> cus) {
-        IndentStatistics indentStatistics = new IndentStatistics();
-        ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
-        SpacesStatistics spacesStatistics = new SpacesStatistics();
-        GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
+    public static Autodetect detect(List<? extends JavaSourceFile> cus) {
+        Builder builder = builder();
+        for (JavaSourceFile cu : cus) {
+            builder.detect(cu);
+        }
+        return builder.build();
+    }
 
-        importLayoutStatistics.mapBlockPatterns(cus);
-        for (J.CompilationUnit cu : cus) {
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final IndentStatistics indentStatistics = new IndentStatistics();
+        private final ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
+        private final SpacesStatistics spacesStatistics = new SpacesStatistics();
+        private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
+        private final NavigableSet<String> importedPackages = new TreeSet<>();
+
+        /**
+         * Accumulate information about style one source file at a time.
+         * @param cu A JVM source file.
+         */
+        public void detect(JavaSourceFile cu) {
             new FindIndentJavaVisitor().visit(cu, indentStatistics);
             new FindImportLayout().visit(cu, importLayoutStatistics);
             new FindSpacesStyle().visit(cu, spacesStatistics);
             new FindLineFormatJavaVisitor().visit(cu, generalFormatStatistics);
+            for (J.Import anImport : cu.getImports()) {
+                importedPackages.add(anImport.getPackageName() + ".");
+            }
         }
 
-        return new Autodetect(Tree.randomId(), Arrays.asList(
-                indentStatistics.getTabsAndIndentsStyle(),
-                importLayoutStatistics.getImportLayoutStyle(),
-                spacesStatistics.getSpacesStyle(),
-                generalFormatStatistics.getFormatStyle()));
+        public Autodetect build() {
+            importLayoutStatistics.mapBlockPatterns(importedPackages);
+            return new Autodetect(Tree.randomId(), Arrays.asList(
+                    indentStatistics.getTabsAndIndentsStyle(),
+                    importLayoutStatistics.getImportLayoutStyle(),
+                    spacesStatistics.getSpacesStyle(),
+                    generalFormatStatistics.getFormatStyle()));
+        }
     }
 
     private static class GeneralFormatStatistics {
@@ -194,7 +213,7 @@ public class Autodetect extends NamedStyles {
                         .mapToObj(c -> c == ' ')
                         .collect(Collectors.groupingBy(identity(), counting()));
 
-                if(!indentTypeCounts.isEmpty()) {
+                if (!indentTypeCounts.isEmpty()) {
                     if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
                         stats.linesWithSpaceIndents++;
                     } else {
@@ -524,17 +543,8 @@ public class Autodetect extends NamedStyles {
          * Maps the imported packages to patterns used to create Blocks in the ImportLayout.
          * Patterns are generated early to prevent block patterns that are too specific.
          * Ex. org.openrewrite.* vs. org.openrewrite.java.test.*
-         *
-         * @param cus list of compilation units to create Block patterns from.
          */
-        public void mapBlockPatterns(List<J.CompilationUnit> cus) {
-            Set<String> importedPackages = new TreeSet<>();
-            for (J.CompilationUnit cu : cus) {
-                for (J.Import anImport : cu.getImports()) {
-                    importedPackages.add(anImport.getPackageName() + ".");
-                }
-            }
-
+        public void mapBlockPatterns(NavigableSet<String> importedPackages) {
             String longestCommonPrefix = null;
             String prevLCP = null;
             List<String> prevPackages = new ArrayList<>();
