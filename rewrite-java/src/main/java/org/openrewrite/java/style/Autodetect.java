@@ -47,7 +47,10 @@ public class Autodetect extends NamedStyles {
     public static Autodetect detect(List<? extends JavaSourceFile> cus) {
         Builder builder = builder();
         for (JavaSourceFile cu : cus) {
-            builder.detect(cu);
+            builder.phase1(cu);
+        }
+        for (JavaSourceFile cu : cus) {
+            builder.phase2(cu);
         }
         return builder.build();
     }
@@ -67,18 +70,21 @@ public class Autodetect extends NamedStyles {
          * Accumulate information about style one source file at a time.
          * @param cu A JVM source file.
          */
-        public void detect(JavaSourceFile cu) {
+        public void phase1(JavaSourceFile cu) {
+            for (J.Import anImport : cu.getImports()) {
+                importedPackages.add(anImport.getPackageName() + ".");
+            }
+            importLayoutStatistics.mapBlockPatterns(importedPackages);
+        }
+
+        public void phase2(JavaSourceFile cu) {
             new FindIndentJavaVisitor().visit(cu, indentStatistics);
             new FindImportLayout().visit(cu, importLayoutStatistics);
             new FindSpacesStyle().visit(cu, spacesStatistics);
             new FindLineFormatJavaVisitor().visit(cu, generalFormatStatistics);
-            for (J.Import anImport : cu.getImports()) {
-                importedPackages.add(anImport.getPackageName() + ".");
-            }
         }
 
         public Autodetect build() {
-            importLayoutStatistics.mapBlockPatterns(importedPackages);
             return new Autodetect(Tree.randomId(), Arrays.asList(
                     indentStatistics.getTabsAndIndentsStyle(),
                     importLayoutStatistics.getImportLayoutStyle(),
