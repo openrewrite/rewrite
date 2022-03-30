@@ -1246,17 +1246,8 @@ public class GroovyParserVisitor {
                 case "--":
                     operator = J.Unary.Type.PreDecrement;
                     break;
-                case "+":
-                    operator = J.Unary.Type.Positive;
-                    break;
-                case "-":
-                    operator = J.Unary.Type.Negative;
-                    break;
                 case "~":
                     operator = J.Unary.Type.Complement;
-                    break;
-                case "!":
-                    operator = J.Unary.Type.Not;
                     break;
             }
 
