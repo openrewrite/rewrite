@@ -44,21 +44,6 @@ class UnaryTest : GroovyTreeTest {
 
     @Disabled
     @Test
-    fun unaryPlus() = assertParsePrintAndProcess(
-        """
-            int k = +10
-        """
-    )
-
-    @Test
-    fun unaryMinus() = assertParsePrintAndProcess(
-        """
-            int k = -10
-        """
-    )
-
-    @Disabled
-    @Test
     fun negation() = assertParsePrintAndProcess(
         """
             def a = !true

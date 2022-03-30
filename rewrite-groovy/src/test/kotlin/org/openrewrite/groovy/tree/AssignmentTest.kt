@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class AssignmentTest : GroovyTreeTest {
 
@@ -38,12 +39,20 @@ class AssignmentTest : GroovyTreeTest {
     )
 
     @Test
-    fun negativeNumber() = assertParsePrintAndProcess(
+    fun unaryMinus() = assertParsePrintAndProcess(
         """
             def i = -1
             def l = -1L
             def f = -1.0f
             def d = -1.0d
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1522")
+    @Test
+    fun unaryPlus() = assertParsePrintAndProcess(
+        """
+            int k = +10
         """
     )
 }

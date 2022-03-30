@@ -805,7 +805,8 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
 
             JavaType.Primitive jType;
-            String text = expression.getText();
+            // The unaryPlus is not included in the expression and must be handled through the source.
+            String text = source.charAt(cursor) == '+' ? "+" + expression.getText() : expression.getText();
 
             ClassNode type = expression.getType();
             if (type == ClassHelper.BigDecimal_TYPE) {
