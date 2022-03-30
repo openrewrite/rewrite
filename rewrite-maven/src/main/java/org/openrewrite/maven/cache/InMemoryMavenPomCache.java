@@ -42,15 +42,19 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     public InMemoryMavenPomCache() {
         this(
                 Caffeine.newBuilder()
+                        .recordStats()
                         .maximumSize(100_000)
                         .build(),
                 Caffeine.newBuilder()
+                        .recordStats()
                         .maximumSize(100_000)
                         .build(),
                 Caffeine.newBuilder()
+                        .recordStats()
                         .maximumSize(10_000)
                         .build(),
                 Caffeine.newBuilder()
+                        .recordStats()
                         .maximumSize(100_000)
                         .build()
         );
