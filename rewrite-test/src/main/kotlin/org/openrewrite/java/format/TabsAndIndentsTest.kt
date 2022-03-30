@@ -38,7 +38,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
     fun tabsAndIndents(with: TabsAndIndentsStyle.() -> TabsAndIndentsStyle = { this }) = listOf(
         NamedStyles(
             randomId(), "test", "test", "test", emptySet(), listOf(
-                IntelliJ.tabsAndIndents().run { with(this) })
+            IntelliJ.tabsAndIndents().run { with(this) })
         )
     )
 
@@ -692,6 +692,23 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun blockCommentCRLF(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents()).build(),
+        before =
+            "public class A {\r\n" +
+            "/*a\r\n" +
+            "  b*/\r\n" +
+            "public void method() {}\r\n" +
+            "}",
+        after =
+            "public class A {\r\n" +
+            "    /*a\r\n" +
+            "      b*/\r\n" +
+            "    public void method() {}\r\n" +
+            "}",
+    )
+
     @Suppress("EmptyClassInitializer")
     @Test
     fun initBlocks(jp: JavaParser) = assertUnchanged(
@@ -754,9 +771,9 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         before = """
             public class A {
             /**
-             * This is a javadoc
-             */
-            public void method() {}
+                    * This is a javadoc
+                        */
+                public void method() {}
             }
         """,
         after = """
@@ -1803,14 +1820,14 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             " */\r\n" +
             "public class A {\r\n" +
             "    /** Align JavaDoc right that starts on 1st line.\r\n" +
-            "      * @param value test value.\r\n" +
-            "      * @return value + 1 */\r\n" +
+            "     * @param value test value.\r\n" +
+            "     * @return value + 1 */\r\n" +
             "    public int methodOne(int value) {\r\n" +
             "        return value + 1;\r\n" +
             "    }\r\n" +
             "\r\n" +
             "    /** Edge case formatting test.\r\n" +
-            "@param value test value.\r\n" +
+            "     @param value test value.\r\n" +
             "     @return value + 1\r\n" +
             "     */\r\n"+
             "    public int methodTwo(int value) {\r\n" +
@@ -1850,14 +1867,14 @@ interface TabsAndIndentsTest : JavaRecipeTest {
              */
             public class A {
                 /** Align JavaDoc right that starts on 1st line.
-                  * @param value test value.
-                  * @return value + 1 */
+                 * @param value test value.
+                 * @return value + 1 */
                 public int methodOne(int value) {
                     return value + 1;
                 }
             
                 /** Edge case formatting test.
-            @param value test value.
+                 @param value test value.
                  @return value + 1
                  */
                 public int methodTwo(int value) {

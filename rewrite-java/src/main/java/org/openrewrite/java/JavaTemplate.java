@@ -136,7 +136,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 return block.withStatements(
                                         ListUtils.insertInOrder(
                                                 block.getStatements(),
-                                                autoFormat(gen.get(0).withPrefix(Space.format("\n")), p, getCursor()),
+                                                autoFormat(gen.get(0), p, getCursor()),
                                                 coordinates.getComparator()
                                         )
                                 );
@@ -145,7 +145,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                             return block.withStatements(
                                     ListUtils.concatAll(
                                             block.getStatements(),
-                                            ListUtils.map(gen, (i, s) -> autoFormat(i == 0 ? s.withPrefix(Space.format("\n")) : s, p, getCursor()))
+                                            ListUtils.map(gen, (i, s) -> autoFormat(s, p, getCursor()))
                                     )
                             );
                         }

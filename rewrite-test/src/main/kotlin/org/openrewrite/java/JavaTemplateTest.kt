@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 @file:Suppress("DuplicatedCode")
+
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
@@ -312,9 +313,9 @@ interface JavaTemplateTest : JavaRecipeTest {
                 val t = JavaTemplate.builder({ cursor }, "return n == 1;").build()
 
                 override fun visitReturn(retrn: J.Return, p: ExecutionContext): J {
-                    if(retrn.expression is J.Binary) {
+                    if (retrn.expression is J.Binary) {
                         val binary = retrn.expression as J.Binary
-                        if(binary.right is J.Literal &&  Integer.valueOf(0) == (binary.right as J.Literal).value) {
+                        if (binary.right is J.Literal && Integer.valueOf(0) == (binary.right as J.Literal).value) {
                             return retrn.withTemplate(t, retrn.coordinates.replace())
                         }
                     }
@@ -360,9 +361,9 @@ interface JavaTemplateTest : JavaRecipeTest {
                 val t = JavaTemplate.builder({ cursor }, "return n == 1;").build()
 
                 override fun visitReturn(retrn: J.Return, p: ExecutionContext): J {
-                    if(retrn.expression is J.Binary) {
+                    if (retrn.expression is J.Binary) {
                         val binary = retrn.expression as J.Binary
-                        if(binary.right is J.Literal &&  Integer.valueOf(0) == (binary.right as J.Literal).value) {
+                        if (binary.right is J.Literal && Integer.valueOf(0) == (binary.right as J.Literal).value) {
                             return retrn.withTemplate(t, retrn.coordinates.replace())
                         }
                     }
@@ -485,8 +486,9 @@ interface JavaTemplateTest : JavaRecipeTest {
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor }, "acceptString(#{any()}.toString())")
-                    .javaParser { JavaParser.fromJavaVersion()
-                        .dependsOn("""
+                    .javaParser {
+                        JavaParser.fromJavaVersion()
+                            .dependsOn("""
                             package org.openrewrite;
                             public class A {
                                 public A acceptInteger(Integer i) { return this; }
@@ -494,7 +496,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                                 public A someOtherMethod() { return this; }
                             }
                         """)
-                        .build() }
+                            .build()
+                    }
                     .build()
 
                 override fun visitMethodInvocation(
@@ -693,9 +696,9 @@ interface JavaTemplateTest : JavaRecipeTest {
             assertThat(type.parameterTypes[1])
                 .matches({
                     it is JavaType.Parameterized
-                            && it.type.fullyQualifiedName == "java.util.List"
-                            && it.typeParameters.size == 1
-                            && it.typeParameters.first().asFullyQualified()!!.fullyQualifiedName == "java.lang.String"
+                        && it.type.fullyQualifiedName == "java.util.List"
+                        && it.typeParameters.size == 1
+                        && it.typeParameters.first().asFullyQualified()!!.fullyQualifiedName == "java.lang.String"
                 }, "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
         }
     )
@@ -848,8 +851,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 val t = JavaTemplate.builder(
                     { cursor },
                     "if(n != 1) {\n" +
-                            "  n++;\n" +
-                            "}"
+                        "  n++;\n" +
+                        "}"
                 )
                     .build()
 
@@ -1706,8 +1709,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .`as`("The method declaration's type's genericSignature second argument should have type 'U' with bound 'java.lang.Object'")
                 .matches { uType ->
                     uType is JavaType.GenericTypeVariable &&
-                            uType.name == "U" &&
-                            uType.bounds.isEmpty()
+                        uType.name == "U" &&
+                        uType.bounds.isEmpty()
                 }
         }
     )
@@ -1915,6 +1918,46 @@ interface JavaTemplateTest : JavaRecipeTest {
             import java.util.function.Function;
             class Test {
                 Function<String, Integer> asInteger = it -> new Integer(it);
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1505")
+    @Test
+    fun methodDeclarationWithComment() = assertChanged(
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitClassDeclaration(classDeclaration: J.ClassDeclaration, p: ExecutionContext): J {
+                    var cd = classDeclaration
+                    if (cd.body.statements.isEmpty()) {
+                        cd = cd.withBody(cd.body.withTemplate(
+                            JavaTemplate.builder(this::getCursor,"""
+                                /**
+                                 * comment
+                                 */
+                                void foo() {
+                                }
+                            """)
+                                .build(),
+                            cd.body.coordinates.firstStatement()));
+                    }
+                    return cd
+                }
+            }
+        },
+        before = """
+            class A {
+            
+            }
+        """,
+        after = """
+            class A {
+                /**
+                 * comment
+                 */
+                void foo() {
+                }
+
             }
         """
     )

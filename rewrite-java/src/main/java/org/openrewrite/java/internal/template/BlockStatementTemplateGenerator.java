@@ -113,10 +113,12 @@ public class BlockStatementTemplateGenerator {
                         return t;
                     }
 
-                    for (Comment comment : t.getPrefix().getComments()) {
+                    List<Comment> comments = t.getPrefix().getComments();
+                    for (int i = 0; i < comments.size(); i++) {
+                        Comment comment = comments.get(i);
                         if (comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
                             blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
-                            js.add(t.withPrefix(Space.EMPTY));
+                            js.add(t.withPrefix(t.getPrefix().withComments(comments.subList(i + 1, comments.size()))));
                             return t;
                         }
                     }

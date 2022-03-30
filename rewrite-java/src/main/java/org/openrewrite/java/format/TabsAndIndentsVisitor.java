@@ -26,8 +26,10 @@ import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
@@ -495,39 +497,20 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 return textComment;
             }
         } else if (comment instanceof Javadoc.DocComment) {
-            String margin = StringUtils.commonMargin(null, priorSuffix);
-
-            int indent = getLengthOfWhitespace(margin);
-            int shift = column - indent;
-            if (shift != 0) {
-                return (Javadoc.DocComment) new JavadocVisitor<Integer>(new JavaVisitor<>()) {
-                    @Override
-                    public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer p) {
-                        if (shift < 0) {
-                            StringBuilder margin = new StringBuilder();
-                            String newLine = lineBreak.getMargin().startsWith("\n") ? "\n" : "\r\n";
-                            char[] charArray = lineBreak.getMargin().substring(lineBreak.getMargin().indexOf("\n") + 1).toCharArray();
-                            boolean inMargin = true;
-                            for (int i = 0; i < charArray.length; i++) {
-                                char c = charArray[i];
-                                if(i < Math.abs(shift) && inMargin) {
-                                    if(!Character.isWhitespace(c)) {
-                                        inMargin = false;
-                                        margin.append(c);
-                                    }
-                                    continue;
-                                }
-                                margin.append(c);
-                            }
-                            return lineBreak.withMargin(newLine + margin);
-                        } else{
-                            String newLine = lineBreak.getMargin().startsWith("\n") ? "\n" : "\r\n";
-                            return lineBreak.withMargin(newLine + indent("", shift) +
-                                    lineBreak.getMargin().substring(lineBreak.getMargin().indexOf("\n") + 1));
-                        }
-                    }
-                }.visitNonNull((Javadoc.DocComment) comment, 0);
-            }
+            final Javadoc.DocComment docComment = (Javadoc.DocComment) comment;
+            return docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
+                if(!(jdoc instanceof Javadoc.LineBreak)) {
+                    return jdoc;
+                }
+                Javadoc.LineBreak lineBreak = (Javadoc.LineBreak) jdoc;
+                String linebreak;
+                if(lineBreak.getMargin().charAt(0) == '\r') {
+                    linebreak = "\r\n";
+                } else {
+                    linebreak = "\n";
+                }
+                return lineBreak.withMargin(lineBreak.getMargin().replaceAll("^\\s+", indent(linebreak, column + 1)));
+            }));
         }
 
         return comment;
