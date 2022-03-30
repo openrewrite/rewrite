@@ -17,6 +17,7 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class BinaryTest : GroovyTreeTest {
 
@@ -32,26 +33,54 @@ class BinaryTest : GroovyTreeTest {
     @Test
     fun regexMatches() = assertParsePrintAndProcess(
         """
-            def UNSTABLE = /^([\d.-]+(alpha|beta|rc|m)[\d.-]+(groovy[\d.-]+)?|20030203.000550|20031129.200437|2004-03-19)${'$'}/
-            tasks.named("dependencyUpdates")?.configure {
-            gradleReleaseChannel = 'current'
-                rejectVersionIf {
-                    !(it.currentVersion.toLowerCase() ==~ UNSTABLE) && it.candidate.version.toLowerCase() ==~ UNSTABLE
-                }
-            }
-        """.trimIndent()
+            def REGEX = /\d+/
+            def text = "123"
+            def result = text =~ REGEX
+        """
     )
 
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1520")
     @Test
-    fun notOperatorAndBinaryExpression() = assertParsePrintAndProcess(
+    fun minusEquals() = assertParsePrintAndProcess(
         """
-            tasks.named("dependencyUpdates")?.configure {
-            gradleReleaseChannel = 'current'
-                rejectVersionIf {
-                    !(it.currentVersion.toLowerCase() == false) && it.candidate.version.toLowerCase() == false
-                }
-            }
-        """.trimIndent()
+            def a = 5
+            a -= 5
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1520")
+    @Test
+    fun divisionEquals() = assertParsePrintAndProcess(
+        """
+            def a = 5
+            a /= 5
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1520")
+    @Test
+    fun bitwiseAnd() = assertParsePrintAndProcess(
+        """
+            def a = 4
+            a &= 1
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1520")
+    @Test
+    fun bitwiseOr() = assertParsePrintAndProcess(
+        """
+            def a = 4
+            a |= 1
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1520")
+    @Test
+    fun bitwiseXOr() = assertParsePrintAndProcess(
+        """
+            def a = 4
+            a ^= 1
+        """
     )
 }

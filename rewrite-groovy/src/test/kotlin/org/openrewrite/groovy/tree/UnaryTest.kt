@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 class UnaryTest : GroovyTreeTest {
@@ -38,6 +39,29 @@ class UnaryTest : GroovyTreeTest {
     fun prefix() = assertParsePrintAndProcess(
         """
             int k = ++i;
+        """
+    )
+
+    @Disabled
+    @Test
+    fun unaryPlus() = assertParsePrintAndProcess(
+        """
+            int k = +10
+        """
+    )
+
+    @Test
+    fun unaryMinus() = assertParsePrintAndProcess(
+        """
+            int k = -10
+        """
+    )
+
+    @Disabled
+    @Test
+    fun negation() = assertParsePrintAndProcess(
+        """
+            def a = !true
         """
     )
 }
