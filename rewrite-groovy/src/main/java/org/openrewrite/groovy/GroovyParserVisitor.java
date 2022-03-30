@@ -806,7 +806,7 @@ public class GroovyParserVisitor {
 
             JavaType.Primitive jType;
             // The unaryPlus is not included in the expression and must be handled through the source.
-            String text = source.charAt(cursor) == '+' ? "+" + expression.getText() : expression.getText();
+            String text = expression.getText();
 
             ClassNode type = expression.getType();
             if (type == ClassHelper.BigDecimal_TYPE) {
@@ -848,6 +848,10 @@ public class GroovyParserVisitor {
                 return;
             }
 
+            if (source.charAt(cursor) == '+' && !text.startsWith("+")) {
+                // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
+                text = "+" + text;
+            }
             cursor += text.length();
 
             if (jType == JavaType.Primitive.Double || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Long) {
