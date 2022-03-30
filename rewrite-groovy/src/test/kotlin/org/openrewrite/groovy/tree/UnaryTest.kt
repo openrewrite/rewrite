@@ -15,8 +15,8 @@
  */
 package org.openrewrite.groovy.tree
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class UnaryTest : GroovyTreeTest {
     @Test
@@ -42,7 +42,7 @@ class UnaryTest : GroovyTreeTest {
         """
     )
 
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1524")
     @Test
     fun negation() = assertParsePrintAndProcess(
         """
