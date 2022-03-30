@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static java.util.Collections.emptyList;
 
@@ -155,7 +156,7 @@ public abstract class Recipe {
     }
 
     @JsonIgnore
-    private final List<Recipe> recipeList = new ArrayList<>();
+    private final List<Recipe> recipeList = new CopyOnWriteArrayList<>();
 
     /**
      * @param recipe {@link Recipe} to add to this recipe's pipeline.
