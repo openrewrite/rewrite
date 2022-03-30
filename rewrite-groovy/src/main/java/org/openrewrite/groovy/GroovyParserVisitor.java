@@ -627,12 +627,15 @@ public class GroovyParserVisitor {
                     assignOp = J.AssignmentOperation.Type.Addition;
                     break;
                 case "-=":
-                    assignOp = J.AssignmentOperation.Type.BitAnd;
+                    assignOp = J.AssignmentOperation.Type.Subtraction;
                     break;
                 case "&=":
-                    assignOp = J.AssignmentOperation.Type.BitOr;
+                    assignOp = J.AssignmentOperation.Type.BitAnd;
                     break;
                 case "|=":
+                    assignOp = J.AssignmentOperation.Type.BitOr;
+                    break;
+                case "^=":
                     assignOp = J.AssignmentOperation.Type.BitXor;
                     break;
                 case "/=":
@@ -649,9 +652,6 @@ public class GroovyParserVisitor {
                     break;
                 case ">>=":
                     assignOp = J.AssignmentOperation.Type.RightShift;
-                    break;
-                case "^=":
-                    assignOp = J.AssignmentOperation.Type.Subtraction;
                     break;
                 case ">>>=":
                     assignOp = J.AssignmentOperation.Type.UnsignedRightShift;
