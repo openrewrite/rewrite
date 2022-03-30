@@ -872,6 +872,14 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitNotExpression(NotExpression expression) {
+            Space fmt = sourceBefore("!");
+            JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
+            Expression expr = visit(expression.getExpression());
+            queue.add(new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, typeMapping.type(expression.getType())));
+        }
+
+        @Override
         public void visitDeclarationExpression(DeclarationExpression expression) {
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
