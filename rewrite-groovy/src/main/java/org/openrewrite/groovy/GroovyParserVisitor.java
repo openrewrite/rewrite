@@ -832,6 +832,8 @@ public class GroovyParserVisitor {
                     text = "/" + text + "/";
                 } else if (source.startsWith("\"\"\"", cursor)) {
                     text = "\"\"\"" + text + "\"\"\"";
+                } else if (source.startsWith("'''", cursor)) {
+                    text = "'''" + text + "'''";
                 } else if (source.startsWith("'", cursor)) {
                     text = "'" + text + "'";
                 } else if (source.startsWith("\"", cursor)) {
