@@ -628,13 +628,13 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         jp.styles(tabsAndIndents()).build(),
         before = """
             public class A {
-            // this is a comment
+              // comment at indent 2
             public void method() {}
             }
         """,
         after = """
             public class A {
-                // this is a comment
+                // comment at indent 2
                 public void method() {}
             }
         """
@@ -645,7 +645,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         jp.styles(tabsAndIndents()).build(),
         before = """
             public class A {
-            // length = 1 from new line.
+              // length = 1 from new line.
                   int valA = 10; // text.length = 1 + shift -2 == -1.
             }
         """,
@@ -1523,13 +1523,13 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             
                     // shift left.
                     public class A { // trailing comment at class.
-            // shift right.
+              // shift right.
                     // shift left.
                             public int method(int value) { // trailing comment at method.
                 // shift right.
                         // shift left.
                 if (value == 1) { // trailing comment at if.
-            // suffix contains new lines with whitespace.
+              // suffix contains new lines with whitespace.
                     
                     
                     // shift right.
@@ -1552,7 +1552,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                 // shift right at end of block.
                         // shift left at end of block.
                         }
-            // shift right at end of block.
+              // shift right at end of block.
                     // shift left at end of block.
                         }
         """,
@@ -1906,6 +1906,25 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             import org.a.A;
             class B extends
                     A {
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1526")
+    @Test
+    fun doNotFormatSingleLineCommentAtCol0() = assertChanged(
+        before = """
+            class A {
+            // DO NOT shift the whitespace of `Space` and the suffix of comment 1.
+            // DOES shift the suffix of comment 2.
+            void shiftRight() {}
+            }
+        """,
+        after = """
+            class A {
+            // DO NOT shift the whitespace of `Space` and the suffix of comment 1.
+            // DOES shift the suffix of comment 2.
+                void shiftRight() {}
             }
         """
     )
