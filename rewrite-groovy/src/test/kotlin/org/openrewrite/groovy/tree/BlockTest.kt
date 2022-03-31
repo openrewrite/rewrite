@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy.tree
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 class BlockTest: GroovyTreeTest {
@@ -25,26 +24,6 @@ class BlockTest: GroovyTreeTest {
         """
             implementation ('org.thymeleaf:thymeleaf-spring4:3.0.6.RELEASE') {
                 force = true;
-            }
-        """.trimIndent()
-    )
-
-    @Disabled
-    @Test
-    fun from() = assertParsePrintAndProcess(
-        """
-            tasks.named('jar') {
-                metaInf {
-                    /* this version of from causes the file to be un-parsable */
-                    from("${'$'}projectDir/licenses/LICENSE-JARJAR")
-                    from("${'$'}projectDir/licenses") {
-                        into('licenses')
-                        include('asm-license.txt')
-                        include('antlr4-license.txt')
-                    }
-                    from("${'$'}projectDir/notices/NOTICE-JARJAR")
-                    rename '^([A-Z]+)-([^.]*)', '${'$'}1'
-                }
             }
         """.trimIndent()
     )
