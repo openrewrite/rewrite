@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -34,7 +35,8 @@ public interface Tree {
     }
 
     static UUID randomId() {
-        return UUID.randomUUID();
+        //noinspection ConstantConditions
+        return MetricsHelper.UUID_TIMER.record(UUID::randomUUID);
     }
 
     /**

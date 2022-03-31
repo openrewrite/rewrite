@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.SourceFile;
@@ -24,6 +25,8 @@ import org.openrewrite.marker.GitProvenance;
 import java.util.Optional;
 
 public class MetricsHelper {
+    public static Timer UUID_TIMER = Metrics.timer("rewrite.id.generate");
+
     public static Timer.Builder successTags(Timer.Builder timer, String detailedOutcome) {
         return successTags(timer, null, detailedOutcome);
     }
