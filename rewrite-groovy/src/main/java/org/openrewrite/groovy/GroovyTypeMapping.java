@@ -54,25 +54,30 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             return existing;
         }
 
-        if (type instanceof ClassNode) {
-            ClassNode clazz = (ClassNode) type;
-            if (clazz.isArray()) {
-                return arrayType(clazz, signature);
-            } else if (ClassHelper.isPrimitiveType(clazz)) {
+        try {
+            if (type instanceof ClassNode) {
+                ClassNode clazz = (ClassNode) type;
+                if (clazz.isArray()) {
+                    return arrayType(clazz, signature);
+                } else if (ClassHelper.isPrimitiveType(clazz)) {
+                    //noinspection ConstantConditions
+                    return JavaType.Primitive.fromKeyword(clazz.getName());
+                } else if (clazz.isUsingGenerics()) {
+                    return parameterizedType(clazz, signature);
+                }
+                return classType((ClassNode) type, signature);
+            } else if (type instanceof GenericsType) {
+                return genericType((GenericsType) type, signature);
+            } else if (type instanceof MethodNode) {
                 //noinspection ConstantConditions
-                return JavaType.Primitive.fromKeyword(clazz.getName());
-            } else if (clazz.isUsingGenerics()) {
-                return parameterizedType(clazz, signature);
+                return methodType((MethodNode) type);
+            } else if (type instanceof FieldNode) {
+                //noinspection ConstantConditions
+                return variableType((FieldNode) type);
             }
-            return classType((ClassNode) type, signature);
-        } else if (type instanceof GenericsType) {
-            return genericType((GenericsType) type, signature);
-        } else if (type instanceof MethodNode) {
-            //noinspection ConstantConditions
-            return methodType((MethodNode) type);
-        } else if (type instanceof FieldNode) {
-            //noinspection ConstantConditions
-            return variableType((FieldNode) type);
+        } catch (NoClassDefFoundError e) {
+            // e.getMessage() returns fully qualified name of type that couldn't be found on the classpath
+            return JavaType.ShallowClass.build(e.getMessage());
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());

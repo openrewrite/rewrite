@@ -33,23 +33,28 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return "{undefined}";
         }
 
-        ASTNode astNode = (ASTNode) t;
-        if (astNode instanceof ClassNode) {
-            ClassNode clazz = (ClassNode) astNode;
-            if (clazz.isArray()) {
-                return arraySignature(clazz);
-            } else if (ClassHelper.isPrimitiveType(clazz)) {
-                return primitiveSignature(clazz);
-            } else if (clazz.isUsingGenerics()) {
-                return parameterizedSignature(clazz);
+        try {
+            ASTNode astNode = (ASTNode) t;
+            if (astNode instanceof ClassNode) {
+                ClassNode clazz = (ClassNode) astNode;
+                if (clazz.isArray()) {
+                    return arraySignature(clazz);
+                } else if (ClassHelper.isPrimitiveType(clazz)) {
+                    return primitiveSignature(clazz);
+                } else if (clazz.isUsingGenerics()) {
+                    return parameterizedSignature(clazz);
+                }
+                return classSignature(astNode);
+            } else if (astNode instanceof GenericsType) {
+                return genericSignature(astNode);
+            } else if (astNode instanceof MethodNode) {
+                return methodSignature((MethodNode) astNode);
+            } else if (astNode instanceof FieldNode) {
+                return variableSignature((FieldNode) astNode);
             }
-            return classSignature(astNode);
-        } else if (astNode instanceof GenericsType) {
-            return genericSignature(astNode);
-        } else if (astNode instanceof MethodNode) {
-            return methodSignature((MethodNode) astNode);
-        } else if (astNode instanceof FieldNode) {
-            return variableSignature((FieldNode) astNode);
+        } catch (NoClassDefFoundError e) {
+            // e.getMessage() returns fully qualified name of type that couldn't be found on the classpath
+            return e.getMessage();
         }
 
         throw new UnsupportedOperationException("Unexpected type " + t.getClass().getName());

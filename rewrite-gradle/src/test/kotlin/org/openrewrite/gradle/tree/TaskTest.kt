@@ -21,7 +21,6 @@ import org.openrewrite.Issue
 
 class TaskTest: GradleTreeTest {
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test
     fun declareTaskOldStyle() = assertParsePrintAndProcess("""
