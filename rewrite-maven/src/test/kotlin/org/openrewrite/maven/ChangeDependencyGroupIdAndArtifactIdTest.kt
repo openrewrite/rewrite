@@ -24,7 +24,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
             "org.openrewrite.recipe",
             "rewrite-testing-frameworks",
             "org.openrewrite.recipe",
-            "rewrite-migrate-java"
+            "rewrite-migrate-java",
+            null
         )
 
     @Test
@@ -33,7 +34,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
             "javax.activation",
             "javax.activation-api",
             "jakarta.activation",
-            "jakarta.activation-api"
+            "jakarta.activation-api",
+            null
         ),
         before = """
             <project>
@@ -99,7 +101,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
             "org.openrewrite",
             "rewrite-java-8",
             "org.openrewrite",
-            "rewrite-java-11"
+            "rewrite-java-11",
+            null
         ),
         before = """
             <project>
@@ -152,4 +155,44 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
         """
     )
 
+    @Test
+    fun changeDependencyGroupIdAndArtifactIdAndVersion() = assertChanged(
+        recipe =  ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.1.0"
+        ),
+        before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>javax.activation</groupId>
+                        <artifactId>javax.activation-api</artifactId>
+                        <version>1.2.0</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>jakarta.activation</groupId>
+                        <artifactId>jakarta.activation-api</artifactId>
+                        <version>2.1.0</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+    )
 }
