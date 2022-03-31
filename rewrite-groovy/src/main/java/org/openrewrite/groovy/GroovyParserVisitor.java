@@ -562,6 +562,7 @@ public class GroovyParserVisitor {
             boolean assignment = false;
             J.AssignmentOperation.Type assignOp = null;
             J.Binary.Type binaryOp = null;
+            G.Binary.Type gBinaryOp = null;
             switch (binary.getOperation().getText()) {
                 case "+":
                     binaryOp = J.Binary.Type.Addition;
@@ -656,6 +657,12 @@ public class GroovyParserVisitor {
                 case ">>>=":
                     assignOp = J.AssignmentOperation.Type.UnsignedRightShift;
                     break;
+                case "=~":
+                    gBinaryOp = G.Binary.Type.Find;
+                    break;
+                case "==~":
+                    gBinaryOp = G.Binary.Type.Match;
+                    break;
             }
 
             cursor += binary.getOperation().getText().length();
@@ -672,6 +679,10 @@ public class GroovyParserVisitor {
             } else if (binaryOp != null) {
                 queue.add(new J.Binary(randomId(), fmt, Markers.EMPTY,
                         left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
+                        right, typeMapping.type(binary.getType())));
+            } else if (gBinaryOp != null) {
+                queue.add(new G.Binary(randomId(), fmt, Markers.EMPTY,
+                        left, JLeftPadded.build(gBinaryOp).withBefore(opPrefix),
                         right, typeMapping.type(binary.getType())));
             }
         }

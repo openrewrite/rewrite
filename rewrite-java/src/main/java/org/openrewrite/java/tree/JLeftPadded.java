@@ -66,6 +66,7 @@ public class JLeftPadded<T> {
         CLASS_KIND(Space.Location.CLASS_KIND),
         EXTENDS(Space.Location.EXTENDS),
         FIELD_ACCESS_NAME(Space.Location.FIELD_ACCESS_NAME),
+        LANGUAGE_EXTENSION(Space.Location.LANGUAGE_EXTENSION),
         MEMBER_REFERENCE_NAME(Space.Location.MEMBER_REFERENCE_NAME),
         METHOD_DECLARATION_DEFAULT_VALUE(Space.Location.METHOD_DECLARATION_DEFAULT_VALUE),
         STATIC_IMPORT(Space.Location.STATIC_IMPORT),
