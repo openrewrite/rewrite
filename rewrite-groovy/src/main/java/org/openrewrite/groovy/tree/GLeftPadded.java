@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,20 +15,18 @@
  */
 package org.openrewrite.groovy.tree;
 
-public class GSpace {
+public class GLeftPadded {
     public enum Location {
-        BINARY_PREFIX,
-        BINARY_OPERATOR,
-        GSTRING,
-        LIST_LITERAL,
-        LIST_LITERAL_ELEMENT_SUFFIX,
-        LIST_LITERAL_ELEMENTS,
-        MAP_ENTRY,
-        MAP_ENTRY_PREFIX,
-        MAP_ENTRY_KEY_SUFFIX,
-        MAP_LITERAL,
-        MAP_LITERAL_ELEMENT_SUFFIX,
-        MAP_LITERAL_ELEMENTS,
-        TOP_LEVEL_STATEMENT,
+        BINARY_OPERATOR(GSpace.Location.BINARY_OPERATOR);
+
+        private final GSpace.Location beforeLocation;
+
+        Location(GSpace.Location beforeLocation) {
+            this.beforeLocation = beforeLocation;
+        }
+
+        public GSpace.Location getBeforeLocation() {
+            return beforeLocation;
+        }
     }
 }

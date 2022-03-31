@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy.tree
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 
@@ -29,13 +28,23 @@ class BinaryTest : GroovyTreeTest {
         """
     )
 
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1531")
     @Test
-    fun regexMatches() = assertParsePrintAndProcess(
+    fun regexFindOperator() = assertParsePrintAndProcess(
         """
             def REGEX = /\d+/
             def text = "123"
             def result = text =~ REGEX
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1531")
+    @Test
+    fun regexMatchOperator() = assertParsePrintAndProcess(
+        """
+            def REGEX = /\d+/
+            def text = "123"
+            def result = text ==~ REGEX
         """
     )
 

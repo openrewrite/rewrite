@@ -116,6 +116,26 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitBinary(G.Binary binary, PrintOutputCapture<P> p) {
+        String keyword = "";
+        switch (binary.getOperator()) {
+            case Find:
+                keyword = "=~";
+                break;
+            case Match:
+                keyword = "==~";
+                break;
+        }
+        visitSpace(binary.getPrefix(), GSpace.Location.BINARY_PREFIX, p);
+        visitMarkers(binary.getMarkers(), p);
+        visit(binary.getLeft(), p);
+        visitSpace(binary.getPadding().getOperator().getBefore(), GSpace.Location.BINARY_OPERATOR, p);
+        p.append(keyword);
+        visit(binary.getRight(), p);
+        return binary;
+    }
+
+    @Override
     public Space visitSpace(Space space, GSpace.Location loc, PrintOutputCapture<P> p) {
         return delegate.visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
     }

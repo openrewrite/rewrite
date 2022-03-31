@@ -16,10 +16,7 @@
 package org.openrewrite.groovy;
 
 import org.openrewrite.SourceFile;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.groovy.tree.GContainer;
-import org.openrewrite.groovy.tree.GRightPadded;
-import org.openrewrite.groovy.tree.GSpace;
+import org.openrewrite.groovy.tree.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
@@ -123,8 +120,29 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
+    public J visitBinary(G.Binary binary, P p) {
+        G.Binary b = binary;
+        b = b.withPrefix(visitSpace(b.getPrefix(), GSpace.Location.BINARY_PREFIX, p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(b, p);
+        if (!(temp instanceof G.Binary)) {
+            return temp;
+        } else {
+            b = (G.Binary) temp;
+        }
+        b = b.withLeft(visitAndCast(b.getLeft(), p));
+        b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), GLeftPadded.Location.BINARY_OPERATOR, p));
+        b = b.withRight(visitAndCast(b.getRight(), p));
+        b = b.withType(visitType(b.getType(), p));
+        return b;
+    }
+
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, GRightPadded.Location loc, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, GLeftPadded.Location loc, P p) {
+        return super.visitLeftPadded(left, JLeftPadded.Location.LANGUAGE_EXTENSION, p);
     }
 
     public Space visitSpace(Space space, GSpace.Location loc, P p) {
