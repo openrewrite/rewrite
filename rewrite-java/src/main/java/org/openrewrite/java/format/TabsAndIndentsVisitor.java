@@ -412,14 +412,24 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             int indent = getLengthOfWhitespace(StringUtils.indent(lastIndent));
 
             if (indent != finalColumn) {
-                if (whitespace.contains("\n") || hasFileLeadingComment) {
+                if (hasFileLeadingComment || whitespace.contains("\n") &&
+                        // Do not shift single line comments at col 0.
+                        !(!s.getComments().isEmpty() && s.getComments().get(0) instanceof TextComment &&
+                        !s.getComments().get(0).isMultiline() && getLengthOfWhitespace(s.getWhitespace()) == 0) && whitespace.contains("\n")) {
                     int shift = finalColumn - indent;
                     s = s.withWhitespace(whitespace.substring(0, whitespace.lastIndexOf('\n') + 1) +
                             indent(lastIndent, shift));
                 }
 
                 Space finalSpace = s;
+                int lastCommentPos = s.getComments().size() - 1;
                 s = s.withComments(ListUtils.map(s.getComments(), (i, c) -> {
+                    if (c instanceof TextComment && !c.isMultiline()) {
+                        // Do not shift single line comments at col 0.
+                        if ((i != lastCommentPos) && getLengthOfWhitespace(c.getSuffix()) == 0) {
+                            return c;
+                        }
+                    }
                     String priorSuffix = i == 0 ?
                             space.getWhitespace() :
                             finalSpace.getComments().get(i - 1).getSuffix();
