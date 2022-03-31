@@ -55,7 +55,7 @@ public class TabsAndIndentsVisitor<P> extends XmlIsoVisitor<P> {
                     if(style.getUseTabCharacter()) {
                         shiftedPrefixBuilder.append("\t");
                     } else {
-                        for(int j = 0; j < style.getIndentSize(); j++) {
+                        for(int j = 0; j < (x instanceof Xml.Attribute ? style.getContinuationIndentSize() : style.getIndentSize()); j++) {
                             shiftedPrefixBuilder.append(" ");
                         }
                     }

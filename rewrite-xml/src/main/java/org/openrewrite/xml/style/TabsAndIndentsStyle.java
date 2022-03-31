@@ -39,11 +39,12 @@ import org.openrewrite.style.StyleHelper;
 @Value
 @With
 public class TabsAndIndentsStyle implements XmlStyle {
-    public static final TabsAndIndentsStyle DEFAULT = new TabsAndIndentsStyle(false, 2, 2);
+    public static final TabsAndIndentsStyle DEFAULT = new TabsAndIndentsStyle(false, 2, 2, 4);
 
     Boolean useTabCharacter;
     Integer tabSize;
     Integer indentSize;
+    Integer continuationIndentSize;
 
     @Override
     public Style applyDefaults() {

@@ -57,6 +57,18 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class IndentStatistics {
+        IndentFrequencies indentFrequencies = new IndentFrequencies();
+        IndentFrequencies continuationIndentFrequencies = new IndentFrequencies();
+
+        public TabsAndIndentsStyle getTabsAndIndentsStyle() {
+            TabsAndIndentsStyle style = indentFrequencies.getTabsAndIndentsStyle();
+            return continuationIndentFrequencies.hasEnoughSamples() ?
+                    style.withContinuationIndentSize(continuationIndentFrequencies.getTabsAndIndentsStyle().getIndentSize()) :
+                    style;
+        }
+    }
+
+    private static class IndentFrequencies {
         private final Map<Integer, Long> spaceIndentFrequencies = new HashMap<>();
         private final Map<Integer, Long> tabIndentFrequencies = new HashMap<>();
         private int linesWithSpaceIndents = 0;
@@ -66,13 +78,17 @@ public class Autodetect extends NamedStyles {
             return linesWithSpaceIndents >= linesWithTabIndents;
         }
 
-        public TabsAndIndentsStyle getTabsAndIndentsStyle() {
+        public boolean hasEnoughSamples() {
+            return linesWithSpaceIndents + linesWithTabIndents > 1;
+        }
+
+        private TabsAndIndentsStyle getTabsAndIndentsStyle() {
             boolean useTabs = !isIndentedWithSpaces();
 
             Map.Entry<Integer, Long> i1 = null;
             Map.Entry<Integer, Long> i2 = null;
 
-            int indent = 2;
+            int indent = TabsAndIndentsStyle.DEFAULT.getIndentSize();
             long indentCount = 0;
 
             Map<Integer, Long> indentFrequencies = useTabs ? tabIndentFrequencies : spaceIndentFrequencies;
@@ -82,7 +98,7 @@ public class Autodetect extends NamedStyles {
                 }
                 long currentCount = 0;
                 for (Map.Entry<Integer, Long> candidate : indentFrequencies.entrySet()) {
-                    if  (candidate.getKey() == 0) {
+                    if (candidate.getKey() == 0) {
                         continue;
                     }
                     if (candidate.getKey() % current.getKey() == 0) {
@@ -100,7 +116,8 @@ public class Autodetect extends NamedStyles {
             return new TabsAndIndentsStyle(
                     useTabs,
                     useTabs ? indent : 1,
-                    useTabs ? 1 : indent
+                    useTabs ? 1 : indent,
+                    useTabs ? 2 : indent * 2
             );
         }
     }
@@ -108,7 +125,7 @@ public class Autodetect extends NamedStyles {
     private static class FindLineFormatJavaVisitor extends XmlVisitor<GeneralFormatStatistics> {
         @Override
         public @Nullable Xml visit(@Nullable Tree tree, GeneralFormatStatistics stats) {
-            if(tree instanceof Xml) {
+            if (tree instanceof Xml) {
                 String prefix = ((Xml) tree).getPrefix();
                 char[] chars = prefix.toCharArray();
 
@@ -131,9 +148,18 @@ public class Autodetect extends NamedStyles {
 
     private static class FindIndentXmlVisitor extends XmlVisitor<IndentStatistics> {
         @Override
-        public Xml preVisit(Xml tree, IndentStatistics stats) {
-            String prefix = tree.getPrefix();
+        public Xml visitTag(Xml.Tag tag, IndentStatistics stats) {
+            measureFrequencies(tag.getPrefix(), stats.indentFrequencies);
+            return super.visitTag(tag, stats);
+        }
 
+        @Override
+        public Xml visitAttribute(Xml.Attribute attribute, IndentStatistics stats) {
+            measureFrequencies(attribute.getPrefix(), stats.continuationIndentFrequencies);
+            return super.visitAttribute(attribute, stats);
+        }
+
+        private void measureFrequencies(String prefix, IndentFrequencies frequencies) {
             AtomicBoolean takeWhile = new AtomicBoolean(true);
             if (prefix.chars()
                     .filter(c -> {
@@ -174,8 +200,8 @@ public class Autodetect extends NamedStyles {
                     }
                 }
 
-                stats.spaceIndentFrequencies.merge(spaceIndent, 1L, Long::sum);
-                stats.tabIndentFrequencies.merge(tabIndent, 1L, Long::sum);
+                frequencies.spaceIndentFrequencies.merge(spaceIndent, 1L, Long::sum);
+                frequencies.tabIndentFrequencies.merge(tabIndent, 1L, Long::sum);
 
                 AtomicBoolean dropWhile = new AtomicBoolean(false);
                 takeWhile.set(true);
@@ -192,13 +218,11 @@ public class Autodetect extends NamedStyles {
                         .collect(Collectors.groupingBy(identity(), counting()));
 
                 if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
-                    stats.linesWithSpaceIndents++;
+                    frequencies.linesWithSpaceIndents++;
                 } else {
-                    stats.linesWithTabIndents++;
+                    frequencies.linesWithTabIndents++;
                 }
             }
-
-            return tree;
         }
     }
 
