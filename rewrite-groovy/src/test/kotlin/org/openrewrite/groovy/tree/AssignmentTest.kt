@@ -55,4 +55,16 @@ class AssignmentTest : GroovyTreeTest {
             int k = +10
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1533")
+    @Test
+    fun baseNConversions() = assertParsePrintAndProcess(
+        """
+            def a = 01
+            def b = 001
+            def c = 0001
+            def d = 00001
+            def e = 000001
+        """
+    )
 }

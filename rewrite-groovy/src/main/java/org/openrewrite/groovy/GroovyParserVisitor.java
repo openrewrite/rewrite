@@ -834,6 +834,13 @@ public class GroovyParserVisitor {
                 jType = JavaType.Primitive.Float;
             } else if (type == ClassHelper.int_TYPE || "java.lang.Integer".equals(type.getName())) {
                 jType = JavaType.Primitive.Int;
+                if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
+                    String literalText = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
+                    // Groovy automatically converts numbers that start with 0 from base-n to an int.
+                    if (literalText.startsWith("0")) {
+                        text = literalText;
+                    }
+                }
             } else if (type == ClassHelper.long_TYPE || "java.lang.Long".equals(type.getName())) {
                 jType = JavaType.Primitive.Long;
             } else if (type == ClassHelper.short_TYPE || "java.lang.Short".equals(type.getName())) {
