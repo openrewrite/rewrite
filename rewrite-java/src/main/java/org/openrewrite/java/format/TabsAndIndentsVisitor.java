@@ -415,7 +415,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 if (hasFileLeadingComment || whitespace.contains("\n") &&
                         // Do not shift single line comments at col 0.
                         !(!s.getComments().isEmpty() && s.getComments().get(0) instanceof TextComment &&
-                        !s.getComments().get(0).isMultiline() && getLengthOfWhitespace(s.getWhitespace()) == 0) && whitespace.contains("\n")) {
+                        !s.getComments().get(0).isMultiline() && getLengthOfWhitespace(s.getWhitespace()) == 0)) {
                     int shift = finalColumn - indent;
                     s = s.withWhitespace(whitespace.substring(0, whitespace.lastIndexOf('\n') + 1) +
                             indent(lastIndent, shift));
