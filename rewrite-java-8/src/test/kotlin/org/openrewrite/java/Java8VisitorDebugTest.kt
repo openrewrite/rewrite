@@ -631,4 +631,8 @@ class Java8SimplifyConsecutiveAssignmentsTest : Java8Test, SimplifyConsecutiveAs
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8SimplifyConstantIfBranchExecutionTest : Java8Test, SimplifyConstantIfBranchExecutionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8SimplifyMethodChainTest : Java8Test, SimplifyMethodChainTest

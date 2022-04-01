@@ -636,4 +636,8 @@ class Java11SimplifyConsecutiveAssignmentsTest : Java11Test, SimplifyConsecutive
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11SimplifyConstantIfBranchExecutionTest : Java11Test, SimplifyConstantIfBranchExecutionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11SimplifyMethodChainTest : Java11Test, SimplifyMethodChainTest
