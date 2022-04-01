@@ -24,7 +24,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.openrewrite.Incubating;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
@@ -33,7 +32,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -92,7 +90,7 @@ public class GitProvenance implements Marker {
     /**
      * @param projectDir The project directory.
      * @return A marker containing git provenance information.
-     * @deprecated Use {@link #fromProjectDirectory(Path, Markers) instead}.
+     * @deprecated Use {@link #fromProjectDirectory(Path, BuildEnvironment) instead}.
      */
     @Deprecated
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir) {
