@@ -28,9 +28,6 @@ import org.openrewrite.xml.tree.Xml
 
 interface MavenTestingSupport : XmlTestingSupport {
 
-    val mavenParser: MavenParser
-        get() = MavenParser.builder().build()
-
     /**
      * Extension method for {@Link MavenParser} that will parse a maven file and add a new JavaProject provenance to the
      * resulting source file. An optional list of additional markers can be associated with the source file.
@@ -65,12 +62,12 @@ interface MavenTestingSupport : XmlTestingSupport {
 
     fun Xml.Document.getModel() : MavenResolutionResult {
         return markers.findFirst(MavenResolutionResult::class.java)
-            .orElseThrow { IllegalStateException("The XML Document is not a maven source file.") };
+            .orElseThrow { IllegalStateException("The XML Document is not a maven source file.") }
     }
 
     fun Xml.Document.getJavaProject() : JavaProject {
         return markers.findFirst(JavaProject::class.java)
-            .orElseThrow { IllegalStateException("There is no Java Project associated with the document") };
+            .orElseThrow { IllegalStateException("There is no Java Project associated with the document") }
     }
 
     private fun createJavaProjectFromMaven(maven : Xml.Document) : JavaProject {

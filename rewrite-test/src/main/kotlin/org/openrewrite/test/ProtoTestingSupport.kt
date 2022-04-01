@@ -25,9 +25,6 @@ import org.openrewrite.protobuf.tree.Proto
 
 interface ProtoTestingSupport : RecipeTestingSupport{
 
-    val protoParser : ProtoParser
-        get() = ProtoParser()
-
     fun ProtoParser.parse(
         @Language("protobuf") source: String,
         markers : List<Marker> = emptyList(),

@@ -25,9 +25,6 @@ import org.openrewrite.xml.tree.Xml
 
 interface XmlTestingSupport : RecipeTestingSupport {
 
-    val xmlParser: XmlParser
-        get() = XmlParser()
-
     fun XmlParser.parse(
         @Language("xml") source: String,
         markers : List<Marker> = emptyList(),

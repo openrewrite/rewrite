@@ -25,9 +25,6 @@ import org.openrewrite.marker.Marker
 
 interface JsonTestingSupport : RecipeTestingSupport {
 
-    val jsonParser: JsonParser
-        get() = JsonParser()
-
     fun JsonParser.parse(
         @Language("json") source: String,
         markers : List<Marker> = emptyList(),

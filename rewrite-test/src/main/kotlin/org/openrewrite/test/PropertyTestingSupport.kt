@@ -26,9 +26,6 @@ import org.openrewrite.properties.tree.Properties
 
 interface PropertyTestingSupport : RecipeTestingSupport  {
 
-    val propertyParser: PropertiesParser
-        get() = PropertiesParser()
-
     fun PropertiesParser.parse(
         @Language("properties") source: String,
         markers : List<Marker> = emptyList(),
@@ -57,7 +54,7 @@ interface PropertyTestingSupport : RecipeTestingSupport  {
         ctx: ExecutionContext = this.executionContext,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (org.openrewrite.properties.tree.Properties.File) -> Unit = { }
+        afterConditions: (Properties.File) -> Unit = { }
     ) {
         assertChangedBase(before, after, additionalSources, recipe, executionContext, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }

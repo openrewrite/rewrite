@@ -25,11 +25,12 @@ import org.openrewrite.test.MavenTestingSupport
 
 class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
 
-    override val javaParser: JavaParser
-        get() = JavaParser.fromJavaVersion()
+    private val javaParser = JavaParser.fromJavaVersion()
         .logCompilationWarningsAndErrors(true)
         .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core")
         .build()
+
+    private val mavenParser = MavenParser.builder().build()
 
     private val usingGuavaIntMath = """
         import com.google.common.math.IntMath;
@@ -42,7 +43,7 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
     """
 
     private val usingJUnit = """
-        class AnExample {
+        class AnExampleTest {
             @org.junit.jupiter.api.Test
             void test() {}
         }

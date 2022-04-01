@@ -25,9 +25,6 @@ import org.openrewrite.marker.Marker
 
 interface JavaTestingSupport : RecipeTestingSupport {
 
-    val javaParser: JavaParser
-        get() = JavaParser.fromJavaVersion().build()
-
     fun JavaParser.parse(
         @Language("java") source: String,
         sourceSet: String = "main",

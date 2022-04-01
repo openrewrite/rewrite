@@ -20,13 +20,14 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.JavaTestingSupport
 import java.io.File
 import java.nio.file.Path
 
-interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
-    override val parser: JavaParser
+interface JavaRecipeTest : JavaTestingSupport {
+
+    val parser: JavaParser
         get() = JavaParser.fromJavaVersion().build()
 
     override val executionContext: ExecutionContext
@@ -62,14 +63,14 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
             TypeValidator.assertTypesValid(cu, TypeValidator.ValidationOptions.builder(typeValidation))
             afterConditions(cu)
         }
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
 
         super.assertChangedBase(
-            parser,
-            recipe,
-            executionContext,
-            before,
-            dependsOn,
-            after,
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
             cycles,
             expectedCyclesThatMakeChanges,
             typeValidatingAfterConditions
@@ -93,14 +94,15 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
             TypeValidator.assertTypesValid(cu, TypeValidator.ValidationOptions.builder(typeValidation))
             afterConditions(cu)
         }
+
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
         super.assertChangedBase(
-            parser,
-            recipe,
-            executionContext,
-            before,
-            relativeTo,
-            dependsOn,
-            after,
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
             cycles,
             expectedCyclesThatMakeChanges,
             typeValidatingAfterConditions
@@ -114,7 +116,13 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         @Language("java") before: String,
         @Language("java") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).toTypedArray())
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext)
     }
 
     fun assertUnchanged(
@@ -125,6 +133,13 @@ interface JavaRecipeTest : RecipeTest<J.CompilationUnit> {
         relativeTo: Path? = null,
         @Language("java") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
+
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext)
     }
 }

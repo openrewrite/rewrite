@@ -24,8 +24,6 @@ import org.openrewrite.yaml.YamlParser
 import org.openrewrite.yaml.tree.Yaml
 
 interface YamlTestingSupport : RecipeTestingSupport {
-    val yamlParser: YamlParser
-        get() = YamlParser()
 
     fun YamlParser.parse(
         @Language("yaml") source: String,

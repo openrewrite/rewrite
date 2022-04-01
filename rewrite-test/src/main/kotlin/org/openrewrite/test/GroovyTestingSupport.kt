@@ -21,15 +21,10 @@ import org.openrewrite.Recipe
 import org.openrewrite.SourceFile
 import org.openrewrite.groovy.GroovyParser
 import org.openrewrite.groovy.tree.G
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.tree.J
 import org.openrewrite.marker.Marker
 import org.openrewrite.xml.tree.Xml
 
 interface GroovyTestingSupport : RecipeTestingSupport {
-
-    val groovyParser: GroovyParser
-        get() = GroovyParser.builder().build()
 
     fun GroovyParser.parse(
         @Language("groovy") source: String,
