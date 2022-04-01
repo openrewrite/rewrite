@@ -14,7 +14,7 @@ tasks.register<JavaExec>("generateAntlrSources") {
 dependencies {
     api(project(":rewrite-core"))
     api("org.jetbrains:annotations:latest.release")
-    api("com.fasterxml.jackson.core:jackson-annotations:2.13.2")
+    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
     implementation("org.antlr:antlr4:latest.release")
     implementation("io.micrometer:micrometer-core:latest.release")
