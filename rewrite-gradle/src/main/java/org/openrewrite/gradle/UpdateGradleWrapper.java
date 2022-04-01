@@ -23,24 +23,24 @@ import org.openrewrite.binary.BinaryParser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Collections.singletonList;
-import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class UpdateGradleWrapper extends Recipe {
     private static final String DEFAULT_VERSION = "7.4.2";
     private static final Path WRAPPER_LOCATION = Paths.get("gradle/wrapper/gradle-wrapper.properties");
+    private static final Path SCRIPT_LOCATION = Paths.get("gradlew");
+    private static final Path BATCH_LOCATION = Paths.get("gradlew.bat");
 
     @Override
     public String getDisplayName() {
@@ -75,9 +75,10 @@ public class UpdateGradleWrapper extends Recipe {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext context) {
-                if (!PathUtils.equalIgnoringSeparators(file.getSourcePath(), WRAPPER_LOCATION)) {
+                if (!equalIgnoringSeparators(file.getSourcePath(), WRAPPER_LOCATION)) {
                     return file;
                 }
+
                 return super.visitFile(file, context);
             }
 
@@ -97,7 +98,7 @@ public class UpdateGradleWrapper extends Recipe {
                 if (!desiredVersion.equals(currentVersion)) {
                     return entry.withMarkers(entry.getMarkers().searchResult());
                 }
-                if(distribution == null) {
+                if (distribution == null) {
                     return entry;
                 }
                 String currentDistribution = distributionComponents[2].substring(0, distributionComponents[2].indexOf('.'));
@@ -112,31 +113,41 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        PlainText gradlew = new PlainText(randomId(),
-                Paths.get("gradlew"), Markers.EMPTY,
-                StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew")));
-        PlainText gradlewBat = new PlainText(randomId(),
-                Paths.get("gradlew.bat"), Markers.EMPTY,
-                StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat")));
         Binary gradleWrapperJar = new BinaryParser().parseInputs(singletonList(
                 new Parser.Input(Paths.get("gradle/wrapper/gradle-wrapper.jar"),
                         () -> UpdateGradleWrapper.class.getResourceAsStream("/gradle-wrapper.jar"))), null, ctx).get(0);
 
-        return ListUtils.concatAll(
+        return ListUtils.concat(
                 ListUtils.map(before, sourceFile -> {
-                    if (!(sourceFile instanceof Properties)) {
-                        return sourceFile;
+                    if(sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), SCRIPT_LOCATION)) {
+                        PlainText gradlew = (PlainText)sourceFile;
+                        String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"));
+                        if(!gradlewText.equals(gradlew.getText())) {
+                            gradlew = gradlew.withText(gradlewText);
+                        }
+                        return gradlew;
                     }
-                    return (Properties.File) new UpdateWrapperPropsVisitor().visitNonNull(sourceFile, ctx);
+                    if(sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), BATCH_LOCATION)) {
+                        PlainText gradlewBat = (PlainText)sourceFile;
+                        String gradlewBatText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat"));
+                        if(!gradlewBatText.equals(gradlewBat.getText())) {
+                            gradlewBat = gradlewBat.withText(gradlewBatText);
+                        }
+                        return gradlewBat;
+                    }
+                    if (sourceFile instanceof Properties.File) {
+                        return (Properties.File) new UpdateWrapperPropsVisitor().visitNonNull(sourceFile, ctx);
+                    }
+                    return sourceFile;
                 }),
-                Arrays.asList(gradlew, gradlewBat, gradleWrapperJar)
+                gradleWrapperJar
         );
     }
 
     private class UpdateWrapperPropsVisitor extends PropertiesVisitor<ExecutionContext> {
         @Override
         public Properties visitFile(Properties.File file, ExecutionContext context) {
-            if (!PathUtils.equalIgnoringSeparators(file.getSourcePath(), WRAPPER_LOCATION)) {
+            if (!equalIgnoringSeparators(file.getSourcePath(), WRAPPER_LOCATION)) {
                 return file;
             }
             return super.visitFile(file, context);
@@ -151,7 +162,7 @@ public class UpdateGradleWrapper extends Recipe {
             String desiredVersion = (version == null) ? DEFAULT_VERSION : version;
 
             String desiredDistributionUrl;
-            if(distribution == null) {
+            if (distribution == null) {
                 desiredDistributionUrl = distributionUrl.substring(0, distributionUrl.lastIndexOf('/') + 1) +
                         "gradle-" + desiredVersion + distributionUrl.substring(distributionUrl.lastIndexOf('-'));
             } else {
