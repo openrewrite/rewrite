@@ -111,6 +111,25 @@ class JsonPathMatcherTest {
         before = simple
     )
 
+    @Disabled("Requires detecting the last json path operation, and returning the value. Note: the scope is being reduced to the match by the binary expression.")
+    @Test
+    fun findScopeOfObject() = assertMatched(
+        jsonPath = "$.object[?(@.literal == '$.object.literal')]",
+        before = simple,
+        after = arrayOf("""
+            object:
+            literal: $.object.literal
+        """.trimIndent())
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1514")
+    @Test
+    fun findLiteralInObject() = assertMatched(
+        jsonPath = "$.object[?(@.literal == '$.object.literal')].literal",
+        before = simple,
+        after = arrayOf("\"literal\": \"$.object.literal\"")
+    )
+
     @Test
     fun wildcardAtRoot() = assertMatched(
         jsonPath = "$.*",
@@ -365,14 +384,14 @@ class JsonPathMatcherTest {
         after = arrayOf("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
     )
 
-    @Disabled("Implement logical &&.")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1063")
     @Test
     fun doesNotMatchWrongAnd() = assertNotMatched(
         jsonPath = "$..list[?(@.literal == 'no-match' && @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
         before = complex
     )
 
-    @Disabled("Implement logical &&.")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1063")
     @Test
     fun filterOnPropertyWithAnd() = assertMatched(
         jsonPath = "$..list[?($.literal == '$.literal' && @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
@@ -380,19 +399,19 @@ class JsonPathMatcherTest {
         after = arrayOf("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
     )
 
-    @Disabled("Implement logical || and operator precedence")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1063")
+    @Test
+    fun doesNotMatchWrongOr() = assertNotMatched(
+        jsonPath = "$..list[?(@.literal == 'no-match-1' || @.literal == 'no-match-2')].literal",
+        before = complex
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1063")
     @Test
     fun filterOnPropertyWithOr() = assertMatched(
         jsonPath = "$..list[?(@.literal == 'no-match' || @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
         before = complex,
         after = arrayOf("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
-    )
-
-    @Disabled("Implement logical || and operator precedence")
-    @Test
-    fun doesNotMatchWrongOr() = assertNotMatched(
-        jsonPath = "$..list[?(@.literal == 'no-match-1' || @.literal == 'no-match-2')].literal",
-        before = complex
     )
 
     @Test
@@ -446,8 +465,7 @@ class JsonPathMatcherTest {
                 "literal": "$.objects.object.list[0].literal"
               }]
             }
-        """.trimIndent()),
-        printMatches = true
+        """.trimIndent())
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1419")
@@ -472,20 +490,10 @@ class JsonPathMatcherTest {
         jsonPath = "$.list.*[?(@.item3 == 'index2')]",
         before = sliceList,
         after = arrayOf("""
-            [
-              {
-                "item1": "index0",
-                "property": "property1"
-              },
-              {
-                "item2": "index1",
-                "property": "property2"
-              },
-              {
-                "item3": "index2",
-                "property": "property3"
-              }
-            ]
+            {
+              "item3": "index2",
+              "property": "property3"
+            }
         """.trimIndent())
     )
 

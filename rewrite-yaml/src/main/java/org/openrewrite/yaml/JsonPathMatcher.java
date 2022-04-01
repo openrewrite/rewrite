@@ -265,7 +265,8 @@ public class JsonPathMatcher {
                     for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
                         if (entry instanceof Yaml.Mapping.Entry) {
                             String key = entry.getKey().getValue();
-                            String name = ctx.StringLiteral() != null ? unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                            String name = ctx.StringLiteral() != null ?
+                                    unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
                             if (key.equals(name)) {
                                 return entry;
                             }
@@ -277,7 +278,8 @@ public class JsonPathMatcher {
 
                 List<Object> matches = new ArrayList<>();
                 String key = member.getKey().getValue();
-                String name = ctx.StringLiteral() != null ? unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                String name = ctx.StringLiteral() != null ?
+                        unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
                 if (isRecursiveDescent) {
                     if (key.equals(name)) {
                         matches.add(member);
@@ -379,6 +381,20 @@ public class JsonPathMatcher {
         }
 
         @Override
+        public Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
+            String s = null;
+            if (ctx.StringLiteral() != null) {
+                s = ctx.StringLiteral().getText();
+            } else if (!ctx.children.isEmpty()) {
+                s = ctx.children.get(0).getText();
+            }
+            if (s != null && (s.startsWith("'") || s.startsWith("\""))) {
+                return s.substring(1, s.length() - 1);
+            }
+            return "null".equals(s) ? null : s;
+        }
+
+        @Override
         public Object visitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) {
             if (ctx.Identifier() != null) {
                 if (scope instanceof Yaml.Mapping) {
@@ -413,7 +429,7 @@ public class JsonPathMatcher {
                             .filter(Objects::nonNull)
                             .collect(Collectors.toList());
 
-                    // Unwrap lists of results from visitProperty to match the position of the cursor.
+                    // Unwrap lists of results from visitUnaryExpression to match the position of the cursor.
                     List<Object> matches = new ArrayList<>();
                     for (Object result : results) {
                         if (result instanceof List) {
@@ -426,9 +442,8 @@ public class JsonPathMatcher {
                     return getResultFromList(matches);
                 }
             } else if (ctx.jsonPath() != null) {
-                Object result = getValue(visit(ctx.jsonPath()));
-                result = getResultByKey(result, ctx.stop.getText());
-                return result;
+                Object result = visit(ctx.jsonPath());
+                return getResultByKey(result, ctx.stop.getText());
             }
             return null;
         }
@@ -471,12 +486,33 @@ public class JsonPathMatcher {
             Object lhs = ctx.children.get(0);
             Object rhs = ctx.children.get(2);
 
-            lhs = getBinaryExpressionResult(lhs);
-            rhs = getBinaryExpressionResult(rhs);
-
             if (ctx.LOGICAL_OPERATOR() != null) {
-                throw new UnsupportedOperationException("Logical operators are not supported. Please open an issue if you need this functionality.");
+                String operator;
+                switch( ctx.LOGICAL_OPERATOR().getText()) {
+                    case ("&&"):
+                        operator = "&&";
+                        break;
+                    case ("||"):
+                        operator = "||";
+                        break;
+                    default:
+                        return false;
+                }
+
+                Object scopeOfLogicalOp = scope;
+                lhs = getBinaryExpressionResult(lhs);
+
+                scope = scopeOfLogicalOp;
+                rhs = getBinaryExpressionResult(rhs);
+                if ("&&".equals(operator) && lhs != null && rhs != null) {
+                    return scopeOfLogicalOp;
+                } else if ("||".equals(operator) && (lhs != null || rhs != null)) {
+                    return scopeOfLogicalOp;
+                }
             } else if (ctx.EQUALITY_OPERATOR() != null) {
+                // Equality operators may resolve the LHS and RHS without caching scope.
+                lhs = getBinaryExpressionResult(lhs);
+                rhs = getBinaryExpressionResult(rhs);
                 String operator;
                 switch (ctx.EQUALITY_OPERATOR().getText()) {
                     case ("=="):
@@ -486,58 +522,21 @@ public class JsonPathMatcher {
                         operator = "!=";
                         break;
                     default:
-                        return false;
+                        return null;
                 }
 
                 if (lhs instanceof List) {
                     for (Object match : ((List<Object>) lhs)) {
-                        if (match instanceof Yaml.Mapping) {
-                            Yaml.Mapping mapping = (Yaml.Mapping) match;
-                            for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-                                if (entry.getValue() instanceof Yaml.Scalar &&
-                                        checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), rhs, operator)) {
-                                    return mapping;
-                                }
-                            }
-                        } else if (match instanceof Yaml.Mapping.Entry) {
-                            Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) match;
-                            if (entry.getValue() instanceof Yaml.Scalar &&
-                                    checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), rhs, operator)) {
-                                return entry;
-                            }
+                        Yaml mappingOrEntry = getOperatorResult(match, operator, rhs);
+                        if (mappingOrEntry != null) {
+                            return mappingOrEntry;
                         }
                     }
-                } else if (lhs instanceof Yaml.Mapping) {
-                    Yaml.Mapping mapping = (Yaml.Mapping) lhs;
-                    for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-                        if (entry.getValue() instanceof Yaml.Scalar &&
-                                checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), rhs, operator)) {
-                            return mapping;
-                        }
-                    }
-                } else if (lhs instanceof Yaml.Mapping.Entry) {
-                    Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) lhs;
-                    if (entry.getValue() instanceof Yaml.Scalar &&
-                            checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), rhs, operator)) {
-                        return entry;
-                    }
+                } else {
+                    return getOperatorResult(lhs, operator, rhs);
                 }
             }
             return null;
-        }
-
-        @Override
-        public Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
-            String s = null;
-            if (ctx.StringLiteral() != null) {
-                s = ctx.StringLiteral().getText();
-            } else if (!ctx.children.isEmpty()) {
-                s = ctx.children.get(0).getText();
-            }
-            if (s != null && (s.startsWith("'") || s.startsWith("\""))) {
-                return s.substring(1, s.length() - 1);
-            }
-            return "null".equals(s) ? null : s;
         }
 
         @Nullable
@@ -554,6 +553,45 @@ public class JsonPathMatcher {
             return ctx;
         }
 
+        // Interpret the LHS to check the appropriate value.
+        @Nullable
+        private Yaml getOperatorResult(Object lhs, String operator, Object rhs) {
+            if (lhs instanceof Yaml.Mapping) {
+                Yaml.Mapping mapping = (Yaml.Mapping) lhs;
+                for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+                    if (entry.getValue() instanceof Yaml.Scalar &&
+                            checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
+                        return mapping;
+                    }
+                }
+            } else if (lhs instanceof Yaml.Mapping.Entry) {
+                Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) lhs;
+                if (entry.getValue() instanceof Yaml.Scalar &&
+                        checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
+                    return entry;
+                }
+            }
+            return null;
+        }
+
+        private boolean checkObjectEquality(Object lhs, String operator, Object rhs) {
+            if (lhs == null || rhs == null) {
+                return false;
+            }
+
+            BiPredicate<Object, Object> predicate = (lh, rh) -> {
+                if ("==".equals(operator)) {
+                    return Objects.equals(lh, rh);
+                } else if ("!=".equals(operator)) {
+                    return !Objects.equals(lh, rh);
+                }
+                return false;
+            };
+
+            return predicate.test(lhs, rhs);
+        }
+
+        // Extract the result from YAML objects that can match by key.
         @Nullable
         public Object getResultByKey(Object result, String key) {
             if (result instanceof Yaml.Mapping.Entry) {
@@ -572,6 +610,7 @@ public class JsonPathMatcher {
             return null;
         }
 
+        // Ensure the scope is set correctly when results are wrapped in a list.
         private Object getResultFromList(Object results) {
             if (results instanceof List) {
                 List<Object> matches = (List<Object>) results;
@@ -605,23 +644,6 @@ public class JsonPathMatcher {
             }
 
             return null;
-        }
-
-        private boolean checkObjectEquality(Object lhs, Object rhs, String operator) {
-            if (lhs == null || rhs == null) {
-                return false;
-            }
-
-            BiPredicate<Object, Object> predicate = (lh, rh) -> {
-                if ("==".equals(operator)) {
-                    return Objects.equals(lh, rh);
-                } else if ("!=".equals(operator)) {
-                    return !Objects.equals(lh, rh);
-                }
-                return false;
-            };
-
-            return predicate.test(lhs, rhs);
         }
 
         private static String unquoteStringLiteral(String literal) {

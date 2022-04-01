@@ -884,9 +884,7 @@ public class JsonPathParser extends Parser {
 	public static class UnaryExpressionContext extends ParserRuleContext {
 		public TerminalNode AT() { return getToken(JsonPathParser.AT, 0); }
 		public TerminalNode DOT() { return getToken(JsonPathParser.DOT, 0); }
-		public PropertyContext property() {
-			return getRuleContext(PropertyContext.class,0);
-		}
+		public TerminalNode Identifier() { return getToken(JsonPathParser.Identifier, 0); }
 		public TerminalNode LBRACK() { return getToken(JsonPathParser.LBRACK, 0); }
 		public TerminalNode StringLiteral() { return getToken(JsonPathParser.StringLiteral, 0); }
 		public TerminalNode RBRACK() { return getToken(JsonPathParser.RBRACK, 0); }
@@ -933,7 +931,7 @@ public class JsonPathParser extends Parser {
 					setState(129);
 					match(DOT);
 					setState(130);
-					property();
+					match(Identifier);
 					}
 					break;
 				case 2:
@@ -1429,7 +1427,7 @@ public class JsonPathParser extends Parser {
 		"\21\3\2\2\2rp\3\2\2\2s|\7\f\2\2tu\7\r\2\2u}\5\30\r\2vx\7\r\2\2wv\3\2\2"+
 		"\2wx\3\2\2\2xy\3\2\2\2yz\7\b\2\2z{\7\24\2\2{}\7\t\2\2|t\3\2\2\2|w\3\2"+
 		"\2\2}~\3\2\2\2~\177\7\5\2\2\177\u0080\7\'\2\2\u0080\u0081\7%\2\2\u0081"+
-		"\23\3\2\2\2\u0082\u008b\7\f\2\2\u0083\u0084\7\r\2\2\u0084\u008c\5\30\r"+
+		"\23\3\2\2\2\u0082\u008b\7\f\2\2\u0083\u0084\7\r\2\2\u0084\u008c\7\23\2"+
 		"\2\u0085\u0087\7\r\2\2\u0086\u0085\3\2\2\2\u0086\u0087\3\2\2\2\u0087\u0088"+
 		"\3\2\2\2\u0088\u0089\7\b\2\2\u0089\u008a\7\24\2\2\u008a\u008c\7\t\2\2"+
 		"\u008b\u0083\3\2\2\2\u008b\u0086\3\2\2\2\u008c\u008f\3\2\2\2\u008d\u008f"+
