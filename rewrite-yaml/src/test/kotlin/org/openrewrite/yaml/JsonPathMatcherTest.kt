@@ -326,14 +326,14 @@ class JsonPathMatcherTest {
         after = arrayOf("literal: $.lists[0].list[0].object.list[0].literal")
     )
 
-    @Disabled("Implement logical &&.")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1063")
     @Test
     fun doesNotMatchWrongAnd() = assertNotMatched(
         jsonPath = "$..list[?(@.literal == 'no-match' && @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
         before = complex
     )
 
-    @Disabled("Implement logical &&.")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1063")
     @Test
     fun filterOnPropertyWithAnd() = assertMatched(
         jsonPath = "$..list[?($.literal == '$.literal' && @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
@@ -341,19 +341,19 @@ class JsonPathMatcherTest {
         after = arrayOf("literal: $.lists[0].list[0].object.list[0].literal")
     )
 
-    @Disabled("Implement logical || and operator precedence")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1063")
+    @Test
+    fun doesNotMatchWrongOr() = assertNotMatched(
+        jsonPath = "$..list[?(@.literal == 'no-match-1' || @.literal == 'no-match-2')].literal",
+        before = complex
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1063")
     @Test
     fun filterOnPropertyWithOr() = assertMatched(
         jsonPath = "$..list[?(@.literal == 'no-match' || @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
         before = complex,
         after = arrayOf("literal: $.lists[0].list[0].object.list[0].literal")
-    )
-
-    @Disabled("Implement logical || and operator precedence")
-    @Test
-    fun doesNotMatchWrongOr() = assertNotMatched(
-        jsonPath = "$..list[?(@.literal == 'no-match-1' || @.literal == 'no-match-2')].literal",
-        before = complex
     )
 
     @Test

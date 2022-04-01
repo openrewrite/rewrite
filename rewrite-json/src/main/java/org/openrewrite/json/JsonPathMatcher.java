@@ -25,7 +25,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.internal.grammar.*;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.json.tree.JsonValue;
 
 import java.util.*;
 import java.util.function.BiPredicate;
@@ -260,7 +259,8 @@ public class JsonPathMatcher {
 
                 List<Object> matches = new ArrayList<>();
                 String key = ((Json.Literal) member.getKey()).getValue().toString();
-                String name = ctx.StringLiteral() != null ? unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                String name = ctx.StringLiteral() != null ?
+                        unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
                 if (isRecursiveDescent) {
                     if (key.equals(name)) {
                         matches.add(member);
@@ -277,6 +277,33 @@ public class JsonPathMatcher {
 
                 scope = member.getValue();
                 return visitProperty(ctx);
+            } else if (scope instanceof Json.JsonObject) {
+                Json.JsonObject jsonObject = (Json.JsonObject) scope;
+                if (isRecursiveDescent) {
+                    scope = jsonObject.getMembers();
+                    return getResultFromList(visitProperty(ctx));
+                } else {
+                    for (Json json : jsonObject.getMembers()) {
+                        if (json instanceof Json.Member) {
+                            Json.Member member = (Json.Member) json;
+                            String key = ((Json.Literal) member.getKey()).getValue().toString();
+                            String name = ctx.StringLiteral() != null ?
+                                    unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                            if (key.equals(name)) {
+                                return member;
+                            }
+                        }
+                    }
+                }
+            } else if (scope instanceof Json.Array) {
+                Object matches = ((Json.Array) scope).getValues().stream()
+                        .map(o -> {
+                            scope = o;
+                            return visitProperty(ctx);
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+                return getResultFromList(matches);
             } else if (scope instanceof List) {
                 List<Object> results = ((List<Object>) scope).stream()
                         .map(o -> {
@@ -295,32 +322,6 @@ public class JsonPathMatcher {
                         matches.add(result);
                     }
                 }
-                return getResultFromList(matches);
-            } else if (scope instanceof Json.JsonObject) {
-                Json.JsonObject jsonObject = (Json.JsonObject) scope;
-                if (isRecursiveDescent) {
-                    scope = jsonObject.getMembers();
-                    return getResultFromList(visitProperty(ctx));
-                } else {
-                    for (Json json : jsonObject.getMembers()) {
-                        if (json instanceof Json.Member) {
-                            Json.Member member = (Json.Member) json;
-                            String key = ((Json.Literal) member.getKey()).getValue().toString();
-                            String name = ctx.StringLiteral() != null ? unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
-                            if (key.equals(name)) {
-                                return member;
-                            }
-                        }
-                    }
-                }
-            } else if (scope instanceof Json.Array) {
-                Object matches = ((Json.Array) scope).getValues().stream()
-                        .map(o -> {
-                            scope = o;
-                            return visitProperty(ctx);
-                        })
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
                 return getResultFromList(matches);
             }
 
@@ -357,50 +358,72 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitFilterExpression(JsonPathParser.FilterExpressionContext ctx) {
-            if (ctx.binaryExpression() != null) {
-                Object filterOfScope = scope;
-                Object result = visitBinaryExpression(ctx.binaryExpression());
-                if (result instanceof Boolean && (Boolean) result) {
-                    scope = filterOfScope;
-                    return scope;
-                }
-            } else if (ctx.regexExpression() != null) {
-                Object result = visitRegexExpression(ctx.regexExpression());
-                if (result instanceof Boolean && (Boolean) result) {
-                    return scope;
-                }
-                return visitRegexExpression(ctx.regexExpression());
-            } else if (ctx.unaryExpression() != null) {
-                if (scope instanceof Json.Member) {
-                    List<Object> results = new ArrayList<>();
-                    Json.Member member = (Json.Member) scope;
-                    if (member.getValue() instanceof Json.Array) {
-                        Json.Array array = (Json.Array) member.getValue();
-                        for (JsonValue value : array.getValues()) {
-                            scope = value;
-                            Object result = visitUnaryExpression(ctx.unaryExpression());
-                            if (result != null) {
-                                results.add(value);
-                            }
-                        }
-                    }
-                    return results;
-                }
+        public Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
+            String s = null;
+            if (ctx.StringLiteral() != null) {
+                s = ctx.StringLiteral().getText();
+            } else if (!ctx.children.isEmpty()) {
+                s = ctx.children.get(0).getText();
             }
-            return null;
+            if (s != null && (s.startsWith("'") || s.startsWith("\""))) {
+                return s.substring(1, s.length() - 1);
+            }
+            return "null".equals(s) ? null : s;
         }
 
         @Override
         public Object visitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) {
-            if (ctx.property() != null) {
-                // Returns the scope from visitProperty instead of the `getValue()` so that dot operators will work
-                // from the specified scope of a list. I.E. $..list[?(@.name)].property
-                return visitProperty(ctx.property());
+            if (ctx.Identifier() != null) {
+                if (scope instanceof Json.Member) {
+                    Json.Member member = (Json.Member) scope;
+                    String key = member.getKey() instanceof Json.Literal ?
+                            ((Json.Literal) member.getKey()).getValue().toString() : ((Json.Identifier) member.getKey()).getName();
+                    String identifier = ctx.Identifier().getText();
+                    if (key.equals(identifier)) {
+                        return member;
+                    }
+                    scope = member.getValue();
+                    return getResultFromList(visitUnaryExpression(ctx));
+                } else if (scope instanceof Json.JsonObject) {
+                    Json.JsonObject jsonObject = (Json.JsonObject) scope;
+                    for (Json json : jsonObject.getMembers()) {
+                        if (json instanceof Json.Member) {
+                            Json.Member member = (Json.Member) json;
+                            String key = ((Json.Literal) member.getKey()).getValue().toString();
+                            String name = ctx.StringLiteral() != null ? unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                            if (key.equals(name)) {
+                                return jsonObject;
+                            }
+                        }
+                    }
+                } else if (scope instanceof Json.Array) {
+                    // Unary operators set the scope of the matched key within a block.
+                    scope = ((Json.Array) scope).getValues();
+                    return visitUnaryExpression(ctx);
+                } else if (scope instanceof List) {
+                    List<Object> results = ((List<Object>) scope).stream()
+                            .map(o -> {
+                                scope = o;
+                                return visitUnaryExpression(ctx);
+                            })
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toList());
+
+                    // Unwrap lists of results from visitUnaryExpression to match the position of the cursor.
+                    List<Object> matches = new ArrayList<>();
+                    for (Object result : results) {
+                        if (result instanceof List) {
+                            matches.addAll(((List<Object>) result));
+                        } else {
+                            matches.add(result);
+                        }
+                    }
+
+                    return getResultFromList(matches);
+                }
             } else if (ctx.jsonPath() != null) {
-                Object result = getValue(visit(ctx.jsonPath()));
-                result = getResultByKey(result, ctx.stop.getText());
-                return result;
+                Object result = visit(ctx.jsonPath());
+                return getResultByKey(result, ctx.stop.getText());
             }
             return null;
         }
@@ -433,10 +456,10 @@ public class JsonPathMatcher {
                 String lhStr = lhs.toString();
                 String rhStr = rhs.toString();
                 if (Pattern.compile(rhStr).matcher(lhStr).matches()) {
-                    return Boolean.TRUE;
+                    return scope;
                 }
             }
-            return Boolean.FALSE;
+            return null;
         }
 
         @Override
@@ -444,14 +467,33 @@ public class JsonPathMatcher {
             Object lhs = ctx.children.get(0);
             Object rhs = ctx.children.get(2);
 
-            lhs = getBinaryExpressionResult(lhs);
-            rhs = getBinaryExpressionResult(rhs);
-
             if (ctx.LOGICAL_OPERATOR() != null) {
-                // Scopes must be cached to implement && conditions. Each condition must be true in the same scope.
-                // Add precedence to support OR conditions.
-                throw new UnsupportedOperationException("Logical operators are not supported. Please open an issue if you need this functionality.");
+                String operator;
+                switch( ctx.LOGICAL_OPERATOR().getText()) {
+                    case ("&&"):
+                        operator = "&&";
+                        break;
+                    case ("||"):
+                        operator = "||";
+                        break;
+                    default:
+                        return false;
+                }
+
+                Object scopeOfLogicalOp = scope;
+                lhs = getBinaryExpressionResult(lhs);
+
+                scope = scopeOfLogicalOp;
+                rhs = getBinaryExpressionResult(rhs);
+                if ("&&".equals(operator) && lhs != null && rhs != null) {
+                    return scopeOfLogicalOp;
+                } else if ("||".equals(operator) && (lhs != null || rhs != null)) {
+                    return scopeOfLogicalOp;
+                }
             } else if (ctx.EQUALITY_OPERATOR() != null) {
+                // Equality operators may resolve the LHS and RHS without caching scope.
+                lhs = getBinaryExpressionResult(lhs);
+                rhs = getBinaryExpressionResult(rhs);
                 String operator;
                 switch (ctx.EQUALITY_OPERATOR().getText()) {
                     case ("=="):
@@ -461,35 +503,22 @@ public class JsonPathMatcher {
                         operator = "!=";
                         break;
                     default:
-                        return false;
+                        return null;
                 }
 
                 if (lhs instanceof List) {
                     for (Object match : ((List<Object>) lhs)) {
-                        if (checkObjectEquality(getValue(match), rhs, operator)) {
-                            return Boolean.TRUE;
+                        Json result = getOperatorResult(match, operator, rhs);
+                        if (result != null) {
+                            return match;
                         }
                     }
-                } else if (checkObjectEquality(getValue(lhs), rhs, operator)) {
-                    return Boolean.TRUE;
+                } else {
+                    return getOperatorResult(lhs, operator, rhs);
                 }
             }
 
-            return Boolean.FALSE;
-        }
-
-        @Override
-        public Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
-            String s = null;
-            if (ctx.StringLiteral() != null) {
-                s = ctx.StringLiteral().getText();
-            } else if (!ctx.children.isEmpty()) {
-                s = ctx.children.get(0).getText();
-            }
-            if (s != null && (s.startsWith("'") || s.startsWith("\""))) {
-                return s.substring(1, s.length() - 1);
-            }
-            return "null".equals(s) ? null : s;
+            return null;
         }
 
         @Nullable
@@ -497,7 +526,7 @@ public class JsonPathMatcher {
             if (ctx instanceof JsonPathParser.BinaryExpressionContext) {
                 ctx = visitBinaryExpression((JsonPathParser.BinaryExpressionContext) ctx);
             } else if (ctx instanceof JsonPathParser.UnaryExpressionContext) {
-                ctx = getValue(visitUnaryExpression((JsonPathParser.UnaryExpressionContext) ctx));
+                ctx = visitUnaryExpression((JsonPathParser.UnaryExpressionContext) ctx);
             } else if (ctx instanceof JsonPathParser.RegexExpressionContext) {
                 ctx = visitRegexExpression((JsonPathParser.RegexExpressionContext) ctx);
             } else if (ctx instanceof JsonPathParser.LiteralExpressionContext) {
@@ -506,6 +535,47 @@ public class JsonPathMatcher {
             return ctx;
         }
 
+        // Interpret the LHS to check the appropriate value.
+        @Nullable
+        private Json getOperatorResult(Object lhs, String operator, Object rhs) {
+            if (lhs instanceof Json.Member) {
+                Json.Member member = (Json.Member) lhs;
+                if (member.getValue() instanceof Json.Literal) {
+                    Json.Literal literal = (Json.Literal) member.getValue();
+                    if (checkObjectEquality(literal.getValue(), operator, rhs)) {
+                        return member;
+                    }
+                }
+            } else if (lhs instanceof Json.JsonObject) {
+                Json.JsonObject jsonObject = (Json.JsonObject) lhs;
+                for (Json json : jsonObject.getMembers()) {
+                    if (json instanceof Json.Member) {
+                        Json.Member member = (Json.Member) json;
+                        if (member.getValue() instanceof Json.Literal &&
+                                checkObjectEquality(((Json.Literal) member.getValue()).getValue(), operator, rhs)) {
+                            return jsonObject;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        private boolean checkObjectEquality(Object lhs, String operator, Object rhs) {
+            BiPredicate<Object, Object> predicate = (lh, rh) -> {
+                if (lh == null || rh == null) {
+                    return false;
+                } else if ("==".equals(operator)) {
+                    return Objects.equals(lh, rh);
+                } else if ("!=".equals(operator)) {
+                    return !Objects.equals(lh, rh);
+                }
+                return false;
+            };
+            return predicate.test(lhs, rhs);
+        }
+
+        // Extract the result from JSON objects that can match by key.
         @Nullable
         public Object getResultByKey(Object result, String key) {
             if (result instanceof Json.Member) {
@@ -526,6 +596,7 @@ public class JsonPathMatcher {
             return null;
         }
 
+        // Ensure the scope is set correctly when results are wrapped in a list.
         private Object getResultFromList(Object results) {
             if (results instanceof List) {
                 List<Object> matches = (List<Object>) results;
@@ -559,21 +630,6 @@ public class JsonPathMatcher {
             }
 
             return null;
-        }
-
-        private boolean checkObjectEquality(Object lhs, Object rhs, String operator) {
-            BiPredicate<Object, Object> predicate = (lh, rh) -> {
-                if (lh == null || rh == null) {
-                    return false;
-                } else if ("==".equals(operator)) {
-                    return Objects.equals(lh, rh);
-                } else if ("!=".equals(operator)) {
-                    return !Objects.equals(lh, rh);
-                } else {
-                    throw new UnsupportedOperationException("oops");
-                }
-            };
-            return predicate.test(lhs, rhs);
         }
 
         private static String unquoteStringLiteral(String literal) {
