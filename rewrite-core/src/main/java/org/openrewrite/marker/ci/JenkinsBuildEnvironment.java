@@ -18,6 +18,7 @@ package org.openrewrite.marker.ci;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -36,6 +37,14 @@ public class JenkinsBuildEnvironment implements BuildEnvironment {
     String host;
     String job;
 
+    /**
+     * When the option to set the local branch is disabled in Jenkins this won't be present.
+     */
+    @Nullable
+    String localBranch;
+
+    String branch;
+
     public static JenkinsBuildEnvironment build(UnaryOperator<String> environment) {
         return new JenkinsBuildEnvironment(
                 randomId(),
@@ -43,7 +52,9 @@ public class JenkinsBuildEnvironment implements BuildEnvironment {
                 environment.apply("BUILD_ID"),
                 environment.apply("BUILD_URL"),
                 environment.apply("JENKINS_URL"),
-                environment.apply("JOB_NAME")
+                environment.apply("JOB_NAME"),
+                environment.apply("GIT_LOCAL_BRANCH"),
+                environment.apply("GIT_BRANCH")
         );
     }
 }
