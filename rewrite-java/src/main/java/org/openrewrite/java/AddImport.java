@@ -145,8 +145,13 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 cu.getPackageDeclaration(), classpath));
 
         J.CompilationUnit c = cu;
-        cu = cu.withClasses(ListUtils.map(cu.getClasses(), (i, clazz) -> i == 0 ?
-                autoFormat(clazz, clazz.getName(), p, new Cursor(null, c)) : clazz));
+        cu = cu.withClasses(ListUtils.map(cu.getClasses(), (i, clazz) -> {
+            if (i == 0) {
+                J.ClassDeclaration cl = autoFormat(clazz, clazz.getName(), p, new Cursor(null, c));
+                clazz = clazz.withPrefix(clazz.getPrefix().withWhitespace(cl.getPrefix().getWhitespace()));
+            }
+            return clazz;
+        }));
 
         return cu;
     }
