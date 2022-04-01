@@ -25,6 +25,7 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.LoggingMeterRegistry
+import org.openrewrite.java.tree.J
 import org.openrewrite.xml.tree.Xml
 import java.io.File
 import java.nio.file.Path
