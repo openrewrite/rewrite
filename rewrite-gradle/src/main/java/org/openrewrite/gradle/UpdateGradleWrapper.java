@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
 import org.openrewrite.binary.BinaryParser;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -29,11 +30,10 @@ import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -78,7 +78,6 @@ public class UpdateGradleWrapper extends Recipe {
                 if (!PathUtils.equalIgnoringSeparators(file.getSourcePath(), WRAPPER_LOCATION)) {
                     return file;
                 }
-
                 return super.visitFile(file, context);
             }
 
@@ -123,15 +122,15 @@ public class UpdateGradleWrapper extends Recipe {
                 new Parser.Input(Paths.get("gradle/wrapper/gradle-wrapper.jar"),
                         () -> UpdateGradleWrapper.class.getResourceAsStream("/gradle-wrapper.jar"))), null, ctx).get(0);
 
-        return Stream.concat(
-                before.stream().map(sourceFile -> {
+        return ListUtils.concatAll(
+                ListUtils.map(before, sourceFile -> {
                     if (!(sourceFile instanceof Properties)) {
                         return sourceFile;
                     }
                     return (Properties.File) new UpdateWrapperPropsVisitor().visitNonNull(sourceFile, ctx);
                 }),
-                Stream.of(gradlew, gradlewBat, gradleWrapperJar)
-        ).collect(toList());
+                Arrays.asList(gradlew, gradlewBat, gradleWrapperJar)
+        );
     }
 
     private class UpdateWrapperPropsVisitor extends PropertiesVisitor<ExecutionContext> {
