@@ -38,11 +38,16 @@ public class JenkinsBuildEnvironment implements BuildEnvironment {
     String job;
 
     /**
+     * Local branch name, e.g. main.
+     *
      * When the option to set the local branch is disabled in Jenkins this won't be present.
      */
     @Nullable
     String localBranch;
 
+    /**
+     * Remote branch name, e.g. origin/main.
+     */
     String branch;
 
     public static JenkinsBuildEnvironment build(UnaryOperator<String> environment) {

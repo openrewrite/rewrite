@@ -20,16 +20,21 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.NameRevCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.transport.RemoteConfig;
 import org.openrewrite.Incubating;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.ci.BuildEnvironment;
+import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -43,12 +48,14 @@ public class GitProvenance implements Marker {
     @Nullable
     String origin;
 
+    @Nullable
     String branch;
+
     String change;
 
     @Nullable
     public String getOrganizationName() {
-        if(origin == null) {
+        if (origin == null) {
             return null;
         }
         String path;
@@ -62,7 +69,7 @@ public class GitProvenance implements Marker {
 
         if (secondSlashPos > -1) {
             return path.substring(secondSlashPos + 1, firstSlashPos);
-        } else if (firstSlashPos > -1 ){
+        } else if (firstSlashPos > -1) {
             return path.substring(0, firstSlashPos);
         } else {
             return "";
@@ -71,7 +78,7 @@ public class GitProvenance implements Marker {
 
     @Nullable
     public String getRepositoryName() {
-        if(origin == null) {
+        if (origin == null) {
             return null;
         }
         if (origin.startsWith("git")) {
@@ -82,18 +89,53 @@ public class GitProvenance implements Marker {
         }
     }
 
+    /**
+     * @param projectDir The project directory.
+     * @return A marker containing git provenance information.
+     * @deprecated Use {@link #fromProjectDirectory(Path, Markers) instead}.
+     */
+    @Deprecated
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir) {
+        return fromProjectDirectory(projectDir, Markers.EMPTY);
+    }
+
+    /**
+     * @param projectDir The project directory.
+     * @param markers The set of markers to be applied to each top-level {@link SourceFile}, especially
+     *                {@link BuildEnvironment} markers. In detached head scenarios, the branch is best
+     *                determined from {@link BuildEnvironment} markers if possible.
+     * @return A marker containing git provenance information.
+     */
+    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, Markers markers) {
         try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
-            String branch = repository.getBranch();
+            String branch = null;
             String changeset = getChangeset(repository);
 
-            if(branch.equals(changeset)) {
+            if (!repository.getBranch().equals(changeset)) {
+                branch = repository.getBranch();
+            } else if (markers.findFirst(JenkinsBuildEnvironment.class).isPresent()) {
+                JenkinsBuildEnvironment jenkins = markers.findFirst(JenkinsBuildEnvironment.class).get();
+                branch = jenkins.getLocalBranch() != null ?
+                        jenkins.getLocalBranch() :
+                        localBranchName(repository, jenkins.getBranch());
+            }
+
+            if (branch == null) {
                 Git git = Git.open(repository.getDirectory());
                 ObjectId commit = repository.resolve(Constants.HEAD);
                 Map<ObjectId, String> branchesByCommit = git.nameRev().addPrefix("refs/heads/").add(commit).call();
-                branch = branchesByCommit.get(commit);
-                if(branch.contains("^")) {
-                    branch = branch.substring(0, branch.indexOf('^'));
+                if (branchesByCommit.containsKey(commit)) {
+                    // detached head but _not_ a shallow clone
+                    branch = branchesByCommit.get(commit);
+                    if (branch.contains("^")) {
+                        branch = branch.substring(0, branch.indexOf('^'));
+                    } else if (branch.contains("~")) {
+                        branch = branch.substring(0, branch.indexOf('~'));
+                    }
+                } else {
+                    // detached head and _also_ a shallow clone
+                    branchesByCommit = git.nameRev().add(commit).call();
+                    branch = localBranchName(repository, branchesByCommit.get(commit));
                 }
             }
 
@@ -103,6 +145,27 @@ public class GitProvenance implements Marker {
         } catch (IllegalArgumentException | GitAPIException e) {
             return null;
         }
+    }
+
+    @Nullable
+    private static String localBranchName(Repository repository, @Nullable String remoteBranch) throws IOException, GitAPIException {
+        if (remoteBranch == null) {
+            return null;
+        }
+
+        String branch = null;
+        try {
+            Git git = Git.open(repository.getDirectory());
+            List<RemoteConfig> remotes = git.remoteList().call();
+            for (RemoteConfig remote : remotes) {
+                if (remoteBranch.startsWith(remote.getName()) &&
+                        (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
+                    branch = remoteBranch.substring(remote.getName().length() + 1); // +1 for the forward slash
+                }
+            }
+        } catch (GitAPIException ignored) {
+        }
+        return branch;
     }
 
     @Nullable

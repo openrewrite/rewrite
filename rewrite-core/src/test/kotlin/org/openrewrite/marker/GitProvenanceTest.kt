@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,32 +15,187 @@
  */
 package org.openrewrite.marker
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
 import org.assertj.core.api.Assertions.assertThat
+import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION
+import org.eclipse.jgit.lib.Constants
+import org.eclipse.jgit.lib.RepositoryCache
+import org.eclipse.jgit.transport.URIish
+import org.eclipse.jgit.util.FS
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.MethodSource
 import org.openrewrite.Tree.randomId
+import org.openrewrite.marker.ci.JenkinsBuildEnvironment
+import org.slf4j.LoggerFactory
+import java.net.URI
+import java.nio.file.Path
+import java.util.concurrent.TimeUnit
+import kotlin.io.path.writeText
+
 
 class GitProvenanceTest {
-    private val sshRepo = GitProvenance(randomId(), "ssh://git@github.com/openrewrite/rewrite.git", "main", "123")
-    private val httpsRepo = GitProvenance(randomId(), "https://github.com/openrewrite/rewrite.git", "main", "123")
-    private val fileRepo = GitProvenance(randomId(), "file:///openrewrite/rewrite.git", "main", "123")
-    private val bitbucketWithBasePath = GitProvenance(randomId(), "http://localhost:7990/scm/openrewrite/rewrite.git", "main", "123")
-    private val sshAlternateFormRepo = GitProvenance(randomId(), "git@github.com:openrewrite/rewrite.git", "main", "123")
+    companion object {
+        init {
+            (LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger).level = Level.INFO
+        }
 
-    @Test
-    fun getOrganizationName() {
-        assertThat(sshRepo.organizationName).isEqualTo("openrewrite")
-        assertThat(httpsRepo.organizationName).isEqualTo("openrewrite")
-        assertThat(fileRepo.organizationName).isEqualTo("openrewrite")
-        assertThat(bitbucketWithBasePath.organizationName).isEqualTo("openrewrite")
-        assertThat(sshAlternateFormRepo.organizationName).isEqualTo("openrewrite")
+        @JvmStatic
+        fun remotes() = arrayOf(
+            "ssh://git@github.com/openrewrite/rewrite.git",
+            "https://github.com/openrewrite/rewrite.git",
+            "file:///openrewrite/rewrite.git",
+            "http://localhost:7990/scm/openrewrite/rewrite.git",
+            "git@github.com:openrewrite/rewrite.git"
+        )
+    }
+
+    @ParameterizedTest
+    @MethodSource("remotes")
+    fun getOrganizationName(remote: String) {
+        assertThat(GitProvenance(randomId(), remote, "main", "123").organizationName)
+            .isEqualTo("openrewrite")
+    }
+
+    @ParameterizedTest
+    @MethodSource("remotes")
+    fun getRepositoryName(remote: String) {
+        assertThat(GitProvenance(randomId(), remote, "main", "123").repositoryName)
+            .isEqualTo("rewrite")
     }
 
     @Test
-    fun getRepositoryName() {
-        assertThat(sshRepo.repositoryName).isEqualTo("rewrite")
-        assertThat(httpsRepo.repositoryName).isEqualTo("rewrite")
-        assertThat(fileRepo.repositoryName).isEqualTo("rewrite")
-        assertThat(bitbucketWithBasePath.repositoryName).isEqualTo("rewrite")
-        assertThat(sshAlternateFormRepo.repositoryName).isEqualTo("rewrite")
+    fun localBranchPresent(@TempDir projectDir: Path) {
+        Git.init().setDirectory(projectDir.toFile()).call()
+        assertThat(GitProvenance.fromProjectDirectory(projectDir, Markers.EMPTY)!!.branch)
+            .isEqualTo("main")
+    }
+
+    @Test
+    fun detachedHead(@TempDir projectDir: Path) {
+        val git = initGitWithOneCommit(projectDir)
+        git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
+        assertThat(GitProvenance.fromProjectDirectory(projectDir, Markers.EMPTY)!!.branch)
+            .isEqualTo("main")
+    }
+
+    @Test
+    fun detachedHeadJenkinsLocalBranch(@TempDir projectDir: Path) {
+        val git = initGitWithOneCommit(projectDir)
+        git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
+        assertThat(
+            GitProvenance.fromProjectDirectory(
+                projectDir, Markers(
+                    randomId(), listOf(
+                        JenkinsBuildEnvironment(
+                            randomId(), "1", "1", "https://jenkins/job/1",
+                            "https://jenkins", "job", "main", "origin/main"
+                        )
+                    )
+                )
+            )!!.branch
+        ).isEqualTo("main")
+    }
+
+    @Test
+    fun detachedHeadJenkinsNoLocalBranch(@TempDir projectDir: Path) {
+        val git = initGitWithOneCommit(projectDir)
+        git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
+
+        assertThat(
+            GitProvenance.fromProjectDirectory(
+                projectDir, Markers(
+                    randomId(), listOf(
+                        JenkinsBuildEnvironment(
+                            randomId(), "1", "1", "https://jenkins/job/1",
+                            "https://jenkins", "job", null, "origin/main"
+                        )
+                    )
+                )
+            )!!.branch
+        ).isEqualTo("main")
+    }
+
+    private fun initGitWithOneCommit(projectDir: Path): Git {
+        val git = Git.init().setDirectory(projectDir.toFile()).call()
+        projectDir.resolve("test.txt").writeText("hi")
+        git.add().addFilepattern("*").call()
+        git.commit().setMessage("init").call()
+        git.remoteAdd().setName("origin").setUri(URIish("git@github.com:openrewrite/doesnotexist.git")).call()
+
+        // origins are still present in .git/config on Jenkins
+        val config = git.repository.config
+        config.setString(CONFIG_BRANCH_SECTION, "main", "remote", "origin")
+        config.setString(CONFIG_BRANCH_SECTION, "main", "merge", "refs/heads/main")
+        config.save()
+
+        return git
+    }
+
+    @Test
+    fun detachedHeadBehindBranchHead(@TempDir projectDir: Path) {
+        val git = Git.init().setDirectory(projectDir.toFile()).call()
+        projectDir.resolve("test.txt").writeText("hi")
+        git.add().addFilepattern("*").call()
+        git.commit().setMessage("init").call()
+        val commit1 = git.repository.resolve(Constants.HEAD).name
+
+        projectDir.resolve("test.txt").writeText("hi")
+        git.add().addFilepattern("*").call()
+        git.commit().setMessage("init").call()
+
+        assertThat(git.repository.resolve(Constants.HEAD).name).isNotEqualTo(commit1)
+
+        git.checkout().setName(commit1).call()
+
+        assertThat(GitProvenance.fromProjectDirectory(projectDir, Markers.EMPTY)!!.branch)
+            .isEqualTo("main")
+    }
+
+    @Test
+    fun shallowCloneDetachedHead(@TempDir projectDir: Path) {
+        val remoteDir = projectDir.resolve("remote")
+        val fileKey = RepositoryCache.FileKey.exact(remoteDir.toFile(), FS.DETECTED)
+        val remoteRepo = fileKey.open(false)
+        remoteRepo.create(true)
+
+        // push an initial commit to the remote
+        val cloneDir = projectDir.resolve("clone1")
+        var git = Git.cloneRepository().setURI(remoteRepo.directory.absolutePath).setDirectory(cloneDir.toFile()).call()
+        projectDir.resolve("test.txt").writeText("hi")
+        git.add().addFilepattern("*").call()
+        git.commit().setMessage("init").call()
+
+        try {
+            "git push -u origin main".runCommand(cloneDir)
+            val commit = git.repository.resolve(Constants.HEAD).name
+
+            // shallow clone the remote to another directory
+            "git clone file:///${remoteRepo.directory.absolutePath} shallowClone --depth 1 --branch main".runCommand(
+                projectDir
+            )
+            git = Git.open(projectDir.resolve("shallowClone").toFile())
+
+            // creates detached head
+            git.checkout().setName(commit).call()
+
+            assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), Markers.EMPTY)!!.branch)
+                .isEqualTo(null)
+        } catch (ignored: Throwable) {
+            // can't run git command line
+        }
+    }
+
+    private fun String.runCommand(workingDir: Path) {
+        workingDir.toFile().mkdirs()
+        ProcessBuilder(*split(" ").toTypedArray())
+            .directory(workingDir.toFile())
+            .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+            .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .start()
+            .waitFor(5, TimeUnit.SECONDS)
     }
 }
