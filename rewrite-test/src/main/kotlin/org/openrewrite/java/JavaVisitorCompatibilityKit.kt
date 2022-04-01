@@ -405,6 +405,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class SimplifyConsecutiveAssignmentsTck : SimplifyConsecutiveAssignmentsTest
 
     @Nested
+    inner class SimplifyConstantIfBranchExecutionTck : SimplifyConstantIfBranchExecutionTest
+
+    @Nested
     inner class SimplifyMethodChainTck : SimplifyMethodChainTest
 
     @Nested
