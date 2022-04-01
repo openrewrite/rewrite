@@ -14,6 +14,8 @@ repositories {
 dependencies {
     api(project(":rewrite-groovy"))
 
+    implementation(project(":rewrite-properties"))
+
     runtimeOnly("org.codehaus.groovy:groovy-ant:latest.release")
     runtimeOnly("org.codehaus.groovy:groovy-xml:latest.release")
 
