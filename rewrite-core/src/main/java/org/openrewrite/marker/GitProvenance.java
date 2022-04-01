@@ -96,25 +96,24 @@ public class GitProvenance implements Marker {
      */
     @Deprecated
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir) {
-        return fromProjectDirectory(projectDir, Markers.EMPTY);
+        return fromProjectDirectory(projectDir, null);
     }
 
     /**
      * @param projectDir The project directory.
-     * @param markers The set of markers to be applied to each top-level {@link SourceFile}, especially
-     *                {@link BuildEnvironment} markers. In detached head scenarios, the branch is best
-     *                determined from {@link BuildEnvironment} markers if possible.
+     * @param buildEnvironment In detached head scenarios, the branch is best
+     *                determined from a {@link BuildEnvironment} marker if possible.
      * @return A marker containing git provenance information.
      */
-    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, Markers markers) {
+    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment buildEnvironment) {
         try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
             String branch = null;
             String changeset = getChangeset(repository);
 
             if (!repository.getBranch().equals(changeset)) {
                 branch = repository.getBranch();
-            } else if (markers.findFirst(JenkinsBuildEnvironment.class).isPresent()) {
-                JenkinsBuildEnvironment jenkins = markers.findFirst(JenkinsBuildEnvironment.class).get();
+            } else if (buildEnvironment instanceof JenkinsBuildEnvironment) {
+                JenkinsBuildEnvironment jenkins = (JenkinsBuildEnvironment) buildEnvironment;
                 branch = jenkins.getLocalBranch() != null ?
                         jenkins.getLocalBranch() :
                         localBranchName(repository, jenkins.getBranch());
