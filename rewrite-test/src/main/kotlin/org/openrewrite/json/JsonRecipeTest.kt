@@ -18,14 +18,14 @@ package org.openrewrite.json
 import org.intellij.lang.annotations.Language
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.json.tree.Json
+import org.openrewrite.test.JsonTestingSupport
 import java.io.File
 import java.nio.file.Path
 
 @Suppress("unused")
-interface JsonRecipeTest : RecipeTest<Json.Document> {
-    override val parser: JsonParser
+interface JsonRecipeTest : JsonTestingSupport {
+    val parser: JsonParser
         get() = JsonParser()
 
     fun assertChanged(
@@ -39,7 +39,18 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Json.Document) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, executionContext, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertChangedBase(
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertChanged(
@@ -54,7 +65,18 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Json.Document) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertChangedBase(
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertUnchanged(
@@ -64,7 +86,14 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
         @Language("json5") before: String,
         @Language("json5") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 
     fun assertUnchanged(
@@ -75,6 +104,13 @@ interface JsonRecipeTest : RecipeTest<Json.Document> {
         relativeTo: Path? = null,
         @Language("json5") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 }

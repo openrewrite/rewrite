@@ -19,42 +19,43 @@ import org.intellij.lang.annotations.Language
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.SourceFile
+import org.openrewrite.hcl.HclParser
+import org.openrewrite.hcl.tree.Hcl
 import org.openrewrite.marker.Marker
-import org.openrewrite.properties.PropertiesParser
-import org.openrewrite.properties.tree.Properties
+import org.openrewrite.xml.XmlParser
+import org.openrewrite.xml.tree.Xml
 
+interface HclTestingSupport : RecipeTestingSupport {
 
-interface PropertyTestingSupport : RecipeTestingSupport  {
-
-    fun PropertiesParser.parse(
-        @Language("properties") source: String,
+    fun HclParser.parse(
+        @Language("HCL") source: String,
         markers : List<Marker> = emptyList(),
         ctx: ExecutionContext = executionContext
-    ): Properties.File {
+    ): Hcl.ConfigFile {
         return parse(ctx, source.trimIndent()).map {
             it.addMarkers(markers)
         }[0]
     }
 
-    fun PropertiesParser.parse(
-        @Language("properties") vararg sources: String,
+    fun HclParser.parse(
+        @Language("HCL") vararg sources: String,
         markers : List<Marker> = emptyList(),
         ctx: ExecutionContext = executionContext
-    ): List<Properties.File> {
+    ): List<Hcl.ConfigFile> {
         return parse(ctx, *sources.map { it.trimIndent() }.toTypedArray()).map {
             it.addMarkers(markers)
         }
     }
 
     fun assertChanged(
-        before: Properties.File,
-        @Language("properties") after: String,
+        before: Hcl.ConfigFile,
+        @Language("HCL") after: String,
         additionalSources: List<SourceFile>,
         recipe: Recipe? = this.recipe,
         ctx: ExecutionContext = this.executionContext,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
-        afterConditions: (Properties.File) -> Unit = { }
+        afterConditions: (Hcl.ConfigFile) -> Unit = { },
     ) {
         assertChangedBase(before, after, additionalSources, recipe, executionContext, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }

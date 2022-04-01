@@ -26,7 +26,7 @@ class FindSourceFilesTest : YamlRecipeTest {
         get() = FindSourceFiles("**/hello.yml")
 
     @Test
-    fun findMatchingFile(@TempDir tempDir: Path) = assertChangedBase(
+    fun findMatchingFile(@TempDir tempDir: Path) = assertChanged(
         before = tempDir.resolve("a/b/hello.yml").apply {
             toFile().parentFile.mkdirs()
             toFile().writeText("key: value")

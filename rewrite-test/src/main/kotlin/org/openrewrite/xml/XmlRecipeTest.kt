@@ -18,14 +18,14 @@ package org.openrewrite.xml
 import org.intellij.lang.annotations.Language
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
+import org.openrewrite.test.XmlTestingSupport
 import org.openrewrite.xml.tree.Xml
 import java.io.File
 import java.nio.file.Path
 
 @Suppress("unused")
-interface XmlRecipeTest : RecipeTest<Xml.Document> {
-    override val parser: XmlParser
+interface XmlRecipeTest : XmlTestingSupport {
+    val parser: XmlParser
         get() = XmlParser()
 
     fun assertChanged(
@@ -39,7 +39,18 @@ interface XmlRecipeTest : RecipeTest<Xml.Document> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Xml.Document) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, executionContext, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertChangedBase(
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertChanged(
@@ -54,7 +65,18 @@ interface XmlRecipeTest : RecipeTest<Xml.Document> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Xml.Document) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertChangedBase(
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertUnchanged(
@@ -64,7 +86,14 @@ interface XmlRecipeTest : RecipeTest<Xml.Document> {
         @Language("xml") before: String,
         @Language("xml") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 
     fun assertUnchanged(
@@ -75,6 +104,13 @@ interface XmlRecipeTest : RecipeTest<Xml.Document> {
         relativeTo: Path? = null,
         @Language("xml") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 }

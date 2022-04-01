@@ -15,48 +15,42 @@
  */
 package org.openrewrite.maven
 
-import io.micrometer.core.instrument.Metrics
-import io.micrometer.core.instrument.config.MeterFilter
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeAll
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
-import org.openrewrite.internal.LoggingMeterRegistry
+import org.openrewrite.test.MavenTestingSupport
 import org.openrewrite.xml.tree.Xml
 import java.io.File
 import java.nio.file.Path
 
 @Suppress("unused")
-interface MavenRecipeTest : RecipeTest<Xml.Document> {
-    companion object {
-        private val meterRegistry = LoggingMeterRegistry.builder().build()
+interface MavenRecipeTest : MavenTestingSupport {
+//    companion object {
+//        private val meterRegistry = LoggingMeterRegistry.builder().build()
+//
+//        @BeforeAll
+//        @JvmStatic
+//        fun setMeterRegistry() {
+//            meterRegistry.config()
+//                .meterFilter(MeterFilter.acceptNameStartsWith("rewrite.maven"))
+//                .meterFilter(MeterFilter.deny())
+//                .meterFilter(MeterFilter.ignoreTags("group.id", "artifact.id"))
+//            Metrics.globalRegistry.add(meterRegistry)
+//        }
+//
+//        @AfterAll
+//        @JvmStatic
+//        fun unsetMeterRegistry() {
+//            Metrics.globalRegistry.remove(meterRegistry)
+//        }
+//    }
+//
+//    @AfterEach
+//    fun printMetrics() {
+//        meterRegistry.print()
+//    }
 
-        @BeforeAll
-        @JvmStatic
-        fun setMeterRegistry() {
-            meterRegistry.config()
-                .meterFilter(MeterFilter.acceptNameStartsWith("rewrite.maven"))
-                .meterFilter(MeterFilter.deny())
-                .meterFilter(MeterFilter.ignoreTags("group.id", "artifact.id"))
-            Metrics.globalRegistry.add(meterRegistry)
-        }
-
-        @AfterAll
-        @JvmStatic
-        fun unsetMeterRegistry() {
-            Metrics.globalRegistry.remove(meterRegistry)
-        }
-    }
-
-    @AfterEach
-    fun printMetrics() {
-        meterRegistry.print()
-    }
-
-    override val parser: MavenParser
+    val parser: MavenParser
         get() = MavenParser.builder().build()
 
     fun assertChanged(
@@ -70,13 +64,15 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Xml.Document) -> Unit = { }
     ) {
+
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
         super.assertChangedBase(
-            parser,
-            recipe,
-            executionContext,
-            before,
-            dependsOn,
-            after,
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
             cycles,
             expectedCyclesThatMakeChanges,
             afterConditions
@@ -95,14 +91,15 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Xml.Document) -> Unit = { }
     ) {
+
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
         super.assertChangedBase(
-            parser,
-            recipe,
-            executionContext,
-            before,
-            relativeTo,
-            dependsOn,
-            after,
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
             cycles,
             expectedCyclesThatMakeChanges,
             afterConditions
@@ -116,7 +113,15 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
         @Language("xml") before: String,
         @Language("xml") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
+
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 
     fun assertUnchanged(
@@ -127,6 +132,14 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
         relativeTo: Path? = null,
         @Language("xml") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
+
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 }

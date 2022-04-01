@@ -18,6 +18,7 @@ package org.openrewrite.test
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.fail
 import org.openrewrite.*
+import org.openrewrite.config.Environment
 import org.openrewrite.java.JavaParser
 import org.openrewrite.marker.Marker
 import org.openrewrite.scheduling.DirectScheduler
@@ -60,7 +61,7 @@ interface RecipeTestingSupport {
     ) {
         Assertions.assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
-        if (recipe !is RecipeTest.AdHocRecipe) {
+        if (recipe !is RecipeTestingSupport.AdHocRecipe) {
             val recipeSerializer = RecipeSerializer()
             Assertions.assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                 .`as`("Recipe must be serializable/deserializable")
@@ -171,5 +172,11 @@ interface RecipeTestingSupport {
         override fun getDisplayName(): String = "Ad hoc recipe"
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> = visitor()
     }
+
+    fun fromRuntimeClasspath(recipe: String): Recipe = Environment.builder()
+        .scanRuntimeClasspath()
+        .build()
+        .activateRecipes(recipe)
+
 
 }

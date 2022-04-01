@@ -122,7 +122,8 @@ interface JavaRecipeTest : JavaTestingSupport {
             before = sourceFiles[0],
             additionalSources = sourceFiles.drop(1),
             recipe = recipe,
-            ctx = executionContext)
+            ctx = executionContext
+        )
     }
 
     fun assertUnchanged(
@@ -140,6 +141,7 @@ interface JavaRecipeTest : JavaTestingSupport {
             before = sourceFiles[0],
             additionalSources = sourceFiles.drop(1),
             recipe = recipe,
-            ctx = executionContext)
+            ctx = executionContext
+        )
     }
 }

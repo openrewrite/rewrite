@@ -18,14 +18,14 @@ package org.openrewrite.hcl
 import org.intellij.lang.annotations.Language
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
 import org.openrewrite.hcl.tree.Hcl
+import org.openrewrite.test.HclTestingSupport
 import java.io.File
 import java.nio.file.Path
 
 @Suppress("unused")
-interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
-    override val parser: HclParser
+interface HclRecipeTest : HclTestingSupport {
+    val parser: HclParser
         get() = HclParser.builder().build()
 
     fun assertChanged(
@@ -39,7 +39,18 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Hcl.ConfigFile) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, executionContext, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertChangedBase(
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertChanged(
@@ -54,7 +65,18 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Hcl.ConfigFile) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertChangedBase(
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertUnchanged(
@@ -64,7 +86,14 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
         @Language("HCL") before: String,
         @Language("HCL") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 
     fun assertUnchanged(
@@ -75,6 +104,13 @@ interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
         relativeTo: Path? = null,
         @Language("HCL") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 }

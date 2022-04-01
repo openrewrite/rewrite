@@ -17,19 +17,20 @@ package org.openrewrite
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.test.PlainTextTestingSupport
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextParser
 import java.nio.file.Path
 
-class FindSourceFilesTest : RecipeTest<PlainText> {
-    override val parser: Parser<PlainText>
+class FindSourceFilesTest : PlainTextTestingSupport {
+    val parser: Parser<PlainText>
         get() = PlainTextParser()
 
     override val recipe: Recipe
         get() = FindSourceFiles("**/hello.txt")
 
     @Test
-    fun findMatchingFile(@TempDir tempDir: Path) = assertChangedBase(
+    fun findMatchingFile(@TempDir tempDir: Path) = assertChanged(
         before = tempDir.resolve("a/b/hello.txt").apply {
             toFile().parentFile.mkdirs()
             toFile().writeText("hello world")

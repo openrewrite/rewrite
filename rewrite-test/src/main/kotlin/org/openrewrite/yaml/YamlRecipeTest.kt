@@ -18,14 +18,14 @@ package org.openrewrite.yaml
 import org.intellij.lang.annotations.Language
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
+import org.openrewrite.test.YamlTestingSupport
 import org.openrewrite.yaml.tree.Yaml
 import java.io.File
 import java.nio.file.Path
 
 @Suppress("unused")
-interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
-    override val parser: YamlParser
+interface YamlRecipeTest : YamlTestingSupport {
+    val parser: YamlParser
         get() = YamlParser()
 
     fun assertChanged(
@@ -39,7 +39,18 @@ interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Yaml.Documents) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, executionContext, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertChangedBase(
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertChanged(
@@ -54,7 +65,18 @@ interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Yaml.Documents) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertChangedBase(
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertUnchanged(
@@ -64,7 +86,14 @@ interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
         @Language("yaml") before: String,
         @Language("yaml") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 
     fun assertUnchanged(
@@ -75,6 +104,13 @@ interface YamlRecipeTest : RecipeTest<Yaml.Documents> {
         relativeTo: Path? = null,
         @Language("yaml") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 }

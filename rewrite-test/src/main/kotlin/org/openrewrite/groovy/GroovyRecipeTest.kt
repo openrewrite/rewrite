@@ -18,12 +18,13 @@ package org.openrewrite.groovy
 import org.intellij.lang.annotations.Language
 import org.openrewrite.*
 import org.openrewrite.groovy.tree.G
+import org.openrewrite.test.GroovyTestingSupport
 import java.io.File
 import java.nio.file.Path
 
 @Suppress("unused")
-interface GroovyRecipeTest : RecipeTest<G.CompilationUnit> {
-    override val parser: Parser<G.CompilationUnit>
+interface GroovyRecipeTest : GroovyTestingSupport {
+    val parser: Parser<G.CompilationUnit>
         get() = GroovyParser.builder().build()
 
     fun assertChanged(
@@ -37,7 +38,18 @@ interface GroovyRecipeTest : RecipeTest<G.CompilationUnit> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (G.CompilationUnit) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, executionContext, before, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertChangedBase(
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertChanged(
@@ -52,7 +64,18 @@ interface GroovyRecipeTest : RecipeTest<G.CompilationUnit> {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (G.CompilationUnit) -> Unit = { }
     ) {
-        super.assertChangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertChangedBase(
+            before = sourceFiles[0],
+            after = after,
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext,
+            cycles,
+            expectedCyclesThatMakeChanges,
+            afterConditions
+        )
     }
 
     fun assertUnchanged(
@@ -62,7 +85,14 @@ interface GroovyRecipeTest : RecipeTest<G.CompilationUnit> {
         @Language("groovy") before: String,
         @Language("groovy") dependsOn: Array<String> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, dependsOn)
+        val sourceFiles = parser.parse(executionContext, *(listOf(before) + dependsOn).map { it.trimIndent() }.toTypedArray())
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 
     fun assertUnchanged(
@@ -73,6 +103,13 @@ interface GroovyRecipeTest : RecipeTest<G.CompilationUnit> {
         relativeTo: Path? = null,
         @Language("groovy") dependsOn: Array<File> = emptyArray()
     ) {
-        super.assertUnchangedBase(parser, recipe, executionContext, before, relativeTo, dependsOn)
+        val sourceFiles = parser.parse(listOf(before).plus(dependsOn).map { it.toPath() }, relativeTo, executionContext)
+
+        super.assertUnchanged(
+            before = sourceFiles[0],
+            additionalSources = sourceFiles.drop(1),
+            recipe = recipe,
+            ctx = executionContext
+        )
     }
 }
