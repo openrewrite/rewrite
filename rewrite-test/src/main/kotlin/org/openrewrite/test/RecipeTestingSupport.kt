@@ -22,16 +22,15 @@ interface RecipeTestingSupport {
             }.apply { this.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true) }
         }
 
-    @Suppress("UNCHECKED_CAST")
-    fun <T : SourceFile> SourceFile.addMarkers(markers: List<Marker>): T {
+    fun <T : SourceFile> T.addMarkers(markers: List<Marker>): T {
         if (markers.isEmpty()) {
-            return this as T
+            return this
         }
         var s = this
         for (marker in markers) {
             s = s.withMarkers(s.markers.addIfAbsent(marker))
         }
-        return s as T
+        return s
     }
 
     fun <T: SourceFile> assertChangedBase(
