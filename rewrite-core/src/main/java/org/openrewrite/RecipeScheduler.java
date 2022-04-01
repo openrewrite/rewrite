@@ -185,7 +185,7 @@ public interface RecipeScheduler {
 
                     if (recipe.getSingleSourceApplicableTest() != null) {
                         if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
-                            sample.stop(MetricsHelper.successTags(timer, s, "skipped").register(Metrics.globalRegistry));
+                            sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
                             return s;
                         }
                     }
@@ -197,7 +197,7 @@ public interface RecipeScheduler {
                             ctx.getOnError().accept(t);
                             ctx.getOnTimeout().accept(t, ctx);
                         }
-                        sample.stop(MetricsHelper.successTags(timer, s, "timeout").register(Metrics.globalRegistry));
+                        sample.stop(MetricsHelper.successTags(timer, "timeout").register(Metrics.globalRegistry));
                         return s;
                     }
 
@@ -221,16 +221,16 @@ public interface RecipeScheduler {
                                         r1.getRecipes().addAll(r2.getRecipes());
                                         return r1;
                                     }));
-                            sample.stop(MetricsHelper.successTags(timer, s, "changed").register(Metrics.globalRegistry));
+                            sample.stop(MetricsHelper.successTags(timer, "changed").register(Metrics.globalRegistry));
                         } else if (afterFile == null) {
                             recipeThatDeletedSourceFile.put(s.getId(), recipeStack);
-                            sample.stop(MetricsHelper.successTags(timer, s, "deleted").register(Metrics.globalRegistry));
+                            sample.stop(MetricsHelper.successTags(timer, "deleted").register(Metrics.globalRegistry));
                         } else {
-                            sample.stop(MetricsHelper.successTags(timer, s, "unchanged").register(Metrics.globalRegistry));
+                            sample.stop(MetricsHelper.successTags(timer, "unchanged").register(Metrics.globalRegistry));
                         }
                         return afterFile;
                     } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(timer, s, t).register(Metrics.globalRegistry));
+                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ctx.getOnError().accept(t);
                         return s;
                     }
