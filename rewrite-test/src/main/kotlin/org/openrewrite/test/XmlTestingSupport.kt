@@ -13,18 +13,32 @@ interface XmlTestingSupport : RecipeTestingSupport {
     val xmlParser: XmlParser
         get() = XmlParser()
 
-    fun XmlParser.parse(markers : List<Marker> = emptyList(), @Language("xml") vararg sources: String): List<Xml.Document> {
-        return parse(executionContext, *sources.map { it.trimIndent() }.toTypedArray()).map {
+    fun XmlParser.parse(
+        @Language("xml") source: String,
+        markers : List<Marker> = emptyList(),
+        ctx: ExecutionContext = executionContext
+    ): Xml.Document {
+        return parse(ctx, source.trimIndent()).map {
+            it.addMarkers(markers)
+        }[0]
+    }
+
+    fun XmlParser.parse(
+        @Language("xml") vararg sources: String,
+        markers : List<Marker> = emptyList(),
+        ctx: ExecutionContext = executionContext
+    ): List<Xml.Document> {
+        return parse(ctx, *sources.map { it.trimIndent() }.toTypedArray()).map {
             it.addMarkers(markers)
         }
     }
 
     fun assertChanged(
-        recipe: Recipe,
-        ctx: ExecutionContext = executionContext,
         before: Xml.Document,
-        additionalSources: List<SourceFile>,
         @Language("xml") after: String,
+        additionalSources: List<SourceFile>,
+        recipe: Recipe? = this.recipe,
+        ctx: ExecutionContext = this.executionContext,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Xml.Document) -> Unit = { },

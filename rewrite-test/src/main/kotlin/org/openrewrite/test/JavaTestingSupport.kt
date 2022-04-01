@@ -13,6 +13,26 @@ interface JavaTestingSupport : RecipeTestingSupport {
     val javaParser: JavaParser
         get() = JavaParser.fromJavaVersion().build()
 
+    fun JavaParser.parse(
+        @Language("java") source: String,
+        sourceSet: String = "main",
+        markers : List<Marker> = emptyList(),
+        ctx: ExecutionContext = executionContext
+    ): J.CompilationUnit {
+        setSourceSet(sourceSet)
+        return parse(ctx, source.trimIndent()).map { j -> j.addMarkers(markers) }.single()
+    }
+
+    fun JavaParser.parse(
+        @Language("java") vararg sources: String,
+        sourceSet: String = "main",
+        markers : List<Marker> = emptyList(),
+        ctx: ExecutionContext = executionContext
+    ): List<J.CompilationUnit> {
+        setSourceSet(sourceSet)
+        return parse(ctx, *sources.map { it.trimIndent() }.toTypedArray()).map { j -> j.addMarkers(markers) }
+    }
+
     fun assertChanged(
         before: J.CompilationUnit,
         @Language("java") after: String,
@@ -24,26 +44,6 @@ interface JavaTestingSupport : RecipeTestingSupport {
         afterConditions: (J.CompilationUnit) -> Unit = { }
     ) {
         assertChangedBase(before, after, additionalSources, recipe, executionContext, cycles, expectedCyclesThatMakeChanges, afterConditions)
-    }
-
-    fun JavaParser.parse(
-        @Language("java") vararg sources: String,
-        sourceSet: String = "main",
-        markers : List<Marker> = emptyList(),
-        cxt: ExecutionContext = executionContext
-    ): List<J.CompilationUnit> {
-        setSourceSet(sourceSet)
-        return parse(cxt, *sources.map { it.trimIndent() }.toTypedArray()).map { j -> j.addMarkers(markers) }
-    }
-
-    fun JavaParser.parse(
-        @Language("java") source: String,
-        sourceSet: String = "main",
-        markers : List<Marker> = emptyList(),
-        cxt: ExecutionContext = executionContext
-    ): J.CompilationUnit {
-        setSourceSet(sourceSet)
-        return parse(cxt, source.trimIndent()).map { j -> j.addMarkers(markers) }.single()
     }
 
 }

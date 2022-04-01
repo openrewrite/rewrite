@@ -1,6 +1,7 @@
 package org.openrewrite.test
 
 import org.intellij.lang.annotations.Language
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Tree
 import org.openrewrite.java.marker.JavaProject
 import org.openrewrite.marker.Marker
@@ -22,8 +23,9 @@ interface MavenTestingSupport : XmlTestingSupport {
     fun MavenParser.parseMavenProjects(
         @Language("xml") source: String,
         markers : List<Marker> = emptyList(),
+        ctx: ExecutionContext = executionContext
     ): Xml.Document {
-        return parse(executionContext, source.trimIndent())[0].let {
+        return parse(ctx, source.trimIndent())[0].let {
             it.addMarkers(listOf(createJavaProjectFromMaven(it)) + markers)
         }
     }
@@ -34,9 +36,10 @@ interface MavenTestingSupport : XmlTestingSupport {
      */
     fun MavenParser.parseMavenProjects(
         @Language("xml") vararg sources: String,
-        markers : List<Marker> = emptyList()
+        markers : List<Marker> = emptyList(),
+        ctx: ExecutionContext = executionContext
     ): List<Xml.Document> {
-        return parse(executionContext, *sources.map { it.trimIndent() }.toTypedArray()).map {
+        return parse(ctx, *sources.map { it.trimIndent() }.toTypedArray()).map {
             it.addMarkers(listOf(createJavaProjectFromMaven(it)) + markers)
         }
     }
@@ -56,7 +59,7 @@ interface MavenTestingSupport : XmlTestingSupport {
     }
 
     private fun createJavaProjectFromMaven(maven : Xml.Document) : JavaProject {
-        val model = maven.getModel()
-        return JavaProject(Tree.randomId(), model.pom.artifactId, JavaProject.Publication(model.pom.groupId, model.pom.artifactId, model.pom.version))
+        val pom = maven.getPom()
+        return JavaProject(Tree.randomId(), pom.artifactId, JavaProject.Publication(pom.groupId, pom.artifactId, pom.version))
     }
 }

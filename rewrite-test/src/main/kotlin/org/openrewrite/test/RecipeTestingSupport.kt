@@ -38,7 +38,7 @@ interface RecipeTestingSupport {
         after: String,
         additionalSources: List<SourceFile> = emptyList(),
         recipe: Recipe? = this.recipe!!,
-        ctx: ExecutionContext = this.executionContext,
+        ctx: ExecutionContext,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (T) -> Unit = { },
@@ -83,7 +83,7 @@ interface RecipeTestingSupport {
     fun assertUnchanged(
         before: SourceFile,
         recipe: Recipe = this.recipe!!,
-        executionContext: ExecutionContext = this.executionContext,
+        ctx: ExecutionContext = this.executionContext,
         additionalSources: List<SourceFile> = emptyList(),
     ) {
         Assertions.assertThat(recipe).`as`("A recipe must be specified").isNotNull
@@ -91,7 +91,7 @@ interface RecipeTestingSupport {
         val results = recipe
             .run(
                 listOf(before) + additionalSources,
-                executionContext
+                ctx
             )
 
         results.filter { result -> result.before == before }
