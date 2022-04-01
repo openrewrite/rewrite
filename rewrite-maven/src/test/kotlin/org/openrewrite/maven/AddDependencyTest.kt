@@ -53,24 +53,20 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
     fun onlyIfUsingTestScope(onlyIfUsing: String) {
 
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
-        val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
-                """
-            )
-        )[0]
+        val maven = mavenParser.parseMavenProjects(source = """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+            </project>
+        """)
 
         //Parse the java with a test source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(usingGuavaIntMath),
+            source = usingGuavaIntMath,
             sourceSet = "test",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertChanged(
             recipe = addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing),
@@ -99,23 +95,21 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
     fun onlyIfUsingCompileScope(onlyIfUsing: String) {
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
         val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
-                """
-            )
-        )[0]
+            source = """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """
+        )
 
         //Parse the java with a main source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(usingGuavaIntMath),
+            source = usingGuavaIntMath,
             sourceSet = "main",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertChanged(
             recipe = addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing),
@@ -142,23 +136,21 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
     fun notUsingType() {
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
         val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
-                """
-            )
-        )[0]
+            source = """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """
+        )
 
         //Parse the java with a main source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(usingGuavaIntMath),
+            source = usingGuavaIntMath,
             sourceSet = "main",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertUnchanged(
             recipe = addDependency("com.google.guava:guava:29.0-jre", "com.google.common.collect.ImmutableMap"),
@@ -172,30 +164,28 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
 
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
         val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>commons-lang</groupId>
-                                <artifactId>commons-lang</artifactId>
-                                <version>1.0</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                """
-            )
-        )[0]
+            source = """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        )
 
         //Parse the java with a main source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(usingGuavaIntMath),
+            source = usingGuavaIntMath,
             sourceSet = "main",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertChanged(
             recipe = addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath"),
@@ -227,29 +217,28 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
     fun doNotAddBecauseAlreadyTransitive() {
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
         val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.junit.jupiter</groupId>
-                                <artifactId>junit-jupiter-engine</artifactId>
-                                <version>5.7.1</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                """)
-        )[0]
+            source = """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-engine</artifactId>
+                            <version>5.7.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        )
 
         //Parse the java with a main source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(usingJUnit),
+            source = usingJUnit,
             sourceSet = "test",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertUnchanged(
             recipe = addDependency("org.junit.jupiter:junit-jupiter-api:5.x", "org.junit.jupiter.api.*"),
@@ -263,23 +252,21 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
     fun semverSelector(onlyIfUsing: String) {
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
         val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                    </project>
-                """
-            )
-        )[0]
+            source = """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """
+        )
 
         //Parse the java with a main source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(usingGuavaIntMath),
+            source = usingGuavaIntMath,
             sourceSet = "main",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertChanged(
             recipe = AddDependency(
@@ -309,30 +296,28 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
     fun addTestDependenciesAfterCompile() {
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
         val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>commons-lang</groupId>
-                                <artifactId>commons-lang</artifactId>
-                                <version>1.0</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                """
-            )
-        )[0]
+            source = """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        )
 
         //Parse the java with a test source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(usingGuavaIntMath),
+            source = usingGuavaIntMath,
             sourceSet = "test",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertChanged(
             recipe = addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath"),
@@ -367,36 +352,34 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
 
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
         val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <!-- comment 1 -->
-                        <?processing instruction1?>
-                        <dependencies>
-                            <!-- comment 2 -->
-                            <?processing instruction2?>
-                            <dependency>
-                                <groupId>commons-lang</groupId>
-                                <artifactId>commons-lang</artifactId>
-                                <version>1.0</version>
-                            </dependency>
-                            <!-- comment 3 -->
-                            <?processing instruction3?>
-                        </dependencies>
-                    </project>
-                """
-            )
-        )[0]
+            source = """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <!-- comment 1 -->
+                    <?processing instruction1?>
+                    <dependencies>
+                        <!-- comment 2 -->
+                        <?processing instruction2?>
+                        <dependency>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                        <!-- comment 3 -->
+                        <?processing instruction3?>
+                    </dependencies>
+                </project>
+            """
+        )
 
         //Parse the java with a test source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(usingGuavaIntMath),
+            source = usingGuavaIntMath,
             sourceSet = "test",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertChanged(
             recipe = addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath"),
@@ -435,30 +418,28 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
     fun addDependencyDoesntAddWhenExistingDependency() {
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
         val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.google.guava</groupId>
-                                <artifactId>guava</artifactId>
-                                <version>28.0-jre</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                """
-            )
-        )[0]
+            source = """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        )
 
         //Parse the java with a main source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(usingGuavaIntMath),
+            source = usingGuavaIntMath,
             sourceSet = "main",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertUnchanged(
             recipe = addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath"),
@@ -506,10 +487,10 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
 
         //Parse the java with a main source set and associate with the child project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(usingGuavaIntMath),
+            source = usingGuavaIntMath,
             sourceSet = "main",
             markers = listOf(mavens[1].getJavaProject())
-        )[0]
+        )
 
         assertChanged(
             recipe = addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath"),
@@ -541,39 +522,36 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
 
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
         val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <properties>
-                            <jackson.version>2.12.0</jackson.version>
-                        </properties>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.fasterxml.jackson.core</groupId>
-                                <artifactId>jackson-databind</artifactId>
-                                <version>${'$'}{jackson.version}</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                """
-            )
-        )[0]
+            source = """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <jackson.version>2.12.0</jackson.version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>${'$'}{jackson.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        )
 
         //Parse the java with a main source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(
-                """
-                    public class A {
-                        com.fasterxml.jackson.databind.ObjectMapper mapper;
-                    }
-                """
-            ),
+            source = """
+                public class A {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper;
+                }
+            """,
+
             sourceSet = "main",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertChanged(
             recipe = AddDependency("com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
@@ -613,36 +591,32 @@ class AddDependencyTest : JavaTestingSupport, MavenTestingSupport {
 
         //Parse the maven project (which will have a JavaProject Provenance associated with it)
         val maven = mavenParser.parseMavenProjects(
-            sources = arrayOf(
-                """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.fasterxml.jackson.core</groupId>
-                                <artifactId>jackson-databind</artifactId>
-                                <version>2.12.0</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                """
-            )
-        )[0]
+            source = """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-databind</artifactId>
+                            <version>2.12.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        )
 
         //Parse the java with a main source set and associate with the java project.
         val javaSource = javaParser.parse(
-            sources = arrayOf(
-                """
-                    public class A {
-                        com.fasterxml.jackson.core.Versioned v;
-                    }
-                """
-            ),
+            source = """
+                public class A {
+                    com.fasterxml.jackson.core.Versioned v;
+                }
+            """,
             sourceSet = "main",
             markers = listOf(maven.getJavaProject())
-        )[0]
+        )
 
         assertChanged(
             recipe = addDependency("com.fasterxml.jackson.core:jackson-core:2.12.0", "com.fasterxml.jackson.core.*"),

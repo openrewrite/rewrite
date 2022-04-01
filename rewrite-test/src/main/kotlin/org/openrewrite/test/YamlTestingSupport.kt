@@ -21,7 +21,6 @@ interface YamlTestingSupport : RecipeTestingSupport {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Yaml.Documents) -> Unit = { }
     ) {
-        assertChangedBase(recipe, executionContext, before, additionalSources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        assertChangedBase(before, after, additionalSources, recipe, executionContext, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
-
 }

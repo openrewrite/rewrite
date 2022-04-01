@@ -22,7 +22,7 @@ interface JsonTestingSupport : RecipeTestingSupport {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Json.Document) -> Unit = { },
     ) {
-        assertChangedBase(recipe, executionContext, before, additionalSources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        assertChangedBase(before, after, additionalSources, recipe, executionContext, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
 }

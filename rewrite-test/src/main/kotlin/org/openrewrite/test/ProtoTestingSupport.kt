@@ -22,7 +22,7 @@ interface ProtoTestingSupport : RecipeTestingSupport{
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Proto.Document) -> Unit = { },
     ) {
-        assertChangedBase(recipe, executionContext, before, additionalSources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        assertChangedBase(before, after, additionalSources, recipe, executionContext, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
 }

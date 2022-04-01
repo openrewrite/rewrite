@@ -29,7 +29,7 @@ interface XmlTestingSupport : RecipeTestingSupport {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (Xml.Document) -> Unit = { },
     ) {
-        assertChangedBase(recipe, executionContext, before, additionalSources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        assertChangedBase(before, after, additionalSources, recipe, executionContext, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
 }

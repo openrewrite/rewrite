@@ -22,7 +22,7 @@ interface PropertyTestingSupport : RecipeTestingSupport  {
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (org.openrewrite.properties.tree.Properties.File) -> Unit = { }
     ) {
-        assertChangedBase(recipe, executionContext, before, additionalSources, after, cycles, expectedCyclesThatMakeChanges, afterConditions)
+        assertChangedBase(before, after, additionalSources, recipe, executionContext, cycles, expectedCyclesThatMakeChanges, afterConditions)
     }
 
 }

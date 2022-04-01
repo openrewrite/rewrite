@@ -11,20 +11,30 @@ import org.openrewrite.xml.tree.Xml
 
 
 interface MavenTestingSupport : XmlTestingSupport {
+
     val mavenParser: MavenParser
         get() = MavenParser.builder().build()
 
+    /**
+     * Extension method for {@Link MavenParser} that will parse a maven file and add a new JavaProject provenance to the
+     * resulting source file. An optional list of additional markers can be associated with the source file.
+     */
     fun MavenParser.parseMavenProjects(
-        @Language("xml") vararg sources: String
-    ): List<Xml.Document> {
-        return parse(executionContext, *sources.map { it.trimIndent() }.toTypedArray()).map {
-            it.addMarkers(listOf(createJavaProjectFromMaven(it)))
+        @Language("xml") source: String,
+        markers : List<Marker> = emptyList(),
+    ): Xml.Document {
+        return parse(executionContext, source.trimIndent())[0].let {
+            it.addMarkers(listOf(createJavaProjectFromMaven(it)) + markers)
         }
     }
 
+    /**
+     * Extension method for {@Link MavenParser} that will parse a maven file and add a new JavaProject provenance to each
+     * resulting source file. An optional list of additional markers can be associated with each source file.
+     */
     fun MavenParser.parseMavenProjects(
-        markers : List<Marker> = emptyList(),
-        @Language("xml") vararg sources: String
+        @Language("xml") vararg sources: String,
+        markers : List<Marker> = emptyList()
     ): List<Xml.Document> {
         return parse(executionContext, *sources.map { it.trimIndent() }.toTypedArray()).map {
             it.addMarkers(listOf(createJavaProjectFromMaven(it)) + markers)
@@ -45,7 +55,7 @@ interface MavenTestingSupport : XmlTestingSupport {
             .orElseThrow { IllegalStateException("There is no Java Project associated with the document") };
     }
 
-    fun createJavaProjectFromMaven(maven : Xml.Document) : JavaProject {
+    private fun createJavaProjectFromMaven(maven : Xml.Document) : JavaProject {
         val model = maven.getModel()
         return JavaProject(Tree.randomId(), model.pom.artifactId, JavaProject.Publication(model.pom.groupId, model.pom.artifactId, model.pom.version))
     }

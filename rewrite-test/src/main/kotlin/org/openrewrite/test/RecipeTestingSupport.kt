@@ -34,11 +34,11 @@ interface RecipeTestingSupport {
     }
 
     fun <T: SourceFile> assertChangedBase(
-        recipe: Recipe,
-        ctx: ExecutionContext = this.executionContext,
         before: T,
-        additionalSources: List<SourceFile>,
         after: String,
+        additionalSources: List<SourceFile> = emptyList(),
+        recipe: Recipe? = this.recipe!!,
+        ctx: ExecutionContext = this.executionContext,
         cycles: Int = 2,
         expectedCyclesThatMakeChanges: Int = cycles - 1,
         afterConditions: (T) -> Unit = { },
@@ -55,7 +55,7 @@ interface RecipeTestingSupport {
         val recipeSchedulerCheckingExpectedCycles =
             RecipeSchedulerCheckingExpectedCycles(DirectScheduler.common(), expectedCyclesThatMakeChanges)
 
-        var results = recipe.run(
+        var results = recipe?.run(
             listOf(before) + additionalSources,
             ctx,
             recipeSchedulerCheckingExpectedCycles,
@@ -63,7 +63,7 @@ interface RecipeTestingSupport {
             expectedCyclesThatMakeChanges + 1
         )
 
-        results = results.filter { it.before == before }
+        results = results!!.filter { it.before == before }
         if (results.isEmpty()) {
             Assertions.fail<Any>("The recipe must make changes")
         }
@@ -81,10 +81,10 @@ interface RecipeTestingSupport {
     }
 
     fun assertUnchanged(
-        recipe: Recipe,
-        executionContext: ExecutionContext = this.executionContext,
         before: SourceFile,
-        additionalSources: List<SourceFile>
+        recipe: Recipe = this.recipe!!,
+        executionContext: ExecutionContext = this.executionContext,
+        additionalSources: List<SourceFile> = emptyList(),
     ) {
         Assertions.assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
