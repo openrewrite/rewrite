@@ -18,16 +18,14 @@ package org.openrewrite.test;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.properties.tree.Properties;
+import org.openrewrite.text.PlainText;
 import org.openrewrite.xml.tree.Xml;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.function.Consumer;
 
 public interface SourceSpecs extends Iterable<SourceSpec<?>> {
-    default SourceSpecs java(@Language("java") String before) {
-        return java(before, s -> {
-        });
-    }
-
     default SourceSpecs dir(String dir, SourceSpecs... sources) {
         return dir(dir, s -> {
         }, sources);
@@ -35,6 +33,11 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
 
     default SourceSpecs dir(String dir, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
         return new Dir(dir, spec, sources);
+    }
+
+    default SourceSpecs java(@Language("java") String before) {
+        return java(before, s -> {
+        });
     }
 
     default SourceSpecs java(@Language("java") String before, Consumer<SourceSpec<J.CompilationUnit>> spec) {
@@ -76,6 +79,75 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
         SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", before, after);
         spec.accept(maven);
         return maven;
+    }
+
+    default SourceSpecs yaml(@Language("yaml") String before) {
+        return yaml(before, s -> {
+        });
+    }
+
+    default SourceSpecs yaml(@Language("yaml") String before, Consumer<SourceSpec<Yaml.Documents>> spec) {
+        SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, before, null);
+        spec.accept(yaml);
+        return yaml;
+    }
+
+    default SourceSpecs yaml(@Language("yaml") String before, @Language("yaml") String after) {
+        return yaml(before, after, s -> {
+        });
+    }
+
+    default SourceSpecs yaml(@Language("yaml") String before, @Language("yaml") String after,
+                             Consumer<SourceSpec<Yaml.Documents>> spec) {
+        SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, before, after);
+        spec.accept(yaml);
+        return yaml;
+    }
+
+    default SourceSpecs properties(@Language("properties") String before) {
+        return properties(before, s -> {
+        });
+    }
+
+    default SourceSpecs properties(@Language("properties") String before, Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> properties = new SourceSpec<>(PlainText.class, null, before, null);
+        spec.accept(properties);
+        return properties;
+    }
+
+    default SourceSpecs properties(@Language("properties") String before, @Language("properties") String after) {
+        return properties(before, after, s -> {
+        });
+    }
+
+    default SourceSpecs properties(@Language("properties") String before, @Language("properties") String after,
+                             Consumer<SourceSpec<Properties.File>> spec) {
+        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, before, after);
+        spec.accept(properties);
+        return properties;
+    }
+
+    default SourceSpecs text(String before) {
+        return text(before, s -> {
+        });
+    }
+
+    default SourceSpecs text(String before, Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, before, null);
+        spec.accept(text);
+        return text;
+    }
+
+    default SourceSpecs text(String before, String after) {
+        return text(before, after, s -> {
+        });
+    }
+
+    default SourceSpecs text(String before, String after,
+                                   Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, before, after);
+        spec.accept(text);
+        return text;
     }
 
     default SourceSpecs mavenProject(String project, SourceSpecs... sources) {
