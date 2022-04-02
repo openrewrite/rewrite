@@ -184,6 +184,6 @@ public class MavenParser implements Parser<Xml.Document> {
 
     @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
-        return prefix.resolve("/pom.xml");
+        return prefix.resolve("pom.xml");
     }
 }

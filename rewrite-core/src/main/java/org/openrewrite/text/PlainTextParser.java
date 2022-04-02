@@ -47,4 +47,9 @@ public class PlainTextParser implements Parser<PlainText> {
     public boolean accept(Path path) {
         return true;
     }
+
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("file.txt");
+    }
 }

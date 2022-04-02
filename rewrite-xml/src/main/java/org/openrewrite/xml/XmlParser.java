@@ -89,6 +89,11 @@ public class XmlParser implements Parser<Xml.Document> {
                 path.toString().endsWith(".xslt");
     }
 
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("file.xml");
+    }
+
     private static class ForwardingErrorListener extends BaseErrorListener {
         private final Path sourcePath;
         private final ExecutionContext ctx;

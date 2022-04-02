@@ -332,6 +332,11 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         return fileName.endsWith(".yml") || fileName.endsWith(".yaml");
     }
 
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("file.yaml");
+    }
+
     private interface BlockBuilder {
         Yaml.Block build();
 

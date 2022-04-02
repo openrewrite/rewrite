@@ -181,6 +181,11 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         return this;
     }
 
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("file.groovy");
+    }
+
     public static Builder builder() {
         return new Builder();
     }

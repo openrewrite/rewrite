@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.StreamSupport;
 
@@ -60,7 +61,7 @@ public interface Parser<S extends SourceFile> {
         return parseInputs(
                 Arrays.stream(sources).map(source ->
                         new Input(
-                                sourcePathFromSourceText(source),
+                                sourcePathFromSourceText(Paths.get(Long.toString(System.nanoTime())), source),
                                 () -> new ByteArrayInputStream(source.getBytes()),
                                 true
                         )
@@ -179,14 +180,5 @@ public interface Parser<S extends SourceFile> {
         }
     }
 
-    /**
-     * Derive a valid source path from the text of the source code.
-     */
-    default Path sourcePathFromSourceText(String sourceCode) {
-        return sourcePathFromSourceText(Paths.get(""), sourceCode);
-    }
-
-    default Path sourcePathFromSourceText(Path prefix, String sourceCode) {
-        return prefix.resolve(Paths.get(Long.toString(System.nanoTime())));
-    }
+    Path sourcePathFromSourceText(Path prefix, String sourceCode);
 }

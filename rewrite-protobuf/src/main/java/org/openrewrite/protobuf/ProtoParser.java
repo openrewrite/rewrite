@@ -57,7 +57,7 @@ public class ProtoParser implements Parser<Proto.Document> {
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
                         String source = StringUtils.readFully(sourceFile.getSource());
-                        if(source.contains("proto3")) {
+                        if (source.contains("proto3")) {
                             return null;
                         }
 
@@ -86,6 +86,11 @@ public class ProtoParser implements Parser<Proto.Document> {
     @Override
     public boolean accept(Path path) {
         return path.toString().endsWith(".proto");
+    }
+
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("file.proto");
     }
 
     private static class ForwardingErrorListener extends BaseErrorListener {

@@ -260,7 +260,6 @@ class EnvironmentTest : RecipeTest<PlainText> {
     private val plainTextParser = object : Parser<PlainText> {
         override fun parse(ctx: ExecutionContext, vararg sources: String): MutableList<PlainText> {
             return sources.asSequence()
-                .filterNotNull()
                 .map { PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, it) }
                 .toMutableList()
         }
@@ -271,14 +270,17 @@ class EnvironmentTest : RecipeTest<PlainText> {
             ctx: ExecutionContext
         ): MutableList<PlainText> {
             return sources.asSequence()
-                    .map { it.source.toString() }
-                    .map { PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, it)}
-                    .toMutableList()
+                .map { it.source.toString() }
+                .map { PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, it) }
+                .toMutableList()
         }
 
         override fun accept(path: Path): Boolean {
             return true
         }
+
+        override fun sourcePathFromSourceText(prefix: Path, sourceCode: String): Path =
+            TODO("Not implemented")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/343")
@@ -311,9 +313,9 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val recipeDescriptors = env.listRecipeDescriptors()
         assertThat(recipeDescriptors).isNotNull.isNotEmpty
         val helloJon2 =
-                recipeDescriptors.firstOrNull { it.name == "org.openrewrite.HelloJon2" }
+            recipeDescriptors.firstOrNull { it.name == "org.openrewrite.HelloJon2" }
         assertThat(helloJon2!!.recipeList)
-                .hasSize(1)
+            .hasSize(1)
         assertThat(helloJon2.recipeList.first().name).isEqualTo("org.openrewrite.HelloJon")
     }
 }

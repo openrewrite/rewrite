@@ -238,4 +238,9 @@ public class PropertiesParser implements Parser<Properties.File> {
     public boolean accept(Path path) {
         return path.toString().endsWith(".properties");
     }
+
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("file.properties");
+    }
 }

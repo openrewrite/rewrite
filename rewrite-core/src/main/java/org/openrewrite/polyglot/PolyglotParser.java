@@ -140,6 +140,11 @@ public class PolyglotParser implements Parser<Polyglot.Source> {
         return path.endsWith(".js");
     }
 
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("polyglot");
+    }
+
     private static class PolyglotHelper implements ProxyObject {
         @Override
         public Object getMember(String key) {

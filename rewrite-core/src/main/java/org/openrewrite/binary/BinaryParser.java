@@ -53,12 +53,17 @@ public class BinaryParser implements Parser<Binary> {
         return true;
     }
 
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("file");
+    }
+
     private byte[] readAllBytes(InputStream is) {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         int byteCount;
         byte[] data = new byte[4096];
         try {
-            while((byteCount = is.read(data, 0, data.length)) != -1) {
+            while ((byteCount = is.read(data, 0, data.length)) != -1) {
                 buffer.write(data, 0, byteCount);
             }
         } catch (IOException e) {

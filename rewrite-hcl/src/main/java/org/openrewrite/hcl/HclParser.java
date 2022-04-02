@@ -90,6 +90,11 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
         return path.toString().endsWith(".tf");
     }
 
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("file.tf");
+    }
+
     private static class ForwardingErrorListener extends BaseErrorListener {
         private final Path sourcePath;
         private final ExecutionContext ctx;

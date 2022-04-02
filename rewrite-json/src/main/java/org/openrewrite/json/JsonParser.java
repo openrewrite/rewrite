@@ -83,6 +83,11 @@ public class JsonParser implements Parser<Json.Document> {
         return path.toString().endsWith(".json");
     }
 
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve("file.json");
+    }
+
     private static class ForwardingErrorListener extends BaseErrorListener {
         private final Path sourcePath;
         private final ExecutionContext ctx;

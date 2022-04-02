@@ -129,7 +129,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         return parseInputs(
                 Arrays.stream(sources)
                         .map(sourceFile -> new Input(
-                                sourcePathFromSourceText(sourceFile),
+                                sourcePathFromSourceText(Paths.get(""), sourceFile),
                                 () -> new ByteArrayInputStream(sourceFile.getBytes())
                         ))
                         .collect(toList()),

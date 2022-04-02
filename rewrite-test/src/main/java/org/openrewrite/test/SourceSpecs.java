@@ -81,23 +81,23 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
         return maven;
     }
 
-    default SourceSpecs yaml(@Language("yaml") String before) {
+    default SourceSpecs yaml(@Language("yml") String before) {
         return yaml(before, s -> {
         });
     }
 
-    default SourceSpecs yaml(@Language("yaml") String before, Consumer<SourceSpec<Yaml.Documents>> spec) {
+    default SourceSpecs yaml(@Language("yml") String before, Consumer<SourceSpec<Yaml.Documents>> spec) {
         SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, before, null);
         spec.accept(yaml);
         return yaml;
     }
 
-    default SourceSpecs yaml(@Language("yaml") String before, @Language("yaml") String after) {
+    default SourceSpecs yaml(@Language("yml") String before, @Language("yml") String after) {
         return yaml(before, after, s -> {
         });
     }
 
-    default SourceSpecs yaml(@Language("yaml") String before, @Language("yaml") String after,
+    default SourceSpecs yaml(@Language("yml") String before, @Language("yml") String after,
                              Consumer<SourceSpec<Yaml.Documents>> spec) {
         SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, before, after);
         spec.accept(yaml);
