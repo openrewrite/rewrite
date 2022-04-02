@@ -39,6 +39,11 @@ public class StringUtils {
     private StringUtils() {
     }
 
+    public static String trimIndentPreserveCRLF(String text) {
+        return trimIndent(text.replace('\r', '⏎'))
+                .replace('⏎', '\r');
+    }
+
     public static String trimIndent(String text) {
         int indentLevel = indentLevel(text);
 

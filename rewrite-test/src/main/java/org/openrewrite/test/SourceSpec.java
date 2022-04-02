@@ -1,0 +1,101 @@
+/*
+ * Copyright 2022 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.test;
+
+import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaVersion;
+import org.openrewrite.marker.Marker;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Consumer;
+
+@RequiredArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class SourceSpec<T extends SourceFile> {
+    @EqualsAndHashCode.Include
+    final UUID id = UUID.randomUUID();
+
+    final Class<T> sourceFileType;
+
+    @Nullable
+    final String dsl;
+
+    final String before;
+
+    @Nullable
+    final String after;
+
+    protected Path dir = Paths.get("");
+
+    @Nullable
+    protected Path sourcePath;
+
+    protected final List<Marker> markers = new ArrayList<>();
+
+    protected Consumer<T> beforeRecipe = t -> {
+
+    };
+
+    protected Consumer<T> afterRecipe = t -> {
+    };
+
+    public SourceSpec<T> path(Path sourcePath) {
+        this.sourcePath = sourcePath;
+        return this;
+    }
+
+    public SourceSpec<T> markers(Marker... markers) {
+        Collections.addAll(this.markers, markers);
+        return this;
+    }
+
+    public SourceSpec<T> beforeRecipe(Consumer<T> beforeRecipe) {
+        this.beforeRecipe = beforeRecipe;
+        return this;
+    }
+
+    public SourceSpec<T> afterRecipe(Consumer<T> afterRecipe) {
+        this.afterRecipe = afterRecipe;
+        return this;
+    }
+
+    public Java java() {
+        return new Java();
+    }
+
+    public class Java {
+        public Java version(int version) {
+            markers(new JavaVersion(Tree.randomId(), "openjdk", "adoptopenjdk",
+                    Integer.toString(version), Integer.toString(version)));
+            return this;
+        }
+
+        public Java project(String projectName) {
+            markers(new JavaProject(Tree.randomId(), projectName, null));
+            return this;
+        }
+    }
+}

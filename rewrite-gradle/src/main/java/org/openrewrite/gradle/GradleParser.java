@@ -90,7 +90,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     }
 
     @Override
-    public Path randomSourceName() {
-        return Parser.super.randomSourceName().resolve("/build.gradle");
+    public Path sourcePathFromSourceText(Path path, String sourceCode) {
+        return Parser.super.sourcePathFromSourceText(path, sourceCode).resolve("/build.gradle");
     }
 }

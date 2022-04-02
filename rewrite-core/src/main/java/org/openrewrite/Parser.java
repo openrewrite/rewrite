@@ -60,7 +60,7 @@ public interface Parser<S extends SourceFile> {
         return parseInputs(
                 Arrays.stream(sources).map(source ->
                         new Input(
-                                randomSourceName(),
+                                sourcePathFromSourceText(source),
                                 () -> new ByteArrayInputStream(source.getBytes()),
                                 true
                         )
@@ -179,7 +179,14 @@ public interface Parser<S extends SourceFile> {
         }
     }
 
-    default Path randomSourceName() {
-        return Paths.get(Long.toString(System.nanoTime()));
+    /**
+     * Derive a valid source path from the text of the source code.
+     */
+    default Path sourcePathFromSourceText(String sourceCode) {
+        return sourcePathFromSourceText(Paths.get(""), sourceCode);
+    }
+
+    default Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return prefix.resolve(Paths.get(Long.toString(System.nanoTime())));
     }
 }

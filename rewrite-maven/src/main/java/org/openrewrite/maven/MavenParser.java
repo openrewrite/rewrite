@@ -73,7 +73,7 @@ public class MavenParser implements Parser<Xml.Document> {
 
     @Override
     public List<Xml.Document> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
-                                   ExecutionContext ctx) {
+                                          ExecutionContext ctx) {
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
         Map<Path, Pom> projectPomsByPath = new HashMap<>();
         for (Input source : sources) {
@@ -112,7 +112,7 @@ public class MavenParser implements Parser<Xml.Document> {
 
             List<MavenResolutionResult> modules = new ArrayList<>(0);
             for (Xml.Document possibleModule : parsed) {
-                if(possibleModule == maven) {
+                if (possibleModule == maven) {
                     continue;
                 }
                 MavenResolutionResult moduleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class)
@@ -180,5 +180,10 @@ public class MavenParser implements Parser<Xml.Document> {
         public MavenParser build() {
             return new MavenParser(httpSender, activeProfiles);
         }
+    }
+
+    @Override
+    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        return Parser.super.sourcePathFromSourceText(prefix, sourceCode).resolve("/pom.xml");
     }
 }

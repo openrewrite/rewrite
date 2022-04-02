@@ -126,29 +126,12 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
     @Override
     default List<J.CompilationUnit> parse(ExecutionContext ctx, @Language("java") String... sources) {
-        Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
-        Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
-
-        Function<String, String> simpleName = sourceStr -> {
-            Matcher classMatcher = classPattern.matcher(sourceStr);
-            return classMatcher.find() ? classMatcher.group(3) : null;
-        };
-
         return parseInputs(
                 Arrays.stream(sources)
-                        .map(sourceFile -> {
-                            Matcher packageMatcher = packagePattern.matcher(sourceFile);
-                            String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
-
-                            String className = Optional.ofNullable(simpleName.apply(sourceFile))
-                                    .orElse(Long.toString(System.nanoTime())) + ".java";
-
-                            Path path = Paths.get(pkg + className);
-                            return new Input(
-                                    path,
-                                    () -> new ByteArrayInputStream(sourceFile.getBytes())
-                            );
-                        })
+                        .map(sourceFile -> new Input(
+                                sourcePathFromSourceText(sourceFile),
+                                () -> new ByteArrayInputStream(sourceFile.getBytes())
+                        ))
                         .collect(toList()),
                 null,
                 ctx
@@ -254,5 +237,24 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         }
 
         public abstract P build();
+    }
+
+    @Override
+    default Path sourcePathFromSourceText(Path prefix, String sourceCode) {
+        Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
+        Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
+
+        Function<String, String> simpleName = sourceStr -> {
+            Matcher classMatcher = classPattern.matcher(sourceStr);
+            return classMatcher.find() ? classMatcher.group(3) : null;
+        };
+
+        Matcher packageMatcher = packagePattern.matcher(sourceCode);
+        String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
+
+        String className = Optional.ofNullable(simpleName.apply(sourceCode))
+                .orElse(Long.toString(System.nanoTime())) + ".java";
+
+        return prefix.resolve(Paths.get(pkg + className));
     }
 }
