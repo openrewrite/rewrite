@@ -60,7 +60,7 @@ class GitProvenanceTest {
 
     @Test
     fun localBranchPresent(@TempDir projectDir: Path) {
-        Git.init().setDirectory(projectDir.toFile()).call()
+        Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()
         assertThat(GitProvenance.fromProjectDirectory(projectDir, null)!!.branch)
             .isEqualTo("main")
     }
@@ -118,7 +118,7 @@ class GitProvenanceTest {
 
     @Test
     fun detachedHeadBehindBranchHead(@TempDir projectDir: Path) {
-        val git = Git.init().setDirectory(projectDir.toFile()).call()
+        val git = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()
         projectDir.resolve("test.txt").writeText("hi")
         git.add().addFilepattern("*").call()
         git.commit().setMessage("init").call()
