@@ -15,7 +15,7 @@
  */
 package org.openrewrite.test;
 
-import org.intellij.lang.annotations.Language;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.internal.ListUtils;
@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -38,7 +39,7 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 import static org.openrewrite.test.ParserTypeUtils.parserType;
 
 @Incubating(since = "7.20.1")
-public interface RewriteTest {
+public interface RewriteTest extends SourceSpecs {
     static Recipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
         return new AdHocRecipe(visitor);
     }
@@ -51,6 +52,18 @@ public interface RewriteTest {
     }
 
     default void defaults(RecipeSpec spec) {
+    }
+
+    default void rewriteRun(SourceSpecs... sourceSpecs) {
+        rewriteRun(spec -> {
+        }, sourceSpecs);
+    }
+
+    default void rewriteRun(Consumer<RecipeSpec> specChange, SourceSpecs... sourceSpecs) {
+        rewriteRun(specChange, Arrays.stream(sourceSpecs)
+                .flatMap(specGroup -> StreamSupport.stream(specGroup.spliterator(), false))
+                .toArray(SourceSpec[]::new)
+        );
     }
 
     default void rewriteRun(Consumer<RecipeSpec> specChange, SourceSpec<?>... sourceSpecs) {
@@ -149,8 +162,9 @@ public interface RewriteTest {
             }
         }
 
+        List<SourceFile> beforeSourceFiles = new ArrayList<>(specBySourceFile.keySet());
         List<Result> results = recipe.run(
-                new ArrayList<>(specBySourceFile.keySet()),
+                beforeSourceFiles,
                 executionContext,
                 recipeSchedulerCheckingExpectedCycles,
                 cycles,
@@ -206,49 +220,19 @@ public interface RewriteTest {
         }, sources);
     }
 
-    default SourceSpec<J.CompilationUnit> java(@Language("java") String before) {
-        return java(before, s -> {
-        });
-    }
+    @NotNull
+    @Override
+    default Iterator<SourceSpec<?>> iterator() {
+        return new Iterator<SourceSpec<?>>() {
+            @Override
+            public boolean hasNext() {
+                return false;
+            }
 
-    default SourceSpec<J.CompilationUnit> java(@Language("java") String before, Consumer<SourceSpec<J.CompilationUnit>> spec) {
-        SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, before, null);
-        spec.accept(java);
-        return java;
-    }
-
-    default SourceSpec<J.CompilationUnit> javaChange(@Language("java") String before, @Language("java") String after) {
-        return javaChange(before, after, s -> {
-        });
-    }
-
-    default SourceSpec<J.CompilationUnit> javaChange(@Language("java") String before, @Language("java") String after,
-                                                     Consumer<SourceSpec<J.CompilationUnit>> spec) {
-        SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, before, after);
-        spec.accept(java);
-        return java;
-    }
-
-    default SourceSpec<Xml.Document> maven(@Language("xml") String before) {
-        return maven(before, s -> {
-        });
-    }
-
-    default SourceSpec<Xml.Document> maven(@Language("xml") String before, Consumer<SourceSpec<Xml.Document>> spec) {
-        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", before, null);
-        spec.accept(maven);
-        return maven;
-    }
-
-    default SourceSpec<Xml.Document> mavenChange(@Language("xml") String before, @Language("xml") String after) {
-        return mavenChange(before, after, s -> {
-        });
-    }
-
-    default SourceSpec<Xml.Document> mavenChange(@Language("xml") String before, @Language("xml") String after,
-                                                 Consumer<SourceSpec<Xml.Document>> spec) {
-        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", before, after);
-        spec.accept(maven);
-        return maven;
+            @Override
+            public SourceSpec<?> next() {
+                throw new UnsupportedOperationException("RewriteTest is not intended to be iterated.");
+            }
+        };
     }
 }

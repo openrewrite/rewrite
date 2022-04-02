@@ -21,20 +21,18 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.marker.Marker;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Consumer;
 
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class SourceSpec<T extends SourceFile> {
+public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     @EqualsAndHashCode.Include
     final UUID id = UUID.randomUUID();
 
@@ -88,14 +86,36 @@ public class SourceSpec<T extends SourceFile> {
 
     public class Java {
         public Java version(int version) {
-            markers(new JavaVersion(Tree.randomId(), "openjdk", "adoptopenjdk",
-                    Integer.toString(version), Integer.toString(version)));
+            markers(SourceSpecMarkers.javaVersion(version));
             return this;
         }
 
         public Java project(String projectName) {
-            markers(new JavaProject(Tree.randomId(), projectName, null));
+            markers(SourceSpecMarkers.javaProject(projectName));
             return this;
         }
+
+        public Java sourceSet(String sourceSet) {
+            markers(SourceSpecMarkers.javaSourceSet(sourceSet));
+            return this;
+        }
+    }
+
+    @Override
+    public Iterator<SourceSpec<?>> iterator() {
+        return new Iterator<SourceSpec<?>>() {
+            boolean next = true;
+
+            @Override
+            public boolean hasNext() {
+                return next;
+            }
+
+            @Override
+            public SourceSpec<?> next() {
+                next = false;
+                return SourceSpec.this;
+            }
+        };
     }
 }
