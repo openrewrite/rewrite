@@ -158,7 +158,11 @@ public interface RewriteTest extends SourceSpecs {
                 sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
                         sourceFile.getMarkers().getMarkers(), testMethodSpec.allSources.markers)));
 
-                specBySourceFile.put(sourceFile, sourceSpecIter.next());
+                SourceSpec<?> spec = sourceSpecIter.next();
+                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
+                        sourceFile.getMarkers().getMarkers(), spec.markers)));
+
+                specBySourceFile.put(sourceFile, spec);
             }
         }
 
