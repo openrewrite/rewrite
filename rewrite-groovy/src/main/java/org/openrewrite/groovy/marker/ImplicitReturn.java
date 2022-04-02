@@ -16,11 +16,13 @@
 package org.openrewrite.groovy.marker;
 
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 @Value
+@With
 public class ImplicitReturn implements Marker {
     UUID id;
 }

@@ -54,8 +54,6 @@ public interface Hcl extends Tree {
 
     Space getPrefix();
 
-    <H extends Hcl> H withId(UUID id);
-
     <H extends Hcl> H withPrefix(Space prefix);
 
     default <H extends Hcl> H withTemplate(SourceTemplate<Hcl, HclCoordinates> template, HclCoordinates coordinates, Object... parameters) {

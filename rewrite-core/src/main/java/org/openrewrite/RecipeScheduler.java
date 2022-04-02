@@ -31,12 +31,12 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
-import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.Tree.randomId;
 
@@ -60,6 +60,14 @@ public interface RecipeScheduler {
                                      ExecutionContext ctx,
                                      int maxCycles,
                                      int minCycles) {
+        Set<UUID> sourceFileIds = new HashSet<>();
+        before = ListUtils.map(before, sourceFile -> {
+            if (!sourceFileIds.add(sourceFile.getId())) {
+                return sourceFile.withId(Tree.randomId());
+            }
+            return sourceFile;
+        });
+
         DistributionSummary.builder("rewrite.recipe.run")
                 .tag("recipe", recipe.getDisplayName())
                 .description("The distribution of recipe runs and the size of source file batches given to them to process.")
@@ -88,8 +96,10 @@ public interface RecipeScheduler {
             return emptyList();
         }
 
-        Map<UUID, SourceFile> sourceFileIdentities = before.stream()
-                .collect(toMap(SourceFile::getId, Function.identity()));
+        Map<UUID, SourceFile> sourceFileIdentities = new HashMap<>();
+        for (SourceFile sourceFile : before) {
+            sourceFileIdentities.put(sourceFile.getId(), sourceFile);
+        }
 
         List<Result> results = new ArrayList<>();
 

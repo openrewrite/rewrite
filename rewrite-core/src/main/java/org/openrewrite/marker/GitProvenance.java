@@ -16,14 +16,12 @@
 package org.openrewrite.marker;
 
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.experimental.FieldDefaults;
+import lombok.Value;
+import lombok.With;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.transport.RemoteConfig;
-import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
@@ -38,11 +36,11 @@ import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
 
-@Incubating(since = "7.0.0")
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
+@Value
+@With
 public class GitProvenance implements Marker {
     UUID id;
+
     @Nullable
     String origin;
 

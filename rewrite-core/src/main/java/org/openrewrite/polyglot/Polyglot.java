@@ -337,6 +337,7 @@ public interface Polyglot extends Tree {
     @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     class HashEntries implements Polyglot {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 

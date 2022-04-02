@@ -16,11 +16,13 @@
 package org.openrewrite.java.dataflow;
 
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 @Value
+@With
 public class LastWrite implements DataflowMarker {
     UUID id;
     UUID declaration;

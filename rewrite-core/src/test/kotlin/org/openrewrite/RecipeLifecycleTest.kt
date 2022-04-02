@@ -133,14 +133,14 @@ class RecipeLifecycleTest {
             if (tree !is FooSource) {
                 throw RuntimeException("tree is not a FooSource")
             }
-            return tree;
+            return tree
         }
 
         override fun postVisit(tree: FooSource, p: P): FooSource {
             if (tree !is FooSource) {
                 throw RuntimeException("tree is not a FooSource")
             }
-            return tree;
+            return tree
         }
     }
 
@@ -150,6 +150,7 @@ class RecipeLifecycleTest {
         override fun getMarkers(): Markers = throw NotImplementedError()
         override fun <T : SourceFile?> withMarkers(markers: Markers): T = throw NotImplementedError()
         override fun getId(): UUID = throw NotImplementedError()
+        override fun <T : Tree?> withId(id: UUID): T = throw NotImplementedError()
         override fun getSourcePath() = throw NotImplementedError()
         override fun withSourcePath(path: Path): SourceFile = throw NotImplementedError()
     }
@@ -183,11 +184,11 @@ class RecipeLifecycleTest {
                 override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
                     return object : PlainTextVisitor<ExecutionContext>() {
                         override fun visit(tree: Tree, p: ExecutionContext): PlainText {
-                            var pt = tree as PlainText;
+                            var pt = tree as PlainText
                             if (!pt.printAll().startsWith("Change1")) {
                                 pt = pt.withText("Change1" + pt.printAll())
                             }
-                            return pt;
+                            return pt
                         }
                     }
 
@@ -199,7 +200,7 @@ class RecipeLifecycleTest {
                 override fun toString() = displayName
                 override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
                     return object : PlainTextVisitor<ExecutionContext>() {
-                        override fun visit(tree: Tree, p: ExecutionContext) = tree as PlainText;
+                        override fun visit(tree: Tree, p: ExecutionContext) = tree as PlainText
                     }
 
                 }
@@ -212,11 +213,11 @@ class RecipeLifecycleTest {
                     override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
                         return object : PlainTextVisitor<ExecutionContext>() {
                             override fun visit(tree: Tree, p: ExecutionContext): PlainText {
-                                var pt = tree as PlainText;
+                                var pt = tree as PlainText
                                 if (!pt.printAll().endsWith("Change2")) {
                                     pt = pt.withText(pt.printAll() + "Change2")
                                 }
-                                return pt;
+                                return pt
                             }
                         }
 

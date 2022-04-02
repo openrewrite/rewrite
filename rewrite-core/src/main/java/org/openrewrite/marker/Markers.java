@@ -17,7 +17,6 @@ package org.openrewrite.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -31,8 +30,8 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
-@Incubating(since = "7.0.0")
 @Value
+@With
 public class Markers implements Tree {
     public static final Markers EMPTY = new Markers(randomId(), emptyList());
 

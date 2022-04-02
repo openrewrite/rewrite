@@ -140,7 +140,7 @@ public interface Javadoc extends Tree {
 
         @SuppressWarnings("unchecked")
         public DocComment withSuffix(String suffix) {
-            if(!suffix.equals(this.suffix)) {
+            if (!suffix.equals(this.suffix)) {
                 return new DocComment(id, markers, body, suffix);
             }
             return this;
@@ -291,6 +291,7 @@ public interface Javadoc extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     class LineBreak implements Javadoc {
         @EqualsAndHashCode.Include
+        @With
         UUID id;
 
         String margin;

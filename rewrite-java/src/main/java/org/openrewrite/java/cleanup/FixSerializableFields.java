@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -36,10 +37,6 @@ import java.util.function.Consumer;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FixSerializableFields extends Recipe {
-
-    private static final JavaType.Class SERIALIZABLE_FQ = JavaType.Class.build("java.io.Serializable");
-    private static final JavaType.Class COLLECTION_FQ = JavaType.Class.build("java.util.Collection");
-    private static final JavaType.Class MAP_FQ = JavaType.Class.build("java.util.Map");
     private static final SerializedMarker SERIALIZED_MARKER = new SerializedMarker(Tree.randomId());
 
     @Option(displayName = "Mark fields as transient",
@@ -216,6 +213,7 @@ public class FixSerializableFields extends Recipe {
     }
 
     @Value
+    @With
     private static class SerializedMarker implements Marker {
         UUID id;
     }
@@ -242,7 +240,7 @@ public class FixSerializableFields extends Recipe {
             return implementsSerializable(((JavaType.Array) type).getElemType(), notSerializableAction);
         } else if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-            if (COLLECTION_FQ.isAssignableFrom(parameterized) || MAP_FQ.isAssignableFrom(parameterized)) {
+            if (TypeUtils.isAssignableTo("java.util.Collection", parameterized) || TypeUtils.isAssignableTo("java.util.Map", parameterized)) {
                 //If the type is either a collection or a map, make sure the type parameters are serializable. We
                 //force all type parameters to be checked to correctly scoop up all non-serializable candidates.
                 boolean typeParametersSerializable = true;
@@ -255,7 +253,7 @@ public class FixSerializableFields extends Recipe {
         }
 
         JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
-        if (SERIALIZABLE_FQ.isAssignableFrom(type)) {
+        if (TypeUtils.isAssignableTo("java.io.Serializable", type)) {
             return true;
         }
         if (fq != null && notSerializableAction != null) {

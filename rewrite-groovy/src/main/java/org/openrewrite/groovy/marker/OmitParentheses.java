@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.marker;
 
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
@@ -24,6 +25,7 @@ import java.util.UUID;
  * See the Groovy style guide on <a href="http://www.groovy-lang.org/style-guide.html#_omitting_parentheses">Ommitting parentheses</a>.
  */
 @Value
+@With
 public class OmitParentheses implements Marker {
     UUID id;
 }

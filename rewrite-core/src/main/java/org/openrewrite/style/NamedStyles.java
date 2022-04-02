@@ -15,8 +15,7 @@
  */
 package org.openrewrite.style;
 
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.*;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -30,18 +29,21 @@ import java.util.UUID;
  */
 @Data
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@AllArgsConstructor
+@With
 public class NamedStyles implements Marker {
-    private final UUID id;
+    UUID id;
 
     @EqualsAndHashCode.Include
-    private final String name;
+    String name;
 
-    private final String displayName;
+    String displayName;
 
     @Nullable
-    private final String description;
-    private final Set<String> tags;
-    private final Collection<Style> styles;
+    String description;
+
+    Set<String> tags;
+    Collection<Style> styles;
 
     @SuppressWarnings("unchecked")
     @Nullable

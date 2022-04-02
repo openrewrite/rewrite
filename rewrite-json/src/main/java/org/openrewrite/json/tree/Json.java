@@ -50,8 +50,6 @@ public interface Json extends Tree {
 
     Space getPrefix();
 
-    <J extends Json> J withId(UUID id);
-
     <J extends Json> J withPrefix(Space prefix);
 
     <T extends Json> T withMarkers(Markers markers);

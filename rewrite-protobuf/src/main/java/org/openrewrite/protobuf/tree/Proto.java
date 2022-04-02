@@ -50,8 +50,6 @@ public interface Proto extends Tree {
 
     Space getPrefix();
 
-    <P extends Proto> P withId(UUID id);
-
     <P extends Proto> P withPrefix(Space prefix);
 
     <P extends Proto> P withMarkers(Markers markers);

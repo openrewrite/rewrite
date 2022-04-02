@@ -27,16 +27,12 @@ import java.util.UUID;
  * The simplest of all ASTs representing nothing more than just unstructured text.
  */
 @Value
+@With
 public class PlainText implements SourceFile, Tree {
     UUID id;
 
-    @With
     Path sourcePath;
-
-    @With
     Markers markers;
-
-    @With
     String text;
 
     @Override

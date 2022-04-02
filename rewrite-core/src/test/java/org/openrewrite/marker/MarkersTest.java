@@ -16,6 +16,7 @@
 package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 
 import java.util.Collections;
@@ -61,7 +62,7 @@ public class MarkersTest {
         private final UUID id;
         private final String text;
 
-        private TextMarker( UUID id, String text) {
+        private TextMarker(UUID id, String text) {
             this.text = text;
             this.id = id;
         }
@@ -84,6 +85,12 @@ public class MarkersTest {
             return id;
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public TextMarker withId(UUID id) {
+            return new TextMarker(id, text);
+        }
+
         @Override
         public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
             return false;
@@ -95,5 +102,12 @@ public class MarkersTest {
         public UUID getId() {
             return randomId();
         }
+
+        @Override
+        public <T extends Tree> T withId(UUID id) {
+            throw new UnsupportedOperationException();
+        }
+
+
     }
 }

@@ -42,6 +42,11 @@ public class PolyglotTree<T extends Tree> implements Tree, ProxyObject {
     }
 
     @Override
+    public <T2 extends Tree> T2 withId(UUID id) {
+        return delegate.withId(id);
+    }
+
+    @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return delegate.isAcceptable(v, p);
     }

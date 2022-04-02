@@ -26,16 +26,11 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 @Value
+@With
 public class Binary implements SourceFile, Tree {
     UUID id;
-
-    @With
     Path sourcePath;
-
-    @With
     Markers markers;
-
-    @With
     byte[] bytes;
 
     @Override

@@ -16,6 +16,7 @@
 package org.openrewrite.marker;
 
 import lombok.Value;
+import lombok.With;
 
 import java.util.UUID;
 
@@ -24,6 +25,7 @@ import java.util.UUID;
  * Such files should never show up in recipe results.
  */
 @Value
+@With
 public class Generated implements Marker {
     UUID id;
 }

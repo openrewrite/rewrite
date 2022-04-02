@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree;
 
 import lombok.Getter;
+import org.openrewrite.Tree;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
@@ -34,5 +35,10 @@ public class JavaVarKeyword implements Marker {
 
     public static JavaVarKeyword build() {
         return INSTANCE;
+    }
+
+    @Override
+    public <T extends Tree> T withId(UUID id) {
+        throw new UnsupportedOperationException();
     }
 }

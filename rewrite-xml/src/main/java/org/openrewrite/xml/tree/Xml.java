@@ -15,8 +15,9 @@
  */
 package org.openrewrite.xml.tree;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
@@ -89,6 +90,7 @@ public interface Xml extends Tree {
 
     @Value
     class Document implements Xml, SourceFile {
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -101,7 +103,7 @@ public interface Xml extends Tree {
         public Document withPrefix(String prefix) {
             return WithPrefix.onlyIfNotEqual(this, prefix);
         }
-        
+
         public String getPrefix() {
             return prefixUnsafe;
         }
@@ -118,7 +120,7 @@ public interface Xml extends Tree {
         String eof;
 
         public Document withEof(String eof) {
-            if(this.eof.equals(eof)) {
+            if (this.eof.equals(eof)) {
                 return this;
             }
             return new Document(id, sourcePath, prefixUnsafe, markers, prolog, root, eof);
@@ -135,14 +137,13 @@ public interface Xml extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class Prolog implements Xml {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefixUnsafe;
 
         public Prolog withPrefix(String prefix) {
@@ -153,14 +154,11 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
-        @With
         Markers markers;
 
         @Nullable
-        @With
         XmlDecl xmlDecl;
 
-        @With
         List<Misc> misc;
 
         @Override
@@ -169,14 +167,12 @@ public interface Xml extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class XmlDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
         UUID id;
-
-        @With
         String prefixUnsafe;
 
         public XmlDecl withPrefix(String prefix) {
@@ -187,19 +183,13 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
-        @With
         Markers markers;
-
-        @With
         String name;
-
-        @With
         List<Attribute> attributes;
 
         /**
          * Space before '&gt;'
          */
-        @With
         String beforeTagDelimiterPrefix;
 
         @Override
@@ -208,14 +198,13 @@ public interface Xml extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class ProcessingInstruction implements Xml, Content, Misc {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefixUnsafe;
 
         public ProcessingInstruction withPrefix(String prefix) {
@@ -226,19 +215,13 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
-        @With
         Markers markers;
-
-        @With
         String name;
-
-        @With
         CharData processingInstructions;
 
         /**
          * Space before '&gt;'
          */
-        @With
         String beforeTagDelimiterPrefix;
 
         @Override
@@ -247,11 +230,11 @@ public interface Xml extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
     class Tag implements Xml, Content {
         @EqualsAndHashCode.Include
+        @With
         UUID id;
 
         @With
@@ -429,14 +412,13 @@ public interface Xml extends Tree {
                     .collect(Collectors.joining("")) + ">";
         }
 
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @Value
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
+        @With
         public static class Closing implements Xml {
             @EqualsAndHashCode.Include
             UUID id;
 
-            @With
             String prefixUnsafe;
 
             public Closing withPrefix(String prefix) {
@@ -447,28 +429,23 @@ public interface Xml extends Tree {
                 return prefixUnsafe;
             }
 
-            @With
             Markers markers;
-
-            @With
             String name;
 
             /**
              * Space before '&gt;'
              */
-            @With
             String beforeTagDelimiterPrefix;
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class Attribute implements Xml {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefixUnsafe;
 
         public Attribute withPrefix(String prefix) {
@@ -479,16 +456,9 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
-        @With
         Markers markers;
-
-        @With
         Ident key;
-
-        @With
         String beforeEquals;
-
-        @With
         Value value;
 
         @Override
@@ -496,9 +466,9 @@ public interface Xml extends Tree {
             return v.visitAttribute(this, p);
         }
 
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @lombok.Value
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
+        @With
         public static class Value implements Xml {
             public enum Quote {
                 Double, Single
@@ -507,7 +477,6 @@ public interface Xml extends Tree {
             @EqualsAndHashCode.Include
             UUID id;
 
-            @With
             String prefixUnsafe;
 
             public Value withPrefix(String prefix) {
@@ -518,13 +487,8 @@ public interface Xml extends Tree {
                 return prefixUnsafe;
             }
 
-            @With
             Markers markers;
-
-            @With
             Quote quote;
-
-            @With
             String value;
         }
 
@@ -537,14 +501,13 @@ public interface Xml extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class CharData implements Xml, Content {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefixUnsafe;
 
         public CharData withPrefix(String prefix) {
@@ -555,16 +518,9 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
-        @With
         Markers markers;
-
-        @With
         boolean cdata;
-
-        @With
         String text;
-
-        @With
         String afterText;
 
         @Override
@@ -573,14 +529,13 @@ public interface Xml extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class Comment implements Xml, Content, Misc {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefixUnsafe;
 
         public Comment withPrefix(String prefix) {
@@ -591,10 +546,7 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
-        @With
         Markers markers;
-
-        @With
         String text;
 
         @Override
@@ -603,14 +555,13 @@ public interface Xml extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class DocTypeDecl implements Xml, Misc {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefixUnsafe;
 
         public DocTypeDecl withPrefix(String prefix) {
@@ -621,36 +572,26 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
-        @With
         Markers markers;
-
-        @With
         Ident name;
-
-        @With
         Ident externalId;
-
-        @With
         List<Ident> internalSubset;
 
-        @With
         @Nullable
         ExternalSubsets externalSubsets;
 
         /**
          * Space before '&gt;'.
          */
-        @With
         String beforeTagDelimiterPrefix;
 
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @Value
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
+        @With
         public static class ExternalSubsets implements Xml {
             @EqualsAndHashCode.Include
             UUID id;
 
-            @With
             String prefixUnsafe;
 
             public ExternalSubsets withPrefix(String prefix) {
@@ -661,10 +602,7 @@ public interface Xml extends Tree {
                 return prefixUnsafe;
             }
 
-            @With
             Markers markers;
-
-            @With
             List<Element> elements;
         }
 
@@ -674,14 +612,13 @@ public interface Xml extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class Element implements Xml {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefixUnsafe;
 
         public Element withPrefix(String prefix) {
@@ -692,16 +629,12 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
-        @With
         Markers markers;
-
-        @With
         List<Ident> subset;
 
         /**
          * Space before '&gt;'
          */
-        @With
         String beforeTagDelimiterPrefix;
 
         @Override
@@ -710,14 +643,13 @@ public interface Xml extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class Ident implements Xml {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefixUnsafe;
 
         public Ident withPrefix(String prefix) {
@@ -728,10 +660,7 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
-        @With
         Markers markers;
-
-        @With
         String name;
 
         @Override

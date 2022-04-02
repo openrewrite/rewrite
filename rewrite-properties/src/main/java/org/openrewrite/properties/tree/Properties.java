@@ -15,12 +15,8 @@
  */
 package org.openrewrite.properties.tree;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.AccessLevel;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
-import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -57,27 +53,17 @@ public interface Properties extends Tree {
 
     Markers getMarkers();
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    @JsonIgnoreProperties(value = "styles")
+    @With
     class File implements Properties, SourceFile {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefix;
-
-        @With
         Markers markers;
-
-        @With
         Path sourcePath;
-
-        @With
         List<Content> content;
-
-        @With
         String eof;
 
         @Override
@@ -94,26 +80,17 @@ public interface Properties extends Tree {
     interface Content extends Properties {
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class Entry implements Content {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefix;
-
-        @With
         Markers markers;
-
-        @With
         String key;
-
-        @With
         String beforeEquals;
-
-        @With
         Value value;
 
         @Override
@@ -122,37 +99,27 @@ public interface Properties extends Tree {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class Value {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefix;
-
-        @With
         Markers markers;
-
-        @With
         String text;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @With
     class Comment implements Content {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         String prefix;
-
-        @With
         Markers markers;
-
-        @With
         String message;
 
         @Override

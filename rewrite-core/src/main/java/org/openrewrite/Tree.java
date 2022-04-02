@@ -46,6 +46,8 @@ public interface Tree {
      */
     UUID getId();
 
+    <T extends Tree> T withId(UUID id);
+
     /**
      * Supports polymorphic visiting via {@link TreeVisitor#visit(Tree, Object)}. This is useful in cases where an AST
      * type contains a field that is of a type with a hierarchy. The visitor doesn't have to figure out which visit

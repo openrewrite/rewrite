@@ -61,8 +61,6 @@ public interface J extends Tree {
         return v.defaultValue(this, p);
     }
 
-    <J2 extends J> J2 withId(UUID id);
-
     <J2 extends J> J2 withPrefix(Space space);
 
     Space getPrefix();
