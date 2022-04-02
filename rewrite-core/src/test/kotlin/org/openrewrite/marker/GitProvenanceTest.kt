@@ -15,8 +15,6 @@
  */
 package org.openrewrite.marker
 
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger
 import org.assertj.core.api.Assertions.assertThat
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION
@@ -30,19 +28,12 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment
-import org.slf4j.LoggerFactory
-import java.net.URI
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.writeText
 
-
 class GitProvenanceTest {
     companion object {
-        init {
-            (LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger).level = Level.INFO
-        }
-
         @JvmStatic
         fun remotes() = arrayOf(
             "ssh://git@github.com/openrewrite/rewrite.git",
@@ -70,7 +61,7 @@ class GitProvenanceTest {
     @Test
     fun localBranchPresent(@TempDir projectDir: Path) {
         Git.init().setDirectory(projectDir.toFile()).call()
-        assertThat(GitProvenance.fromProjectDirectory(projectDir, Markers.EMPTY)!!.branch)
+        assertThat(GitProvenance.fromProjectDirectory(projectDir, null)!!.branch)
             .isEqualTo("main")
     }
 
@@ -78,7 +69,7 @@ class GitProvenanceTest {
     fun detachedHead(@TempDir projectDir: Path) {
         val git = initGitWithOneCommit(projectDir)
         git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
-        assertThat(GitProvenance.fromProjectDirectory(projectDir, Markers.EMPTY)!!.branch)
+        assertThat(GitProvenance.fromProjectDirectory(projectDir, null)!!.branch)
             .isEqualTo("main")
     }
 
@@ -88,14 +79,9 @@ class GitProvenanceTest {
         git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
         assertThat(
             GitProvenance.fromProjectDirectory(
-                projectDir, Markers(
-                    randomId(), listOf(
-                        JenkinsBuildEnvironment(
-                            randomId(), "1", "1", "https://jenkins/job/1",
-                            "https://jenkins", "job", "main", "origin/main"
-                        )
-                    )
-                )
+                projectDir,
+                JenkinsBuildEnvironment(randomId(), "1", "1", "https://jenkins/job/1",
+                    "https://jenkins", "job", "main", "origin/main")
             )!!.branch
         ).isEqualTo("main")
     }
@@ -107,14 +93,9 @@ class GitProvenanceTest {
 
         assertThat(
             GitProvenance.fromProjectDirectory(
-                projectDir, Markers(
-                    randomId(), listOf(
-                        JenkinsBuildEnvironment(
-                            randomId(), "1", "1", "https://jenkins/job/1",
-                            "https://jenkins", "job", null, "origin/main"
-                        )
-                    )
-                )
+                projectDir,
+                JenkinsBuildEnvironment(randomId(), "1", "1", "https://jenkins/job/1",
+                    "https://jenkins", "job", null, "origin/main")
             )!!.branch
         ).isEqualTo("main")
     }
@@ -151,7 +132,7 @@ class GitProvenanceTest {
 
         git.checkout().setName(commit1).call()
 
-        assertThat(GitProvenance.fromProjectDirectory(projectDir, Markers.EMPTY)!!.branch)
+        assertThat(GitProvenance.fromProjectDirectory(projectDir, null)!!.branch)
             .isEqualTo("main")
     }
 
@@ -182,7 +163,7 @@ class GitProvenanceTest {
             // creates detached head
             git.checkout().setName(commit).call()
 
-            assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), Markers.EMPTY)!!.branch)
+            assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), null)!!.branch)
                 .isEqualTo(null)
         } catch (ignored: Throwable) {
             // can't run git command line
