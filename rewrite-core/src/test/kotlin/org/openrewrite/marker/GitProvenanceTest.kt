@@ -101,7 +101,7 @@ class GitProvenanceTest {
     }
 
     private fun initGitWithOneCommit(projectDir: Path): Git {
-        val git = Git.init().setDirectory(projectDir.toFile()).call()
+        val git = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()
         projectDir.resolve("test.txt").writeText("hi")
         git.add().addFilepattern("*").call()
         git.commit().setMessage("init").call()
