@@ -153,8 +153,8 @@ public class Result {
             this.changeType = originalFilePath.equals(filePath) ? ChangeType.MODIFY : ChangeType.RENAME;
             this.recipesThatMadeChanges = recipesThatMadeChanges;
 
-            this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString();
-            this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString();
+            this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString().replace("\\", "/");
+            this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString().replace("\\", "/");
 
             try {
                 this.repo = new InMemoryRepository.Builder()

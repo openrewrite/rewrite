@@ -22,9 +22,7 @@ import java.nio.file.Paths
 class ResultTest {
     private val filePath = Paths.get("com/netflix/MyJavaClass.java")
 
-    private fun ab(which: String) = ("$which/" + filePath.toString().replace("\\", "\\\\")).apply {
-        return if (contains("\\")) "\"$this\"" else this
-    }
+    private fun ab(which: String) = "$which/" + filePath.toString().replace("\\", "/")
 
     @Test
     fun idempotent() {
