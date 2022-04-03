@@ -27,6 +27,7 @@ import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
@@ -145,7 +146,7 @@ public interface RewriteTest extends SourceSpecs {
                 String beforeTrimmed = trimIndentPreserveCRLF(sourceSpec.before);
                 Path sourcePath = sourceSpecsForParser.getKey().get()
                         .sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
-                inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes())));
+                inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(StandardCharsets.UTF_8))));
             }
 
             Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;

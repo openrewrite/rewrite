@@ -23,6 +23,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaTypeSignatureBuilderTest;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Iterator;
 
@@ -37,7 +38,7 @@ public class GroovyTypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             .logCompilationWarningsAndErrors(true)
             .build()
             .parseInputsToCompilerAst(
-                    singletonList(new Parser.Input(Paths.get("GroovyTypeGoat.groovy"), () -> new ByteArrayInputStream(goat.getBytes()))),
+                    singletonList(new Parser.Input(Paths.get("GroovyTypeGoat.groovy"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
                     null,
                     new InMemoryExecutionContext(Throwable::printStackTrace))
             .iterator()

@@ -29,6 +29,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 
 import static java.util.Collections.singletonList;
@@ -41,7 +42,7 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             .logCompilationWarningsAndErrors(true)
             .build()
             .parseInputsToCompilerAst(
-                    singletonList(new Parser.Input(Paths.get("JavaTypeGoat.java"), () -> new ByteArrayInputStream(goat.getBytes()))),
+                    singletonList(new Parser.Input(Paths.get("JavaTypeGoat.java"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
                     new InMemoryExecutionContext(Throwable::printStackTrace))
             .entrySet()
             .iterator()

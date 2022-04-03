@@ -40,6 +40,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -178,7 +179,7 @@ public class ParentModelResolver extends ProjectModelResolver {
                     "<version>" + version + "</version>\n" +
                     "</project>";
 
-            return new ByteArrayInputStream(syntheticPom.getBytes());
+            return new ByteArrayInputStream(syntheticPom.getBytes(StandardCharsets.UTF_8));
         }
 
         @Nullable
