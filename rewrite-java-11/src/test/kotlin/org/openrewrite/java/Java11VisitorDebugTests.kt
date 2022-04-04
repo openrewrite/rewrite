@@ -156,6 +156,10 @@ class Java11EqualsAvoidsNullTest : Java11Test, EqualsAvoidsNullTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ExplicitCharsetOnStringToBytesTest : Java11Test, ExplicitCharsetOnStringToBytesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ExecutionContextParameterNameTest : Java11Test, ExecutionContextParameterNameTest
 
 @DebugOnly

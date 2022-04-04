@@ -129,6 +129,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class EqualsAvoidsNullTck : EqualsAvoidsNullTest
 
     @Nested
+    inner class ExplicitCharsetOnStringToBytesTck : ExplicitCharsetOnStringToBytesTest
+
+    @Nested
     inner class ExecutionContextParameterNameTck : ExecutionContextParameterNameTest
 
     @Nested
