@@ -54,7 +54,7 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Option(displayName = "Version",
             description = "The version of Gradle to use. Defaults to " + DEFAULT_VERSION,
-            example = "7.4.2",
+            example = DEFAULT_VERSION,
             required = false
     )
     @Nullable
@@ -69,6 +69,16 @@ public class UpdateGradleWrapper extends Recipe {
     )
     @Nullable
     String distribution;
+
+    @Option(displayName = "Distribution Url",
+            description = "The URL to download the Gradle distribution from. Providing the distribution " +
+                    "url overrides the \"Version\" and \"Distribution type\" parameters. This is intended " +
+                    "to cover customized distributions of the Gradle wrapper.",
+            example = "https://services.gradle.org/distributions/gradle-" + DEFAULT_VERSION + "-bin.zip",
+            required = false
+    )
+    @Nullable
+    String distributionUrl;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
@@ -88,8 +98,13 @@ public class UpdateGradleWrapper extends Recipe {
                     return entry;
                 }
                 // Typical example: https\://services.gradle.org/distributions/gradle-7.4-all.zip
-                String distributionUrl = entry.getValue().getText();
-                String[] distributionComponents = distributionUrl.substring(distributionUrl.lastIndexOf('/') + 1).split("-");
+                String currentDistributionUrl = entry.getValue().getText();
+                if (distributionUrl != null && (!distributionUrl.equals(currentDistributionUrl)
+                        || !distributionUrl.equals(currentDistributionUrl.replace("https\\://", "https://")))) {
+                    return entry.withMarkers(entry.getMarkers().searchResult());
+                }
+
+                String[] distributionComponents = currentDistributionUrl.substring(currentDistributionUrl.lastIndexOf('/') + 1).split("-");
                 if (distributionComponents.length != 3) {
                     return entry;
                 }
@@ -158,18 +173,27 @@ public class UpdateGradleWrapper extends Recipe {
             if (!"distributionUrl".equals(entry.getKey())) {
                 return entry;
             }
-            String distributionUrl = entry.getValue().getText();
+
+            String desiredDistributionUrl = getDesiredDistributionUrl(entry.getValue().getText());
+            return entry.withValue(entry.getValue().withText(desiredDistributionUrl));
+        }
+
+        private String getDesiredDistributionUrl(String currentDistributionUrl) {
+            if (distributionUrl != null) {
+                return distributionUrl.replace("https://", "https\\://");
+            }
+
             String desiredVersion = (version == null) ? DEFAULT_VERSION : version;
 
             String desiredDistributionUrl;
             if (distribution == null) {
-                desiredDistributionUrl = distributionUrl.substring(0, distributionUrl.lastIndexOf('/') + 1) +
-                        "gradle-" + desiredVersion + distributionUrl.substring(distributionUrl.lastIndexOf('-'));
+                desiredDistributionUrl = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf('/') + 1) +
+                        "gradle-" + desiredVersion + currentDistributionUrl.substring(currentDistributionUrl.lastIndexOf('-'));
             } else {
-                desiredDistributionUrl = distributionUrl.substring(0, distributionUrl.lastIndexOf('/') + 1) +
+                desiredDistributionUrl = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf('/') + 1) +
                         "gradle-" + desiredVersion + "-" + distribution + ".zip";
             }
-            return entry.withValue(entry.getValue().withText(desiredDistributionUrl));
+            return desiredDistributionUrl;
         }
     }
 }
