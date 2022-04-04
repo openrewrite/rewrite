@@ -20,9 +20,9 @@ import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
-interface ExplicitCharsetOnStringToBytesTest: JavaRecipeTest {
+interface ExplicitCharsetOnStringGetBytesTest: JavaRecipeTest {
     override val recipe: Recipe
-        get() = ExplicitCharsetOnStringToBytes(null)
+        get() = ExplicitCharsetOnStringGetBytes(null)
 
     @Suppress("ResultOfMethodCallIgnored")
     @Test

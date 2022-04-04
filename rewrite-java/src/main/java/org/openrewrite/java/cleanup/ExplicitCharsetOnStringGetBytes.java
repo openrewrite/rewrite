@@ -31,7 +31,7 @@ import org.openrewrite.java.tree.J;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ExplicitCharsetOnStringToBytes extends Recipe {
+public class ExplicitCharsetOnStringGetBytes extends Recipe {
     private static final MethodMatcher GET_BYTES = new MethodMatcher("java.lang.String getBytes()");
 
     @Option(displayName = "Default encoding",

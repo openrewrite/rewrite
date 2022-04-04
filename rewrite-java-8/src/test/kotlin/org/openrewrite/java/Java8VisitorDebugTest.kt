@@ -156,7 +156,7 @@ class Java8EqualsAvoidsNullTest : Java8Test, EqualsAvoidsNullTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8ExplicitCharsetOnStringToBytesTest : Java8Test, ExplicitCharsetOnStringToBytesTest
+class Java8ExplicitCharsetOnStringGetBytesTest : Java8Test, ExplicitCharsetOnStringGetBytesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

@@ -129,7 +129,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class EqualsAvoidsNullTck : EqualsAvoidsNullTest
 
     @Nested
-    inner class ExplicitCharsetOnStringToBytesTck : ExplicitCharsetOnStringToBytesTest
+    inner class ExplicitCharsetOnStringGetBytesTck : ExplicitCharsetOnStringGetBytesTest
 
     @Nested
     inner class ExecutionContextParameterNameTck : ExecutionContextParameterNameTest
