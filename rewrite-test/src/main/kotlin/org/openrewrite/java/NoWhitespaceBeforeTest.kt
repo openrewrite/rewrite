@@ -18,6 +18,8 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.DisabledOnOs
+import org.junit.jupiter.api.condition.OS
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Recipe
@@ -49,6 +51,7 @@ interface NoWhitespaceBeforeTest : JavaRecipeTest {
         )
 
     @Test
+    @DisabledOnOs(value = [OS.WINDOWS], disabledReason = "java.nio.file.Path does not allow leading or trailing spaces on Windows")
     fun packages(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         parser = jp.styles(noWhitespaceBeforeStyle()).build(),
         before = """
@@ -60,6 +63,7 @@ interface NoWhitespaceBeforeTest : JavaRecipeTest {
     )
 
     @Test
+    @DisabledOnOs(value = [OS.WINDOWS], disabledReason = "java.nio.file.Path does not allow leading or trailing spaces on Windows")
     fun imports(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         parser = jp.styles(noWhitespaceBeforeStyle()).build(),
         before = """

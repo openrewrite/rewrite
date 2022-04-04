@@ -29,6 +29,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -153,8 +154,8 @@ public class Result {
             this.changeType = originalFilePath.equals(filePath) ? ChangeType.MODIFY : ChangeType.RENAME;
             this.recipesThatMadeChanges = recipesThatMadeChanges;
 
-            this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString();
-            this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString();
+            this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString().replace("\\", "/");
+            this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString().replace("\\", "/");
 
             try {
                 this.repo = new InMemoryRepository.Builder()
@@ -162,8 +163,8 @@ public class Result {
                         .build();
 
                 ObjectInserter inserter = repo.getObjectDatabase().newInserter();
-                oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes()).abbreviate(40);
-                newId = inserter.insert(Constants.OBJ_BLOB, newSource.getBytes()).abbreviate(40);
+                oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
+                newId = inserter.insert(Constants.OBJ_BLOB, newSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
                 inserter.flush();
 
                 oldMode = FileMode.REGULAR_FILE;

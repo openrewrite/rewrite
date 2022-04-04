@@ -29,7 +29,6 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.StreamSupport;
 
@@ -62,7 +61,7 @@ public interface Parser<S extends SourceFile> {
                 Arrays.stream(sources).map(source ->
                         new Input(
                                 sourcePathFromSourceText(Paths.get(Long.toString(System.nanoTime())), source),
-                                () -> new ByteArrayInputStream(source.getBytes()),
+                                () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
                                 true
                         )
                 ).collect(toList()),

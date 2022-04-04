@@ -40,6 +40,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -82,7 +83,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                             Path path = Paths.get(pkg + className);
                             return new Input(
                                     path,
-                                    () -> new ByteArrayInputStream(sourceFile.getBytes())
+                                    () -> new ByteArrayInputStream(sourceFile.getBytes(StandardCharsets.UTF_8))
                             );
                         })
                         .collect(toList()),

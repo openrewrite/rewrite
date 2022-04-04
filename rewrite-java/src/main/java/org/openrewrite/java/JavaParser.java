@@ -30,6 +30,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -130,7 +131,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                 Arrays.stream(sources)
                         .map(sourceFile -> new Input(
                                 sourcePathFromSourceText(Paths.get(""), sourceFile),
-                                () -> new ByteArrayInputStream(sourceFile.getBytes())
+                                () -> new ByteArrayInputStream(sourceFile.getBytes(StandardCharsets.UTF_8))
                         ))
                         .collect(toList()),
                 null,
