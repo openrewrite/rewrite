@@ -757,6 +757,20 @@ public interface J extends Tree {
                 return t.statements == statements ? t : new Block(t.id, t.prefix, t.markers, t.statik, statements, t.end);
             }
         }
+
+        /**
+         * An empty {@link Block} with no contents.
+         */
+        public static J.Block empty() {
+            return new J.Block(
+                    Tree.randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    JRightPadded.build(false),
+                    Collections.emptyList(),
+                    Space.EMPTY
+            );
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2255,7 +2269,7 @@ public interface J extends Tree {
                     JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
                     if (owner != null && !(qualid.getTarget().getType() instanceof JavaType.ShallowClass)) {
                         Iterator<JavaType.Method> visibleMethods = owner.getVisibleMethods();
-                        while(visibleMethods.hasNext()) {
+                        while (visibleMethods.hasNext()) {
                             JavaType.Method method = visibleMethods.next();
                             if (method.getName().equals(possibleInnerClassName)) {
                                 return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.lastIndexOf('$'));
@@ -2263,7 +2277,7 @@ public interface J extends Tree {
                         }
 
                         Iterator<JavaType.Variable> visibleMembers = owner.getVisibleMembers();
-                        while(visibleMembers.hasNext()) {
+                        while (visibleMembers.hasNext()) {
                             JavaType.Variable member = visibleMembers.next();
                             if (member.getName().equals(possibleInnerClassName)) {
                                 return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.lastIndexOf('$'));

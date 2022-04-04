@@ -432,6 +432,10 @@ class Java8RemoveExtraSemicolonsTest : Java8Test, RemoveExtraSemicolonsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8RemoveUnneededBlockTest : Java8Test, RemoveUnneededBlockTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RemoveImplementsTest : Java8Test, RemoveImplementsTest
 
 @DebugOnly

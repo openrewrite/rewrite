@@ -115,7 +115,7 @@ interface EmptyBlockTest : JavaRecipeTest {
             import java.io.FileInputStream;
             import java.io.IOException;
             import java.nio.file.*;
-            
+
             public class A {
                 public void foo() {
                     try {
@@ -132,7 +132,7 @@ interface EmptyBlockTest : JavaRecipeTest {
         jp,
         before = """
             import java.nio.file.*;
-            
+
             public class A {
                 public void foo() {
                     try {
@@ -145,7 +145,7 @@ interface EmptyBlockTest : JavaRecipeTest {
         """,
         after = """
             import java.nio.file.*;
-            
+
             public class A {
                 public void foo() {
                     try {
@@ -206,15 +206,15 @@ interface EmptyBlockTest : JavaRecipeTest {
         before = """
             public class A {
                 int n = sideEffect();
-            
+
                 int sideEffect() {
                     return new java.util.Random().nextInt();
                 }
-            
+
                 boolean boolSideEffect() {
                     return sideEffect() == 0;
                 }
-            
+
                 public void lotsOfIfs() {
                     if(sideEffect() == 1) {}
                     if(sideEffect() == sideEffect()) {}
@@ -230,15 +230,15 @@ interface EmptyBlockTest : JavaRecipeTest {
         after = """
             public class A {
                 int n = sideEffect();
-            
+
                 int sideEffect() {
                     return new java.util.Random().nextInt();
                 }
-            
+
                 boolean boolSideEffect() {
                     return sideEffect() == 0;
                 }
-            
+
                 public void lotsOfIfs() {
                     sideEffect();
                     sideEffect();
@@ -304,6 +304,30 @@ interface EmptyBlockTest : JavaRecipeTest {
                         else {
                             System.out.println("this");
                         }
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun emptyElseBlock(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                {
+                    if (true) {
+                        System.out.println("this");
+                    } else {
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                {
+                    if (true) {
+                        System.out.println("this");
                     }
                 }
             }
