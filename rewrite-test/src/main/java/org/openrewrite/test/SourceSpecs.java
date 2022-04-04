@@ -17,8 +17,12 @@ package org.openrewrite.test;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.SourceFile;
+import org.openrewrite.groovy.tree.G;
+import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.properties.tree.Properties;
+import org.openrewrite.protobuf.tree.Proto;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.xml.tree.Xml;
 import org.openrewrite.yaml.tree.Yaml;
@@ -81,6 +85,29 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
         return maven;
     }
 
+    default SourceSpecs buildGradle(@Language("gradle") String before) {
+        return buildGradle(before, s -> {
+        });
+    }
+
+    default SourceSpecs buildGradle(@Language("gradle") String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", before, null);
+        spec.accept(gradle);
+        return gradle;
+    }
+
+    default SourceSpecs buildGradle(@Language("gradle") String before, @Language("gradle") String after) {
+        return buildGradle(before, after, s -> {
+        });
+    }
+
+    default SourceSpecs buildGradle(@Language("gradle") String before, @Language("gradle") String after,
+                               Consumer<SourceSpec<G.CompilationUnit>> spec) {
+        SourceSpec<G.CompilationUnit> maven = new SourceSpec<>(G.CompilationUnit.class, "gradle", before, after);
+        spec.accept(maven);
+        return maven;
+    }
+
     default SourceSpecs yaml(@Language("yml") String before) {
         return yaml(before, s -> {
         });
@@ -121,10 +148,101 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs properties(@Language("properties") String before, @Language("properties") String after,
-                             Consumer<SourceSpec<Properties.File>> spec) {
+                                   Consumer<SourceSpec<Properties.File>> spec) {
         SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, before, after);
         spec.accept(properties);
         return properties;
+    }
+
+    default SourceSpecs json(@Language("json") String before) {
+        return json(before, s -> {
+        });
+    }
+
+    default SourceSpecs json(@Language("json") String before, Consumer<SourceSpec<Json.Document>> spec) {
+        SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, before, null);
+        spec.accept(json);
+        return json;
+    }
+
+    default SourceSpecs json(@Language("json") String before, @Language("json") String after) {
+        return json(before, after, s -> {
+        });
+    }
+
+    default SourceSpecs json(@Language("json") String before, @Language("json") String after,
+                                   Consumer<SourceSpec<Json.Document>> spec) {
+        SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, before, after);
+        spec.accept(json);
+        return json;
+    }
+
+    default SourceSpecs proto(@Language("protobuf") String before) {
+        return proto(before, s -> {
+        });
+    }
+
+    default SourceSpecs proto(@Language("protobuf") String before, Consumer<SourceSpec<Proto.Document>> spec) {
+        SourceSpec<Proto.Document> proto = new SourceSpec<>(Proto.Document.class, null, before, null);
+        spec.accept(proto);
+        return proto;
+    }
+
+    default SourceSpecs proto(@Language("protobuf") String before, @Language("protobuf") String after) {
+        return proto(before, after, s -> {
+        });
+    }
+
+    default SourceSpecs proto(@Language("protobuf") String before, @Language("protobuf") String after,
+                             Consumer<SourceSpec<Proto.Document>> spec) {
+        SourceSpec<Proto.Document> proto = new SourceSpec<>(Proto.Document.class, null, before, after);
+        spec.accept(proto);
+        return proto;
+    }
+
+    default SourceSpecs groovy(@Language("groovy") String before) {
+        return groovy(before, s -> {
+        });
+    }
+
+    default SourceSpecs groovy(@Language("groovy") String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
+        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, before, null);
+        spec.accept(groovy);
+        return groovy;
+    }
+
+    default SourceSpecs groovy(@Language("groovy") String before, @Language("groovy") String after) {
+        return groovy(before, after, s -> {
+        });
+    }
+
+    default SourceSpecs groovy(@Language("groovy") String before, @Language("groovy") String after,
+                             Consumer<SourceSpec<G.CompilationUnit>> spec) {
+        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, before, after);
+        spec.accept(groovy);
+        return groovy;
+    }
+
+    default SourceSpecs hcl(String before) {
+        return hcl(before, s -> {
+        });
+    }
+
+    default SourceSpecs hcl(String before, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
+        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, before, null);
+        spec.accept(hcl);
+        return hcl;
+    }
+
+    default SourceSpecs hcl(String before, String after) {
+        return hcl(before, after, s -> {
+        });
+    }
+
+    default SourceSpecs hcl(String before, String after, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
+        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, before, after);
+        spec.accept(hcl);
+        return hcl;
     }
 
     default SourceSpecs text(String before) {
@@ -144,29 +262,49 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs text(String before, String after,
-                                   Consumer<SourceSpec<PlainText>> spec) {
+                             Consumer<SourceSpec<PlainText>> spec) {
         SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, before, after);
         spec.accept(text);
         return text;
     }
 
+    default SourceSpecs mavenProject(String project, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
+        return dir(project, spec, sources);
+    }
+
     default SourceSpecs mavenProject(String project, SourceSpecs... sources) {
-        return dir(project, spec -> spec.java().project(project), sources);
+        return mavenProject(project, spec -> spec.java().project(project), sources);
+    }
+
+    default SourceSpecs srcMainJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
+        return dir("src/main/java", spec, javaSources);
     }
 
     default SourceSpecs srcMainJava(SourceSpecs... javaSources) {
-        return dir("src/main/java", spec -> spec.java().sourceSet("main"), javaSources);
+        return srcMainJava(spec -> spec.java().sourceSet("main"), javaSources);
+    }
+
+    default SourceSpecs srcMainResources(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... resources) {
+        return dir("src/main/resources", spec, resources);
     }
 
     default SourceSpecs srcMainResources(SourceSpecs... resources) {
-        return dir("src/main/resources", spec -> spec.java().sourceSet("main"), resources);
+        return srcMainResources(spec -> spec.java().sourceSet("main"), resources);
+    }
+
+    default SourceSpecs srcTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
+        return dir("src/test/java", spec, javaSources);
     }
 
     default SourceSpecs srcTestJava(SourceSpecs... javaSources) {
-        return dir("src/test/java", spec -> spec.java().sourceSet("test"), javaSources);
+        return srcTestJava(spec -> spec.java().sourceSet("test"), javaSources);
+    }
+
+    default SourceSpecs srcTestResources(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... resources) {
+        return dir("src/test/resources", spec, resources);
     }
 
     default SourceSpecs srcTestResources(SourceSpecs... resources) {
-        return dir("src/test/resources", spec -> spec.java().sourceSet("test"), resources);
+        return srcTestResources(spec -> spec.java().sourceSet("test"), resources);
     }
 }
