@@ -53,13 +53,12 @@ import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class GroovyParser implements Parser<G.CompilationUnit> {
-    private final JavaTypeCache typeCache = new JavaTypeCache();
-
     @Nullable
     private final Collection<Path> classpath;
 
     private final List<NamedStyles> styles;
     private final boolean logCompilationWarningsAndErrors;
+    private final JavaTypeCache typeCache;
 
     @Override
     public List<G.CompilationUnit> parse(@Language("groovy") String... sources) {
@@ -195,6 +194,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         @Nullable
         private Collection<Path> classpath = JavaParser.runtimeClasspath();
 
+        private JavaTypeCache typeCache = new JavaTypeCache();
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
 
@@ -213,6 +213,11 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             return this;
         }
 
+        public Builder typeCache(JavaTypeCache typeCache) {
+            this.typeCache = typeCache;
+            return this;
+        }
+
         public Builder styles(Iterable<? extends NamedStyles> styles) {
             for (NamedStyles style : styles) {
                 this.styles.add(style);
@@ -221,7 +226,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         }
 
         public GroovyParser build() {
-            return new GroovyParser(classpath, styles, logCompilationWarningsAndErrors);
+            return new GroovyParser(classpath, styles, logCompilationWarningsAndErrors, typeCache);
         }
     }
 }
