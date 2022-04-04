@@ -41,11 +41,11 @@ class JsonPathMatcherTest {
         ---
         list:
           - item1: index0
-            property: property1
+            property: property
           - item2: index1
-            property: property2
+            property: property
           - item3: index2
-            property: property3
+            property: property
     """.trimIndent())
 
     @Language("yaml")
@@ -216,7 +216,7 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item1: index0
-                property: property1
+                property: property
             """.trimIndent())
     )
 
@@ -227,7 +227,7 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item3: index2
-                property: property3
+                property: property
             """.trimIndent())
     )
 
@@ -238,11 +238,11 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item1: index0
-                property: property1
+                property: property
             """.trimIndent(),
             """
                 - item2: index1
-                property: property2
+                property: property
             """.trimIndent())
     )
 
@@ -253,11 +253,11 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item2: index1
-                property: property2
+                property: property
             """.trimIndent(),
             """
                 - item3: index2
-                property: property3
+                property: property
          """.trimIndent())
     )
 
@@ -268,15 +268,15 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item1: index0
-                property: property1
+                property: property
             """.trimIndent(),
             """
                 - item2: index1
-                property: property2
+                property: property
             """.trimIndent(),
             """
                 - item3: index2
-                property: property3
+                property: property
             """.trimIndent())
     )
 
@@ -304,10 +304,10 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item1: index0
-                property: property1
+                property: property
             """.trimIndent(),"""
                 - item2: index1
-                property: property2
+                property: property
             """.trimIndent())
     )
 
@@ -357,21 +357,42 @@ class JsonPathMatcherTest {
     )
 
     @Test
-    fun unaryExpression() = assertMatched(
+    fun unaryExpressionByScope() = assertMatched(
         jsonPath = "$.list[?(@.property)]",
         before = sliceList,
         after = arrayOf(
             """
                 item1: index0
-                   property: property1
+                   property: property
             """.trimIndent(),
             """
                 item2: index1
-                   property: property2
+                   property: property
             """.trimIndent(),
             """
                 item3: index2
-                   property: property3
+                   property: property
+            """.trimIndent()
+        )
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1567")
+    @Test
+    fun unaryExpressionByValue() = assertMatched(
+        jsonPath = "$.list[?(@.property == 'property')]",
+        before = sliceList,
+        after = arrayOf(
+            """
+                item1: index0
+                   property: property
+            """.trimIndent(),
+            """
+                item2: index1
+                   property: property
+            """.trimIndent(),
+            """
+                item3: index2
+                   property: property
             """.trimIndent()
         )
     )
@@ -422,7 +443,7 @@ class JsonPathMatcherTest {
         before = sliceList,
         after = arrayOf("""
             item3: index2
-               property: property3
+               property: property
             """.trimIndent())
     )
 

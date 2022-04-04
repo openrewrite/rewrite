@@ -504,9 +504,11 @@ public class JsonPathMatcher {
 
                 scope = scopeOfLogicalOp;
                 rhs = getBinaryExpressionResult(rhs);
-                if ("&&".equals(operator) && lhs != null && rhs != null) {
+                if ("&&".equals(operator) &&
+                        ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) && (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     return scopeOfLogicalOp;
-                } else if ("||".equals(operator) && (lhs != null || rhs != null)) {
+                } else if ("||".equals(operator) &&
+                        ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) || (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     return scopeOfLogicalOp;
                 }
             } else if (ctx.EQUALITY_OPERATOR() != null) {
@@ -526,12 +528,14 @@ public class JsonPathMatcher {
                 }
 
                 if (lhs instanceof List) {
+                    List<Object> matches = new ArrayList<>();
                     for (Object match : ((List<Object>) lhs)) {
                         Yaml mappingOrEntry = getOperatorResult(match, operator, rhs);
                         if (mappingOrEntry != null) {
-                            return mappingOrEntry;
+                            matches.add(mappingOrEntry);
                         }
                     }
+                    return matches;
                 } else {
                     return getOperatorResult(lhs, operator, rhs);
                 }
