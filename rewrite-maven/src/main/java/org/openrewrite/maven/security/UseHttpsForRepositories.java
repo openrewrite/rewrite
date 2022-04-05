@@ -1,0 +1,96 @@
+/*
+ * Copyright 2022 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.maven.security;
+
+import lombok.AllArgsConstructor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.tree.Xml;
+
+import java.util.Collections;
+import java.util.Set;
+
+public class UseHttpsForRepositories extends Recipe {
+    @Override
+    public String getDisplayName() {
+        return "Use HTTPS for repositories";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Use HTTPS for repository urls";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("security");
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (isRepositoryUrlTag()) {
+                    if (isInsecureTag(tag)) {
+                        @SuppressWarnings("OptionalGetWithoutIsPresent")
+                        String newValue = replaceInsecure(tag.getValue().get());
+                        doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+                    } else if (tag.getValue().map(v -> v.startsWith("$")).orElse(false)) {
+                        String repositoryUrlProperty = tag.getValue().get();
+                        doAfterVisit(new UpdateMavenPropertyToHttpsVisitor(
+                            repositoryUrlProperty.substring(2, repositoryUrlProperty.length() - 1)
+                        ));
+                    }
+                }
+                return super.visitTag(tag, ctx);
+
+            }
+        };
+    }
+
+    @AllArgsConstructor
+    static class UpdateMavenPropertyToHttpsVisitor extends MavenIsoVisitor<ExecutionContext> {
+        final String propertyName;
+
+        @Override
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (isPropertyTag() && propertyName.equals(tag.getName()) && isInsecureTag(tag)) {
+                @SuppressWarnings("OptionalGetWithoutIsPresent")
+                String newValue = replaceInsecure(tag.getValue().get());
+                doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+            }
+            return super.visitTag(tag, ctx);
+        }
+    }
+
+    private static boolean isInsecureTag(Xml.Tag tag) {
+        return tag.getValue().map(UseHttpsForRepositories::isInsecure).orElse(false);
+    }
+
+    @SuppressWarnings("HttpUrlsUsage")
+    private static boolean isInsecure(String value) {
+        return value.startsWith("http://") || value.startsWith("ftp://");
+    }
+
+    private static String replaceInsecure(String value) {
+        return value.replaceAll("^http://(.*)", "https://$1")
+            .replaceAll("^ftp://(.*)", "ftps://$1");
+    }
+}
