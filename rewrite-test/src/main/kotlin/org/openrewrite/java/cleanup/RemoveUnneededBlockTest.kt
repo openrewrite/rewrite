@@ -47,6 +47,64 @@ interface RemoveUnneededBlockTest : JavaRecipeTest {
     )
 
     @Test
+    fun doNotRemoveDoubleBraceInitBlocksInMethod(jp: JavaParser) = assertUnchanged(
+        before = """
+            import java.util.HashSet;
+            import java.util.Set;
+            public class T {
+                public void whenInitializeSetWithDoubleBraces_containsElements() {
+                    Set<String> countries = new HashSet<String>() {
+                        {
+                           add("a");
+                           add("b");
+                        }
+                    };
+                }
+            }
+        """
+    )
+
+    @Test
+    fun doNotRemoveDoubleBraceInitBlocks(jp: JavaParser) = assertUnchanged(
+        before = """
+            import java.util.HashSet;
+            import java.util.Set;
+            public class T {
+                final Set<String> countries = new HashSet<String>() {
+                    {
+                       add("a");
+                       add("b");
+                    }
+                };
+            }
+        """
+    )
+
+    @Test
+    fun doNotRemoveObjectArrayInitializer(jp: JavaParser) = assertUnchanged(
+        before = """
+            public class A {
+                Object[] a = new Object[] {
+                    "a",
+                    "b"
+                };
+            }
+        """
+    )
+
+    @Test
+    fun doNotRemoveObjectArrayArrayInitializer(jp: JavaParser) = assertUnchanged(
+        before = """
+            public class A {
+                Object[][] a = new Object[][] {
+                    { "a", "b" },
+                    { "c", "d" }
+                };
+            }
+        """
+    )
+
+    @Test
     fun simplifyNestedBlock(jp: JavaParser) = assertChanged(
         jp,
         before = """
@@ -106,6 +164,110 @@ interface RemoveUnneededBlockTest : JavaRecipeTest {
                     if (true) {
                         System.out.println("hello!");
                     }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyBlockInStaticInitializerIfBlock(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                static {
+                    {
+                         {
+                            System.out.println("hello static!");
+                            System.out.println("goodbye static!");
+                         }
+                    }
+                }
+
+                {
+                    {
+                        System.out.println("hello init!");
+                        System.out.println("goodbye init!");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                static {
+                    System.out.println("hello static!");
+                    System.out.println("goodbye static!");
+                }
+
+                {
+                    System.out.println("hello init!");
+                    System.out.println("goodbye init!");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyCraziness(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.HashSet;
+            import java.util.Set;
+            public class A {
+                static {
+                    {
+                         new HashSet<String>() {
+                            {
+                                add("a");
+                                add("b");
+                                {
+                                    System.out.println("hello static!");
+                                    System.out.println("goodbye static!");
+                                }
+                            }
+                         };
+                    }
+                }
+
+                {
+                    {
+                         new HashSet<String>() {
+                            {
+                                add("a");
+                                add("b");
+                                {
+                                    System.out.println("hello init!");
+                                    System.out.println("goodbye init!");
+                                }
+                            }
+                         };
+                    }
+                }
+            }
+        """,
+        after = """
+            import java.util.HashSet;
+            import java.util.Set;
+            public class A {
+                static {
+                    new HashSet<String>() {
+                        {
+                            add("a");
+                            add("b");
+                            System.out.println("hello static!");
+                            System.out.println("goodbye static!");
+                        }
+                    };
+                }
+
+                {
+                    new HashSet<String>() {
+                        {
+                            add("a");
+                            add("b");
+                            System.out.println("hello init!");
+                            System.out.println("goodbye init!");
+                        }
+                    };
                 }
             }
         """

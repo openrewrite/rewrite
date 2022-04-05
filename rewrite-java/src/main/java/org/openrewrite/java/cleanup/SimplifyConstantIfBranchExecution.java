@@ -47,26 +47,23 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
     }
 
     private static class SimplifyConstantIfBranchExecutionVisitor extends JavaVisitor<ExecutionContext> {
-        private static final UnnecessaryParenthesesVisitor UNNECESSARY_PARENTHESES_VISITOR =
-            new UnnecessaryParenthesesVisitor(Checkstyle.unnecessaryParentheses());
-
-        @Override
-        public J visitWhileLoop(J.WhileLoop whileLoop, ExecutionContext executionContext) {
-            return whileLoop;
-        }
+        private static final UnnecessaryParenthesesVisitor<ExecutionContext> UNNECESSARY_PARENTHESES_VISITOR =
+            new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses());
 
         @Override
         public J visitBlock(J.Block block, ExecutionContext executionContext) {
             J.Block bl = (J.Block) super.visitBlock(block, executionContext);
-            bl = (J.Block) new RemoveUnneededBlock.RemoveUnneededBlockStatementVisitor()
-                .visitNonNull(bl, executionContext, getCursor().getParentOrThrow());
-            EmptyBlockStyle style = ((SourceFile) getCursor().firstEnclosingOrThrow(JavaSourceFile.class))
-                .getStyle(EmptyBlockStyle.class);
-            if (style == null) {
-                style = Checkstyle.emptyBlock();
+            if (bl != block) {
+                bl = (J.Block) new RemoveUnneededBlock.RemoveUnneededBlockStatementVisitor()
+                    .visitNonNull(bl, executionContext, getCursor().getParentOrThrow());
+                EmptyBlockStyle style = ((SourceFile) getCursor().firstEnclosingOrThrow(JavaSourceFile.class))
+                    .getStyle(EmptyBlockStyle.class);
+                if (style == null) {
+                    style = Checkstyle.emptyBlock();
+                }
+                bl = (J.Block) new EmptyBlockVisitor<>(style)
+                    .visitNonNull(bl, executionContext, getCursor().getParentOrThrow());
             }
-            bl = (J.Block) new EmptyBlockVisitor<>(style)
-                .visitNonNull(bl, executionContext, getCursor().getParentOrThrow());
             return bl;
         }
 
@@ -75,7 +72,8 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
             J.ControlParentheses<Expression> controlParentheses, ExecutionContext context
         ) {
             J.ControlParentheses cp1 =
-                (J.ControlParentheses) UNNECESSARY_PARENTHESES_VISITOR.visitNonNull(controlParentheses, context);
+                (J.ControlParentheses) UNNECESSARY_PARENTHESES_VISITOR
+                    .visitNonNull(controlParentheses, context, getCursor().getParentOrThrow());
             J.ControlParentheses cp2 =
                 (J.ControlParentheses) new SimplifyBooleanExpressionVisitor<ExecutionContext>()
                     .visitNonNull(cp1, context, getCursor().getParentOrThrow());
@@ -100,7 +98,7 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
 
             // The simplification process did not result in resolving to a single 'true' or 'false' value
             if (!compileTimeConstantBoolean.isPresent()) {
-                return if__; // Return the original `if`
+                return if__; // Return the visited `if`
             } else if (compileTimeConstantBoolean.get()) {
                 // True branch
                 // Only keep the `then` branch, and remove the `else` branch.
