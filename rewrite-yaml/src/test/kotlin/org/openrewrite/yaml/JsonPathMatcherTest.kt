@@ -408,16 +408,9 @@ class JsonPathMatcherTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1419")
     @Test
     fun recursiveDecentToFilter() = assertMatched(
-        jsonPath = "$..[?(@.literal =~ '.*objects.object.literal.*')]",
+        jsonPath = "$..[?(@.literal =~ '.*objects.object.literal.*')].literal",
         before = complex,
-        after = arrayOf("$.objects.object.literal",
-            """
-                literal: $.objects.object.literal
-                object:
-                  literal: $.objects.object.object.literal
-                list:
-                  - literal: $.objects.object.list[0].literal
-            """.trimIndent())
+        after = arrayOf("literal: $.objects.object.literal")
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1419")

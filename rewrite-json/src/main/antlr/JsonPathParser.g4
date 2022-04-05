@@ -45,10 +45,8 @@ binaryExpression
     | literalExpression EQUALITY_OPERATOR unaryExpression
     ;
 
-// Note: @.name cannot be a StringLiteral.
-// DOT property is a compromise to simplify visitors.
 regexExpression
-    : AT (DOT property | DOT? LBRACK StringLiteral RBRACK) MATCHES_REGEX_OPEN REGEX MATCHES_REGEX_CLOSE
+    : unaryExpression MATCHES_REGEX_OPEN REGEX MATCHES_REGEX_CLOSE
     ;
 
 unaryExpression
