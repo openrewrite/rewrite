@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -74,6 +75,7 @@ public class ChangeDependencyVersion extends Recipe {
         return new GroovyVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = DependencyMatcher.build(dependencyPattern).getValue();
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
+
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
@@ -82,52 +84,48 @@ public class ChangeDependencyVersion extends Recipe {
                 }
 
                 List<Expression> depArgs = m.getArguments();
-                String versionStringDelimiter = "'";
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         String[] gavs = gav.split(":");
 
                         if (gavs.length >= 3 && !newVersion.equals(gavs[2]) && depMatcher.matches(gavs[0], gavs[1], gavs[2])) {
-                            String valueSource = ((J.Literal) depArgs.get(0)).getValueSource();
-                            String delimiter = (valueSource == null) ? versionStringDelimiter
-                                    : valueSource.substring(0, valueSource.indexOf(gav));
-
                             String newGav = gavs[0] + ":" + gavs[1] + ":" + newVersion;
                             m = m.withArguments(ListUtils.map(m.getArguments(), (n, arg) ->
                                     n == 0 ?
-                                            ((J.Literal) arg).withValue(newGav).withValueSource(delimiter + newGav + delimiter) :
+                                            ChangeStringLiteral.withStringValue((J.Literal) arg, newGav) :
                                             arg
                             ));
                         }
                     }
-                } else if(depArgs.get(0) instanceof G.MapEntry) {
+                } else if (depArgs.get(0) instanceof G.MapEntry) {
                     G.MapEntry versionEntry = null;
                     String groupId = null;
                     String artifactId = null;
                     String version = null;
 
-                    for(Expression e : depArgs) {
-                        if(!(e instanceof G.MapEntry)) {
+                    String versionStringDelimiter = "'";
+                    for (Expression e : depArgs) {
+                        if (!(e instanceof G.MapEntry)) {
                             continue;
                         }
                         G.MapEntry arg = (G.MapEntry) e;
-                        if(!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
+                        if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
                             continue;
                         }
                         J.Literal key = (J.Literal) arg.getKey();
                         J.Literal value = (J.Literal) arg.getValue();
-                        if(!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+                        if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
                             continue;
                         }
-                        String keyValue = (String)key.getValue();
-                        String valueValue = (String)value.getValue();
-                        if("group".equals(keyValue)) {
+                        String keyValue = (String) key.getValue();
+                        String valueValue = (String) value.getValue();
+                        if ("group".equals(keyValue)) {
                             groupId = valueValue;
-                        } else if("name".equals(keyValue)) {
+                        } else if ("name".equals(keyValue)) {
                             artifactId = valueValue;
-                        } else if("version".equals(keyValue) && !newVersion.equals(valueValue)) {
-                            if(value.getValueSource() != null) {
+                        } else if ("version".equals(keyValue) && !newVersion.equals(valueValue)) {
+                            if (value.getValueSource() != null) {
                                 versionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
                             }
                             versionEntry = arg;
@@ -142,8 +140,8 @@ public class ChangeDependencyVersion extends Recipe {
                     String delimiter = versionStringDelimiter;
                     G.MapEntry finalVersion = versionEntry;
                     m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                        if(arg == finalVersion) {
-                            return finalVersion.withValue(((J.Literal)finalVersion.getValue())
+                        if (arg == finalVersion) {
+                            return finalVersion.withValue(((J.Literal) finalVersion.getValue())
                                     .withValue(newVersion)
                                     .withValueSource(delimiter + newVersion + delimiter));
                         }
