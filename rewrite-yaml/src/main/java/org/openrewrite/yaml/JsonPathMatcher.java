@@ -455,30 +455,21 @@ public class JsonPathMatcher {
             }
 
             Object rhs = ctx.REGEX().getText();
-            Object lhs;
-            if (scope instanceof Yaml.Scalar) {
-                lhs = getValue(scope);
-            } else if (scope instanceof Yaml.Mapping.Entry) {
-                scope = ((Yaml.Mapping.Entry) scope).getValue();
-                return visitRegexExpression(ctx);
+            Object lhs = visitUnaryExpression(ctx.unaryExpression());
+            String operator = "=~";
+
+            if (lhs instanceof List) {
+                List<Object> matches = new ArrayList<>();
+                for (Object match : ((List<Object>) lhs)) {
+                    Yaml mappingOrEntry = getOperatorResult(match, operator, rhs);
+                    if (mappingOrEntry != null) {
+                        matches.add(mappingOrEntry);
+                    }
+                }
+                return matches;
             } else {
-                lhs = getValue(visitProperty(ctx.property()));
+                return getOperatorResult(lhs, operator, rhs);
             }
-
-            if (lhs instanceof Yaml.Mapping.Entry) {
-                if (((Yaml.Mapping.Entry) lhs).getValue() instanceof Yaml.Scalar) {
-                    lhs = getValue(lhs);
-                }
-            }
-
-            if (lhs != null) {
-                String lhStr = lhs.toString();
-                String rhStr = rhs.toString();
-                if (Pattern.compile(rhStr).matcher(lhStr).matches()) {
-                    return scope;
-                }
-            }
-            return null;
         }
 
         @Override
@@ -584,10 +575,13 @@ public class JsonPathMatcher {
             }
 
             BiPredicate<Object, Object> predicate = (lh, rh) -> {
-                if ("==".equals(operator)) {
-                    return Objects.equals(lh, rh);
-                } else if ("!=".equals(operator)) {
-                    return !Objects.equals(lh, rh);
+                switch (operator) {
+                    case "==":
+                        return Objects.equals(lh, rh);
+                    case "!=":
+                        return !Objects.equals(lh, rh);
+                    case "=~":
+                        return Pattern.compile(rh.toString()).matcher(lh.toString()).matches();
                 }
                 return false;
             };
