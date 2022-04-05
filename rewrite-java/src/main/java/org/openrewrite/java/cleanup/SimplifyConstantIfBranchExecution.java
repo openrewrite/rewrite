@@ -47,8 +47,6 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
     }
 
     private static class SimplifyConstantIfBranchExecutionVisitor extends JavaVisitor<ExecutionContext> {
-        private static final UnnecessaryParenthesesVisitor<ExecutionContext> UNNECESSARY_PARENTHESES_VISITOR =
-            new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses());
 
         @Override
         public J visitBlock(J.Block block, ExecutionContext executionContext) {
@@ -71,10 +69,10 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
         private J.ControlParentheses<Expression> cleanupControlParentheses(
             J.ControlParentheses<Expression> controlParentheses, ExecutionContext context
         ) {
-            J.ControlParentheses cp1 =
-                (J.ControlParentheses) UNNECESSARY_PARENTHESES_VISITOR
+            final J.ControlParentheses cp1 =
+                (J.ControlParentheses) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
                     .visitNonNull(controlParentheses, context, getCursor().getParentOrThrow());
-            J.ControlParentheses cp2 =
+            final J.ControlParentheses cp2 =
                 (J.ControlParentheses) new SimplifyBooleanExpressionVisitor<ExecutionContext>()
                     .visitNonNull(cp1, context, getCursor().getParentOrThrow());
             return cp2;
@@ -149,6 +147,5 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
             return expression instanceof J.Literal && ((J.Literal) expression).getValue() == Boolean.valueOf(false);
         }
     }
-
 
 }
