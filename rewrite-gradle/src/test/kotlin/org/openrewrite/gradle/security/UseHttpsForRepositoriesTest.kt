@@ -21,7 +21,6 @@ import org.openrewrite.gradle.GradleRecipeTest
 
 @Suppress("HttpUrlsUsage")
 class UseHttpsForRepositoriesTest : GradleRecipeTest {
-
     override val recipe: Recipe
         get() = UseHttpsForRepositories()
 

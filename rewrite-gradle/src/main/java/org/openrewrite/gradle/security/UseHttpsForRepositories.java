@@ -17,18 +17,20 @@ package org.openrewrite.gradle.security;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.gradle.util.RewriteStringLiteralValueVisitor;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Set;
 
 public class UseHttpsForRepositories extends Recipe {
+    private static final MethodMatcher REPO_URL = new MethodMatcher("MavenArtifactRepositorySpec url(..)");
 
     @Override
     public String getDisplayName() {
@@ -46,41 +48,41 @@ public class UseHttpsForRepositories extends Recipe {
     }
 
     @Override
-    protected GroovyVisitor<ExecutionContext> getVisitor() {
-        return new RepositoryUrlVisitor();
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>(REPO_URL);
     }
 
-    private static class RepositoryUrlVisitor extends GroovyVisitor<ExecutionContext> {
-        MethodMatcher repositories = new MethodMatcher("MavenArtifactRepositorySpec url(..)");
+    @Override
+    protected GroovyVisitor<ExecutionContext> getVisitor() {
+        return new GroovyVisitor<ExecutionContext>() {
 
-        private void fixupLiteralIfNeeded(J.Literal arg) {
-            String url = (String) arg.getValue();
-            //noinspection HttpUrlsUsage
-            if (url.startsWith("http://")) {
-                String newUrl = url.replaceAll("^http://(.*)", "https://$1");
-                doAfterVisit(new RewriteStringLiteralValueVisitor<>(arg, newUrl));
+            private J.Literal fixupLiteralIfNeeded(J.Literal arg) {
+                String url = (String) arg.getValue();
+                //noinspection HttpUrlsUsage
+                if (url != null && url.startsWith("http://")) {
+                    String newUrl = url.replaceAll("^http://(.*)", "https://$1");
+                    return ChangeStringLiteral.withStringValue(arg, newUrl);
+                }
+                return arg;
             }
-        }
 
-        @Override
-        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-            if(!repositories.matches(method)) {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if (REPO_URL.matches(method)) {
+                    m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                        if (arg instanceof J.Literal) {
+                            return fixupLiteralIfNeeded((J.Literal) arg);
+                        } else if (arg instanceof G.GString) {
+                            G.GString garg = (G.GString) arg;
+                            return garg.withStrings(ListUtils.mapFirst(garg.getStrings(),
+                                    lit -> lit instanceof J.Literal ? fixupLiteralIfNeeded((J.Literal) lit) : lit));
+                        }
+                        return arg;
+                    }));
+                }
                 return m;
             }
-            List<Expression> args = m.getArguments();
-            if (args.get(0) instanceof J.Literal) {
-                J.Literal arg = (J.Literal) args.get(0);
-                fixupLiteralIfNeeded(arg);
-            } else if (args.get(0) instanceof G.GString) {
-                G.GString arg = (G.GString) args.get(0);
-                if (arg.getStrings().get(0) instanceof J.Literal) {
-                    // Only fixup the first literal in the GString
-                    fixupLiteralIfNeeded((J.Literal) arg.getStrings().get(0));
-                }
-            }
-            return m;
-        }
+        };
     }
-
 }
