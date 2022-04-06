@@ -166,8 +166,18 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
+        return (J.ForEachLoop.Control) super.visitForEachControl(control, p);
+    }
+
+    @Override
     public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
         return (J.ForLoop) super.visitForLoop(forLoop, p);
+    }
+
+    @Override
+    public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
+        return (J.ForLoop.Control) super.visitForControl(control, p);
     }
 
     @Override

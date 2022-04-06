@@ -102,13 +102,13 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J visitForControl(J.ForLoop.Control control, P p) {
+    public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
         // FIXME fix formatting of control sections
         return control;
     }
 
     @Override
-    public J visitForEachControl(J.ForEachLoop.Control control, P p) {
+    public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
         // FIXME fix formatting of control sections
         return control;
     }
