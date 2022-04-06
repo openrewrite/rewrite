@@ -92,6 +92,14 @@ public class RemoveUnusedPrivateMethods extends Recipe {
                         }
                     }
 
+                    // Temporary stop-gap until we have data flow analysis.
+                    // Do not remove method declarations with generic types since the method invocation in `cu.getTypesInUse` will be bounded with a type.
+                    for (JavaType.Method usedMethodType : cu.getTypesInUse().getDeclaredMethods()) {
+                        if (methodType.getName().equals(usedMethodType.getName()) && methodType.equals(usedMethodType) && m.toString().contains("Generic{")) {
+                            return m;
+                        }
+                    }
+
                     //noinspection ConstantConditions
                     return null;
                 }

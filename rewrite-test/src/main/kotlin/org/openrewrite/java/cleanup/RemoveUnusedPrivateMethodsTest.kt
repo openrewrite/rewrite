@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -80,6 +81,24 @@ interface RemoveUnusedPrivateMethodsTest : JavaRecipeTest {
                 }
                 private Stream<Arguments> sourceExample() {
                     return null;
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1536")
+    @Test
+    fun privateMethodWithBoundedGenericTypes() = assertUnchanged(
+        before = """
+            public class TestClass {
+                void method() {
+                    checkMethodInUse("String", "String");
+                }
+
+                private static void checkMethodInUse(String arg0, String arg1) {
+                }
+
+                private static <T> void checkMethodInUse(String arg0, T arg1) {
                 }
             }
         """
