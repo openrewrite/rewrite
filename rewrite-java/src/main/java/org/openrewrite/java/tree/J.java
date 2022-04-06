@@ -757,20 +757,6 @@ public interface J extends Tree {
                 return t.statements == statements ? t : new Block(t.id, t.prefix, t.markers, t.statik, statements, t.end);
             }
         }
-
-        /**
-         * An empty {@link Block} with no contents.
-         */
-        public static J.Block empty() {
-            return new J.Block(
-                    Tree.randomId(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    JRightPadded.build(false),
-                    Collections.emptyList(),
-                    Space.EMPTY
-            );
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

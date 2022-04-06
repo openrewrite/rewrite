@@ -18,15 +18,15 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.EmptyBlockStyle;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.Optional;
 
 public class SimplifyConstantIfBranchExecution extends Recipe {
@@ -135,8 +135,22 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                  * ```
                  * The above is not valid java and will cause later processing errors.
                  */
-                return J.Block.empty();
+                return emptyJBlock();
             }
+        }
+
+        /**
+         * An empty {@link J.Block} with no contents.
+         */
+        private static J.Block emptyJBlock() {
+            return new J.Block(
+                Tree.randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                JRightPadded.build(false),
+                Collections.emptyList(),
+                Space.EMPTY
+            );
         }
 
         private static boolean isLiteralTrue(@Nullable Expression expression) {
