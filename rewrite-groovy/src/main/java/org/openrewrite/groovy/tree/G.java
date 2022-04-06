@@ -21,6 +21,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
@@ -317,6 +318,13 @@ public interface G extends J {
             return v.visitMapEntry(this, p);
         }
 
+        @Override
+        public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
+            G.MapEntry m = this;
+            m = m.withType(v.visitType(type, p));
+            return m;
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -388,6 +396,13 @@ public interface G extends J {
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             return v.visitMapLiteral(this, p);
+        }
+
+        @Override
+        public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
+            G.MapLiteral m = this;
+            m = m.withType(v.visitType(type, p));
+            return m;
         }
 
         public Padding getPadding() {
@@ -462,6 +477,13 @@ public interface G extends J {
             return v.visitListLiteral(this, p);
         }
 
+        @Override
+        public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
+            ListLiteral l = this;
+            l = l.withType(v.visitType(type, p));
+            return l;
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -507,6 +529,14 @@ public interface G extends J {
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             return v.visitGString(this, p);
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            GString g = this;
+            g = g.withStrings(ListUtils.map(strings, s -> v.visit(s, p)));
+            g = g.withType(v.visitType(type, p));
+            return g;
         }
 
         @Override
@@ -586,6 +616,13 @@ public interface G extends J {
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             return v.visitBinary(this, p);
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            G.Binary b = this;
+            b = b.withType(v.visitType(type, p));
+            return b;
         }
 
 //        @Override
