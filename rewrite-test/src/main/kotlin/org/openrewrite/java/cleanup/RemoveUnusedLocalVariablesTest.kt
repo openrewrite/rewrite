@@ -83,7 +83,7 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
                 void method(Object someData) {
                     int ignoreMeCompletely = writeDataToTheDB(someData);
                     int replaceMeWithRightHandSideStatement = writeDataToTheDB(someData);
-                    int removeMeEntirelyBecauseRightHandSideIsNotAStandaloneStatement = 1 + writeDataToTheDB(someData);
+                    int doNotRemoveBecauseRightHandSideIsNotAStandaloneStatement = 1 + writeDataToTheDB(someData);
                 }
 
                 int writeDataToTheDB(Object save) {
@@ -96,6 +96,7 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
                 void method(Object someData) {
                     int ignoreMeCompletely = writeDataToTheDB(someData);
                     writeDataToTheDB(someData);
+                    int doNotRemoveBecauseRightHandSideIsNotAStandaloneStatement = 1 + writeDataToTheDB(someData);
                 }
 
                 int writeDataToTheDB(Object save) {
