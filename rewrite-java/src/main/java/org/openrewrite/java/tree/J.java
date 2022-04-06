@@ -2255,7 +2255,7 @@ public interface J extends Tree {
                     JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
                     if (owner != null && !(qualid.getTarget().getType() instanceof JavaType.ShallowClass)) {
                         Iterator<JavaType.Method> visibleMethods = owner.getVisibleMethods();
-                        while(visibleMethods.hasNext()) {
+                        while (visibleMethods.hasNext()) {
                             JavaType.Method method = visibleMethods.next();
                             if (method.getName().equals(possibleInnerClassName)) {
                                 return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.lastIndexOf('$'));
@@ -2263,7 +2263,7 @@ public interface J extends Tree {
                         }
 
                         Iterator<JavaType.Variable> visibleMembers = owner.getVisibleMembers();
-                        while(visibleMembers.hasNext()) {
+                        while (visibleMembers.hasNext()) {
                             JavaType.Variable member = visibleMembers.next();
                             if (member.getName().equals(possibleInnerClassName)) {
                                 return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.lastIndexOf('$'));

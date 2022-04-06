@@ -17,16 +17,17 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.ListUtils;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.style.Checkstyle;
+import org.openrewrite.java.style.EmptyBlockStyle;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Collections;
+import java.util.Optional;
 
 public class SimplifyConstantIfBranchExecution extends Recipe {
 
@@ -48,75 +49,108 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
     private static class SimplifyConstantIfBranchExecutionVisitor extends JavaVisitor<ExecutionContext> {
 
         @Override
-        public J visitWhileLoop(J.WhileLoop whileLoop, ExecutionContext executionContext) {
-            return whileLoop;
-        }
-
-        @Override
         public J visitBlock(J.Block block, ExecutionContext executionContext) {
             J.Block bl = (J.Block) super.visitBlock(block, executionContext);
-            List<Statement> addStatements = getCursor().pollMessage("statements");
-            J.If removeIf = getCursor().pollMessage("remove-if");
-            if (removeIf != null) {
-                bl = maybeAutoFormat(bl, bl.withStatements(ListUtils.flatMap(bl.getStatements(), stmt -> {
-                    if (stmt == removeIf) {
-                        return addStatements;
-                    }
-                    return stmt;
-                })), executionContext, getCursor().getParent());
+            if (bl != block) {
+                bl = (J.Block) new RemoveUnneededBlock.RemoveUnneededBlockStatementVisitor()
+                    .visitNonNull(bl, executionContext, getCursor().getParentOrThrow());
+                EmptyBlockStyle style = ((SourceFile) getCursor().firstEnclosingOrThrow(JavaSourceFile.class))
+                    .getStyle(EmptyBlockStyle.class);
+                if (style == null) {
+                    style = Checkstyle.emptyBlock();
+                }
+                bl = (J.Block) new EmptyBlockVisitor<>(style)
+                    .visitNonNull(bl, executionContext, getCursor().getParentOrThrow());
             }
             return bl;
+        }
+
+        @SuppressWarnings("rawtypes")
+        private J.ControlParentheses<Expression> cleanupControlParentheses(
+            J.ControlParentheses<Expression> controlParentheses, ExecutionContext context
+        ) {
+            final J.ControlParentheses cp1 =
+                (J.ControlParentheses) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
+                    .visitNonNull(controlParentheses, context, getCursor().getParentOrThrow());
+            final J.ControlParentheses cp2 =
+                (J.ControlParentheses) new SimplifyBooleanExpressionVisitor<ExecutionContext>()
+                    .visitNonNull(cp1, context, getCursor().getParentOrThrow());
+            return cp2;
         }
 
         @Override
         public J visitIf(J.If if_, ExecutionContext context) {
             J.If if__ = (J.If) super.visitIf(if_, context);
-            AtomicReference<Boolean> b = new AtomicReference<>(null);
-            new JavaIsoVisitor<ExecutionContext>() {
-                @Override
-                public <T extends J> J.ControlParentheses<T> visitControlParentheses(J.ControlParentheses<T> controlParens, ExecutionContext executionContext) {
-                    J.ControlParentheses cp = super.visitControlParentheses(controlParens, executionContext);
-                    J.ControlParentheses cp2 = (J.ControlParentheses) new SimplifyBooleanExpressionVisitor<ExecutionContext>().visitNonNull(cp, executionContext);
-                    if (isLiteralTrue((Expression) cp2.getTree())) {
-                        b.getAndSet(true);
-                    } else if (isLiteralFalse((Expression) cp2.getTree())) {
-                        b.getAndSet(false);
-                    }
-                    // else leave it as null
-                    return cp;
-                }
-            }.visit(if__, context);
+            J.ControlParentheses<Expression> cp =
+                cleanupControlParentheses(if__.getIfCondition(), context);
             // The compile-time constant value of the if condition control parentheses.
-            Boolean compileTimeConstantBoolean = b.get();
-            // The simplification process did not result in resolving to a single 'true' or 'false' value
-            if (compileTimeConstantBoolean == null) {
-                return if__; // Return the original `if` (unmodified)
+            final Optional<Boolean> compileTimeConstantBoolean;
+            if (isLiteralTrue(cp.getTree())) {
+                compileTimeConstantBoolean = Optional.of(true);
+            } else if (isLiteralFalse(cp.getTree())) {
+                compileTimeConstantBoolean = Optional.of(false);
+            } else {
+                // The condition is not a literal, so we can't simplify it.
+                compileTimeConstantBoolean = Optional.empty();
             }
-            // True branch
-            if (compileTimeConstantBoolean) {
+
+            // The simplification process did not result in resolving to a single 'true' or 'false' value
+            if (!compileTimeConstantBoolean.isPresent()) {
+                return if__; // Return the visited `if`
+            } else if (compileTimeConstantBoolean.get()) {
+                // True branch
+                // Only keep the `then` branch, and remove the `else` branch.
                 Statement s = if__.getThenPart();
-                if (s instanceof J.Block) {
-                    getCursor().dropParentUntil(J.Block.class::isInstance).putMessage("statements", ((J.Block) s).getStatements());
-                    getCursor().dropParentUntil(J.Block.class::isInstance).putMessage("remove-if", if__);
-                    return if__; // Return the original `if` (unmodified) since this will need to be replaced
-                } else {
-                    return maybeAutoFormat(if__, s, context, getCursor().getParent());
-                }
-            } else { // False branch
+                return maybeAutoFormat(
+                    if__,
+                    s,
+                    context,
+                    getCursor().getParentOrThrow()
+                );
+            } else {
+                // False branch
+                // Only keep the `else` branch, and remove the `then` branch.
                 if (if__.getElsePart() != null) {
                     // The `else` part needs to be kept
                     Statement s = if__.getElsePart().getBody();
-                    if (s instanceof J.Block) {
-                        getCursor().dropParentUntil(J.Block.class::isInstance).putMessage("statements", ((J.Block) s).getStatements());
-                        getCursor().dropParentUntil(J.Block.class::isInstance).putMessage("remove-if", if__);
-                        return if__; // Return the original `if` (unmodified) since this will need to be replaced
-                    } else {
-                        return maybeAutoFormat(if__, s, context, getCursor().getParent());
-                    }
+                    return maybeAutoFormat(
+                        if__,
+                        s,
+                        context,
+                        getCursor().getParentOrThrow()
+                    );
                 }
-                // The if statement can be completely removed
-                return null;
+                /*
+                 * The `else` branch is not present, therefore, the `if` can be removed.
+                 * Temporarily return an empty block that will (most likely) later be removed.
+                 * We need to return an empty block, in the following cases:
+                 * ```
+                 * if (a) a();
+                 * else if (false) { }
+                 * ```
+                 * Failing to return an empty block here would result in the following code being emitted:
+                 * ```
+                 * if (a) a();
+                 * else
+                 * ```
+                 * The above is not valid java and will cause later processing errors.
+                 */
+                return emptyJBlock();
             }
+        }
+
+        /**
+         * An empty {@link J.Block} with no contents.
+         */
+        private static J.Block emptyJBlock() {
+            return new J.Block(
+                Tree.randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                JRightPadded.build(false),
+                Collections.emptyList(),
+                Space.EMPTY
+            );
         }
 
         private static boolean isLiteralTrue(@Nullable Expression expression) {
@@ -127,4 +161,5 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
             return expression instanceof J.Literal && ((J.Literal) expression).getValue() == Boolean.valueOf(false);
         }
     }
+
 }

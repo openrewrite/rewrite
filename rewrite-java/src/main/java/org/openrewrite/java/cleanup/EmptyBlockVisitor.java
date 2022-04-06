@@ -110,6 +110,12 @@ public class EmptyBlockVisitor<P> extends JavaIsoVisitor<P> {
     public J.If visitIf(J.If iff, P p) {
         J.If i = super.visitIf(iff, p);
 
+        if (Boolean.TRUE.equals(emptyBlockStyle.getLiteralElse()) &&
+            i.getElsePart() != null &&
+            isEmptyBlock(i.getElsePart().getBody())) {
+            i = i.withElsePart(null);
+        }
+
         if (Boolean.FALSE.equals(emptyBlockStyle.getLiteralIf()) || !isEmptyBlock(i.getThenPart())) {
             return i;
         }

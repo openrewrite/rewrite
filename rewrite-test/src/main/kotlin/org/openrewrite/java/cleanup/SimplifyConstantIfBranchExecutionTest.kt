@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("StatementWithEmptyBody")
+@file:Suppress("StatementWithEmptyBody", "PointlessBooleanExpression")
 
 package org.openrewrite.java.cleanup
 
@@ -65,6 +65,70 @@ interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
     )
 
     @Test
+    fun simplifyConstantIfTrueInParens(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if ((true)) {
+                        System.out.println("hello");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                    System.out.println("hello");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfNotFalse(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (!false) {
+                        System.out.println("hello");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                    System.out.println("hello");
+                }
+            }
+        """
+    )
+
+    @Test
+    @Suppress("DuplicateCondition")
+    fun simplifyConstantIfTrueOrTrue(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (true || true) {
+                        System.out.println("hello");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                    System.out.println("hello");
+                }
+            }
+        """
+    )
+
+    @Test
     fun simplifyConstantIfFalse(jp: JavaParser) = assertChanged(
         jp,
         before = """
@@ -85,7 +149,7 @@ interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
     )
 
     @Test
-    fun simplifyConstantIfElseTrue(jp: JavaParser) = assertChanged(
+    fun simplifyConstantIfTrueElse(jp: JavaParser) = assertChanged(
         jp,
         before = """
             public class A {
@@ -106,7 +170,7 @@ interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
     )
 
     @Test
-    fun simplifyConstantIfElseFalse(jp: JavaParser) = assertChanged(
+    fun simplifyConstantIfFalseElse(jp: JavaParser) = assertChanged(
         jp,
         before = """
             public class A {
@@ -195,6 +259,275 @@ interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
         after = """
             public class A {
                 public void test() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfTrueElseIf(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test(boolean a) {
+                    if (true) {
+                        System.out.println("hello");
+                    } else if (a) {
+                        System.out.println("goodbye");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test(boolean a) {
+                    System.out.println("hello");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfFalseElseIf(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test(boolean a) {
+                    if (false) {
+                        System.out.println("hello");
+                    } else if (a) {
+                        System.out.println("goodbye");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test(boolean a) {
+                    if (a) {
+                        System.out.println("goodbye");
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfTrueElseIfFalse(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (true) {
+                    } else if (false) {
+                        System.out.println("hello");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfFalseElseIfTrue(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (false) {
+                    } else if (true) {
+                        System.out.println("hello");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                    System.out.println("hello");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfTrueElseIfFalseNoBlock(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (true) System.out.println("hello");
+                    else if (false) System.out.println("goodbye");
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                    System.out.println("hello");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfFalseElseIfNoBlock(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (false) System.out.println("hello");
+                    else if (true) System.out.println("goodbye");
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                    System.out.println("goodbye");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfTrueElseIfFalseEmptyBlock(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (true) {}
+                    else if (false) {}
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfFalseElseIfTrueEmptyBlock(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (false) {}
+                    else if (true) {}
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfVariableElseIfTrueEmptyBlock(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test(boolean a) {
+                    if (a) {
+                        System.out.println("hello");
+                    } else if (true) {
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test(boolean a) {
+                    if (a) {
+                        System.out.println("hello");
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfVariableElseIfTruePrint(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test(boolean a) {
+                    if (a) {
+                        System.out.println("hello");
+                    } else if (true) {
+                        System.out.println("goodbye");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test(boolean a) {
+                    if (a) {
+                        System.out.println("hello");
+                    } else {
+                        System.out.println("goodbye");
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyConstantIfVariableElseIfFalseEmptyBlock(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test(boolean a) {
+                    if (a) {
+                        System.out.println("hello");
+                    } else if (false) {
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test(boolean a) {
+                    if (a) {
+                        System.out.println("hello");
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
+    @Suppress("InfiniteLoopStatement")
+    fun simplifyConstantIfFalseElseWhileTrueEmptyBlock(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (false) {}
+                    else while (true) {
+                        System.out.println("hello");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                    while (true) {
+                        System.out.println("hello");
+                    }
                 }
             }
         """
