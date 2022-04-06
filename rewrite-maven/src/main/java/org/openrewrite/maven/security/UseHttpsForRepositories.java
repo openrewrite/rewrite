@@ -21,12 +21,19 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 
 public class UseHttpsForRepositories extends Recipe {
+    private static final XPathMatcher REPOSITORY_URL_MATCHER = new XPathMatcher("/project/repositories/repository/url");
+    private static final XPathMatcher PLUGIN_REPOSITORY_URL_MATCHER = new XPathMatcher("/project/pluginRepositories/pluginRepository/url");
+    private static final XPathMatcher DISTRIBUTION_MANAGEMENT_REPOSITORY_URL_MATCHER = new XPathMatcher("/project/distributionManagement/repository/url");
+    private static final XPathMatcher DISTRIBUTION_MANAGEMENT_SNAPSHOT_REPOSITORY_URL_MATCHER = new XPathMatcher("/project/distributionManagement/snapshotRepository/url");
+
     @Override
     public String getDisplayName() {
         return "Use HTTPS for repositories";
@@ -39,7 +46,7 @@ public class UseHttpsForRepositories extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("security");
+        return new HashSet<>(Arrays.asList("security", "CWE-829"));
     }
 
     @Override
@@ -61,6 +68,13 @@ public class UseHttpsForRepositories extends Recipe {
                 }
                 return super.visitTag(tag, ctx);
 
+            }
+
+            private boolean isRepositoryUrlTag() {
+                return REPOSITORY_URL_MATCHER.matches(getCursor()) ||
+                    PLUGIN_REPOSITORY_URL_MATCHER.matches(getCursor()) ||
+                    DISTRIBUTION_MANAGEMENT_REPOSITORY_URL_MATCHER.matches(getCursor()) ||
+                    DISTRIBUTION_MANAGEMENT_SNAPSHOT_REPOSITORY_URL_MATCHER.matches(getCursor());
             }
         };
     }

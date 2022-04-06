@@ -41,11 +41,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     private static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     private static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
     private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
-    private static final XPathMatcher REPOSITORY_URL_MATCHER = new XPathMatcher("/project/repositories/repository/url");
-    private static final XPathMatcher PLUGIN_REPOSITORY_URL_MATCHER = new XPathMatcher("/project/pluginRepositories/pluginRepository/url");
-    private static final XPathMatcher DISTRIBUTION_MANAGEMENT_REPOSITORY_URL_MATCHER = new XPathMatcher("/project/distributionManagement/repository/url");
-    private static final XPathMatcher DISTRIBUTION_MANAGEMENT_SNAPSHOT_REPOSITORY_URL_MATCHER = new XPathMatcher("/project/distributionManagement/snapshotRepository/url");
-
 
     private transient MavenResolutionResult resolutionResult;
     private transient List<MavenResolutionResult> modules;
@@ -79,13 +74,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     public boolean isDependencyTag() {
         return DEPENDENCY_MATCHER.matches(getCursor());
-    }
-
-    public boolean isRepositoryUrlTag() {
-        return REPOSITORY_URL_MATCHER.matches(getCursor()) ||
-                PLUGIN_REPOSITORY_URL_MATCHER.matches(getCursor()) ||
-                DISTRIBUTION_MANAGEMENT_REPOSITORY_URL_MATCHER.matches(getCursor()) ||
-                DISTRIBUTION_MANAGEMENT_SNAPSHOT_REPOSITORY_URL_MATCHER.matches(getCursor());
     }
 
     /**
