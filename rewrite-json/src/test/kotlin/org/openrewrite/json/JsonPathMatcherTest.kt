@@ -561,8 +561,7 @@ class JsonPathMatcherTest {
                 override fun visitMember(member: Json.Member, p: MutableList<String>): Json? {
                     val e = super.visitMember(member, p)
                     if (matcher.matches(cursor)) {
-                        val j: Json = e.withPrefix(Space.EMPTY)
-                        val match = j.printTrimmed(cursor)
+                        val match = e.printTrimmed(cursor)
                         if (printMatches) {
                             println("matched in visitMember")
                             println(match)
@@ -576,8 +575,7 @@ class JsonPathMatcherTest {
                 override fun visitObject(obj: Json.JsonObject, p: MutableList<String>): Json {
                     val e = super.visitObject(obj, p)
                     if (matcher.matches(cursor)) {
-                        val j: Json = e.withPrefix(Space.EMPTY)
-                        val match = j.printTrimmed(cursor)
+                        val match = e.printTrimmed(cursor)
                         if (printMatches) {
                             println("matched in visitObject")
                             println(match)
