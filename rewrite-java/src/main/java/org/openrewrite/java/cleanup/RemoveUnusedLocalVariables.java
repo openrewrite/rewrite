@@ -23,10 +23,12 @@ import org.openrewrite.java.DeleteStatement;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 
 @Value
@@ -114,7 +116,9 @@ public class RemoveUnusedLocalVariables extends Recipe {
                     // skip if defined in a try's catch clause as an Exception variable declaration
                     parent instanceof J.Try.Resource || parent instanceof J.Try.Catch || parent instanceof J.MultiCatch ||
                     // skip if defined as a parameter to a lambda expression
-                    parent instanceof J.Lambda
+                    parent instanceof J.Lambda ||
+                    // skip if the initializer may have a side effect
+                    initializerMightSideEffect(variable)
             ) {
                 return variable;
             }
@@ -144,6 +148,26 @@ public class RemoveUnusedLocalVariables extends Recipe {
             return mv;
         }
 
+        private boolean initializerMightSideEffect(J.VariableDeclarations.NamedVariable variable) {
+            if (variable.getInitializer() == null) {
+                return false;
+            }
+            AtomicBoolean mightSideEffect = new AtomicBoolean(false);
+            new JavaIsoVisitor<AtomicBoolean>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation methodInvocation, AtomicBoolean result) {
+                    result.set(true);
+                    return methodInvocation;
+                }
+
+                @Override
+                public J.Assignment visitAssignment(J.Assignment assignment, AtomicBoolean result) {
+                    result.set(true);
+                    return assignment;
+                }
+            }.visit(variable.getInitializer(), mightSideEffect);
+            return mightSideEffect.get();
+        }
     }
 
     private static class References {
