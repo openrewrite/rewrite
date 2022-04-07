@@ -128,7 +128,7 @@ public class MavenParser implements Parser<Xml.Document> {
             }
 
             if (!modules.isEmpty()) {
-                parsed.set(i, maven.withMarkers(maven.getMarkers().computeByType(resolutionResult.withModules(modules), (old, n) -> n)));
+                resolutionResult.unsafeSetModules(modules);
             }
         }
 
