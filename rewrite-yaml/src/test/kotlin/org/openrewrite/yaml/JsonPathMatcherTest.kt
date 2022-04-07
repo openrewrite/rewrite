@@ -110,11 +110,11 @@ class JsonPathMatcherTest {
         after = arrayOf("literal: $.literal",
             """
                 object:
-                literal: $.object.literal
+                  literal: $.object.literal
             """.trimIndent(),
             """
                 list:
-                - literal: $.object.list[0]
+                  - literal: $.object.list[0]
             """.trimIndent()
         )
     )
@@ -143,7 +143,7 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 object:
-                literal: $.object.literal
+                  literal: $.object.literal
             """.trimIndent())
     )
 
@@ -175,7 +175,7 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 object:
-                literal: $.object.literal
+                  literal: $.object.literal
             """.trimIndent())
     )
 
@@ -216,7 +216,7 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item1: index0
-                property: property
+                    property: property
             """.trimIndent())
     )
 
@@ -227,7 +227,7 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item3: index2
-                property: property
+                    property: property
             """.trimIndent())
     )
 
@@ -238,11 +238,11 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item1: index0
-                property: property
+                    property: property
             """.trimIndent(),
             """
                 - item2: index1
-                property: property
+                    property: property
             """.trimIndent())
     )
 
@@ -253,11 +253,11 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item2: index1
-                property: property
+                    property: property
             """.trimIndent(),
             """
                 - item3: index2
-                property: property
+                    property: property
          """.trimIndent())
     )
 
@@ -268,15 +268,15 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item1: index0
-                property: property
+                    property: property
             """.trimIndent(),
             """
                 - item2: index1
-                property: property
+                    property: property
             """.trimIndent(),
             """
                 - item3: index2
-                property: property
+                    property: property
             """.trimIndent())
     )
 
@@ -287,7 +287,7 @@ class JsonPathMatcherTest {
         after = arrayOf("literal: $.literal",
             """
                 object:
-                literal: $.object.literal
+                  literal: $.object.literal
             """.trimIndent())
     )
 
@@ -304,10 +304,10 @@ class JsonPathMatcherTest {
         after = arrayOf(
             """
                 - item1: index0
-                property: property
+                    property: property
             """.trimIndent(),"""
                 - item2: index1
-                property: property
+                    property: property
             """.trimIndent())
     )
 
