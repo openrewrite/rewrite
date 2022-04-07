@@ -46,13 +46,13 @@ public interface JavaTreeTest {
 
         switch (nestingLevel) {
             case Block:
-                source = source + "class A" + System.nanoTime() + "{{\n" + code + "\n}}";
+                source = source + "class A" + System.nanoTime() + "{{" + code + "}}";
                 break;
             case Class:
-                source = source + "class A" + System.nanoTime() + "{\n" + code + "\n}";
+                source = source + "class A" + System.nanoTime() + "{" + code + "}";
                 break;
             case CompilationUnit:
-                source = source + "/*<START>*/\n" + code;
+                source = source + "/*<START>*/" + code;
                 break;
         }
 
