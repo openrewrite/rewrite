@@ -1,4 +1,5 @@
 plugins {
+    id("org.openrewrite.java-library")
     id("me.champeau.gradle.jmh") version "0.5.2"
 }
 

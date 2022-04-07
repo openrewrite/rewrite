@@ -5,6 +5,10 @@ pluginManagement {
     }
 }
 
+includeBuild(
+    "build-src"
+)
+
 include(
     "rewrite-core",
     "rewrite-gradle",
@@ -20,6 +24,7 @@ include(
     "rewrite-xml",
     "rewrite-yaml",
     "rewrite-test",
+    "rewrite-bom",
     "rewrite-benchmarks"
 )
 
