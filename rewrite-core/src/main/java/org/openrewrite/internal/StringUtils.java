@@ -89,7 +89,7 @@ public class StringUtils {
 
         //If the last line of the string is only whitespace, trim it.
         int end = text.length() - 1;
-        while (end > start + 1) {
+        while (end > start) {
             char endChar = text.charAt(end);
             if (!Character.isWhitespace(endChar)) {
                 end = text.length();
@@ -98,6 +98,9 @@ public class StringUtils {
                 break;
             }
             end--;
+        }
+        if (end == start) {
+            end++;
         }
         char[] charArray = text.substring(start, end).toCharArray();
 
@@ -137,7 +140,6 @@ public class StringUtils {
     private static int minCommonIndentLevel(String text) {
         int minIndent = Integer.MAX_VALUE;
         int whiteSpaceCount = 0;
-
         boolean contentEncountered = false;
         for (char c : text.toCharArray()) {
             if (c == '\n' || c == '\r') {
@@ -154,6 +156,9 @@ public class StringUtils {
             } else {
                 contentEncountered = true;
             }
+        }
+        if (contentEncountered) {
+            minIndent = Math.min(whiteSpaceCount, minIndent);
         }
         return minIndent;
     }

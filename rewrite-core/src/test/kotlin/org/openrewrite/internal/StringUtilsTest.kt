@@ -141,6 +141,18 @@ class StringUtilsTest {
     }
 
     @Test
+    fun trimIndentNoNewLine() {
+        val input = " a"
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
+    }
+
+    @Test
+    fun trimIndentOneCharacter() {
+        val input = "a"
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
+    }
+
+    @Test
     fun trimIndentFirstLineNotEmpty() {
         val input = """
     fred
