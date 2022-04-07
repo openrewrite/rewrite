@@ -102,8 +102,12 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();
-        int expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
-                testClassSpec.getExpectedCyclesThatMakeChanges(cycles) : testMethodSpec.getExpectedCyclesThatMakeChanges(cycles);
+        int expectedCyclesThatMakeChanges = 0;
+        if (Arrays.stream(sourceSpecs).anyMatch(s -> s.after != null)) {
+            //If there are any tests that have assertions (an "after"), then set the expected cycles.
+            expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
+                    testClassSpec.getExpectedCyclesThatMakeChanges(cycles) : testMethodSpec.getExpectedCyclesThatMakeChanges(cycles);
+        }
 
         RecipeSchedulerCheckingExpectedCycles recipeSchedulerCheckingExpectedCycles =
                 new RecipeSchedulerCheckingExpectedCycles(DirectScheduler.common(), expectedCyclesThatMakeChanges);
@@ -192,8 +196,13 @@ public interface RewriteTest extends SourceSpecs {
             Map<SourceSpec<?>, Parser.Input> inputs = new HashMap<>(sourceSpecsForParser.getValue().size());
             for (SourceSpec<?> sourceSpec : sourceSpecsForParser.getValue()) {
                 String beforeTrimmed = trimIndentPreserveCRLF(sourceSpec.before);
-                Path sourcePath = sourceSpecsForParser.getKey().get()
-                        .sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
+                Path sourcePath;
+                if (sourceSpec.sourcePath != null) {
+                    sourcePath = sourceSpec.dir.resolve(sourceSpec.sourcePath);
+                } else {
+                    sourcePath = sourceSpecsForParser.getKey().get()
+                            .sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
+                }
                 inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(StandardCharsets.UTF_8))));
             }
 
