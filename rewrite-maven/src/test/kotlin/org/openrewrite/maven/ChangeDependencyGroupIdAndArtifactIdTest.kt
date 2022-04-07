@@ -15,7 +15,11 @@
  */
 package org.openrewrite.maven
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.InMemoryExecutionContext
+import java.nio.file.Path
 
 class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
 
@@ -195,4 +199,95 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
             </project>
         """
     )
+
+    @Test
+    fun changeDependencyGroupIdAndArtifactIdWithDeepHierarchy(@TempDir tempDir: Path) {
+        val parent = tempDir.resolve("pom.xml")
+        val child = tempDir.resolve("child/pom.xml")
+        val subchild = tempDir.resolve("child/subchild/pom.xml")
+
+        subchild.toFile().parentFile.mkdirs()
+
+        parent.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                </project>
+            """.trimIndent()
+        )
+
+        child.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>child</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>subchild</module>
+                    </modules>
+                </project>
+            """.trimIndent()
+        )
+
+        subchild.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>child</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>subchild</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-core</artifactId>
+                            <version>2.8.0.Final</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """.trimIndent()
+        )
+
+        val results = ChangeDependencyGroupIdAndArtifactId("io.quarkus", "quarkus-core", "io.quarkus", "quarkus-arc", null)
+            .run(parser.parse(listOf(subchild, child, parent), tempDir, InMemoryExecutionContext()))
+
+        assertThat(results).hasSize(1)
+        assertThat(results[0].after!!.printAllTrimmed()).isEqualTo(
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>child</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>subchild</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-arc</artifactId>
+                            <version>2.8.0.Final</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """.trimIndent()
+        )
+    }
 }

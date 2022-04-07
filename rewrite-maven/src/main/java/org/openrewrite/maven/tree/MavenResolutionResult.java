@@ -45,6 +45,7 @@ public class MavenResolutionResult implements Marker {
      * Resolution results of POMs in this repository that hold this POM as a parent.
      */
     @With
+    @NonFinal
     List<MavenResolutionResult> modules;
 
     @Nullable
@@ -120,6 +121,10 @@ public class MavenResolutionResult implements Marker {
 
     public void unsafeSetParent(MavenResolutionResult parent) {
         this.parent = parent;
+    }
+
+    public void unsafeSetModules(List<MavenResolutionResult> modules) {
+        this.modules = new ArrayList<>(modules);
     }
 
     @Incubating(since = "7.18.0")
