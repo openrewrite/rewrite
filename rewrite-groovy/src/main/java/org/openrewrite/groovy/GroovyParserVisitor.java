@@ -425,7 +425,7 @@ public class GroovyParserVisitor {
                     throwz,
                     body,
                     null,
-                    null
+                    typeMapping.methodType(method)
             ));
         }
 

@@ -22,7 +22,6 @@ import org.openrewrite.java.tree.J
 
 class MethodDeclarationTest : GroovyTreeTest {
 
-    @Disabled
     @Test
     fun methodDeclarationDeclaringType() = assertParsePrintAndProcess(
         """
