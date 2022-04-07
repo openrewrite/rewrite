@@ -21,7 +21,7 @@ class TernaryTest : GroovyTreeTest {
 
     @Test
     fun ternary() = assertParsePrintAndProcess("""
-        1 == 2 ? /no it isn't/ : /yes it is/        
+        1 == 2 ? /no it isn't/ : /yes it is/
     """)
 
     @Test

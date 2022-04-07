@@ -105,7 +105,7 @@ class MethodInvocationTest : GroovyTreeTest {
         def acceptsClosure(Closure cl) {}
         acceptsClosure { foo ->
             println(foo)
-        }   
+        }
     """)
 
     @Test
@@ -113,6 +113,6 @@ class MethodInvocationTest : GroovyTreeTest {
         def acceptsClosure(Closure cl) {}
         acceptsClosure { String foo ->
             println(foo)
-        }   
+        }
     """)
 }

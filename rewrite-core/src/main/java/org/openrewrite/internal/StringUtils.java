@@ -89,7 +89,7 @@ public class StringUtils {
 
         //If the last line of the string is only whitespace, trim it.
         int end = text.length() - 1;
-        while (end > start) {
+        while (end > start + 1) {
             char endChar = text.charAt(end);
             if (!Character.isWhitespace(endChar)) {
                 end = text.length();
