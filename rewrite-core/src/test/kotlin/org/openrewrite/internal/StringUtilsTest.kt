@@ -79,13 +79,87 @@ class StringUtilsTest {
     }
 
     @Test
-    fun trimIndent() {
+    fun trimIndentBlankLines() {
         val input = """
+  
             class {
+                
+                A field;
+            }
+            """
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
+    }
+
+    @Test
+    fun trimIndentEndLineNonWhitespace() {
+        val input = """
+
+            class {
+                
+                A field;
+            }
+            hello"""
+        System.out.println("Kotlin : '" + input.trimIndent() + "'")
+
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
+    }
+
+    @Test
+    fun trimIndentFirstLineSameAsIndent() {
+        val input = """
+            
+            class {
+                
                 A field;
             }
         """
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
+    }
 
+    @Test
+    fun trimIndentFirstLineGreaterThanIndent() {
+        val input = """
+                
+            class {
+                
+                A field;
+            }
+        """
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
+    }
+
+    @Test
+    fun trimIndentFirstLineEmpty() {
+        val input = """
+
+            class {
+                
+                A field;
+            }
+        """
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
+    }
+
+    @Test
+    fun trimIndentFirstLineNotEmpty() {
+        val input = """
+    fred
+            class {
+                
+                A field;
+            }
+        """
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
+    }
+
+    @Test
+    fun trimIndentFirstCharacterNotLineBreak() {
+        val input = """fred
+            class {
+                
+                A field;
+            }
+        """
         assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
     }
 

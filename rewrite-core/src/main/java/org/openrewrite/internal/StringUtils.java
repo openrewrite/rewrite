@@ -44,27 +44,76 @@ public class StringUtils {
                 .replace('⏎', '\r');
     }
 
+    /**
+     * Detects a common minimal indent of all the input lines and removes the indent from each line.
+     *
+     * This is modeled after Kotlin's trimIndent and is useful for pruning the indent from multi-line text blocks.
+     *
+     * Note: Blank lines do not affect the detected indent level.
+     *
+     * @param text A string that have a common indention
+     * @return A mutated version of the string that removed the common indention.
+     */
     public static String trimIndent(String text) {
-        int indentLevel = indentLevel(text);
+
+        if (text.isEmpty()) {
+            return text;
+        }
+
+        int indentLevel = minCommonIndentLevel(text);
+
+        // The logic for trimming the start of the string is consistent with the functionality of Kotlin's trimIndent.
+        char startChar = text.charAt(0);
+        int start = 0;
+        if (startChar == '\n' || startChar == '\r') {
+            //If the string starts with a line break, always trim it.
+            int i = 1;
+            for (; i < text.length(); i++) {
+                char c = text.charAt(i);
+                if (!Character.isWhitespace(c)) {
+                    //If there is any non-whitespace on the first line, do not trim the line.
+                    start = 1;
+                    break;
+                } else if (c == '\n' || c == '\r') {
+                    if (i - 1 <= indentLevel) {
+                        //If the first line is only whitespace and the line size is less than indent size, trim it.
+                        start = i;
+                    } else {
+                        //If the line size is equal or greater than indent, do not trim the line.
+                        start = 1;
+                    }
+                    break;
+                }
+            }
+        }
+
+        //If the last line of the string is only whitespace, trim it.
+        int end = text.length() - 1;
+        while (end > start) {
+            char endChar = text.charAt(end);
+            if (!Character.isWhitespace(endChar)) {
+                end = text.length();
+                break;
+            } else if (endChar == '\n' || endChar == '\r') {
+                break;
+            }
+            end--;
+        }
+        char[] charArray = text.substring(start, end).toCharArray();
 
         StringBuilder trimmed = new StringBuilder();
-        AtomicBoolean dropWhile = new AtomicBoolean(false);
-        int[] charArray = text.replaceAll("\\s+$", "").chars()
-                .filter(c -> {
-                    dropWhile.set(dropWhile.get() || !(c == '\n' || c == '\r'));
-                    return dropWhile.get();
-                })
-                .toArray();
-
         for (int i = 0; i < charArray.length; i++) {
             boolean nonWhitespaceEncountered = false;
             int j = i;
             for (; j < charArray.length; j++) {
-                int c = charArray[j];
+                char c = charArray[j];
                 if (j - i >= indentLevel || (nonWhitespaceEncountered |= !Character.isWhitespace(c))) {
-                    trimmed.append((char) c);
+                    trimmed.append(c);
                 }
                 if (c == '\r' || c == '\n') {
+                    if (!nonWhitespaceEncountered && j-1 < indentLevel) {
+                        trimmed.append(c);
+                    }
                     break;
                 }
             }
@@ -74,8 +123,43 @@ public class StringUtils {
         return trimmed.toString();
     }
 
+
+    /**
+     * This method will count the number of white space characters that precede any content for each line contained
+     * in string. It will not compute a white space count for a line, if the entire line is blank (only made up of white
+     * space characters).
+     * <P><P>
+     * It will compute the minimum common number of white spaces across all lines and return that minimum.
+     *
+     * @param text A string with zero or more line breaks.
+     * @return The minimum count of white space characters preceding each line of content.
+     */
+    private static int minCommonIndentLevel(String text) {
+        int minIndent = Integer.MAX_VALUE;
+        int whiteSpaceCount = 0;
+
+        boolean contentEncountered = false;
+        for (char c : text.toCharArray()) {
+            if (c == '\n' || c == '\r') {
+                if (contentEncountered) {
+                    minIndent = Math.min(whiteSpaceCount, minIndent);
+                    if (minIndent == 0) {
+                        break;
+                    }
+                }
+                whiteSpaceCount = 0;
+                contentEncountered = false;
+            } else if (!contentEncountered && Character.isWhitespace(c)) {
+                whiteSpaceCount++;
+            } else {
+                contentEncountered = true;
+            }
+        }
+        return minIndent;
+    }
+
     static int indentLevel(String text) {
-        Stream<String> lines = Arrays.stream(text.replaceAll("\\s+$", "").split("\\r?\\n"));
+        Stream<String> lines = Arrays.stream(text.replaceAll("\\s+$", "").split("\\r?\\n")).filter(s -> !isBlank(s));
 
         AtomicBoolean dropWhile = new AtomicBoolean(false);
         AtomicBoolean takeWhile = new AtomicBoolean(true);
