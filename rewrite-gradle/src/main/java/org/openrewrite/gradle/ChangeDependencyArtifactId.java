@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -69,7 +70,7 @@ public class ChangeDependencyArtifactId extends Recipe {
     @Override
     public Validated validate() {
         Validated validated = super.validate();
-        if(dependencyPattern != null) {
+        if (dependencyPattern != null) {
             validated = validated.and(DependencyMatcher.build(dependencyPattern));
         }
         return validated;
@@ -80,6 +81,7 @@ public class ChangeDependencyArtifactId extends Recipe {
         return new GroovyVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = DependencyMatcher.build(dependencyPattern).getValue();
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
+
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
@@ -88,20 +90,15 @@ public class ChangeDependencyArtifactId extends Recipe {
                 }
 
                 List<Expression> depArgs = m.getArguments();
-                String versionStringDelimiter = "'";
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         String[] gavs = gav.split(":");
                         if (gavs.length >= 3 && !newArtifactId.equals(gavs[1]) && depMatcher.matches(gavs[0], gavs[1], gavs[2])) {
-                            String valueSource = ((J.Literal) depArgs.get(0)).getValueSource();
-                            String delimiter = (valueSource == null) ? versionStringDelimiter
-                                    : valueSource.substring(0, valueSource.indexOf(gav));
-
                             String newGav = gavs[0] + ":" + newArtifactId + ":" + gavs[2];
                             m = m.withArguments(ListUtils.map(m.getArguments(), (n, arg) ->
                                     n == 0 ?
-                                            ((J.Literal) arg).withValue(newGav).withValueSource(delimiter + newGav + delimiter) :
+                                            ChangeStringLiteral.withStringValue((J.Literal) arg, newGav) :
                                             arg
                             ));
                         }
@@ -112,6 +109,7 @@ public class ChangeDependencyArtifactId extends Recipe {
                     String artifactId = null;
                     String version = null;
 
+                    String versionStringDelimiter = "'";
                     for (Expression e : depArgs) {
                         if (!(e instanceof G.MapEntry)) {
                             continue;
@@ -135,7 +133,7 @@ public class ChangeDependencyArtifactId extends Recipe {
                             }
                             artifactEntry = arg;
                             artifactId = valueValue;
-                        } else if("version".equals(keyValue)) {
+                        } else if ("version".equals(keyValue)) {
                             version = valueValue;
                         }
                     }
@@ -148,7 +146,7 @@ public class ChangeDependencyArtifactId extends Recipe {
                     G.MapEntry finalArtifact = artifactEntry;
                     m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                         if (arg == finalArtifact) {
-                            return finalArtifact.withValue(((J.Literal)finalArtifact.getValue())
+                            return finalArtifact.withValue(((J.Literal) finalArtifact.getValue())
                                     .withValue(newArtifactId)
                                     .withValueSource(delimiter + newArtifactId + delimiter));
                         }
@@ -161,4 +159,3 @@ public class ChangeDependencyArtifactId extends Recipe {
         };
     }
 }
-
