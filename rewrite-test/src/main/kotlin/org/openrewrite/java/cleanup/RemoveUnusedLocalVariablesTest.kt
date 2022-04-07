@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -74,33 +73,43 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1278")
-    @Disabled
     @Suppress("MethodMayBeStatic")
-    fun keepRightHandSideStatement() = assertChanged(
-        recipe = RemoveUnusedLocalVariables(arrayOf("ignoreMeCompletely")),
+    fun keepRightHandSideStatement() = assertUnchanged(
         before = """
             class Test {
                 void method(Object someData) {
-                    int ignoreMeCompletely = writeDataToTheDB(someData);
-                    int replaceMeWithRightHandSideStatement = writeDataToTheDB(someData);
-                    int doNotRemoveBecauseRightHandSideIsNotAStandaloneStatement = 1 + writeDataToTheDB(someData);
+                    int doNotRemoveMe = writeDataToTheDB(someData);
+                    int doNotRemoveMeEither = 1 + writeDataToTheDB(someData);
                 }
 
                 int writeDataToTheDB(Object save) {
                     return 1;
                 }
             }
-        """,
-        after = """
+        """
+    )
+
+    @Test
+    fun keepStatementWhenSideEffectInInitialization() = assertUnchanged(
+        before = """
             class Test {
                 void method(Object someData) {
-                    int ignoreMeCompletely = writeDataToTheDB(someData);
-                    writeDataToTheDB(someData);
-                    int doNotRemoveBecauseRightHandSideIsNotAStandaloneStatement = 1 + writeDataToTheDB(someData);
+                    // Don't write code like this.... Please
+                    int a = null == (someData = null) ? 0 : 9;
                 }
+            }
+        """
+    )
 
-                int writeDataToTheDB(Object save) {
-                    return 1;
+    @Test
+    fun keepStatementWhenSideEffectInAccess() = assertUnchanged(
+        before = """
+            class Test {
+                void method(Object someData) {
+                    String a = "";
+                    while((a = reader.nexLine()) != null) {
+                        System.out.println(a);
+                    }
                 }
             }
         """
