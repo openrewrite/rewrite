@@ -97,18 +97,22 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(node.getOuterClass()));
 
             List<JavaType.Variable> fields = null;
-            for (FieldNode field : node.getFields()) {
+            if(node.getFields().size() > 0) {
                 fields = new ArrayList<>(node.getFields().size());
-                if (!field.isSynthetic()) {
-                    fields.add(variableType(field));
+                for (FieldNode field : node.getFields()) {
+                    if (!field.isSynthetic()) {
+                        fields.add(variableType(field));
+                    }
                 }
             }
 
             List<JavaType.Method> methods = null;
-            for (MethodNode method : node.getAllDeclaredMethods()) {
+            if(node.getAllDeclaredMethods().size() > 0) {
                 methods = new ArrayList<>(node.getAllDeclaredMethods().size());
-                if (!method.isSynthetic()) {
-                    methods.add(methodType(method));
+                for (MethodNode method : node.getAllDeclaredMethods()) {
+                    if (!method.isSynthetic()) {
+                        methods.add(methodType(method));
+                    }
                 }
             }
 

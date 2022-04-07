@@ -31,8 +31,11 @@ class MethodDeclarationTest : GroovyTreeTest {
         """.trimIndent(),
         withAst = { cu ->
             val method = (cu.classes[0].body.statements[0] as J.MethodDeclaration)
-            assertThat(method.methodType).isNotNull
-            assertThat(method.methodType?.declaringType?.fullyQualifiedName).isEqualTo("A")
+            val methodType = method.methodType!!
+            assertThat(methodType.name).isEqualTo("method")
+            val declaring = method.methodType!!.declaringType
+            assertThat(declaring.fullyQualifiedName).isEqualTo("A")
+            assertThat(declaring.methods.find { it == methodType }).isNotNull
         }
     )
 
