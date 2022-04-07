@@ -504,6 +504,7 @@ public class JsonPathMatcher {
                 }
             } else if (ctx.EQUALITY_OPERATOR() != null) {
                 // Equality operators may resolve the LHS and RHS without caching scope.
+                Object originalScope = scope;
                 lhs = getBinaryExpressionResult(lhs);
                 rhs = getBinaryExpressionResult(rhs);
                 String operator;
@@ -528,7 +529,13 @@ public class JsonPathMatcher {
                     }
                     return matches;
                 } else {
-                    return getOperatorResult(lhs, operator, rhs);
+                    if (originalScope instanceof Yaml.Mapping.Entry) {
+                        if (getOperatorResult(lhs, operator, rhs) != null) {
+                            return originalScope;
+                        }
+                    } else {
+                        return getOperatorResult(lhs, operator, rhs);
+                    }
                 }
             }
             return null;
