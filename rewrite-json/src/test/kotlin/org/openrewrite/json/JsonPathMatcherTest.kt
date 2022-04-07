@@ -230,6 +230,27 @@ class JsonPathMatcherTest {
             "\"literal\": \"$.object.list[0]\"")
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1590")
+    @Test
+    fun returnScopeOfMemberOnBinaryEx() = assertMatched(
+        jsonPath = "$.root[?(@.on == 'condition')].list",
+        before = arrayOf("""
+            {
+              "root": {
+                "on": "condition",
+                "list": [
+                  "item"
+                ]
+              }
+            }
+        """.trimIndent()),
+        after = arrayOf("""
+            "list": [
+              "item"
+            ]
+        """.trimIndent())
+    )
+
     @Test
     fun recurseToMatchProperties() = assertMatched(
         jsonPath = "$..object.literal",
