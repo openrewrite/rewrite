@@ -18,8 +18,12 @@ package org.openrewrite.groovy.tree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.asFullyQualified
 import org.openrewrite.java.asParameterized
 import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
 
 class ClassDeclarationTest : GroovyTreeTest {
 
@@ -182,6 +186,24 @@ class ClassDeclarationTest : GroovyTreeTest {
             assertThat(a.type.asParameterized()!!.toString()).isEqualTo("java.util.List<java.lang.String>")
             val b = (statements[1] as J.VariableDeclarations).variables[0]
             assertThat(b.type.asParameterized()!!.toString()).isEqualTo("java.util.Map<java.lang.Object, java.lang.Object>")
+        }
+    )
+
+    @Test
+    fun singleLineCommentBeforeModifier() = assertParsePrintAndProcess(
+        """
+            @Deprecated
+            // Some comment
+            public final class A {}
+        """,
+        withAst = { cu ->
+            val annotations = cu.classes[0].allAnnotations
+            assertThat(annotations.size).isEqualTo(1)
+            val annotation = annotations[0]!!
+            val type = annotation.type
+            assertThat(type).isNotNull
+            assertThat(type).isInstanceOf(JavaType.FullyQualified::class.java)
+            assertThat(type.asFullyQualified()!!.fullyQualifiedName).isEqualTo("java.lang.Deprecated")
         }
     )
 }

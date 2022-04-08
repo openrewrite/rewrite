@@ -1483,7 +1483,7 @@ public class GroovyParserVisitor {
             String part = parts[i];
             if (i == 0) {
                 fullName = part;
-                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, part, null, null);
+                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, part, typeMapping.type(classNode), null);
             } else {
                 fullName += "." + part;
 
