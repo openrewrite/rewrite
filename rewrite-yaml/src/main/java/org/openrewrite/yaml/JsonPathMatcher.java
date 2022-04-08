@@ -479,6 +479,11 @@ public class JsonPathMatcher {
             if (ctx.children.get(0) instanceof JsonPathParser.UnaryExpressionContext) {
                 Object lhs = visitUnaryExpression(ctx.unaryExpression());
                 Object rhs = visitLiteralExpression(ctx.literalExpression());
+                if (lhs instanceof List) {
+                    String key = ctx.children.get(0).getChild(2).getText();
+                    lhs = getResultByKey(lhs, key);
+                }
+
                 if (lhs instanceof Yaml.Mapping.Entry && rhs != null) {
                     Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) lhs;
                     if (entry.getValue() instanceof Yaml.Sequence) {
@@ -499,6 +504,11 @@ public class JsonPathMatcher {
             } else {
                 Object lhs = visitLiteralExpression(ctx.literalExpression());
                 Object rhs = visitUnaryExpression(ctx.unaryExpression());
+                if (rhs instanceof List) {
+                    String key = ctx.children.get(2).getChild(2).getText();
+                    rhs = getResultByKey(rhs, key);
+                }
+
                 if (rhs instanceof Yaml.Mapping.Entry && lhs != null) {
                     Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) rhs;
                     if (entry.getValue() instanceof Yaml.Scalar) {
