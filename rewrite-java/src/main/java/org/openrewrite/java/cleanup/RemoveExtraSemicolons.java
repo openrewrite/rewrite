@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 
@@ -51,9 +52,9 @@ public class RemoveExtraSemicolons extends Recipe {
     @SuppressWarnings("ConstantConditions")
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+        return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J visitEmpty(J.Empty empty, ExecutionContext ctx) {
+            public J.Empty visitEmpty(J.Empty empty, ExecutionContext ctx) {
                 if (getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) {
                     return null;
                 }
@@ -61,11 +62,20 @@ public class RemoveExtraSemicolons extends Recipe {
             }
 
             @Override
-            public J visitTry(J.Try tryable, ExecutionContext ctx) {
+            public J.Try visitTry(J.Try tryable, ExecutionContext ctx) {
                 return tryable.withResources(ListUtils.map(tryable.getResources(), r -> r.withTerminatedWithSemicolon(false)))
                         .withBody((J.Block) super.visit(tryable.getBody(), ctx))
                         .withCatches(ListUtils.map(tryable.getCatches(), c -> (J.Try.Catch) super.visit(c, ctx)))
                         .withFinally((J.Block) super.visit(tryable.getFinally(), ctx));
+            }
+
+            @Override
+            public J.EnumValueSet visitEnumValueSet(J.EnumValueSet enums, ExecutionContext executionContext) {
+                J.EnumValueSet e = super.visitEnumValueSet(enums, executionContext);
+                if (getCursor().firstEnclosing(J.Block.class).getStatements().size() == 1) {
+                    e = e.withTerminatedWithSemicolon(false);
+                }
+                return e;
             }
         };
     }

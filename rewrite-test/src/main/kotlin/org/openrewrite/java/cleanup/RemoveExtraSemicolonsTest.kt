@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
 
@@ -23,6 +24,36 @@ import org.openrewrite.java.JavaRecipeTest
 interface RemoveExtraSemicolonsTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = RemoveExtraSemicolons()
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1587")
+    @Test
+    fun enumSemicolons() = assertChanged(
+        before = """
+            public enum FRUITS {
+                BANANA,
+                APPLE;
+            }
+        """,
+        after = """
+            public enum FRUITS {
+                BANANA,
+                APPLE
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1587")
+    @Test
+    fun enumSemicolonsWithOtherStatements() = assertUnchanged(
+        before = """
+            public enum FRUITS {
+                BANANA,
+                APPLE;
+                
+                void hiFruit() {}
+            }
+        """
+    )
 
     @Test
     fun emptyBlockStatements() = assertChanged(
