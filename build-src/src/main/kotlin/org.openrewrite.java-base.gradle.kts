@@ -1,4 +1,3 @@
-import gradle.kotlin.dsl.accessors._378df9f54425f6cc20297cfac9699af1.java
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
 import org.gradle.jvm.toolchain.JavaLanguageVersion

@@ -8,7 +8,7 @@ repositories {
 
 dependencies {
     implementation("org.gradle:test-retry-gradle-plugin:1.2.1")
-    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.21")
+    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:1.6.20")
     implementation("org.owasp:dependency-check-gradle:6.5.3")
     implementation("gradle.plugin.com.hierynomus.gradle.plugins:license-gradle-plugin:0.16.1")
     implementation("com.github.jk1:gradle-license-report:2.0")
@@ -30,7 +30,8 @@ java {
 
 kotlin {
     jvmToolchain {
-        (this as JavaToolchainSpec).languageVersion.set(JavaLanguageVersion.of("11"))
+        this as JavaToolchainSpec
+        languageVersion.set(JavaLanguageVersion.of("11"))
     }
 }
 
