@@ -75,6 +75,12 @@ public interface JsonPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link JsonPathParser#containsExpression}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitContainsExpression(JsonPathParser.ContainsExpressionContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link JsonPathParser#regexExpression}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

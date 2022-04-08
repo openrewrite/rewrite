@@ -127,6 +127,18 @@ public class JsonPathParserBaseListener implements JsonPathParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterContainsExpression(JsonPathParser.ContainsExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitContainsExpression(JsonPathParser.ContainsExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterRegexExpression(JsonPathParser.RegexExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}

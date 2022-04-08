@@ -230,10 +230,94 @@ class JsonPathMatcherTest {
             "\"literal\": \"$.object.list[0]\"")
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1599")
+    @Test
+    fun containsInList() = assertMatched(
+        jsonPath = "$.root[?(@.list contains 'item')].list",
+        before = arrayOf("""
+            {
+              "root": {
+                "on": "condition",
+                "list": [
+                  "item"
+                ]
+              }
+            }
+        """.trimIndent()),
+        after = arrayOf("""
+            "list": [
+              "item"
+            ]
+        """.trimIndent())
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1599")
+    @Test
+    fun containsInLhsString() = assertMatched(
+        jsonPath = "$.root[?(@.on contains 'ition')].list",
+        before = arrayOf("""
+            {
+              "root": {
+                "on": "condition",
+                "list": [
+                  "item"
+                ]
+              }
+            }
+        """.trimIndent()),
+        after = arrayOf("""
+            "list": [
+              "item"
+            ]
+        """.trimIndent())
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1599")
+    @Test
+    fun containsInRhsString() = assertMatched(
+        jsonPath = "$.root[?('ition' contains @.on)].list",
+        before = arrayOf("""
+            {
+              "root": {
+                "on": "condition",
+                "list": [
+                  "item"
+                ]
+              }
+            }
+        """.trimIndent()),
+        after = arrayOf("""
+            "list": [
+              "item"
+            ]
+        """.trimIndent())
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1590")
     @Test
     fun returnScopeOfMemberOnBinaryEx() = assertMatched(
         jsonPath = "$.root[?(@.on == 'condition')].list",
+        before = arrayOf("""
+            {
+              "root": {
+                "on": "condition",
+                "list": [
+                  "item"
+                ]
+              }
+            }
+        """.trimIndent()),
+        after = arrayOf("""
+            "list": [
+              "item"
+            ]
+        """.trimIndent())
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1599")
+    @Test
+    fun matchByConditionAndItemInList() = assertMatched(
+        jsonPath = "$.root[?(@.on == 'condition' && @.list contains 'item')].list",
         before = arrayOf("""
             {
               "root": {
