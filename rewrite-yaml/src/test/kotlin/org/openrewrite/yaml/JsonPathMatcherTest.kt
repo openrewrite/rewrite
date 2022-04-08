@@ -29,11 +29,14 @@ class JsonPathMatcherTest {
     @Language("yaml")
     private val simple = arrayOf("""
         ---
-        literal: $.literal
-        object:
-          literal: $.object.literal
-        list:
-          - literal: $.object.list[0]
+        root:
+          literal: $.root.literal
+          object:
+            literal: $.root.object.literal
+            list:
+              - literal: $.root.object.list[0]
+          list:
+            - literal: $.root.list[0]
     """.trimIndent())
 
     @Language("yaml")
@@ -84,37 +87,41 @@ class JsonPathMatcherTest {
         before = simple
     )
 
-    @Disabled("Requires detecting the last json path operation, and returning the value. Note: the scope is being reduced to the match by the binary expression.")
+    @Disabled("Requires tracking if the scope is set to a List from a Yaml.Mapping.Entry.")
     @Test
     fun findScopeOfObject() = assertMatched(
-        jsonPath = "$.object[?(@.literal == '$.object.literal')]",
+        jsonPath = "$.root.object[?(@.literal == '$.root.object.literal')]",
         before = simple,
         after = arrayOf("""
-            object:
-            literal: $.object.literal
+                object:
+                    literal: $.root.object.literal
+                    list:
+                      - literal: $.root.object.list[0]
         """.trimIndent())
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1514")
     @Test
     fun findLiteralInObject() = assertMatched(
-        jsonPath = "$.object[?(@.literal == '$.object.literal')].literal",
+        jsonPath = "$.root.object[?(@.literal == '$.root.object.literal')].literal",
         before = simple,
-        after = arrayOf("literal: $.object.literal")
+        after = arrayOf("literal: $.root.object.literal")
     )
 
     @Test
     fun wildcardAtRoot() = assertMatched(
         jsonPath = "$.*",
         before = simple,
-        after = arrayOf("literal: $.literal",
+        after = arrayOf(
             """
-                object:
-                  literal: $.object.literal
-            """.trimIndent(),
-            """
-                list:
-                  - literal: $.object.list[0]
+                root:
+                  literal: $.root.literal
+                  object:
+                    literal: $.root.object.literal
+                    list:
+                      - literal: $.root.object.list[0]
+                  list:
+                    - literal: $.root.list[0]
             """.trimIndent()
         )
     )
@@ -138,44 +145,48 @@ class JsonPathMatcherTest {
 
     @Test
     fun matchObjectAtRoot() = assertMatched(
-        jsonPath = "$.object",
+        jsonPath = "$.root.object",
         before = simple,
         after = arrayOf(
             """
                 object:
-                  literal: $.object.literal
+                    literal: $.root.object.literal
+                    list:
+                      - literal: $.root.object.list[0]
             """.trimIndent())
     )
 
     @Test
     fun matchLiteral() = assertMatched(
-        jsonPath = "$.literal",
+        jsonPath = "$.root.literal",
         before = simple,
-        after = arrayOf("literal: $.literal"),
+        after = arrayOf("literal: $.root.literal"),
     )
 
     @Test
     fun dotOperatorIntoObject() = assertMatched(
-        jsonPath = "$.object.literal",
+        jsonPath = "$.root.object.literal",
         before = simple,
-        after = arrayOf("literal: $.object.literal")
+        after = arrayOf("literal: $.root.object.literal")
     )
 
     @Test
     fun dotOperatorByBracketName() = assertMatched(
-        jsonPath = "$.['object'].['literal']",
+        jsonPath = "$.['root'].['object'].['literal']",
         before = simple,
-        after = arrayOf("literal: $.object.literal")
+        after = arrayOf("literal: $.root.object.literal")
     )
 
     @Test
     fun bracketNameAtRoot() = assertMatched(
-        jsonPath = "['object']",
+        jsonPath = "['root'].['object']",
         before = simple,
         after = arrayOf(
             """
                 object:
-                  literal: $.object.literal
+                    literal: $.root.object.literal
+                    list:
+                      - literal: $.root.object.list[0]
             """.trimIndent())
     )
 
@@ -183,22 +194,64 @@ class JsonPathMatcherTest {
     fun relativePath() = assertMatched(
         jsonPath = ".literal",
         before = simple,
-        after = arrayOf("literal: $.literal", "literal: $.object.literal", "literal: $.object.list[0]")
+        after = arrayOf("literal: $.root.literal",
+            "literal: $.root.object.literal",
+            "literal: $.root.object.list[0]",
+            "literal: $.root.list[0]")
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1599")
+    @Test
+    fun containsInList() = assertMatched(
+        jsonPath = "$.root.object[?(@.literal contains 'object')].list",
+        before = simple,
+        after = arrayOf("""
+            list:
+                  - literal: $.root.object.list[0]
+        """.trimIndent())
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1599")
+    @Test
+    fun containsInLhsString() = assertMatched(
+        jsonPath = "$.root.object[?(@.literal contains 'literal')].list",
+        before = simple,
+        after = arrayOf("""
+            list:
+                  - literal: $.root.object.list[0]
+        """.trimIndent())
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1599")
+    @Test
+    fun containsInRhsString() = assertMatched(
+        jsonPath = "$.root.object[?('$.root.object.literal' contains @.literal)].list",
+        before = simple,
+        after = arrayOf("""
+            list:
+                  - literal: $.root.object.list[0]
+        """.trimIndent())
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1590")
     @Test
     fun returnScopeOfMappingEntryOnBinaryEx() = assertMatched(
-        jsonPath = "$.root[?(@.on == 'condition')].list",
-        before = arrayOf("""
-            root:
-              on: condition
-              list:
-                - item
-        """.trimIndent()),
+        jsonPath = "$.root.object[?($.root.literal == '$.root.literal')].list",
+        before = simple,
         after = arrayOf("""
             list:
-                - item
+                  - literal: $.root.object.list[0]
+        """.trimIndent())
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1599")
+    @Test
+    fun matchByConditionAndItemInList() = assertMatched(
+        jsonPath = "$.root.object[?($.root.literal == '$.root.literal' && @.literal contains 'literal')].list",
+        before = simple,
+        after = arrayOf("""
+            list:
+                  - literal: $.root.object.list[0]
         """.trimIndent())
     )
 
@@ -298,12 +351,14 @@ class JsonPathMatcherTest {
 
     @Test
     fun bracketOperatorByNames() = assertMatched(
-        jsonPath = "$.['literal', 'object']",
+        jsonPath = "$.root['literal', 'object']",
         before = simple,
-        after = arrayOf("literal: $.literal",
+        after = arrayOf("literal: $.root.literal",
             """
                 object:
-                  literal: $.object.literal
+                    literal: $.root.object.literal
+                    list:
+                      - literal: $.root.object.list[0]
             """.trimIndent())
     )
 
@@ -460,7 +515,7 @@ class JsonPathMatcherTest {
     fun returnResultsWithVisitDocument() {
         val ctx = InMemoryExecutionContext { it.printStackTrace() }
         val documents = YamlParser().parse(ctx, *simple)
-        val matcher = JsonPathMatcher("$.literal")
+        val matcher = JsonPathMatcher("$.root.literal")
         val results = ArrayList<Yaml>()
         documents.forEach {
             object : YamlIsoVisitor<MutableList<Yaml>>() {

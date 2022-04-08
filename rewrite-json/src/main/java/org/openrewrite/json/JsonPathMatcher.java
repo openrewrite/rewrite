@@ -452,6 +452,57 @@ public class JsonPathMatcher {
             }
         }
 
+        // Checks if a string contains the specified substring (case-sensitive), or an array contains the specified element.
+        @Override
+        public Object visitContainsExpression(JsonPathParser.ContainsExpressionContext ctx) {
+            Object originalScope = scope;
+            if (ctx.children.get(0) instanceof JsonPathParser.UnaryExpressionContext) {
+                Object lhs = visitUnaryExpression(ctx.unaryExpression());
+                Object rhs = visitLiteralExpression(ctx.literalExpression());
+                if (lhs instanceof Json.JsonObject && rhs != null) {
+                    Json.JsonObject jsonObject = (Json.JsonObject) lhs;
+                    String key = ctx.children.get(0).getChild(2).getText();
+                    lhs = getResultByKey(jsonObject, key);
+                    if (lhs instanceof Json.Member) {
+                        Json.Member member = (Json.Member) lhs;
+                        if (member.getValue() instanceof Json.Array) {
+                            Json.Array array = (Json.Array) ((Json.Member) lhs).getValue();
+                            if (array.getValues().stream()
+                                    .filter(o -> o instanceof Json.Literal)
+                                    .map(o -> (Json.Literal) o)
+                                    .anyMatch(o -> String.valueOf(o.getValue()).contains(String.valueOf(rhs)))) {
+                                return originalScope;
+                            }
+                        } else if (member.getValue() instanceof Json.Literal) {
+                            Json.Literal literal = (Json.Literal) member.getValue();
+                            if (literal.getValue().toString().contains(String.valueOf(rhs))) {
+                                return originalScope;
+                            }
+                        }
+                    }
+                }
+            } else {
+                Object lhs = visitLiteralExpression(ctx.literalExpression());
+                Object rhs = visitUnaryExpression(ctx.unaryExpression());
+                if (rhs instanceof Json.JsonObject && lhs != null) {
+                    Json.JsonObject jsonObject = (Json.JsonObject) rhs;
+                    String key = ctx.children.get(2).getChild(2).getText();
+                    rhs = getResultByKey(jsonObject, key);
+                    if (rhs instanceof Json.Member) {
+                        Json.Member member = (Json.Member) rhs;
+                        if (member.getValue() instanceof Json.Literal) {
+                            Json.Literal literal = (Json.Literal) member.getValue();
+                            if (literal.getValue().toString().contains(String.valueOf(lhs))) {
+                                return originalScope;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
         @Override
         public Object visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) {
             Object lhs = ctx.children.get(0);
@@ -526,10 +577,16 @@ public class JsonPathMatcher {
         private Object getBinaryExpressionResult(Object ctx) {
             if (ctx instanceof JsonPathParser.BinaryExpressionContext) {
                 ctx = visitBinaryExpression((JsonPathParser.BinaryExpressionContext) ctx);
-            } else if (ctx instanceof JsonPathParser.UnaryExpressionContext) {
-                ctx = visitUnaryExpression((JsonPathParser.UnaryExpressionContext) ctx);
+
             } else if (ctx instanceof JsonPathParser.RegexExpressionContext) {
                 ctx = visitRegexExpression((JsonPathParser.RegexExpressionContext) ctx);
+
+            } else if (ctx instanceof JsonPathParser.ContainsExpressionContext) {
+                ctx = visitContainsExpression((JsonPathParser.ContainsExpressionContext) ctx);
+
+            } else if (ctx instanceof JsonPathParser.UnaryExpressionContext) {
+                ctx = visitUnaryExpression((JsonPathParser.UnaryExpressionContext) ctx);
+
             } else if (ctx instanceof JsonPathParser.LiteralExpressionContext) {
                 ctx = visitLiteralExpression((JsonPathParser.LiteralExpressionContext) ctx);
             }
@@ -580,7 +637,18 @@ public class JsonPathMatcher {
         // Extract the result from JSON objects that can match by key.
         @Nullable
         public Object getResultByKey(Object result, String key) {
-            if (result instanceof Json.Member) {
+            if (result instanceof Json.JsonObject) {
+                Json.JsonObject jsonObject = (Json.JsonObject) result;
+                for (Json json : jsonObject.getMembers()) {
+                    if (json instanceof Json.Member) {
+                        Json.Member member = (Json.Member) json;
+                        if (member.getKey() instanceof Json.Literal &&
+                                ((Json.Literal) member.getKey()).getValue().equals(key)) {
+                            return member;
+                        }
+                    }
+                }
+            } else if (result instanceof Json.Member) {
                 Json.Member member = (Json.Member) result;
                 if (member.getValue() instanceof Json.Literal) {
                     String k = member.getKey() instanceof Json.Literal ?

@@ -472,6 +472,57 @@ public class JsonPathMatcher {
             }
         }
 
+        // Checks if a string contains the specified substring (case-sensitive), or an array contains the specified element.
+        @Override
+        public Object visitContainsExpression(JsonPathParser.ContainsExpressionContext ctx) {
+            Object originalScope = scope;
+            if (ctx.children.get(0) instanceof JsonPathParser.UnaryExpressionContext) {
+                Object lhs = visitUnaryExpression(ctx.unaryExpression());
+                Object rhs = visitLiteralExpression(ctx.literalExpression());
+                if (lhs instanceof List) {
+                    String key = ctx.children.get(0).getChild(2).getText();
+                    lhs = getResultByKey(lhs, key);
+                }
+
+                if (lhs instanceof Yaml.Mapping.Entry && rhs != null) {
+                    Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) lhs;
+                    if (entry.getValue() instanceof Yaml.Sequence) {
+                        Yaml.Sequence sequence = (Yaml.Sequence) entry.getValue();
+                        if (sequence.getEntries().stream()
+                                .filter(o -> o.getBlock() instanceof Yaml.Scalar)
+                                .map(o -> (Yaml.Scalar) o.getBlock())
+                                .anyMatch(o -> o.getValue().contains(String.valueOf(rhs)))) {
+                            return originalScope;
+                        }
+                    } else if (entry.getValue() instanceof Yaml.Scalar) {
+                        Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
+                        if (scalar.getValue().contains(String.valueOf(rhs))) {
+                            return originalScope;
+                        }
+                    }
+                }
+            } else {
+                Object lhs = visitLiteralExpression(ctx.literalExpression());
+                Object rhs = visitUnaryExpression(ctx.unaryExpression());
+                if (rhs instanceof List) {
+                    String key = ctx.children.get(2).getChild(2).getText();
+                    rhs = getResultByKey(rhs, key);
+                }
+
+                if (rhs instanceof Yaml.Mapping.Entry && lhs != null) {
+                    Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) rhs;
+                    if (entry.getValue() instanceof Yaml.Scalar) {
+                        Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
+                        if (scalar.getValue().contains(String.valueOf(lhs))) {
+                            return originalScope;
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
         @Override
         public Object visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) {
             Object lhs = ctx.children.get(0);
@@ -496,10 +547,12 @@ public class JsonPathMatcher {
                 scope = scopeOfLogicalOp;
                 rhs = getBinaryExpressionResult(rhs);
                 if ("&&".equals(operator) &&
-                        ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) && (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
+                        ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) &&
+                                (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     return scopeOfLogicalOp;
                 } else if ("||".equals(operator) &&
-                        ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) || (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
+                        ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) ||
+                                (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     return scopeOfLogicalOp;
                 }
             } else if (ctx.EQUALITY_OPERATOR() != null) {
@@ -545,10 +598,16 @@ public class JsonPathMatcher {
         private Object getBinaryExpressionResult(Object ctx) {
             if (ctx instanceof JsonPathParser.BinaryExpressionContext) {
                 ctx = visitBinaryExpression((JsonPathParser.BinaryExpressionContext) ctx);
-            } else if (ctx instanceof JsonPathParser.UnaryExpressionContext) {
-                ctx = visitUnaryExpression((JsonPathParser.UnaryExpressionContext) ctx);
+
             } else if (ctx instanceof JsonPathParser.RegexExpressionContext) {
                 ctx = visitRegexExpression((JsonPathParser.RegexExpressionContext) ctx);
+
+            } else if (ctx instanceof JsonPathParser.ContainsExpressionContext) {
+                ctx = visitContainsExpression((JsonPathParser.ContainsExpressionContext) ctx);
+
+            } else if (ctx instanceof JsonPathParser.UnaryExpressionContext) {
+                ctx = visitUnaryExpression((JsonPathParser.UnaryExpressionContext) ctx);
+
             } else if (ctx instanceof JsonPathParser.LiteralExpressionContext) {
                 ctx = visitLiteralExpression((JsonPathParser.LiteralExpressionContext) ctx);
             }

@@ -24,6 +24,12 @@ WILDCARD : '*';
 COLON : ':';
 QUESTION : '?';
 
+CONTAINS : 'contains';
+//IN : 'in'
+//NIN : 'nin'
+//SUBSET : 'subset'
+//SIZE : 'size'
+
 Identifier
     : [_A-Za-z] [_A-Za-z0-9-]*
     ;
@@ -67,13 +73,6 @@ NE : '!=';
 //GT : '>';
 //LE : '<=';
 //LT : '<';
-
-// Operations
-//IN : 'in'
-//NIN : 'nin'
-//SUBSET : 'subset'
-//CONTAINS : 'contains'
-//SIZE : 'size'
 
 TRUE : 'true';
 FALSE : 'false';

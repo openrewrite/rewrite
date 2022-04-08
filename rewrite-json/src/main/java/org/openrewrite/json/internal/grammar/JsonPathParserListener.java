@@ -104,6 +104,16 @@ public interface JsonPathParserListener extends ParseTreeListener {
 	 */
 	void exitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link JsonPathParser#containsExpression}.
+	 * @param ctx the parse tree
+	 */
+	void enterContainsExpression(JsonPathParser.ContainsExpressionContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link JsonPathParser#containsExpression}.
+	 * @param ctx the parse tree
+	 */
+	void exitContainsExpression(JsonPathParser.ContainsExpressionContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link JsonPathParser#regexExpression}.
 	 * @param ctx the parse tree
 	 */
