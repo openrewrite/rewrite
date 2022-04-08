@@ -1,5 +1,9 @@
-import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform.getCurrentOperatingSystem
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
+plugins {
+    id("org.openrewrite.java-library")
+    id("org.openrewrite.maven-publish")
+}
 
 val compiler = javaToolchains.compilerFor {
     languageVersion.set(JavaLanguageVersion.of(8))
@@ -43,7 +47,7 @@ tasks.withType<JavaCompile>().configureEach {
     sourceCompatibility = JavaVersion.VERSION_1_8.toString()
     targetCompatibility = JavaVersion.VERSION_1_8.toString()
     options.isFork = true
-    options.release.set(null as? Int) // remove `--release 8` set in root gradle build
+    options.release.set(null as? Int) // remove `--release 8` set in `org.openrewrite.java-base`
 }
 
 tasks.withType<Test>().configureEach {

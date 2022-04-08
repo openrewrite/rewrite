@@ -1,8 +1,9 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
-    id("com.github.johnrengelman.shadow")
-    id("nebula.maven-shadow-publish")
+    id("org.openrewrite.java-library")
+    id("org.openrewrite.maven-publish")
+    id("org.openrewrite.shadow")
 }
 
 dependencies {
@@ -33,8 +34,6 @@ dependencies {
 }
 
 tasks.withType<ShadowJar> {
-    configurations = listOf(project.configurations.compileClasspath.get())
-    archiveClassifier.set(null as String?)
     dependencies {
         include(dependency("org.eclipse.jgit:"))
     }
@@ -43,9 +42,4 @@ tasks.withType<ShadowJar> {
         from("$rootDir/LICENSE")
         from("$rootDir/NOTICE")
     }
-}
-
-tasks.named("jar") {
-    enabled = false
-    dependsOn(tasks.named("shadowJar"))
 }

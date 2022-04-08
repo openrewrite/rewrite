@@ -1,7 +1,8 @@
 import nl.javadude.gradle.plugins.license.LicenseExtension
 
 plugins {
-    id("nebula.integtest") version "7.0.9" apply false
+    id("org.openrewrite.java-library")
+    id("org.openrewrite.maven-publish")
 }
 
 apply(plugin = "nebula.integtest-standalone")
