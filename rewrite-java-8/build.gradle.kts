@@ -38,7 +38,6 @@ java {
 
 tasks.withType<KotlinCompile>().configureEach {
     kotlinOptions {
-        jdkHome = compiler.get().metadata.installationPath.asFile.absolutePath
         jvmTarget = "1.8"
     }
 }

@@ -5,6 +5,7 @@ import org.gradle.kotlin.dsl.exclude
 import org.gradle.kotlin.dsl.kotlin
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.withType
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     `java-base`
@@ -18,6 +19,8 @@ repositories {
 }
 
 java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(11))
     }
@@ -28,11 +31,20 @@ configurations.all {
     resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
 }
 
+tasks.withType<KotlinCompile>().configureEach {
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}
+
+
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
     options.isFork = true
     options.release.set(8)
+    sourceCompatibility = "1.8"
+    targetCompatibility = "1.8"
 }
 
 tasks.named<Test>("test").configure {
