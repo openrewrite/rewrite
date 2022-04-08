@@ -20,10 +20,12 @@ import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.maven.MavenParser
+import org.openrewrite.maven.tree.GroupArtifactVersion
 import org.openrewrite.maven.tree.MavenRepository
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -53,6 +55,22 @@ class MavenPomDownloaderTest {
             null
         )
         assertThat(normalizedRepository).isEqualTo(null)
+    }
+
+    @Test
+    fun invalidArtifact() {
+        val downloader = MavenPomDownloader(emptyMap(), InMemoryExecutionContext())
+
+        val gav = GroupArtifactVersion("fred", "fred", "1.0.0")
+        val repositories = listOf(
+            MavenRepository("id", "https://httpstat.us/500", true, true, false, null, null),
+            MavenRepository("id2", "https://httpstat.us/400", true, true, false, null, null)
+        )
+
+        assertThatThrownBy {downloader.download(gav, null, null, repositories)}
+            .isInstanceOf(MavenDownloadingException::class.java)
+            .hasMessageContaining("https://httpstat.us/500")
+            .hasMessageContaining("https://httpstat.us/400")
     }
 
     @Test

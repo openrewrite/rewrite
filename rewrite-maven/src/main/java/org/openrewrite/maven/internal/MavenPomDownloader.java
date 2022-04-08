@@ -39,6 +39,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
@@ -303,7 +304,9 @@ public class MavenPomDownloader {
         if (containingPom != null) {
             ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
         }
-        throw new MavenDownloadingException("Unable to download dependency " + gav);
+
+        throw new MavenDownloadingException("Unable to download dependency " + gav + " from the following repositories :\n  - "
+                + normalizedRepos.stream().map(MavenRepository::getUri).collect(Collectors.joining("\n  - ")));
     }
 
     @Nullable
