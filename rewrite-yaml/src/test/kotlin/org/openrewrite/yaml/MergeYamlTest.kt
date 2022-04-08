@@ -19,9 +19,10 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
+import org.openrewrite.test.RewriteTest
 import java.nio.file.Path
 
-class MergeYamlTest : YamlRecipeTest {
+class MergeYamlTest : YamlRecipeTest, RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1469")
     @Test
@@ -74,42 +75,6 @@ class MergeYamlTest : YamlRecipeTest {
     )
 
     @Test
-    fun existingBlock() = assertChanged(
-        recipe = MergeYaml(
-            "$.spec",
-            """
-            lifecycleRule:
-                - condition:
-                    age: 7
-            """.trimIndent(),
-            false,
-            null
-        ),
-        before = """
-            apiVersion: storage.cnrm.cloud.google.com/v1beta1
-            kind: StorageBucket
-            spec:
-                bucketPolicyOnly: true
-                lifecycleRule:
-                    - action:
-                          type: Delete
-                      condition:
-                          age: 1
-        """,
-        after = """
-            apiVersion: storage.cnrm.cloud.google.com/v1beta1
-            kind: StorageBucket
-            spec:
-                bucketPolicyOnly: true
-                lifecycleRule:
-                    - action:
-                          type: Delete
-                      condition:
-                          age: 7
-        """
-    )
-
-    @Test
     fun nonExistentBlock() = assertChanged(
         recipe = MergeYaml(
             "$.spec",
@@ -140,6 +105,62 @@ class MergeYamlTest : YamlRecipeTest {
                       condition:
                           age: 7
         """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1598")
+    @Test
+    fun mergeList() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                MergeYaml(
+                    "$",
+                    """
+                      widget:
+                        list:
+                          - item 2
+                    """,
+                    false, null
+                )
+            )
+        },
+        yaml(
+            """
+              widget:
+                list:
+                  - item 1
+            """,
+            """
+              widget:
+                list:
+                  - item 1
+                  - item 2
+            """
+        )
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1598")
+    @Test
+    fun mergeListAcceptTheirs() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                MergeYaml(
+                    "$",
+                    """
+                      widget:
+                        list:
+                          - item 2
+                    """,
+                    true, null
+                )
+            )
+        },
+        yaml(
+            """
+              widget:
+                list:
+                  - item 1
+            """
+        )
     )
 
     @Test
