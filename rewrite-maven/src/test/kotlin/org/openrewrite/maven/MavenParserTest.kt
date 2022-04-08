@@ -188,6 +188,32 @@ class MavenParserTest {
         assertThat(pomXml.mavenResolutionResult().dependencies[Scope.Compile]?.size).isEqualTo(1)
     }
 
+    @Test
+    fun repositoryWithPropertyPlaceHolders() {
+        val pomXml = parser.parse(
+            ctx,
+            """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                    <properties>
+                        <repo-id>coolId</repo-id>
+                        <repo-url>https://repository.apache.org/content/repositories/snapshots</repo-url>
+                    </properties>
+                    <repositories>
+                        <repository>
+                          <id>${'$'}{repo-id}</id>
+                          <url>${'$'}{repo-url}</url>
+                        </repository>
+                    </repositories>
+                </project>
+            """
+        )[0]
+        assertThat(pomXml.mavenResolutionResult().pom.repositories[0].id).isEqualTo("coolId")
+        assertThat(pomXml.mavenResolutionResult().pom.repositories[0].uri).isEqualTo("https://repository.apache.org/content/repositories/snapshots")
+    }
+
     @Suppress("CheckDtdRefs")
     @Test
     fun parse() {

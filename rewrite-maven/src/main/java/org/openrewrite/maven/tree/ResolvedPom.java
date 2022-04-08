@@ -391,14 +391,25 @@ public class ResolvedPom {
 
                 nextRepository:
                 for (MavenRepository incomingRepository : incomingRepositories) {
-                    if (incomingRepository.getId() != null) {
+                    @SuppressWarnings("ConstantConditions")
+                    MavenRepository incoming = new MavenRepository(
+                            getValue(incomingRepository.getId()),
+                            getValue(incomingRepository.getUri()),
+                            incomingRepository.isReleases(),
+                            incomingRepository.isSnapshots(),
+                            incomingRepository.isKnownToExist(),
+                            incomingRepository.getUsername(),
+                            incomingRepository.getPassword()
+                    );
+
+                    if (incoming.getId() != null) {
                         for (MavenRepository repository : repositories) {
-                            if (incomingRepository.getId().equals(repository.getId())) {
+                            if (incoming.getId().equals(repository.getId())) {
                                 continue nextRepository;
                             }
                         }
                     }
-                    repositories.add(incomingRepository);
+                    repositories.add(incoming);
                 }
             }
         }
