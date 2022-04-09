@@ -498,7 +498,7 @@ public class ResolvedPom {
                     throw new MavenParsingException("No version provided for dependency " + d.getGroupId() + ":" + d.getArtifactId());
                 }
 
-                if (d.getType() != null && !"jar".equals(d.getType())) {
+                if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()))) {
                     continue;
                 }
 
