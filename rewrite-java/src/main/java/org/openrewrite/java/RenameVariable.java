@@ -89,8 +89,16 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         public J.Identifier visitIdentifier(J.Identifier ident, P p) {
             // The size of the stack will be 1 if the identifier is in the right scope.
             if (ident.getSimpleName().equals(variable.getSimpleName()) && isInSameNameScope(scope, getCursor()) && currentNameScope.size() == 1) {
-                if (!(getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.FieldAccess)) {
+                J parent  = getCursor().dropParentUntil(J.class::isInstance).getValue();
+                if (!(parent instanceof J.FieldAccess)) {
                     return ident.withSimpleName(toName);
+                } else if (parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getTarget() instanceof J.Identifier) {
+                    J.FieldAccess fieldAccess =  ((J.FieldAccess) parent);
+                    J.Identifier fieldAccessTarget = (J.Identifier) fieldAccess.getTarget();
+                    if (fieldAccessTarget.getFieldType().equals(variable.getName().getFieldType())
+                            || fieldAccessTarget.getFieldType().getType().equals(variable.getName().getFieldType().getOwner())){
+                        return ident.withSimpleName(toName);
+                    }
                 }
             }
             return super.visitIdentifier(ident, p);

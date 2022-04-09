@@ -536,6 +536,67 @@ interface RenameVariableTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnnecessaryLocalVariable")
+    @Test
+    fun renameFieldAccessVariables(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = renameVariableTest("A", "val", "VALUE"),
+        dependsOn =  arrayOf("""
+            class ClassWithPublicField {
+                public int publicField = 10;
+            }
+        """),
+        before = """
+            public class A {
+                public ClassWithPublicField val = new ClassWithPublicField();
+
+                int getNumberTwice() {
+                    val.publicField = this.val.publicField + 10;
+                    return val.publicField;
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public ClassWithPublicField VALUE = new ClassWithPublicField();
+
+                int getNumberTwice() {
+                    VALUE.publicField = this.VALUE.publicField + 10;
+                    return VALUE.publicField;
+                }
+            }
+        """
+    )
+
+    @Suppress("UnnecessaryLocalVariable")
+    @Test
+    fun renameLocalFieldAccessInStaticMethod(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = renameVariableTest("A", "val", "VALUE"),
+        before = """
+            public class A {
+                private int val;
+
+                static A getInstance() {
+                    A a = new A();
+                    a.val = 12;
+                    return a;
+                }
+            }
+        """,
+        after = """
+            public class A {
+                private int VALUE;
+
+                static A getInstance() {
+                    A a = new A();
+                    a.VALUE = 12;
+                    return a;
+                }
+            }
+        """
+    )
+
     @Suppress("StatementWithEmptyBody", "ConstantConditions", "UnusedAssignment")
     @Test
     fun renameVariable(jp: JavaParser) = assertChanged(
