@@ -200,6 +200,7 @@ class JsonPathMatcherTest {
             "literal: $.root.list[0]")
     )
 
+    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1599")
     @Test
     fun containsInList() = assertMatched(
@@ -211,6 +212,7 @@ class JsonPathMatcherTest {
         """.trimIndent())
     )
 
+    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1599")
     @Test
     fun containsInLhsString() = assertMatched(
