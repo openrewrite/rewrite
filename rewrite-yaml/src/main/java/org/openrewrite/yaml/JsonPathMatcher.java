@@ -23,7 +23,10 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.yaml.internal.grammar.*;
+import org.openrewrite.yaml.internal.grammar.JsonPathLexer;
+import org.openrewrite.yaml.internal.grammar.JsonPathParser;
+import org.openrewrite.yaml.internal.grammar.JsonPathParserBaseVisitor;
+import org.openrewrite.yaml.internal.grammar.JsonPathParserVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
@@ -396,16 +399,22 @@ public class JsonPathMatcher {
 
         @Override
         public Object visitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) {
-            if (ctx.Identifier() != null) {
-                if (scope instanceof Yaml.Mapping) {
+            if (ctx.AT() != null) {
+                if (scope instanceof Yaml.Scalar) {
+                    if (ctx.Identifier() == null && ctx.StringLiteral() == null) {
+                        return scope;
+                    }
+                } else if (scope instanceof Yaml.Mapping) {
                     scope = ((Yaml.Mapping) scope).getEntries();
                     return visitUnaryExpression(ctx);
                 } else if (scope instanceof Yaml.Mapping.Entry) {
                     Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) scope;
                     String key = entry.getKey().getValue();
-                    String identifier = ctx.Identifier().getText();
-                    if (key.equals(identifier)) {
-                        return entry;
+                    if (ctx.Identifier() != null) {
+                        String identifier = ctx.Identifier().getText();
+                        if (key.equals(identifier)) {
+                            return entry;
+                        }
                     }
                     scope = entry.getValue();
                     return getResultFromList(visitUnaryExpression(ctx));
@@ -530,7 +539,7 @@ public class JsonPathMatcher {
 
             if (ctx.LOGICAL_OPERATOR() != null) {
                 String operator;
-                switch( ctx.LOGICAL_OPERATOR().getText()) {
+                switch (ctx.LOGICAL_OPERATOR().getText()) {
                     case ("&&"):
                         operator = "&&";
                         break;
@@ -575,9 +584,9 @@ public class JsonPathMatcher {
                 if (lhs instanceof List) {
                     List<Object> matches = new ArrayList<>();
                     for (Object match : ((List<Object>) lhs)) {
-                        Yaml mappingOrEntry = getOperatorResult(match, operator, rhs);
-                        if (mappingOrEntry != null) {
-                            matches.add(mappingOrEntry);
+                        Yaml result = getOperatorResult(match, operator, rhs);
+                        if (result != null) {
+                            matches.add(result);
                         }
                     }
                     return matches;
@@ -630,6 +639,11 @@ public class JsonPathMatcher {
                 if (entry.getValue() instanceof Yaml.Scalar &&
                         checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
                     return entry;
+                }
+            } else if (lhs instanceof Yaml.Scalar) {
+                Yaml.Scalar scalar = (Yaml.Scalar) lhs;
+                if (checkObjectEquality(scalar.getValue(), operator, rhs)) {
+                    return scalar;
                 }
             }
             return null;

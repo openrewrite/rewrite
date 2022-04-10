@@ -74,6 +74,26 @@ class DeleteKeyTest : YamlRecipeTest {
     )
 
     @Test
+    fun deleteScalarSequenceEntry() = assertChanged(
+        recipe = DeleteKey("$.widget.list[?(@ == 'item 2')]", null),
+        before = """
+            widget:
+              on: yes
+              list:
+                - item 1
+                - item 2
+                - item 3
+        """,
+        after = """
+            widget:
+              on: yes
+              list:
+                - item 1
+                - item 3
+        """
+    )
+
+    @Test
     fun deleteSequenceKeyByWildcard() = assertChanged(
         recipe = DeleteKey("$.subjects[*].kind", null),
         before = """

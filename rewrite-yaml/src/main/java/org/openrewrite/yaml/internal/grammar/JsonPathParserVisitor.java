@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPathParser.g4 by ANTLR 4.9.3
 package org.openrewrite.yaml.internal.grammar;
-// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPathParser.g4 by ANTLR 4.9.2
-
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
 /**
@@ -69,7 +68,7 @@ public interface JsonPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitFilterExpression(JsonPathParser.FilterExpressionContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link JsonPathParser#binaryExpression()}.
+	 * Visit a parse tree produced by {@link JsonPathParser#binaryExpression}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */

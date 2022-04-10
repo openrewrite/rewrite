@@ -65,7 +65,7 @@ regexExpression
     ;
 
 unaryExpression
-    : AT (DOT Identifier | DOT? LBRACK StringLiteral RBRACK)
+    : AT (DOT Identifier | DOT? LBRACK StringLiteral RBRACK)?
     | jsonPath
     ;
 
