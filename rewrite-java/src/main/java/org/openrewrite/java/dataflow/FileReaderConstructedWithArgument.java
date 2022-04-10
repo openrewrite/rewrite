@@ -42,9 +42,9 @@ public class FileReaderConstructedWithArgument<P> extends JavaIsoVisitor<P> {
             // modify the input itself to sanitize it
         }
 
+
         return super.visitLiteral(literal, p);
     }
-
 
     // API -----------------------------------------------
 
