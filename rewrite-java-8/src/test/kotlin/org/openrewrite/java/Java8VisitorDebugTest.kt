@@ -464,6 +464,10 @@ class Java8RenameLocalVariablesToCamelCaseTest : Java8Test, RenameLocalVariables
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8RenamePrivateFieldsToCamelCaseTest : Java8Test, RenamePrivateFieldsToCamelCaseTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RenameMethodsNamedHashcodeEqualOrTostringTest : Java8Test, RenameMethodsNamedHashcodeEqualOrTostringTest
 
 @DebugOnly

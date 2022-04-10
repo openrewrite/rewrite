@@ -480,6 +480,10 @@ class Java11RenameLocalVariablesToCamelCaseTest : Java11Test, RenameLocalVariabl
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RenamePrivateFieldsToCamelCaseTest : Java11Test, RenamePrivateFieldsToCamelCaseTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RenameMethodsNamedHashcodeEqualOrTostringTest : Java11Test, RenameMethodsNamedHashcodeEqualOrTostringTest
 
 @DebugOnly
