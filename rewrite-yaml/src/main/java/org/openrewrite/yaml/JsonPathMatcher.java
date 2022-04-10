@@ -410,9 +410,10 @@ public class JsonPathMatcher {
                 } else if (scope instanceof Yaml.Mapping.Entry) {
                     Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) scope;
                     String key = entry.getKey().getValue();
-                    if (ctx.Identifier() != null) {
-                        String identifier = ctx.Identifier().getText();
-                        if (key.equals(identifier)) {
+                    if (ctx.StringLiteral() != null || ctx.Identifier() != null) {
+                        String name = ctx.StringLiteral() != null ?
+                                unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                        if (key.equals(name)) {
                             return entry;
                         }
                     }

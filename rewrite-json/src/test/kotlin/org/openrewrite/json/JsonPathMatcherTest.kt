@@ -493,6 +493,21 @@ class JsonPathMatcherTest {
         after = arrayOf("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1607")
+    @Test
+    fun unaryExpressionByBracketOperator() = assertMatched(
+        jsonPath = "$.list[?(@.['item1'])]",
+        before = sliceList,
+        after = arrayOf(
+            """
+                {
+                  "item1": "index0",
+                  "property": "property"
+                }
+            """.trimIndent()
+        )
+    )
+
     @Test
     fun unaryExpressionByScope() = assertMatched(
         jsonPath = "$.list[?(@.property)]",

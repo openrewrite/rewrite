@@ -373,13 +373,13 @@ public class JsonPathMatcher {
 
         @Override
         public Object visitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) {
-            if (ctx.Identifier() != null) {
+            if (ctx.Identifier() != null || ctx.StringLiteral() != null) { // temp fix. will update with https://github.com/openrewrite/rewrite/issues/1606.
                 if (scope instanceof Json.Member) {
                     Json.Member member = (Json.Member) scope;
                     String key = member.getKey() instanceof Json.Literal ?
                             ((Json.Literal) member.getKey()).getValue().toString() : ((Json.Identifier) member.getKey()).getName();
-                    String identifier = ctx.Identifier().getText();
-                    if (key.equals(identifier)) {
+                    String name = ctx.StringLiteral() != null ? unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                    if (key.equals(name)) {
                         return member;
                     }
                     scope = member.getValue();
