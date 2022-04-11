@@ -33,8 +33,8 @@ filter
 filterExpression
     : binaryExpression
     | regexExpression
-    | unaryExpression
     | containsExpression
+    | unaryExpression
     ;
 
 binaryExpression

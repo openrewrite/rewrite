@@ -373,14 +373,21 @@ public class JsonPathMatcher {
 
         @Override
         public Object visitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) {
-            if (ctx.Identifier() != null || ctx.StringLiteral() != null) { // temp fix. will update with https://github.com/openrewrite/rewrite/issues/1606.
-                if (scope instanceof Json.Member) {
+            if (ctx.AT() != null) {
+                if (scope instanceof Json.Literal) {
+                    if (ctx.Identifier() == null && ctx.StringLiteral() == null) {
+                        return scope;
+                    }
+                } else if (scope instanceof Json.Member) {
                     Json.Member member = (Json.Member) scope;
-                    String key = member.getKey() instanceof Json.Literal ?
-                            ((Json.Literal) member.getKey()).getValue().toString() : ((Json.Identifier) member.getKey()).getName();
-                    String name = ctx.StringLiteral() != null ? unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
-                    if (key.equals(name)) {
-                        return member;
+                    if (ctx.Identifier() != null || ctx.StringLiteral() != null) {
+                        String key = member.getKey() instanceof Json.Literal ?
+                                ((Json.Literal) member.getKey()).getValue().toString() : ((Json.Identifier) member.getKey()).getName();
+                        String name = ctx.StringLiteral() != null ?
+                                unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                        if (key.equals(name)) {
+                            return member;
+                        }
                     }
                     scope = member.getValue();
                     return getResultFromList(visitUnaryExpression(ctx));
@@ -389,10 +396,14 @@ public class JsonPathMatcher {
                     for (Json json : jsonObject.getMembers()) {
                         if (json instanceof Json.Member) {
                             Json.Member member = (Json.Member) json;
-                            String key = ((Json.Literal) member.getKey()).getValue().toString();
-                            String name = ctx.StringLiteral() != null ? unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
-                            if (key.equals(name)) {
-                                return jsonObject;
+                            if (ctx.Identifier() != null || ctx.StringLiteral() != null) {
+                                String key = member.getKey() instanceof Json.Literal ?
+                                        ((Json.Literal) member.getKey()).getValue().toString() : ((Json.Identifier) member.getKey()).getName();
+                                String name = ctx.StringLiteral() != null ?
+                                        unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                                if (key.equals(name)) {
+                                    return jsonObject;
+                                }
                             }
                         }
                     }
@@ -614,6 +625,11 @@ public class JsonPathMatcher {
                             return jsonObject;
                         }
                     }
+                }
+            } else if (lhs instanceof Json.Literal) {
+                Json.Literal literal = (Json.Literal) lhs;
+                if (checkObjectEquality(literal.getValue(), operator, rhs)) {
+                    return literal;
                 }
             }
             return null;
