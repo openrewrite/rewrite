@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-json/src/main/antlr/JsonPathParser.g4 by ANTLR 4.10
 package org.openrewrite.json.internal.grammar;
-// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-json/src/main/antlr/JsonPathParser.g4 by ANTLR 4.9.2
-
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
 /**
