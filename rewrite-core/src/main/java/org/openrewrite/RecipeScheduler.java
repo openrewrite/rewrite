@@ -174,6 +174,9 @@ public interface RecipeScheduler {
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         Recipe recipe = recipeStack.peek();
         ctx.putCurrentRecipe(recipe);
+        if (ctx instanceof WatchableExecutionContext) {
+            ((WatchableExecutionContext) ctx).resetHasNewMessages();
+        }
 
         if (recipe.getApplicableTest() != null) {
             boolean applicable = false;
