@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPathParser.g4 by ANTLR 4.9.3
 package org.openrewrite.yaml.internal.grammar;
-// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPathParser.g4 by ANTLR 4.9.2
-
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.*;
@@ -572,11 +571,11 @@ public class JsonPathParser extends Parser {
 		public RegexExpressionContext regexExpression() {
 			return getRuleContext(RegexExpressionContext.class,0);
 		}
-		public UnaryExpressionContext unaryExpression() {
-			return getRuleContext(UnaryExpressionContext.class,0);
-		}
 		public ContainsExpressionContext containsExpression() {
 			return getRuleContext(ContainsExpressionContext.class,0);
+		}
+		public UnaryExpressionContext unaryExpression() {
+			return getRuleContext(UnaryExpressionContext.class,0);
 		}
 		public FilterExpressionContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -622,14 +621,14 @@ public class JsonPathParser extends Parser {
 				enterOuterAlt(_localctx, 3);
 				{
 				setState(82);
-				unaryExpression();
+				containsExpression();
 				}
 				break;
 			case 4:
 				enterOuterAlt(_localctx, 4);
 				{
 				setState(83);
-				containsExpression();
+				unaryExpression();
 				}
 				break;
 			}
@@ -1519,7 +1518,7 @@ public class JsonPathParser extends Parser {
 		"\n\f\3\f\5\f\u00a5\n\f\3\r\3\r\3\16\3\16\3\17\3\17\3\20\3\20\3\20\5\20"+
 		"\u00b0\n\20\3\20\3\20\3\20\3\20\3\20\5\20\u00b7\n\20\3\21\3\21\3\22\3"+
 		"\22\3\23\6\23\u00be\n\23\r\23\16\23\u00bf\3\23\2\3\20\24\2\4\6\b\n\f\16"+
-		"\20\22\24\26\30\32\34\36 \"$\2\4\4\2\25\30#%\3\2\24\25\2\u00d0\2\'\3\2"+
+		"\20\22\24\26\30\32\34\36 \"$\2\4\4\2\25\30#%\3\2\24\25\2\u00d1\2\'\3\2"+
 		"\2\2\4\62\3\2\2\2\6\67\3\2\2\2\b9\3\2\2\2\n<\3\2\2\2\fI\3\2\2\2\16V\3"+
 		"\2\2\2\20y\3\2\2\2\22\u0091\3\2\2\2\24\u0093\3\2\2\2\26\u00a4\3\2\2\2"+
 		"\30\u00a6\3\2\2\2\32\u00a8\3\2\2\2\34\u00aa\3\2\2\2\36\u00b6\3\2\2\2 "+
@@ -1532,8 +1531,8 @@ public class JsonPathParser extends Parser {
 		"\23\2@B\5\32\16\2A@\3\2\2\2BC\3\2\2\2CA\3\2\2\2CD\3\2\2\2DF\3\2\2\2E="+
 		"\3\2\2\2E>\3\2\2\2E?\3\2\2\2EA\3\2\2\2FG\3\2\2\2GH\7\t\2\2H\13\3\2\2\2"+
 		"IJ\7\22\2\2JL\7\n\2\2KM\5\16\b\2LK\3\2\2\2MN\3\2\2\2NL\3\2\2\2NO\3\2\2"+
-		"\2OP\3\2\2\2PQ\7\13\2\2Q\r\3\2\2\2RW\5\20\t\2SW\5\24\13\2TW\5\26\f\2U"+
-		"W\5\22\n\2VR\3\2\2\2VS\3\2\2\2VT\3\2\2\2VU\3\2\2\2W\17\3\2\2\2XY\b\t\1"+
+		"\2OP\3\2\2\2PQ\7\13\2\2Q\r\3\2\2\2RW\5\20\t\2SW\5\24\13\2TW\5\22\n\2U"+
+		"W\5\26\f\2VR\3\2\2\2VS\3\2\2\2VT\3\2\2\2VU\3\2\2\2W\17\3\2\2\2XY\b\t\1"+
 		"\2YZ\5\24\13\2Z[\7\35\2\2[\\\5\24\13\2\\z\3\2\2\2]^\5\24\13\2^_\7\35\2"+
 		"\2_`\5\20\t\t`z\3\2\2\2ab\5\24\13\2bc\7\35\2\2cd\5\22\n\2dz\3\2\2\2ef"+
 		"\5\22\n\2fg\7\35\2\2gh\5\22\n\2hz\3\2\2\2ij\5\22\n\2jk\7\35\2\2kl\5\20"+
@@ -1552,18 +1551,18 @@ public class JsonPathParser extends Parser {
 		"\25\3\2\2\2\u0098\u00a1\7\f\2\2\u0099\u009a\7\r\2\2\u009a\u00a2\7\24\2"+
 		"\2\u009b\u009d\7\r\2\2\u009c\u009b\3\2\2\2\u009c\u009d\3\2\2\2\u009d\u009e"+
 		"\3\2\2\2\u009e\u009f\7\b\2\2\u009f\u00a0\7\25\2\2\u00a0\u00a2\7\t\2\2"+
-		"\u00a1\u0099\3\2\2\2\u00a1\u009c\3\2\2\2\u00a2\u00a5\3\2\2\2\u00a3\u00a5"+
-		"\5\2\2\2\u00a4\u0098\3\2\2\2\u00a4\u00a3\3\2\2\2\u00a5\27\3\2\2\2\u00a6"+
-		"\u00a7\t\2\2\2\u00a7\31\3\2\2\2\u00a8\u00a9\t\3\2\2\u00a9\33\3\2\2\2\u00aa"+
-		"\u00ab\7\20\2\2\u00ab\35\3\2\2\2\u00ac\u00ad\5 \21\2\u00ad\u00af\7\21"+
-		"\2\2\u00ae\u00b0\5\"\22\2\u00af\u00ae\3\2\2\2\u00af\u00b0\3\2\2\2\u00b0"+
-		"\u00b7\3\2\2\2\u00b1\u00b2\7\21\2\2\u00b2\u00b7\7\26\2\2\u00b3\u00b4\7"+
-		"\27\2\2\u00b4\u00b7\7\21\2\2\u00b5\u00b7\5\34\17\2\u00b6\u00ac\3\2\2\2"+
-		"\u00b6\u00b1\3\2\2\2\u00b6\u00b3\3\2\2\2\u00b6\u00b5\3\2\2\2\u00b7\37"+
-		"\3\2\2\2\u00b8\u00b9\7\26\2\2\u00b9!\3\2\2\2\u00ba\u00bb\7\26\2\2\u00bb"+
-		"#\3\2\2\2\u00bc\u00be\7\26\2\2\u00bd\u00bc\3\2\2\2\u00be\u00bf\3\2\2\2"+
-		"\u00bf\u00bd\3\2\2\2\u00bf\u00c0\3\2\2\2\u00c0%\3\2\2\2\24\',\62\67CE"+
-		"NVy\u0084\u0086\u0091\u009c\u00a1\u00a4\u00af\u00b6\u00bf";
+		"\u00a1\u0099\3\2\2\2\u00a1\u009c\3\2\2\2\u00a1\u00a2\3\2\2\2\u00a2\u00a5"+
+		"\3\2\2\2\u00a3\u00a5\5\2\2\2\u00a4\u0098\3\2\2\2\u00a4\u00a3\3\2\2\2\u00a5"+
+		"\27\3\2\2\2\u00a6\u00a7\t\2\2\2\u00a7\31\3\2\2\2\u00a8\u00a9\t\3\2\2\u00a9"+
+		"\33\3\2\2\2\u00aa\u00ab\7\20\2\2\u00ab\35\3\2\2\2\u00ac\u00ad\5 \21\2"+
+		"\u00ad\u00af\7\21\2\2\u00ae\u00b0\5\"\22\2\u00af\u00ae\3\2\2\2\u00af\u00b0"+
+		"\3\2\2\2\u00b0\u00b7\3\2\2\2\u00b1\u00b2\7\21\2\2\u00b2\u00b7\7\26\2\2"+
+		"\u00b3\u00b4\7\27\2\2\u00b4\u00b7\7\21\2\2\u00b5\u00b7\5\34\17\2\u00b6"+
+		"\u00ac\3\2\2\2\u00b6\u00b1\3\2\2\2\u00b6\u00b3\3\2\2\2\u00b6\u00b5\3\2"+
+		"\2\2\u00b7\37\3\2\2\2\u00b8\u00b9\7\26\2\2\u00b9!\3\2\2\2\u00ba\u00bb"+
+		"\7\26\2\2\u00bb#\3\2\2\2\u00bc\u00be\7\26\2\2\u00bd\u00bc\3\2\2\2\u00be"+
+		"\u00bf\3\2\2\2\u00bf\u00bd\3\2\2\2\u00bf\u00c0\3\2\2\2\u00c0%\3\2\2\2"+
+		"\24\',\62\67CENVy\u0084\u0086\u0091\u009c\u00a1\u00a4\u00af\u00b6\u00bf";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

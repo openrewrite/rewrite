@@ -46,6 +46,17 @@ class JsonPathMatcherTest {
     """.trimIndent())
 
     @Language("JSON5")
+    private val listOfScalars = arrayOf("""
+        {
+          "list": [
+            "item 1",
+            "item 2",
+            "item 3"
+          ]
+        }
+    """.trimIndent())
+
+    @Language("JSON5")
     private val sliceList = arrayOf("""
         {
           "list": [
@@ -491,6 +502,28 @@ class JsonPathMatcherTest {
         jsonPath = "$..list[?(@.literal == 'no-match' || @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
         before = complex,
         after = arrayOf("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
+    )
+
+    @Test
+    fun unaryExpressionByAt() = assertMatched(
+        jsonPath = "$.list[?(@ == 'item 1')]",
+        before = listOfScalars,
+        after = arrayOf("\"item 1\"")
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1607")
+    @Test
+    fun unaryExpressionByBracketOperator() = assertMatched(
+        jsonPath = "$.list[?(@.['item1'])]",
+        before = sliceList,
+        after = arrayOf(
+            """
+                {
+                  "item1": "index0",
+                  "property": "property"
+                }
+            """.trimIndent()
+        )
     )
 
     @Test

@@ -18,6 +18,7 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
@@ -66,7 +67,12 @@ public abstract class Recipe {
         }
     };
 
-    @Incubating(since = "7.18.0")
+    @Getter
+    private final transient List<TreeVisitor<?, ExecutionContext>> singleSourceApplicableTests = new ArrayList<>();
+
+    @Getter
+    private final transient List<TreeVisitor<?, ExecutionContext>> applicableTests = new ArrayList<>();
+
     public static Recipe noop() {
         return new Recipe() {
             @Override
@@ -191,10 +197,26 @@ public abstract class Recipe {
      *
      * @return A tree visitor that performs an applicability test.
      */
-    @Incubating(since = "7.2.0")
     @Nullable
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
         return null;
+    }
+
+    /**
+     * A recipe can be configured with any number of applicable tests that can be used to determine whether it should run on a
+     * particular source file.
+     * <p>
+     * To identify a {@link SourceFile} as applicable, the visitor should mark or change it at any level. Any mutation
+     * that the applicability test visitor makes on the tree will not included in the results.
+     * <p>
+     * The applicability test only affects whether this recipes {@link #getVisitor()} will run. Downstream
+     * {@link #doNext(Recipe)} will still run.
+     *
+     * @return A tree visitor that performs an applicability test.
+     */
+    public Recipe addApplicableTest(TreeVisitor<?, ExecutionContext> test) {
+        this.applicableTests.add(test);
+        return this;
     }
 
     /**
@@ -209,10 +231,26 @@ public abstract class Recipe {
      *
      * @return A tree visitor that performs an applicability test.
      */
-    @Incubating(since = "7.4.0")
     @Nullable
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return null;
+    }
+
+    /**
+     * A recipe can be configured with any number of applicable tests that can be used to determine whether it should run on a
+     * particular source file.
+     * <p>
+     * To identify a {@link SourceFile} as applicable, the visitor should mark or change it at any level. Any mutation
+     * that the applicability test visitor makes on the tree will not included in the results.
+     * <p>
+     * The applicability test only affects whether this recipes {@link #getVisitor()} will run. Downstream
+     * {@link #doNext(Recipe)} will still run.
+     *
+     * @return A tree visitor that performs an applicability test.
+     */
+    public Recipe addSingleSourceApplicableTest(TreeVisitor<?, ExecutionContext> test) {
+        this.singleSourceApplicableTests.add(test);
+        return this;
     }
 
     /**

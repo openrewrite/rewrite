@@ -173,12 +173,21 @@ public interface RecipeScheduler {
         long startTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         Recipe recipe = recipeStack.peek();
+        ctx.putCurrentRecipe(recipe);
+
         if (recipe.getApplicableTest() != null) {
             boolean applicable = false;
             for (S s : before) {
                 if (recipe.getApplicableTest().visit(s, ctx) != s) {
                     applicable = true;
                     break;
+                }
+
+                for (TreeVisitor<?, ExecutionContext> applicableTest : recipe.getApplicableTests()) {
+                    if (applicableTest.visit(s, ctx) != s) {
+                        applicable = true;
+                        break;
+                    }
                 }
             }
 
@@ -195,6 +204,13 @@ public interface RecipeScheduler {
 
                     if (recipe.getSingleSourceApplicableTest() != null) {
                         if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
+                            sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
+                            return s;
+                        }
+                    }
+
+                    for (TreeVisitor<?, ExecutionContext> singleSourceApplicableTest : recipe.getSingleSourceApplicableTests()) {
+                        if (singleSourceApplicableTest.visit(s, ctx) == s) {
                             sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
                             return s;
                         }

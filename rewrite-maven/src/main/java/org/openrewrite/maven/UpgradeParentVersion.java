@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
@@ -85,12 +86,12 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     @Override
-    protected MavenVisitor getSingleSourceApplicableTest() {
+    protected MavenVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         return changeParentPom.getSingleSourceApplicableTest();
     }
 
     @Override
-    protected MavenVisitor getVisitor() {
+    protected MavenVisitor<ExecutionContext> getVisitor() {
         return changeParentPom.getVisitor();
     }
 }

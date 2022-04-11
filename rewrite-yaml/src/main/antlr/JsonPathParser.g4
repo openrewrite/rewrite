@@ -33,8 +33,8 @@ filter
 filterExpression
     : binaryExpression
     | regexExpression
-    | unaryExpression
     | containsExpression
+    | unaryExpression
     ;
 
 binaryExpression
@@ -65,7 +65,7 @@ regexExpression
     ;
 
 unaryExpression
-    : AT (DOT Identifier | DOT? LBRACK StringLiteral RBRACK)
+    : AT (DOT Identifier | DOT? LBRACK StringLiteral RBRACK)?
     | jsonPath
     ;
 
