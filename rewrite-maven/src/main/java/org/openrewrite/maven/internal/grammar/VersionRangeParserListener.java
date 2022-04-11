@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.10
 package org.openrewrite.maven.internal.grammar;
-// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.2
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
 /**
@@ -23,15 +23,15 @@ import org.antlr.v4.runtime.tree.ParseTreeListener;
  */
 public interface VersionRangeParserListener extends ParseTreeListener {
 	/**
-	 * Enter a parse tree produced by {@link VersionRangeParser#requestedVersion}.
+	 * Enter a parse tree produced by {@link VersionRangeParser#versionRequirement}.
 	 * @param ctx the parse tree
 	 */
-	void enterRequestedVersion(VersionRangeParser.RequestedVersionContext ctx);
+	void enterVersionRequirement(VersionRangeParser.VersionRequirementContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link VersionRangeParser#requestedVersion}.
+	 * Exit a parse tree produced by {@link VersionRangeParser#versionRequirement}.
 	 * @param ctx the parse tree
 	 */
-	void exitRequestedVersion(VersionRangeParser.RequestedVersionContext ctx);
+	void exitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link VersionRangeParser#range}.
 	 * @param ctx the parse tree

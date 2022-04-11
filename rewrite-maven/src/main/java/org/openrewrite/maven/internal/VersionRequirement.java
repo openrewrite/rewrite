@@ -93,7 +93,7 @@ public class VersionRequirement {
 
                 return new VersionRangeParserBaseVisitor<VersionSpec>() {
                     @Override
-                    public VersionSpec visitRequestedVersion(VersionRangeParser.RequestedVersionContext ctx) {
+                    public VersionSpec visitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx) {
                         return new RangeSet(ctx.range().stream()
                                 .map(range -> {
                                     Version lower, upper;
@@ -120,7 +120,7 @@ public class VersionRequirement {
                     private Version toVersion(TerminalNode version) {
                         return new Version(version.getText());
                     }
-                }.visit(parser.requestedVersion());
+                }.visit(parser.versionRequirement());
             }
             return direct ?
                     new DirectRequirement(requested) :

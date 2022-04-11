@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,50 +13,47 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-json/src/main/antlr/JSON5.g4 by ANTLR 4.10
 package org.openrewrite.json.internal.grammar;
-// Generated from /Users/pat/dev/openrewrite/rewrite/rewrite-json/src/main/antlr/JSON5.g4 by ANTLR 4.9.2
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.misc.*;
 import org.antlr.v4.runtime.tree.*;
 import java.util.List;
-import java.util.Iterator;
-import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class JSON5Parser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.9.2", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.10", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
-			new PredictionContextCache();
+		new PredictionContextCache();
 	public static final int
-			T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7,
-			MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12,
-			SYMBOL=13, IDENTIFIER=14, WS=15, UTF_8_BOM=16;
+		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7, 
+		MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12, 
+		SYMBOL=13, IDENTIFIER=14, WS=15, UTF_8_BOM=16;
 	public static final int
-			RULE_json5 = 0, RULE_obj = 1, RULE_member = 2, RULE_key = 3, RULE_value = 4,
-			RULE_arr = 5, RULE_number = 6;
+		RULE_json5 = 0, RULE_obj = 1, RULE_member = 2, RULE_key = 3, RULE_value = 4, 
+		RULE_arr = 5, RULE_number = 6;
 	private static String[] makeRuleNames() {
 		return new String[] {
-				"json5", "obj", "member", "key", "value", "arr", "number"
+			"json5", "obj", "member", "key", "value", "arr", "number"
 		};
 	}
 	public static final String[] ruleNames = makeRuleNames();
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-				null, "'{'", "','", "'}'", "':'", "'['", "']'", null, null, null, null,
-				null, null, null, null, null, "'\uFEFF'"
+			null, "'{'", "','", "'}'", "':'", "'['", "']'", null, null, null, null, 
+			null, null, null, null, null, "'\\uFEFF'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-				null, null, null, null, null, null, null, "SINGLE_LINE_COMMENT", "MULTI_LINE_COMMENT",
-				"LITERAL", "STRING", "NUMBER", "NUMERIC_LITERAL", "SYMBOL", "IDENTIFIER",
-				"WS", "UTF_8_BOM"
+			null, null, null, null, null, null, null, "SINGLE_LINE_COMMENT", "MULTI_LINE_COMMENT", 
+			"LITERAL", "STRING", "NUMBER", "NUMERIC_LITERAL", "SYMBOL", "IDENTIFIER", 
+			"WS", "UTF_8_BOM"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
@@ -141,18 +138,18 @@ public class JSON5Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(15);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << T__0) | (1L << T__4) | (1L << LITERAL) | (1L << STRING) | (1L << NUMBER) | (1L << NUMERIC_LITERAL) | (1L << SYMBOL))) != 0)) {
-					{
-						setState(14);
-						value();
-					}
+			setState(15);
+			_errHandler.sync(this);
+			_la = _input.LA(1);
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << T__0) | (1L << T__4) | (1L << LITERAL) | (1L << STRING) | (1L << NUMBER) | (1L << NUMERIC_LITERAL) | (1L << SYMBOL))) != 0)) {
+				{
+				setState(14);
+				value();
 				}
+			}
 
-				setState(17);
-				match(EOF);
+			setState(17);
+			match(EOF);
 			}
 		}
 		catch (RecognitionException re) {
@@ -201,52 +198,52 @@ public class JSON5Parser extends Parser {
 			setState(35);
 			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,3,_ctx) ) {
-				case 1:
-					enterOuterAlt(_localctx, 1);
+			case 1:
+				enterOuterAlt(_localctx, 1);
 				{
-					setState(19);
-					match(T__0);
-					setState(20);
-					member();
-					setState(25);
+				setState(19);
+				match(T__0);
+				setState(20);
+				member();
+				setState(25);
+				_errHandler.sync(this);
+				_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
+					if ( _alt==1 ) {
+						{
+						{
+						setState(21);
+						match(T__1);
+						setState(22);
+						member();
+						}
+						} 
+					}
+					setState(27);
 					_errHandler.sync(this);
 					_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
-					while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-						if ( _alt==1 ) {
-							{
-								{
-									setState(21);
-									match(T__1);
-									setState(22);
-									member();
-								}
-							}
-						}
-						setState(27);
-						_errHandler.sync(this);
-						_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
+				}
+				setState(29);
+				_errHandler.sync(this);
+				_la = _input.LA(1);
+				if (_la==T__1) {
+					{
+					setState(28);
+					match(T__1);
 					}
-					setState(29);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-					if (_la==T__1) {
-						{
-							setState(28);
-							match(T__1);
-						}
-					}
+				}
 
-					setState(31);
-					match(T__2);
+				setState(31);
+				match(T__2);
 				}
 				break;
-				case 2:
-					enterOuterAlt(_localctx, 2);
+			case 2:
+				enterOuterAlt(_localctx, 2);
 				{
-					setState(33);
-					match(T__0);
-					setState(34);
-					match(T__2);
+				setState(33);
+				match(T__0);
+				setState(34);
+				match(T__2);
 				}
 				break;
 			}
@@ -294,12 +291,12 @@ public class JSON5Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(37);
-				key();
-				setState(38);
-				match(T__3);
-				setState(39);
-				value();
+			setState(37);
+			key();
+			setState(38);
+			match(T__3);
+			setState(39);
+			value();
 			}
 		}
 		catch (RecognitionException re) {
@@ -342,16 +339,16 @@ public class JSON5Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(41);
-				_la = _input.LA(1);
-				if ( !(_la==STRING || _la==IDENTIFIER) ) {
-					_errHandler.recoverInline(this);
-				}
-				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
-					_errHandler.reportMatch(this);
-					consume();
-				}
+			setState(41);
+			_la = _input.LA(1);
+			if ( !(_la==STRING || _la==IDENTIFIER) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -403,45 +400,45 @@ public class JSON5Parser extends Parser {
 			setState(48);
 			_errHandler.sync(this);
 			switch (_input.LA(1)) {
-				case STRING:
-					enterOuterAlt(_localctx, 1);
+			case STRING:
+				enterOuterAlt(_localctx, 1);
 				{
-					setState(43);
-					match(STRING);
+				setState(43);
+				match(STRING);
 				}
 				break;
-				case NUMBER:
-				case NUMERIC_LITERAL:
-				case SYMBOL:
-					enterOuterAlt(_localctx, 2);
+			case NUMBER:
+			case NUMERIC_LITERAL:
+			case SYMBOL:
+				enterOuterAlt(_localctx, 2);
 				{
-					setState(44);
-					number();
+				setState(44);
+				number();
 				}
 				break;
-				case T__0:
-					enterOuterAlt(_localctx, 3);
+			case T__0:
+				enterOuterAlt(_localctx, 3);
 				{
-					setState(45);
-					obj();
+				setState(45);
+				obj();
 				}
 				break;
-				case T__4:
-					enterOuterAlt(_localctx, 4);
+			case T__4:
+				enterOuterAlt(_localctx, 4);
 				{
-					setState(46);
-					arr();
+				setState(46);
+				arr();
 				}
 				break;
-				case LITERAL:
-					enterOuterAlt(_localctx, 5);
+			case LITERAL:
+				enterOuterAlt(_localctx, 5);
 				{
-					setState(47);
-					match(LITERAL);
+				setState(47);
+				match(LITERAL);
 				}
 				break;
-				default:
-					throw new NoViableAltException(this);
+			default:
+				throw new NoViableAltException(this);
 			}
 		}
 		catch (RecognitionException re) {
@@ -490,52 +487,52 @@ public class JSON5Parser extends Parser {
 			setState(66);
 			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,7,_ctx) ) {
-				case 1:
-					enterOuterAlt(_localctx, 1);
+			case 1:
+				enterOuterAlt(_localctx, 1);
 				{
-					setState(50);
-					match(T__4);
-					setState(51);
-					value();
-					setState(56);
+				setState(50);
+				match(T__4);
+				setState(51);
+				value();
+				setState(56);
+				_errHandler.sync(this);
+				_alt = getInterpreter().adaptivePredict(_input,5,_ctx);
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
+					if ( _alt==1 ) {
+						{
+						{
+						setState(52);
+						match(T__1);
+						setState(53);
+						value();
+						}
+						} 
+					}
+					setState(58);
 					_errHandler.sync(this);
 					_alt = getInterpreter().adaptivePredict(_input,5,_ctx);
-					while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-						if ( _alt==1 ) {
-							{
-								{
-									setState(52);
-									match(T__1);
-									setState(53);
-									value();
-								}
-							}
-						}
-						setState(58);
-						_errHandler.sync(this);
-						_alt = getInterpreter().adaptivePredict(_input,5,_ctx);
+				}
+				setState(60);
+				_errHandler.sync(this);
+				_la = _input.LA(1);
+				if (_la==T__1) {
+					{
+					setState(59);
+					match(T__1);
 					}
-					setState(60);
-					_errHandler.sync(this);
-					_la = _input.LA(1);
-					if (_la==T__1) {
-						{
-							setState(59);
-							match(T__1);
-						}
-					}
+				}
 
-					setState(62);
-					match(T__5);
+				setState(62);
+				match(T__5);
 				}
 				break;
-				case 2:
-					enterOuterAlt(_localctx, 2);
+			case 2:
+				enterOuterAlt(_localctx, 2);
 				{
-					setState(64);
-					match(T__4);
-					setState(65);
-					match(T__5);
+				setState(64);
+				match(T__4);
+				setState(65);
+				match(T__5);
 				}
 				break;
 			}
@@ -581,26 +578,26 @@ public class JSON5Parser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-				setState(69);
-				_errHandler.sync(this);
-				_la = _input.LA(1);
-				if (_la==SYMBOL) {
-					{
-						setState(68);
-						match(SYMBOL);
-					}
+			setState(69);
+			_errHandler.sync(this);
+			_la = _input.LA(1);
+			if (_la==SYMBOL) {
+				{
+				setState(68);
+				match(SYMBOL);
 				}
+			}
 
-				setState(71);
-				_la = _input.LA(1);
-				if ( !(_la==NUMBER || _la==NUMERIC_LITERAL) ) {
-					_errHandler.recoverInline(this);
-				}
-				else {
-					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
-					_errHandler.reportMatch(this);
-					consume();
-				}
+			setState(71);
+			_la = _input.LA(1);
+			if ( !(_la==NUMBER || _la==NUMERIC_LITERAL) ) {
+			_errHandler.recoverInline(this);
+			}
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -615,28 +612,54 @@ public class JSON5Parser extends Parser {
 	}
 
 	public static final String _serializedATN =
-			"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\22L\4\2\t\2\4\3\t"+
-					"\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\3\2\5\2\22\n\2\3\2\3\2\3\3"+
-					"\3\3\3\3\3\3\7\3\32\n\3\f\3\16\3\35\13\3\3\3\5\3 \n\3\3\3\3\3\3\3\3\3"+
-					"\5\3&\n\3\3\4\3\4\3\4\3\4\3\5\3\5\3\6\3\6\3\6\3\6\3\6\5\6\63\n\6\3\7\3"+
-					"\7\3\7\3\7\7\79\n\7\f\7\16\7<\13\7\3\7\5\7?\n\7\3\7\3\7\3\7\3\7\5\7E\n"+
-					"\7\3\b\5\bH\n\b\3\b\3\b\3\b\2\2\t\2\4\6\b\n\f\16\2\4\4\2\f\f\20\20\3\2"+
-					"\r\16\2P\2\21\3\2\2\2\4%\3\2\2\2\6\'\3\2\2\2\b+\3\2\2\2\n\62\3\2\2\2\f"+
-					"D\3\2\2\2\16G\3\2\2\2\20\22\5\n\6\2\21\20\3\2\2\2\21\22\3\2\2\2\22\23"+
-					"\3\2\2\2\23\24\7\2\2\3\24\3\3\2\2\2\25\26\7\3\2\2\26\33\5\6\4\2\27\30"+
-					"\7\4\2\2\30\32\5\6\4\2\31\27\3\2\2\2\32\35\3\2\2\2\33\31\3\2\2\2\33\34"+
-					"\3\2\2\2\34\37\3\2\2\2\35\33\3\2\2\2\36 \7\4\2\2\37\36\3\2\2\2\37 \3\2"+
-					"\2\2 !\3\2\2\2!\"\7\5\2\2\"&\3\2\2\2#$\7\3\2\2$&\7\5\2\2%\25\3\2\2\2%"+
-					"#\3\2\2\2&\5\3\2\2\2\'(\5\b\5\2()\7\6\2\2)*\5\n\6\2*\7\3\2\2\2+,\t\2\2"+
-					"\2,\t\3\2\2\2-\63\7\f\2\2.\63\5\16\b\2/\63\5\4\3\2\60\63\5\f\7\2\61\63"+
-					"\7\13\2\2\62-\3\2\2\2\62.\3\2\2\2\62/\3\2\2\2\62\60\3\2\2\2\62\61\3\2"+
-					"\2\2\63\13\3\2\2\2\64\65\7\7\2\2\65:\5\n\6\2\66\67\7\4\2\2\679\5\n\6\2"+
-					"8\66\3\2\2\29<\3\2\2\2:8\3\2\2\2:;\3\2\2\2;>\3\2\2\2<:\3\2\2\2=?\7\4\2"+
-					"\2>=\3\2\2\2>?\3\2\2\2?@\3\2\2\2@A\7\b\2\2AE\3\2\2\2BC\7\7\2\2CE\7\b\2"+
-					"\2D\64\3\2\2\2DB\3\2\2\2E\r\3\2\2\2FH\7\17\2\2GF\3\2\2\2GH\3\2\2\2HI\3"+
-					"\2\2\2IJ\t\3\2\2J\17\3\2\2\2\13\21\33\37%\62:>DG";
+		"\u0004\u0001\u0010J\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
+		"\u0002\u0007\u0002\u0002\u0003\u0007\u0003\u0002\u0004\u0007\u0004\u0002"+
+		"\u0005\u0007\u0005\u0002\u0006\u0007\u0006\u0001\u0000\u0003\u0000\u0010"+
+		"\b\u0000\u0001\u0000\u0001\u0000\u0001\u0001\u0001\u0001\u0001\u0001\u0001"+
+		"\u0001\u0005\u0001\u0018\b\u0001\n\u0001\f\u0001\u001b\t\u0001\u0001\u0001"+
+		"\u0003\u0001\u001e\b\u0001\u0001\u0001\u0001\u0001\u0001\u0001\u0001\u0001"+
+		"\u0003\u0001$\b\u0001\u0001\u0002\u0001\u0002\u0001\u0002\u0001\u0002"+
+		"\u0001\u0003\u0001\u0003\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004"+
+		"\u0001\u0004\u0003\u00041\b\u0004\u0001\u0005\u0001\u0005\u0001\u0005"+
+		"\u0001\u0005\u0005\u00057\b\u0005\n\u0005\f\u0005:\t\u0005\u0001\u0005"+
+		"\u0003\u0005=\b\u0005\u0001\u0005\u0001\u0005\u0001\u0005\u0001\u0005"+
+		"\u0003\u0005C\b\u0005\u0001\u0006\u0003\u0006F\b\u0006\u0001\u0006\u0001"+
+		"\u0006\u0001\u0006\u0000\u0000\u0007\u0000\u0002\u0004\u0006\b\n\f\u0000"+
+		"\u0002\u0002\u0000\n\n\u000e\u000e\u0001\u0000\u000b\fN\u0000\u000f\u0001"+
+		"\u0000\u0000\u0000\u0002#\u0001\u0000\u0000\u0000\u0004%\u0001\u0000\u0000"+
+		"\u0000\u0006)\u0001\u0000\u0000\u0000\b0\u0001\u0000\u0000\u0000\nB\u0001"+
+		"\u0000\u0000\u0000\fE\u0001\u0000\u0000\u0000\u000e\u0010\u0003\b\u0004"+
+		"\u0000\u000f\u000e\u0001\u0000\u0000\u0000\u000f\u0010\u0001\u0000\u0000"+
+		"\u0000\u0010\u0011\u0001\u0000\u0000\u0000\u0011\u0012\u0005\u0000\u0000"+
+		"\u0001\u0012\u0001\u0001\u0000\u0000\u0000\u0013\u0014\u0005\u0001\u0000"+
+		"\u0000\u0014\u0019\u0003\u0004\u0002\u0000\u0015\u0016\u0005\u0002\u0000"+
+		"\u0000\u0016\u0018\u0003\u0004\u0002\u0000\u0017\u0015\u0001\u0000\u0000"+
+		"\u0000\u0018\u001b\u0001\u0000\u0000\u0000\u0019\u0017\u0001\u0000\u0000"+
+		"\u0000\u0019\u001a\u0001\u0000\u0000\u0000\u001a\u001d\u0001\u0000\u0000"+
+		"\u0000\u001b\u0019\u0001\u0000\u0000\u0000\u001c\u001e\u0005\u0002\u0000"+
+		"\u0000\u001d\u001c\u0001\u0000\u0000\u0000\u001d\u001e\u0001\u0000\u0000"+
+		"\u0000\u001e\u001f\u0001\u0000\u0000\u0000\u001f \u0005\u0003\u0000\u0000"+
+		" $\u0001\u0000\u0000\u0000!\"\u0005\u0001\u0000\u0000\"$\u0005\u0003\u0000"+
+		"\u0000#\u0013\u0001\u0000\u0000\u0000#!\u0001\u0000\u0000\u0000$\u0003"+
+		"\u0001\u0000\u0000\u0000%&\u0003\u0006\u0003\u0000&\'\u0005\u0004\u0000"+
+		"\u0000\'(\u0003\b\u0004\u0000(\u0005\u0001\u0000\u0000\u0000)*\u0007\u0000"+
+		"\u0000\u0000*\u0007\u0001\u0000\u0000\u0000+1\u0005\n\u0000\u0000,1\u0003"+
+		"\f\u0006\u0000-1\u0003\u0002\u0001\u0000.1\u0003\n\u0005\u0000/1\u0005"+
+		"\t\u0000\u00000+\u0001\u0000\u0000\u00000,\u0001\u0000\u0000\u00000-\u0001"+
+		"\u0000\u0000\u00000.\u0001\u0000\u0000\u00000/\u0001\u0000\u0000\u0000"+
+		"1\t\u0001\u0000\u0000\u000023\u0005\u0005\u0000\u000038\u0003\b\u0004"+
+		"\u000045\u0005\u0002\u0000\u000057\u0003\b\u0004\u000064\u0001\u0000\u0000"+
+		"\u00007:\u0001\u0000\u0000\u000086\u0001\u0000\u0000\u000089\u0001\u0000"+
+		"\u0000\u00009<\u0001\u0000\u0000\u0000:8\u0001\u0000\u0000\u0000;=\u0005"+
+		"\u0002\u0000\u0000<;\u0001\u0000\u0000\u0000<=\u0001\u0000\u0000\u0000"+
+		"=>\u0001\u0000\u0000\u0000>?\u0005\u0006\u0000\u0000?C\u0001\u0000\u0000"+
+		"\u0000@A\u0005\u0005\u0000\u0000AC\u0005\u0006\u0000\u0000B2\u0001\u0000"+
+		"\u0000\u0000B@\u0001\u0000\u0000\u0000C\u000b\u0001\u0000\u0000\u0000"+
+		"DF\u0005\r\u0000\u0000ED\u0001\u0000\u0000\u0000EF\u0001\u0000\u0000\u0000"+
+		"FG\u0001\u0000\u0000\u0000GH\u0007\u0001\u0000\u0000H\r\u0001\u0000\u0000"+
+		"\u0000\t\u000f\u0019\u001d#08<BE";
 	public static final ATN _ATN =
-			new ATNDeserializer().deserialize(_serializedATN.toCharArray());
+		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {
 		_decisionToDFA = new DFA[_ATN.getNumberOfDecisions()];
 		for (int i = 0; i < _ATN.getNumberOfDecisions(); i++) {

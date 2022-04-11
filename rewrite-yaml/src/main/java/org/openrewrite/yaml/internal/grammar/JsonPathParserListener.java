@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPathParser.g4 by ANTLR 4.9.3
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPathParser.g4 by ANTLR 4.10
 package org.openrewrite.yaml.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -93,12 +93,12 @@ public interface JsonPathParserListener extends ParseTreeListener {
 	 */
 	void exitFilterExpression(JsonPathParser.FilterExpressionContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link JsonPathParser#binaryExpression}.
+	 * Enter a parse tree produced by {@link JsonPathParser#binaryExpression()}.
 	 * @param ctx the parse tree
 	 */
 	void enterBinaryExpression(JsonPathParser.BinaryExpressionContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link JsonPathParser#binaryExpression}.
+	 * Exit a parse tree produced by {@link JsonPathParser#binaryExpression()}.
 	 * @param ctx the parse tree
 	 */
 	void exitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx);
