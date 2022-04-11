@@ -409,8 +409,8 @@ public class JsonPathMatcher {
                     return visitUnaryExpression(ctx);
                 } else if (scope instanceof Yaml.Mapping.Entry) {
                     Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) scope;
-                    String key = entry.getKey().getValue();
-                    if (ctx.StringLiteral() != null || ctx.Identifier() != null) {
+                    if (ctx.Identifier() != null || ctx.StringLiteral() != null) {
+                        String key = entry.getKey().getValue();
                         String name = ctx.StringLiteral() != null ?
                                 unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
                         if (key.equals(name)) {
