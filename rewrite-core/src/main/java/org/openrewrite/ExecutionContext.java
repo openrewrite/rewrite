@@ -29,6 +29,8 @@ import java.util.function.Supplier;
  * back to the process controlling parsing or recipe execution.
  */
 public interface ExecutionContext {
+    String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
+
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
         putMessageInCollection("org.openrewrite.internal.treeObservers", observer,
@@ -78,6 +80,15 @@ public interface ExecutionContext {
     default <T> T pollMessage(String key, T defaultValue) {
         T t = pollMessage(key);
         return t == null ? defaultValue : t;
+    }
+
+    default void putCurrentRecipe(Recipe recipe) {
+        putMessage(CURRENT_RECIPE, recipe);
+    }
+
+    default Recipe getCurrentRecipe() {
+        //noinspection ConstantConditions
+        return getMessage(CURRENT_RECIPE);
     }
 
     Consumer<Throwable> getOnError();

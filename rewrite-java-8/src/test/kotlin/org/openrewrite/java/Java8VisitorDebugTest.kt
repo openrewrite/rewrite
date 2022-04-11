@@ -588,6 +588,10 @@ class Java8UseDiamondOperatorTest : Java8Test, UseDiamondOperatorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UsesRewriteSkipTest : Java8Test, UsesRewriteSkipTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UseStaticImportTest : Java8Test, UseStaticImportTest
 
 @DebugOnly

@@ -600,6 +600,10 @@ class Java11UseLambdaForFunctionalInterface : Java11Test, UseLambdaForFunctional
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UsesRewriteSkipTest : Java11Test, UsesRewriteSkipTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UseStaticImportTest : Java11Test, UseStaticImportTest
 
 @DebugOnly

@@ -477,6 +477,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UsesMethodTck : UsesMethodTest
 
     @Nested
+    inner class UsesRewriteSkipTck : UsesRewriteSkipTest
+
+    @Nested
     inner class UseStaticImportTck : UseStaticImportTest
 
     @Nested
