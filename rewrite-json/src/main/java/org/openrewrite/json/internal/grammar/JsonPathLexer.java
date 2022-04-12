@@ -13,18 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-json/src/main/antlr/JsonPathLexer.g4 by ANTLR 4.9.3
 package org.openrewrite.json.internal.grammar;
-// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-json/src/main/antlr/JsonPathLexer.g4 by ANTLR 4.9.2
-
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
+import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class JsonPathLexer extends Lexer {
-	static { RuntimeMetaData.checkVersion("4.9.2", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.9.3", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =

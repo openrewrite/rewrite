@@ -22,7 +22,7 @@ dependencies {
     api("io.micrometer:micrometer-core:latest.release")
     api("org.jetbrains:annotations:latest.release")
 
-    implementation("org.antlr:antlr4:latest.release")
+    implementation("org.antlr:antlr4:4.9.+")
     compileOnly("com.puppycrawl.tools:checkstyle:9.+") {
         isTransitive = false
     }

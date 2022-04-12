@@ -92,11 +92,11 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 J parent  = getCursor().dropParentUntil(J.class::isInstance).getValue();
                 if (!(parent instanceof J.FieldAccess)) {
                     return ident.withSimpleName(toName);
-                } else if (parent instanceof J.FieldAccess && ((J.FieldAccess) parent).getTarget() instanceof J.Identifier) {
+                } else if (((J.FieldAccess) parent).getTarget() instanceof J.Identifier) {
                     J.FieldAccess fieldAccess =  ((J.FieldAccess) parent);
                     J.Identifier fieldAccessTarget = (J.Identifier) fieldAccess.getTarget();
-                    if (fieldAccessTarget.getFieldType().equals(variable.getName().getFieldType())
-                            || fieldAccessTarget.getFieldType().getType().equals(variable.getName().getFieldType().getOwner())){
+                    if (fieldAccessTarget.getFieldType() != null && (fieldAccessTarget.getFieldType().equals(variable.getName().getFieldType())
+                            || fieldAccessTarget.getFieldType().getType() != null && fieldAccessTarget.getFieldType().getType().equals(variable.getName().getFieldType().getOwner()))) {
                         return ident.withSimpleName(toName);
                     }
                 }

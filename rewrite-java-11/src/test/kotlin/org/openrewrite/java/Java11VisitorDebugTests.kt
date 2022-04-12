@@ -84,6 +84,10 @@ class Java11CatchClauseOnlyRethrowsTest : Java11Test, CatchClauseOnlyRethrowsTes
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11CompareEnumWithEqualityOperatorTest : Java11Test, CompareEnumWithEqualityOperatorTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ControlFlowIndentationTest : Java11Test, ControlFlowIndentationTest
 
 @DebugOnly
