@@ -123,7 +123,7 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
                     return identifier;
                 }
             }
-            if(identifier.getType() == null) {
+            if (identifier.getType() == null) {
                 ((Set<String>) getCursor().getNearestMessage("HAS_NAME_KEY")).add(identifier.getSimpleName());
             }
             return identifier;
