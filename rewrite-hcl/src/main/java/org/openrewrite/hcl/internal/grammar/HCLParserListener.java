@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/tyler.vangorder/work/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.9.2
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.9.3
 package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -84,169 +84,169 @@ public interface HCLParserListener extends ParseTreeListener {
 	void exitBlockLabel(HCLParser.BlockLabelContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code OperationExpression}
-	 * labeled alternative in {@link HCLParser#expression()}.
+	 * labeled alternative in {@link HCLParser#expression}.
 	 * @param ctx the parse tree
 	 */
 	void enterOperationExpression(HCLParser.OperationExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code OperationExpression}
-	 * labeled alternative in {@link HCLParser#expression()}.
+	 * labeled alternative in {@link HCLParser#expression}.
 	 * @param ctx the parse tree
 	 */
 	void exitOperationExpression(HCLParser.OperationExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code ConditionalExpression}
-	 * labeled alternative in {@link HCLParser#expression()}.
+	 * labeled alternative in {@link HCLParser#expression}.
 	 * @param ctx the parse tree
 	 */
 	void enterConditionalExpression(HCLParser.ConditionalExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code ConditionalExpression}
-	 * labeled alternative in {@link HCLParser#expression()}.
+	 * labeled alternative in {@link HCLParser#expression}.
 	 * @param ctx the parse tree
 	 */
 	void exitConditionalExpression(HCLParser.ConditionalExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code ExpressionTerm}
-	 * labeled alternative in {@link HCLParser#expression()}.
+	 * labeled alternative in {@link HCLParser#expression}.
 	 * @param ctx the parse tree
 	 */
 	void enterExpressionTerm(HCLParser.ExpressionTermContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code ExpressionTerm}
-	 * labeled alternative in {@link HCLParser#expression()}.
+	 * labeled alternative in {@link HCLParser#expression}.
 	 * @param ctx the parse tree
 	 */
 	void exitExpressionTerm(HCLParser.ExpressionTermContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code ParentheticalExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterParentheticalExpression(HCLParser.ParentheticalExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code ParentheticalExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitParentheticalExpression(HCLParser.ParentheticalExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code AttributeAccessExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterAttributeAccessExpression(HCLParser.AttributeAccessExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code AttributeAccessExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitAttributeAccessExpression(HCLParser.AttributeAccessExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code LiteralExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterLiteralExpression(HCLParser.LiteralExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code LiteralExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitLiteralExpression(HCLParser.LiteralExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code TemplateExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterTemplateExpression(HCLParser.TemplateExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code TemplateExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitTemplateExpression(HCLParser.TemplateExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code VariableExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterVariableExpression(HCLParser.VariableExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code VariableExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitVariableExpression(HCLParser.VariableExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code SplatExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterSplatExpression(HCLParser.SplatExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code SplatExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitSplatExpression(HCLParser.SplatExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code IndexAccessExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterIndexAccessExpression(HCLParser.IndexAccessExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code IndexAccessExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitIndexAccessExpression(HCLParser.IndexAccessExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code BlockExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterBlockExpression(HCLParser.BlockExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code BlockExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitBlockExpression(HCLParser.BlockExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code ForExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterForExpression(HCLParser.ForExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code ForExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitForExpression(HCLParser.ForExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code FunctionCallExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterFunctionCallExpression(HCLParser.FunctionCallExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code FunctionCallExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitFunctionCallExpression(HCLParser.FunctionCallExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code CollectionValueExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void enterCollectionValueExpression(HCLParser.CollectionValueExpressionContext ctx);
 	/**
 	 * Exit a parse tree produced by the {@code CollectionValueExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm()}.
+	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
 	 */
 	void exitCollectionValueExpression(HCLParser.CollectionValueExpressionContext ctx);
