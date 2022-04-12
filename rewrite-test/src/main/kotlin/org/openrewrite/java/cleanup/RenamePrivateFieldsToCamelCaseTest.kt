@@ -277,6 +277,26 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                         this._variable = _variable;
                     }
                 }
+        """)
+
+    @Test
+    fun renameWhenSameMethodExists(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+                class A (){
+                    private boolean _hasMethod;
+                    public boolean hasMethod(){
+                        return _hasMethod;
+                    }
+                }
+        """,
+        after = """
+                class A (){
+                    private boolean hasMethod;
+                    public boolean hasMethod(){
+                        return hasMethod;
+                    }
+                }
         """
     )
 }
