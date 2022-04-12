@@ -72,6 +72,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class CatchClauseOnlyRethrowsTcx : CatchClauseOnlyRethrowsTest
 
     @Nested
+    inner class CompareEnumWithEqualityOperatorTcx : CompareEnumWithEqualityOperatorTest
+
+    @Nested
     inner class CaseInsensitiveComparisonsDoNotChangeCaseTck : CaseInsensitiveComparisonsDoNotChangeCaseTest
 
     @Nested
