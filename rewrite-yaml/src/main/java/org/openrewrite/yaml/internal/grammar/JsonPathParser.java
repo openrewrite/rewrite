@@ -13,17 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPathParser.g4 by ANTLR 4.9.3
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-yaml/src/main/antlr/JsonPathParser.g4 by ANTLR 4.9.3
 package org.openrewrite.yaml.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.misc.*;
 import org.antlr.v4.runtime.tree.*;
 import java.util.List;
+import java.util.Iterator;
+import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class JsonPathParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.9.2", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.9.3", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -135,15 +138,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_jsonPath; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterJsonPath(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterJsonPath(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitJsonPath(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitJsonPath(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitJsonPath(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitJsonPath(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -185,7 +188,7 @@ public class JsonPathParser extends Parser {
 				setState(42); 
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,1,_ctx);
-			} while ( _alt!=2 && _alt!= ATN.INVALID_ALT_NUMBER );
+			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
 			}
 		}
 		catch (RecognitionException re) {
@@ -216,15 +219,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_expression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterExpression(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitExpression(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitExpression(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitExpression(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -290,15 +293,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_dotOperator; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterDotOperator(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterDotOperator(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitDotOperator(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitDotOperator(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitDotOperator(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitDotOperator(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -358,15 +361,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_recursiveDecent; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterRecursiveDecent(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterRecursiveDecent(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitRecursiveDecent(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitRecursiveDecent(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitRecursiveDecent(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitRecursiveDecent(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -418,15 +421,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_bracketOperator; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterBracketOperator(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterBracketOperator(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitBracketOperator(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitBracketOperator(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitBracketOperator(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitBracketOperator(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -511,15 +514,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_filter; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterFilter(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterFilter(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitFilter(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitFilter(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitFilter(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitFilter(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -583,15 +586,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_filterExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterFilterExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterFilterExpression(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitFilterExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitFilterExpression(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitFilterExpression(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitFilterExpression(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -677,15 +680,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_binaryExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterBinaryExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterBinaryExpression(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitBinaryExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitBinaryExpression(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitBinaryExpression(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitBinaryExpression(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -793,7 +796,7 @@ public class JsonPathParser extends Parser {
 			setState(132);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,10,_ctx);
-			while ( _alt!=2 && _alt!= ATN.INVALID_ALT_NUMBER ) {
+			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
 					_prevctx = _localctx;
@@ -871,15 +874,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_containsExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterContainsExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterContainsExpression(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitContainsExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitContainsExpression(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitContainsExpression(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitContainsExpression(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -951,15 +954,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_regexExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterRegexExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterRegexExpression(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitRegexExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitRegexExpression(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitRegexExpression(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitRegexExpression(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1007,15 +1010,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_unaryExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterUnaryExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterUnaryExpression(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitUnaryExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitUnaryExpression(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitUnaryExpression(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitUnaryExpression(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1106,15 +1109,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_literalExpression; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterLiteralExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterLiteralExpression(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitLiteralExpression(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitLiteralExpression(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitLiteralExpression(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitLiteralExpression(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1158,15 +1161,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_property; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterProperty(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterProperty(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitProperty(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitProperty(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitProperty(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitProperty(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1209,15 +1212,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_wildcard; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterWildcard(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterWildcard(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitWildcard(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitWildcard(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitWildcard(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitWildcard(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1262,15 +1265,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_slice; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterSlice(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterSlice(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitSlice(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitSlice(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitSlice(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitSlice(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1350,15 +1353,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_start; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterStart(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterStart(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitStart(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitStart(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitStart(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitStart(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1392,15 +1395,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_end; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterEnd(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterEnd(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitEnd(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitEnd(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitEnd(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitEnd(this);
 			else return visitor.visitChildren(this);
 		}
 	}
@@ -1437,15 +1440,15 @@ public class JsonPathParser extends Parser {
 		@Override public int getRuleIndex() { return RULE_indexes; }
 		@Override
 		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).enterIndexes(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).enterIndexes(this);
 		}
 		@Override
 		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof JsonPathParserListener) ((JsonPathParserListener)listener).exitIndexes(this);
+			if ( listener instanceof JsonPathParserListener ) ((JsonPathParserListener)listener).exitIndexes(this);
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>)visitor).visitIndexes(this);
+			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitIndexes(this);
 			else return visitor.visitChildren(this);
 		}
 	}

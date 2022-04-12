@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/tyler.vangorder/work/rewrite/rewrite-hcl/src/main/antlr/HCLLexer.g4 by ANTLR 4.9.2
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-hcl/src/main/antlr/HCLLexer.g4 by ANTLR 4.9.3
 package org.openrewrite.hcl.internal.grammar;
-
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.LexerATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
-import org.antlr.v4.runtime.dfa.DFA;
-
 import java.util.Stack;
+import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenStream;
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.atn.*;
+import org.antlr.v4.runtime.dfa.DFA;
+import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class HCLLexer extends Lexer {
-	static { RuntimeMetaData.checkVersion("4.9.2", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.9.3", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =

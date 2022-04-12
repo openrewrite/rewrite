@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.3
 package org.openrewrite.maven.internal.grammar;
-// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.2
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
@@ -31,13 +31,13 @@ public class VersionRangeParserBaseListener implements VersionRangeParserListene
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterRequestedVersion(VersionRangeParser.RequestedVersionContext ctx) { }
+	@Override public void enterVersionRequirement(VersionRangeParser.VersionRequirementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitRequestedVersion(VersionRangeParser.RequestedVersionContext ctx) { }
+	@Override public void exitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/tyler.vangorder/work/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.9.2
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.9.3
 package org.openrewrite.hcl.internal.grammar;
-
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.ParserATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
-import org.antlr.v4.runtime.tree.ParseTreeVisitor;
-import org.antlr.v4.runtime.tree.TerminalNode;
-
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.misc.*;
+import org.antlr.v4.runtime.tree.*;
 import java.util.List;
+import java.util.Iterator;
+import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class HCLParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.9.2", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.9.3", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -1118,7 +1114,7 @@ public class HCLParser extends Parser {
 			{
 			setState(157);
 			_la = _input.LA(1);
-			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << NULL))) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << NULL))) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -1246,7 +1242,7 @@ public class HCLParser extends Parser {
 			setState(175);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if (((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << FOR_BRACE) | (1L << FOR_BRACK) | (1L << LBRACE) | (1L << Identifier) | (1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << QUOTE) | (1L << NULL) | (1L << HEREDOC_START) | (1L << LBRACK) | (1L << LPAREN) | (1L << MINUS) | (1L << NOT))) != 0)) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << FOR_BRACE) | (1L << FOR_BRACK) | (1L << LBRACE) | (1L << Identifier) | (1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << QUOTE) | (1L << NULL) | (1L << HEREDOC_START) | (1L << LBRACK) | (1L << LPAREN) | (1L << MINUS) | (1L << NOT))) != 0)) {
 				{
 				setState(164);
 				expression(0);
@@ -1894,7 +1890,7 @@ public class HCLParser extends Parser {
 			setState(247);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if (((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << FOR_BRACE) | (1L << FOR_BRACK) | (1L << LBRACE) | (1L << Identifier) | (1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << QUOTE) | (1L << NULL) | (1L << HEREDOC_START) | (1L << LBRACK) | (1L << LPAREN) | (1L << MINUS) | (1L << NOT))) != 0)) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << FOR_BRACE) | (1L << FOR_BRACK) | (1L << LBRACE) | (1L << Identifier) | (1L << NumericLiteral) | (1L << BooleanLiteral) | (1L << QUOTE) | (1L << NULL) | (1L << HEREDOC_START) | (1L << LBRACK) | (1L << LPAREN) | (1L << MINUS) | (1L << NOT))) != 0)) {
 				{
 				setState(246);
 				arguments();
@@ -2623,7 +2619,7 @@ public class HCLParser extends Parser {
 			{
 			setState(307);
 			_la = _input.LA(1);
-			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << EQ) | (1L << LT) | (1L << NEQ) | (1L << GT) | (1L << LEQ) | (1L << GEQ))) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << EQ) | (1L << LT) | (1L << NEQ) | (1L << GT) | (1L << LEQ) | (1L << GEQ))) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -2678,7 +2674,7 @@ public class HCLParser extends Parser {
 			{
 			setState(309);
 			_la = _input.LA(1);
-			if ( !((_la & ~0x3f) == 0 && ((1L << _la) & ((1L << PLUS) | (1L << MINUS) | (1L << MUL) | (1L << DIV) | (1L << MOD))) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << PLUS) | (1L << MINUS) | (1L << MUL) | (1L << DIV) | (1L << MOD))) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {

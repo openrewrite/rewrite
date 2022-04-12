@@ -31,6 +31,7 @@ SLASH=30
 EQUALS=31
 STRING=32
 Name=33
+'<?xml'=8
 '<'=9
 'DOCTYPE'=16
 '?>'=27
