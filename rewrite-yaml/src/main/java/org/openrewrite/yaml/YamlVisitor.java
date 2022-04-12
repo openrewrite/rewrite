@@ -117,9 +117,9 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
         }
     }
 
-    public void removeUnused() {
+    public void removeUnused(@Nullable Cursor cursorParent) {
         if (getAfterVisit().stream().noneMatch(RemoveUnusedVisitor.class::isInstance)) {
-            doAfterVisit(new RemoveUnusedVisitor<>());
+            doAfterVisit(new RemoveUnusedVisitor<>(cursorParent));
         }
     }
 }

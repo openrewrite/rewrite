@@ -80,7 +80,7 @@ public class DeleteKey extends Recipe {
                         if (i == 0 && getCursor().getParentOrThrow().getValue() instanceof Yaml.Sequence.Entry) {
                             copyFirstPrefix.set(e.getPrefix());
                         }
-                        removeUnused();
+                        removeUnused(getCursor().getParent());
                         return null;
                     }
                     return e;

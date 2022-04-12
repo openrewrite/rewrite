@@ -33,6 +33,6 @@ public class RemoveUnused extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemoveUnusedVisitor<>();
+        return new RemoveUnusedVisitor<>(null);
     }
 }
