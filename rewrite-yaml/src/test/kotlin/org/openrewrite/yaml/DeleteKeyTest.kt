@@ -15,7 +15,6 @@
  */
 package org.openrewrite.yaml
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
@@ -143,9 +142,8 @@ class DeleteKeyTest : YamlRecipeTest {
         """
     )
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1175")
-    @Disabled
+    @Test
     fun deleteKeyKeepingUnrelatedUnusedKeys() = assertChanged(
         recipe = DeleteKey("$.jobs.build.strategy.fail-fast", null),
         before = """

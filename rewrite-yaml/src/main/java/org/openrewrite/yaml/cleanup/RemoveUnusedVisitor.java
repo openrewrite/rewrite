@@ -15,24 +15,35 @@
  */
 package org.openrewrite.yaml.cleanup;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class RemoveUnusedVisitor<P> extends YamlIsoVisitor<P> {
 
+    @Nullable
+    private final Cursor cursor;
+
+    public RemoveUnusedVisitor(@Nullable Cursor cursor) {
+        this.cursor = cursor;
+    }
+
     @Override
     public Yaml.Sequence visitSequence(Yaml.Sequence sequence, P p) {
         Yaml.Sequence s = super.visitSequence(sequence, p);
-        s = s.withEntries(ListUtils.map(s.getEntries(), e -> {
-            if (e.getBlock() == null || isEmptyScalar(e.getBlock())) {
+        if (cursor == null || cursor.isScopeInPath(s)) {
+            s = s.withEntries(ListUtils.map(s.getEntries(), e -> {
+                if (e.getBlock() == null || isEmptyScalar(e.getBlock())) {
+                    return null;
+                }
+                return e;
+            }));
+            if (s.getEntries().isEmpty()) {
+                //noinspection ConstantConditions
                 return null;
             }
-            return e;
-        }));
-        if (s.getEntries().isEmpty()) {
-            //noinspection ConstantConditions
-            return null;
         }
         return s;
     }
@@ -40,19 +51,21 @@ public class RemoveUnusedVisitor<P> extends YamlIsoVisitor<P> {
     @Override
     public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
         Yaml.Mapping m = super.visitMapping(mapping, p);
-        m = m.withEntries(ListUtils.map(m.getEntries(), e -> {
-            if (e.getValue() == null || isEmptyScalar(e.getValue())) {
+        if (cursor == null || cursor.isScopeInPath(m)) {
+            m = m.withEntries(ListUtils.map(m.getEntries(), e -> {
+                if (e.getValue() == null || isEmptyScalar(e.getValue())) {
+                    return null;
+                }
+                if (e.getValue() instanceof Yaml.Mapping &&
+                        ((Yaml.Mapping) e.getValue()).getEntries().isEmpty()) {
+                    return null;
+                }
+                return e;
+            }));
+            if (m.getEntries().isEmpty()) {
+                //noinspection ConstantConditions
                 return null;
             }
-            if (e.getValue() instanceof Yaml.Mapping &&
-                    ((Yaml.Mapping) e.getValue()).getEntries().isEmpty()) {
-                return null;
-            }
-            return e;
-        }));
-        if (m.getEntries().isEmpty()) {
-            //noinspection ConstantConditions
-            return null;
         }
         return m;
     }
