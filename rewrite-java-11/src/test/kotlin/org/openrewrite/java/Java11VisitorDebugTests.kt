@@ -224,6 +224,10 @@ class Java11FindEmptyClassesTest : Java11Test, FindEmptyClassesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11FindEmptyMethodsTest : Java11Test, FindEmptyMethodsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FindFieldsTest : Java11Test, FindFieldsTest
 
 @DebugOnly

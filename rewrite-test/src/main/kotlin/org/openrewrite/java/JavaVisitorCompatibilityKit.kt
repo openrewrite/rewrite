@@ -183,7 +183,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindDeprecatedFieldsTck : FindDeprecatedFieldsTest
 
     @Nested
-    inner class FindEmptyClassesTck : FindEmptyClassesTest
+    inner class FindEmptyMethodsTck : FindEmptyMethodsTest
 
     @Nested
     inner class FindFieldsTck : FindFieldsTest
