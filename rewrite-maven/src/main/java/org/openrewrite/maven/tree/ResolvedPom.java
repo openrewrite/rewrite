@@ -296,6 +296,19 @@ public class ResolvedPom {
             pomAncestry.add(requested);
             resolveParentPropertiesAndRepositoriesRecursively(pomAncestry);
 
+            //Once properties have been merged, update any property placeholders in the resolved gav
+            //coordinates. This is important to do early because any system properties used within the coordinates
+            //are transient and will not be available once pom has been serialized/deserialized into a different VM.
+            Pom pomReference = ResolvedPom.this.requested;
+            pomReference = pomReference.withGav(pomReference.getGav().withRepository(getValue(pomReference.getGav().getRepository())));
+            pomReference = pomReference.withGav(pomReference.getGav().withGroupId(getValue(pomReference.getGav().getGroupId())));
+            pomReference = pomReference.withGav(pomReference.getGav().withArtifactId(getValue(pomReference.getGav().getArtifactId())));
+            pomReference = pomReference.withGav(pomReference.getGav().withVersion(getValue(pomReference.getGav().getVersion())));
+            pomReference = pomReference.withGav(pomReference.getGav().withDatedSnapshotVersion(getValue(pomReference.getGav().getDatedSnapshotVersion())));
+            if (ResolvedPom.this.requested != pomReference) {
+                ResolvedPom.this.requested = pomReference;
+            }
+
             pomAncestry.clear();
             pomAncestry.add(requested);
             resolveParentDependenciesRecursively(pomAncestry);
