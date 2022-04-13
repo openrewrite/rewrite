@@ -17,19 +17,16 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Parser;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
 import org.openrewrite.binary.BinaryParser;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.text.PlainText;
-import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,6 +35,7 @@ import java.util.List;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -117,16 +115,14 @@ public class AddGradleWrapper extends Recipe {
         }
 
         if (needsGradleShellScript) {
-            PlainText gradlew = new PlainTextParser().parseInputs(singletonList(
-                    new Parser.Input(WRAPPER_SCRIPT_LOCATION,
-                            () -> AddGradleWrapper.class.getResourceAsStream("/gradlew"))), null, ctx).get(0);
+            PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY,
+                    StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew")));
             gradleWrapper.add(gradlew);
         }
 
         if (needsGradleBatchScript) {
-            PlainText gradlewBat = new PlainTextParser().parseInputs(singletonList(
-                    new Parser.Input(WRAPPER_BATCH_LOCATION,
-                            () -> AddGradleWrapper.class.getResourceAsStream("/gradlew.bat"))), null, ctx).get(0);
+            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY,
+                    StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")));
             gradleWrapper.add(gradlewBat);
         }
 
@@ -145,7 +141,7 @@ public class AddGradleWrapper extends Recipe {
 
     private String getDesiredDistributionUrl() {
         if (distributionUrl != null) {
-            return distributionUrl.replace("https://", "https\\://");
+            return distributionUrl.replaceAll("(?<!\\\\)://", "\\\\://");
         }
 
         String desiredVersion = (version == null) ? DEFAULT_VERSION : version;

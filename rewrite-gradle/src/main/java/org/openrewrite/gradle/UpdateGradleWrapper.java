@@ -38,9 +38,10 @@ import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 @EqualsAndHashCode(callSuper = true)
 public class UpdateGradleWrapper extends Recipe {
     private static final String DEFAULT_VERSION = "7.4.2";
-    private static final Path WRAPPER_LOCATION = Paths.get("gradle/wrapper/gradle-wrapper.properties");
-    private static final Path SCRIPT_LOCATION = Paths.get("gradlew");
-    private static final Path BATCH_LOCATION = Paths.get("gradlew.bat");
+    private static final Path WRAPPER_PROPERTIES_LOCATION = Paths.get("gradle/wrapper/gradle-wrapper.properties");
+    private static final Path WRAPPER_SCRIPT_LOCATION = Paths.get("gradlew");
+    private static final Path WRAPPER_BATCH_LOCATION = Paths.get("gradlew.bat");
+    private static final Path WRAPPER_JAR_LOCATION = Paths.get("gradle/wrapper/gradle-wrapper.jar");
 
     @Override
     public String getDisplayName() {
@@ -85,7 +86,7 @@ public class UpdateGradleWrapper extends Recipe {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext context) {
-                if (!equalIgnoringSeparators(file.getSourcePath(), WRAPPER_LOCATION)) {
+                if (!equalIgnoringSeparators(file.getSourcePath(), WRAPPER_PROPERTIES_LOCATION)) {
                     return file;
                 }
 
@@ -134,7 +135,7 @@ public class UpdateGradleWrapper extends Recipe {
 
         return ListUtils.concat(
                 ListUtils.map(before, sourceFile -> {
-                    if(sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), SCRIPT_LOCATION)) {
+                    if(sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                         PlainText gradlew = (PlainText)sourceFile;
                         String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"));
                         if(!gradlewText.equals(gradlew.getText())) {
@@ -142,7 +143,7 @@ public class UpdateGradleWrapper extends Recipe {
                         }
                         return gradlew;
                     }
-                    if(sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), BATCH_LOCATION)) {
+                    if(sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
                         PlainText gradlewBat = (PlainText)sourceFile;
                         String gradlewBatText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat"));
                         if(!gradlewBatText.equals(gradlewBat.getText())) {
@@ -162,7 +163,7 @@ public class UpdateGradleWrapper extends Recipe {
     private class UpdateWrapperPropsVisitor extends PropertiesVisitor<ExecutionContext> {
         @Override
         public Properties visitFile(Properties.File file, ExecutionContext context) {
-            if (!equalIgnoringSeparators(file.getSourcePath(), WRAPPER_LOCATION)) {
+            if (!equalIgnoringSeparators(file.getSourcePath(), WRAPPER_PROPERTIES_LOCATION)) {
                 return file;
             }
             return super.visitFile(file, context);
@@ -180,7 +181,7 @@ public class UpdateGradleWrapper extends Recipe {
 
         private String getDesiredDistributionUrl(String currentDistributionUrl) {
             if (distributionUrl != null) {
-                return distributionUrl.replace("https://", "https\\://");
+                return distributionUrl.replaceAll("(?<!\\\\)://", "\\\\://");
             }
 
             String desiredVersion = (version == null) ? DEFAULT_VERSION : version;
