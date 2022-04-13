@@ -604,6 +604,10 @@ class Java11UseDiamondOperatorTest : Java11Test, UseDiamondOperatorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UseGenericTypeMethodParametersTest : Java11Test, UseGenericTypeMethodParametersTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UseJavaStyleArrayDeclarations : Java11Test, UseJavaStyleArrayDeclarationsTest
 
 @DebugOnly

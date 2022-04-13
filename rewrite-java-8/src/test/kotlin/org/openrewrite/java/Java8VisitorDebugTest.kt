@@ -600,6 +600,10 @@ class Java8UseDiamondOperatorTest : Java8Test, UseDiamondOperatorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UseGenericTypeMethodParametersTest : Java8Test, UseGenericTypeMethodParametersTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UsesRewriteSkipTest : Java8Test, UsesRewriteSkipTest
 
 @DebugOnly
