@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("GrUnnecessaryPublicModifier", "GrPackage")
+
 package org.openrewrite.groovy.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.asFullyQualified
 import org.openrewrite.java.asParameterized
 import org.openrewrite.java.tree.J

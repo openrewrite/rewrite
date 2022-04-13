@@ -15,8 +15,10 @@
  */
 package org.openrewrite.groovy.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.tree.J
 
 class VariableDeclarationsTest : GroovyTreeTest {
 
@@ -37,13 +39,28 @@ class VariableDeclarationsTest : GroovyTreeTest {
     fun wildcardWithUpperBound() = assertParsePrintAndProcess(
         """
             List<? extends String> l
-        """
+        """,
+        withAst = { cu ->
+            val vd = cu.statements[0] as J.VariableDeclarations
+            assertThat(vd.typeExpression).isInstanceOf(J.ParameterizedType::class.java)
+            val typeExpression = (vd.typeExpression as J.ParameterizedType).typeParameters!![0]
+            assertThat(typeExpression).isInstanceOf(J.Wildcard::class.java)
+            val wildcard = typeExpression as J.Wildcard
+            assertThat(wildcard.bound).isEqualTo(J.Wildcard.Bound.Extends)
+        }
     )
 
     @Test
     fun wildcardWithLowerBound() = assertParsePrintAndProcess(
         """
             List<? super String> l
+        """
+    )
+
+    @Test
+    fun diamondOperator() = assertParsePrintAndProcess(
+        """
+            List<String> l = new ArrayList< /* */ >()
         """
     )
 

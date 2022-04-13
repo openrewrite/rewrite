@@ -1296,7 +1296,7 @@ public class GroovyParserVisitor {
                     expression.getOriginType().getUnresolvedName(),
                     type, null);
             if(type instanceof JavaType.Parameterized) {
-                return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameters(expression.getType().getGenericsTypes()));
+                return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(expression.getType().getGenericsTypes()));
             }
             return ident.withPrefix(prefix);
         }
@@ -1510,7 +1510,7 @@ public class GroovyParserVisitor {
 
         assert expr != null;
         if(classNode != null && classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
-            expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameters(classNode.getGenericsTypes()));
+            expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()));
         }
         return expr.withPrefix(prefix);
     }
@@ -1630,12 +1630,55 @@ public class GroovyParserVisitor {
         return result;
     }
 
-    private <T extends J> JContainer<T> visitTypeParameters(GenericsType[] genericsTypes) {
+    /*
+       Visit the value filled in to a parameterized type, such as in a variable declaration.
+       Not to be confused with the declaration of a type parameter on a class or method.
+
+       Can contain a J.Identifier, as is the case in a typical variable declaration:
+           List<String>
+           Map<T, Y>
+       Can contain a J.Blank, as in a diamond operator:
+           List<String> s = new ArrayList< >()
+       Can contain a J.FieldAccess, as in a variable declaration with fully qualified type parameterization:
+           List<java.lang.String>
+     */
+    private JContainer<Expression> visitTypeParameterizations(GenericsType[] genericsTypes) {
         Space prefix = sourceBefore("<");
-        List<JRightPadded<T>> typeParameters = new ArrayList<>(genericsTypes.length);
+        List<JRightPadded<Expression>> parameters = new ArrayList<>(genericsTypes.length);
         for (int i = 0; i < genericsTypes.length; i++) {
-            T t = "?".equals(genericsTypes[i].getName()) ? visitWildcard(genericsTypes[i]) : visitTypeParameter(genericsTypes[i]);
-            typeParameters.add(JRightPadded.build(t)
+            parameters.add(JRightPadded.build(visitTypeParameterization(genericsTypes[i]))
+                    .withAfter(
+                            i < genericsTypes.length - 1 ?
+                                    sourceBefore(",") :
+                                    sourceBefore(">")
+                    ));
+        }
+        return JContainer.build(prefix, parameters, Markers.EMPTY);
+    }
+
+    /*
+        Visit the declaration of a type parameter as part of a class declaration or method declaration
+     */
+    private Expression visitTypeParameterization(GenericsType genericsType) {
+        int saveCursor = cursor;
+        Space prefix = whitespace();
+        if(source.charAt(cursor) == '?') {
+            cursor = saveCursor;
+            return visitWildcard(genericsType);
+        } else if(source.charAt(cursor) == '>') {
+            cursor++;
+            return new J.Empty(randomId(), prefix, Markers.EMPTY);
+        }
+        cursor = saveCursor;
+        return typeTree(null)
+                .withType(typeMapping.type(genericsType));
+    }
+
+    private JContainer<J.TypeParameter> visitTypeParameters(GenericsType[] genericsTypes) {
+        Space prefix = sourceBefore("<");
+        List<JRightPadded<J.TypeParameter>> typeParameters = new ArrayList<>(genericsTypes.length);
+        for (int i = 0; i < genericsTypes.length; i++) {
+            typeParameters.add(JRightPadded.build(visitTypeParameter(genericsTypes[i]))
                     .withAfter(
                             i < genericsTypes.length - 1 ?
                                     sourceBefore(",") :
@@ -1645,11 +1688,10 @@ public class GroovyParserVisitor {
         return JContainer.build(prefix, typeParameters, Markers.EMPTY);
     }
 
-    @SuppressWarnings("unchecked")
-    private <T extends J> T visitTypeParameter(GenericsType genericType) {
+    private J.TypeParameter visitTypeParameter(GenericsType genericType) {
         Space prefix = whitespace();
-        J.Identifier name = genericType.getName() != null ?
-                new J.Identifier(randomId(), sourceBefore(genericType.getName()), Markers.EMPTY, genericType.getName(), null, null) : typeTree(null);
+        Expression name = typeTree(null)
+                .withType(typeMapping.type(genericType));
         JContainer<TypeTree> bounds = null;
         if (genericType.getUpperBounds() != null) {
             Space boundsPrefix = sourceBefore("extends");
@@ -1672,11 +1714,10 @@ public class GroovyParserVisitor {
                         .withAfter(EMPTY));
             bounds = JContainer.build(boundsPrefix, convertedBounds, Markers.EMPTY);
         }
-        return (T) new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), name, bounds);
+        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), name, bounds);
     }
 
-    @SuppressWarnings("unchecked")
-    private <T extends J> T visitWildcard(GenericsType genericType) {
+    private J.Wildcard visitWildcard(GenericsType genericType) {
         Space namePrefix = sourceBefore("?");
 
         JLeftPadded<J.Wildcard.Bound> bound;
@@ -1692,6 +1733,6 @@ public class GroovyParserVisitor {
             boundedType = null;
         }
 
-        return (T) new J.Wildcard(randomId(), namePrefix, Markers.EMPTY, bound, boundedType);
+        return new J.Wildcard(randomId(), namePrefix, Markers.EMPTY, bound, boundedType);
     }
 }
