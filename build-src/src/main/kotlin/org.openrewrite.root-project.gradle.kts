@@ -1,9 +1,8 @@
 plugins {
-    `java-library`
-    id("org.openrewrite.java-base")
+    id("org.openrewrite.base")
+    id("org.openrewrite.rewrite")
     id("nebula.release")
     id("io.github.gradle-nexus.publish-plugin")
-    id("org.openrewrite.rewrite")
 }
 
 nexusPublishing {

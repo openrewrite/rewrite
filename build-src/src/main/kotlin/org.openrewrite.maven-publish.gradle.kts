@@ -6,8 +6,6 @@ plugins {
     id("org.openrewrite.base")
     id("nebula.maven-publish")
     id("nebula.maven-resolved-dependencies")
-    id("nebula.javadoc-jar")
-    id("nebula.source-jar")
     id("nebula.maven-apache-license")
 }
 

@@ -1,13 +1,26 @@
 import nebula.plugin.contacts.Contact
 import nebula.plugin.contacts.ContactsExtension
 
-apply(plugin = "org.openrewrite.license")
-apply(plugin = "org.openrewrite.dependency-check")
-apply(plugin = "nebula.contacts")
-apply(plugin = "nebula.info")
+plugins {
+    base
+    id("org.openrewrite.license")
+    id("org.openrewrite.dependency-check")
+    id("nebula.contacts")
+    id("nebula.info")
+}
 
 group = "org.openrewrite"
 description = "Eliminate tech-debt. Automatically."
+
+repositories {
+    if (!project.hasProperty("releasing")) {
+        mavenLocal()
+        maven {
+            url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
+        }
+    }
+    mavenCentral()
+}
 
 configure<ContactsExtension> {
     val j = Contact("team@moderne.io")
