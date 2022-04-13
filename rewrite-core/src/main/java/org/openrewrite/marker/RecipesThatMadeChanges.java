@@ -18,11 +18,13 @@ package org.openrewrite.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
+import org.openrewrite.config.RecipeDescriptor;
 
-import java.util.Collection;
-import java.util.Stack;
-import java.util.UUID;
+import java.util.*;
+
+import static java.util.stream.Collectors.joining;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -32,4 +34,70 @@ public class RecipesThatMadeChanges implements Marker {
     UUID id;
 
     Collection<Stack<Recipe>> recipes;
+
+    /**
+     * A list of recipe names and their associated options which have made changes to the AST
+     * @param indent string prepended to sub recipes for logging a hierarchical view
+     */
+    @Incubating(since = "7.22.0")
+    public List<String> recipeNamesAndOptionsThatMadeChanges(String indent) {
+        List<RecipeDescriptor> recipesToDisplay = new ArrayList<>();
+
+        for (Stack<Recipe> currentStack : recipes) {
+
+            Recipe root = currentStack.get(1);
+            RecipeDescriptor rootDescriptor = root.getDescriptor().withRecipeList(new ArrayList<>());
+
+            RecipeDescriptor index;
+            if (!recipesToDisplay.contains(rootDescriptor)) {
+                recipesToDisplay.add(rootDescriptor);
+                index = rootDescriptor;
+            } else {
+                index = recipesToDisplay.get(recipesToDisplay.indexOf(rootDescriptor));
+            }
+
+            for (int i = 1; i < currentStack.size(); i++) {
+                Recipe child = currentStack.get(i);
+                if (child == root) {
+                    continue;
+                }
+                RecipeDescriptor childDescriptor = child.getDescriptor().withRecipeList(new ArrayList<>());
+                if (!index.getRecipeList().contains(childDescriptor)) {
+                    index.getRecipeList().add(childDescriptor);
+                    index = childDescriptor;
+                } else {
+                    index = index.getRecipeList().get(index.getRecipeList().indexOf(childDescriptor));
+                }
+            }
+        }
+        String prefix = "" + indent;
+        List<String> recipeNamesAndOptions = new ArrayList<>();
+        for (RecipeDescriptor recipeDescriptor : recipesToDisplay) {
+            addRecipeNameAndOptions(recipeDescriptor, prefix, recipeNamesAndOptions);
+            prefix = prefix + indent;
+        }
+        return recipeNamesAndOptions;
+    }
+
+    private void addRecipeNameAndOptions(RecipeDescriptor rd, String prefix, List<String> recipeNamesAndOptions) {
+        StringBuilder recipeString = new StringBuilder(prefix + rd.getName());
+        if (!rd.getOptions().isEmpty()) {
+            String opts = rd.getOptions().stream().map(option -> {
+                        if (option.getValue() != null) {
+                            return option.getName() + "=" + option.getValue();
+                        }
+                        return null;
+                    }
+            ).filter(Objects::nonNull).collect(joining(", "));
+            if (!opts.isEmpty()) {
+                recipeString.append(": {").append(opts).append("}");
+            }
+        }
+        recipeNamesAndOptions .add(recipeString.toString());
+        if (rd.getRecipeList() != null) {
+            for (RecipeDescriptor rchild : rd.getRecipeList()) {
+                addRecipeNameAndOptions(rchild, prefix + "    ", recipeNamesAndOptions );
+            }
+        }
+    }
 }
