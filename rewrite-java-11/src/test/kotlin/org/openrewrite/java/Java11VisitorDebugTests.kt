@@ -472,6 +472,10 @@ class Java11RemoveUnusedPrivateMethodsTest : Java11Test, RemoveUnusedPrivateMeth
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RenameExceptionInEmptyCatchTest : Java11Test, RenameExceptionInEmptyCatchTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RemoveImportTest : Java11Test, RemoveImportTest
 
 @DebugOnly
