@@ -369,6 +369,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveUnusedPrivateMethodsTck : RemoveUnusedPrivateMethodsTest
 
     @Nested
+    inner class RenameExceptionInEmptyCatchTck : RenameExceptionInEmptyCatchTest
+
+    @Nested
     inner class RemoveImportTck : RemoveImportTest
 
     @Nested

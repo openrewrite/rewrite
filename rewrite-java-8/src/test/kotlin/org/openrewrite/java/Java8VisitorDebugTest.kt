@@ -456,6 +456,10 @@ class Java8RemoveUnusedPrivateMethodsTest : Java8Test, RemoveUnusedPrivateMethod
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8RenameExceptionInEmptyCatchTest : Java8Test, RenameExceptionInEmptyCatchTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RemoveImportTest : Java8Test, RemoveImportTest
 
 @DebugOnly
