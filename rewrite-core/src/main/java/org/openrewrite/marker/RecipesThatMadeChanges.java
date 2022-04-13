@@ -56,17 +56,14 @@ public class RecipesThatMadeChanges implements Marker {
                 index = recipesToDisplay.get(recipesToDisplay.indexOf(rootDescriptor));
             }
 
-            for (int i = 1; i < currentStack.size(); i++) {
-                Recipe child = currentStack.get(i);
-                if (child == root) {
-                    continue;
-                }
-                RecipeDescriptor childDescriptor = child.getDescriptor().withRecipeList(new ArrayList<>());
-                if (!index.getRecipeList().contains(childDescriptor)) {
-                    index.getRecipeList().add(childDescriptor);
-                    index = childDescriptor;
+            for (int i = 2; i < currentStack.size(); i++) {
+                Recipe next = currentStack.get(i);
+                RecipeDescriptor nextDescriptor = next.getDescriptor().withRecipeList(new ArrayList<>());
+                if (!index.getRecipeList().contains(nextDescriptor)) {
+                    index.getRecipeList().add(nextDescriptor);
+                    index = nextDescriptor;
                 } else {
-                    index = index.getRecipeList().get(index.getRecipeList().indexOf(childDescriptor));
+                    index = index.getRecipeList().get(index.getRecipeList().indexOf(nextDescriptor));
                 }
             }
         }
