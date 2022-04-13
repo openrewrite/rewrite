@@ -179,7 +179,7 @@ public class GroovyParserVisitor {
             J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);
             Space namePrefix = whitespace();
             String simpleName = name();
-            J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, simpleName, null, null);
+            J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, simpleName, typeMapping.type(clazz), null);
             JContainer<J.TypeParameter> typeParameterContainer = null;
             if (clazz.isUsingGenerics() && clazz.getGenericsTypes() != null) {
                 typeParameterContainer = visitTypeParameters(clazz.getGenericsTypes());
@@ -286,7 +286,7 @@ public class GroovyParserVisitor {
             TypeTree typeExpr = visitTypeTree(field.getOriginType());
 
             J.Identifier name = new J.Identifier(randomId(), sourceBefore(field.getName()), Markers.EMPTY,
-                    field.getName(), typeMapping.type(field.getOriginType()), null);
+                    field.getName(), typeMapping.type(field.getOriginType()), typeMapping.variableType(field));
 
             J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                     randomId(),

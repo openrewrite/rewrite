@@ -105,6 +105,7 @@ public class AddGradleWrapper extends Recipe {
         List<SourceFile> gradleWrapper = new ArrayList<>();
 
         if (needsGradleWrapperProperties) {
+            //noinspection UnusedProperty
             Properties.File gradleWrapperProperties = new PropertiesParser().parse(
                             "distributionBase=GRADLE_USER_HOME\n" +
                                     "distributionPath=wrapper/dists\n" +
