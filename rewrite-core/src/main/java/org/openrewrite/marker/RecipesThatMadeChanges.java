@@ -24,8 +24,6 @@ import org.openrewrite.config.RecipeDescriptor;
 
 import java.util.*;
 
-import static java.util.stream.Collectors.joining;
-
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
@@ -36,15 +34,37 @@ public class RecipesThatMadeChanges implements Marker {
     Collection<Stack<Recipe>> recipes;
 
     /**
-     * A list of recipe names and their associated options which have made changes to the AST
-     * @param indent string prepended to sub recipes for logging a hierarchical view
+     * Return a list of recipes that have made changes as a hierarchy of descriptors.
+     * The method transforms the flat, stack-based representation into descriptors where children are grouped under their common parents.
+     * <PRE>
+     *
+     * List of changes:
+     *
+     * A->B->C
+     * A->B->D
+     * E->F
+     * E->G
+     * H
+     *
+     * Converted to a List of the following descriptors:
+     *
+     * A
+     * |-B
+     * | |-C
+     * | |-D
+     *
+     * E
+     * |-F
+     *
+     * H
+     * </PRE>
      */
     @Incubating(since = "7.22.0")
-    public List<String> recipeNamesAndOptionsThatMadeChanges(String indent) {
+    public List<RecipeDescriptor> recipeDescriptors() {
         List<RecipeDescriptor> recipesToDisplay = new ArrayList<>();
 
         for (Stack<Recipe> currentStack : recipes) {
-
+            // The first recipe is an Environment.CompositeRecipe and should not be included in the list of RecipeDescriptors
             Recipe root = currentStack.get(1);
             RecipeDescriptor rootDescriptor = root.getDescriptor().withRecipeList(new ArrayList<>());
 
@@ -57,8 +77,7 @@ public class RecipesThatMadeChanges implements Marker {
             }
 
             for (int i = 2; i < currentStack.size(); i++) {
-                Recipe next = currentStack.get(i);
-                RecipeDescriptor nextDescriptor = next.getDescriptor().withRecipeList(new ArrayList<>());
+                RecipeDescriptor nextDescriptor = currentStack.get(i).getDescriptor().withRecipeList(new ArrayList<>());
                 if (!index.getRecipeList().contains(nextDescriptor)) {
                     index.getRecipeList().add(nextDescriptor);
                     index = nextDescriptor;
@@ -67,34 +86,6 @@ public class RecipesThatMadeChanges implements Marker {
                 }
             }
         }
-        String prefix = "" + indent;
-        List<String> recipeNamesAndOptions = new ArrayList<>();
-        for (RecipeDescriptor recipeDescriptor : recipesToDisplay) {
-            addRecipeNameAndOptions(recipeDescriptor, prefix, recipeNamesAndOptions);
-            prefix = prefix + indent;
-        }
-        return recipeNamesAndOptions;
-    }
-
-    private void addRecipeNameAndOptions(RecipeDescriptor rd, String prefix, List<String> recipeNamesAndOptions) {
-        StringBuilder recipeString = new StringBuilder(prefix + rd.getName());
-        if (!rd.getOptions().isEmpty()) {
-            String opts = rd.getOptions().stream().map(option -> {
-                        if (option.getValue() != null) {
-                            return option.getName() + "=" + option.getValue();
-                        }
-                        return null;
-                    }
-            ).filter(Objects::nonNull).collect(joining(", "));
-            if (!opts.isEmpty()) {
-                recipeString.append(": {").append(opts).append("}");
-            }
-        }
-        recipeNamesAndOptions .add(recipeString.toString());
-        if (rd.getRecipeList() != null) {
-            for (RecipeDescriptor rchild : rd.getRecipeList()) {
-                addRecipeNameAndOptions(rchild, prefix + "    ", recipeNamesAndOptions );
-            }
-        }
+        return recipesToDisplay;
     }
 }
