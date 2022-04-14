@@ -99,6 +99,7 @@ class RecipeLifecycleTest {
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
                 emptyList<SourceFile>()
         }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "test")))
+
         assertThat(results.map {
             it.recipesThatMadeChanges.map { r -> r.name }.first()
         }).containsExactly("test.DeletingRecipe")
@@ -159,8 +160,7 @@ class RecipeLifecycleTest {
     // https://github.com/openrewrite/rewrite/issues/389
     @Test
     fun sourceFilesAcceptOnlyApplicableVisitors() {
-        val sources =
-            listOf(FooSource(), PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello"))
+        val sources = listOf(FooSource(), PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello"))
         val fooVisitor = FooVisitor<ExecutionContext>()
         val textVisitor = PlainTextVisitor<ExecutionContext>()
         val ctx = InMemoryExecutionContext {
