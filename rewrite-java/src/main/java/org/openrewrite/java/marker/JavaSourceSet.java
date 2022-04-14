@@ -100,13 +100,8 @@ public class JavaSourceSet implements Marker {
             if (typeDeclaration == null) {
                 continue;
             }
-            result.compute(classInfo.getPackageName(), (unused, acc) -> {
-                if (acc == null) {
-                    acc = new ArrayList<>();
-                }
-                acc.add(typeDeclaration);
-                return acc;
-            });
+            result.computeIfAbsent(classInfo.getPackageName(), p -> new ArrayList<>())
+                    .add(typeDeclaration);
         }
         return result;
     }
@@ -133,10 +128,13 @@ public class JavaSourceSet implements Marker {
 
             List<J.CompilationUnit> cus = jp.parse(noRecursiveJavaSourceSet, typeStubs);
             for (J.CompilationUnit cu : cus) {
-                for (Statement s : cu.getClasses().get(0).getBody().getStatements()) {
-                    JavaType type = ((J.MethodDeclaration) s).getType();
-                    if (type instanceof JavaType.FullyQualified) {
-                        types.add((JavaType.FullyQualified) type);
+                if (!cu.getClasses().isEmpty()) {
+                    J.Block body = cu.getClasses().get(0).getBody();
+                    for (Statement s : body.getStatements()) {
+                        JavaType type = ((J.MethodDeclaration) s).getType();
+                        if (type instanceof JavaType.FullyQualified) {
+                            types.add((JavaType.FullyQualified) type);
+                        }
                     }
                 }
             }
@@ -192,7 +190,7 @@ public class JavaSourceSet implements Marker {
             // The declarable name of "class A$B {}" is "A$B"
             // The declarable name of class B in "class A { class B {}}" is "A.B"
             StringBuilder sb = new StringBuilder();
-            int classNameStartIndex = classInfo.getPackageName().length() == 0 ?
+            int classNameStartIndex = classInfo.getPackageName().isEmpty() ?
                     0 :
                     classInfo.getPackageName().length() + 1;
             ClassInfoList outerClasses = classInfo.getOuterClasses();
@@ -232,7 +230,9 @@ public class JavaSourceSet implements Marker {
             TypeParameter typeParameter = typeParameters.get(i);
             StringBuilder bounds = new StringBuilder();
             if (typeParameter.getClassBound() != null) {
-                String bound = typeParameter.getClassBound().toString();
+                String bound = typeParameter.getClassBound().toString()
+                        // e.g. for ClassSpecializer<T,K,S extends ClassSpecializer<T,K,S>.SpeciesData>
+                        .replace(">$", ">.");
                 if (!"java.lang.Object".equals(bound)) {
                     bounds.append(bound);
                 }

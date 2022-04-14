@@ -19,7 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
-import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTypeGoat
 import org.openrewrite.java.JavaTypeVisitor
@@ -29,6 +29,13 @@ import org.openrewrite.java.tree.JavaType
 import java.util.*
 
 interface JavaSourceSetTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1636")
+    @Test
+    fun buildJavaSourceSet() {
+        val typeCache = JavaTypeCache()
+        JavaSourceSet.build("main", emptyList(), typeCache, true)
+    }
 
     @Test
     fun shallowTypes() {
