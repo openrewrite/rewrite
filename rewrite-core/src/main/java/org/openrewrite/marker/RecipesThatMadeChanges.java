@@ -36,28 +36,6 @@ public class RecipesThatMadeChanges implements Marker {
     /**
      * Return a list of recipes that have made changes as a hierarchy of descriptors.
      * The method transforms the flat, stack-based representation into descriptors where children are grouped under their common parents.
-     * <PRE>
-     *
-     * List of changes:
-     *
-     * A->B->C
-     * A->B->D
-     * E->F
-     * E->G
-     * H
-     *
-     * Converted to a List of the following descriptors:
-     *
-     * A
-     * |-B
-     * | |-C
-     * | |-D
-     *
-     * E
-     * |-F
-     *
-     * H
-     * </PRE>
      */
     @Incubating(since = "7.22.0")
     public List<RecipeDescriptor> recipeDescriptors() {
