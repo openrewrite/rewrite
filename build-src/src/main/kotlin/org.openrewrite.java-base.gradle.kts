@@ -1,10 +1,6 @@
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
 import org.gradle.jvm.toolchain.JavaLanguageVersion
-import org.gradle.kotlin.dsl.exclude
-import org.gradle.kotlin.dsl.kotlin
-import org.gradle.kotlin.dsl.named
-import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -12,10 +8,6 @@ plugins {
     kotlin("jvm")
     id("org.openrewrite.base")
     id("org.gradle.test-retry")
-}
-
-repositories {
-    mavenCentral()
 }
 
 java {
@@ -36,7 +28,6 @@ tasks.withType<KotlinCompile>().configureEach {
         jvmTarget = "1.8"
     }
 }
-
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"

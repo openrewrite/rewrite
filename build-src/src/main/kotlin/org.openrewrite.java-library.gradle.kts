@@ -1,6 +1,8 @@
 plugins {
     `java-library`
     id("org.openrewrite.java-base")
+    id("nebula.javadoc-jar")
+    id("nebula.source-jar")
 }
 
 dependencies {
