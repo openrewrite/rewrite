@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
-interface UsesRewriteSkipTest : RewriteTest {
+interface DoesNotUseRewriteSkipTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(
             ChangeType("java.util.List", "java.util.Collection", false)
-                .addSingleSourceApplicableTest(UsesRewriteSkip().visitor)
+                .addSingleSourceApplicableTest(DoesNotUseRewriteSkip().visitor)
         )
     }
 

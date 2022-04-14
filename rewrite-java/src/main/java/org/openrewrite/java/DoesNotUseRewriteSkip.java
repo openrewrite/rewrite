@@ -26,7 +26,7 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.Set;
 
-public class UsesRewriteSkip extends Recipe {
+public class DoesNotUseRewriteSkip extends Recipe {
     @Override
     public String getDisplayName() {
         return "Uses `@RewriteSkip` annotation";

@@ -148,6 +148,10 @@ class Java11DeleteStatementTest : Java11Test, DeleteStatementTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11DoesNotUseRewriteSkipTest : Java11Test, DoesNotUseRewriteSkipTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11EmptyBlockTest : Java11Test, EmptyBlockTest
 
 @DebugOnly
@@ -609,10 +613,6 @@ class Java11UseJavaStyleArrayDeclarations : Java11Test, UseJavaStyleArrayDeclara
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11UseLambdaForFunctionalInterface : Java11Test, UseLambdaForFunctionalInterfaceTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11UsesRewriteSkipTest : Java11Test, UsesRewriteSkipTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

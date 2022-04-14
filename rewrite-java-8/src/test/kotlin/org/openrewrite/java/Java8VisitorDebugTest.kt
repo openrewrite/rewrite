@@ -600,7 +600,7 @@ class Java8UseDiamondOperatorTest : Java8Test, UseDiamondOperatorTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8UsesRewriteSkipTest : Java8Test, UsesRewriteSkipTest
+class Java8DoesNotUseRewriteSkipTest : Java8Test, DoesNotUseRewriteSkipTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
