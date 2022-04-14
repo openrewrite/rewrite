@@ -18,11 +18,11 @@ package org.openrewrite.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
+import org.openrewrite.config.RecipeDescriptor;
 
-import java.util.Collection;
-import java.util.Stack;
-import java.util.UUID;
+import java.util.*;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -32,4 +32,38 @@ public class RecipesThatMadeChanges implements Marker {
     UUID id;
 
     Collection<Stack<Recipe>> recipes;
+
+    /**
+     * Return a list of recipes that have made changes as a hierarchy of descriptors.
+     * The method transforms the flat, stack-based representation into descriptors where children are grouped under their common parents.
+     */
+    @Incubating(since = "7.22.0")
+    public List<RecipeDescriptor> recipeDescriptors() {
+        List<RecipeDescriptor> recipesToDisplay = new ArrayList<>();
+
+        for (Stack<Recipe> currentStack : recipes) {
+            // The first recipe is an Environment.CompositeRecipe and should not be included in the list of RecipeDescriptors
+            Recipe root = currentStack.get(1);
+            RecipeDescriptor rootDescriptor = root.getDescriptor().withRecipeList(new ArrayList<>());
+
+            RecipeDescriptor index;
+            if (!recipesToDisplay.contains(rootDescriptor)) {
+                recipesToDisplay.add(rootDescriptor);
+                index = rootDescriptor;
+            } else {
+                index = recipesToDisplay.get(recipesToDisplay.indexOf(rootDescriptor));
+            }
+
+            for (int i = 2; i < currentStack.size(); i++) {
+                RecipeDescriptor nextDescriptor = currentStack.get(i).getDescriptor().withRecipeList(new ArrayList<>());
+                if (!index.getRecipeList().contains(nextDescriptor)) {
+                    index.getRecipeList().add(nextDescriptor);
+                    index = nextDescriptor;
+                } else {
+                    index = index.getRecipeList().get(index.getRecipeList().indexOf(nextDescriptor));
+                }
+            }
+        }
+        return recipesToDisplay;
+    }
 }

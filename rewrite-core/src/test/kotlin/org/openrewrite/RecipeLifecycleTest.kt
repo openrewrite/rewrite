@@ -18,7 +18,9 @@ package org.openrewrite
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
+import org.openrewrite.internal.lang.Nullable
 import org.openrewrite.marker.Markers
+import org.openrewrite.marker.RecipesThatMadeChanges
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
 import java.nio.file.Path
@@ -172,63 +174,65 @@ class RecipeLifecycleTest {
 
     @Test
     fun accurateReportingOfRecipesMakingChanges() {
-        val sources = listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello"))
+        val sources = listOf(
+            PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello")
+        )
         // Set up a composite recipe which prepends "Change1" and appends "Change2" to the input text
         val recipe = object : Recipe() {
-            override fun getDisplayName() = "root"
+            override fun getDisplayName() = "Environment.Composite"
+            override fun getName() = displayName
+            override fun toString() = displayName
         }.apply {
-            doNext(object : Recipe() {
-                override fun getDisplayName() = "Change1"
-                override fun getName() = displayName
-                override fun toString() = displayName
-                override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
-                    return object : PlainTextVisitor<ExecutionContext>() {
-                        override fun visit(tree: Tree, p: ExecutionContext): PlainText {
-                            var pt = tree as PlainText
-                            if (!pt.printAll().startsWith("Change1")) {
-                                pt = pt.withText("Change1" + pt.printAll())
-                            }
-                            return pt
-                        }
-                    }
-
-                }
-            })
-            doNext(object : Recipe() {
-                override fun getDisplayName() = "NoChange"
-                override fun getName() = displayName
-                override fun toString() = displayName
-                override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
-                    return object : PlainTextVisitor<ExecutionContext>() {
-                        override fun visit(tree: Tree, p: ExecutionContext) = tree as PlainText
-                    }
-
-                }
-            })
             doNext(
                 object : Recipe() {
-                    override fun getDisplayName() = "Change2"
+                    override fun getDisplayName() = "a"
                     override fun getName() = displayName
                     override fun toString() = displayName
-                    override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
-                        return object : PlainTextVisitor<ExecutionContext>() {
-                            override fun visit(tree: Tree, p: ExecutionContext): PlainText {
-                                var pt = tree as PlainText
-                                if (!pt.printAll().endsWith("Change2")) {
-                                    pt = pt.withText(pt.printAll() + "Change2")
-                                }
-                                return pt
-                            }
-                        }
-
-                    }
-                },
-            )
+                }.doNext(
+                    testRecipe("ab")
+                        .doNext(
+                            testRecipe("abc")
+                                .doNext(testRecipe("abc1"))
+                                .doNext(
+                                    testRecipe("abc2")
+                                        .doNext(testRecipe("abc2x"))
+                                )
+                        )
+                ).doNext(
+                    DeleteSourceFiles("delete.txt")
+                )
+            ).doNext(testRecipe("r2"))
         }
         val results = recipe.run(sources, InMemoryExecutionContext { throw it })
-        assertThat(results.size)
-            .isEqualTo(1)
-        assertThat(results.first().recipesThatMadeChanges.map { it.name })
-            .containsExactlyInAnyOrder("Change1", "Change2")
+        assertThat(results.size).isEqualTo(1)
+
+        val recipesThatMadeChanges =
+            results.first().after?.markers?.findFirst(RecipesThatMadeChanges::class.java)?.orElse(null)
+        assertThat(recipesThatMadeChanges).isNotNull
+        val recipeDescriptors = recipesThatMadeChanges?.recipeDescriptors()
+        assertThat(recipeDescriptors?.size).isEqualTo(2)
+        val abcDescriptors = recipeDescriptors?.get(0)?.recipeList?.get(0)?.recipeList?.get(0)
+        assertThat(abcDescriptors?.recipeList?.map { it.name }).containsExactlyInAnyOrder("abc1", "abc2")
+        assertThat(abcDescriptors?.recipeList?.size).isEqualTo(2)
+        assertThat(abcDescriptors?.recipeList?.get(1)?.recipeList?.get(0)?.name).isEqualTo("abc2x")
+    }
+
+    private fun testRecipe(name: String): Recipe {
+        return object : Recipe() {
+            override fun getDisplayName() = name
+            override fun getName() = displayName
+            override fun toString() = displayName
+            override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
+                return object : PlainTextVisitor<ExecutionContext>() {
+                    override fun visit(@Nullable tree: Tree?, p: ExecutionContext): PlainText {
+                        var pt = tree as PlainText
+                        if (!pt.printAll().startsWith(displayName)) {
+                            pt = pt.withText(displayName + pt.printAll())
+                        }
+                        return pt
+                    }
+                }
+            }
+        }
     }
 }
