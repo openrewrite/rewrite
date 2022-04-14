@@ -31,7 +31,7 @@ import java.util.Comparator;
 import java.util.Set;
 
 @Value
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 public class MissingOverrideAnnotation extends Recipe {
     @Option(displayName = "Ignore methods in anonymous classes",
             description = "When enabled, ignore missing annotations on methods which override methods when the class definition is within an anonymous class.",
@@ -76,6 +76,7 @@ public class MissingOverrideAnnotation extends Recipe {
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             if (!method.hasModifier(J.Modifier.Type.Static)
+                    && !method.isConstructor()
                     && method.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)
                     && TypeUtils.isOverride(method.getMethodType())
                     && !(Boolean.TRUE.equals(ignoreAnonymousClassMethods)
