@@ -452,6 +452,10 @@ class Java11RemoveExtraSemicolonsTest : Java11Test, RemoveExtraSemicolonsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RemoveJavaDocAuthorTagTest : Java11Test, RemoveJavaDocAuthorTagTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RemoveUnneededBlockTest : Java11Test, RemoveUnneededBlockTest
 
 @DebugOnly

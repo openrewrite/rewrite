@@ -347,6 +347,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveExtraSemicolonsTck : RemoveExtraSemicolonsTest
 
     @Nested
+    inner class RemoveJavaDocAuthorTagTck : RemoveJavaDocAuthorTagTest
+
+    @Nested
     inner class RemoveUnneededBlockTck : RemoveUnneededBlockTest
 
     @Nested
