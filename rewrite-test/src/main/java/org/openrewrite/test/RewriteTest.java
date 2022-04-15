@@ -68,6 +68,7 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     default void defaults(RecipeSpec spec) {
+        spec.recipe(Recipe.noop());
     }
 
     default void rewriteRun(SourceSpecs... sourceSpecs) {
@@ -220,6 +221,9 @@ public interface RewriteTest extends SourceSpecs {
                 sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
                         sourceFile.getMarkers().getMarkers(), spec.markers)));
 
+                //noinspection unchecked
+                ((Consumer<SourceFile>) spec.beforeRecipe).accept(sourceFile);
+
                 specBySourceFile.put(sourceFile, spec);
             }
         }
@@ -260,17 +264,26 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        nextSpec:
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
-            if (specForSourceFile.getValue().after != null) {
-                for (Result result : results) {
-                    if (result.getBefore() == specForSourceFile.getKey()) {
-                        continue nextSpec;
+            String after = specForSourceFile.getValue().after;
+            for (Result result : results) {
+                if (result.getBefore() == specForSourceFile.getKey()) {
+                    if(after == null) {
+                        assertThat(result.getAfter() == null ? "<deleted>" : result.getAfter().printAll())
+                                .as("The recipe must not make changes")
+                                .isEqualTo(result.getBefore() == null ? "" : result.getBefore().printAll());
                     }
+                    //noinspection unchecked
+                    ((Consumer<SourceFile>) specForSourceFile.getValue().afterRecipe).accept(result.getAfter());
+                    break;
                 }
-                if (results.isEmpty()) {
-                    fail("The recipe must make changes");
-                }
+            }
+
+            if (after != null && results.isEmpty()) {
+                fail("The recipe must make changes");
+            } else if(after == null) {
+                //noinspection unchecked
+                ((Consumer<SourceFile>) specForSourceFile.getValue().afterRecipe).accept(specForSourceFile.getKey());
             }
         }
 

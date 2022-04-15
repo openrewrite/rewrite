@@ -74,17 +74,19 @@ public abstract class Recipe {
     private final transient List<TreeVisitor<?, ExecutionContext>> applicableTests = new ArrayList<>();
 
     public static Recipe noop() {
-        return new Recipe() {
-            @Override
-            public String getDisplayName() {
-                return "Do nothing";
-            }
+        return new Noop();
+    }
 
-            @Override
-            protected TreeVisitor<?, ExecutionContext> getVisitor() {
-                return NOOP;
-            }
-        };
+    static class Noop extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Do nothing";
+        }
+
+        @Override
+        protected TreeVisitor<?, ExecutionContext> getVisitor() {
+            return NOOP;
+        }
     }
 
     /**
