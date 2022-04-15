@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.9.3
+// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.10.1
 package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
