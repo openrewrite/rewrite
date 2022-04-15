@@ -174,34 +174,64 @@ class RecipeLifecycleTest {
 
     @Test
     fun accurateReportingOfRecipesMakingChanges() {
+        val sources = listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello"))
+        // Set up a composite recipe which prepends "Change1" and appends "Change2" to the input text
+        val recipe = object : Recipe() {
+            override fun getDisplayName() = "root"
+        }.apply {
+            doNext(testRecipe("Change1"))
+            doNext(noChangeRecipe())
+            doNext(testRecipe("Change2"))
+        }
+        val results = recipe.run(sources, InMemoryExecutionContext { throw it })
+        assertThat(results.size)
+            .isEqualTo(1)
+        assertThat(results.first().recipesThatMadeChanges.map { it.name })
+            .containsExactlyInAnyOrder("Change1", "Change2")
+    }
+
+
+    /**
+     * EC
+     * A - B - C
+     * A - B - D
+     * E - F
+     * E - NoChange
+     * H
+     * B - A - C
+     *
+     * Converted to a List of the following descriptors:
+     *
+     * A
+     * |-B
+     * | |-C
+     * | |-D
+     *
+     * E
+     * |-F
+     *
+     */
+    @Test
+    fun recipeDescriptorsReturnCorrectStructure() {
         val sources = listOf(
             PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello")
         )
-        // Set up a composite recipe which prepends "Change1" and appends "Change2" to the input text
+        // Set up a composite recipe which with a nested structure of recipes
         val recipe = object : Recipe() {
             override fun getDisplayName() = "Environment.Composite"
             override fun getName() = displayName
             override fun toString() = displayName
         }.apply {
-            doNext(
-                object : Recipe() {
-                    override fun getDisplayName() = "a"
-                    override fun getName() = displayName
-                    override fun toString() = displayName
-                }.doNext(
-                    testRecipe("ab")
-                        .doNext(
-                            testRecipe("abc")
-                                .doNext(testRecipe("abc1"))
-                                .doNext(
-                                    testRecipe("abc2")
-                                        .doNext(testRecipe("abc2x"))
-                                )
-                        )
-                ).doNext(
-                    DeleteSourceFiles("delete.txt")
-                )
-            ).doNext(testRecipe("r2"))
+            doNext(testRecipe("A")
+                .doNext(testRecipe("B")
+                    .doNext(testRecipe("C"))))
+            doNext(testRecipe("A")
+                .doNext(testRecipe("B")
+                    .doNext(testRecipe("D")))
+                    .doNext(noChangeRecipe()))
+            doNext(testRecipe("E")
+                .doNext(testRecipe("F")))
+            doNext(noChangeRecipe())
         }
         val results = recipe.run(sources, InMemoryExecutionContext { throw it })
         assertThat(results.size).isEqualTo(1)
@@ -211,10 +241,12 @@ class RecipeLifecycleTest {
         assertThat(recipesThatMadeChanges).isNotNull
         val recipeDescriptors = recipesThatMadeChanges?.recipeDescriptors()
         assertThat(recipeDescriptors?.size).isEqualTo(2)
-        val abcDescriptors = recipeDescriptors?.get(0)?.recipeList?.get(0)?.recipeList?.get(0)
-        assertThat(abcDescriptors?.recipeList?.map { it.name }).containsExactlyInAnyOrder("abc1", "abc2")
-        assertThat(abcDescriptors?.recipeList?.size).isEqualTo(2)
-        assertThat(abcDescriptors?.recipeList?.get(1)?.recipeList?.get(0)?.name).isEqualTo("abc2x")
+
+        val aDescriptor = recipeDescriptors?.get(0)
+        val bDescriptor = aDescriptor?.recipeList?.get(0);
+        // B has three child recipes one is no change
+        assertThat(bDescriptor?.name).isEqualTo("B")
+        assertThat(bDescriptor?.recipeList?.size).isEqualTo(2)
     }
 
     private fun testRecipe(name: String): Recipe {
@@ -226,12 +258,25 @@ class RecipeLifecycleTest {
                 return object : PlainTextVisitor<ExecutionContext>() {
                     override fun visit(@Nullable tree: Tree?, p: ExecutionContext): PlainText {
                         var pt = tree as PlainText
-                        if (!pt.printAll().startsWith(displayName)) {
+                        if (!pt.printAll().contains(displayName)) {
                             pt = pt.withText(displayName + pt.printAll())
                         }
                         return pt
                     }
                 }
+            }
+        }
+    }
+    private fun noChangeRecipe(): Recipe {
+        return object : Recipe() {
+            override fun getDisplayName() = "NoChange"
+            override fun getName() = displayName
+            override fun toString() = displayName
+            override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
+                return object : PlainTextVisitor<ExecutionContext>() {
+                    override fun visit(tree: Tree, p: ExecutionContext) = tree as PlainText
+                }
+
             }
         }
     }
