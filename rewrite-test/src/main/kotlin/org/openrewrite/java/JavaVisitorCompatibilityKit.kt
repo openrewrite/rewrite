@@ -350,6 +350,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveJavaDocAuthorTagTck : RemoveJavaDocAuthorTagTest
 
     @Nested
+    inner class RemoveRemoveRedundantTypeCastTck : RemoveRedundantTypeCastTest
+
+    @Nested
     inner class RemoveUnneededBlockTck : RemoveUnneededBlockTest
 
     @Nested

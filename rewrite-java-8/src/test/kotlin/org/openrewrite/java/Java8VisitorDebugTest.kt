@@ -18,7 +18,6 @@ package org.openrewrite.java
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
-import org.openrewrite.java.dataflow.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.recipes.ExecutionContextParameterNameTest
 import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
@@ -441,6 +440,10 @@ class Java8RemoveExtraSemicolonsTest : Java8Test, RemoveExtraSemicolonsTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8RemoveJavaDocAuthorTagTest : Java8Test, RemoveJavaDocAuthorTagTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8RemoveRedundantTypeCastTest : Java8Test, RemoveRedundantTypeCastTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
