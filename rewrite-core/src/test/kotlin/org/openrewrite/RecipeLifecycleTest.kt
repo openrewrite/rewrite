@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
 import org.openrewrite.internal.lang.Nullable
 import org.openrewrite.marker.Markers
-import org.openrewrite.marker.RecipesThatMadeChanges
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
 import java.nio.file.Path
@@ -236,19 +235,15 @@ class RecipeLifecycleTest {
         val results = recipe.run(sources, InMemoryExecutionContext { throw it })
         assertThat(results.size).isEqualTo(1)
 
-        val recipesThatMadeChanges =
-            results.first().after?.markers?.findFirst(RecipesThatMadeChanges::class.java)?.orElse(null)
-        assertThat(recipesThatMadeChanges).isNotNull
-        val recipeDescriptors = recipesThatMadeChanges?.recipeDescriptors()
-        assertThat(recipeDescriptors?.size).isEqualTo(2)
+        val recipeDescriptors = results[0].recipeDescriptorsThatMadeChanges
+        assertThat(recipeDescriptors.size).isEqualTo(2)
 
-        val aDescriptor = recipeDescriptors?.get(0)
-        val bDescriptor = aDescriptor?.recipeList?.get(0);
+        val aDescriptor = recipeDescriptors.get(0)
+        val bDescriptor = aDescriptor?.recipeList?.get(0)
         // B has three child recipes one is no change
         assertThat(bDescriptor?.name).isEqualTo("B")
         assertThat(bDescriptor?.recipeList?.size).isEqualTo(2)
     }
-
     private fun testRecipe(name: String): Recipe {
         return object : Recipe() {
             override fun getDisplayName() = name
@@ -272,12 +267,6 @@ class RecipeLifecycleTest {
             override fun getDisplayName() = "NoChange"
             override fun getName() = displayName
             override fun toString() = displayName
-            override fun getVisitor(): PlainTextVisitor<ExecutionContext> {
-                return object : PlainTextVisitor<ExecutionContext>() {
-                    override fun visit(tree: Tree, p: ExecutionContext) = tree as PlainText
-                }
-
-            }
         }
     }
 }

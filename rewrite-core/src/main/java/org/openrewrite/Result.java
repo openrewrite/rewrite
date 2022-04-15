@@ -23,6 +23,7 @@ import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayOutputStream;
@@ -68,6 +69,40 @@ public class Result {
     @Deprecated
     public Set<Recipe> getRecipesThatMadeChanges() {
         return recipes.stream().map(Stack::peek).collect(Collectors.toSet());
+    }
+
+    /**
+     * Return a list of recipes that have made changes as a hierarchy of descriptors.
+     * The method transforms the flat, stack-based representation into descriptors where children are grouped under their common parents.
+     */
+    @Incubating(since = "7.22.0")
+    public List<RecipeDescriptor> getRecipeDescriptorsThatMadeChanges() {
+        List<RecipeDescriptor> recipesToDisplay = new ArrayList<>();
+
+        for (Stack<Recipe> currentStack : recipes) {
+            // The first recipe is an Environment.CompositeRecipe and should not be included in the list of RecipeDescriptors
+            Recipe root = currentStack.get(1);
+            RecipeDescriptor rootDescriptor = root.getDescriptor().withRecipeList(new ArrayList<>());
+
+            RecipeDescriptor index;
+            if (recipesToDisplay.contains(rootDescriptor)) {
+                index = recipesToDisplay.get(recipesToDisplay.indexOf(rootDescriptor));
+            } else {
+                recipesToDisplay.add(rootDescriptor);
+                index = rootDescriptor;
+            }
+
+            for (int i = 2; i < currentStack.size(); i++) {
+                RecipeDescriptor nextDescriptor = currentStack.get(i).getDescriptor().withRecipeList(new ArrayList<>());
+                if (index.getRecipeList().contains(nextDescriptor)) {
+                    index = index.getRecipeList().get(index.getRecipeList().indexOf(nextDescriptor));
+                } else {
+                    index.getRecipeList().add(nextDescriptor);
+                    index = nextDescriptor;
+                }
+            }
+        }
+        return recipesToDisplay;
     }
 
     public Result(@Nullable SourceFile before, @Nullable SourceFile after, Collection<Stack<Recipe>> recipes) {
