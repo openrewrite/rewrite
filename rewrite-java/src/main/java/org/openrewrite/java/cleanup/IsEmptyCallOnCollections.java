@@ -26,7 +26,8 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class IsEmptyCallOnCollections extends Recipe {
@@ -44,7 +45,7 @@ public class IsEmptyCallOnCollections extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-3981");
+        return new LinkedHashSet<>(Arrays.asList("RSPEC-1155", "RSPEC-3981"));
     }
 
     @Override
