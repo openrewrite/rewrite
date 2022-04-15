@@ -21,7 +21,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
-    implementation("org.antlr:antlr4:4.9.+")
+    implementation("org.antlr:antlr4:4.10.1")
     implementation("org.yaml:snakeyaml:latest.release")
     implementation("io.micrometer:micrometer-core:1.+")
 
