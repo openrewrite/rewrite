@@ -247,7 +247,7 @@ class ReloadableJava8Parser implements JavaParser {
         typeCache.clear();
         compilerLog.reset();
         pfm.flush();
-        Check.instance(context).compiled.clear();
+        compileDependencies();
         return this;
     }
 
