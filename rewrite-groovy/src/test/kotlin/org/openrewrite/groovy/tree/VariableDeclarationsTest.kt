@@ -80,4 +80,13 @@ class VariableDeclarationsTest : GroovyTreeTest {
     fun genericVariableDeclaration() = assertParsePrintAndProcess(
         "def a = new HashMap<String, String>()"
     )
+
+    @Test
+    fun anonymousClass() = assertParsePrintAndProcess(
+        """
+            def a = new Object( ) { 
+                def b = new Object() { }
+            }
+        """
+    )
 }

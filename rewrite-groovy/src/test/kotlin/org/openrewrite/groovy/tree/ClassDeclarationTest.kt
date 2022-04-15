@@ -157,7 +157,6 @@ class ClassDeclarationTest : GroovyTreeTest {
         """
     )
 
-    @Disabled
     @Test
     fun newParameterizedConstructor() = assertParsePrintAndProcess(
         """

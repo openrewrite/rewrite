@@ -61,17 +61,9 @@ public interface JavaTreeTest {
         J processed = new JavaVisitor<>().visit(cu, new Object());
         assertThat(processed).as("Processing is idempotent").isSameAs(cu);
 
-//        TreeSerializer<J.CompilationUnit> treeSerializer = new TreeSerializer<>(true);
-//        byte[] write = treeSerializer.write(cu);
-//        J.CompilationUnit roundTripCu = treeSerializer.read(write);
-
         assertThat(JavaParserTestUtil.print(nestingLevel, cu))
                 .as("Source code is printed the same after parsing")
                 .isEqualTo(StringUtils.trimIndent(code));
-
-//        assertThat(JavaParserTestUtil.print(nestingLevel, roundTripCu))
-//                .as("Source code is printed the same after round trip serialization")
-//                .isEqualTo(StringUtils.trimIndent(code));
     }
 
     enum NestingLevel {
