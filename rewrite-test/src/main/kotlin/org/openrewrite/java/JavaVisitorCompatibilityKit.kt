@@ -22,7 +22,6 @@ import org.openrewrite.java.format.*
 import org.openrewrite.java.recipes.ExecutionContextParameterNameTest
 import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
 import org.openrewrite.java.search.*
-import org.openrewrite.java.dataflow.*
 import org.openrewrite.java.style.AutodetectTest
 import org.openrewrite.java.tree.TypeTreeTest
 
@@ -166,9 +165,6 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class ForLoopIncrementInUpdateTck : ForLoopIncrementInUpdateTest
-
-    @Nested
-    inner class UpdateGuardedByTck : UpdateGuardedByTest
 
     @Nested
     inner class FindDeprecatedClassesTck : FindDeprecatedClassesTest
