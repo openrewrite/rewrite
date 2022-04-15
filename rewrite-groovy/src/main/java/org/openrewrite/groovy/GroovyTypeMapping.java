@@ -293,6 +293,11 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
      */
     @Nullable
     public JavaType.Variable variableType(String name, @Nullable ASTNode type) {
+        return variableType(name, type(type));
+    }
+
+    @Nullable
+    public JavaType.Variable variableType(String name, @Nullable JavaType type) {
         if (type == null) {
             return null;
         }
@@ -311,7 +316,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
 
         typeCache.put(signature, variable);
 
-        variable.unsafeSet(JavaType.Unknown.getInstance(), type(type), null);
+        variable.unsafeSet(JavaType.Unknown.getInstance(), type, null);
 
         return variable;
     }

@@ -952,7 +952,7 @@ public class GroovyParserVisitor {
                         name.withPrefix(EMPTY),
                         emptyList(),
                         null,
-                        typeMapping.variableType(name.getSimpleName(), expression.getVariableExpression().getType())
+                        typeMapping.variableType(name.getSimpleName(), typeExpr.getType())
                 );
             }
 
@@ -1315,7 +1315,9 @@ public class GroovyParserVisitor {
         }
 
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
-            JavaType type = typeMapping.type(expression.getOriginType());
+            ClassNode inferred = (ClassNode) expression.getNodeMetaData().get(StaticTypesMarker.INFERRED_TYPE);
+            JavaType type = typeMapping.type(inferred == null ? expression.getOriginType() : inferred);
+
             if (expression.isDynamicTyped()) {
                 return new J.Identifier(randomId(),
                         sourceBefore("def"),
@@ -1679,6 +1681,8 @@ public class GroovyParserVisitor {
     private JContainer<Expression> visitTypeParameterizations(@Nullable GenericsType[] genericsTypes) {
         Space prefix = sourceBefore("<");
         List<JRightPadded<Expression>> parameters;
+
+        //noinspection ConstantConditions
         if(genericsTypes == null) {
             // Groovy compiler does not always bother to record type parameter info in places it does not care about
             Space paramPrefix = whitespace();
