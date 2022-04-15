@@ -13,9 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.dataflow;
+package org.openrewrite.dataflow;
 
-import org.openrewrite.marker.Marker;
+import org.openrewrite.Incubating;
 
-public interface DataflowMarker extends Marker {
+import java.util.List;
+
+/**
+ * @param <S> The statement type of a particular language family.
+ */
+@Incubating(since = "7.22.0")
+public class ControlFlowGraph<S> extends Graph<BasicBlock<S>> {
+    protected ControlFlowGraph(BasicBlock<S> bb, List<Graph<BasicBlock<S>>> children) {
+        super(bb, children);
+    }
 }

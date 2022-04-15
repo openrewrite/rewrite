@@ -26,6 +26,7 @@ import io.micrometer.core.instrument.distribution.DistributionStatisticConfig;
 import io.micrometer.core.instrument.distribution.HistogramSnapshot;
 import io.micrometer.core.instrument.distribution.pause.PauseDetector;
 import io.micrometer.core.instrument.internal.DefaultGauge;
+import io.micrometer.core.instrument.internal.DefaultLongTaskTimer;
 import io.micrometer.core.instrument.util.TimeUtils;
 import io.micrometer.core.lang.Nullable;
 import org.openrewrite.internal.lang.NonNullApi;
@@ -222,6 +223,11 @@ public class LoggingMeterRegistry extends MeterRegistry {
     @Override
     protected Counter newCounter(Meter.Id id) {
         return new CumulativeCounter(id);
+    }
+
+    @Override
+    protected LongTaskTimer newLongTaskTimer(Meter.Id id, DistributionStatisticConfig distributionStatisticConfig) {
+        return new DefaultLongTaskTimer(id, clock, baseTimeUnit, distributionStatisticConfig, false);
     }
 
     @Override

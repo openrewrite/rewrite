@@ -38,7 +38,7 @@ dependencies {
     compileOnly(project(":rewrite-yaml"))
     compileOnly(project(":rewrite-properties"))
 
-    implementation("io.micrometer:micrometer-core:latest.release")
+    implementation("io.micrometer:micrometer-core:1.+")
 
     implementation("org.apache.commons:commons-text:latest.release")
 
@@ -50,7 +50,7 @@ dependencies {
     integTestImplementation("org.eclipse.aether:aether-transport-http:latest.release")
     integTestImplementation("org.apache.maven:maven-aether-provider:latest.release")
     integTestImplementation("org.apache.maven:maven-core:latest.release")
-    integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")
+    integTestImplementation("io.micrometer:micrometer-registry-prometheus:1.+")
     integTestImplementation("org.rocksdb:rocksdbjni:latest.release")
 
     integTestImplementation(project(":rewrite-java-11"))

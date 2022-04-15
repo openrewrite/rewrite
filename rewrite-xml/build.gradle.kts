@@ -22,7 +22,7 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
     implementation("org.antlr:antlr4:4.9.+")
-    implementation("io.micrometer:micrometer-core:latest.release")
+    implementation("io.micrometer:micrometer-core:1.+")
 
     testImplementation(project(":rewrite-test"))
 }

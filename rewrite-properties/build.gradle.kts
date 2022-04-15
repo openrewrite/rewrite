@@ -8,7 +8,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
-    implementation("io.micrometer:micrometer-core:latest.release")
+    implementation("io.micrometer:micrometer-core:1.+")
 
     testImplementation(project(":rewrite-test"))
 }

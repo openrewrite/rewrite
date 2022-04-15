@@ -18,7 +18,7 @@ dependencies {
 
     api("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
-    compileOnly("io.micrometer:micrometer-registry-prometheus:latest.release")
+    compileOnly("io.micrometer:micrometer-registry-prometheus:1.+")
 
     implementation("com.squareup.okhttp3:okhttp:4.+")
 

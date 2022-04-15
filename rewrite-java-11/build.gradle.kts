@@ -13,13 +13,13 @@ dependencies {
 
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
-    implementation("io.micrometer:micrometer-core:latest.release")
+    implementation("io.micrometer:micrometer-core:1.+")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
 
-    integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")
+    integTestImplementation("io.micrometer:micrometer-registry-prometheus:1.+")
 }
 
 tasks.withType<JavaCompile> {

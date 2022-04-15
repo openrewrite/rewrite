@@ -7,6 +7,7 @@ plugins {
 }
 
 dependencies {
+    implementation("org.projectlombok:lombok:1.18.20")
     compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
     testImplementation("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
@@ -28,7 +29,7 @@ dependencies {
     implementation("commons-io:commons-io:latest.release")
     implementation("org.apache.commons:commons-compress:latest.release")
 
-    implementation("io.micrometer:micrometer-core:latest.release")
+    implementation("io.micrometer:micrometer-core:1.+")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
 }

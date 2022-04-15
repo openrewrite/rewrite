@@ -13,17 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.dataflow;
+package org.openrewrite.dataflow;
 
 import lombok.Value;
-import lombok.With;
+import org.openrewrite.Incubating;
 
-import java.util.UUID;
+import java.util.List;
 
+import static java.util.Collections.emptyList;
+
+/**
+ * @param <S> The statement type of a particular language family.
+ */
 @Value
-@With
-public class GuardedBy implements DataflowMarker {
-    UUID id;
-    UUID guard;
-    boolean byNegation;
+@Incubating(since = "7.22.0")
+public class BasicBlock<S> {
+    static <S> BasicBlock<S> epsilon() {
+        return new BasicBlock<>(emptyList());
+    }
+
+    List<S> statements;
 }
