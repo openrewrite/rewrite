@@ -16,7 +16,6 @@
 package org.openrewrite.java.cleanup
 
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
@@ -357,14 +356,14 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
     @Test
     fun `when ignoreAnonymousClassMethods is true and a method overrides within an anonymous class`() = assertUnchanged(
         recipe = MissingOverrideAnnotation(true),
-        dependsOn = arrayOf(testParent, testParentParent),
         before = """
             package com.example;
             
             class Test {
                 public void method() {
-                    TestParent t = new TestParent() {
-                        public void testParent() {
+                    //noinspection all
+                    Runnable t = new Runnable() {
+                        public void run() {
                         }
                     };
                 }
@@ -373,17 +372,16 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
     )
 
     @Test
-    @Disabled("Override annotation is not being attributed in Java 8, causing infinite cycles when adding annotations to anonymous classes.")
     fun `when ignoreAnonymousClassMethods is false and a method overrides within an anonymous class`() = assertChanged(
         recipe = MissingOverrideAnnotation(false),
-        dependsOn = arrayOf(testParent, testParentParent),
         before = """
             package com.example;
             
             class Test {
                 public void method() {
-                    TestParent t = new TestParent() {
-                        public void testParent() {
+                    //noinspection all
+                    Runnable t = new Runnable() {
+                        public void run() {
                         }
                     };
                 }
@@ -394,9 +392,10 @@ interface MissingOverrideAnnotationTest : JavaRecipeTest {
             
             class Test {
                 public void method() {
-                    TestParent t = new TestParent() {
+                    //noinspection all
+                    Runnable t = new Runnable() {
                         @Override
-                        public void testParent() {
+                        public void run() {
                         }
                     };
                 }
