@@ -320,18 +320,6 @@ class Java11LambdaBlockToExpressionTest : Java11Test, LambdaBlockToExpressionTes
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11UpdateGuardedByTest : Java11Test, UpdateGuardedByTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11UpdateLastReadTest : Java11Test, UpdateLastReadTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11UpdateLastWriteTest : Java11Test, UpdateLastWriteTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java11LineCounterTest : Java11Test, LineCounterTest
 
 @DebugOnly

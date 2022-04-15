@@ -584,18 +584,6 @@ class Java8UnwrapParenthesesTest : Java8Test, UnwrapParenthesesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8UpdateGuardedByTest : Java8Test, UpdateGuardedByTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java8UpdateLastReadTest : Java8Test, UpdateLastReadTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java8UpdateLastWriteTest : Java8Test, UpdateLastWriteTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java8UseDiamondOperatorTest : Java8Test, UseDiamondOperatorTest
 
 @DebugOnly

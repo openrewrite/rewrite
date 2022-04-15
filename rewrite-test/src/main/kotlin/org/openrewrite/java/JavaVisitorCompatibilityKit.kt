@@ -171,12 +171,6 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UpdateGuardedByTck : UpdateGuardedByTest
 
     @Nested
-    inner class UpdateLastReadTck : UpdateLastReadTest
-
-    @Nested
-    inner class UpdateLastWriteTck : UpdateLastWriteTest
-
-    @Nested
     inner class FindDeprecatedClassesTck : FindDeprecatedClassesTest
 
     @Nested
