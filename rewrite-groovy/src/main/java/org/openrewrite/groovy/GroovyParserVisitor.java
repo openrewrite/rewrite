@@ -57,6 +57,7 @@ public class GroovyParserVisitor {
     private final String source;
     private final GroovyTypeMapping typeMapping;
     private final ExecutionContext ctx;
+    private final Map<ASTNode, JavaType> inferredTypes = new HashMap<>();
 
     private int cursor = 0;
 
@@ -794,7 +795,18 @@ public class GroovyParserVisitor {
         @Override
         public void visitClosureExpression(ClosureExpression expression) {
             Space prefix = sourceBefore("{");
-
+            ClassNode inferred = (ClassNode) expression.getNodeMetaData().get(StaticTypesMarker.INFERRED_TYPE);
+            JavaType closureType = typeMapping.type(inferred == null ? expression.getType() : inferred);
+            if(inferredTypes.containsKey(expression)) {
+                JavaType actualParamType = inferredTypes.get(expression);
+                if(closureType instanceof JavaType.Parameterized) {
+                    closureType = ((JavaType.Parameterized) closureType)
+                            .withTypeParameters(singletonList(actualParamType));
+                } else if (closureType instanceof JavaType.FullyQualified) {
+                    closureType = new JavaType.Parameterized(null,
+                            (JavaType.FullyQualified) closureType, singletonList(actualParamType));
+                }
+            }
             List<JRightPadded<J>> paramExprs = emptyList();
             if (expression.getParameters().length > 0) {
                 paramExprs = new ArrayList<>(expression.getParameters().length);
@@ -824,7 +836,7 @@ public class GroovyParserVisitor {
             J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, paramExprs);
             Space arrow = params.getParameters().isEmpty() ? EMPTY : sourceBefore("->");
 
-            queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params, arrow, visit(expression.getCode()), null));
+            queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params, arrow, visit(expression.getCode()), closureType));
             cursor += 1; // skip '}'
         }
 
@@ -1142,9 +1154,24 @@ public class GroovyParserVisitor {
             if (implicitDot != null) {
                 name = name.withMarkers(name.getMarkers().add(implicitDot));
             }
-
+            // Method invocations have type information on them that we want to get in to any closure parameters
+            List<ASTNode> toRemove = null;
+            if(call.getArguments() instanceof ArgumentListExpression && call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
+                ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
+                toRemove = new ArrayList<>(args.getExpressions().size());
+                for(org.codehaus.groovy.ast.expr.Expression arg : args.getExpressions()) {
+                    if(arg instanceof ClosureExpression) {
+                        toRemove.add(arg);
+                        inferredTypes.put(arg, typeMapping.type(call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE)));
+                    }
+                }
+            }
             JContainer<Expression> args = visit(call.getArguments());
-
+            if(toRemove != null) {
+                for(ASTNode node : toRemove) {
+                    inferredTypes.remove(node);
+                }
+            }
             MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
             JavaType.Method methodType = typeMapping.methodType(methodNode);
             queue.add(new J.MethodInvocation(randomId(), fmt, Markers.EMPTY,
@@ -1687,7 +1714,7 @@ public class GroovyParserVisitor {
             // Groovy compiler does not always bother to record type parameter info in places it does not care about
             Space paramPrefix = whitespace();
             if(source.charAt(cursor) == '>') {
-                parameters = Collections.singletonList(JRightPadded.build(new J.Empty(randomId(), paramPrefix, Markers.EMPTY)));
+                parameters = singletonList(JRightPadded.build(new J.Empty(randomId(), paramPrefix, Markers.EMPTY)));
             } else {
                 parameters = new ArrayList<>();
                 while (true) {
