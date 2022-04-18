@@ -257,24 +257,26 @@ interface AutodetectTest {
             import java.util.ArrayList;
             import java.util.Collections;
             import java.util.HashSet;
+            import java.util.HashMap;
+            import java.util.Map;
             import java.util.List;
             import java.util.Set;
             
-            import javax.persistence.Entity;
-            import javax.persistence.FetchType;
-            import javax.persistence.JoinColumn;
-            import javax.persistence.JoinTable;
-            import javax.persistence.ManyToMany;
-            import javax.persistence.Table;
-            import javax.xml.bind.annotation.XmlElement;
+            import java.util.concurrent.*;
             
             public class Test {
-                List<Integer> l;
-                Set<Integer> s;
-                Map<Integer, Integer> m;
-                Collection<Integer> c;
-                LinkedHashMap<Integer, Integer> lhm;
-                HashSet<Integer> integer;
+                ArrayList<Integer> arrayList;
+                Collection<Integer> collection;
+                HashSet<Integer> hashSet;
+                HashMap<Integer, Integer> hashMap;
+                Map<Integer, Integer> map;
+                List<Integer> list;
+                Set<Integer> set;
+            
+                // The `concurrent` package is intentionally using fewer types than `util`.
+                ConcurrentLinkedQueue<Integer> concurrentLinkedQueue;
+                ConcurrentLinkedDeque<Integer> concurrentLinkedDeque;
+                ConcurrentHashMap<Integer, Integer> concurrentHashMap;
             }
         """.trimIndent()
         )

@@ -241,6 +241,8 @@ public class Autodetect extends NamedStyles {
         int javaxBeforeJavaCount = 0;
         int minimumFoldedImports = Integer.MAX_VALUE;
         int minimumFoldedStaticImports = Integer.MAX_VALUE;
+        int maximumUnfoldedImports = 0;
+        int maximumUnfoldedStaticImports = 0;
 
         public boolean isStaticImportsAtBot() {
             return staticAtBotCount >= staticAtTopCount;
@@ -522,10 +524,14 @@ public class Autodetect extends NamedStyles {
                             builder.importStaticAllOthers();
                         }
 
+                        // Default the lower limit to 9999 if there is any evidence imports should not be folded.
+                        int unfoldedImports = maximumUnfoldedImports > 5 ? Integer.MAX_VALUE : 5;
+                        int unfoldedStaticImports = maximumUnfoldedStaticImports > 3 ? Integer.MAX_VALUE : 3;
+
                         // set lower limits in case type attribution is really messed up on the project
                         // and we can't effectively count star imports
-                        builder.classCountToUseStarImport(Math.max(minimumFoldedImports, 5));
-                        builder.nameCountToUseStarImport(Math.max(minimumFoldedStaticImports, 3));
+                        builder.classCountToUseStarImport(Math.max(minimumFoldedImports, unfoldedImports));
+                        builder.nameCountToUseStarImport(Math.max(minimumFoldedStaticImports, unfoldedStaticImports));
 
                         return builder.build();
                     })
@@ -613,6 +619,8 @@ public class Autodetect extends NamedStyles {
             int previousPkgCount = 1;
             int javaPos = Integer.MAX_VALUE;
             int javaxPos = Integer.MAX_VALUE;
+            Map<String, Integer> maxUnfoldedImports = new HashMap<>();
+            Map<String, Integer> maxUnfoldedStaticImports = new HashMap<>();
             Map<ImportLayoutStatistics.Block, Integer> referenceCount = new HashMap<>();
             for (J.Import anImport : cu.getImports()) {
                 previousPkgCount += previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
@@ -674,6 +682,12 @@ public class Autodetect extends NamedStyles {
                                 fqns.size()
                         );
                     }
+                } else {
+                    if (anImport.isStatic()) {
+                        maxUnfoldedStaticImports.compute(anImport.getPackageName(), (k, v) -> v == null ? 1 : v + 1);
+                    } else {
+                        maxUnfoldedImports.compute(anImport.getPackageName(), (k, v) -> v == null ? 1 : v + 1);
+                    }
                 }
 
                 staticBlock = anImport.isStatic();
@@ -701,6 +715,15 @@ public class Autodetect extends NamedStyles {
             if (javaPos != Integer.MAX_VALUE && javaxPos != Integer.MAX_VALUE) {
                 importLayoutStatistics.javaBeforeJavaxCount += javaPos < javaxPos ? 1 : 0;
                 importLayoutStatistics.javaxBeforeJavaCount += javaxPos < javaPos ? 1 : 0;
+            }
+
+            int unfoldedImportCount = maxUnfoldedImports.isEmpty() ? 0 : Collections.max(maxUnfoldedImports.values());
+            if (importLayoutStatistics.maximumUnfoldedImports < unfoldedImportCount) {
+                importLayoutStatistics.maximumUnfoldedImports = unfoldedImportCount;
+            }
+            int unfoldedStaticImportCount = maxUnfoldedStaticImports.isEmpty() ? 0 : Collections.max(maxUnfoldedStaticImports.values());
+            if (importLayoutStatistics.maximumUnfoldedStaticImports < unfoldedStaticImportCount) {
+                importLayoutStatistics.maximumUnfoldedStaticImports = unfoldedStaticImportCount;
             }
 
             importLayoutStatistics.blocksPerSourceFile.add(new ArrayList<>(blocks));
