@@ -43,7 +43,7 @@ public class FindMissingTypes extends Recipe {
 
                 if (type == null) {
                     return method.withMarkers(method.getMarkers().searchResult("type is 'null'"));
-                } else if (!type.getName().equals(method.getSimpleName())) {
+                } else if (!type.getName().equals("<constructor>") && !type.getName().equals(method.getSimpleName())) {
                     return method.withMarkers(method.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'"));
                 }
 
