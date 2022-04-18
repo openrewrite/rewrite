@@ -21,6 +21,7 @@ import de.danielbechler.diff.node.DiffNode;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -282,18 +283,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
     @Incubating(since = "7.2.0")
     public Markers visitMarkers(Markers markers, P p) {
-        Collection<? extends Marker> originalMarkers = markers.entries();
-        List<Marker> visited = new ArrayList<>(originalMarkers.size());
-        boolean anyChanged = false;
-        for (Marker originalMarker : originalMarkers) {
-            Marker visitedMarker = visitMarker(originalMarker, p);
-            visited.add(visitedMarker);
-            anyChanged = anyChanged || (visitedMarker != originalMarker);
-        }
-        if (anyChanged) {
-            return Markers.build(visited);
-        }
-        return markers;
+        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
     }
 
     @Incubating(since = "7.2.0")
