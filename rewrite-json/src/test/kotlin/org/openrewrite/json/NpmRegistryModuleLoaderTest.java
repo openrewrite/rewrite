@@ -22,7 +22,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Result;
 import org.openrewrite.config.Environment;
-import org.openrewrite.internal.StreamUtils;
 import org.openrewrite.scheduling.DirectScheduler;
 
 import java.nio.file.Files;
