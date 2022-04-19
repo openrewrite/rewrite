@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
@@ -90,7 +91,9 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
-        if (to instanceof JavaType.FullyQualified) {
+        if(to == from) {
+            return true;
+        }else if (to instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
             return isAssignableTo(toFq.getFullyQualifiedName(), from);
         } else if (to instanceof JavaType.GenericTypeVariable) {
@@ -104,6 +107,12 @@ public class TypeUtils {
             return isAssignableTo(((JavaType.Variable) to).getType(), from);
         } else if(to instanceof JavaType.Method) {
             return isAssignableTo(((JavaType.Method) to).getReturnType(), from);
+        } else if(to instanceof JavaType.Primitive) {
+            if(from instanceof JavaType.FullyQualified) {
+                // Account for auto-unboxing
+                JavaType.FullyQualified boxed = JavaType.ShallowClass.build(((JavaType.Primitive) to).getClassName());
+                return isAssignableTo(boxed, from);
+            }
         }
         return false;
     }

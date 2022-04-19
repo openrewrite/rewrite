@@ -816,6 +816,36 @@ public interface JavaType {
             }
         }
 
+        public String getClassName() {
+            switch (this) {
+                case Boolean:
+                    return "java.lang.Boolean";
+                case Byte:
+                    return "java.lang.Byte";
+                case Char:
+                    return "java.lang.Character";
+                case Double:
+                    return "java.lang.Double";
+                case Float:
+                    return "java.lang.Float";
+                case Int:
+                    return "java.lang.Integer";
+                case Long:
+                    return "java.lang.Long";
+                case Short:
+                    return "java.lang.Short";
+                case Void:
+                    return "java.lang.Void";
+                case String:
+                    return "java.lang.String";
+                case Null:
+                    return "null";
+                case None:
+                default:
+                    return "";
+            }
+        }
+
         @Override
         public String toString() {
             return getKeyword();
