@@ -86,7 +86,7 @@ public class ImportLayoutStyle implements JavaStyle {
     public ImportLayoutStyle(int classCountToUseStarImport, int nameCountToUseStarImport, List<Block> layout, List<Block> packagesToFold) {
         this.classCountToUseStarImport = classCountToUseStarImport;
         this.nameCountToUseStarImport = nameCountToUseStarImport;
-        this.layout = layout;
+        this.layout = layout.isEmpty() ? IntelliJ.importLayout().getLayout() : layout;
         this.packagesToFold = packagesToFold;
 
         // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages

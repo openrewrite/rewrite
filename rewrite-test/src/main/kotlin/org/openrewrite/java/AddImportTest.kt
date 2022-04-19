@@ -942,6 +942,26 @@ interface AddImportTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1687")
+    @Test
+    fun noImportLayout() = assertChanged(
+        JavaParser.fromJavaVersion().styles(
+            listOf(
+                NamedStyles(
+                    Tree.randomId(), "test", "test", "test", emptySet(), listOf(
+                        ImportLayoutStyle(999, 999, emptyList(), emptyList())
+                    )
+                )
+            )
+        ).build(),
+        recipe = addImports({ AddImport("java.util.List", null, false) }),
+        before = """
+        """,
+        after = """
+            import java.util.List;
+        """
+    )
+
     @Test
     fun foldStaticSubPackageWithExistingImports() = assertChanged(
         JavaParser.fromJavaVersion().styles(
