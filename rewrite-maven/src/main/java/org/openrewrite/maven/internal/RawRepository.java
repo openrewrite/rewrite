@@ -15,39 +15,28 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.List;
+import javax.xml.bind.annotation.XmlRootElement;
 
-import static java.util.Collections.emptyList;
+@Data
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@XmlRootElement(name="repository")
+public class RawRepository {
 
-@FieldDefaults(level = AccessLevel.PRIVATE)
-@Getter
-@Setter
-public class RawRepositories {
-    @JacksonXmlProperty(localName = "repository")
-    @JacksonXmlElementWrapper(useWrapping = false)
-    List<Repository> repositories = emptyList();
+    @Nullable
+    String id;
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
-    public static class Repository {
-        @Nullable
-        String id;
+    @With
+    String url;
 
-        @With
-        String url;
+    @Nullable
+    ArtifactPolicy releases;
 
-        @Nullable
-        ArtifactPolicy releases;
-
-        @Nullable
-        ArtifactPolicy snapshots;
-    }
+    @Nullable
+    ArtifactPolicy snapshots;
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode
@@ -67,4 +56,6 @@ public class RawRepositories {
             this(true);
         }
     }
+
 }
+

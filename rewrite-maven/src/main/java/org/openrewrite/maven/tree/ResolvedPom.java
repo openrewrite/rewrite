@@ -50,7 +50,7 @@ public class ResolvedPom {
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
     private static final ResolvedPom SUPER_POM = new ResolvedPom(
-            new Pom(null, null, null, null, null, null, emptyMap(), emptyList(), emptyList(), singletonList(MavenRepository.MAVEN_CENTRAL), emptyList(), emptyList()),
+            new Pom(null, null, null, null, null, null, emptyMap(), emptyList(), emptyList(), singletonList(MavenRepository.MAVEN_CENTRAL), emptyList(), emptyList(), null),
             emptyList()
     );
 
