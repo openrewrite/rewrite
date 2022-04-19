@@ -38,6 +38,8 @@ dependencies {
 
     // configuration generator for service providers
     implementation("com.google.auto.service:auto-service:latest.release")
+
+    implementation("org.apache.hbase:hbase-shaded-client:2.4.11")
 }
 
 tasks.withType<Javadoc> {
