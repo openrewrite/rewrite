@@ -28,7 +28,7 @@ public class GenerateGetterAndSetterVisitor<P> extends JavaIsoVisitor<P> {
     private final String fieldName;
     private final String capitalizedFieldName;
     private final JavaTemplate getter = JavaTemplate
-            .builder(this::getCursor, "" + "public #{} #{}() {return #{};}").build();
+            .builder(this::getCursor, "" + "public #{} #{}() {return #{any()};}").build();
     private final JavaTemplate setter = JavaTemplate
             .builder(this::getCursor, "" + "public void set#{}(#{} #{}) {this.#{} = #{};}").build();
 
@@ -79,7 +79,7 @@ public class GenerateGetterAndSetterVisitor<P> extends JavaIsoVisitor<P> {
             if (getCursor().pollMessage("getter-exists") == null) {
                 Statement getterStatement = maybeAutoFormat(c, c.withBody(c.getBody().withStatements(Collections.emptyList()))
                         .withTemplate(getter, c.getBody().getCoordinates().lastStatement(), fieldType,
-                                getterPrefix + capitalizedFieldName, var.getSimpleName()), p).getBody().getStatements().get(0);
+                                getterPrefix + capitalizedFieldName, var.getName()), p).getBody().getStatements().get(0);
                 c = c.withBody(c.getBody().withStatements(ListUtils.concat(c.getBody().getStatements(), getterStatement)));
             }
             if (getCursor().pollMessage("setter-exists") == null) {
