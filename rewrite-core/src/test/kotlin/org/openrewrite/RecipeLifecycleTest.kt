@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
 import org.openrewrite.internal.lang.Nullable
 import org.openrewrite.marker.Markers
+import org.openrewrite.text.ChangeText
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
 import java.nio.file.Path
@@ -189,27 +190,6 @@ class RecipeLifecycleTest {
             .containsExactlyInAnyOrder("Change1", "Change2")
     }
 
-
-    /**
-     * EC
-     * A - B - C
-     * A - B - D
-     * E - F
-     * E - NoChange
-     * H
-     * B - A - C
-     *
-     * Converted to a List of the following descriptors:
-     *
-     * A
-     * |-B
-     * | |-C
-     * | |-D
-     *
-     * E
-     * |-F
-     *
-     */
     @Test
     fun recipeDescriptorsReturnCorrectStructure() {
         val sources = listOf(
@@ -223,11 +203,14 @@ class RecipeLifecycleTest {
         }.apply {
             doNext(testRecipe("A")
                 .doNext(testRecipe("B")
-                    .doNext(testRecipe("C"))))
+                    .doNext(testRecipe("D")
+                        .doNext(testRecipe("C"))))
+                    .doNext(noChangeRecipe()))
             doNext(testRecipe("A")
                 .doNext(testRecipe("B")
-                    .doNext(testRecipe("D")))
-                    .doNext(noChangeRecipe()))
+                    .doNext(testRecipe("E"))
+                    .doNext(ChangeText("E1"))
+                    .doNext(ChangeText( "E2"))))
             doNext(testRecipe("E")
                 .doNext(testRecipe("F")))
             doNext(noChangeRecipe())
@@ -238,11 +221,11 @@ class RecipeLifecycleTest {
         val recipeDescriptors = results[0].recipeDescriptorsThatMadeChanges
         assertThat(recipeDescriptors.size).isEqualTo(2)
 
-        val aDescriptor = recipeDescriptors.get(0)
+        val aDescriptor = recipeDescriptors[0]
         val bDescriptor = aDescriptor?.recipeList?.get(0)
-        // B has three child recipes one is no change
+        // B (2 test recipes, 2 ChangeText with different options and 1 noChangeRecipe) resulting in 4 changes
         assertThat(bDescriptor?.name).isEqualTo("B")
-        assertThat(bDescriptor?.recipeList?.size).isEqualTo(2)
+        assertThat(bDescriptor?.recipeList?.size).isEqualTo(4)
     }
     private fun testRecipe(name: String): Recipe {
         return object : Recipe() {

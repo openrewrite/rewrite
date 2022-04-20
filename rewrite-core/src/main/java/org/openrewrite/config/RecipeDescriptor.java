@@ -40,6 +40,7 @@ public class RecipeDescriptor {
     @Nullable
     Duration estimatedEffortPerOccurrence;
 
+    @EqualsAndHashCode.Include
     List<OptionDescriptor> options;
 
     List<String> languages;

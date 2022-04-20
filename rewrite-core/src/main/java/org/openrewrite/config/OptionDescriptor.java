@@ -15,16 +15,20 @@
  */
 package org.openrewrite.config;
 
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 
 @Value
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class OptionDescriptor {
 
+    @EqualsAndHashCode.Include
     String name;
 
+    @EqualsAndHashCode.Include
     String type;
 
     @Nullable
@@ -42,5 +46,6 @@ public class OptionDescriptor {
     boolean required;
 
     @Nullable
+    @EqualsAndHashCode.Include
     Object value;
 }
