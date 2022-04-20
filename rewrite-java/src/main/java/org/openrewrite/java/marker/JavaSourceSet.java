@@ -190,9 +190,7 @@ public class JavaSourceSet implements Marker {
             // The declarable name of "class A$B {}" is "A$B"
             // The declarable name of class B in "class A { class B {}}" is "A.B"
             StringBuilder sb = new StringBuilder();
-            int classNameStartIndex = classInfo.getPackageName().isEmpty() ?
-                    0 :
-                    classInfo.getPackageName().length() + 1;
+            String packageName = classInfo.getPackageName();
             ClassInfoList outerClasses = classInfo.getOuterClasses();
             // Classgraph orders this collection innermost -> outermost, but type names are declared outermost -> innermost
             for (int i = outerClasses.size() - 1; i >= 0; i--) {
@@ -200,9 +198,18 @@ public class JavaSourceSet implements Marker {
                 if (outerClass.isPrivate() || outerClass.isAnonymousInnerClass() || outerClass.isSynthetic()) {
                     return null;
                 }
-                sb.append(outerClass.getName().substring(classNameStartIndex + sb.length())).append(".");
+                String typeName;
+                if (outerClass.getName().contains(packageName)) {
+                    typeName = outerClass.getName();
+                } else {
+                    if (!classInfo.getName().contains(outerClass.getSimpleName())) {
+                        return null;
+                    }
+                    typeName = classInfo.getName().substring(0, classInfo.getName().indexOf(outerClass.getSimpleName()) + outerClass.getSimpleName().length());
+                }
+                sb.append(typeName.substring(packageName.length() + 1 + sb.length())).append(".");
             }
-            String nameFragment = classInfo.getName().substring(classNameStartIndex + sb.length());
+            String nameFragment = classInfo.getName().substring(packageName.length() + 1 + sb.length());
 
             if (isUndeclarable(nameFragment)) {
                 return null;

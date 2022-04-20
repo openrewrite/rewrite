@@ -27,6 +27,7 @@ import org.openrewrite.java.internal.JavaReflectionTypeMapping
 import org.openrewrite.java.internal.JavaTypeCache
 import org.openrewrite.java.tree.JavaType
 import java.util.*
+import kotlin.streams.toList
 
 interface JavaSourceSetTest {
 
@@ -45,6 +46,17 @@ interface JavaSourceSetTest {
             .classpath
         assertThat(classpath).isNotEmpty
         assertThat(classpath[0]).isInstanceOf(JavaType.ShallowClass::class.java)
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1677")
+    @Test
+    fun shadedJar() {
+        val typeCache = JavaTypeCache()
+
+        val shaded = JavaSourceSet.build("test", JavaParser.dependenciesFromClasspath("hbase-shaded-client"), typeCache, false)
+            .classpath.stream().filter {o -> o.fullyQualifiedName.startsWith("org.apache.hadoop.hbase.shaded")}.toList()
+        assertThat(shaded).isNotEmpty
+        assertThat(shaded[0]).isInstanceOf(JavaType.ShallowClass::class.java)
     }
 
     // This test uses a lot of memory and examines a code path that we don't actually take anywhere right now
