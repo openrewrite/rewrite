@@ -32,6 +32,7 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.+")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
+    implementation("com.github.albfernandez:juniversalchardet:latest.release")
 }
 
 tasks.withType<ShadowJar> {

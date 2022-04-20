@@ -15,13 +15,12 @@
  */
 package org.openrewrite;
 
+import org.mozilla.universalchardet.UniversalDetector;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
+import java.io.*;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -62,7 +61,8 @@ public interface Parser<S extends SourceFile> {
                         new Input(
                                 sourcePathFromSourceText(Paths.get(Long.toString(System.nanoTime())), source),
                                 () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
-                                true
+                                true,
+                                StandardCharsets.UTF_8
                         )
                 ).collect(toList()),
                 null,
@@ -109,15 +109,24 @@ public interface Parser<S extends SourceFile> {
         private final boolean synthetic;
         private final Path path;
         private final Supplier<InputStream> source;
+        private final Charset characterEncoding;
 
         public Input(Path path, Supplier<InputStream> source) {
-            this(path, source, false);
+            this(path, source, false, detectCharacterEncoding(path));
         }
 
         public Input(Path path, Supplier<InputStream> source, boolean synthetic) {
             this.path = path;
             this.source = source;
             this.synthetic = synthetic;
+            this.characterEncoding = detectCharacterEncoding(path);
+        }
+
+        public Input(Path path, Supplier<InputStream> source, boolean synthetic, Charset characterEncoding) {
+            this.path = path;
+            this.source = source;
+            this.synthetic = synthetic;
+            this.characterEncoding = characterEncoding;
         }
 
         @Incubating(since = "7.0.0")
@@ -125,7 +134,8 @@ public interface Parser<S extends SourceFile> {
             return new Input(
                     Paths.get(Long.toString(System.nanoTime())),
                     () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
-                    true
+                    true,
+                    StandardCharsets.UTF_8
             );
         }
 
@@ -134,7 +144,8 @@ public interface Parser<S extends SourceFile> {
             return new Input(
                     Paths.get(Long.toString(System.nanoTime())),
                     () -> Input.class.getResourceAsStream(resource),
-                    true
+                    true,
+                    StandardCharsets.UTF_8
             );
         }
 
@@ -144,7 +155,8 @@ public interface Parser<S extends SourceFile> {
                     .map(source -> new Parser.Input(
                             Paths.get(Long.toString(System.nanoTime())),
                             () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
-                            true
+                            true,
+                            StandardCharsets.UTF_8
                     ))
                     .collect(toList());
         }
@@ -163,6 +175,46 @@ public interface Parser<S extends SourceFile> {
 
         public boolean isSynthetic() {
             return synthetic;
+        }
+
+        public Charset getCharacterEncoding() {
+            return characterEncoding;
+        }
+
+        /**
+         * Get the file encoding or default to UTF-8.
+         */
+        public static Charset detectCharacterEncoding(Path input) {
+            UniversalDetector detector = new UniversalDetector();
+            try (FileInputStream fis = new FileInputStream(input.toFile())) {
+                byte[] buf = new byte[4096];
+                int n;
+                while ((n = fis.read(buf)) > 0 && !detector.isDone()) {
+                    detector.handleData(buf, 0, n);
+                }
+                detector.dataEnd();
+            } catch (Exception ignored) {
+            }
+
+            Charset encoding;
+
+            String charset = detector.getDetectedCharset();
+            charset = charset == null ? "" : charset;
+            switch (charset) {
+                case "UTF-16BE":
+                    encoding = StandardCharsets.UTF_16BE;
+                    break;
+                case "UTF-16LE":
+                    encoding = StandardCharsets.UTF_16LE;
+                    break;
+                case "US-ASCII":
+                    encoding = StandardCharsets.ISO_8859_1;
+                    break;
+                default:
+                    encoding = StandardCharsets.UTF_8;
+            }
+
+            return encoding;
         }
 
         @Override
