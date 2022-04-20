@@ -15,15 +15,24 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class FindMissingTypes extends Recipe {
-    public static String markerDescriptionPrefix = "Missing Type: ";
     @Override
     public String getDisplayName() {
         return "Find missing type information on Java ASTs";
@@ -39,7 +48,39 @@ public class FindMissingTypes extends Recipe {
         return new FindMissingTypesVisitor();
     }
 
+    public static List<MissingTypeResult> findMissingTypes(JavaSourceFile sf) {
+        JavaSourceFile sf1 = (JavaSourceFile) new FindMissingTypesVisitor().visit(sf, new InMemoryExecutionContext());
+        List<MissingTypeResult> results = new ArrayList<>();
+        if (sf1 != sf) {
+            new JavaIsoVisitor<List<MissingTypeResult>>() {
+                @Override
+                public <M extends Marker> M visitMarker(Marker marker, List<MissingTypeResult> missingTypeResults) {
+                    if (marker instanceof SearchResult) {
+                        String message = ((SearchResult) marker).getDescription();
+                        String path = getCursor().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
+                        J j = getCursor().firstEnclosing(J.class);
+                        String printedTree = j != null ? j.withMarkers(Markers.EMPTY).printTrimmed(getCursor()) : "";
+                        missingTypeResults.add(new MissingTypeResult(message,path, printedTree, j));
+                    }
+                    return super.visitMarker(marker, missingTypeResults);
+                }
+            }.visit(sf1, results);
+        }
+        return results;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class MissingTypeResult {
+        String message;
+        String path;
+        String printedTree;
+        J j;
+    }
+
     static class FindMissingTypesVisitor extends JavaIsoVisitor<ExecutionContext> {
+
+
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
@@ -47,7 +88,7 @@ public class FindMissingTypes extends Recipe {
             // The non-nullability of J.Identifier.getType() in our AST is a white lie
             // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
             if (isNullType(ident.getType()) && !isAllowedToHaveNullType(ident)) {
-                ident = ident.withMarkers(ident.getMarkers().searchResult(markerDescriptionPrefix + " null Identifier type"));
+                ident = ident.withMarkers(ident.getMarkers().searchResult("Identifier type is null"));
             }
             return ident;
         }
@@ -57,9 +98,9 @@ public class FindMissingTypes extends Recipe {
             J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
             JavaType.Method type = method.getMethodType();
             if (isNullType(type)) {
-                return method.withMarkers(method.getMarkers().searchResult(markerDescriptionPrefix + " null MethodInvocation type"));
+                return method.withMarkers(method.getMarkers().searchResult("MethodInvocation type is null"));
             } else if (!type.getName().equals(method.getSimpleName()) && !type.isConstructor()) {
-                return method.withMarkers(method.getMarkers().searchResult(markerDescriptionPrefix + "type information has a different method name '" + type.getName() + "'"));
+                return method.withMarkers(method.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'"));
             }
             return mi;
         }
@@ -69,9 +110,9 @@ public class FindMissingTypes extends Recipe {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
             JavaType.Method type = md.getMethodType();
             if (isNullType(type)) {
-                md = md.withMarkers(md.getMarkers().searchResult(markerDescriptionPrefix + " null MethodDeclaration type"));
+                md = md.withMarkers(md.getMarkers().searchResult("MethodDeclaration type is null"));
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
-                md = md.withMarkers(md.getMarkers().searchResult(markerDescriptionPrefix + "type information has a different method name '" + type.getName() + "'"));
+                md = md.withMarkers(md.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'"));
             }
             return md;
         }
@@ -81,17 +122,17 @@ public class FindMissingTypes extends Recipe {
             J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
             JavaType.FullyQualified t = cd.getType();
             if (isNullType(t)) {
-                return cd.withMarkers(cd.getMarkers().searchResult(markerDescriptionPrefix + " null ClassDeclaration type"));
+                return cd.withMarkers(cd.getMarkers().searchResult("ClassDeclaration type is null"));
             }
             if (!cd.getKind().name().equals(t.getKind().name())) {
                 cd = cd.withMarkers(cd.getMarkers().searchResult(
-                        markerDescriptionPrefix + " J.ClassDeclaration kind " + cd.getKind() + " does not match the kind in its type information " + t.getKind()));
+                        " J.ClassDeclaration kind " + cd.getKind() + " does not match the kind in its type information " + t.getKind()));
             }
             @SuppressWarnings("ConstantConditions")
             J.Package pkg = getCursor().firstEnclosing(J.CompilationUnit.class).getPackageDeclaration();
             if (pkg != null && t.getPackageName().equals(pkg.printTrimmed(getCursor()))) {
                 cd = cd.withMarkers(cd.getMarkers().searchResult(
-                         markerDescriptionPrefix + " J.ClassDeclaration package " + pkg + " does not match the package in its type information " + pkg.printTrimmed(getCursor())));
+                         " J.ClassDeclaration package " + pkg + " does not match the package in its type information " + pkg.printTrimmed(getCursor())));
             }
             return cd;
         }
