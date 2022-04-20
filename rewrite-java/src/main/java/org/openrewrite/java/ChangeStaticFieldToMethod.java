@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.apache.commons.lang.StringUtils;
+import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
@@ -111,7 +112,11 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 JavaTemplate template = makeNewMethod(newClass, statementCursor);
                 J.Block block = statement.withTemplate(template, statement.getCoordinates().replace());
                 J.MethodInvocation method = block.getStatements().get(0).withPrefix(tree.getPrefix());
-                //noinspection ConstantConditions
+
+                if (method.getMethodType() == null) {
+                    throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class ["
+                            + newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
+                }
                 return tree.getType() == null ? method :
                         method.withMethodType(method.getMethodType().withReturnType(tree.getType()));
             }
@@ -122,7 +127,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 String packageName = StringUtils.substringBeforeLast(newClass, ".");
                 String simpleClassName = StringUtils.substringAfterLast(newClass, ".");
                 String methodInvocationTemplate = "{" + simpleClassName + "." + newMethodName + "();}";
-                String methodStub = "package " + packageName + ";" +
+                @Language("java") String methodStub = "package " + packageName + ";" +
                         " public class " + simpleClassName + " {" +
                         " public static void " + newMethodName + "() { return null; }" +
                         " }";

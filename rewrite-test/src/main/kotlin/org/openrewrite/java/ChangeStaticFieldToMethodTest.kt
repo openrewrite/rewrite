@@ -210,4 +210,62 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1626")
+    fun successConstantToMethod() = assertChanged(
+        recipe = ChangeStaticFieldToMethod(
+            "constants.Constants",
+            "SUCCESS_CODE",
+            "io.netty.handler.codec.http.HttpResponseStatus.OK",
+            "codeAsText"),
+
+        dependsOn = arrayOf(
+            """
+                package constants;
+
+                public class Constants {
+                    public static final String SUCCESS_CODE = "200";
+                }
+            """,
+            """
+                package io.netty.handler.codec.http;
+
+                public class HttpResponseStatus {
+                    public static final HttpResponseStatus OK = new HttpResponseStatus(200);
+
+                    private final int code;
+                    private HttpResponseStatus(int code) {
+                        this.code = code;
+                    }
+                    
+                    String codeAsText() {
+                        return String.valueOf(code);
+                    }
+                }
+
+            """
+        ),
+        before = """
+            package com.example;
+            
+            import constants.Constants;
+            
+            class Test {
+                public static String testMe() {
+                    return Constants.SUCCESS_CODE;
+                }
+            }
+        """,
+        after = """
+            package com.example;
+            
+            import io.netty.handler.codec.http.HttpResponseStatus.OK;
+            
+            class Test {
+                public static String testMe() {
+                    return OK.codeAsText();
+                }
+            }
+        """
+    )
 }
