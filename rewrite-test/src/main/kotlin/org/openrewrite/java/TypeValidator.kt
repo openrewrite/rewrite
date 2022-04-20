@@ -24,6 +24,7 @@ import org.openrewrite.java.TypeValidator.InvalidTypeResult
 import org.openrewrite.java.search.FindMissingTypes
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaSourceFile
+import org.openrewrite.marker.Markers
 import org.openrewrite.marker.SearchResult
 import java.util.stream.Collectors
 
@@ -91,8 +92,9 @@ class TypeValidator(
                 val reportText = report.asSequence()
                     .map {
                         """
+                            | ${it.message}
                             |  AT:  ${it.cursor.pathAsStream.filter(J::class.java::isInstance).map{ j -> j.javaClass.simpleName }.collect(Collectors.joining("->"))}
-                            |       ${it.tree.printTrimmed(it.cursor)}
+                            |  AST: ${it.tree.printTrimmed(it.cursor)}
                         """.trimMargin()
                     }
                     .joinToString("\n")
@@ -150,7 +152,7 @@ class TypeValidator(
         if (m != null) {
             val message: @Nullable String? = m.description
             if (message != null && message.startsWith(FindMissingTypes.markerDescriptionPrefix)) {
-                p.add(InvalidTypeResult(cursor, j, message))
+                p.add(InvalidTypeResult(cursor, j.withMarkers(Markers.EMPTY), message.substring(FindMissingTypes.markerDescriptionPrefix.length)))
             }
 
         }

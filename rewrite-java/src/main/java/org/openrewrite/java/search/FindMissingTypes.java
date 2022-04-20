@@ -47,7 +47,7 @@ public class FindMissingTypes extends Recipe {
             // The non-nullability of J.Identifier.getType() in our AST is a white lie
             // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
             if (isNullType(ident.getType()) && !isAllowedToHaveNullType(ident)) {
-                ident = ident.withMarkers(ident.getMarkers().searchResult(markerDescriptionPrefix));
+                ident = ident.withMarkers(ident.getMarkers().searchResult(markerDescriptionPrefix + " null Identifier type"));
             }
             return ident;
         }
@@ -57,7 +57,7 @@ public class FindMissingTypes extends Recipe {
             J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
             JavaType.Method type = method.getMethodType();
             if (isNullType(type)) {
-                return method.withMarkers(method.getMarkers().searchResult(markerDescriptionPrefix));
+                return method.withMarkers(method.getMarkers().searchResult(markerDescriptionPrefix + " null MethodInvocation type"));
             } else if (!type.getName().equals(method.getSimpleName()) && !type.isConstructor()) {
                 return method.withMarkers(method.getMarkers().searchResult(markerDescriptionPrefix + "type information has a different method name '" + type.getName() + "'"));
             }
@@ -69,7 +69,7 @@ public class FindMissingTypes extends Recipe {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
             JavaType.Method type = md.getMethodType();
             if (isNullType(type)) {
-                md = md.withMarkers(md.getMarkers().searchResult(markerDescriptionPrefix));
+                md = md.withMarkers(md.getMarkers().searchResult(markerDescriptionPrefix + " null MethodDeclaration type"));
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
                 md = md.withMarkers(md.getMarkers().searchResult(markerDescriptionPrefix + "type information has a different method name '" + type.getName() + "'"));
             }
@@ -81,7 +81,7 @@ public class FindMissingTypes extends Recipe {
             J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
             JavaType.FullyQualified t = cd.getType();
             if (isNullType(t)) {
-                return cd.withMarkers(cd.getMarkers().searchResult(markerDescriptionPrefix));
+                return cd.withMarkers(cd.getMarkers().searchResult(markerDescriptionPrefix + " null ClassDeclaration type"));
             }
             if (!cd.getKind().name().equals(t.getKind().name())) {
                 cd = cd.withMarkers(cd.getMarkers().searchResult(
