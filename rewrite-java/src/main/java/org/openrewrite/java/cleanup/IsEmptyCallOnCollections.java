@@ -35,7 +35,7 @@ public class IsEmptyCallOnCollections extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Use `Collections#isEmpty()` instead of comparing `size()`";
+        return "Use `Collection#isEmpty()` instead of comparing `size()`";
     }
 
     @Override
