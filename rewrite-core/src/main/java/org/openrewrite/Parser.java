@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -22,6 +23,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -120,16 +122,18 @@ public interface Parser<S extends SourceFile> {
             this.synthetic = synthetic;
         }
 
-        @Incubating(since = "7.0.0")
         public static Input fromString(String source) {
+            return fromString(source, StandardCharsets.UTF_8);
+        }
+
+        public static Input fromString(String source, Charset charset) {
             return new Input(
                     Paths.get(Long.toString(System.nanoTime())),
-                    () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
+                    () -> new ByteArrayInputStream(source.getBytes(charset)),
                     true
             );
         }
 
-        @Incubating(since = "7.0.0")
         public static Input fromResource(String resource) {
             return new Input(
                     Paths.get(Long.toString(System.nanoTime())),
@@ -138,7 +142,6 @@ public interface Parser<S extends SourceFile> {
             );
         }
 
-        @Incubating(since = "7.0.0")
         public static List<Input> fromResource(String resource, String delimiter) {
             return Arrays.stream(StringUtils.readFully(Input.class.getResourceAsStream(resource)).split(delimiter))
                     .map(source -> new Parser.Input(
@@ -157,8 +160,8 @@ public interface Parser<S extends SourceFile> {
             return relativeTo == null ? path : relativeTo.relativize(path);
         }
 
-        public InputStream getSource() {
-            return source.get();
+        public EncodingDetectingInputStream getSource() {
+            return new EncodingDetectingInputStream(source.get());
         }
 
         public boolean isSynthetic() {

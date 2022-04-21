@@ -22,6 +22,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -32,7 +33,6 @@ import org.openrewrite.protobuf.tree.Proto;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
@@ -49,21 +49,24 @@ public class ProtoParser implements Parser<Proto.Document> {
                             .description("The time spent parsing a Protobuf file")
                             .tag("file.type", "Proto");
                     Timer.Sample sample = Timer.start();
-                    try (InputStream sourceStream = sourceFile.getSource()) {
+                    try {
+                        EncodingDetectingInputStream is = sourceFile.getSource();
+                        String sourceStr = is.readFully();
                         Protobuf2Parser parser = new Protobuf2Parser(new CommonTokenStream(new Protobuf2Lexer(
-                                CharStreams.fromStream(sourceStream))));
+                                CharStreams.fromString(sourceStr))));
 
                         parser.removeErrorListeners();
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
-                        String source = StringUtils.readFully(sourceFile.getSource());
-                        if (source.contains("proto3")) {
+                        if (sourceStr.contains("proto3")) {
                             return null;
                         }
 
                         Proto.Document document = new ProtoParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
-                                source
+                                sourceStr,
+                                sourceFile.getCharset(),
+                                sourceFile.isCharsetBomMarked()
                         ).visitProto(parser.proto());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, document);

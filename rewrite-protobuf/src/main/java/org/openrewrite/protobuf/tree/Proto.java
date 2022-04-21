@@ -170,6 +170,24 @@ public interface Proto extends Tree {
         @Getter
         Markers markers;
 
+        @Nullable // for backwards compatibility
+        @With(AccessLevel.PRIVATE)
+        String charsetName;
+
+        @With
+        @Getter
+        boolean charsetBomMarked;
+
+        @Override
+        public java.nio.charset.Charset getCharset() {
+            return charsetName == null ? java.nio.charset.StandardCharsets.UTF_8 : java.nio.charset.Charset.forName(charsetName);
+        }
+
+        @Override
+        public SourceFile withCharset(java.nio.charset.Charset charset) {
+            return withCharsetName(charset.name());
+        }
+
         @With
         @Getter
         Syntax syntax;
@@ -222,7 +240,7 @@ public interface Proto extends Tree {
             }
 
             public Document withBody(List<ProtoRightPadded<Proto>> body) {
-                return t.body == body ? t : new Document(t.id, t.sourcePath, t.prefix, t.markers, t.syntax, body, t.eof);
+                return t.body == body ? t : new Document(t.id, t.sourcePath, t.prefix, t.markers, t.charsetName, t.charsetBomMarked, t.syntax, body, t.eof);
             }
         }
     }

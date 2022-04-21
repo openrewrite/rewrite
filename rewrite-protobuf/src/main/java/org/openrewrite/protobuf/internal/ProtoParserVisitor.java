@@ -25,6 +25,7 @@ import org.openrewrite.protobuf.internal.grammar.Protobuf2Parser;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2ParserBaseVisitor;
 import org.openrewrite.protobuf.tree.*;
 
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,12 +36,16 @@ import static org.openrewrite.Tree.randomId;
 public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     private final Path path;
     private final String source;
+    private final Charset charset;
+    private final boolean charsetBomMarked;
 
     private int cursor = 0;
 
-    public ProtoParserVisitor(Path path, String source) {
+    public ProtoParserVisitor(Path path, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
         this.source = source;
+        this.charset = charset;
+        this.charsetBomMarked = charsetBomMarked;
     }
 
     public Proto.Block visitBlock(List<ParseTree> statementTrees) {
@@ -103,7 +108,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         Space blockPrefix = sourceBefore("{");
 
         List<ProtoRightPadded<Proto>> statements = new ArrayList<>(ctx.messageField().size());
-        for(Protobuf2Parser.MessageFieldContext mfc : ctx.messageField()) {
+        for (Protobuf2Parser.MessageFieldContext mfc : ctx.messageField()) {
             statements.add(new ProtoRightPadded<>(visitMessageField(mfc), sourceBefore(";"), Markers.EMPTY));
         }
 
@@ -132,9 +137,9 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     public Proto.Import visitImportStatement(Protobuf2Parser.ImportStatementContext ctx) {
         Space prefix = sourceBefore("import");
         Proto.Keyword modifier = null;
-        if(ctx.WEAK() != null) {
+        if (ctx.WEAK() != null) {
             modifier = new Proto.Keyword(randomId(), sourceBefore(ctx.WEAK().getText()), Markers.EMPTY, ctx.WEAK().getText());
-        } else if(ctx.PUBLIC() != null) {
+        } else if (ctx.PUBLIC() != null) {
             modifier = new Proto.Keyword(randomId(), sourceBefore(ctx.PUBLIC().getText()), Markers.EMPTY, ctx.PUBLIC().getText());
         }
 
@@ -303,7 +308,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         List<ProtoRightPadded<Proto>> list = new ArrayList<>();
         // The first element is the syntax, which we've already parsed
         // The last element is a "TerminalNode" which we are uninterested in
-        for(int i = 1; i < ctx.children.size() - 1; i++) {
+        for (int i = 1; i < ctx.children.size() - 1; i++) {
             Proto s = visit(ctx.children.get(i));
             ProtoRightPadded<Proto> protoProtoRightPadded = ProtoRightPadded.build(s).withAfter(
                     (s instanceof Proto.Empty ||

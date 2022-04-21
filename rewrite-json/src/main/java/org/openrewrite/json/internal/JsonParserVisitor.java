@@ -18,12 +18,14 @@ package org.openrewrite.json.internal;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.internal.grammar.JSON5BaseVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Parser;
 import org.openrewrite.json.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,12 +39,16 @@ import static org.openrewrite.Tree.randomId;
 public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     private final Path path;
     private final String source;
+    private final Charset charset;
+    private final boolean charsetBomMarked;
 
     private int cursor = 0;
 
-    public JsonParserVisitor(Path path, String source) {
+    public JsonParserVisitor(Path path, EncodingDetectingInputStream source) {
         this.path = path;
-        this.source = source;
+        this.source = source.readFully();
+        this.charset = source.getCharset();
+        this.charsetBomMarked = source.isCharsetBomMarked();
     }
 
     @Override
@@ -83,6 +89,8 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 path,
                 prefix,
                 Markers.EMPTY,
+                charset.name(),
+                charsetBomMarked,
                 visitValue(c.value()),
                 Space.format(source.substring(cursor))
         ));

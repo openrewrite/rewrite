@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.openrewrite.Parser;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import javax.lang.model.element.Modifier;
@@ -81,7 +80,7 @@ public class Java11ParserInputFileObject implements JavaFileObject {
 
     @Override
     public CharSequence getCharContent(boolean ignoreEncodingErrors) {
-        return StringUtils.readFully(input.getSource());
+        return input.getSource().readFully();
     }
 
     @Override

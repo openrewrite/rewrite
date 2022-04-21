@@ -67,6 +67,10 @@ public abstract class Recipe {
         }
     };
 
+    public List<TreeVisitor<?, ExecutionContext>> getSingleSourceApplicableTests() {
+        return singleSourceApplicableTests;
+    }
+
     @Getter
     private final transient List<TreeVisitor<?, ExecutionContext>> singleSourceApplicableTests = new ArrayList<>();
 

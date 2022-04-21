@@ -196,7 +196,7 @@ class ReloadableJava8Parser implements JavaParser {
                     try {
                         ReloadableJava8ParserVisitor parser = new ReloadableJava8ParserVisitor(
                                 input.getRelativePath(relativeTo),
-                                StringUtils.readFully(input.getSource()),
+                                input.getSource(),
                                 styles,
                                 typeCache,
                                 ctx,

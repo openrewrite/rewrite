@@ -25,6 +25,8 @@ import org.openrewrite.json.internal.JsonPrinter;
 import org.openrewrite.marker.Markers;
 
 import java.lang.ref.WeakReference;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -122,21 +124,51 @@ public interface Json extends Tree {
         }
     }
 
-    @Value
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
+    @RequiredArgsConstructor
     class Document implements Json, SourceFile {
+        @Getter
+        @With
         @EqualsAndHashCode.Include
         UUID id;
 
+        @Getter
+        @With
         Path sourcePath;
 
+        @Getter
+        @With
         Space prefix;
 
+        @Getter
+        @With
         Markers markers;
 
+        @Nullable // for backwards compatibility
+        @With(AccessLevel.PRIVATE)
+        String charsetName;
+
+        @With
+        @Getter
+        boolean charsetBomMarked;
+
+        @Override
+        public Charset getCharset() {
+            return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
+        }
+
+        @Override
+        public SourceFile withCharset(Charset charset) {
+            return withCharsetName(charset.name());
+        }
+
+        @Getter
+        @With
         JsonValue value;
 
+        @Getter
+        @With
         Space eof;
 
         @Override

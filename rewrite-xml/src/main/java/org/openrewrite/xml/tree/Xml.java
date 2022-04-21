@@ -15,9 +15,8 @@
  */
 package org.openrewrite.xml.tree;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
@@ -29,6 +28,8 @@ import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlListMarkersVisitor;
 import org.openrewrite.xml.internal.XmlPrinter;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -88,12 +89,16 @@ public interface Xml extends Tree {
         return trees;
     }
 
-    @Value
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     class Document implements Xml, SourceFile {
+        @Getter
         @With
         @EqualsAndHashCode.Include
         UUID id;
 
+        @Getter
         @With
         Path sourcePath;
 
@@ -108,22 +113,44 @@ public interface Xml extends Tree {
             return prefixUnsafe;
         }
 
+        @Getter
         @With
         Markers markers;
 
+        @Nullable // for backwards compatibility
+        @With(AccessLevel.PRIVATE)
+        String charsetName;
+
+        @With
+        @Getter
+        boolean charsetBomMarked;
+
+        @Override
+        public java.nio.charset.Charset getCharset() {
+            return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
+        }
+
+        @Override
+        public SourceFile withCharset(Charset charset) {
+            return withCharsetName(charset.name());
+        }
+
+        @Getter
         @With
         Prolog prolog;
 
+        @Getter
         @With
         Tag root;
 
+        @Getter
         String eof;
 
         public Document withEof(String eof) {
             if (this.eof.equals(eof)) {
                 return this;
             }
-            return new Document(id, sourcePath, prefixUnsafe, markers, prolog, root, eof);
+            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, prolog, root, eof);
         }
 
         @Override
