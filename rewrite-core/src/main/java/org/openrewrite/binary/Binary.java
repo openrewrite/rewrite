@@ -22,6 +22,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.Markers;
 
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.UUID;
 
@@ -36,6 +37,41 @@ public class Binary implements SourceFile, Tree {
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return v instanceof BinaryVisitor;
+    }
+
+    @Override
+    public Charset getCharset() {
+        throw new UnsupportedOperationException("Binary files do not have a character encoding.");
+    }
+
+    @Override
+    public SourceFile withCharset(Charset charset) {
+        throw new UnsupportedOperationException("Binary files do not have a character encoding.");
+    }
+
+    @Override
+    public boolean isCharsetBomMarked() {
+        throw new UnsupportedOperationException("Binary files do not have a character encoding.");
+    }
+
+    @Override
+    public SourceFile withCharsetBomMarked(boolean marked) {
+        throw new UnsupportedOperationException("Binary files do not have a character encoding.");
+    }
+
+    @Override
+    public <P> byte[] printAllAsBytes(P p) {
+        return bytes;
+    }
+
+    @Override
+    public <P> String printAll(P p) {
+        throw new UnsupportedOperationException("Cannot print a binary as a string.");
+    }
+
+    @Override
+    public <P> String printAllTrimmed(P p) {
+        throw new UnsupportedOperationException("Cannot print a binary as a string.");
     }
 
     @SuppressWarnings("unchecked")

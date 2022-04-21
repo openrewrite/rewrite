@@ -35,6 +35,8 @@ public class EncodingDetectingInputStream extends InputStream {
      * Last byte read
      */
     private int prev;
+    private int prev2;
+    private int prev3;
 
     public EncodingDetectingInputStream(InputStream inputStream) {
         this.inputStream = inputStream;
@@ -54,11 +56,17 @@ public class EncodingDetectingInputStream extends InputStream {
 
         // if we haven't yet determined a charset...
         if (charset == null && aByte != -1) {
+            if(aByte == 0xaa && prev == 0xa1 && prev2 == 0xa2 && prev3 == 0xa3) {
+                charset = Charset.forName("Windows-1252");
+            }
+
             if (aByte >= 0x80 && notUtfHighByte(aByte)) {
                 if (notUtfHighByte(prev)) {
                     charset = StandardCharsets.ISO_8859_1;
                 }
             }
+            prev3 = prev2;
+            prev2 = prev;
             prev = aByte;
         }
 

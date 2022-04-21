@@ -24,7 +24,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.protobuf.internal.ProtoParserVisitor;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Lexer;
@@ -65,8 +64,8 @@ public class ProtoParser implements Parser<Proto.Document> {
                         Proto.Document document = new ProtoParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
                                 sourceStr,
-                                sourceFile.getCharset(),
-                                sourceFile.isCharsetBomMarked()
+                                is.getCharset(),
+                                is.isCharsetBomMarked()
                         ).visitProto(parser.proto());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, document);

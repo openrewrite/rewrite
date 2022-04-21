@@ -48,6 +48,14 @@ public interface SourceFile extends Tree {
         return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
     }
 
+    default <P> byte[] printAllAsBytes(P p) {
+        return printAll(p).getBytes(getCharset());
+    }
+
+    default byte[] printAllAsBytes() {
+        return printAllAsBytes(0);
+    }
+
     default <P> String printAll(P p) {
         return print(p, new Cursor(null, this));
     }
