@@ -24,15 +24,14 @@ import org.openrewrite.hcl.internal.HclParserVisitor;
 import org.openrewrite.hcl.internal.grammar.HCLLexer;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
 import org.openrewrite.hcl.tree.Hcl;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,8 +55,11 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
                             .description("The time spent parsing an HCL file")
                             .tag("file.type", "HCL");
                     Timer.Sample sample = Timer.start();
-                    try (InputStream sourceStream = sourceFile.getSource()) {
-                        HCLLexer lexer = new HCLLexer(CharStreams.fromStream(sourceStream));
+                    try {
+                        EncodingDetectingInputStream is = sourceFile.getSource();
+                        String sourceStr = is.readFully();
+
+                        HCLLexer lexer = new HCLLexer(CharStreams.fromString(sourceStr));
                         lexer.removeErrorListeners();
                         lexer.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
@@ -67,9 +69,9 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
 
                         Hcl.ConfigFile configFile = (Hcl.ConfigFile) new HclParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
-                                sourceFile.getSource().readFully(),
-                                sourceFile.getSource().getCharset(),
-                                sourceFile.getSource().isCharsetBomMarked()
+                                sourceStr,
+                                is.getCharset(),
+                                is.isCharsetBomMarked()
                         ).visitConfigFile(parser.configFile());
 
                         configFile = configFile.withMarkers(Markers.build(styles));

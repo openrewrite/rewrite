@@ -19,7 +19,6 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
-import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
@@ -47,11 +46,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     private int cursor = 0;
 
-    public XmlParserVisitor(Path path, EncodingDetectingInputStream source) {
+    public XmlParserVisitor(Path path, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
-        this.source = source.readFully();
-        this.charset = source.getCharset();
-        this.charsetBomMarked = source.isCharsetBomMarked();
+        this.source = source;
+        this.charset = charset;
+        this.charsetBomMarked = charsetBomMarked;
     }
 
     @Override
@@ -185,7 +184,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     String name = convert(ctx.SPECIAL_OPEN(), (n, p) -> n.getText()).substring(2);
 
                     Xml.CharData piText = convert(c.PI_TEXT(), (cdata, p) ->
-                                    charData(cdata.getText(), false));
+                            charData(cdata.getText(), false));
                     return new Xml.ProcessingInstruction(
                             randomId(),
                             prefix,

@@ -28,7 +28,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -101,9 +100,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             try {
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                         compiled.getInput().getPath(),
-                        compiled.getInput().getSource().readFully(),
-                        compiled.getInput().getSource().getCharset(),
-                        compiled.getInput().getSource().isCharsetBomMarked(),
+                        compiled.getInput().getSource(),
                         typeCache,
                         ctx
                 );

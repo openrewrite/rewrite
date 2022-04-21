@@ -24,7 +24,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -33,7 +32,6 @@ import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
@@ -51,17 +49,23 @@ public class XmlParser implements Parser<Xml.Document> {
                             .tag("file.type", "XML");
                     Timer.Sample sample = Timer.start();
 
-                    try (EncodingDetectingInputStream sourceStream = sourceFile.getSource()) {
+                    try {
+                        EncodingDetectingInputStream is = sourceFile.getSource();
+                        String sourceStr = is.readFully();
+
                         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                                CharStreams.fromStream(sourceStream))));
+                                CharStreams.fromString(sourceStr))));
 
                         parser.removeErrorListeners();
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
                         Xml.Document document = new XmlParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
-                                sourceStream
+                                sourceStr,
+                                is.getCharset(),
+                                is.isCharsetBomMarked()
                         ).visitDocument(parser.document());
+
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, document);
                         return document;
