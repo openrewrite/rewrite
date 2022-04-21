@@ -162,14 +162,6 @@ public interface Proto extends Tree {
         @Getter
         Path sourcePath;
 
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
         @Nullable // for backwards compatibility
         @With(AccessLevel.PRIVATE)
         String charsetName;
@@ -187,6 +179,14 @@ public interface Proto extends Tree {
         public SourceFile withCharset(java.nio.charset.Charset charset) {
             return withCharsetName(charset.name());
         }
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
 
         @With
         @Getter
@@ -240,7 +240,7 @@ public interface Proto extends Tree {
             }
 
             public Document withBody(List<ProtoRightPadded<Proto>> body) {
-                return t.body == body ? t : new Document(t.id, t.sourcePath, t.prefix, t.markers, t.charsetName, t.charsetBomMarked, t.syntax, body, t.eof);
+                return t.body == body ? t : new Document(t.id, t.sourcePath, t.charsetName, t.charsetBomMarked, t.prefix, t.markers, t.syntax, body, t.eof);
             }
         }
     }

@@ -59,10 +59,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return convert(ctx, (c, prefix) -> new Xml.Document(
                 randomId(),
                 path,
-                prefix,
-                Markers.EMPTY,
                 charset.name(),
                 charsetBomMarked,
+                prefix,
+                Markers.EMPTY,
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
                 source.substring(cursor))

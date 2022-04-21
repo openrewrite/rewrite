@@ -15,7 +15,12 @@
  */
 package org.openrewrite.xml.tree;
 
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Value;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
@@ -102,21 +107,6 @@ public interface Xml extends Tree {
         @With
         Path sourcePath;
 
-        @With
-        String prefixUnsafe;
-
-        public Document withPrefix(String prefix) {
-            return WithPrefix.onlyIfNotEqual(this, prefix);
-        }
-
-        public String getPrefix() {
-            return prefixUnsafe;
-        }
-
-        @Getter
-        @With
-        Markers markers;
-
         @Nullable // for backwards compatibility
         @With(AccessLevel.PRIVATE)
         String charsetName;
@@ -135,6 +125,21 @@ public interface Xml extends Tree {
             return withCharsetName(charset.name());
         }
 
+        @With
+        String prefixUnsafe;
+
+        public Document withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
+
+        @Getter
+        @With
+        Markers markers;
+
         @Getter
         @With
         Prolog prolog;
@@ -150,7 +155,7 @@ public interface Xml extends Tree {
             if (this.eof.equals(eof)) {
                 return this;
             }
-            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, prolog, root, eof);
+            return new Document(id, sourcePath, charsetName, charsetBomMarked, prefixUnsafe, markers, prolog, root, eof);
         }
 
         @Override

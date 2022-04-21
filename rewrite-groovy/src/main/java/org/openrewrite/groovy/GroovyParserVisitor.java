@@ -36,6 +36,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -55,6 +56,8 @@ import static org.openrewrite.java.tree.Space.format;
 public class GroovyParserVisitor {
     private final Path sourcePath;
     private final String source;
+    private final Charset charset;
+    private final boolean charsetBomMarked;
     private final GroovyTypeMapping typeMapping;
     private final ExecutionContext ctx;
 
@@ -63,9 +66,11 @@ public class GroovyParserVisitor {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public GroovyParserVisitor(Path sourcePath, String source, JavaTypeCache typeCache, ExecutionContext ctx) {
+    public GroovyParserVisitor(Path sourcePath, String source, Charset charset, boolean charsetBomMarked, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.source = source;
+        this.charset = charset;
+        this.charsetBomMarked = charsetBomMarked;
         this.typeMapping = new GroovyTypeMapping(typeCache);
         this.ctx = ctx;
     }
@@ -135,6 +140,8 @@ public class GroovyParserVisitor {
                 Space.EMPTY,
                 Markers.EMPTY,
                 sourcePath,
+                charset.name(),
+                charsetBomMarked,
                 pkg,
                 statements,
                 format(source.substring(cursor))

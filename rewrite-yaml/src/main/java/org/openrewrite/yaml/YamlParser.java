@@ -21,6 +21,7 @@ import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
@@ -65,7 +66,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             .description("The time spent parsing a YAML file")
                             .tag("file.type", "YAML");
                     Timer.Sample sample = Timer.start();
-                    try (InputStream is = sourceFile.getSource()) {
+                    try (EncodingDetectingInputStream is = sourceFile.getSource()) {
                         Yaml.Documents yaml = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, yaml);
@@ -89,8 +90,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 .collect(toList());
     }
 
-    private Yaml.Documents parseFromInput(Path sourceFile, InputStream source) {
-        String yamlSource = StringUtils.readFully(source);
+    private Yaml.Documents parseFromInput(Path sourceFile, EncodingDetectingInputStream source) {
+        String yamlSource = source.readFully();
         Map<String, String> variableByUuid = new HashMap<>();
 
         StringBuilder yamlSourceWithVariablePlaceholders = new StringBuilder();
@@ -298,7 +299,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 }
             }
 
-            return new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, documents);
+            return new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, source.getCharset().name(), source.isCharsetBomMarked(), documents);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

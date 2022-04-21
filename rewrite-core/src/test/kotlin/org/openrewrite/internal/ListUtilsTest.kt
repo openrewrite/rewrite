@@ -35,7 +35,7 @@ class ListUtilsTest {
     @Test
     fun replaceSingleWithMultipleAtPosition0() {
         val l = listOf(1)
-        assertThat(ListUtils.flatMap(l) { l1 -> listOf(2, 3) }).containsExactly(2, 3)
+        assertThat(ListUtils.flatMap(l) { _ -> listOf(2, 3) }).containsExactly(2, 3)
     }
     @Test
     fun removeSingleItem() {

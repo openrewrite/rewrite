@@ -15,7 +15,6 @@
  */
 package org.openrewrite.internal;
 
-import org.graalvm.polyglot.Value;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
@@ -107,16 +106,6 @@ public final class ListUtils {
                 newLs.set(0, newFirst);
             }
             return newLs;
-        }
-        return ls;
-    }
-
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    public static <T> List<T> mapValues(Value values, BiFunction<Integer, Value, T> mapFn) {
-        final int size = ((Long) values.getArraySize()).intValue();
-        List ls = new ArrayList(size);
-        for (int i = 0; i < size; i++) {
-            ls.set(i, mapFn.apply(i, values.getArrayElement(i)));
         }
         return ls;
     }

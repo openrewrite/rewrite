@@ -23,9 +23,11 @@ import org.jetbrains.annotations.NotNull;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
 import org.openrewrite.hcl.internal.grammar.HCLParserBaseVisitor;
 import org.openrewrite.hcl.tree.*;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,12 +42,16 @@ import static org.openrewrite.Tree.randomId;
 public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     private final Path path;
     private final String source;
+    private final Charset charset;
+    private final boolean charsetBomMarked;
 
     private int cursor = 0;
 
-    public HclParserVisitor(Path path, String source) {
+    public HclParserVisitor(Path path, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
         this.source = source;
+        this.charset = charset;
+        this.charsetBomMarked = charsetBomMarked;
     }
 
     @Override
@@ -202,6 +208,8 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         return convert(ctx, (c, prefix) -> new Hcl.ConfigFile(
                 randomId(),
                 path,
+                charset.name(),
+                charsetBomMarked,
                 Space.format(prefix),
                 Markers.EMPTY,
                 c.body().bodyContent().stream()

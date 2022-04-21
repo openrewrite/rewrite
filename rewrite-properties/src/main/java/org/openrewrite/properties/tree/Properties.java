@@ -15,14 +15,15 @@
  */
 package org.openrewrite.properties.tree;
 
-import lombok.EqualsAndHashCode;
-import lombok.With;
+import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -65,6 +66,24 @@ public interface Properties extends Tree {
         Path sourcePath;
         List<Content> content;
         String eof;
+
+        @Nullable // for backwards compatibility
+        @With(AccessLevel.PRIVATE)
+        String charsetName;
+
+        @With
+        @Getter
+        boolean charsetBomMarked;
+
+        @Override
+        public Charset getCharset() {
+            return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
+        }
+
+        @Override
+        public SourceFile withCharset(Charset charset) {
+            return withCharsetName(charset.name());
+        }
 
         @Override
         public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {

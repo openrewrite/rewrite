@@ -67,7 +67,9 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
 
                         Hcl.ConfigFile configFile = (Hcl.ConfigFile) new HclParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
-                                StringUtils.readFully(sourceFile.getSource())
+                                sourceFile.getSource().readFully(),
+                                sourceFile.getSource().getCharset(),
+                                sourceFile.getSource().isCharsetBomMarked()
                         ).visitConfigFile(parser.configFile());
 
                         configFile = configFile.withMarkers(Markers.build(styles));

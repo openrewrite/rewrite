@@ -20,7 +20,6 @@ import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
-import org.openrewrite.polyglot.PolyglotRecipe;
 import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,7 +120,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
                 Class<?> recipeClass = classInfo.loadClass();
-                if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) || recipeClass.getName().equals(PolyglotRecipe.class.getName()) || recipeClass.getEnclosingClass() != null) {
+                if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) || recipeClass.getEnclosingClass() != null) {
                     continue;
                 }
                 try {

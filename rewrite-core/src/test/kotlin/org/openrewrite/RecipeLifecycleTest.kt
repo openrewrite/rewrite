@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
+import java.nio.charset.Charset
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
@@ -46,7 +47,7 @@ class RecipeLifecycleTest {
                     }
                 }
             }
-        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "hello world")), ctx)
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "hello world")), ctx)
 
         assertThat(visited.get()).isEqualTo(0)
     }
@@ -64,7 +65,7 @@ class RecipeLifecycleTest {
             }
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
-                before + PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "test")
+                before + PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "test")
         }.run(emptyList())
 
         assertThat(results).isEmpty()
@@ -79,7 +80,7 @@ class RecipeLifecycleTest {
             }
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
-                before + PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "test")
+                before + PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "test")
         }.run(emptyList())
 
         assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }
@@ -97,7 +98,7 @@ class RecipeLifecycleTest {
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
                 emptyList<SourceFile>()
-        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "test")))
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "test")))
 
         assertThat(results.map {
             it.recipesThatMadeChanges.map { r -> r.name }.first()
@@ -120,7 +121,7 @@ class RecipeLifecycleTest {
 
             }
 
-        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "test")))
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "test")))
 
         assertThat(results.map {
             it.recipesThatMadeChanges.map { r -> r.name }.first()
@@ -154,12 +155,16 @@ class RecipeLifecycleTest {
         override fun <T : Tree?> withId(id: UUID): T = throw NotImplementedError()
         override fun getSourcePath() = throw NotImplementedError()
         override fun withSourcePath(path: Path): SourceFile = throw NotImplementedError()
+        override fun getCharset() = throw NotImplementedError()
+        override fun withCharset(charset: Charset) = throw NotImplementedError()
+        override fun isCharsetBomMarked() = throw NotImplementedError()
+        override fun withCharsetBomMarked(marked: Boolean) = throw NotImplementedError()
     }
 
     // https://github.com/openrewrite/rewrite/issues/389
     @Test
     fun sourceFilesAcceptOnlyApplicableVisitors() {
-        val sources = listOf(FooSource(), PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello"))
+        val sources = listOf(FooSource(), PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.build(listOf()), "Hello"))
         val fooVisitor = FooVisitor<ExecutionContext>()
         val textVisitor = PlainTextVisitor<ExecutionContext>()
         val ctx = InMemoryExecutionContext {
@@ -173,7 +178,7 @@ class RecipeLifecycleTest {
 
     @Test
     fun accurateReportingOfRecipesMakingChanges() {
-        val sources = listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello"))
+        val sources = listOf(PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.build(listOf()), "Hello"))
         // Set up a composite recipe which prepends "Change1" and appends "Change2" to the input text
         val recipe = object : Recipe() {
             override fun getDisplayName() = "root"
@@ -213,7 +218,7 @@ class RecipeLifecycleTest {
     @Test
     fun recipeDescriptorsReturnCorrectStructure() {
         val sources = listOf(
-            PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), "Hello")
+            PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.build(listOf()), "Hello")
         )
         // Set up a composite recipe which with a nested structure of recipes
         val recipe = object : Recipe() {

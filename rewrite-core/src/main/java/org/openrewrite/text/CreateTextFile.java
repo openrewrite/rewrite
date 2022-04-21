@@ -73,10 +73,10 @@ public class CreateTextFile extends Recipe {
             return before;
         }
 
-        PlainText brandNewFile = new PlainText(Tree.randomId(), path, Markers.EMPTY, fileContents);
+        PlainText brandNewFile = new PlainText(Tree.randomId(), path, null, false, Markers.EMPTY, fileContents);
 
-        if (matchingFile != null && Boolean.TRUE.equals(overwriteExisting)) {
-            brandNewFile = new PlainText(matchingFile.getId(), brandNewFile.getSourcePath(), brandNewFile.getMarkers(), brandNewFile.getText());
+        if (matchingFile != null) {
+            brandNewFile = new PlainText(matchingFile.getId(), brandNewFile.getSourcePath(), null, false, brandNewFile.getMarkers(), brandNewFile.getText());
         }
 
         return ListUtils.concat(before, brandNewFile);

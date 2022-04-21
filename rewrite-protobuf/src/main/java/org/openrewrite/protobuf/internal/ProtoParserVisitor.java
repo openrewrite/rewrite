@@ -321,7 +321,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
             );
             list.add(protoProtoRightPadded);
         }
-        return new Proto.Document(randomId(), path, syntax.getPrefix(), Markers.EMPTY,
+        return new Proto.Document(randomId(), path, charset.name(), charsetBomMarked, syntax.getPrefix(), Markers.EMPTY,
                 syntax.withPrefix(Space.EMPTY),
                 list,
                 Space.format(source.substring(cursor)));
