@@ -21,6 +21,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -29,7 +30,6 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -54,7 +54,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                             .description("The time spent parsing a properties file")
                             .tag("file.type", "Properties");
                     Timer.Sample sample = Timer.start();
-                    try (InputStream is = sourceFile.getSource()) {
+                    try (EncodingDetectingInputStream is = sourceFile.getSource()) {
                         Properties.File file = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, file);
@@ -69,7 +69,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                 .collect(toList());
     }
 
-    private Properties.File parseFromInput(Path sourceFile, InputStream source) {
+    private Properties.File parseFromInput(Path sourceFile, EncodingDetectingInputStream source) {
         List<Properties.Content> contents = new ArrayList<>();
 
         StringBuilder prefix = new StringBuilder();
@@ -103,7 +103,9 @@ public class PropertiesParser implements Parser<Properties.File> {
                 Markers.EMPTY,
                 sourceFile,
                 contents,
-                prefix.toString()
+                prefix.toString(),
+                source.getCharset().name(),
+                source.isCharsetBomMarked()
         );
     }
 

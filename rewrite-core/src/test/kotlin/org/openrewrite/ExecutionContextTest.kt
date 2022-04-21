@@ -48,7 +48,7 @@ class ExecutionContextTest {
                     }
                 }
             }
-        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "hello world")))
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "hello world")))
 
         assertThat(cycles).isEqualTo(2)
     }

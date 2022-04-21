@@ -18,11 +18,8 @@ package org.openrewrite.java;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.ClassFinder;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.comp.Enter;
-import com.sun.tools.javac.comp.Env;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
@@ -30,6 +27,7 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -39,8 +37,8 @@ import org.openrewrite.style.NamedStyles;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
-import java.lang.module.ModuleFinder;
 import java.lang.reflect.Field;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -72,6 +70,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     private final Path sourcePath;
     private final String source;
+    private final Charset charset;
+    private final boolean charsetBomMarked;
     private final Collection<NamedStyles> styles;
     private final ExecutionContext ctx;
     private final Context context;
@@ -89,13 +89,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public Java11ParserVisitor(Path sourcePath,
-                               String source,
+                               EncodingDetectingInputStream source,
                                Collection<NamedStyles> styles,
                                JavaTypeCache typeCache,
                                ExecutionContext ctx,
                                Context context) {
         this.sourcePath = sourcePath;
-        this.source = source;
+        this.source = source.readFully();
+        this.charset = source.getCharset();
+        this.charsetBomMarked = source.isCharsetBomMarked();
         this.styles = styles;
         this.ctx = ctx;
         this.context = context;
@@ -498,6 +500,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 fmt,
                 Markers.build(styles),
                 sourcePath,
+                charset.name(),
+                charsetBomMarked,
                 packageDecl == null ? null : padRight(packageDecl, sourceBefore(";")),
                 convertAll(node.getImports(), this::statementDelim, this::statementDelim),
                 convertAll(node.getTypeDecls().stream().filter(JCClassDecl.class::isInstance).collect(toList())),

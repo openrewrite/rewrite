@@ -115,13 +115,13 @@ public class AddGradleWrapper extends Recipe {
         }
 
         if (needsGradleShellScript) {
-            PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY,
+            PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, null, false, Markers.EMPTY,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew")));
             gradleWrapper.add(gradlew);
         }
 
         if (needsGradleBatchScript) {
-            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY,
+            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, null, false, Markers.EMPTY,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")));
             gradleWrapper.add(gradlewBat);
         }

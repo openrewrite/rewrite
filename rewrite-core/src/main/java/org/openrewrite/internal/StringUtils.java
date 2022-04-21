@@ -23,7 +23,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -114,7 +117,7 @@ public class StringUtils {
                     trimmed.append(c);
                 }
                 if (c == '\r' || c == '\n') {
-                    if (!nonWhitespaceEncountered && j-1 < indentLevel) {
+                    if (!nonWhitespaceEncountered && j - 1 < indentLevel) {
                         trimmed.append(c);
                     }
                     break;
@@ -260,6 +263,13 @@ public class StringUtils {
         return string == null || string.isEmpty();
     }
 
+    /**
+     * If the input stream is coming from a stream with an unknown encoding, use
+     * {@link EncodingDetectingInputStream#readFully()} instead.
+     *
+     * @param inputStream An input stream.
+     * @return A UTF-8 encoded string.
+     */
     public static String readFully(InputStream inputStream) {
         try (InputStream is = inputStream) {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -296,15 +306,15 @@ public class StringUtils {
         char[] chars = text.toCharArray();
         boolean inSingleLineComment = false;
         boolean inMultilineComment = false;
-        while(i < chars.length) {
+        while (i < chars.length) {
             char c = chars[i];
-            if(inSingleLineComment && c == '\n') {
+            if (inSingleLineComment && c == '\n') {
                 inSingleLineComment = false;
                 continue;
             }
-            if(i < chars.length - 1) {
+            if (i < chars.length - 1) {
                 String s = String.valueOf(c) + chars[i + 1];
-                switch(s) {
+                switch (s) {
                     case "//": {
                         inSingleLineComment = true;
                         i += 2;
@@ -322,7 +332,7 @@ public class StringUtils {
                     }
                 }
             }
-            if(!inSingleLineComment && !inMultilineComment && !Character.isWhitespace(c)) {
+            if (!inSingleLineComment && !inMultilineComment && !Character.isWhitespace(c)) {
                 return false;
             }
             i++;

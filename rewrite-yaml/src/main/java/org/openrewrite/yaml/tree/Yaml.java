@@ -23,6 +23,8 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -70,6 +72,25 @@ public interface Yaml extends Tree {
 
         Markers markers;
         Path sourcePath;
+
+        @Nullable // for backwards compatibility
+        @With(AccessLevel.PRIVATE)
+        String charsetName;
+
+        @With
+        @Getter
+        boolean charsetBomMarked;
+
+        @Override
+        public Charset getCharset() {
+            return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
+        }
+
+        @Override
+        public SourceFile withCharset(Charset charset) {
+            return withCharsetName(charset.name());
+        }
+
         List<? extends Document> documents;
 
         @Override
@@ -80,7 +101,7 @@ public interface Yaml extends Tree {
         @Override
         public Documents copyPaste() {
             return new Documents(randomId(), Markers.EMPTY,
-                    sourcePath, documents.stream().map(Document::copyPaste).collect(toList()));
+                    sourcePath, charsetName, charsetBomMarked, documents.stream().map(Document::copyPaste).collect(toList()));
         }
 
         /**

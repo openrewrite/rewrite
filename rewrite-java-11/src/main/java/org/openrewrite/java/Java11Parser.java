@@ -32,7 +32,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -165,7 +164,7 @@ public class Java11Parser implements JavaParser {
                     try {
                         Java11ParserVisitor parser = new Java11ParserVisitor(
                                 input.getRelativePath(relativeTo),
-                                StringUtils.readFully(input.getSource()),
+                                input.getSource(),
                                 styles,
                                 typeCache,
                                 ctx,

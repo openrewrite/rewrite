@@ -20,6 +20,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 
 public interface SourceFile extends Tree {
@@ -30,6 +31,14 @@ public interface SourceFile extends Tree {
 
     SourceFile withSourcePath(Path path);
 
+    Charset getCharset();
+
+    SourceFile withCharset(Charset charset);
+
+    boolean isCharsetBomMarked();
+
+    SourceFile withCharsetBomMarked(boolean marked);
+
     Markers getMarkers();
 
     <T extends SourceFile> T withMarkers(Markers markers);
@@ -37,6 +46,14 @@ public interface SourceFile extends Tree {
     @Nullable
     default <S extends Style> S getStyle(Class<S> style) {
         return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
+    }
+
+    default <P> byte[] printAllAsBytes(P p) {
+        return printAll(p).getBytes(getCharset());
+    }
+
+    default byte[] printAllAsBytes() {
+        return printAllAsBytes(0);
     }
 
     default <P> String printAll(P p) {

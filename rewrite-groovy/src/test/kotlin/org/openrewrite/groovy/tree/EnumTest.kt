@@ -46,7 +46,7 @@ class EnumTest : GroovyTreeTest {
 
     @Disabled
     @Test
-    fun enumWithAnnotations(jp: JavaParser) = assertParsePrintAndProcess(
+    fun enumWithAnnotations() = assertParsePrintAndProcess(
         """
             enum Test {
                 @Deprecated(since = "now")
@@ -60,7 +60,7 @@ class EnumTest : GroovyTreeTest {
 
     @Disabled
     @Test
-    fun anonymousClassInitializer(jp: JavaParser) = assertParsePrintAndProcess(
+    fun anonymousClassInitializer() = assertParsePrintAndProcess(
         """
             enum A {
                 A1(1) {
@@ -83,7 +83,7 @@ class EnumTest : GroovyTreeTest {
 
     @Disabled
     @Test
-    fun enumConstructor(jp: JavaParser) = assertParsePrintAndProcess(
+    fun enumConstructor() = assertParsePrintAndProcess(
         """
             class Outer {
                 enum A {
@@ -103,7 +103,7 @@ class EnumTest : GroovyTreeTest {
 
     @Disabled
     @Test
-    fun noArguments(jp: JavaParser) = assertParsePrintAndProcess(
+    fun noArguments() = assertParsePrintAndProcess(
         """
             enum A {
                 A1, A2();
@@ -113,7 +113,7 @@ class EnumTest : GroovyTreeTest {
 
     @Disabled
     @Test
-    fun enumWithParameters(jp: JavaParser) = assertParsePrintAndProcess(
+    fun enumWithParameters() = assertParsePrintAndProcess(
         """
             enum A {
                 ONE(1),
@@ -126,19 +126,19 @@ class EnumTest : GroovyTreeTest {
 
     @Disabled
     @Test
-    fun enumWithoutParameters(jp: JavaParser) = assertParsePrintAndProcess(
+    fun enumWithoutParameters() = assertParsePrintAndProcess(
         "enum A { ONE, TWO }"
     )
 
     @Disabled
     @Test
-    fun enumUnnecessarilyTerminatedWithSemicolon(jp: JavaParser) = assertParsePrintAndProcess(
+    fun enumUnnecessarilyTerminatedWithSemicolon() = assertParsePrintAndProcess(
         "enum A { ONE ; }"
     )
 
     @Disabled
     @Test
-    fun enumWithEmptyParameters(jp: JavaParser) = assertParsePrintAndProcess(
+    fun enumWithEmptyParameters() = assertParsePrintAndProcess(
         "enum A { ONE ( ), TWO ( ) }"
     )
 }

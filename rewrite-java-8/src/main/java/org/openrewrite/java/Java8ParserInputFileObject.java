@@ -81,7 +81,7 @@ public class Java8ParserInputFileObject implements JavaFileObject {
 
     @Override
     public CharSequence getCharContent(boolean ignoreEncodingErrors) {
-        return StringUtils.readFully(input.getSource());
+        return input.getSource().readFully();
     }
 
     @Override

@@ -23,25 +23,26 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class GraphTest {
-    Graph<Integer> bottom = new Graph<>(4, emptyList());
-    Graph<Integer> loop;
+public class ControlFlowGraphTest {
+    ControlFlowGraph<Integer> bottom = new ControlFlowGraph<>(new BasicBlock<>(singletonList(4)), emptyList(), emptyList());
+    ControlFlowGraph<Integer> loop;
 
     {
-        Graph<Integer> lastStatementInLoop = new Graph<>(5, emptyList());
-        loop = new Graph<>(2,
+        ControlFlowGraph<Integer> lastStatementInLoop = new ControlFlowGraph<>(new BasicBlock<>(singletonList(5)), emptyList(), emptyList());
+        loop = new ControlFlowGraph<>(new BasicBlock<>(singletonList(2)),
                 Arrays.asList(
                         lastStatementInLoop,
                         bottom
-                )
+                ),
+                emptyList()
         );
-        lastStatementInLoop.setChildren(singletonList(loop));
+        lastStatementInLoop.unsafeSetLoops(singletonList(loop));
     }
 
-    Graph<Integer> g = new Graph<>(1, Arrays.asList(
+    ControlFlowGraph<Integer> g = new ControlFlowGraph<>(new BasicBlock<>(singletonList(1)), Arrays.asList(
             loop,
-            new Graph<>(3, singletonList(bottom))
-    ));
+            new ControlFlowGraph<>(new BasicBlock<>(singletonList(3)), singletonList(bottom), emptyList())
+    ), emptyList());
 
     /* (https://asciiflow.com)
      *     1
@@ -58,7 +59,8 @@ public class GraphTest {
 
     @Test
     void postorder() {
-        assertThat(g.postorder()).containsExactly(4, 3, 5, 2, 1);
+        assertThat(g.postorder().map(bb -> bb.getStatements().get(0)))
+                .containsExactly(4, 3, 5, 2, 1);
     }
 
     // NOTE Preorder != reverse postorder
@@ -67,6 +69,7 @@ public class GraphTest {
     //      at runtime.
     @Test
     void reversePostorder() {
-        assertThat(g.reversePostorder()).containsExactly(1, 2, 5, 3, 4);
+        assertThat(g.reversePostorder().map(bb -> bb.getStatements().get(0)))
+                .containsExactly(1, 2, 5, 3, 4);
     }
 }

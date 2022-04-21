@@ -18,15 +18,27 @@ package org.openrewrite.java.dataflow;
 import org.openrewrite.Incubating;
 import org.openrewrite.dataflow.BasicBlock;
 import org.openrewrite.dataflow.ControlFlowGraph;
-import org.openrewrite.dataflow.Graph;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
+import java.net.URI;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 @Incubating(since = "7.22.0")
 public class JavaControlFlowGraph extends ControlFlowGraph<Statement> {
-    protected JavaControlFlowGraph(BasicBlock<Statement> bb, List<Graph<BasicBlock<Statement>>> children) {
-        super(bb, children);
+    protected JavaControlFlowGraph(BasicBlock<Statement> bb, List<JavaControlFlowGraph> children,
+                                   List<JavaControlFlowGraph> loops) {
+        super(bb, children, loops);
     }
 
     /**
@@ -35,6 +47,49 @@ public class JavaControlFlowGraph extends ControlFlowGraph<Statement> {
      * @return A local control flow graph.
      */
     public JavaControlFlowGraph buildLocal(Statement statement) {
-        throw new UnsupportedOperationException("local control flow");
+        return null;
+//        return cfg;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(args);
+//        Map<String, String> env = Collections.singletonMap("java.home", javaHome.toString());
+//        Path jrtfsJar = javaHome.resolve("lib").resolve("jrt-fs.jar");
+//        try (FileSystem fs = FileSystems.newFileSystem(URI.create("jrt:/"), env, classloader)) {
+//            Path modulesRoot = fs.getPath("modules");
+//            return Files.list(modulesRoot);
+//        }
+    }
+
+    private static class ControlFlowGraphGenerator extends JavaIsoVisitor<JavaControlFlowGraph> {
+        List<Statement> basicBlockStatements = new ArrayList<>();
+
+        public JavaControlFlowGraph buildLocal(Statement statement) {
+            JavaControlFlowGraph cfg = new JavaControlFlowGraph(new BasicBlock<>(singletonList(statement)),
+                    emptyList(), emptyList());
+            return cfg;
+        }
+
+        @Override
+        public J.If visitIf(J.If iff, JavaControlFlowGraph cfg) {
+            cfg.getBasicBlock().unsafeSetStatements(basicBlockStatements);
+            basicBlockStatements = new ArrayList<>();
+            JavaControlFlowGraph header = new JavaControlFlowGraph(new BasicBlock<>(singletonList(iff)),
+                    emptyList(), emptyList());
+            cfg = header;
+
+            visit(iff.getThenPart(), cfg);
+
+            visit(iff.getElsePart(), cfg);
+
+            cfg.unsafeSetChildren(singletonList(header));
+            return iff;
+        }
+
+        @Override
+        public Statement visitStatement(Statement statement, JavaControlFlowGraph cfg) {
+            basicBlockStatements.add(statement);
+            return statement;
+        }
     }
 }

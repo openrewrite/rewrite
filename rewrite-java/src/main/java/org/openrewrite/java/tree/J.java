@@ -32,6 +32,8 @@ import org.openrewrite.template.SourceTemplate;
 
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -1161,6 +1163,24 @@ public interface J extends Tree {
         @Getter
         Path sourcePath;
 
+        @Nullable // for backwards compatibility
+        @With(AccessLevel.PRIVATE)
+        String charsetName;
+
+        @With
+        @Getter
+        boolean charsetBomMarked;
+
+        @Override
+        public Charset getCharset() {
+            return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
+        }
+
+        @Override
+        public SourceFile withCharset(Charset charset) {
+            return withCharsetName(charset.name());
+        }
+
         @Nullable
         JRightPadded<Package> packageDeclaration;
 
@@ -1245,7 +1265,7 @@ public interface J extends Tree {
             }
 
             public CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
-                return t.packageDeclaration == packageDeclaration ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, packageDeclaration, t.imports, t.classes, t.eof);
+                return t.packageDeclaration == packageDeclaration ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, packageDeclaration, t.imports, t.classes, t.eof);
             }
 
             @Override
@@ -1255,7 +1275,7 @@ public interface J extends Tree {
 
             @Override
             public CompilationUnit withImports(List<JRightPadded<Import>> imports) {
-                return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, imports, t.classes, t.eof);
+                return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, t.packageDeclaration, imports, t.classes, t.eof);
             }
         }
     }

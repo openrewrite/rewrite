@@ -15,11 +15,16 @@
  */
 package org.openrewrite.text;
 
+import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.UUID;
 
@@ -32,6 +37,25 @@ public class PlainText implements SourceFile, Tree {
     UUID id;
 
     Path sourcePath;
+
+    @Nullable // for backwards compatibility
+    @With(AccessLevel.PRIVATE)
+    String charsetName;
+
+    @With
+    @Getter
+    boolean charsetBomMarked;
+
+    @Override
+    public Charset getCharset() {
+        return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
+    }
+
+    @Override
+    public SourceFile withCharset(Charset charset) {
+        return withCharsetName(charset.name());
+    }
+
     Markers markers;
     String text;
 

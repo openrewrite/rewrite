@@ -31,6 +31,8 @@ import org.openrewrite.marker.Markers;
 
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -88,6 +90,24 @@ public interface G extends J {
         @With
         @Getter
         Path sourcePath;
+
+        @Nullable // for backwards compatibility
+        @With(AccessLevel.PRIVATE)
+        String charsetName;
+
+        @With
+        @Getter
+        boolean charsetBomMarked;
+
+        @Override
+        public Charset getCharset() {
+            return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
+        }
+
+        @Override
+        public SourceFile withCharset(Charset charset) {
+            return withCharsetName(charset.name());
+        }
 
         @Nullable
         JRightPadded<Package> packageDeclaration;
@@ -243,7 +263,7 @@ public interface G extends J {
             }
 
             public G.CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
-                return t.packageDeclaration == packageDeclaration ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, packageDeclaration, t.statements, t.eof);
+                return t.packageDeclaration == packageDeclaration ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, packageDeclaration, t.statements, t.eof);
             }
 
             @Override
@@ -267,7 +287,7 @@ public interface G extends J {
             }
 
             public G.CompilationUnit withStatements(List<JRightPadded<Statement>> statements) {
-                return t.statements == statements ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, statements, t.eof);
+                return t.statements == statements ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, t.packageDeclaration, statements, t.eof);
             }
         }
     }

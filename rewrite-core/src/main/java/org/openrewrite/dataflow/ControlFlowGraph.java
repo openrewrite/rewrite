@@ -15,16 +15,69 @@
  */
 package org.openrewrite.dataflow;
 
+import lombok.*;
+import lombok.experimental.NonFinal;
 import org.openrewrite.Incubating;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-/**
- * @param <S> The statement type of a particular language family.
- */
+@Data
+@AllArgsConstructor
+@Getter(AccessLevel.PROTECTED)
+@Setter(AccessLevel.PRIVATE)
 @Incubating(since = "7.22.0")
-public class ControlFlowGraph<S> extends Graph<BasicBlock<S>> {
-    protected ControlFlowGraph(BasicBlock<S> bb, List<Graph<BasicBlock<S>>> children) {
-        super(bb, children);
+public class ControlFlowGraph<S> {
+    BasicBlock<S> basicBlock;
+
+    @NonFinal
+    List<? extends ControlFlowGraph<S>> children;
+
+    @NonFinal
+    List<? extends ControlFlowGraph<S>> loops;
+
+    public void unsafeSetChildren(List<? extends ControlFlowGraph<S>> children) {
+        this.children = children;
+    }
+
+    public void unsafeSetLoops(List<? extends ControlFlowGraph<S>> loops) {
+        this.loops = loops;
+    }
+
+    public Stream<BasicBlock<S>> postorder() {
+        Stream.Builder<BasicBlock<S>> postorder = Stream.builder();
+
+        Set<ControlFlowGraph<S>> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Stack<ControlFlowGraph<S>> s = new Stack<>();
+        s.add(this);
+
+        nextStack:
+        while (!s.isEmpty()) {
+            ControlFlowGraph<S> current = s.peek();
+            for (int i = current.children.size() - 1; i >= 0; i--) {
+                ControlFlowGraph<S> child = current.children.get(i);
+                if (seen.add(child)) {
+                    s.add(child);
+                    continue nextStack;
+                }
+            }
+            postorder.add(current.basicBlock);
+            s.pop();
+        }
+
+        return postorder.build();
+    }
+
+    public Stream<BasicBlock<S>> reversePostorder() {
+        return postorder().collect(
+                Collectors.collectingAndThen(
+                        Collectors.toList(),
+                        (List<BasicBlock<S>> l) -> {
+                            Collections.reverse(l);
+                            return l;
+                        }
+                )
+        ).stream();
     }
 }

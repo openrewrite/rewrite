@@ -22,6 +22,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -50,7 +51,7 @@ public class XmlParser implements Parser<Xml.Document> {
                             .tag("file.type", "XML");
                     Timer.Sample sample = Timer.start();
 
-                    try (InputStream sourceStream = sourceFile.getSource()) {
+                    try (EncodingDetectingInputStream sourceStream = sourceFile.getSource()) {
                         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
                                 CharStreams.fromStream(sourceStream))));
 
@@ -59,7 +60,7 @@ public class XmlParser implements Parser<Xml.Document> {
 
                         Xml.Document document = new XmlParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
-                                StringUtils.readFully(sourceFile.getSource())
+                                sourceStream
                         ).visitDocument(parser.document());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, document);

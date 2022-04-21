@@ -23,7 +23,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.internal.JsonParserVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Lexer;
@@ -58,7 +57,7 @@ public class JsonParser implements Parser<Json.Document> {
 
                         Json.Document document = new JsonParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
-                                StringUtils.readFully(sourceFile.getSource())
+                                sourceFile.getSource()
                         ).visitJson5(parser.json5());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, document);

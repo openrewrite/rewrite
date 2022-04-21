@@ -15,7 +15,6 @@
  */
 package org.openrewrite.config;
 
-import org.graalvm.polyglot.Source;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
@@ -160,15 +159,6 @@ public class Environment {
         public Builder scanJar(Path jar, ClassLoader classLoader) {
             return load(new ClasspathScanningLoader(jar, properties, classLoader));
         }
-
-        public Builder scanNpmModules(String registry, String... modules) {
-            return load(new NpmRegistryModuleLoader(registry, modules));
-        }
-
-        public Builder scanPolyglotModule(Source... sources) {
-            return load(new PolyglotResourceLoader(sources));
-        }
-
 
         public Builder scanUserHome() {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");

@@ -101,7 +101,9 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             try {
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                         compiled.getInput().getPath(),
-                        StringUtils.readFully(compiled.getInput().getSource()),
+                        compiled.getInput().getSource().readFully(),
+                        compiled.getInput().getSource().getCharset(),
+                        compiled.getInput().getSource().isCharsetBomMarked(),
                         typeCache,
                         ctx
                 );

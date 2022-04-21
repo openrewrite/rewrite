@@ -19,6 +19,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
@@ -27,6 +28,7 @@ import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,12 +42,16 @@ import static org.openrewrite.Tree.randomId;
 public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     private final Path path;
     private final String source;
+    private final Charset charset;
+    private final boolean charsetBomMarked;
 
     private int cursor = 0;
 
-    public XmlParserVisitor(Path path, String source) {
+    public XmlParserVisitor(Path path, EncodingDetectingInputStream source) {
         this.path = path;
-        this.source = source;
+        this.source = source.readFully();
+        this.charset = source.getCharset();
+        this.charsetBomMarked = source.isCharsetBomMarked();
     }
 
     @Override
@@ -53,6 +59,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return convert(ctx, (c, prefix) -> new Xml.Document(
                 randomId(),
                 path,
+                charset.name(),
+                charsetBomMarked,
                 prefix,
                 Markers.EMPTY,
                 visitProlog(ctx.prolog()),

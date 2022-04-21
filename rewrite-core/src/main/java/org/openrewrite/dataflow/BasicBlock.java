@@ -16,21 +16,31 @@
 package org.openrewrite.dataflow;
 
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.openrewrite.Incubating;
 
 import java.util.List;
 
-import static java.util.Collections.emptyList;
-
 /**
+ * A maximal sequence of statements I_0, I_1, I_2, ..., I_n such that
+ * if I_j and I_j+1 are two adjacent statements in this
+ * sequence, then
+ *  - The execution of I_j is always immediately followed by the
+ *    execution of I_j+1.
+ *  - The execution of I_j+1 is always immediate preceded by
+ *    the execution of I_j.
+ * Edges between basic blocks represent potential flow of control.
+ *
  * @param <S> The statement type of a particular language family.
+ *
  */
 @Value
 @Incubating(since = "7.22.0")
 public class BasicBlock<S> {
-    static <S> BasicBlock<S> epsilon() {
-        return new BasicBlock<>(emptyList());
-    }
-
+    @NonFinal
     List<S> statements;
+
+    public void unsafeSetStatements(List<S> statements) {
+        this.statements = statements;
+    }
 }

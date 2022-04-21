@@ -17,7 +17,6 @@ package org.openrewrite.text;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -37,8 +36,10 @@ public class PlainTextParser implements Parser<PlainText> {
                     relativeTo == null ?
                             source.getPath() :
                             relativeTo.relativize(source.getPath()).normalize(),
+                    source.getSource().getCharset().name(),
+                    source.getSource().isCharsetBomMarked(),
                     Markers.EMPTY,
-                    StringUtils.readFully(source.getSource())));
+                    source.getSource().readFully()));
         }
         return plainTexts;
     }
