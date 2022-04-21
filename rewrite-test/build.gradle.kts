@@ -33,8 +33,8 @@ dependencies {
     // later versions are compiled with Java 11, so are not usable in rewrite-java-8 tests
 //    implementation("com.google.googlejavaformat:google-java-format:1.6")
 
-    implementation("org.slf4j:slf4j-api:1.7.+")
-    implementation("ch.qos.logback:logback-classic:1.2.10")
+    implementation("org.slf4j:slf4j-api:1.7.36")
+    implementation("ch.qos.logback:logback-classic:1.2.11")
 
     // configuration generator for service providers
     implementation("com.google.auto.service:auto-service:latest.release")
