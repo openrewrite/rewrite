@@ -27,7 +27,7 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
 
     testImplementation(project(":rewrite-test"))
-    testRuntimeOnly("ch.qos.logback:logback-classic:1.2.10")
+    testRuntimeOnly("ch.qos.logback:logback-classic:1.2.11")
 }
 
 java {
