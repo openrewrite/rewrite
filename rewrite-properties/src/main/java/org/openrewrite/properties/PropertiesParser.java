@@ -74,27 +74,22 @@ public class PropertiesParser implements Parser<Properties.File> {
 
         StringBuilder prefix = new StringBuilder();
         StringBuilder buff = new StringBuilder();
-        int b;
-        try {
-            while ((b = source.read()) != -1) {
-                char c = (char) b;
-                if (c == '\n') {
-                    Properties.Content content = extractContent(buff.toString(), prefix);
-                    if (content != null) {
-                        contents.add(content);
-                    }
-                    buff = new StringBuilder();
-                    prefix.append(c);
-                } else {
-                    buff.append(c);
+        String s = source.readFully();
+        for (char c : s.toCharArray()) {
+            if (c == '\n') {
+                Properties.Content content = extractContent(buff.toString(), prefix);
+                if (content != null) {
+                    contents.add(content);
                 }
+                buff = new StringBuilder();
+                prefix.append(c);
+            } else {
+                buff.append(c);
             }
-            Properties.Content content = extractContent(buff.toString(), prefix);
-            if (content != null) {
-                contents.add(content);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        }
+        Properties.Content content = extractContent(buff.toString(), prefix);
+        if (content != null) {
+            contents.add(content);
         }
 
         return new Properties.File(
