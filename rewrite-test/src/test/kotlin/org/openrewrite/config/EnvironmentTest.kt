@@ -55,7 +55,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val recipe = env.activateRecipes("test.ChangeTextToHello")
         assertThat(recipe.validateAll()).allMatch { v -> v.isValid }
 
-        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "hello")))
+        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "hello")))
         assertThat(results).hasSize(1)
     }
 
@@ -109,7 +109,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val recipe = env.activateRecipes("test.TextMigration")
         assertThat(recipe.validateAll()).allMatch { v -> v.isValid }
 
-        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "hello")))
+        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "hello")))
         assertThat(results).hasSize(1)
     }
 
@@ -148,7 +148,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val recipe = env.activateRecipes("test.TextMigration")
         assertThat(recipe.validateAll()).allMatch { v -> v.isValid }
 
-        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, "hello")))
+        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "hello")))
         assertThat(results).hasSize(1)
     }
 
@@ -260,7 +260,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
     private val plainTextParser = object : Parser<PlainText> {
         override fun parse(ctx: ExecutionContext, vararg sources: String): MutableList<PlainText> {
             return sources.asSequence()
-                .map { PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, it) }
+                .map { PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, it) }
                 .toMutableList()
         }
 
@@ -271,7 +271,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         ): MutableList<PlainText> {
             return sources.asSequence()
                 .map { it.source.toString() }
-                .map { PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, it) }
+                .map { PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, it) }
                 .toMutableList()
         }
 
