@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("GroovyUnusedAssignment")
+@file:Suppress("GroovyUnusedAssignment", "GrPackage")
 
 package org.openrewrite.groovy
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.groovy.tree.G
 import org.openrewrite.java.JavaVisitor
@@ -125,6 +126,55 @@ class GroovyTypeAttributionTest : RewriteTest {
                 assertThat(m.arguments[2]).isInstanceOf(J.Lambda::class.java)
                 val foo = (((m.arguments[2] as J.Lambda).body as J.Block).statements[0] as J.Return).expression as J.Identifier
                 assertThat(foo.type.asFullyQualified()!!.fullyQualifiedName).isEqualTo("java.lang.String")
+            }
+        }
+    )
+
+    @Test
+    fun closureWithDelegate() = rewriteRun(
+        groovy("""
+            public String register(@DelegatesTo(String) Closure stringAction) {
+                return null
+            }
+            register {
+                substring(0, 0)
+            }
+        """) { spec ->
+            spec.afterRecipe { cu ->
+                val m = cu.statements[1] as J.MethodInvocation
+                assertThat(m.arguments).hasSize(1)
+                assertThat(m.arguments[0]).isInstanceOf(J.Lambda::class.java)
+                val substring = (((m.arguments[0] as J.Lambda).body as J.Block).statements[0] as J.Return).expression as J.MethodInvocation
+                assertThat(substring.methodType!!.name).isEqualTo("substring")
+                assertThat(substring.methodType!!.declaringType.fullyQualifiedName).isEqualTo("java.lang.String")
+            }
+        }
+    )
+
+    @Disabled
+    @Test
+    fun infersDelegateViaSimilarGradleApi() = rewriteRun(
+        groovy("""
+            package org.gradle.api
+            
+            interface Action<T> {
+                void execute(T t);
+            }
+            void register(Action<String> stringAction) {
+            }
+            void register(Closure stringAction) {
+            }
+            register {
+                substring(0, 0)
+            }
+        """) { spec ->
+            spec.afterRecipe { cu ->
+                val m = cu.statements.filterIsInstance(J.MethodInvocation::class.java).first()
+                assertThat(m.arguments).hasSize(1)
+                assertThat(m.arguments[0]).isInstanceOf(J.Lambda::class.java)
+                val substring = (((m.arguments[0] as J.Lambda).body as J.Block).statements[0] as J.Return).expression as J.MethodInvocation
+                assertThat(substring.methodType!!.name).isEqualTo("substring")
+                assertThat(substring.methodType!!.declaringType.fullyQualifiedName).isEqualTo("java.lang.String")
             }
         }
     )
