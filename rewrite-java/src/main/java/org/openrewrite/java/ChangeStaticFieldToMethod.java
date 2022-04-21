@@ -46,6 +46,13 @@ public class ChangeStaticFieldToMethod extends Recipe {
     @Nullable
     String newClassName;
 
+    @Option(displayName = "New field target",
+            description = "An optional method target that can be used to specify a static field within the new class.",
+            example = "OK_RESPONSE",
+            required = false)
+    @Nullable
+    String newTarget;
+
     @Option(displayName = "New method name",
             description = "The simple name of the method to use. The method must be static and have no arguments.",
             example = "of")
@@ -126,11 +133,21 @@ public class ChangeStaticFieldToMethod extends Recipe {
 
                 String packageName = StringUtils.substringBeforeLast(newClass, ".");
                 String simpleClassName = StringUtils.substringAfterLast(newClass, ".");
-                String methodInvocationTemplate = "{" + simpleClassName + "." + newMethodName + "();}";
-                @Language("java") String methodStub = "package " + packageName + ";" +
-                        " public class " + simpleClassName + " {" +
-                        " public static void " + newMethodName + "() { return null; }" +
-                        " }";
+                String methodInvocationTemplate = "{" + simpleClassName + (newTarget != null ? "." + newTarget + "." : ".") + newMethodName + "();}";
+
+                @Language("java") String methodStub;
+                if (newTarget == null) {
+                    methodStub = "package " + packageName + ";" +
+                            " public class " + simpleClassName + " {" +
+                            " public static void " + newMethodName + "() { return null; }" +
+                            " }";
+                } else {
+                    methodStub = "package " + packageName + ";" +
+                            " public class Target {" +
+                            " public static void " + newMethodName + "() { return null; }" +
+                            " }" +
+                            " public class " + simpleClassName + " {public static Target " + newTarget + ";}";
+                }
                 return JavaTemplate
                         .builder(() -> statementCursor, methodInvocationTemplate)
                         .javaParser(() -> JavaParser.fromJavaVersion()

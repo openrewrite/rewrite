@@ -25,6 +25,7 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
             "java.util.Collections",
             "EMPTY_LIST",
             "com.acme.Lists",
+            null,
             "of"
         )
 
@@ -169,6 +170,7 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
             "com.acme.Example",
             "EXAMPLE",
             "java.lang.System",
+            null,
             "lineSeparator"
         ),
         dependsOn = arrayOf(staticStringClass),
@@ -200,6 +202,7 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
             "com.example.Test",
             "EXAMPLE",
             "com.doesntmatter.Foo",
+            null,
             "BAR"),
         before = """
             package com.example;
@@ -212,11 +215,12 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1626")
-    fun successConstantToMethod() = assertChanged(
+    fun constantToMethodOnStaticTarget() = assertChanged(
         recipe = ChangeStaticFieldToMethod(
             "constants.Constants",
             "SUCCESS_CODE",
-            "io.netty.handler.codec.http.HttpResponseStatus.OK",
+            "io.netty.handler.codec.http.HttpResponseStatus",
+            "OK",
             "codeAsText"),
 
         dependsOn = arrayOf(
@@ -259,11 +263,11 @@ interface ChangeStaticFieldToMethodTest : JavaRecipeTest {
         after = """
             package com.example;
             
-            import io.netty.handler.codec.http.HttpResponseStatus.OK;
+            import io.netty.handler.codec.http.HttpResponseStatus;
             
             class Test {
                 public static String testMe() {
-                    return OK.codeAsText();
+                    return HttpResponseStatus.OK.codeAsText();
                 }
             }
         """
