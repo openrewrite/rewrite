@@ -1,3 +1,18 @@
+/*
+ * Copyright 2022 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.gradle;
 
 import org.openrewrite.ExecutionContext;
@@ -8,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
@@ -58,13 +74,20 @@ public class AddDelegatesToGradleApi extends Recipe {
                     if (method.getMethodType() == null || !(method.getMethodType().getDeclaringType() instanceof JavaType.Class)) {
                         return param;
                     }
+                    // Construct a matcher that will identify methods identical to this one except they accept Action instead of Closure
+                    MethodMatcher matcher = new MethodMatcher(method.getMethodType().withParameterTypes(
+                            ListUtils.map(method.getMethodType().getParameterTypes(), p -> {
+                                if (TypeUtils.isOfType(CLOSURE_TYPE, p)) {
+                                    return ACTION_TYPE;
+                                }
+                                return p;
+                            })));
+
+                    // Get the type parameter of the Action
                     JavaType.Class declaringClass = (JavaType.Class) method.getMethodType().getDeclaringType();
                     //noinspection OptionalGetWithoutIsPresent
                     Optional<JavaType> maybeDelegateType = declaringClass.getMethods().stream()
-                            .filter(m -> m.getName().equals(method.getSimpleName())
-                                    && m.getParameterTypes().stream()
-                                    .anyMatch(mp -> TypeUtils.isOfType(ACTION_TYPE, mp)
-                                            && mp instanceof JavaType.Parameterized))
+                            .filter(matcher::matches)
                             .map(m -> (JavaType.Parameterized) m.getParameterTypes().stream()
                                     .filter(mp -> TypeUtils.isOfType(ACTION_TYPE, mp))
                                     .findFirst().get())
@@ -74,18 +97,14 @@ public class AddDelegatesToGradleApi extends Recipe {
                     if (!maybeDelegateType.isPresent()) {
                         return param;
                     }
-                    JavaType delegateType = unwrapGenericTypeVariable(maybeDelegateType.get());
-                    String simpleName;
-                    String fullyQualifiedName;
-                    if(delegateType instanceof JavaType.FullyQualified) {
-                        fullyQualifiedName = ((JavaType.FullyQualified) delegateType).getFullyQualifiedName();
-                        simpleName = fullyQualifiedName.substring(fullyQualifiedName.lastIndexOf('.') + 1);
-                    } else {
+                    JavaType.FullyQualified delegateType = unwrapGenericTypeVariable(maybeDelegateType.get());
+                    if(delegateType == null) {
                         return param;
                     }
+                    String simpleName =  delegateType.getFullyQualifiedName().substring( delegateType.getFullyQualifiedName().lastIndexOf('.') + 1);
                     param = param.withTemplate(
                             JavaTemplate.builder(this::getCursor, "@DelegatesTo(#{}.class)")
-                                    .imports(fullyQualifiedName, DELEGATES_TO_TYPE.getFullyQualifiedName())
+                                    .imports(delegateType.getFullyQualifiedName(), DELEGATES_TO_TYPE.getFullyQualifiedName())
                                     .javaParser(() -> JavaParser.fromJavaVersion()
                                             .classpath("groovy")
                                             .build())
@@ -100,10 +119,16 @@ public class AddDelegatesToGradleApi extends Recipe {
         };
     }
 
-    private static JavaType unwrapGenericTypeVariable(JavaType type) {
-        if(type instanceof JavaType.GenericTypeVariable) {
-            return unwrapGenericTypeVariable(((JavaType.GenericTypeVariable) type).getBounds().get(0));
+    @Nullable
+    private static JavaType.FullyQualified unwrapGenericTypeVariable(JavaType type) {
+        if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable)type;
+            if(genericType.getBounds().size() == 1) {
+                return unwrapGenericTypeVariable(genericType.getBounds().get(0));
+            } else {
+                return null;
+            }
         }
-        return type;
+        return TypeUtils.asFullyQualified(type);
     }
 }

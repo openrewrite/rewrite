@@ -109,6 +109,10 @@ public class MethodMatcher {
         this(method, false);
     }
 
+    public MethodMatcher(JavaType.Method method) {
+        this(methodPattern(method), false);
+    }
+
     public boolean matches(@Nullable JavaType.Method type) {
         if (type == null) {
             return false;
@@ -268,17 +272,20 @@ public class MethodMatcher {
 
     public static String methodPattern(J.MethodDeclaration method) {
         assert method.getMethodType() != null;
+        return methodPattern(method.getMethodType());
+    }
 
+    public static String methodPattern(JavaType.Method method) {
         StringJoiner parameters = new StringJoiner(",");
-        for (JavaType javaType : method.getMethodType().getParameterTypes()) {
+        for (JavaType javaType : method.getParameterTypes()) {
             String s = typePattern(javaType);
             if (s != null) {
                 parameters.add(s);
             }
         }
 
-        return typePattern(method.getMethodType().getDeclaringType()) + " " +
-                method.getSimpleName() + "(" + parameters + ")";
+        return typePattern(method.getDeclaringType()) + " " +
+                method.getName() + "(" + parameters + ")";
     }
 }
 
