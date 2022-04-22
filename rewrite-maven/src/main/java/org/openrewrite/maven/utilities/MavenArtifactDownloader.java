@@ -72,7 +72,7 @@ public class MavenArtifactDownloader {
         this.onError = onError;
         this.serverIdToServer = settings == null || settings.getServers() == null ?
                 new HashMap<>() :
-                settings.getServers().getServers().stream()
+                settings.getServers().stream()
                         .collect(toMap(MavenSettings.Server::getId, Function.identity()));
     }
 
@@ -90,6 +90,7 @@ public class MavenArtifactDownloader {
 
         return mavenArtifactCache.computeArtifact(dependency, () -> {
             try {
+                assert dependency.getRepository() != null;
                 String uri = dependency.getRepository().getUri() + "/" +
                         dependency.getGroupId().replace('.', '/') + '/' +
                         dependency.getArtifactId() + '/' +

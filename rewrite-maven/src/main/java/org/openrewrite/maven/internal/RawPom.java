@@ -16,6 +16,8 @@
 package org.openrewrite.maven.internal;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
@@ -30,9 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -80,22 +80,37 @@ public class RawPom {
     String packaging;
 
     @Nullable
-    Dependencies dependencies;
+    Map<String, String> properties;
+
+    @NonFinal
+    @Nullable
+    @JacksonXmlElementWrapper(localName = "dependencies")
+    @JacksonXmlProperty(localName = "dependency")
+    List<Dependency> dependencies;
 
     @Nullable
     DependencyManagement dependencyManagement;
 
     @Nullable
-    Map<String, String> properties;
+    Build build;
 
+    @NonFinal
     @Nullable
-    RawRepositories repositories;
+    @JacksonXmlElementWrapper(localName = "repositories")
+    @JacksonXmlProperty(localName = "repository")
+    List<RawRepository> repositories;
 
+    @NonFinal
     @Nullable
-    Licenses licenses;
+    @JacksonXmlElementWrapper(localName = "licenses")
+    @JacksonXmlProperty(localName = "license")
+    List<License> licenses;
 
+    @NonFinal
     @Nullable
-    Profiles profiles;
+    @JacksonXmlElementWrapper(localName = "profiles")
+    @JacksonXmlProperty(localName = "profile")
+    List<Profile> profiles;
 
     public static RawPom parse(InputStream inputStream, @Nullable String snapshotVersion) {
         try {
@@ -131,61 +146,100 @@ public class RawPom {
         Boolean optional;
 
         @Nullable
-        @JacksonXmlElementWrapper
+        @NonFinal
+        @JacksonXmlElementWrapper(localName = "exclusions")
+        @JacksonXmlProperty(localName = "exclusion")
         List<GroupArtifact> exclusions;
     }
 
-    @Getter
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Data
     public static class DependencyManagement {
+
+        @JacksonXmlElementWrapper(localName = "dependencies")
+        @JacksonXmlProperty(localName = "dependency")
+        List<Dependency> dependencies;
+    }
+
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Data
+    @AllArgsConstructor
+    public static class Build {
+
+        @NonFinal
         @Nullable
-        private final Dependencies dependencies;
+        @JacksonXmlElementWrapper(localName = "plugins")
+        @JacksonXmlProperty(localName = "plugin")
+        List<Plugin> plugins;
 
-        public DependencyManagement() {
-            this.dependencies = null;
-        }
+        @Nullable
+        @JacksonXmlProperty(localName = "pluginManagement")
+        PluginManagement pluginManagement;
 
-        public DependencyManagement(@JsonProperty("dependencies") @Nullable Dependencies dependencies) {
-            this.dependencies = dependencies;
-        }
-    }
-
-    @Getter
-    public static class Dependencies {
-        private final List<Dependency> dependencies;
-
-        public Dependencies() {
-            this.dependencies = emptyList();
-        }
-
-        public Dependencies(@JacksonXmlProperty(localName = "dependency") List<Dependency> dependencies) {
-            this.dependencies = dependencies;
+        public Build() {
+            plugins = null;
+            pluginManagement = null;
         }
     }
 
-    @Getter
-    public static class Licenses {
-        private final List<License> licenses;
-
-        public Licenses() {
-            this.licenses = emptyList();
-        }
-
-        public Licenses(@JacksonXmlProperty(localName = "license") List<License> licenses) {
-            this.licenses = licenses;
-        }
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Data
+    @AllArgsConstructor
+    public static class PluginManagement {
+        @Nullable
+        @JacksonXmlElementWrapper(localName = "plugins")
+        @JacksonXmlProperty(localName = "plugin")
+        List<Plugin> plugins;
     }
 
-    @Getter
-    public static class Profiles {
-        private final List<Profile> profiles;
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    public static class Plugin {
+        String groupId;
+        String artifactId;
 
-        public Profiles() {
-            this.profiles = emptyList();
-        }
+        @Nullable
+        String version;
 
-        public Profiles(@JacksonXmlProperty(localName = "profile") List<Profile> profiles) {
-            this.profiles = profiles;
-        }
+        @Nullable
+        Boolean extensions;
+
+        @Nullable
+        Boolean inherited;
+
+        @Nullable
+        JsonNode configuration;
+
+        @NonFinal
+        @Nullable
+        @JacksonXmlElementWrapper(localName = "dependencies")
+        @JacksonXmlProperty(localName = "dependency")
+        List<Dependency> dependencies;
+
+        @NonFinal
+        @Nullable
+        @JacksonXmlElementWrapper(localName = "executions")
+        @JacksonXmlProperty(localName = "execution")
+        List<Execution> executions;
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    public static class Execution {
+        String id;
+
+        @NonFinal
+        @JacksonXmlElementWrapper(localName = "goals")
+        @JacksonXmlProperty(localName = "goal")
+        List<String> goals;
+
+        String phase;
+
+        @Nullable
+        Boolean inherited;
+
+        @Nullable
+        JsonNode configuration;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -227,14 +281,23 @@ public class RawPom {
         @Nullable
         Map<String, String> properties;
 
+        @NonFinal
         @Nullable
-        Dependencies dependencies;
+        @JacksonXmlElementWrapper(localName = "dependencies")
+        @JacksonXmlProperty(localName = "dependency")
+        List<Dependency> dependencies;
 
         @Nullable
         DependencyManagement dependencyManagement;
 
         @Nullable
-        RawRepositories repositories;
+        Build build;
+
+        @NonFinal
+        @Nullable
+        @JacksonXmlElementWrapper(localName = "repositories")
+        @JacksonXmlProperty(localName = "repository")
+        List<RawRepository> repositories;
     }
 
     @Nullable
@@ -264,63 +327,56 @@ public class RawPom {
                 mapRequestedDependencies(getDependencies()),
                 mapRepositories(getRepositories()),
                 mapLicenses(getLicenses()),
-                mapProfiles(getProfiles())
+                mapProfiles(getProfiles()),
+                mapPlugins((build != null) ? build.getPlugins()  : null),
+                mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
         );
     }
 
-    private List<org.openrewrite.maven.tree.License> mapLicenses(@Nullable Licenses rawLicenses) {
+    private List<org.openrewrite.maven.tree.License> mapLicenses(@Nullable List<License> rawLicenses) {
         List<org.openrewrite.maven.tree.License> licenses = emptyList();
         if (rawLicenses != null) {
-            List<License> unmappedLicenses = rawLicenses.getLicenses();
-            if (unmappedLicenses != null) {
-                licenses = new ArrayList<>(unmappedLicenses.size());
-                for (License l : unmappedLicenses) {
-                    licenses.add(org.openrewrite.maven.tree.License.fromName(l.getName()));
-                }
+            licenses = new ArrayList<>(rawLicenses.size());
+            for (License l : rawLicenses) {
+                licenses.add(org.openrewrite.maven.tree.License.fromName(l.getName()));
             }
         }
         return licenses;
     }
 
-    private List<org.openrewrite.maven.tree.Profile> mapProfiles(@Nullable Profiles rawProfiles) {
+    private List<org.openrewrite.maven.tree.Profile> mapProfiles(@Nullable List<Profile> rawProfiles) {
         List<org.openrewrite.maven.tree.Profile> profiles = emptyList();
         if (rawProfiles != null) {
-            List<Profile> unmappedProfiles = rawProfiles.getProfiles();
-            if (unmappedProfiles != null) {
-                profiles = new ArrayList<>(unmappedProfiles.size());
+            profiles = new ArrayList<>(rawProfiles.size());
 
-                // profiles are mapped in reverse order to put them in precedence order left to right
-                for (int i = unmappedProfiles.size() - 1; i >= 0; i--) {
-                    Profile p = unmappedProfiles.get(i);
-                    profiles.add(new org.openrewrite.maven.tree.Profile(
-                            p.getId(),
-                            p.getActivation(),
-                            p.getProperties() == null ? emptyMap() : p.getProperties(),
-                            mapRequestedDependencies(p.getDependencies()),
-                            mapDependencyManagement(p.getDependencyManagement()),
-                            mapRepositories(p.getRepositories())
-                    ));
+            // profiles are mapped in reverse order to put them in precedence order left to right
+            for (int i = rawProfiles.size() - 1; i >= 0; i--) {
+                Profile p = rawProfiles.get(i);
+                profiles.add(new org.openrewrite.maven.tree.Profile(
+                        p.getId(),
+                        p.getActivation(),
+                        p.getProperties() == null ? emptyMap() : p.getProperties(),
+                        mapRequestedDependencies(p.getDependencies()),
+                        mapDependencyManagement(p.getDependencyManagement()),
+                        mapRepositories(p.getRepositories()),
+                        mapPlugins((p.getBuild() != null) ? p.getBuild().getPlugins()  : null),
+                        mapPlugins((p.getBuild() != null && p.getBuild().getPluginManagement() != null) ? p.getBuild().getPluginManagement().getPlugins() : null)
+                ));
                 }
-
-            }
         }
         return profiles;
     }
 
     @NotNull
-    private List<MavenRepository> mapRepositories(@Nullable RawRepositories rawRepositories) {
+    private List<MavenRepository> mapRepositories(@Nullable List<RawRepository> rawRepositories) {
         List<MavenRepository> pomRepositories = emptyList();
         if (rawRepositories != null) {
-            List<RawRepositories.Repository> unmappedRepos = rawRepositories.getRepositories();
-            if (unmappedRepos != null) {
-                pomRepositories = new ArrayList<>(unmappedRepos.size());
-                for (RawRepositories.Repository r : unmappedRepos) {
-                    pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
-                            r.getReleases() == null || r.getReleases().isEnabled(),
-                            r.getSnapshots() == null || r.getSnapshots().isEnabled(),
-                            false, null, null));
-                }
-
+            pomRepositories = new ArrayList<>(rawRepositories.size());
+            for (RawRepository r : rawRepositories) {
+                pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
+                        r.getReleases() == null || r.getReleases().isEnabled(),
+                        r.getSnapshots() == null || r.getSnapshots().isEnabled(),
+                        false, null, null));
             }
         }
         return pomRepositories;
@@ -329,7 +385,7 @@ public class RawPom {
     private List<ManagedDependency> mapDependencyManagement(@Nullable DependencyManagement rawDependencyManagement) {
         List<ManagedDependency> dependencyManagementDependencies = emptyList();
         if (rawDependencyManagement != null && rawDependencyManagement.getDependencies() != null) {
-            List<Dependency> unmappedDependencies = rawDependencyManagement.getDependencies().getDependencies();
+            List<Dependency> unmappedDependencies = rawDependencyManagement.getDependencies();
             if (unmappedDependencies != null) {
                 dependencyManagementDependencies = new ArrayList<>(unmappedDependencies.size());
                 for (Dependency d : unmappedDependencies) {
@@ -345,19 +401,63 @@ public class RawPom {
         return dependencyManagementDependencies;
     }
 
-    private List<org.openrewrite.maven.tree.Dependency> mapRequestedDependencies(@Nullable Dependencies rawDependencies) {
+    private List<org.openrewrite.maven.tree.Dependency> mapRequestedDependencies(@Nullable List<Dependency> rawDependencies) {
         List<org.openrewrite.maven.tree.Dependency> dependencies = emptyList();
-        if (rawDependencies != null && rawDependencies.getDependencies() != null) {
-            List<Dependency> unmappedDependencies = rawDependencies.getDependencies();
-            if (unmappedDependencies != null) {
-                dependencies = new ArrayList<>(unmappedDependencies.size());
-                for (Dependency d : unmappedDependencies) {
-                    GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
-                    dependencies.add(new org.openrewrite.maven.tree.Dependency(dGav, d.getClassifier(), d.getType(), d.getScope(), d.getExclusions(),
-                            d.getOptional() != null && d.getOptional()));
-                }
+        if (rawDependencies != null) {
+            dependencies = new ArrayList<>(rawDependencies.size());
+            for (Dependency d : rawDependencies) {
+                GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
+                dependencies.add(new org.openrewrite.maven.tree.Dependency(dGav, d.getClassifier(), d.getType(), d.getScope(), d.getExclusions(),
+                        d.getOptional() != null && d.getOptional()));
             }
         }
         return dependencies;
     }
+
+    private List<org.openrewrite.maven.tree.Plugin> mapPlugins(@Nullable List<Plugin> rawPlugins) {
+        List<org.openrewrite.maven.tree.Plugin> plugins = emptyList();
+        if (rawPlugins != null) {
+            plugins = new ArrayList<>(rawPlugins.size());
+            for (Plugin rawPlugin : rawPlugins) {
+
+                plugins.add(new org.openrewrite.maven.tree.Plugin(
+                        rawPlugin.getGroupId(),
+                        rawPlugin.getArtifactId(),
+                        rawPlugin.getVersion(),
+                        rawPlugin.getExtensions(),
+                        rawPlugin.getInherited(),
+                        rawPlugin.getConfiguration(),
+                        mapRequestedDependencies(rawPlugin.getDependencies()),
+                        mapPluginExecutions(rawPlugin.getExecutions())
+                ));
+            }
+        }
+        return plugins;
+    }
+
+    private Map<String, Object> mapPluginConfiguration(@Nullable JsonNode configuration) {
+        if (configuration == null || configuration.isEmpty()) {
+            return emptyMap();
+        }
+        return MavenXmlMapper.readMapper().convertValue(configuration, new TypeReference<Map<String, Object>>(){});
+    }
+
+    private List<org.openrewrite.maven.tree.Plugin.Execution> mapPluginExecutions(@Nullable List<Execution> rawExecutions) {
+        List<org.openrewrite.maven.tree.Plugin.Execution> executions = emptyList();
+        if (rawExecutions != null) {
+            executions = new ArrayList<>(rawExecutions.size());
+            for (Execution rawExecution : rawExecutions) {
+                executions.add(new org.openrewrite.maven.tree.Plugin.Execution(
+                        rawExecution.getId(),
+                        rawExecution.getGoals(),
+                        rawExecution.getPhase(),
+                        rawExecution.getInherited(),
+                        rawExecution.getConfiguration()
+                ));
+            }
+        }
+        return executions;
+    }
+
 }
+

@@ -264,9 +264,10 @@ class MavenSettingsTest {
             """.trimIndent().byteInputStream()
         }, ctx)
 
+
         assertThat(settings!!.servers).isNotNull
-        assertThat(settings.servers!!.servers).hasSize(1)
-        assertThat(settings.servers!!.servers.first())
+        assertThat(settings.servers).hasSize(1)
+        assertThat(settings.servers!!.first())
             .matches { it.id == "server001" }
             .matches { it.username == "my_login" }
             .matches { it.password == "my_password" }

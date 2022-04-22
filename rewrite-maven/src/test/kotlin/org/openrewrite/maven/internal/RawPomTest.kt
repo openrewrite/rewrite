@@ -15,11 +15,12 @@
  */
 package org.openrewrite.maven.internal
 
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.maven.tree.ProfileActivation
-import java.nio.file.Path
+import kotlin.streams.toList
 
 class RawPomTest {
     @Test
@@ -36,7 +37,7 @@ class RawPomTest {
     }
 
     @Test
-    fun repositoriesSerializationAndDeserialization(@TempDir tempDir: Path) {
+    fun repositoriesSerializationAndDeserialization() {
         val pom = RawPom.parse(
             """
                 <project>
@@ -56,12 +57,13 @@ class RawPomTest {
                 </project>
             """.trimIndent().byteInputStream(), null)
 
-        assertThat(pom.repositories?.repositories).hasSize(1)
+        assertThat(pom.repositories).hasSize(1)
     }
 
+    @Suppress("UNCHECKED_CAST")
     @Test
     fun deserializePom() {
-        val pom = """
+        val pomString = """
             <project>
                 <modelVersion>4.0.0</modelVersion>
             
@@ -87,7 +89,7 @@ class RawPomTest {
                         </dependency>
                     </dependencies>
                 </dependencyManagement>
-            
+                
                 <dependencies>
                   <dependency>
                     <groupId>org.junit.jupiter</groupId>
@@ -102,7 +104,69 @@ class RawPomTest {
                     </exclusions>
                   </dependency>
                 </dependencies>
-                
+
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-surefire-plugin</artifactId>
+                            <version>2.22.1</version>
+                            <configuration>
+                                <includes>
+                                        <include>**/*Tests.java</include>
+                                        <include>**/*Test.java</include>
+                                </includes>
+                                <excludes>
+                                        <exclude>**/Abstract*.java</exclude>
+                                </excludes>
+                                <!-- see https://stackoverflow.com/questions/18107375/getting-skipping-jacoco-execution-due-to-missing-execution-data-file-upon-exec -->
+                                <argLine>hello</argLine>
+                            </configuration>
+                        </plugin>
+                        <plugin>
+                            <groupId>org.jacoco</groupId>
+                            <artifactId>jacoco-maven-plugin</artifactId>
+                            <executions>
+                                <execution>
+                                    <id>agent</id>
+                                    <goals>
+                                        <goal>prepare-agent</goal>
+                                    </goals>
+                                </execution>
+                                <execution>
+                                        <id>report</id>
+                                        <phase>test</phase>
+                                        <goals>
+                                            <goal>report</goal>
+                                        </goals>
+                                </execution>
+                            </executions>
+                        </plugin>
+                    </plugins>
+                    <pluginManagement>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.openrewrite.maven</groupId>
+                                <artifactId>rewrite-maven-plugin</artifactId>
+                                <version>4.22.2</version>
+                                <configuration>
+                                    <activeRecipes>
+                                        <recipe>org.openrewrite.java.format.AutoFormat</recipe>
+                                        <recipe>com.yourorg.VetToVeterinary</recipe>
+                                        <recipe>org.openrewrite.java.spring.boot2.SpringBoot2JUnit4to5Migration</recipe>
+                                    </activeRecipes>
+                                </configuration>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>org.openrewrite.recipe</groupId>
+                                        <artifactId>rewrite-spring</artifactId>
+                                        <version>4.19.3</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                    </pluginManagement>
+                </build>
                 <licenses>
                   <license>
                     <name>Apache License, Version 2.0</name>
@@ -149,32 +213,233 @@ class RawPomTest {
                         <dependencies>
                         </dependencies>
                     </profile>
+                    <profile>
+                        <id>plugin-stuff</id>
+                        <build>
+                            <plugins>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-surefire-plugin</artifactId>
+                                    <version>2.22.1</version>
+                                    <configuration>
+                                        <includes>
+                                                <include>**/*Tests.java</include>
+                                                <include>**/*Test.java</include>
+                                        </includes>
+                                        <excludes>
+                                                <exclude>**/Abstract*.java</exclude>
+                                        </excludes>
+                                        <!-- see https://stackoverflow.com/questions/18107375/getting-skipping-jacoco-execution-due-to-missing-execution-data-file-upon-exec -->
+                                        <argLine>hello</argLine>
+                                    </configuration>
+                                </plugin>
+                                <plugin>
+                                    <groupId>org.jacoco</groupId>
+                                    <artifactId>jacoco-maven-plugin</artifactId>
+                                    <executions>
+                                        <execution>
+                                            <id>agent</id>
+                                            <goals>
+                                                <goal>prepare-agent</goal>
+                                            </goals>
+                                        </execution>
+                                        <execution>
+                                                <id>report</id>
+                                                <phase>test</phase>
+                                                <goals>
+                                                    <goal>report</goal>
+                                                </goals>
+                                        </execution>
+                                    </executions>
+                                </plugin>
+                            </plugins>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <groupId>org.openrewrite.maven</groupId>
+                                        <artifactId>rewrite-maven-plugin</artifactId>
+                                        <version>4.22.2</version>
+                                        <configuration>
+                                            <activeRecipes>
+                                                <recipe>org.openrewrite.java.format.AutoFormat</recipe>
+                                                <recipe>com.yourorg.VetToVeterinary</recipe>
+                                                <recipe>org.openrewrite.java.spring.boot2.SpringBoot2JUnit4to5Migration</recipe>
+                                            </activeRecipes>
+                                        </configuration>
+                                        <dependencies>
+                                            <dependency>
+                                                <groupId>org.openrewrite.recipe</groupId>
+                                                <artifactId>rewrite-spring</artifactId>
+                                                <version>4.19.3</version>
+                                            </dependency>
+                                        </dependencies>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+
+                    </profile>
                 </profiles>
             </project>
         """.trimIndent()
 
-        val model = MavenXmlMapper.readMapper().readValue(pom, RawPom::class.java)
-
+        val model = MavenXmlMapper.readMapper().readValue(pomString, RawPom::class.java).toPom(null, null)
         assertThat(model.parent!!.groupId).isEqualTo("org.springframework.boot")
 
         assertThat(model.packaging).isEqualTo("jar")
 
-        assertThat(model.dependencies!!.dependencies[0].groupId)
+        assertThat(model.dependencies.get(0)?.groupId)
             .isEqualTo("org.junit.jupiter")
 
-        assertThat(model.dependencies!!.dependencies[0].exclusions!!.first().groupId)
+        assertThat(model.dependencies.get(0)?.exclusions!!.first().groupId)
             .isEqualTo("com.google.guava")
 
-        assertThat(model.dependencyManagement?.dependencies?.dependencies?.first()?.groupId)
+        assertThat(model.dependencyManagement.first()?.groupId)
             .isEqualTo("org.springframework.cloud")
 
-        assertThat(model.licenses?.licenses?.first()?.name)
+        assertThat(model.plugins).hasSize(2)
+        val surefirePlugin = model.plugins.stream()
+            .filter { p -> p.artifactId.equals("maven-surefire-plugin") }!!.toList()[0]
+        assertThat(surefirePlugin.getConfigurationList("includes", String::class.java))
+            .hasSize(2)
+            .contains("**/*Test.java", "**/*Tests.java")
+
+        assertThat(surefirePlugin.getConfigurationList("excludes", String::class.java))
+            .hasSize(1)
+            .contains("**/Abstract*.java")
+
+        assertThat(surefirePlugin.getConfigurationStringValue("argLine")).isEqualTo("hello")
+        var jacocoPlugin = model.plugins.stream()
+            .filter { p -> p.artifactId.equals("jacoco-maven-plugin") }!!.toList()[0]
+
+        assertThat(jacocoPlugin.executions).hasSize(2)
+
+        var rewritePlugin = model.pluginManagement.stream()
+            .filter { p -> p.artifactId.equals("rewrite-maven-plugin") }!!.toList()[0]
+
+        assertThat(rewritePlugin.dependencies).hasSize(1)
+        assertThat(rewritePlugin.dependencies[0].groupId).isEqualTo("org.openrewrite.recipe")
+        assertThat(rewritePlugin.dependencies[0].artifactId).isEqualTo("rewrite-spring")
+        assertThat(rewritePlugin.dependencies[0].artifactId).isEqualTo("rewrite-spring")
+        assertThat(rewritePlugin.dependencies[0].version).isEqualTo("4.19.3")
+
+        var activeRecipes = rewritePlugin.getConfigurationList("activeRecipes.recipe", String::class.java)
+        assertThat(activeRecipes).contains(
+            "org.openrewrite.java.format.AutoFormat",
+            "com.yourorg.VetToVeterinary",
+            "org.openrewrite.java.spring.boot2.SpringBoot2JUnit4to5Migration"
+        )
+
+        assertThat(model.licenses.first()?.name)
             .isEqualTo("Apache License, Version 2.0")
 
-        assertThat(model.repositories?.repositories?.first()?.url)
+        assertThat(model.repositories.first()?.uri)
             .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots")
+        val java9Profile = model.profiles.stream().filter { p -> p.id!!.equals("java9+") }!!.toList()[0]
+        val java11Profile = model.profiles.stream().filter { p -> p.id!!.equals("java11+") }!!.toList()[0]
+        assertThat(java9Profile.dependencies[0].groupId).isEqualTo("javax.xml.bind")
+        assertThat(java11Profile.dependencies).isEmpty()
 
-        assertThat(model.profiles!!.profiles[0].dependencies!!.dependencies.first().groupId).isEqualTo("javax.xml.bind")
-        assertThat(model.profiles!!.profiles[1].dependencies!!.dependencies).isEmpty()
+        val rewriteProfile = model.profiles.stream().filter { p -> p.id!!.equals("plugin-stuff") }!!.toList()[0]
+
+        assertThat(rewriteProfile.plugins).hasSize(2)
+        jacocoPlugin = rewriteProfile.plugins.stream()
+            .filter { p -> p.artifactId.equals("jacoco-maven-plugin") }!!.toList()[0]
+
+        assertThat(jacocoPlugin.executions).hasSize(2)
+
+        rewritePlugin = rewriteProfile.pluginManagement.stream()
+            .filter { p -> p.artifactId.equals("rewrite-maven-plugin") }!!.toList()[0]
+
+        assertThat(rewritePlugin.dependencies).hasSize(1)
+        assertThat(rewritePlugin.dependencies[0].groupId).isEqualTo("org.openrewrite.recipe")
+        assertThat(rewritePlugin.dependencies[0].artifactId).isEqualTo("rewrite-spring")
+        assertThat(rewritePlugin.dependencies[0].artifactId).isEqualTo("rewrite-spring")
+        assertThat(rewritePlugin.dependencies[0].version).isEqualTo("4.19.3")
+
+        activeRecipes = rewritePlugin.getConfigurationList("activeRecipes", String::class.java)
+        assertThat(activeRecipes).contains(
+            "org.openrewrite.java.format.AutoFormat",
+            "com.yourorg.VetToVeterinary",
+            "org.openrewrite.java.spring.boot2.SpringBoot2JUnit4to5Migration"
+        )
+    }
+
+    @Test
+    fun deserializePluginConfiguration() {
+        val pomString = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+            
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <packaging>jar</packaging>
+
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-surefire-plugin</artifactId>
+                            <version>2.22.1</version>
+                            <configuration>
+                                <includes>
+                                        <include>hello</include>
+                                        <include>fred</include>
+                                </includes>
+                                <activeRecipes>
+                                        <recipe>cool-recipe-1</recipe>
+                                        <recipe>cool-recipe-2</recipe>
+                                </activeRecipes>
+                                <string-value>fred</string-value>
+                                <int-value>123</int-value>
+                                <grandparent>
+                                    <parent>
+                                        <child>
+                                            <stringList>
+                                              <element>f</element>
+                                              <element>r</element>
+                                              <element>e</element>
+                                              <element>d</element>
+                                            </stringList>
+                                            <stringValue>fred</stringValue>
+                                            <intValue>123</intValue>
+                                        </child>
+                                    </parent>
+                                </grandparent>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+        """
+
+        val model = MavenXmlMapper.readMapper().readValue(pomString, RawPom::class.java).toPom(null, null)
+
+        val plugin = model.plugins[0]
+
+        assertThat(plugin.getConfigurationList("includes", String::class.java)).hasSize(2).contains("fred", "hello")
+        assertThat(plugin.getConfigurationList("activeRecipes", String::class.java)).hasSize(2)
+            .contains("cool-recipe-1", "cool-recipe-2")
+
+        assertThat(plugin.getConfigurationList("includes", String::class.java)).hasSize(2).contains("fred", "hello")
+        assertThat(plugin.getConfigurationList("activeRecipes", String::class.java)).hasSize(2)
+            .contains("cool-recipe-1", "cool-recipe-2")
+
+        assertThat(plugin.getConfigurationStringValue("string-value")).isEqualTo("fred")
+        assertThat(plugin.getConfigurationStringValue("int-value")).isEqualTo("123")
+        assertThat(plugin.getConfiguration("int-value", Integer::class.java)).isEqualTo(123)
+
+        val child = plugin.getConfiguration("grandparent.parent.child", Child::class.java)
+        assertThat(child!!.stringValue).isEqualTo("fred")
+        assertThat(child.intValue).isEqualTo(123)
+        assertThat(plugin.getConfigurationList("grandparent.parent.child.stringList", String::class.java)).hasSize(4).contains("f", "r", "e", "d")
+    }
+
+    @Suppress("unused")
+    data class Child (val stringValue : String, val intValue : Int) {
+        @JacksonXmlElementWrapper(localName = "stringList", useWrapping = true)
+        @JacksonXmlProperty(localName = "element")
+        lateinit var stringList : List<String>
     }
 }

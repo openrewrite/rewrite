@@ -41,6 +41,9 @@ public class Profile {
     List<ManagedDependency> dependencyManagement;
     List<MavenRepository> repositories;
 
+    List<Plugin> plugins;
+    List<Plugin> pluginManagement;
+
     public boolean isActive(Iterable<String> activeProfiles) {
         return ProfileActivation.isActive(id, activeProfiles, activation);
     }
