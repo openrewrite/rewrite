@@ -13,10 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
+import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class EncodingTest {
@@ -26,8 +29,30 @@ public class EncodingTest {
         assertThat(isISO88591("yÀaÀÅÈËÑãêïñùý".getBytes(StandardCharsets.ISO_8859_1))).as("not iso").isTrue();
         assertThat(isISO88591("yÀaÀÅÈËÑãêïñùý".getBytes(StandardCharsets.UTF_8))).as("not utf").isFalse();
 
-        // unlikely false negative -- two consecutive characters in the range [0xc2, 0xd0]
-        assertThat(isISO88591("ÂÂ".getBytes(StandardCharsets.ISO_8859_1))).as("is iso").isFalse();
+        assertThat(isISO88591("ÂÂ".getBytes(StandardCharsets.ISO_8859_1))).as("is iso").isTrue();
+    }
+
+    @Test
+    void compareWindows1252ToISO88591() {
+        int startCharacter = 0;
+        int lastIso88591Character = 255;
+
+        for (int i = startCharacter; i < lastIso88591Character; i++) {
+            String c = Character.toString((char) i);
+            byte[] iso = c.getBytes(ISO_8859_1);
+            byte[] win = c.getBytes(Charset.forName("Windows-1252"));
+
+            int isoB = iso[0] & 0xFF;
+            int winB = win[0] & 0xFF;
+            if (128 <= i && i <= 159) {
+                // The characters between the range of 128 and 159 do not match.
+                // In Windows-1252, the Euro sign () occurs at i == 128 and is the only printable character in the range.
+                // Characters between 129 - 159 are control characters.
+                assertThat(isoB).isNotEqualTo(winB);
+            } else {
+                assertThat(isoB).isEqualTo(winB);
+            }
+        }
     }
 
     /**
@@ -35,19 +60,23 @@ public class EncodingTest {
      * Looks for any character greater than 0x7f and not preceded by a character in the range [0xc2, 0xd0].
      */
     private boolean isISO88591(byte[] bytes) {
-        byte prev = 0;
+        int prev = 0;
         for (byte aByte : bytes) {
-            if ((aByte & 0xff) >= 0x80 && notUtfHighByte(aByte)) {
-                if (notUtfHighByte(prev)) {
-                    return true;
-                }
+            int aInt = (aByte & 0xFF);
+            if (aInt >= 0x80 &&
+                    (!(aInt >= 0xC2 && aInt <= 0xEF) && prev == 0) ||
+                    // UTF-8 conditions.
+                    ((prev >= 0xC2 && prev <= 0xDF && notUtfHighByte(aInt)) || // 2 byte sequence
+                            (prev >= 0xE0 && prev <= 0xEF && notUtfHighByte(aInt)) || // 3 byte sequence
+                            (prev >= 0xF0 && prev <= 0xF7 && notUtfHighByte(aInt)))) { // 4 byte sequence
+                return true;
             }
-            prev = aByte;
+            prev = aInt;
         }
         return false;
     }
 
-    private boolean notUtfHighByte(byte b) {
-        return (b & 0xff) < 0xc2 || (b & 0xff) > 0xd0;
+    private boolean notUtfHighByte(int b) {
+        return !(b >= 0x80 && b <= 0xBF);
     }
 }
