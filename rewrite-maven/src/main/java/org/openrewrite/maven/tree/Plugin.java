@@ -25,11 +25,8 @@ public class Plugin {
     @Nullable
     Boolean inherited;
 
-    @Nullable
     Map<String, Object> configuration;
-
     List<Dependency> dependencies;
-
     List<Execution> executions;
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

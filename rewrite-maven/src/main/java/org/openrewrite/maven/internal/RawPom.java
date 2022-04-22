@@ -16,6 +16,7 @@
 package org.openrewrite.maven.internal;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
@@ -31,9 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -240,7 +239,7 @@ public class RawPom {
         Boolean inherited;
 
         @Nullable
-        Map<String, String> configuration;
+        JsonNode configuration;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -291,6 +290,9 @@ public class RawPom {
         @Nullable
         DependencyManagement dependencyManagement;
 
+        @Nullable
+        Build build;
+
         @NonFinal
         @Nullable
         @JacksonXmlElementWrapper(localName = "repositories")
@@ -326,7 +328,8 @@ public class RawPom {
                 mapRepositories(getRepositories()),
                 mapLicenses(getLicenses()),
                 mapProfiles(getProfiles()),
-                mapBuild(getBuild())
+                mapPlugins((build != null) ? build.getPlugins()  : null),
+                mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
         );
     }
 
@@ -355,7 +358,9 @@ public class RawPom {
                         p.getProperties() == null ? emptyMap() : p.getProperties(),
                         mapRequestedDependencies(p.getDependencies()),
                         mapDependencyManagement(p.getDependencyManagement()),
-                        mapRepositories(p.getRepositories())
+                        mapRepositories(p.getRepositories()),
+                        mapPlugins((p.getBuild() != null) ? p.getBuild().getPlugins()  : null),
+                        mapPlugins((p.getBuild() != null && p.getBuild().getPluginManagement() != null) ? p.getBuild().getPluginManagement().getPlugins() : null)
                 ));
                 }
         }
@@ -409,18 +414,6 @@ public class RawPom {
         return dependencies;
     }
 
-    @Nullable
-    private Pom.Build mapBuild(@Nullable Build build) {
-        if (build == null) {
-            return null;
-        }
-        Pom.Build.PluginManagement pluginManagement = null;
-        if (build.getPluginManagement() != null) {
-            pluginManagement = new  Pom.Build.PluginManagement(mapPlugins(build.getPluginManagement().getPlugins()));
-        }
-        return new Pom.Build(mapPlugins(build.getPlugins()), pluginManagement);
-    }
-
     private List<org.openrewrite.maven.tree.Plugin> mapPlugins(@Nullable List<Plugin> rawPlugins) {
         List<org.openrewrite.maven.tree.Plugin> plugins = emptyList();
         if (rawPlugins != null) {
@@ -442,14 +435,57 @@ public class RawPom {
         return plugins;
     }
 
-    @Nullable
     private Map<String, Object> mapPluginConfiguration(@Nullable JsonNode configuration) {
-        return null;
+        if (configuration == null || configuration.isEmpty()) {
+            return emptyMap();
+        }
+        Map<String, Object> result = new HashMap<>();
+        Iterator<Map.Entry<String, JsonNode>> fields = configuration.fields();
+        fields.forEachRemaining(e -> result.put(e.getKey(), mapJsonNode(e.getValue())));
+        return result;
     }
 
-    @Nullable
-    private List<org.openrewrite.maven.tree.Plugin.Execution> mapPluginExecutions(@Nullable List<Execution> executions) {
-        return null;
+    private Object mapJsonNode(JsonNode currentNode) {
+
+        if (currentNode.isObject() && !currentNode.isEmpty()) {
+            if (currentNode.size() == 1) {
+                Object value = mapJsonNode(currentNode.fields().next().getValue());
+                if (value instanceof List) {
+                    return value;
+                } else if ((value instanceof String)) {
+                    return Collections.singletonList(value);
+                }
+            }
+            Map<String, Object> map = new HashMap<>();
+            Iterator<Map.Entry<String, JsonNode>> fields = currentNode.fields();
+            fields.forEachRemaining(e -> map.put(e.getKey(), mapJsonNode(e.getValue())));
+            return map;
+        } else if (currentNode.isArray()) {
+            List<String> list = new ArrayList<>();
+            for (JsonNode jsonNode : currentNode) {
+                list.add(jsonNode.asText());
+            }
+            return list;
+        } else {
+            return currentNode.asText();
+        }
+    }
+
+    private List<org.openrewrite.maven.tree.Plugin.Execution> mapPluginExecutions(@Nullable List<Execution> rawExecutions) {
+        List<org.openrewrite.maven.tree.Plugin.Execution> executions = emptyList();
+        if (rawExecutions != null) {
+            executions = new ArrayList<>(rawExecutions.size());
+            for (Execution rawExecution : rawExecutions) {
+                executions.add(new org.openrewrite.maven.tree.Plugin.Execution(
+                        rawExecution.getId(),
+                        rawExecution.getGoals(),
+                        rawExecution.getPhase(),
+                        rawExecution.getInherited(),
+                        mapPluginConfiguration(rawExecution.getConfiguration())
+                ));
+            }
+        }
+        return executions;
     }
 
 }
