@@ -26,7 +26,6 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
