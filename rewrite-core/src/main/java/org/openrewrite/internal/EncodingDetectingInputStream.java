@@ -67,7 +67,7 @@ public class EncodingDetectingInputStream extends InputStream {
                         ((prev >= 0xC2 && prev <= 0xDF && notUtfHighByte(aByte)) || // 2 byte sequence
                                 (prev >= 0xE0 && prev <= 0xEF && notUtfHighByte(aByte)) || // 3 byte sequence
                                 (prev >= 0xF0 && prev <= 0xF7 && notUtfHighByte(aByte)))) { // 4 byte sequence
-                    charset = Charset.forName("Windows-1252");
+                    charset = StandardCharsets.ISO_8859_1;
                 }
             }
 
