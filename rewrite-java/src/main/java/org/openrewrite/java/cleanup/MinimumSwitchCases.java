@@ -23,7 +23,9 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 public class MinimumSwitchCases extends Recipe {
@@ -149,7 +151,16 @@ public class MinimumSwitchCases extends Recipe {
                     }
 
                     // move first case to "if"
-                    generatedIf = generatedIf.withThenPart(((J.Block) generatedIf.getThenPart()).withStatements(ListUtils.map(cases[0].getStatements(),
+                    List<Statement> statements = new ArrayList<>();
+                    for (Statement statement : cases[0].getStatements()) {
+                        if (statement instanceof J.Block) {
+                            statements.addAll(((J.Block) statement).getStatements());
+                        } else {
+                            statements.add(statement);
+                        }
+                    }
+
+                    generatedIf = generatedIf.withThenPart(((J.Block) generatedIf.getThenPart()).withStatements(ListUtils.map(statements,
                             s -> s instanceof J.Break ? null : s)));
 
                     // move second case to "else"

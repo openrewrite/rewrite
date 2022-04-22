@@ -313,4 +313,35 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1701")
+    @Test
+    fun removeBreaksFromCaseBody() = assertChanged(
+        before = """
+            class Test {
+                String name;
+                void test() {
+                    switch (name) {
+                      case "jonathan": {
+                          doSomething();
+                          break;
+                      }
+                    }
+                }
+            }
+        """,
+        after = """
+            class Test {
+                String name;
+                void test() {
+                    if ("jonathan".equals(name)) {
+                        doSomething();
+                    }
+                }
+            }
+        """,
+        typeValidation = {
+            methodInvocations = false
+        }
+    )
 }
