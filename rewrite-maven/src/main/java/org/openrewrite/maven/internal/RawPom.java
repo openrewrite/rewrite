@@ -426,7 +426,7 @@ public class RawPom {
                         rawPlugin.getVersion(),
                         rawPlugin.getExtensions(),
                         rawPlugin.getInherited(),
-                        mapPluginConfiguration(rawPlugin.getConfiguration()),
+                        rawPlugin.getConfiguration(),
                         mapRequestedDependencies(rawPlugin.getDependencies()),
                         mapPluginExecutions(rawPlugin.getExecutions())
                 ));
@@ -439,36 +439,7 @@ public class RawPom {
         if (configuration == null || configuration.isEmpty()) {
             return emptyMap();
         }
-        Map<String, Object> result = new HashMap<>();
-        Iterator<Map.Entry<String, JsonNode>> fields = configuration.fields();
-        fields.forEachRemaining(e -> result.put(e.getKey(), mapJsonNode(e.getValue())));
-        return result;
-    }
-
-    private Object mapJsonNode(JsonNode currentNode) {
-
-        if (currentNode.isObject() && !currentNode.isEmpty()) {
-            if (currentNode.size() == 1) {
-                Object value = mapJsonNode(currentNode.fields().next().getValue());
-                if (value instanceof List) {
-                    return value;
-                } else if ((value instanceof String)) {
-                    return Collections.singletonList(value);
-                }
-            }
-            Map<String, Object> map = new HashMap<>();
-            Iterator<Map.Entry<String, JsonNode>> fields = currentNode.fields();
-            fields.forEachRemaining(e -> map.put(e.getKey(), mapJsonNode(e.getValue())));
-            return map;
-        } else if (currentNode.isArray()) {
-            List<String> list = new ArrayList<>();
-            for (JsonNode jsonNode : currentNode) {
-                list.add(jsonNode.asText());
-            }
-            return list;
-        } else {
-            return currentNode.asText();
-        }
+        return MavenXmlMapper.readMapper().convertValue(configuration, new TypeReference<Map<String, Object>>(){});
     }
 
     private List<org.openrewrite.maven.tree.Plugin.Execution> mapPluginExecutions(@Nullable List<Execution> rawExecutions) {
@@ -481,7 +452,7 @@ public class RawPom {
                         rawExecution.getGoals(),
                         rawExecution.getPhase(),
                         rawExecution.getInherited(),
-                        mapPluginConfiguration(rawExecution.getConfiguration())
+                        rawExecution.getConfiguration()
                 ));
             }
         }
