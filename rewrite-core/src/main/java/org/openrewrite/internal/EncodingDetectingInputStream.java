@@ -35,6 +35,8 @@ public class EncodingDetectingInputStream extends InputStream {
      * Last byte read
      */
     private int prev;
+    private int prev2;
+    private int prev3;
 
     public EncodingDetectingInputStream(InputStream inputStream) {
         this.inputStream = inputStream;
@@ -55,15 +57,22 @@ public class EncodingDetectingInputStream extends InputStream {
         // if we haven't yet determined a charset...
         if (charset == null && aByte != -1) {
             // The first 128 characters in ASCII share the same bytes and are defaulted to UTF-8.
-            if (aByte >= 0x80 &&
-                    (!(aByte >= 0xC2 && aByte <= 0xEF) && prev == 0) ||
-                    // UTF-8 conditions.
-                    ((prev >= 0xC2 && prev <= 0xDF && notUtfHighByte(aByte)) || // 2 byte sequence
-                            (prev >= 0xE0 && prev <= 0xEF && notUtfHighByte(aByte)) || // 3 byte sequence
-                            (prev >= 0xF0 && prev <= 0xF7 && notUtfHighByte(aByte)))) { // 4 byte sequence
-                charset = StandardCharsets.ISO_8859_1;
+            if (prev3 == 0xC3 && prev2 == 0xAF && prev == 0xC2) {
+                charsetBomMarked = true;
+                charset = StandardCharsets.UTF_8;
+            } else {
+                if (aByte >= 0x80 &&
+                        (!(aByte >= 0xC2 && aByte <= 0xEF) && prev == 0) ||
+                        // UTF-8 conditions.
+                        ((prev >= 0xC2 && prev <= 0xDF && notUtfHighByte(aByte)) || // 2 byte sequence
+                                (prev >= 0xE0 && prev <= 0xEF && notUtfHighByte(aByte)) || // 3 byte sequence
+                                (prev >= 0xF0 && prev <= 0xF7 && notUtfHighByte(aByte)))) { // 4 byte sequence
+                    charset = Charset.forName("Windows-1252");
+                }
             }
 
+            prev3 = prev2;
+            prev2 = prev;
             prev = aByte;
         }
 

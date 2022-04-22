@@ -27,6 +27,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class EncodingDetectingInputStreamTest {
 
     @Test
+    void detectUTF8Bom() {
+        String bom = "ï»¿";
+        assertThat(read(bom, UTF_8).isCharsetBomMarked()).isTrue();
+    }
+
+    @Test
     void iso88591() {
         assertThat(read("yÀaÀÅÈËÑãêïñùý", ISO_8859_1).getCharset()).isEqualTo(ISO_8859_1);
     }
