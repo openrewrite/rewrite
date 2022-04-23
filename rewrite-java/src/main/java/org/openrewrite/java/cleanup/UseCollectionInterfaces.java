@@ -101,7 +101,8 @@ public class UseCollectionInterfaces extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, executionContext);
-                if (m.hasModifier(J.Modifier.Type.Public) && m.getReturnTypeExpression() != null) {
+                if ((m.hasModifier(J.Modifier.Type.Public) || m.hasModifier(J.Modifier.Type.Private) || m.getModifiers().isEmpty())
+                        && m.getReturnTypeExpression() != null) {
                     JavaType.FullyQualified originalType = TypeUtils.asFullyQualified(m.getReturnTypeExpression().getType());
                     if (originalType != null && rspecRulesReplaceTypeMap.containsKey(originalType.getFullyQualifiedName())) {
 
@@ -143,7 +144,7 @@ public class UseCollectionInterfaces extends Recipe {
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
                 J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, executionContext);
                 JavaType.FullyQualified originalType = TypeUtils.asFullyQualified(mv.getType());
-                if (multiVariable.hasModifier(J.Modifier.Type.Public) &&
+                if ((mv.hasModifier(J.Modifier.Type.Public) || mv.hasModifier(J.Modifier.Type.Private) || mv.getModifiers().isEmpty()) &&
                         originalType != null && rspecRulesReplaceTypeMap.containsKey(originalType.getFullyQualifiedName())) {
 
                     JavaType.FullyQualified newType = TypeUtils.asFullyQualified(
