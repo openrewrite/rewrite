@@ -61,13 +61,13 @@ public class EncodingDetectingInputStream extends InputStream {
                 charsetBomMarked = true;
                 charset = StandardCharsets.UTF_8;
             } else {
-                if (aByte >= 0x80 &&
-                        (!(aByte >= 0xC2 && aByte <= 0xEF) && prev == 0) ||
-                        // UTF-8 conditions.
-                        ((prev >= 0xC2 && prev <= 0xDF && notUtfHighByte(aByte)) || // 2 byte sequence
-                                (prev >= 0xE0 && prev <= 0xEF && notUtfHighByte(aByte)) || // 3 byte sequence
-                                (prev >= 0xF0 && prev <= 0xF7 && notUtfHighByte(aByte)))) { // 4 byte sequence
-                    charset = StandardCharsets.ISO_8859_1;
+                if (0x80 <= aByte && (!(0xC2 <= aByte && aByte <= 0xEF) && prev == 0) ||
+                        ((0xC2 <= prev && prev <= 0xDF && notUtfHighByte(aByte)) || // 2 byte sequence
+                        (0xE0 <= prev && prev <= 0xEF && notUtfHighByte(aByte)) || // 3 byte sequence
+                        (0xF0 <= prev && prev <= 0xF7 && notUtfHighByte(aByte)) || // 4 byte sequence
+                        (0xF8 <= prev && prev <= 0xFB && notUtfHighByte(aByte)) || // 5 byte sequence
+                        (0xFC <= prev && prev <= 0xFD && notUtfHighByte(aByte)))) { // 6 byte sequence
+                    charset = Charset.forName("Windows-1252");
                 }
             }
 
@@ -96,6 +96,6 @@ public class EncodingDetectingInputStream extends InputStream {
     }
 
     private boolean notUtfHighByte(int b) {
-        return !(b >= 0x80 && b <= 0xBF);
+        return !(0x80 <= b && b <= 0xBF);
     }
 }
