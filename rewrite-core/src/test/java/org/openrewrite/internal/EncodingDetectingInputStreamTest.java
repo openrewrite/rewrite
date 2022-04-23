@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
+import java.util.Arrays;
+import java.util.List;
 
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -35,18 +37,29 @@ public class EncodingDetectingInputStreamTest {
     }
 
     @Test
-    void utf8() {
-        assertThat(read("yÀaÀÅÈËÑãêïñùý", UTF_8).getCharset()).isEqualTo(UTF_8);
+    void isUtf8() {
+        List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
+        for (String accent : accents) {
+            assertThat(read(accent, UTF_8).getCharset()).isEqualTo(UTF_8);
+        }
     }
 
     @Test
-    void windows1252() {
-        assertThat(read("yÀaÀÅÈËÑãêïñùý", WINDOWS_1252).getCharset()).isEqualTo(WINDOWS_1252);
+    void isWindows1252() {
+        List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
+        for (String accent : accents) {
+            assertThat(read(accent, WINDOWS_1252).getCharset()).isEqualTo(WINDOWS_1252);
+        }
+    }
+
+    @Test
+    void oddPairInWINDOWS_1252() {
+        assertThat(read("ÂÂ", WINDOWS_1252).getCharset()).isEqualTo(UTF_8);
     }
 
     @Test
     void utf8Characters() {
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < 1024; i++) {
             String c = Character.toString((char) i);
             assertThat(read(c, UTF_8).getCharset()).isEqualTo(UTF_8);
         }
