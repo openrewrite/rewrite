@@ -53,13 +53,16 @@ public class EncodingDetectingInputStreamTest {
     }
 
     @Test
-    void oddPairInWINDOWS_1252() {
-        assertThat(read("ÂÂ", WINDOWS_1252).getCharset()).isEqualTo(UTF_8);
+    void oddPairInWindows1252() {
+        // Range 1: 0xC0 - 0xDF == "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"
+        // Range 2: 0x80 - 0xBF == "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”·–—˜™š›œžŸ¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿"
+        // A character in range 1 followed by a character in range 2 encoded in Windows-1252 will be detected as UTF-8.
+        assertThat(read("À€", WINDOWS_1252).getCharset()).isEqualTo(UTF_8);
     }
 
     @Test
     void utf8Characters() {
-        for (int i = 0; i < 1024; i++) {
+        for (int i = 192; i < 2048; i++) {
             String c = Character.toString((char) i);
             assertThat(read(c, UTF_8).getCharset()).isEqualTo(UTF_8);
         }
