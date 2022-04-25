@@ -65,24 +65,24 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
             return bl;
         }
 
-        @SuppressWarnings("rawtypes")
-        private J.ControlParentheses<Expression> cleanupControlParentheses(
-            J.ControlParentheses<Expression> controlParentheses, ExecutionContext context
+        @SuppressWarnings("unchecked")
+        private <E extends Expression> E cleanupBooleanExpression(
+            E expression, ExecutionContext context
         ) {
-            final J.ControlParentheses cp1 =
-                (J.ControlParentheses) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
-                    .visitNonNull(controlParentheses, context, getCursor().getParentOrThrow());
-            final J.ControlParentheses cp2 =
-                (J.ControlParentheses) new SimplifyBooleanExpressionVisitor<ExecutionContext>()
-                    .visitNonNull(cp1, context, getCursor().getParentOrThrow());
-            return cp2;
+            final E ex1 =
+                    (E) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
+                            .visitNonNull(expression, context, getCursor().getParentOrThrow());
+            final E ex2 =
+                    (E) new SimplifyBooleanExpressionVisitor<>()
+                            .visitNonNull(ex1, context, getCursor().getParentOrThrow());
+            return ex2;
         }
 
         @Override
         public J visitIf(J.If if_, ExecutionContext context) {
             J.If if__ = (J.If) super.visitIf(if_, context);
             J.ControlParentheses<Expression> cp =
-                cleanupControlParentheses(if__.getIfCondition(), context);
+                    cleanupBooleanExpression(if__.getIfCondition(), context);
             // The compile-time constant value of the if condition control parentheses.
             final Optional<Boolean> compileTimeConstantBoolean;
             if (isLiteralTrue(cp.getTree())) {

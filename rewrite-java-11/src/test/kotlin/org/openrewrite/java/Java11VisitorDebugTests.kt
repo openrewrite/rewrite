@@ -639,6 +639,10 @@ class Java11UsesTypeTest : Java11Test, UsesTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UselessCompoundTest : Java11Test, UselessCompoundTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11WhileInsteadOfForTest : Java11Test, WhileInsteadOfForTest
 
 @DebugOnly

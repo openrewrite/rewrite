@@ -494,6 +494,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UsesTypeTck : UsesTypeTest
 
     @Nested
+    inner class UslessCompoundTck : UselessCompoundTest
+
+    @Nested
     inner class WhileInsteadOfForTck : WhileInsteadOfForTest
 
     @Nested
