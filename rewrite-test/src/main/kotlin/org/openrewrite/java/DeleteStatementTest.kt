@@ -46,4 +46,83 @@ interface DeleteStatementTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun deleteSecondStatement(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object: TestRecipe() {
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object: JavaIsoVisitor<ExecutionContext>() {
+                    override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
+                        val b = super.visitBlock(block, p)
+                        if (b.statements.size != 4) return b
+                        b.statements.forEachIndexed { i, s ->
+                            if (i == 1) {
+                                doAfterVisit(DeleteStatement(s))
+                            }
+                        }
+                        return b
+                    }
+                }
+            }
+        },
+        before = """
+            public class A {
+               {
+                  String s = "";
+                  s.toString();
+                  s = "hello";
+                  s.toString();
+               }
+            }
+        """,
+        after = """
+            public class A {
+               {
+                  String s = "";
+                  s = "hello";
+                  s.toString();
+               }
+            }
+        """
+    )
+
+    @Test
+    fun deleteSecondAndFourthStatement(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object: TestRecipe() {
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object: JavaIsoVisitor<ExecutionContext>() {
+                    override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
+                        val b = super.visitBlock(block, p)
+                        if (b.statements.size != 4) return b
+                        b.statements.forEachIndexed { i, s ->
+                            if (i == 1 || i == 3) {
+                                doAfterVisit(DeleteStatement(s))
+                            }
+                        }
+                        return b
+                    }
+                }
+            }
+        },
+        before = """
+            public class A {
+               {
+                  String s = "";
+                  s.toString();
+                  s = "hello";
+                  s.toString();
+               }
+            }
+        """,
+        after = """
+            public class A {
+               {
+                  String s = "";
+                  s = "hello";
+               }
+            }
+        """
+    )
 }
