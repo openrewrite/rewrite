@@ -495,6 +495,10 @@ class Java8ReplaceDuplicateStringLiteralsTest : Java8Test, ReplaceDuplicateStrin
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ReplaceLambdaWithMethodReferenceTest : Java8Test, ReplaceLambdaWithMethodReferenceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RenameVariableTest : Java8Test, RenameVariableTest
 
 @DebugOnly

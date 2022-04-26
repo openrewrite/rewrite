@@ -503,6 +503,10 @@ class Java11ReplaceDuplicateStringLiteralsTest : Java11Test, ReplaceDuplicateStr
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ReplaceLambdaWithMethodReferenceTest : Java11Test, ReplaceLambdaWithMethodReferenceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RenameVariableTest : Java11Test, RenameVariableTest
 
 @DebugOnly

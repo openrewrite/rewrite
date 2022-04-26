@@ -41,7 +41,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class AddLicenseHeaderTck : AddLicenseHeaderTest
 
     @Nested
-    class AddOrUpdateAnnotationAttributeTck : AddOrUpdateAnnotationAttributeTest
+    inner class AddOrUpdateAnnotationAttributeTck : AddOrUpdateAnnotationAttributeTest
 
     @Nested
     inner class AddSerialVersionUidToSerializableTck : AddSerialVersionUidToSerializableTest
@@ -390,6 +390,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class ReplaceDuplicateStringLiteralsTestTck : ReplaceDuplicateStringLiteralsTest
+
+    @Nested
+    inner class ReplaceReplaceLambdaWithMethodReferenceTck : ReplaceLambdaWithMethodReferenceTest
 
     @Nested
     inner class ReorderMethodArgumentsTck : ReorderMethodArgumentsTest
