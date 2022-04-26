@@ -84,5 +84,6 @@ recipeList:
   - org.openrewrite.java.cleanup.UseDiamondOperator
   - org.openrewrite.java.cleanup.UseJavaStyleArrayDeclarations
   - org.openrewrite.java.cleanup.UseLambdaForFunctionalInterface
+  - org.openrewrite.java.cleanup.UseStringReplace
   - org.openrewrite.java.cleanup.WhileInsteadOfFor
   - org.openrewrite.java.cleanup.WriteOctalValuesAsDecimal

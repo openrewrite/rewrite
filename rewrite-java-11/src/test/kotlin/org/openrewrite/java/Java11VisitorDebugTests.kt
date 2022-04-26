@@ -635,6 +635,10 @@ class Java11UsesMethodTest : Java11Test, UsesMethodTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UseStringReplaceTest : Java11Test, UseStringReplaceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UsesTypeTest : Java11Test, UsesTypeTest
 
 @DebugOnly
