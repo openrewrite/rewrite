@@ -234,7 +234,14 @@ public interface Yaml extends Tree {
         UUID id;
 
         Markers markers;
+
+        @Nullable
+        String openingBracePrefix;
+
         List<Entry> entries;
+
+        @Nullable
+        String closingBracePrefix;
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -243,8 +250,8 @@ public interface Yaml extends Tree {
 
         @Override
         public Mapping copyPaste() {
-            return new Mapping(randomId(), Markers.EMPTY, entries.stream().map(Entry::copyPaste)
-                    .collect(toList()));
+            return new Mapping(randomId(), Markers.EMPTY, openingBracePrefix, entries.stream().map(Entry::copyPaste)
+                    .collect(toList()), closingBracePrefix);
         }
 
         /**
