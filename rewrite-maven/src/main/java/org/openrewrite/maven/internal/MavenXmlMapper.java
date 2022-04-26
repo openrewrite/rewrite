@@ -29,7 +29,6 @@ import com.fasterxml.jackson.dataformat.xml.XmlFactory;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.xml.deser.FromXmlParser;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
-import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 
 import javax.xml.stream.XMLInputFactory;
@@ -61,9 +60,7 @@ public class MavenXmlMapper {
                     .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
                     .withSetterVisibility(JsonAutoDetect.Visibility.NONE)
                     .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY)).
-                    registerModule(new KotlinModule.Builder().build()).
-                    registerModule(new StringTrimModule())
-            ;
+                    registerModule(new StringTrimModule());
         }
         {
             writeMapper = XmlMapper.builder(xmlFactory)

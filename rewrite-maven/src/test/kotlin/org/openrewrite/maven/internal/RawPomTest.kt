@@ -15,8 +15,6 @@
  */
 package org.openrewrite.maven.internal
 
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.maven.tree.ProfileActivation
@@ -57,7 +55,7 @@ class RawPomTest {
                 </project>
             """.trimIndent().byteInputStream(), null)
 
-        assertThat(pom.repositories).hasSize(1)
+        assertThat(pom.repositories!!.repositories).hasSize(1)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -430,16 +428,9 @@ class RawPomTest {
         assertThat(plugin.getConfigurationStringValue("int-value")).isEqualTo("123")
         assertThat(plugin.getConfiguration("int-value", Integer::class.java)).isEqualTo(123)
 
-        val child = plugin.getConfiguration("grandparent.parent.child", Child::class.java)
+        val child = plugin.getConfiguration("grandparent.parent.child", ConfigChild::class.java)
         assertThat(child!!.stringValue).isEqualTo("fred")
         assertThat(child.intValue).isEqualTo(123)
         assertThat(plugin.getConfigurationList("grandparent.parent.child.stringList", String::class.java)).hasSize(4).contains("f", "r", "e", "d")
-    }
-
-    @Suppress("unused")
-    data class Child (val stringValue : String, val intValue : Int) {
-        @JacksonXmlElementWrapper(localName = "stringList", useWrapping = true)
-        @JacksonXmlProperty(localName = "element")
-        lateinit var stringList : List<String>
     }
 }

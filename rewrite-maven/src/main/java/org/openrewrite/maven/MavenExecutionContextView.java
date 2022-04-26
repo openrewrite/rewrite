@@ -112,13 +112,13 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         }
 
         if (settings.getServers() != null) {
-            setCredentials(settings.getServers().stream()
+            setCredentials(settings.getServers().getServers().stream()
                     .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
                     .collect(Collectors.toList()));
         }
 
         if (settings.getMirrors() != null) {
-            setMirrors(settings.getMirrors().stream()
+            setMirrors(settings.getMirrors().getMirrors().stream()
                     .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots()))
                     .collect(Collectors.toList()));
         }

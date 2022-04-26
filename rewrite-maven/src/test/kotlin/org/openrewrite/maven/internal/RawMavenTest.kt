@@ -43,9 +43,9 @@ class RawMavenTest {
             """.trimIndent().byteInputStream(), null)
 
         assertThat(pom.dependencyManagement?.dependencies).isNull()
-        assertThat(pom.repositories).isEmpty()
-        assertThat(pom.licenses).isEmpty()
-        assertThat(pom.profiles).isEmpty()
+        assertThat(pom.repositories?.repositories).isEmpty()
+        assertThat(pom.licenses?.licenses).isEmpty()
+        assertThat(pom.profiles?.profiles).isEmpty()
     }
 
     @Test
@@ -70,6 +70,6 @@ class RawMavenTest {
             """.trimIndent().byteInputStream(), null
         )
 
-        assertThat(pom.dependencyManagement?.dependencies).isNotEmpty
+        assertThat(pom.dependencyManagement?.dependencies?.dependencies).isNotEmpty
     }
 }
