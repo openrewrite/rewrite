@@ -532,4 +532,24 @@ interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun simplifyConstantIfTrueBlockInWhile(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    while (true)
+                        if (true) break;
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                    while (true) break;
+                }
+            }
+        """
+    )
 }
