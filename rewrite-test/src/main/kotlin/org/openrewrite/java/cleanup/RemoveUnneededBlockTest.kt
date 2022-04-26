@@ -287,4 +287,56 @@ interface RemoveUnneededBlockTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun simplifyDoesNotFormatSurroundingCode(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                static {
+                    int[] a = new int[] { 1, 2, 3 };
+                    int[] b = new int[] {4,5,6};
+                    {
+                        System.out.println("hello static!");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                static {
+                    int[] a = new int[] { 1, 2, 3 };
+                    int[] b = new int[] {4,5,6};
+                    System.out.println("hello static!");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun simplifyDoesNotFormatInternalCode(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                static {
+                    int[] a = new int[] { 1, 2, 3 };
+                    int[] b = new int[] {4,5,6};
+                    {
+                        System.out.println("hello!");
+                        System.out.println( "world!" );
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                static {
+                    int[] a = new int[] { 1, 2, 3 };
+                    int[] b = new int[] {4,5,6};
+                    System.out.println("hello!");
+                    System.out.println("world!");
+                }
+            }
+        """
+    )
 }
