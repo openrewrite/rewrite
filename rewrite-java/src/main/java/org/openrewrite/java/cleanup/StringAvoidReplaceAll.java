@@ -59,8 +59,9 @@ public class StringAvoidReplaceAll extends Recipe {
         return Collections.singleton("RSPEC-5361");
     }
 
+    @Override
     public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
+        return Duration.ofMinutes(2);
     }
 
     @Override
