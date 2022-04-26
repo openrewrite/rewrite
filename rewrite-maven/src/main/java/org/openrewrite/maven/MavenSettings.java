@@ -38,8 +38,6 @@ import static java.util.Collections.emptyList;
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class MavenSettings {
 
     @NonFinal
@@ -89,8 +87,6 @@ public class MavenSettings {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
-    @AllArgsConstructor
-    @RequiredArgsConstructor
     public static class Profile {
         @Nullable
         String id;
