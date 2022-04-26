@@ -23,6 +23,12 @@ configurations.all {
     resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
 }
 
+if(name != "rewrite-test") {
+    configurations.named("compileClasspath") {
+        exclude("org.jetbrains.kotlin")
+    }
+}
+
 tasks.withType<KotlinCompile>().configureEach {
     kotlinOptions {
         jvmTarget = "1.8"

@@ -30,9 +30,12 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.xml.deser.FromXmlParser;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import org.openrewrite.RecipeSerializer;
 
 import javax.xml.stream.XMLInputFactory;
 import java.io.IOException;
+
+import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 
 public class MavenXmlMapper {
     private static final ObjectMapper readMapper;
@@ -55,6 +58,7 @@ public class MavenXmlMapper {
                     .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
                     .disable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
                     .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+            maybeAddKotlinModule(m);
             readMapper = m.setVisibility(m.getSerializationConfig().getDefaultVisibilityChecker()
                     .withFieldVisibility(JsonAutoDetect.Visibility.NONE)
                     .withGetterVisibility(JsonAutoDetect.Visibility.NONE)

@@ -16,8 +16,6 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-databind:latest.release")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
     api("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")
-    api("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
-
     implementation("net.java.dev.jna:jna-platform:latest.release")
 
     // Pinning okhttp while waiting on 5.0.0
@@ -30,6 +28,7 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.+")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
+    testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 }
 
 tasks.withType<ShadowJar> {

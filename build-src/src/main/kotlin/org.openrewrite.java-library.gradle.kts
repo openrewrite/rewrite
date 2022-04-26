@@ -6,8 +6,7 @@ plugins {
 }
 
 dependencies {
-    implementation(platform("org.jetbrains.kotlin:kotlin-bom"))
-
+    implementation("org.jetbrains:annotations:latest.release")
     compileOnly("com.google.code.findbugs:jsr305:latest.release")
 
     compileOnly("org.projectlombok:lombok:latest.release")
@@ -18,7 +17,9 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-params")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 
+    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom"))
     testImplementation("org.jetbrains.kotlin:kotlin-reflect")
+    testImplementation("org.jetbrains.kotlin:kotlin-stdlib")
     testImplementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     testImplementation("org.jetbrains.kotlin:kotlin-stdlib-common")
 
