@@ -637,6 +637,10 @@ class Java8UsesMethodTest : Java8Test, UsesMethodTest
 @ExtendWith(JavaParserResolver::class)
 class Java8UsesTypeTest : Java8Test, UsesTypeTest
 
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8SimplifyCompoundStatementTest : Java8Test, SimplifyCompoundStatementTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8WhileInsteadOfForTest : Java8Test, WhileInsteadOfForTest
