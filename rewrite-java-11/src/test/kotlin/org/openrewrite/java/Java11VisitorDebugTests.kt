@@ -639,7 +639,7 @@ class Java11UsesTypeTest : Java11Test, UsesTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11UselessCompoundTest : Java11Test, UselessCompoundTest
+class Java11SimplifyCompoundStatementTest : Java11Test, SimplifyCompoundStatementTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
