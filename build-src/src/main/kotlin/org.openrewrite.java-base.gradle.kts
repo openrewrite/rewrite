@@ -24,9 +24,13 @@ configurations.all {
 }
 
 if(name != "rewrite-test") {
-    configurations.named("compileClasspath") {
-        exclude("org.jetbrains.kotlin")
-    }
+    listOf("compileClasspath", "runtimeClasspath")
+        .map(configurations::named)
+        .forEach { it ->
+            it.configure {
+                exclude("org.jetbrains.kotlin")
+            }
+        }
 }
 
 tasks.withType<KotlinCompile>().configureEach {
