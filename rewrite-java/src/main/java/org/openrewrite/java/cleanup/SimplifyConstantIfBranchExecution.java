@@ -42,7 +42,7 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new SimplifyConstantIfBranchExecutionVisitor();
     }
 
