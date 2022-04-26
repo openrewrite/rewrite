@@ -21,9 +21,16 @@ import org.openrewrite.Recipe
 import org.openrewrite.groovy.GroovyRecipeTest
 import org.openrewrite.java.cleanup.ExplicitInitialization
 
+@Suppress("GroovyUnusedAssignment")
 class ExplicitInitializationVisitorGroovyTest : GroovyRecipeTest {
     override val recipe: Recipe
         get() = ExplicitInitialization()
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1272")
+    @Test
+    fun gTypes() = assertUnchanged(
+        before = """int a = 0"""
+    )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1272")
     @Test

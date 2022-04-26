@@ -37,12 +37,15 @@ public class ExplicitInitializationVisitor<P> extends JavaIsoVisitor<P> {
 
         Cursor variableDeclsCursor = getCursor().dropParentUntil(J.class::isInstance);
         Cursor maybeBlockOrGType = variableDeclsCursor.dropParentUntil(J.class::isInstance);
-        if (maybeBlockOrGType.getValue() instanceof J.Block) {
+        if (maybeBlockOrGType.getParent() == null || maybeBlockOrGType.getParent().getParent() == null) {
+            // Groovy type.
+            return v;
+        } else {
             J maybeClassDecl = maybeBlockOrGType
                     .dropParentUntil(J.class::isInstance) // maybe J.ClassDecl
                     .getValue();
-            if (!(maybeClassDecl instanceof J.ClassDeclaration)
-                    || J.ClassDeclaration.Kind.Type.Class != ((J.ClassDeclaration)maybeClassDecl).getKind()) {
+            if (!(maybeClassDecl instanceof J.ClassDeclaration) ||
+                    J.ClassDeclaration.Kind.Type.Class != ((J.ClassDeclaration)maybeClassDecl).getKind()) {
                 return v;
             }
         }
