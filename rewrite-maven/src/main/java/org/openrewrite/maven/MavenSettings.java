@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
@@ -37,7 +38,8 @@ import static java.util.Collections.emptyList;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class MavenSettings {
@@ -90,7 +92,6 @@ public class MavenSettings {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     @AllArgsConstructor
-    @RequiredArgsConstructor
     public static class Profile {
         @Nullable
         String id;
@@ -103,6 +104,12 @@ public class MavenSettings {
         @JacksonXmlElementWrapper(localName = "repositories")
         @JacksonXmlProperty(localName = "repository")
         List<RawRepository> repositories;
+
+        @JsonCreator
+        public Profile(String id, ProfileActivation activation) {
+            this.id = id;
+            this.activation = activation;
+        }
 
         public boolean isActive(Iterable<String> activeProfiles) {
             return ProfileActivation.isActive(id, activeProfiles, activation);
