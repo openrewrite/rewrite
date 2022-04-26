@@ -440,9 +440,6 @@ abstract class JavaVisitorCompatibilityKit {
     inner class TypeTreeTck : TypeTreeTest
 
     @Nested
-    inner class StringAvoidReplaceAllTestTck : StringAvoidReplaceAllTest
-
-    @Nested
     inner class StringLiteralEqualityTestTck : StringLiteralEqualityTest
 
     @Nested
@@ -483,6 +480,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class UsesMethodTck : UsesMethodTest
+
+    @Nested
+    inner class UseStringReplaceTestTck : UseStringReplaceTest
 
     @Nested
     inner class DoesNotUseRewriteSkipTck : DoesNotUseRewriteSkipTest

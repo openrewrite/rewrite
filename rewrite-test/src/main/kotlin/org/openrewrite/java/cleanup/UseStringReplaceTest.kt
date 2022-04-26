@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,9 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
 
-interface StringAvoidReplaceAllTest : JavaRecipeTest {
+interface UseStringReplaceTest : JavaRecipeTest {
     override val recipe: Recipe?
-        get() = StringAvoidReplaceAll()
+        get() = UseStringReplace()
 
     @Test
     @DisplayName("String#repalaceAll replaced by String#replace, 'cause fist argument is not a regular expression")

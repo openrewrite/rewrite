@@ -559,10 +559,6 @@ class Java11TypeTreeTest : Java11Test, TypeTreeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11StringAvoidReplaceAllTest : Java11Test, StringAvoidReplaceAllTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java11StringLiteralEqualityTest : Java11Test, StringLiteralEqualityTest
 
 @DebugOnly
@@ -636,6 +632,10 @@ class Java11UsesJavaVersionTest : Java11Test, UsesJavaVersionTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11UsesMethodTest : Java11Test, UsesMethodTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UseStringReplaceTest : Java11Test, UseStringReplaceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

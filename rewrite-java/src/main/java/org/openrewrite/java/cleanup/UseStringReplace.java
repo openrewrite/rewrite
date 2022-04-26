@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Recipe to avoid using {@link String#replaceAll(String, String)} when the fist argument is not a regular expression.
+ * Recipe to use {@link String#replace(CharSequence, CharSequence)} when the fist argument is not a regular expression.
  * <p>
  * The underlying implementation of {@link String#replaceAll(String, String)} calls the {@link Pattern#compile(String)}
  * method each time it is called even if the first argument is not a regular expression. This has a significant
@@ -41,11 +41,11 @@ import java.util.regex.Pattern;
  * @see <a href="https://rules.sonarsource.com/java/RSPEC-5361"></a>
  * @see <a href="https://docs.oracle.com/javase/tutorial/essential/regex/index.html"></a>
  */
-public class StringAvoidReplaceAll extends Recipe {
+public class UseStringReplace extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Use `String::replaceAll()` only when fist parameter is a real regular expression";
+        return "Use `String::replace()` when fist parameter is not a real regular expression";
     }
 
     @Override
@@ -66,10 +66,10 @@ public class StringAvoidReplaceAll extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new StringAvoidReplaceAllVisitor();
+        return new UseStringReplaceVisitor();
     }
 
-    private static class StringAvoidReplaceAllVisitor extends JavaVisitor<ExecutionContext> {
+    private static class UseStringReplaceVisitor extends JavaVisitor<ExecutionContext> {
 
         private static final MethodMatcher REPLACE_ALL = new MethodMatcher("java.lang.String replaceAll(..)");
         private static final String REPLACE_METHOD_NAME = "replace";

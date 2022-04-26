@@ -555,7 +555,7 @@ class Java8TypeTreeTest : Java8Test, TypeTreeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8StringAvoidReplaceAllTest : Java8Test, StringAvoidReplaceAllTest
+class Java8UseStringReplaceTest : Java8Test, UseStringReplaceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
