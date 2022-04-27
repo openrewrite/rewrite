@@ -58,7 +58,6 @@ class MavenSettingsTest {
         assertThat(ctx.repositories).hasSize(1)
     }
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
     @Test
     fun defaultActiveWhenNoOthersAreActive() {

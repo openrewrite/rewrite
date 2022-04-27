@@ -214,7 +214,6 @@ class UpgradePluginVersionTest : MavenRecipeTest {
     )
 
     @Test
-    @Disabled("not currently dealing with parents") // todo
     fun upgradeVersionIgnoringParent(@TempDir tempDir: Path) {
         val parent = tempDir.resolve("pom.xml")
         val server = tempDir.resolve("server/pom.xml")
@@ -312,7 +311,7 @@ class UpgradePluginVersionTest : MavenRecipeTest {
     }
 
     @Test
-    @Disabled("not currently dealing with parents") // todo
+    @Disabled
     fun trustParent(@TempDir tempDir: Path) {
         val parent = tempDir.resolve("pom.xml")
         val server = tempDir.resolve("server/pom.xml")
@@ -410,7 +409,7 @@ class UpgradePluginVersionTest : MavenRecipeTest {
     }
 
     @Test
-    @Disabled("not currently dealing with parents") // todo
+    @Disabled
     fun upgradePluginInParent(@TempDir tempDir: Path) {
         val parent = tempDir.resolve("pom.xml")
         val server = tempDir.resolve("server/pom.xml")
