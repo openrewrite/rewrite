@@ -16,7 +16,6 @@
 package org.openrewrite.config;
 
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -24,7 +23,6 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
-import org.openrewrite.RecipeSerializer;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
@@ -38,9 +36,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -116,9 +111,9 @@ public class YamlResourceLoader implements ResourceLoader {
 
         mapper = JsonMapper.builder()
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
                 .build()
                 .registerModule(new ParameterNamesModule())
-                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         maybeAddKotlinModule(mapper);
 
@@ -177,7 +172,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
                     String estimatedEffortPerOccurrenceStr = (String) r.get("estimatedEffortPerOccurrence");
                     Duration estimatedEffortPerOccurrence = null;
-                    if(estimatedEffortPerOccurrenceStr != null) {
+                    if (estimatedEffortPerOccurrenceStr != null) {
                         estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
                     }
 
@@ -186,6 +181,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     if (recipeList == null) {
                         throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
                     }
+
                     for (int i = 0; i < recipeList.size(); i++) {
                         Object next = recipeList.get(i);
                         if (next instanceof String) {
@@ -224,6 +220,39 @@ public class YamlResourceLoader implements ResourceLoader {
                                     null));
                         }
                     }
+
+                    List<Object> excludedRecipeList = (List<Object>) r.get("excludedRecipeList");
+                    if (excludedRecipeList == null) {
+                        excludedRecipeList = emptyList();
+                    }
+
+                    for (Object next : excludedRecipeList) {
+                        if (next instanceof String) {
+                            recipe.excludeRecipe((String) next);
+                        } else if (next instanceof Map) {
+                            Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) next).entrySet().iterator().next();
+                            try {
+                                if (nameAndConfig.getValue() instanceof Map) {
+                                    Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
+                                    withJsonType.put("@c", nameAndConfig.getKey());
+                                    try {
+                                        recipe.excludeRecipe(mapper.convertValue(withJsonType, Recipe.class));
+                                    } catch (IllegalArgumentException ex) {
+                                        if (ex.getCause() instanceof InvalidTypeIdException) {
+                                            recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
+                                                    nameAndConfig.getValue(), "Recipe class " +
+                                                            nameAndConfig.getKey() + " cannot be found"));
+                                        }
+                                    }
+                                }
+                            } catch (Exception ex) {
+                                recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
+                                        "Unexpected declarative recipe parsing exception " +
+                                                ex.getClass().getName()));
+                            }
+                        }
+                    }
+
                     return recipe;
                 })
                 .collect(toList());

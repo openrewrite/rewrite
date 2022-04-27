@@ -35,6 +35,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val env = Environment.builder()
             .load(
                 YamlResourceLoader(
+                    //language=yaml
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.ChangeTextToHello
@@ -64,6 +65,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val env = Environment.builder()
             .load(
                 YamlResourceLoader(
+                    //language=yaml
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.ChangeTextToHello
@@ -86,6 +88,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val env = Environment.builder()
             .load(
                 YamlResourceLoader(
+                    //language=yaml
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.TextMigration
@@ -118,6 +121,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val env = Environment.builder()
             .load(
                 YamlResourceLoader(
+                    //language=yaml
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.TextMigration
@@ -131,6 +135,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
             )
             .load(
                 YamlResourceLoader(
+                    //language=yaml
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.ChangeTextToHello
@@ -157,6 +162,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val env = Environment.builder()
             .load(
                 YamlResourceLoader(
+                    //language=yaml
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.TextMigration
@@ -179,6 +185,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val env = Environment.builder()
             .load(
                 YamlResourceLoader(
+                    //language=yaml
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.LicenseHeader
@@ -201,6 +208,7 @@ class EnvironmentTest : RecipeTest<PlainText> {
         val env = Environment.builder()
             .load(
                 YamlResourceLoader(
+                    //language=yaml
                     """
                         type: specs.openrewrite.org/v1beta/recipe
                         name: test.ResultOfFileMkdirsIgnored
@@ -317,5 +325,59 @@ class EnvironmentTest : RecipeTest<PlainText> {
         assertThat(helloJon2!!.recipeList)
             .hasSize(1)
         assertThat(helloJon2.recipeList.first().name).isEqualTo("org.openrewrite.HelloJon")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1596")
+    @Test
+    fun removeExclusion() {
+        val env = Environment.builder()
+            .load(
+                YamlResourceLoader(
+                    //language=yaml
+                    """
+                        type: specs.openrewrite.org/v1beta/recipe
+                        name: test.Parent
+                        displayName: Text migration
+                        recipeList:
+                            - test.ParentChild
+                        excludedRecipeList:
+                            - org.openrewrite.text.ChangeText:
+                                toText: Hello
+                        ---
+                        type: specs.openrewrite.org/v1beta/recipe
+                        name: test.ChildChild
+                        displayName: Test Composite recipe
+                        recipeList:
+                            - org.openrewrite.text.ChangeText:
+                                toText: Hello
+                            - org.openrewrite.text.ChangeText:
+                                toText: World
+                        ---
+                        type: specs.openrewrite.org/v1beta/recipe
+                        name: test.ParentChild
+                        displayName: Change text to hello
+                        recipeList:
+                            - org.openrewrite.text.ChangeText:
+                                toText: Hello
+                            - org.openrewrite.text.ChangeText:
+                                toText: World
+                            - test.ChildChild
+                    """.trimIndent().byteInputStream(),
+                    URI.create("rewrite.yml"),
+                    Properties()
+                )
+            )
+            .build()
+
+        val recipe = env.activateRecipes("test.Parent")
+        assertThat(recipe.validateAll()).allMatch { v -> v.isValid }
+
+        assertThat(recipe.recipeList[0].recipeList[0].recipeList).hasSize(2)
+        assertThat(recipe.recipeList[0].recipeList[0].recipeList[0].descriptor.options[0].value).isEqualTo("World")
+        assertThat(recipe.recipeList[0].recipeList[0].recipeList[1].recipeList).hasSize(1)
+        assertThat(recipe.recipeList[0].recipeList[0].recipeList[1].recipeList[0].descriptor.options[0].value).isEqualTo("World")
+
+        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "hello")))
+        assertThat(results).hasSize(1)
     }
 }

@@ -37,9 +37,17 @@ public class Environment {
         List<Recipe> recipes = resourceLoaders.stream()
                 .flatMap(r -> r.listRecipes().stream())
                 .collect(toList());
+        Set<Recipe> recipeExclusions = new HashSet<>();
         for (Recipe recipe : recipes) {
             if (recipe instanceof DeclarativeRecipe) {
                 ((DeclarativeRecipe) recipe).initialize(recipes);
+                recipeExclusions.addAll(((DeclarativeRecipe) recipe).getExcludeRecipeList());
+            }
+        }
+
+        if (!recipeExclusions.isEmpty()) {
+            for (Recipe recipe : recipes) {
+                recipe.getRecipeList().removeAll(recipeExclusions);
             }
         }
         return recipes;

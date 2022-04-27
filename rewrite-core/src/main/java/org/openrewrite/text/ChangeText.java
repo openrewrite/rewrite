@@ -15,6 +15,7 @@
  */
 package org.openrewrite.text;
 
+import lombok.EqualsAndHashCode;
 import org.openrewrite.*;
 
 import java.util.Collections;
@@ -22,6 +23,7 @@ import java.util.Set;
 
 import static org.openrewrite.Validated.required;
 
+@EqualsAndHashCode(callSuper = true)
 public class ChangeText extends Recipe {
 
     @Option(displayName = "Text after change",

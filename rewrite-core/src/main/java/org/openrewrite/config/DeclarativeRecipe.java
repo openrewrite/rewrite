@@ -24,6 +24,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.net.URI;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.openrewrite.Validated.invalid;
 
@@ -39,6 +40,7 @@ public class DeclarativeRecipe extends Recipe {
 
     private final URI source;
     private final List<String> lazyNext = new ArrayList<>();
+    private final List<String> lazyExclude = new ArrayList<>();
 
     @Override
     public String getDisplayName() {
@@ -76,6 +78,13 @@ public class DeclarativeRecipe extends Recipe {
             }
         }
         lazyNext.clear();
+
+        for (String nextName : lazyExclude) {
+            Optional<Recipe> next = availableRecipes.stream()
+                    .filter(r -> r.getName().equals(nextName)).findAny();
+            next.ifPresent(excludeRecipeList::add);
+        }
+        lazyExclude.clear();
     }
 
     void doNext(String recipeName) {
@@ -84,6 +93,28 @@ public class DeclarativeRecipe extends Recipe {
         } catch (Exception e) {
             lazyNext.add(recipeName);
         }
+    }
+
+    void excludeRecipe(String recipeName) {
+        try {
+            excludeRecipe((Recipe) Class.forName(recipeName).getDeclaredConstructor().newInstance());
+        } catch (Exception e) {
+            lazyExclude.add(recipeName);
+        }
+    }
+
+    @JsonIgnore
+    private final List<Recipe> excludeRecipeList = new CopyOnWriteArrayList<>();
+
+    public List<Recipe> getExcludeRecipeList() {
+        return excludeRecipeList;
+    }
+
+    /**
+     * @param recipe {@link Recipe} to exclude from this recipe's pipeline.
+     */
+    public void excludeRecipe(Recipe recipe) {
+        excludeRecipeList.add(recipe);
     }
 
     void addValidation(Validated validated) {
