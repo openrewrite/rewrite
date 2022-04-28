@@ -16,6 +16,7 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
@@ -284,6 +285,93 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                             <groupId>io.quarkus</groupId>
                             <artifactId>quarkus-arc</artifactId>
                             <version>2.8.0.Final</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """.trimIndent()
+        )
+    }
+
+    @Test
+    @Disabled
+    fun changeDependencyGroupIdAndArtifactIdWithDependencyManagementScopeTest(@TempDir tempDir: Path) {
+        val parent = tempDir.resolve("pom.xml")
+        val child = tempDir.resolve("child/pom.xml")
+        val subchild = tempDir.resolve("child/subchild/pom.xml")
+
+        subchild.toFile().parentFile.mkdirs()
+
+        parent.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>io.quarkus</groupId>
+                                <artifactId>quarkus-core</artifactId>
+                                <version>2.8.0.Final</version>
+                                <scope>test</scope>
+                            </dependency>
+                            <dependency>
+                                <groupId>io.quarkus</groupId>
+                                <artifactId>quarkus-arc</artifactId>
+                                <version>2.8.0.Final</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """.trimIndent()
+        )
+
+        child.toFile().writeText(
+            //language=xml
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>child</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-core</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """.trimIndent()
+        )
+
+        val results = ChangeDependencyGroupIdAndArtifactId("io.quarkus", "quarkus-core", "io.quarkus", "quarkus-arc", null)
+            .run(parser.parse(listOf(child, parent), tempDir, InMemoryExecutionContext()))
+
+        assertThat(results).hasSize(1)
+        assertThat(results[0].after!!.printAllTrimmed()).isEqualTo(
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>child</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-arc</artifactId>
                         </dependency>
                     </dependencies>
                 </project>
