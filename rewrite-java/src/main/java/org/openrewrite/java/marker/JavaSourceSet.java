@@ -55,31 +55,31 @@ public class JavaSourceSet implements Marker {
      */
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath,
                                       JavaTypeCache typeCache, boolean fullTypeInformation) {
-        List<JavaType.FullyQualified> types;
-        // Load JRE-provided types
-        try (ScanResult scanResult = new ClassGraph()
-                .enableClassInfo()
-                .enableSystemJarsAndModules()
-                .acceptPackages("java")
-                .ignoreClassVisibility()
-                .scan()) {
-            Map<String, List<String>> packagesToTypes = packagesToTypeDeclarations(scanResult);
-            // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
-            packagesToTypes.computeIfAbsent("java.lang", p -> new ArrayList<>())
-                    .add("java.lang.Object");
-            types = typesFrom(packagesToTypes, typeCache, Collections.emptyList(), fullTypeInformation);
-        }
-        if (classpath.iterator().hasNext()) {
-            // Load types from the classpath
-            try (ScanResult scanResult = new ClassGraph()
-                    .overrideClasspath(classpath)
-                    .enableMemoryMapping()
-                    .enableClassInfo()
-                    .ignoreClassVisibility()
-                    .scan()) {
-                types.addAll(typesFrom(packagesToTypeDeclarations(scanResult), typeCache, classpath, fullTypeInformation));
-            }
-        }
+        List<JavaType.FullyQualified> types = new ArrayList<>();
+//        // Load JRE-provided types
+//        try (ScanResult scanResult = new ClassGraph()
+//                .enableClassInfo()
+//                .enableSystemJarsAndModules()
+//                .acceptPackages("java")
+//                .ignoreClassVisibility()
+//                .scan()) {
+//            Map<String, List<String>> packagesToTypes = packagesToTypeDeclarations(scanResult);
+//            // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
+//            packagesToTypes.computeIfAbsent("java.lang", p -> new ArrayList<>())
+//                    .add("java.lang.Object");
+//            types = typesFrom(packagesToTypes, typeCache, Collections.emptyList(), fullTypeInformation);
+//        }
+//        if (classpath.iterator().hasNext()) {
+//            // Load types from the classpath
+//            try (ScanResult scanResult = new ClassGraph()
+//                    .overrideClasspath(classpath)
+//                    .enableMemoryMapping()
+//                    .enableClassInfo()
+//                    .ignoreClassVisibility()
+//                    .scan()) {
+//                types.addAll(typesFrom(packagesToTypeDeclarations(scanResult), typeCache, classpath, fullTypeInformation));
+//            }
+//        }
 
         return new JavaSourceSet(randomId(), sourceSetName, types);
     }
