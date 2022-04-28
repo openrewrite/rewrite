@@ -615,6 +615,10 @@ class Java11UseLambdaForFunctionalInterface : Java11Test, UseLambdaForFunctional
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UseStandardCharsetTest : Java11Test, UseStandardCharsetTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UseStaticImportTest : Java11Test, UseStaticImportTest
 
 @DebugOnly

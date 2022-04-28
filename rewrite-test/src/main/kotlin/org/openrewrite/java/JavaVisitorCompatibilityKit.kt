@@ -479,6 +479,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UseLambdaForFunctionalInterfaceTck : UseLambdaForFunctionalInterfaceTest
 
     @Nested
+    inner class UseStandardCharsetTck : UseStandardCharsetTest
+
+    @Nested
     inner class UsesMethodTck : UsesMethodTest
 
     @Nested

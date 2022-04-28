@@ -631,6 +631,10 @@ class Java8UseLambdaForFunctionalInterfaceTck : Java8Test, UseLambdaForFunctiona
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UseStandardCharsetTck : Java8Test, UseStandardCharsetTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UsesMethodTest : Java8Test, UsesMethodTest
 
 @DebugOnly
