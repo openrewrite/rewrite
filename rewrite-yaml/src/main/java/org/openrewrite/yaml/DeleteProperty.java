@@ -69,7 +69,7 @@ public class DeleteProperty extends Recipe {
     @Override
     public String getDescription() {
         return "Delete a YAML property. Nested YAML mappings are interpreted as dot separated property names, i.e. " +
-                " as Spring Boot interprets application.yml files.";
+                " as Spring Boot interprets application.yml files like `a.b.c.d` or `a.b.c:d`.";
     }
 
     @Override
