@@ -23,6 +23,7 @@ import okio.ByteString.Companion.encode
 import org.assertj.core.api.Assertions.assertThat
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
@@ -1009,6 +1010,7 @@ class MavenParserTest {
             .matches { it.first().artifactId == "guava" && it.first().version == "29.0-jre" }
     }
 
+    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/376")
     @Test
     fun dependencyManagementPropagatesToDependencies() {
