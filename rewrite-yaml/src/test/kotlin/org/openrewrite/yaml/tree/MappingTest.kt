@@ -24,9 +24,21 @@ import org.openrewrite.yaml.YamlParser
 @Suppress("YAMLUnusedAnchor")
 class MappingTest: YamlParserTest {
 
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/423")
     @Test
     fun emptyObject() = assertRoundTrip("workflow_dispatch: {}")
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/423")
+    @Test
+    fun flowStyleMapping() = assertRoundTrip(
+        source = """
+          {
+            "data": {
+              "prometheus.yml": "global:\n  scrape_interval: 10s\n  scrape_timeout: 9s"
+            }
+          }
+        """
+    )
 
     @Test
     fun multipleEntries() = assertRoundTrip(

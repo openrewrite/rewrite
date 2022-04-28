@@ -87,7 +87,14 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     @Override
     public Yaml visitMapping(Yaml.Mapping mapping, PrintOutputCapture<P> p) {
         visitMarkers(mapping.getMarkers(), p);
-        return super.visitMapping(mapping, p);
+        if (mapping.getOpeningBracePrefix() != null) {
+            p.out.append(mapping.getOpeningBracePrefix()).append('{');
+        }
+        Yaml result = super.visitMapping(mapping, p);
+        if (mapping.getClosingBracePrefix() != null) {
+            p.out.append(mapping.getClosingBracePrefix()).append('}');
+        }
+        return result;
     }
 
     @Override
