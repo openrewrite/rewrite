@@ -273,4 +273,11 @@ class StringUtilsTest {
         assertThat(greatestCommonMargin("")).isEqualTo("")
         assertThat(greatestCommonMargin("\n\n")).isEqualTo("")
     }
+
+    @Test
+    fun greatestCommonSubstringLength() {
+        assertThat(greatestCommonSubstringLength("", "")).isEqualTo(0)
+        assertThat(greatestCommonSubstringLength("abc", "def")).isEqualTo(0)
+        assertThat(greatestCommonSubstringLength("abc1", "1")).isEqualTo(1)
+    }
 }
