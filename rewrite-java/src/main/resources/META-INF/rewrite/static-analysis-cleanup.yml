@@ -36,7 +36,6 @@ recipeList:
   - org.openrewrite.java.cleanup.FallThrough
   - org.openrewrite.java.cleanup.FinalClass
   - org.openrewrite.java.cleanup.ForLoopIncrementInUpdate
-  - org.openrewrite.java.cleanup.HiddenField
   - org.openrewrite.java.cleanup.HideUtilityClassConstructor
   - org.openrewrite.java.cleanup.IndexOfChecksShouldUseAStartPosition
   - org.openrewrite.java.cleanup.IndexOfReplaceableByContains
