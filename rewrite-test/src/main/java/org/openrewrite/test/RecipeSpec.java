@@ -21,6 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.AssertionsForClassTypes.fail;
 
@@ -49,6 +50,12 @@ public class RecipeSpec {
 
     @Nullable
     Integer expectedCyclesThatMakeChanges;
+
+    Consumer<List<SourceFile>> beforeRecipe = s -> {
+    };
+
+    Consumer<List<Result>> afterRecipe = r -> {
+    };
 
     // The before and after here don't mean anything
     SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, "", null);
@@ -82,6 +89,16 @@ public class RecipeSpec {
 
     public RecipeSpec cycles(int cycles) {
         this.cycles = cycles;
+        return this;
+    }
+
+    public RecipeSpec beforeRecipe(Consumer<List<SourceFile>> beforeRecipe) {
+        this.beforeRecipe = beforeRecipe;
+        return this;
+    }
+
+    public RecipeSpec afterRecipe(Consumer<List<Result>> afterRecipe) {
+        this.afterRecipe = afterRecipe;
         return this;
     }
 

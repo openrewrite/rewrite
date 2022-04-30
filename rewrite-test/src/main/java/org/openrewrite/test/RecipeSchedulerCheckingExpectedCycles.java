@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeScheduler;
 import org.openrewrite.SourceFile;
+import org.openrewrite.quark.Quark;
 
 import java.util.List;
 import java.util.Map;
@@ -54,12 +55,14 @@ class RecipeSchedulerCheckingExpectedCycles implements RecipeScheduler {
                     !before.isEmpty() && !afterList.isEmpty()) {
                 for (int i = 0; i < before.size(); i++) {
                     S s1 = before.get(i);
-                    assertThat(afterList.get(i).printAllTrimmed())
-                            .as(
-                                    "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
-                                            "but took at least one more cycle. Between the last two executed cycles there were changes."
-                            )
-                            .isEqualTo(before.get(i).printAllTrimmed());
+                    if(!(afterList.get(i) instanceof Quark)) {
+                        assertThat(afterList.get(i).printAllTrimmed())
+                                .as(
+                                        "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
+                                                "but took at least one more cycle. Between the last two executed cycles there were changes."
+                                )
+                                .isEqualTo(before.get(i).printAllTrimmed());
+                    }
                 }
             }
         }

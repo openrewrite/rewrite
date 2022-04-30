@@ -28,6 +28,9 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.+")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
+
+    testImplementation(project(":rewrite-test"))
+
     testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 }
 

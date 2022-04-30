@@ -65,6 +65,11 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         return this;
     }
 
+    public SourceSpec<T> path(String sourcePath) {
+        this.sourcePath = Paths.get(sourcePath);
+        return this;
+    }
+
     public SourceSpec<T> markers(Marker... markers) {
         Collections.addAll(this.markers, markers);
         return this;
