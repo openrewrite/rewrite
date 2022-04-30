@@ -36,7 +36,6 @@ import java.util.function.UnaryOperator;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.Tree.randomId;
 
@@ -152,9 +151,10 @@ public interface RecipeScheduler {
             }
         }
 
-        Set<UUID> afterIds = after.stream()
-                .map(SourceFile::getId)
-                .collect(toSet());
+        Set<UUID> afterIds = new HashSet<>();
+        for (SourceFile sourceFile : after) {
+            afterIds.add(sourceFile.getId());
+        }
 
         // removed files
         for (SourceFile s : before) {

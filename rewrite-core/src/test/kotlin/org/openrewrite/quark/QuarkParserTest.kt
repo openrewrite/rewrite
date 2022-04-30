@@ -16,13 +16,18 @@
 package org.openrewrite.quark
 
 import org.assertj.core.api.Assertions.assertThat
+import org.eclipse.jgit.api.Git
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.ExecutionContext
 import org.openrewrite.SourceFile
 import org.openrewrite.TreeVisitor
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.RewriteTest.toRecipe
+import java.nio.file.Path
 import java.nio.file.Paths
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
 
 class QuarkParserTest : RewriteTest {
 
@@ -30,7 +35,7 @@ class QuarkParserTest : RewriteTest {
     fun allOthers() = rewriteRun(
         { spec ->
             spec.beforeRecipe { sources ->
-                val quarks = QuarkParser.parseAllOtherFiles(Paths.get(""), sources)
+                val quarks = QuarkParser.parseAllOtherFiles(Paths.get("../"), sources)
                 assertThat(quarks).isNotEmpty
                 assertThat(quarks.map { it.sourcePath }).doesNotContain(Paths.get("build.gradle.kts"))
             }
@@ -50,24 +55,36 @@ class QuarkParserTest : RewriteTest {
     )
 
     @Test
-    fun renameQuark() = rewriteRun(
+    fun renameQuark(@TempDir tempDir: Path) = rewriteRun(
         { spec ->
-            spec.recipe(toRecipe {
-                object : TreeVisitor<SourceFile, ExecutionContext>() {
-                    override fun visitSourceFile(sourceFile: SourceFile, p: ExecutionContext): SourceFile {
-                        return if (sourceFile.sourcePath.toString().endsWith(".bak")) {
-                            sourceFile
-                        } else sourceFile.withSourcePath(Paths.get(sourceFile.sourcePath.toString() + ".bak"))
+            spec.expectedCyclesThatMakeChanges(1)
+                .recipe(toRecipe {
+                    object : TreeVisitor<SourceFile, ExecutionContext>() {
+                        override fun visitSourceFile(sourceFile: SourceFile, p: ExecutionContext): SourceFile {
+                            return if (sourceFile.sourcePath.toString().endsWith(".bak")) {
+                                sourceFile
+                            } else sourceFile.withSourcePath(Paths.get(sourceFile.sourcePath.toString() + ".bak"))
+                        }
                     }
+                })
+                .afterRecipe { results ->
+                    results.forEach {
+                        val git = Git.init().setDirectory(tempDir.toFile()).call()
+                        git.apply().setPatch(it.diff().byteInputStream()).call()
+                    }
+                    assertThat(tempDir.toFile().list())
+                        .containsExactlyInAnyOrder("hi.txt.bak", "jon.bak", ".git")
+                    assertThat(tempDir.resolve("jon.bak").readText().trim()).isEqualTo("jon")
                 }
-            })
         },
         text("hi") { spec ->
             spec.path("hi.txt")
+                .beforeRecipe { s -> tempDir.resolve(s.sourcePath).writeText("hi") }
                 .afterRecipe { s -> assertThat(s.sourcePath).isEqualTo(Paths.get("hi.txt.bak")) }
         },
         other("jon") { spec ->
             spec.path("jon")
+                .beforeRecipe { s -> tempDir.resolve(s.sourcePath).writeText("jon") }
                 .afterRecipe { s -> assertThat(s.sourcePath).isEqualTo(Paths.get("jon.bak")) }
         }
     )

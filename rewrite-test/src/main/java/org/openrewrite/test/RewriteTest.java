@@ -105,11 +105,21 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();
-        int expectedCyclesThatMakeChanges = 0;
-        if (Arrays.stream(sourceSpecs).anyMatch(s -> s.after != null)) {
-            //If there are any tests that have assertions (an "after"), then set the expected cycles.
-            expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
-                    testClassSpec.getExpectedCyclesThatMakeChanges(cycles) : testMethodSpec.getExpectedCyclesThatMakeChanges(cycles);
+
+        // There may not be any tests that have "after" assertions, but that change file attributes or file names.
+        // If so, the test can declare an expected set of cycles that make changes.
+        int expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
+                (testClassSpec.expectedCyclesThatMakeChanges == null ? 0 : testClassSpec.expectedCyclesThatMakeChanges) :
+                testMethodSpec.expectedCyclesThatMakeChanges;
+
+        // If there are any tests that have assertions (an "after"), then set the expected cycles.
+        for (SourceSpec<?> s : sourceSpecs) {
+            if (s.after != null) {
+                expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
+                        testClassSpec.getExpectedCyclesThatMakeChanges(cycles) :
+                        testMethodSpec.getExpectedCyclesThatMakeChanges(cycles);
+                break;
+            }
         }
 
         RecipeSchedulerCheckingExpectedCycles recipeSchedulerCheckingExpectedCycles =
@@ -236,12 +246,8 @@ public interface RewriteTest extends SourceSpecs {
 
         List<SourceFile> beforeSourceFiles = new ArrayList<>(specBySourceFile.keySet());
 
-        if(testClassSpec.beforeRecipe != null) {
-            testClassSpec.beforeRecipe.accept(beforeSourceFiles);
-        }
-        if(testMethodSpec.beforeRecipe != null) {
-            testMethodSpec.beforeRecipe.accept(beforeSourceFiles);
-        }
+        testClassSpec.beforeRecipe.accept(beforeSourceFiles);
+        testMethodSpec.beforeRecipe.accept(beforeSourceFiles);
 
         List<Result> results = recipe.run(
                 beforeSourceFiles,
@@ -250,6 +256,9 @@ public interface RewriteTest extends SourceSpecs {
                 cycles,
                 expectedCyclesThatMakeChanges + 1
         );
+
+        testMethodSpec.afterRecipe.accept(results);
+        testClassSpec.afterRecipe.accept(results);
 
         for (Result result : results) {
             SourceFile before = result.getBefore();
@@ -278,18 +287,23 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
+        nextSourceFile:
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
             String after = specForSourceFile.getValue().after;
             for (Result result : results) {
+                if (result.getBefore() instanceof Quark) {
+                    continue nextSourceFile;
+                }
+
                 if (result.getBefore() == specForSourceFile.getKey()) {
                     if (after == null) {
                         assertThat(result.getAfter() == null ? "<deleted>" : result.getAfter().printAll())
-                                .as("The recipe must not make changes")
+                                .as("The recipe must not make changes to the contents of the source file.")
                                 .isEqualTo(result.getBefore() == null ? "" : result.getBefore().printAll());
                     }
                     //noinspection unchecked
                     ((Consumer<SourceFile>) specForSourceFile.getValue().afterRecipe).accept(result.getAfter());
-                    break;
+                    break nextSourceFile;
                 }
             }
 

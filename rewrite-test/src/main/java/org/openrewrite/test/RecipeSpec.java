@@ -51,8 +51,11 @@ public class RecipeSpec {
     @Nullable
     Integer expectedCyclesThatMakeChanges;
 
-    @Nullable
-    Consumer<List<SourceFile>> beforeRecipe;
+    Consumer<List<SourceFile>> beforeRecipe = s -> {
+    };
+
+    Consumer<List<Result>> afterRecipe = r -> {
+    };
 
     // The before and after here don't mean anything
     SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, "", null);
@@ -91,6 +94,11 @@ public class RecipeSpec {
 
     public RecipeSpec beforeRecipe(Consumer<List<SourceFile>> beforeRecipe) {
         this.beforeRecipe = beforeRecipe;
+        return this;
+    }
+
+    public RecipeSpec afterRecipe(Consumer<List<Result>> afterRecipe) {
+        this.afterRecipe = afterRecipe;
         return this;
     }
 

@@ -19,25 +19,23 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
+import java.io.*;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static org.openrewrite.Tree.randomId;
 
 public class QuarkParser implements Parser<Quark> {
 
     public static List<Quark> parseAllOtherFiles(Path rootDir, List<SourceFile> sourceFiles) throws IOException {
+        Stack<List<PathMatcher>> gitignores = new Stack<>();
+        parseGitignore(new File(System.getProperty("user.home") + "/.gitignore"), gitignores);
+
         Set<Path> sourceFilePaths = new HashSet<>();
         for (SourceFile sourceFile : sourceFiles) {
             sourceFilePaths.add(sourceFile.getSourcePath());
@@ -46,14 +44,61 @@ public class QuarkParser implements Parser<Quark> {
         List<Path> quarks = new ArrayList<>();
         Files.walkFileTree(rootDir, new SimpleFileVisitor<Path>() {
             @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                if (isIgnored(dir)) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                parseGitignore(dir.resolve(".gitignore").toFile(), gitignores);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                if (!attrs.isSymbolicLink() && !attrs.isOther() && !sourceFilePaths.contains(file)) {
+                if (!attrs.isSymbolicLink() && !attrs.isOther() &&
+                        !sourceFilePaths.contains(rootDir.relativize(file)) &&
+                        !isIgnored(file)) {
                     quarks.add(file);
                 }
                 return FileVisitResult.CONTINUE;
             }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
+                if (dir.resolve(".gitignore").toFile().exists()) {
+                    gitignores.pop();
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            private boolean isIgnored(Path path) {
+                for (List<PathMatcher> gitignore : gitignores) {
+                    for (PathMatcher gitignoreLine : gitignore) {
+                        if (gitignoreLine.matches(path)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
         });
         return new QuarkParser().parse(quarks, rootDir, new InMemoryExecutionContext());
+    }
+
+    private static void parseGitignore(File gitignore, Stack<List<PathMatcher>> gitignores) throws IOException {
+        if (gitignore.exists()) {
+            try (FileInputStream fis = new FileInputStream(gitignore);
+                 BufferedReader reader = new BufferedReader(new InputStreamReader(fis))) {
+                List<PathMatcher> gitignorePaths = new ArrayList<>();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (!line.trim().startsWith("#") && !StringUtils.isBlank(line)) {
+                        gitignorePaths.add(gitignore.toPath().getFileSystem().getPathMatcher("glob:**/" + line.trim() +
+                                (line.trim().endsWith("/") ? "**" : "")));
+                    }
+                }
+                gitignores.add(gitignorePaths);
+            }
+        }
     }
 
     @Override
