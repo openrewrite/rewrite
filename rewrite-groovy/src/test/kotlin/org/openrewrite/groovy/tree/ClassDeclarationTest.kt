@@ -19,6 +19,7 @@ package org.openrewrite.groovy.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.asFullyQualified
 import org.openrewrite.java.asParameterized
 import org.openrewrite.java.tree.J
@@ -97,6 +98,20 @@ class ClassDeclarationTest : GroovyTreeTest {
            public class A{}
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1736")
+    @Test
+    fun parameterizedFieldDoesNotAffectClassType() = assertParsePrintAndProcess(
+        """
+            class A {
+                List<String> a
+            }
+        """
+    ) { cu ->
+        val aType = cu.classes[0].type
+        assertThat(aType).isInstanceOf(JavaType.Class::class.java)
+        assertThat((aType as JavaType.Class).fullyQualifiedName).isEqualTo("A")
+    }
 
     @Test
     fun implicitlyPublic() = assertParsePrintAndProcess(

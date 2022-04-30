@@ -55,7 +55,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
                 void someMethod(@DelegatesTo(String.class) Closure action) { }
             }
         """)
-    );
+    )
 
     @Test
     fun methodWithBound() = rewriteRun(

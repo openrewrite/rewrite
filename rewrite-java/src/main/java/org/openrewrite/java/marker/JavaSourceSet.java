@@ -100,7 +100,7 @@ public class JavaSourceSet implements Marker {
             if (classInfo.getPackageName().startsWith("kotlin.reflect.jvm.internal.impl.resolve.jvm")) {
                 continue;
             }
-            String typeDeclaration = typeDeclarationFor(classInfo);
+            String typeDeclaration = declarableFullyQualifiedName(classInfo);
             if (typeDeclaration == null) {
                 continue;
             }
@@ -194,17 +194,133 @@ public class JavaSourceSet implements Marker {
      */
     @Nullable
     private static String typeDeclarationFor(ClassInfo classInfo) {
+        String name = declarableFullyQualifiedName(classInfo);
+        if(name == null) {
+            return null;
+        }
+        ClassTypeSignature cts = classInfo.getTypeSignature();
+        if (cts == null) {
+            return name;
+        }
+        List<TypeParameter> typeParameters = cts.getTypeParameters();
+        if (typeParameters == null || typeParameters.isEmpty()) {
+            return name;
+        }
+        StringBuilder withTypeParams = new StringBuilder("<");
+        for (int i = 0; i < typeParameters.size(); i++) {
+            TypeParameter typeParameter = typeParameters.get(i);
+            StringBuilder bounds = new StringBuilder();
+            if (typeParameter.getClassBound() != null) {
+                String bound;
+                if(typeParameter.getClassBound() instanceof ClassRefTypeSignature) {
+                    bound = printBound((ClassRefTypeSignature)typeParameter.getClassBound());
+                } else {
+                    bound = typeParameter.getClassBound().toString()
+                            // e.g. for ClassSpecializer<T,K,S extends ClassSpecializer<T,K,S>.SpeciesData>
+                            .replace(">$", ">.");
+                }
+                if (!"java.lang.Object".equals(bound)) {
+                    bounds.append(bound);
+                }
+            } else if (typeParameter.getInterfaceBounds() != null) {
+                StringJoiner interfaceBounds = new StringJoiner(" & ");
+                for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
+                    if(interfaceBound instanceof ClassRefTypeSignature) {
+                        interfaceBounds.add(printBound((ClassRefTypeSignature)interfaceBound));
+                    } else {
+                        interfaceBounds.add(interfaceBound.toString());
+                    }
+                }
+                bounds.append(interfaceBounds);
+            }
+
+            if (bounds.length() == 0) {
+                withTypeParams.append(typeParameter.getName());
+            } else {
+                withTypeParams.append(typeParameter.getName()).append(" extends ").append(bounds);
+            }
+            if (i < typeParameters.size() - 1) {
+                withTypeParams.append(", ");
+            }
+        }
+        withTypeParams.append(">");
+        withTypeParams.append(" ");
+        withTypeParams.append(name);
+        withTypeParams.append(typeParametersNoBounds(classInfo));
+        return withTypeParams.toString();
+    }
+
+    private static String typeParametersNoBounds(ClassInfo classInfo) {
+        ClassTypeSignature cts = classInfo.getTypeSignature();
+        if (cts == null) {
+            return "";
+        }
+        List<TypeParameter> typeParameters = cts.getTypeParameters();
+        if (typeParameters == null || typeParameters.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("<");
+        for (int i = 0; i < typeParameters.size(); i++) {
+            TypeParameter typeParameter = typeParameters.get(i);
+            sb.append(typeParameter.getName());
+            if (i < typeParameters.size() - 1) {
+                sb.append(", ");
+            }
+        }
+        sb.append(">");
+        return sb.toString();
+    }
+    private static String printBound(ClassRefTypeSignature refTypeSignature) {
+        StringBuilder sb = new StringBuilder(refTypeSignature.getBaseClassName());
+        List<TypeArgument> typeArguments = refTypeSignature.getTypeArguments();
+        if(typeArguments != null && typeArguments.size() > 0) {
+            sb.append("<");
+            for (int i = 0; i < typeArguments.size(); i++) {
+                TypeArgument typeParameter = typeArguments.get(i);
+                sb.append(typeParameter.toString());
+                if (i < typeArguments.size() - 1) {
+                    sb.append(", ");
+                }
+            }
+            sb.append(">");
+        }
+        List<String> suffixes = refTypeSignature.getSuffixes();
+        if(suffixes != null && suffixes.size() > 0) {
+            for(int i = 0; i < suffixes.size(); i++) {
+                String suffix = suffixes.get(0);
+                List<TypeArgument> suffixTypeArgs = refTypeSignature.getSuffixTypeArguments().get(i);
+                sb.append(".").append(suffix).append("<");
+                for (int j = 0; j < suffixTypeArgs.size(); j++) {
+                    sb.append(suffixTypeArgs.get(j));
+                    if(j < suffixTypeArgs.size() - 1) {
+                        sb.append(",");
+                    }
+                }
+                sb.append(">");
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Java allows "$" in class names, and also uses "$" as part of the names of inner classes. e.g.: OuterClass$InnerClass
+     * So if you only look at the textual representation of a class name, you can't tell if "A$B" means "class A$B {}" or "class A { class B {}}"
+     * The declarable name of "class A$B {}" is "A$B"
+     * The declarable name of class B in "class A { class B {}}" is "A.B"
+     * ClassInfo.getPackageName() does not understand this and will always replace "$" in names with "."
+     *
+     * This method takes all of these considerations into account and returns a fully qualified name which replaces
+     * inner-class signifying "$" with ".", while preserving
+     */
+    @Nullable
+    private static String declarableFullyQualifiedName(ClassInfo classInfo) {
         String name;
         if(classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
             // Because we put java-supplied types into another package, we cannot access package-private types
             return null;
         }
         if (classInfo.isInnerClass()) {
-            // Java allows "$" in class names, and also uses "$" as part of the names of inner classes. e.g.: OuterClass$InnerClass
-            // So if you only look at the textual representation of a class name, you can't tell if "A$B" means "class A$B {}" or "class A { class B {}}"
-            // The declarable name of "class A$B {}" is "A$B"
-            // The declarable name of class B in "class A { class B {}}" is "A.B"
-            // ClassInfo.getPackageName() does not understand this and will always replace "$" in names with "."
             StringBuilder sb = new StringBuilder();
             ClassInfoList outerClasses = classInfo.getOuterClasses();
             // Classgraph orders this collection innermost -> outermost, but type names are declared outermost -> innermost
@@ -228,59 +344,11 @@ public class JavaSourceSet implements Marker {
             name = sb.toString();
         } else {
             name = classInfo.getName();
-            if (isUndeclarable(name)) {
-                return null;
-            }
         }
-        ClassTypeSignature cts = classInfo.getTypeSignature();
-        if (cts == null) {
-            return name;
+        if (isUndeclarable(name)) {
+            return null;
         }
-        List<TypeParameter> typeParameters = cts.getTypeParameters();
-        if (typeParameters == null || typeParameters.isEmpty()) {
-            return name;
-        }
-        StringBuilder withTypeParams = new StringBuilder("<");
-        for (int i = 0; i < typeParameters.size(); i++) {
-            TypeParameter typeParameter = typeParameters.get(i);
-            StringBuilder bounds = new StringBuilder();
-            if (typeParameter.getClassBound() != null) {
-                String bound = typeParameter.getClassBound().toString()
-                        // e.g. for ClassSpecializer<T,K,S extends ClassSpecializer<T,K,S>.SpeciesData>
-                        .replace(">$", ">.");
-                if (!"java.lang.Object".equals(bound)) {
-                    bounds.append(bound);
-                }
-            } else if (typeParameter.getInterfaceBounds() != null) {
-                StringJoiner interfaceBounds = new StringJoiner(" & ");
-                for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
-                    interfaceBounds.add(interfaceBound.toString());
-                }
-                bounds.append(interfaceBounds);
-            }
-
-            if (bounds.length() == 0) {
-                withTypeParams.append(typeParameter.getName());
-            } else {
-                withTypeParams.append(typeParameter.getName()).append(" extends ").append(bounds);
-            }
-            if (i < typeParameters.size() - 1) {
-                withTypeParams.append(", ");
-            }
-        }
-        withTypeParams.append(">");
-        withTypeParams.append(" ");
-        withTypeParams.append(name);
-        withTypeParams.append("<");
-        for (int i = 0; i < typeParameters.size(); i++) {
-            TypeParameter typeParameter = typeParameters.get(i);
-            withTypeParams.append(typeParameter.getName());
-            if (i < typeParameters.size() - 1) {
-                withTypeParams.append(", ");
-            }
-        }
-        withTypeParams.append(">");
-        return withTypeParams.toString();
+        return name;
     }
 
     @SuppressWarnings("SpellCheckingInspection")

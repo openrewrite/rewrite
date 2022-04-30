@@ -38,6 +38,7 @@ interface JavaSourceSetTest {
         val jss = JavaSourceSet.build("main", emptyList(), typeCache, true)
         val typesBySignature = jss.classpath.associateBy { it.toString() }
         assertThat(typesBySignature["java.lang.Object"]).isInstanceOf(JavaType.Class::class.java)
+        assertThat(typesBySignature["java.util.List"]).isInstanceOf(JavaType.Class::class.java)
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1712")
@@ -48,6 +49,7 @@ interface JavaSourceSetTest {
         val jss = JavaSourceSet.build("main", emptyList(), typeCache, false)
         val typesBySignature = jss.classpath.associateBy { it.toString() }
         assertThat(typesBySignature["java.lang.Object"]).isInstanceOf(JavaType.ShallowClass::class.java)
+        assertThat(typesBySignature["java.util.List"]).isInstanceOf(JavaType.ShallowClass::class.java)
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1677")
