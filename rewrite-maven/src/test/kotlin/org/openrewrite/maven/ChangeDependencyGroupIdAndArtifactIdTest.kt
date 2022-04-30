@@ -20,9 +20,10 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.test.RewriteTest
 import java.nio.file.Path
 
-class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
+class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest, RewriteTest {
 
     override val recipe: ChangeDependencyGroupIdAndArtifactId
         get() = ChangeDependencyGroupIdAndArtifactId(
@@ -89,6 +90,193 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                             <artifactId>javax.activation-api</artifactId>
                             <version>1.2.0</version>
                         </dependency>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>1.2.1</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """
+    )
+
+    @Test
+    fun overrideManagedDependency() = assertChanged(
+        recipe =  ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.2",
+            true
+        ),
+        before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>javax.activation</groupId>
+                        <artifactId>javax.activation-api</artifactId>
+                    </dependency>
+                </dependencies>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>1.2.1</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """,
+        after = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>jakarta.activation</groupId>
+                        <artifactId>jakarta.activation-api</artifactId>
+                        <version>1.2.2</version>
+                    </dependency>
+                </dependencies>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>1.2.1</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """
+    )
+
+    @Test
+    fun managedToUnmanaged() = assertChanged(
+        recipe =  ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.2",
+            false
+        ),
+        before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>javax.activation</groupId>
+                        <artifactId>javax.activation-api</artifactId>
+                    </dependency>
+                </dependencies>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """,
+        after = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>jakarta.activation</groupId>
+                        <artifactId>jakarta.activation-api</artifactId>
+                        <version>1.2.2</version>
+                    </dependency>
+                </dependencies>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """
+    )
+
+    @Test
+    fun unmanagedToManaged() = assertChanged(
+        recipe =  ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.2",
+            false
+        ),
+        before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>javax.activation</groupId>
+                        <artifactId>javax.activation-api</artifactId>
+                        <version>1.2.0</version>
+                    </dependency>
+                </dependencies>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>1.2.1</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """,
+        after = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>jakarta.activation</groupId>
+                        <artifactId>jakarta.activation-api</artifactId>
+                    </dependency>
+                </dependencies>
+                <dependencyManagement>
+                    <dependencies>
                         <dependency>
                             <groupId>jakarta.activation</groupId>
                             <artifactId>jakarta.activation-api</artifactId>
