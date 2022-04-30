@@ -66,6 +66,7 @@ dependencies {
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-11"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
+    testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {

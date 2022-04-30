@@ -19,18 +19,21 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
-import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 public class RecipeSerializer {
     private final ObjectMapper mapper;
@@ -45,9 +48,9 @@ public class RecipeSerializer {
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .build()
                 .registerModule(new ParameterNamesModule())
-                .registerModule(new KotlinModule())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        maybeAddKotlinModule(m);
 
         this.mapper = m.setVisibility(m.getSerializationConfig().getDefaultVisibilityChecker()
                 .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY)
@@ -85,6 +88,24 @@ public class RecipeSerializer {
             return mapper.readValue(bytes, Recipe.class);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * If it is available on the runtime classpath, add jackson's Kotlin module to the provided object mapper.
+     * Does nothing if jackson's kotlin module is not available.
+     */
+    public static void maybeAddKotlinModule(ObjectMapper mapper) {
+        try {
+            Class<?> kmbClass = RecipeSerializer.class.getClassLoader()
+                    .loadClass("com.fasterxml.jackson.module.kotlin.KotlinModule$Builder");
+            Constructor<?> kmbConstructor = kmbClass.getConstructor();
+            Object kotlinModuleBuilder = kmbConstructor.newInstance();
+            Method kmbBuildMethod = kmbClass.getMethod("build");
+            Module kotlinModule = (Module) kmbBuildMethod.invoke(kotlinModuleBuilder);
+            mapper.registerModule(kotlinModule);
+        } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException  | InstantiationException | IllegalAccessException e) {
+            // KotlinModule is optional
         }
     }
 }

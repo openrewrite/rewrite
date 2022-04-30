@@ -36,13 +36,18 @@ public class ExplicitInitializationVisitor<P> extends JavaIsoVisitor<P> {
         J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, p);
 
         Cursor variableDeclsCursor = getCursor().dropParentUntil(J.class::isInstance);
-        J maybeClassDecl = variableDeclsCursor
-                .dropParentUntil(J.class::isInstance) // maybe J.Block
-                .dropParentUntil(J.class::isInstance) // maybe J.ClassDecl
-                .getValue();
-        if (!(maybeClassDecl instanceof J.ClassDeclaration)
-                || J.ClassDeclaration.Kind.Type.Class != ((J.ClassDeclaration)maybeClassDecl).getKind()) {
+        Cursor maybeBlockOrGType = variableDeclsCursor.dropParentUntil(J.class::isInstance);
+        if (maybeBlockOrGType.getParent() == null || maybeBlockOrGType.getParent().getParent() == null) {
+            // Groovy type.
             return v;
+        } else {
+            J maybeClassDecl = maybeBlockOrGType
+                    .dropParentUntil(J.class::isInstance) // maybe J.ClassDecl
+                    .getValue();
+            if (!(maybeClassDecl instanceof J.ClassDeclaration) ||
+                    J.ClassDeclaration.Kind.Type.Class != ((J.ClassDeclaration)maybeClassDecl).getKind()) {
+                return v;
+            }
         }
 
         JavaType.Primitive primitive = TypeUtils.asPrimitive(variable.getType());
@@ -68,7 +73,7 @@ public class ExplicitInitializationVisitor<P> extends JavaIsoVisitor<P> {
                         }
                         break;
                     case Char:
-                        if (literalInit.getValue() != null && (Character) literalInit.getValue() == 0) {
+                        if (literalInit.getValue() instanceof Character && (Character) literalInit.getValue() == 0) {
                             v = v.withInitializer(null);
                         }
                         break;

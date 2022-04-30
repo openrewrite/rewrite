@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
 
@@ -32,19 +33,6 @@ interface UseCollectionInterfacesTest : JavaRecipeTest {
             class Test {
                 Set<Integer> method() {
                     return Collections.emptySet();
-                }
-            }
-        """
-    )
-
-    @Test
-    fun methodIsNotPublic() = assertUnchanged(
-        before = """
-            import java.util.HashSet;
-            
-            class Test {
-                HashSet<Integer> method() {
-                    return new HashSet<>();
                 }
             }
         """
@@ -130,17 +118,6 @@ interface UseCollectionInterfacesTest : JavaRecipeTest {
                 public Set<Integer> method(int primitive, Integer integer) {
                     return new HashSet<>();
                 }
-            }
-        """
-    )
-
-    @Test
-    fun fieldIsNotPublic() = assertUnchanged(
-        before = """
-            import java.util.HashSet;
-            
-            class Test {
-                HashSet<Integer> values = new HashSet<>();
             }
         """
     )
@@ -645,6 +622,94 @@ interface UseCollectionInterfacesTest : JavaRecipeTest {
             
             class Test {
                 public Set values = new CopyOnWriteArraySet();
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1703")
+    @Test
+    fun privateVariable() = assertChanged(
+        before = """
+            import java.util.ArrayList;
+            
+            class Test {
+                private ArrayList<Integer> values = new ArrayList<>();
+            }
+        """,
+        after = """
+            import java.util.ArrayList;
+            import java.util.List;
+            
+            class Test {
+                private List<Integer> values = new ArrayList<>();
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1703")
+    @Test
+    fun noModifierOnVariable() = assertChanged(
+        before = """
+            import java.util.ArrayList;
+            
+            class Test {
+                ArrayList<Integer> values = new ArrayList<>();
+            }
+        """,
+        after = """
+            import java.util.ArrayList;
+            import java.util.List;
+            
+            class Test {
+                List<Integer> values = new ArrayList<>();
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1703")
+    @Test
+    fun privateMethod() = assertChanged(
+        before = """
+            import java.util.HashSet;
+            
+            class Test {
+                private HashSet<Integer> method() {
+                    return new HashSet<>();
+                }
+            }
+        """,
+        after = """
+            import java.util.HashSet;
+            import java.util.Set;
+            
+            class Test {
+                private Set<Integer> method() {
+                    return new HashSet<>();
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1703")
+    @Test
+    fun noModifierOnMethod() = assertChanged(
+        before = """
+            import java.util.HashSet;
+            
+            class Test {
+                HashSet<Integer> method() {
+                    return new HashSet<>();
+                }
+            }
+        """,
+        after = """
+            import java.util.HashSet;
+            import java.util.Set;
+            
+            class Test {
+                Set<Integer> method() {
+                    return new HashSet<>();
+                }
             }
         """
     )

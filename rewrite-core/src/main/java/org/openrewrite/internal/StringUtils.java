@@ -555,4 +555,49 @@ public class StringUtils {
                 .replace("*", "[^.]*")
                 .replace("..", "\\.(.+\\.)?");
     }
+
+    /**
+     * @see <a href="https://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Longest_common_substring#Java_-_O(n)_storage"></a>
+     * @param s1 first string
+     * @param s2 second string
+     * @return length of the longest substring common to both strings
+     */
+    public static int greatestCommonSubstringLength(String s1, String s2) {
+        if (s1.isEmpty() || s2.isEmpty()) {
+            return 0;
+        }
+
+        int m = s1.length();
+        int n = s2.length();
+        int cost;
+        int maxLen = 0;
+        int[] p = new int[n];
+        int[] d = new int[n];
+
+        for (int i = 0; i < m; ++i) {
+            for (int j = 0; j < n; ++j) {
+                // calculate cost/score
+                if (s1.charAt(i) != s2.charAt(j)) {
+                    cost = 0;
+                } else {
+                    if ((i == 0) || (j == 0)) {
+                        cost = 1;
+                    } else {
+                        cost = p[j - 1] + 1;
+                    }
+                }
+                d[j] = cost;
+
+                if (cost > maxLen) {
+                    maxLen = cost;
+                }
+            } // for {}
+
+            int[] swap = p;
+            p = d;
+            d = swap;
+        }
+
+        return maxLen;
+    }
 }

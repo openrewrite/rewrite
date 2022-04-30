@@ -448,10 +448,7 @@ public interface JavaType {
         }
 
         /**
-         * Build a class type only from the class' fully qualified name. Since we are not providing any member, type parameter,
-         * interface, or supertype information, this fully qualified name could potentially match on more than one version of
-         * the class found in the type cache. This method will simply pick one of them, because there is no way of selecting
-         * between the versions of the class based solely on the fully qualified class name.
+         * Build a class type only from the class' fully qualified name.
          *
          * @param fullyQualifiedName The fully qualified name of the class to build
          * @return Any class found in the type cache

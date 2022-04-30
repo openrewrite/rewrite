@@ -62,7 +62,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                 } else if (ClassHelper.isPrimitiveType(clazz)) {
                     //noinspection ConstantConditions
                     return JavaType.Primitive.fromKeyword(clazz.getName());
-                } else if (clazz.isUsingGenerics()) {
+                } else if (clazz.isUsingGenerics() && clazz.getGenericsTypes() != null) {
                     return parameterizedType(clazz, signature);
                 }
                 return classType((ClassNode) type, signature);

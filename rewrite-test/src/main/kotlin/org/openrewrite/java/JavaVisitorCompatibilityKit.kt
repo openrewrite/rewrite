@@ -41,7 +41,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class AddLicenseHeaderTck : AddLicenseHeaderTest
 
     @Nested
-    class AddOrUpdateAnnotationAttributeTck : AddOrUpdateAnnotationAttributeTest
+    inner class AddOrUpdateAnnotationAttributeTck : AddOrUpdateAnnotationAttributeTest
 
     @Nested
     inner class AddSerialVersionUidToSerializableTck : AddSerialVersionUidToSerializableTest
@@ -392,6 +392,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ReplaceDuplicateStringLiteralsTestTck : ReplaceDuplicateStringLiteralsTest
 
     @Nested
+    inner class ReplaceReplaceLambdaWithMethodReferenceTck : ReplaceLambdaWithMethodReferenceTest
+
+    @Nested
     inner class ReorderMethodArgumentsTck : ReorderMethodArgumentsTest
 
     @Nested
@@ -476,7 +479,13 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UseLambdaForFunctionalInterfaceTck : UseLambdaForFunctionalInterfaceTest
 
     @Nested
+    inner class UseStandardCharsetTck : UseStandardCharsetTest
+
+    @Nested
     inner class UsesMethodTck : UsesMethodTest
+
+    @Nested
+    inner class UseStringReplaceTestTck : UseStringReplaceTest
 
     @Nested
     inner class DoesNotUseRewriteSkipTck : DoesNotUseRewriteSkipTest
@@ -489,6 +498,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class UsesTypeTck : UsesTypeTest
+
+    @Nested
+    inner class SimplifyCompoundStatementTck : SimplifyCompoundStatementTest
 
     @Nested
     inner class WhileInsteadOfForTck : WhileInsteadOfForTest

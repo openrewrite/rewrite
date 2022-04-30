@@ -503,6 +503,10 @@ class Java11ReplaceDuplicateStringLiteralsTest : Java11Test, ReplaceDuplicateStr
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ReplaceLambdaWithMethodReferenceTest : Java11Test, ReplaceLambdaWithMethodReferenceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RenameVariableTest : Java11Test, RenameVariableTest
 
 @DebugOnly
@@ -611,6 +615,10 @@ class Java11UseLambdaForFunctionalInterface : Java11Test, UseLambdaForFunctional
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UseStandardCharsetTest : Java11Test, UseStandardCharsetTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UseStaticImportTest : Java11Test, UseStaticImportTest
 
 @DebugOnly
@@ -631,7 +639,15 @@ class Java11UsesMethodTest : Java11Test, UsesMethodTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UseStringReplaceTest : Java11Test, UseStringReplaceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UsesTypeTest : Java11Test, UsesTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11SimplifyCompoundStatementTest : Java11Test, SimplifyCompoundStatementTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

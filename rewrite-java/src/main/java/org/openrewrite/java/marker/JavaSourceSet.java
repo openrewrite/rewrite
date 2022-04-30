@@ -62,7 +62,11 @@ public class JavaSourceSet implements Marker {
                 .acceptPackages("java")
                 .ignoreClassVisibility()
                 .scan()) {
-            types = typesFrom(packagesToTypeDeclarations(scanResult), typeCache, Collections.emptyList(), fullTypeInformation);
+            Map<String, List<String>> packagesToTypes = packagesToTypeDeclarations(scanResult);
+            // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
+            packagesToTypes.computeIfAbsent("java.lang", p -> new ArrayList<>())
+                    .add("java.lang.Object");
+            types = typesFrom(packagesToTypes, typeCache, Collections.emptyList(), fullTypeInformation);
         }
         if (classpath.iterator().hasNext()) {
             // Load types from the classpath
@@ -96,7 +100,7 @@ public class JavaSourceSet implements Marker {
             if (classInfo.getPackageName().startsWith("kotlin.reflect.jvm.internal.impl.resolve.jvm")) {
                 continue;
             }
-            String typeDeclaration = typeDeclarationFor(classInfo);
+            String typeDeclaration = declarableFullyQualifiedName(classInfo);
             if (typeDeclaration == null) {
                 continue;
             }
@@ -141,7 +145,7 @@ public class JavaSourceSet implements Marker {
         } else {
             for (Map.Entry<String, List<String>> packageToTypes : packagesToTypes.entrySet()) {
                 for (String className : packageToTypes.getValue()) {
-                    types.add(JavaType.ShallowClass.build(packageToTypes.getKey() + "." + className));
+                    types.add(JavaType.ShallowClass.build(className));
                 }
             }
         }
@@ -155,7 +159,14 @@ public class JavaSourceSet implements Marker {
         String[] result = new String[packagesToTypeNames.size()];
         int i = 0;
         for (Map.Entry<String, List<String>> packageToTypes : packagesToTypeNames.entrySet()) {
-            StringBuilder sb = new StringBuilder("package ").append(packageToTypes.getKey()).append(";\n")
+            boolean isJreType = packageToTypes.getKey().startsWith("java.");
+            StringBuilder sb = new StringBuilder("package ");
+            if(isJreType) {
+                // Avoid java compiler complaints that we're redefining java.lang, etc.
+                // Only apply to java provided types because this limits our ability to get type information from package-private classes
+                sb.append("rewrite.");
+            }
+            sb.append(packageToTypes.getKey()).append(";\n")
                     .append("abstract class $RewriteTypeStub {\n");
 
             List<String> value = packageToTypes.getValue();
@@ -174,23 +185,24 @@ public class JavaSourceSet implements Marker {
     }
 
     /**
-     * A declaration is the text you would use to declare the type parameters and return type a method.
-     * So the declarable name of "com.foo.Clazz" is "Clazz" since to declare a variable of that type would write "Clazz <name>"
-     * Java/Kotlin/Groovy all sometimes compile lambdas/closures to classes named things like "ClassThatUsesLambda$1".
-     * These types are not declarable.
+     * Java allows "$" in class names, and also uses "$" as part of the names of inner classes. e.g.: OuterClass$InnerClass
+     * So if you only look at the textual representation of a class name, you can't tell if "A$B" means "class A$B {}" or "class A { class B {}}"
+     * The declarable name of "class A$B {}" is "A$B"
+     * The declarable name of class B in "class A { class B {}}" is "A.B"
+     * ClassInfo.getPackageName() does not understand this and will always replace "$" in names with "."
      *
-     * @return the name a variable of the class's type can be declared with, or null if a variable of the type cannot be declared
+     * This method takes all of these considerations into account and returns a fully qualified name which replaces
+     * inner-class signifying "$" with ".", while preserving
      */
     @Nullable
-    private static String typeDeclarationFor(ClassInfo classInfo) {
+    private static String declarableFullyQualifiedName(ClassInfo classInfo) {
         String name;
+        if(classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
+            // Because we put java-supplied types into another package, we cannot access package-private types
+            return null;
+        }
         if (classInfo.isInnerClass()) {
-            // Java allows "$" in class names, and also uses "$" as part of the names of inner classes. e.g.: OuterClass$InnerClass
-            // So if you only look at the textual representation of a class name, you can't tell if "A$B" means "class A$B {}" or "class A { class B {}}"
-            // The declarable name of "class A$B {}" is "A$B"
-            // The declarable name of class B in "class A { class B {}}" is "A.B"
             StringBuilder sb = new StringBuilder();
-            String packageName = classInfo.getPackageName();
             ClassInfoList outerClasses = classInfo.getOuterClasses();
             // Classgraph orders this collection innermost -> outermost, but type names are declared outermost -> innermost
             for (int i = outerClasses.size() - 1; i >= 0; i--) {
@@ -198,18 +210,13 @@ public class JavaSourceSet implements Marker {
                 if (outerClass.isPrivate() || outerClass.isAnonymousInnerClass() || outerClass.isSynthetic()) {
                     return null;
                 }
-                String typeName;
-                if (outerClass.getName().contains(packageName)) {
-                    typeName = outerClass.getName();
+                if(i == outerClasses.size() - 1) {
+                    sb.append(outerClass.getName()).append(".");
                 } else {
-                    if (!classInfo.getName().contains(outerClass.getSimpleName())) {
-                        return null;
-                    }
-                    typeName = classInfo.getName().substring(0, classInfo.getName().indexOf(outerClass.getSimpleName()) + outerClass.getSimpleName().length());
+                    sb.append(outerClass.getName().substring(sb.length())).append(".");
                 }
-                sb.append(typeName.substring(packageName.length() + 1 + sb.length())).append(".");
             }
-            String nameFragment = classInfo.getName().substring(packageName.length() + 1 + sb.length());
+            String nameFragment = classInfo.getName().substring(sb.length());
 
             if (isUndeclarable(nameFragment)) {
                 return null;
@@ -217,62 +224,12 @@ public class JavaSourceSet implements Marker {
             sb.append(nameFragment);
             name = sb.toString();
         } else {
-            name = classInfo.getPackageName().length() == 0 ?
-                    classInfo.getName() :
-                    classInfo.getName().substring(classInfo.getPackageName().length() + 1);
-            if (isUndeclarable(name)) {
-                return null;
-            }
+            name = classInfo.getName();
         }
-        ClassTypeSignature cts = classInfo.getTypeSignature();
-        if (cts == null) {
-            return name;
+        if (isUndeclarable(name)) {
+            return null;
         }
-        List<TypeParameter> typeParameters = cts.getTypeParameters();
-        if (typeParameters == null || typeParameters.isEmpty()) {
-            return name;
-        }
-        StringBuilder withTypeParams = new StringBuilder("<");
-        for (int i = 0; i < typeParameters.size(); i++) {
-            TypeParameter typeParameter = typeParameters.get(i);
-            StringBuilder bounds = new StringBuilder();
-            if (typeParameter.getClassBound() != null) {
-                String bound = typeParameter.getClassBound().toString()
-                        // e.g. for ClassSpecializer<T,K,S extends ClassSpecializer<T,K,S>.SpeciesData>
-                        .replace(">$", ">.");
-                if (!"java.lang.Object".equals(bound)) {
-                    bounds.append(bound);
-                }
-            } else if (typeParameter.getInterfaceBounds() != null) {
-                StringJoiner interfaceBounds = new StringJoiner(" & ");
-                for (ReferenceTypeSignature interfaceBound : typeParameter.getInterfaceBounds()) {
-                    interfaceBounds.add(interfaceBound.toString());
-                }
-                bounds.append(interfaceBounds);
-            }
-
-            if (bounds.length() == 0) {
-                withTypeParams.append(typeParameter.getName());
-            } else {
-                withTypeParams.append(typeParameter.getName()).append(" extends ").append(bounds);
-            }
-            if (i < typeParameters.size() - 1) {
-                withTypeParams.append(", ");
-            }
-        }
-        withTypeParams.append(">");
-        withTypeParams.append(" ");
-        withTypeParams.append(name);
-        withTypeParams.append("<");
-        for (int i = 0; i < typeParameters.size(); i++) {
-            TypeParameter typeParameter = typeParameters.get(i);
-            withTypeParams.append(typeParameter.getName());
-            if (i < typeParameters.size() - 1) {
-                withTypeParams.append(", ");
-            }
-        }
-        withTypeParams.append(">");
-        return withTypeParams.toString();
+        return name;
     }
 
     @SuppressWarnings("SpellCheckingInspection")

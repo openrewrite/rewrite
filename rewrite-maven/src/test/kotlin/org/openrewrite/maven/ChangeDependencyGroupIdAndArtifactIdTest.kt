@@ -15,33 +15,27 @@
  */
 package org.openrewrite.maven
 
-import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.InMemoryExecutionContext
-import java.nio.file.Path
+import org.openrewrite.test.RewriteTest
+import java.nio.file.Paths
 
-class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
-
-    override val recipe: ChangeDependencyGroupIdAndArtifactId
-        get() = ChangeDependencyGroupIdAndArtifactId(
-            "org.openrewrite.recipe",
-            "rewrite-testing-frameworks",
-            "org.openrewrite.recipe",
-            "rewrite-migrate-java",
-            null
-        )
+class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
 
     @Test
-    fun changeDependencyGroupIdAndArtifactId() = assertChanged(
-        recipe =  ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            null
-        ),
-        before = """
+    fun changeDependencyGroupIdAndArtifactId() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "javax.activation",
+                    "javax.activation-api",
+                    "jakarta.activation",
+                    "jakarta.activation-api",
+                    null
+                )
+            )
+        },
+        pomXml("""
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -69,7 +63,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                 </dependencyManagement>
             </project>
         """,
-        after = """
+        """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -97,33 +91,243 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                 </dependencyManagement>
             </project>
         """
+    ))
+
+    @Test
+    fun overrideManagedDependency() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "javax.activation",
+                    "javax.activation-api",
+                    "jakarta.activation",
+                    "jakarta.activation-api",
+                    "1.2.2",
+                    true
+                )
+            )
+        },
+        pomXml(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                        </dependency>
+                    </dependencies>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>javax.activation</groupId>
+                                <artifactId>javax.activation-api</artifactId>
+                                <version>1.2.0</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>jakarta.activation</groupId>
+                                <artifactId>jakarta.activation-api</artifactId>
+                                <version>1.2.1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>1.2.2</version>
+                        </dependency>
+                    </dependencies>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>javax.activation</groupId>
+                                <artifactId>javax.activation-api</artifactId>
+                                <version>1.2.0</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>jakarta.activation</groupId>
+                                <artifactId>jakarta.activation-api</artifactId>
+                                <version>1.2.1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """
+        )
     )
 
     @Test
-    fun changeOnlyArtifactId() = assertChanged(
-        recipe = ChangeDependencyGroupIdAndArtifactId(
-            "org.openrewrite",
-            "rewrite-java-8",
-            "org.openrewrite",
-            "rewrite-java-11",
-            null
-        ),
-        before = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.openrewrite</groupId>
-                        <artifactId>rewrite-java-8</artifactId>
-                        <version>7.20.0</version>
-                    </dependency>
-                </dependencies>
-            </project>
-        """,
-        after = """
+    fun managedToUnmanaged() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "javax.activation",
+                    "javax.activation-api",
+                    "jakarta.activation",
+                    "jakarta.activation-api",
+                    "1.2.2",
+                    false
+                )
+            )
+        },
+        pomXml(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                        </dependency>
+                    </dependencies>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>javax.activation</groupId>
+                                <artifactId>javax.activation-api</artifactId>
+                                <version>1.2.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>1.2.2</version>
+                        </dependency>
+                    </dependencies>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>javax.activation</groupId>
+                                <artifactId>javax.activation-api</artifactId>
+                                <version>1.2.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """
+        )
+    )
+
+    @Test
+    fun unmanagedToManaged() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "javax.activation",
+                    "javax.activation-api",
+                    "jakarta.activation",
+                    "jakarta.activation-api",
+                    "1.2.2",
+                    false
+                )
+            )
+        },
+        pomXml(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>jakarta.activation</groupId>
+                                <artifactId>jakarta.activation-api</artifactId>
+                                <version>1.2.1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                        </dependency>
+                    </dependencies>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>jakarta.activation</groupId>
+                                <artifactId>jakarta.activation-api</artifactId>
+                                <version>1.2.1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """
+        )
+    )
+
+    @Test
+    fun changeOnlyArtifactId() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "org.openrewrite",
+                    "rewrite-java-8",
+                    "org.openrewrite",
+                    "rewrite-java-11",
+                    null
+                )
+            )
+        },
+        pomXml(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite</groupId>
+                            <artifactId>rewrite-java-8</artifactId>
+                            <version>7.20.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """,
+            """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -137,79 +341,103 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                     </dependency>
                 </dependencies>
             </project>
-        """
+            """
+        )
     )
 
     @Test
-    fun doNotChangeUnlessBothGroupIdAndArtifactIdMatch() = assertUnchanged(
-        before = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.openrewrite.recipe</groupId>
-                        <artifactId>rewrite-spring</artifactId>
-                        <version>4.12.0</version>
-                    </dependency>
-                </dependencies>
-            </project>
-        """
+    fun doNotChangeUnlessBothGroupIdAndArtifactIdMatch()  = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "org.openrewrite.recipe",
+                    "rewrite-testing-frameworks",
+                    "org.openrewrite.recipe",
+                    "rewrite-migrate-java",
+                    null
+                )
+            )
+        },
+        pomXml(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite.recipe</groupId>
+                            <artifactId>rewrite-spring</artifactId>
+                            <version>4.12.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        )
     )
 
     @Test
-    fun changeDependencyGroupIdAndArtifactIdAndVersion() = assertChanged(
-        recipe =  ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            "2.1.0"
-        ),
-        before = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>javax.activation</groupId>
-                        <artifactId>javax.activation-api</artifactId>
-                        <version>1.2.0</version>
-                    </dependency>
-                </dependencies>
-            </project>
-        """,
-        after = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>jakarta.activation</groupId>
-                        <artifactId>jakarta.activation-api</artifactId>
-                        <version>2.1.0</version>
-                    </dependency>
-                </dependencies>
-            </project>
-        """
+    fun changeDependencyGroupIdAndArtifactIdAndVersion()  = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "javax.activation",
+                    "javax.activation-api",
+                    "jakarta.activation",
+                    "jakarta.activation-api",
+                    "2.1.0"
+                )
+            )
+        },
+        pomXml(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>2.1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        )
     )
 
     @Test
-    fun changeDependencyGroupIdAndArtifactIdWithDeepHierarchy(@TempDir tempDir: Path) {
-        val parent = tempDir.resolve("pom.xml")
-        val child = tempDir.resolve("child/pom.xml")
-        val subchild = tempDir.resolve("child/subchild/pom.xml")
-
-        subchild.toFile().parentFile.mkdirs()
-
-        parent.toFile().writeText(
-            //language=xml
+    fun changeDependencyGroupIdAndArtifactIdWithDeepHierarchy() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "io.quarkus",
+                    "quarkus-core",
+                    "io.quarkus",
+                    "quarkus-arc",
+                    null
+                )
+            )
+        },
+        pomXml(
             """
                 <project>
                     <groupId>com.mycompany.app</groupId>
@@ -219,11 +447,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                         <module>child</module>
                     </modules>
                 </project>
-            """.trimIndent()
-        )
-
-        child.toFile().writeText(
-            //language=xml
+        """
+        ) { p -> p.path(Paths.get("pom.xml")) },
+        pomXml(
             """
                 <project>
                     <parent>
@@ -238,11 +464,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                         <module>subchild</module>
                     </modules>
                 </project>
-            """.trimIndent()
-        )
-
-        subchild.toFile().writeText(
-            //language=xml
+            """
+        ) { p -> p.path(Paths.get("child/pom.xml")) },
+        pomXml(
             """
                 <project>
                     <parent>
@@ -261,14 +485,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                         </dependency>
                     </dependencies>
                 </project>
-            """.trimIndent()
-        )
-
-        val results = ChangeDependencyGroupIdAndArtifactId("io.quarkus", "quarkus-core", "io.quarkus", "quarkus-arc", null)
-            .run(parser.parse(listOf(subchild, child, parent), tempDir, InMemoryExecutionContext()))
-
-        assertThat(results).hasSize(1)
-        assertThat(results[0].after!!.printAllTrimmed()).isEqualTo(
+            """,
             """
                 <project>
                     <parent>
@@ -288,6 +505,88 @@ class ChangeDependencyGroupIdAndArtifactIdTest : MavenRecipeTest {
                     </dependencies>
                 </project>
             """.trimIndent()
-        )
-    }
+        ) { p -> p.path(Paths.get("child/subchild/pom.xml")) },
+    )
+
+    @Test
+    @Disabled
+    fun changeDependencyGroupIdAndArtifactIdWithDependencyManagementScopeTest() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "io.quarkus",
+                    "quarkus-core",
+                    "io.quarkus",
+                    "quarkus-arc",
+                    null
+                )
+            )
+        },
+        pomXml(
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>io.quarkus</groupId>
+                                <artifactId>quarkus-core</artifactId>
+                                <version>2.8.0.Final</version>
+                                <scope>test</scope>
+                            </dependency>
+                            <dependency>
+                                <groupId>io.quarkus</groupId>
+                                <artifactId>quarkus-arc</artifactId>
+                                <version>2.8.0.Final</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+        """
+        ) { p -> p.path(Paths.get("pom.xml")) },
+        pomXml(
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>child</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-core</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """,
+            """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>child</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-arc</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>                
+            """
+        ) { p -> p.path(Paths.get("child/pom.xml")) },
+    )
 }

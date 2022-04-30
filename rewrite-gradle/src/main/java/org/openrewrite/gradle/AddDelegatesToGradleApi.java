@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import static java.util.Comparator.comparing;
 
@@ -63,6 +64,9 @@ public class AddDelegatesToGradleApi extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext context) {
                 J.MethodDeclaration md = super.visitMethodDeclaration(method, context);
+                if(!hasClosureParameter(md) || commentSuggestsNoDelegate(md)) {
+                    return md;
+                }
                 md = md.withParameters(ListUtils.map(md.getParameters(), it -> {
                     if (!(it instanceof J.VariableDeclarations)) {
                         return it;
@@ -130,5 +134,16 @@ public class AddDelegatesToGradleApi extends Recipe {
             }
         }
         return TypeUtils.asFullyQualified(type);
+    }
+
+    private static final Pattern COMMENT_PATTERN = Pattern.compile("(?<!also)[\\s*]++passed[\\s*]+to[\\s*]+the[\\s*]+closure[^.]+parameter", Pattern.DOTALL);
+    private static boolean commentSuggestsNoDelegate(J.MethodDeclaration methodDeclaration) {
+        return methodDeclaration.getComments().stream()
+                .anyMatch(comment -> COMMENT_PATTERN.matcher(comment.printComment()).find());
+    }
+
+    private static boolean hasClosureParameter(J.MethodDeclaration methodDeclaration) {
+        return methodDeclaration.getParameters().stream()
+                .anyMatch(param -> param instanceof J.VariableDeclarations && TypeUtils.isOfType(CLOSURE_TYPE, ((J.VariableDeclarations)param).getType()));
     }
 }

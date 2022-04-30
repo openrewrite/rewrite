@@ -495,6 +495,10 @@ class Java8ReplaceDuplicateStringLiteralsTest : Java8Test, ReplaceDuplicateStrin
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ReplaceLambdaWithMethodReferenceTest : Java8Test, ReplaceLambdaWithMethodReferenceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RenameVariableTest : Java8Test, RenameVariableTest
 
 @DebugOnly
@@ -548,6 +552,10 @@ class Java8TypeTest : Java8Test, JavaTypeTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8TypeTreeTest : Java8Test, TypeTreeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8UseStringReplaceTest : Java8Test, UseStringReplaceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -623,12 +631,20 @@ class Java8UseLambdaForFunctionalInterfaceTck : Java8Test, UseLambdaForFunctiona
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UseStandardCharsetTck : Java8Test, UseStandardCharsetTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UsesMethodTest : Java8Test, UsesMethodTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8UsesTypeTest : Java8Test, UsesTypeTest
 
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8SimplifyCompoundStatementTest : Java8Test, SimplifyCompoundStatementTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java8WhileInsteadOfForTest : Java8Test, WhileInsteadOfForTest

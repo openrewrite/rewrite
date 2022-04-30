@@ -40,6 +40,7 @@ dependencies {
     implementation("com.google.auto.service:auto-service:latest.release")
 
     implementation("org.apache.hbase:hbase-shaded-client:2.4.11")
+    testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 }
 
 tasks.withType<Javadoc> {

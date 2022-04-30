@@ -15,46 +15,16 @@
  */
 package org.openrewrite.maven
 
-import io.micrometer.core.instrument.Metrics
-import io.micrometer.core.instrument.config.MeterFilter
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeAll
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.internal.LoggingMeterRegistry
 import org.openrewrite.xml.tree.Xml
 import java.io.File
 import java.nio.file.Path
 
 @Suppress("unused")
 interface MavenRecipeTest : RecipeTest<Xml.Document> {
-    companion object {
-        private val meterRegistry = LoggingMeterRegistry.builder().build()
-
-        @BeforeAll
-        @JvmStatic
-        fun setMeterRegistry() {
-            meterRegistry.config()
-                .meterFilter(MeterFilter.acceptNameStartsWith("rewrite.maven"))
-                .meterFilter(MeterFilter.deny())
-                .meterFilter(MeterFilter.ignoreTags("group.id", "artifact.id"))
-            Metrics.globalRegistry.add(meterRegistry)
-        }
-
-        @AfterAll
-        @JvmStatic
-        fun unsetMeterRegistry() {
-            Metrics.globalRegistry.remove(meterRegistry)
-        }
-    }
-
-    @AfterEach
-    fun printMetrics() {
-        meterRegistry.print()
-    }
 
     override val parser: MavenParser
         get() = MavenParser.builder().build()

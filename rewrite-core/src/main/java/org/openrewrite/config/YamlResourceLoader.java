@@ -15,17 +15,16 @@
  */
 package org.openrewrite.config;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
-import com.fasterxml.jackson.module.kotlin.KotlinModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
+import org.openrewrite.RecipeSerializer;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
@@ -39,6 +38,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -47,6 +49,7 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.invalid;
 
@@ -115,9 +118,9 @@ public class YamlResourceLoader implements ResourceLoader {
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .build()
                 .registerModule(new ParameterNamesModule())
-                .registerModule(new KotlinModule())
                 .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        maybeAddKotlinModule(mapper);
 
         if (classLoader != null) {
             TypeFactory tf = TypeFactory.defaultInstance().withClassLoader(classLoader);

@@ -28,13 +28,14 @@ recipeList:
   - org.openrewrite.java.cleanup.ControlFlowIndentation
   - org.openrewrite.java.cleanup.CovariantEquals
   - org.openrewrite.java.cleanup.DefaultComesLast
+  - org.openrewrite.java.cleanup.EmptyBlock
   - org.openrewrite.java.cleanup.EqualsAvoidsNull
   - org.openrewrite.java.cleanup.ExplicitInitialization
+  - org.openrewrite.java.cleanup.ExplicitLambdaArgumentTypes
   - org.openrewrite.java.cleanup.ExternalizableHasNoArgsConstructor
   - org.openrewrite.java.cleanup.FallThrough
   - org.openrewrite.java.cleanup.FinalClass
   - org.openrewrite.java.cleanup.ForLoopIncrementInUpdate
-  - org.openrewrite.java.cleanup.HiddenField
   - org.openrewrite.java.cleanup.HideUtilityClassConstructor
   - org.openrewrite.java.cleanup.IndexOfChecksShouldUseAStartPosition
   - org.openrewrite.java.cleanup.IndexOfReplaceableByContains
@@ -45,6 +46,7 @@ recipeList:
   - org.openrewrite.java.cleanup.MinimumSwitchCases
   - org.openrewrite.java.cleanup.ModifierOrder
   - org.openrewrite.java.cleanup.MultipleVariableDeclarations
+  - org.openrewrite.java.cleanup.NeedBraces
   - org.openrewrite.java.cleanup.NestedEnumsAreNotStatic
   - org.openrewrite.java.cleanup.NewStringBuilderBufferWithCharArgument
   - org.openrewrite.java.cleanup.NoDoubleBraceInitialization
@@ -59,10 +61,15 @@ recipeList:
   - org.openrewrite.java.cleanup.PrimitiveWrapperClassConstructorToValueOf
   - org.openrewrite.java.cleanup.RedundantFileCreation
   - org.openrewrite.java.cleanup.RemoveExtraSemicolons
+  - org.openrewrite.java.cleanup.RemoveRedundantTypeCast
 #  - org.openrewrite.java.RemoveUnusedImports
   - org.openrewrite.java.cleanup.RemoveUnusedLocalVariables
 #  - org.openrewrite.java.cleanup.RemoveUnusedPrivateMethods
   - org.openrewrite.java.cleanup.RenameLocalVariablesToCamelCase
+  - org.openrewrite.java.cleanup.RenameMethodsNamedHashcodeEqualOrTostring
+  - org.openrewrite.java.cleanup.RenamePrivateFieldsToCamelCase
+  - org.openrewrite.java.cleanup.ReplaceDuplicateStringLiterals
+  - org.openrewrite.java.cleanup.ReplaceLambdaWithMethodReference
   - org.openrewrite.java.cleanup.SimplifyBooleanExpression
   - org.openrewrite.java.cleanup.SimplifyBooleanReturn
   - org.openrewrite.java.cleanup.StaticMethodNotFinal
@@ -76,5 +83,6 @@ recipeList:
   - org.openrewrite.java.cleanup.UseDiamondOperator
   - org.openrewrite.java.cleanup.UseJavaStyleArrayDeclarations
   - org.openrewrite.java.cleanup.UseLambdaForFunctionalInterface
+  - org.openrewrite.java.cleanup.UseStringReplace
   - org.openrewrite.java.cleanup.WhileInsteadOfFor
   - org.openrewrite.java.cleanup.WriteOctalValuesAsDecimal

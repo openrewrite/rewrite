@@ -59,6 +59,8 @@ public class Pom {
     List<MavenRepository> repositories;
     List<License> licenses;
     List<Profile> profiles;
+    List<Plugin> plugins;
+    List<Plugin> pluginManagement;
 
     public String getGroupId() {
         return gav.getGroupId();
@@ -86,4 +88,5 @@ public class Pom {
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
         return new ResolvedPom(this, activeProfiles).resolve(ctx, downloader);
     }
+
 }

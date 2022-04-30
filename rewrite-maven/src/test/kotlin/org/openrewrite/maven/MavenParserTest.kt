@@ -1010,8 +1010,8 @@ class MavenParserTest {
             .matches { it.first().artifactId == "guava" && it.first().version == "29.0-jre" }
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/376")
     @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/376")
     @Test
     fun dependencyManagementPropagatesToDependencies() {
         // a depends on b

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -22,7 +23,13 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.ManagedDependency;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
+import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -57,6 +64,32 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     @Nullable
     String newVersion;
 
+    @Option(displayName = "Override managed version",
+            description = "If the new dependency has a managed version, this flag can be used to explicitly set the version on the dependency. The default for this flag is `false`.",
+            example = "false",
+            required = false)
+    @Nullable
+    Boolean overrideManagedVersion;
+
+    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion) {
+        this.oldGroupId = oldGroupId;
+        this.oldArtifactId = oldArtifactId;
+        this.newGroupId = newGroupId;
+        this.newArtifactId = newArtifactId;
+        this.newVersion = newVersion;
+        this.overrideManagedVersion = false;
+    }
+
+    @JsonCreator
+    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable Boolean overrideManagedVersion) {
+        this.oldGroupId = oldGroupId;
+        this.oldArtifactId = oldArtifactId;
+        this.newGroupId = newGroupId;
+        this.newArtifactId = newArtifactId;
+        this.newVersion = newVersion;
+        this.overrideManagedVersion = overrideManagedVersion;
+    }
+
     @Override
     public String getDisplayName() {
         return "Change Maven dependency groupId, artifactId and optionally the version";
@@ -69,34 +102,63 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
+
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+
                 if (isDependencyTag(oldGroupId, oldArtifactId)) {
-                    Optional<Xml.Tag> groupIdTag = tag.getChild("groupId");
-                    boolean changed = false;
-                    if (groupIdTag.isPresent() && !newGroupId.equals(groupIdTag.get().getValue().orElse(null))) {
-                        doAfterVisit(new ChangeTagValueVisitor<>(groupIdTag.get(), newGroupId));
-                        changed = true;
-                    }
-                    Optional<Xml.Tag> artifactIdTag = tag.getChild("artifactId");
-                    if (artifactIdTag.isPresent() && !newArtifactId.equals(artifactIdTag.get().getValue().orElse(null))) {
-                        doAfterVisit(new ChangeTagValueVisitor<>(artifactIdTag.get(), newArtifactId));
-                        changed = true;
-                    }
+
+                    t = changeChildTagValue(t, "groupId", newGroupId, ctx);
+                    t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
                     if (newVersion != null) {
-                        Optional<Xml.Tag> versionTag = tag.getChild("version");
-                        if (versionTag.isPresent() && !newVersion.equals(versionTag.get().getValue().orElse(null))) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
-                            changed = true;
+                        Optional<Xml.Tag> scopeTag = t.getChild("scope");
+                        Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
+                        Optional<Xml.Tag> versionTag = t.getChild("version");
+                        if (!versionTag.isPresent() && (Boolean.TRUE.equals(overrideManagedVersion) || !isNewDepenencyManaged(scope))) {
+                            //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
+                            Xml.Tag newVersionTag = Xml.Tag.build("<version>" + newVersion + "</version>");
+                            //noinspection ConstantConditions
+                            t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
+                        } else if (versionTag.isPresent()) {
+                            if (isNewDepenencyManaged(scope)) {
+                                //If the previous dependency had a version but the new artifact is managed, removed the
+                                //version tag.
+                                t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false).visit(t, ctx);
+                            } else {
+                                //Otherwise, change the version to the new value.
+                                t = changeChildTagValue(t, "version", newVersion, ctx);
+                            }
                         }
                     }
-                    if (changed) {
+                    if (t != tag) {
                         maybeUpdateModel();
                     }
                 }
 
-                return super.visitTag(tag, ctx);
+                //noinspection ConstantConditions
+                return t;
+            }
+
+            private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
+                Optional<Xml.Tag> childTag = tag.getChild(childTagName);
+                if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
+                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
+                }
+                return tag;
+            }
+
+            private boolean isNewDepenencyManaged(Scope scope) {
+
+                MavenResolutionResult result = getResolutionResult();
+                for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
+                    if (newGroupId.equals(managedDependency.getGroupId()) && newArtifactId.equals(managedDependency.getArtifactId())) {
+                        return scope.isInClasspathOf(managedDependency.getScope());
+                    }
+                }
+                return false;
             }
         };
     }

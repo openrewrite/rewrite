@@ -58,13 +58,18 @@ public class RemoveUnneededBlock extends Recipe {
             }
 
             // Else perform the flattening on this block.
-            return maybeAutoFormat(bl, block.withStatements(ListUtils.flatMap(bl.getStatements(), stmt -> {
+            return block.withStatements(ListUtils.flatMap(bl.getStatements(), stmt -> {
                 if (!(stmt instanceof J.Block)) {
                     return stmt;
                 }
                 J.Block nested = (J.Block) stmt;
-                return nested.getStatements();
-            })), executionContext, getCursor().getParentOrThrow());
+                return ListUtils.map(nested.getStatements(), inlinedStmt -> maybeAutoFormat(
+                        stmt,
+                        inlinedStmt,
+                        executionContext,
+                        getCursor()
+                ));
+            }));
         }
     }
 }

@@ -532,4 +532,54 @@ interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun simplifyConstantIfTrueBlockInWhile(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    while (true)
+                        if (true) break;
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                    while (true) break;
+                }
+            }
+        """
+    )
+
+
+    @Test
+    fun doNotFormatCodeOutsideRemovedBlock(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    int[] a = new int[] { 1, 2, 3 };
+                    int[] b = new int[] {4,5,6};
+                    if (true) {
+                        System.out.println("hello");
+                    }
+                    int[] c = new int[] { 1, 2, 3 };
+                    int[] d = new int[] {4,5,6};
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void test() {
+                    int[] a = new int[] { 1, 2, 3 };
+                    int[] b = new int[] {4,5,6};
+                    System.out.println("hello");
+                    int[] c = new int[] { 1, 2, 3 };
+                    int[] d = new int[] {4,5,6};
+                }
+            }
+        """
+    )
 }

@@ -55,7 +55,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
                 void someMethod(@DelegatesTo(String.class) Closure action) { }
             }
         """)
-    );
+    )
 
     @Test
     fun methodWithBound() = rewriteRun(
@@ -183,6 +183,57 @@ class AddDelegatesToGradleApiTest : RewriteTest {
             class A {
                 <T> void someMethod(Action<T> action) { }
                 void someMethod(Closure action) { }
+            }
+        """)
+    )
+
+    @Test
+    fun commentSaysNoDelegate() = rewriteRun(
+        java("""
+            package org.gradle.example;
+            
+            import groovy.lang.Closure;
+            import org.gradle.api.Action;
+            
+            class A {
+                void someMethod(Action<String> action) { }
+                /**
+                 * The {@link String} is passed to the closure as a parameter.
+                 * @param action
+                 */
+                void someMethod(Closure action) { }
+
+                void anotherMethod(Action<String> action) { }
+
+                /**
+                 * The {@link String} is the delegate and also passed to the closure as a parameter
+                 * @param action
+                 */
+                void anotherMethod(Closure action) { }
+            }
+        """,
+        """
+            package org.gradle.example;
+            
+            import groovy.lang.Closure;
+            import groovy.lang.DelegatesTo;
+            import org.gradle.api.Action;
+            
+            class A {
+                void someMethod(Action<String> action) { }
+                /**
+                 * The {@link String} is passed to the closure as a parameter.
+                 * @param action
+                 */
+                void someMethod(Closure action) { }
+
+                void anotherMethod(Action<String> action) { }
+
+                /**
+                 * The {@link String} is the delegate and also passed to the closure as a parameter
+                 * @param action
+                 */
+                void anotherMethod(@DelegatesTo(String.class) Closure action) { }
             }
         """)
     )

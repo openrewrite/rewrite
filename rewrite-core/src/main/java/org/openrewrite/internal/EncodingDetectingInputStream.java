@@ -24,6 +24,8 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 public class EncodingDetectingInputStream extends InputStream {
+    private static final Charset WINDOWS_1252 = Charset.forName("Windows-1252");
+
     private final InputStream inputStream;
 
     @Nullable
@@ -35,6 +37,12 @@ public class EncodingDetectingInputStream extends InputStream {
      * Last byte read
      */
     private int prev;
+    private int prev2;
+    private int prev3;
+
+    boolean maybeTwoByteSequence = false;
+    boolean maybeThreeByteSequence = false;
+    boolean maybeFourByteSequence = false;
 
     public EncodingDetectingInputStream(InputStream inputStream) {
         this.inputStream = inputStream;
@@ -53,20 +61,65 @@ public class EncodingDetectingInputStream extends InputStream {
         int aByte = inputStream.read();
 
         // if we haven't yet determined a charset...
-        if (charset == null && aByte != -1) {
-            // The first 128 characters in ASCII share the same bytes and are defaulted to UTF-8.
-            if (aByte >= 0x80 &&
-                    (!(aByte >= 0xC2 && aByte <= 0xEF) && prev == 0) ||
-                    // UTF-8 conditions.
-                    ((prev >= 0xC2 && prev <= 0xDF && notUtfHighByte(aByte)) || // 2 byte sequence
-                            (prev >= 0xE0 && prev <= 0xEF && notUtfHighByte(aByte)) || // 3 byte sequence
-                            (prev >= 0xF0 && prev <= 0xF7 && notUtfHighByte(aByte)))) { // 4 byte sequence
-                charset = StandardCharsets.ISO_8859_1;
+        if (charset == null) {
+            if (prev3 == 0xC3 && prev2 == 0xAF && prev == 0xC2) {
+                charsetBomMarked = true;
+                charset = StandardCharsets.UTF_8;
+            } else {
+                if (aByte == -1 || !(prev2 == 0 && prev == 0xC3 || prev3 == 0 && prev2 == 0xC3)) {
+                    if (maybeTwoByteSequence) {
+                        if (aByte == -1 && !utf8SequenceEnd(prev) || aByte != -1 && !(utf8SequenceEnd(aByte))) {
+                            charset = WINDOWS_1252;
+                        } else {
+                            maybeTwoByteSequence = false;
+                            prev2 = -1;
+                            prev = -1;
+                        }
+                    } else if (maybeThreeByteSequence) {
+                        if (aByte == -1 ||
+                                utf8SequenceEnd(prev) && !(utf8SequenceEnd(aByte)) ||
+                                !utf8SequenceEnd(aByte)) {
+                            charset = WINDOWS_1252;
+                        }
+
+                        if (utf8SequenceEnd(prev) && utf8SequenceEnd(aByte)) {
+                            maybeThreeByteSequence = false;
+                            prev2 = -1;
+                            prev = -1;
+                        }
+                    } else if (maybeFourByteSequence) {
+                        if (aByte == -1 ||
+                                utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) ||
+                                utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) ||
+                                !(utf8SequenceEnd(aByte))) {
+                            charset = WINDOWS_1252;
+                        }
+
+                        if (utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && utf8SequenceEnd(aByte)) {
+                            maybeFourByteSequence = false;
+                            prev2 = -1;
+                            prev = -1;
+                        }
+                    } else if (utf8TwoByteSequence(aByte)) {
+                        maybeTwoByteSequence = true;
+                    } else if (utf8ThreeByteSequence(aByte)) {
+                        maybeThreeByteSequence = true;
+                    } else if (utf8FourByteSequence(aByte)) {
+                        maybeFourByteSequence = true;
+                    } else if (!utf8TwoByteSequence(prev) && utf8SequenceEnd(aByte)) {
+                        charset = WINDOWS_1252;
+                    }
+                }
+
+                if (aByte == -1 && charset == null) {
+                    charset = StandardCharsets.UTF_8;
+                }
             }
 
+            prev3 = prev2;
+            prev2 = prev;
             prev = aByte;
         }
-
         return aByte;
     }
 
@@ -86,7 +139,23 @@ public class EncodingDetectingInputStream extends InputStream {
         }
     }
 
-    private boolean notUtfHighByte(int b) {
-        return !(b >= 0x80 && b <= 0xBF);
+    // The first byte of a UTF-8 two byte sequence is between 0xC0 - 0xDF.
+    private boolean utf8TwoByteSequence(int b) {
+        return 0xC0 <= b && b <= 0xDF;
+    }
+
+    // The first byte of a UTF-8 three byte sequence is between 0xE0 - 0xEF.
+    private boolean utf8ThreeByteSequence(int b) {
+        return 0xE0 <= b && b <= 0xEF;
+    }
+
+    // The first byte of a UTF-8 four byte sequence is between 0xF0 - 0xF7.
+    private boolean utf8FourByteSequence(int b) {
+        return 0xF0 <= b && b <= 0xF7;
+    }
+
+    // A UTF-8 byte sequence must end between 0x80 - 0xBF.
+    private boolean utf8SequenceEnd(int b) {
+        return 0x80 <= b && b <= 0xBF;
     }
 }
