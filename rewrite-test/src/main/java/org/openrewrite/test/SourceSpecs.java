@@ -23,6 +23,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.protobuf.tree.Proto;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.xml.tree.Xml;
 import org.openrewrite.yaml.tree.Yaml;
@@ -243,6 +244,17 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
         SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, before, after);
         spec.accept(hcl);
         return hcl;
+    }
+
+    default SourceSpecs other(String before) {
+        return other(before, s -> {
+        });
+    }
+
+    default SourceSpecs other(String before, Consumer<SourceSpec<Quark>> spec) {
+        SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, before, null);
+        spec.accept(quark);
+        return quark;
     }
 
     default SourceSpecs text(String before) {
