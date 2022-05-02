@@ -18,12 +18,13 @@ package org.openrewrite.java.cleanup;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.DeleteStatement;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 
 import java.time.Duration;
@@ -136,6 +137,15 @@ public class RemoveUnusedLocalVariables extends Recipe {
         }
 
         @Override
+        public Statement visitStatement(Statement statement, ExecutionContext executionContext) {
+            List<Comment> comments = getCursor().pollNearestMessage("COMMENTS_KEY");
+            if (comments != null) {
+                statement = statement.withComments(ListUtils.concatAll(statement.getComments(), comments));
+            }
+            return super.visitStatement(statement, executionContext);
+        }
+
+        @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
             if (!multiVariable.getAllAnnotations().isEmpty()) {
                 return multiVariable;
@@ -143,6 +153,9 @@ public class RemoveUnusedLocalVariables extends Recipe {
 
             J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
             if (mv.getVariables().isEmpty()) {
+                if (!mv.getPrefix().getComments().isEmpty()) {
+                    getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration).putMessage("COMMENTS_KEY", mv.getPrefix().getComments());
+                }
                 doAfterVisit(new DeleteStatement<>(mv));
             }
             return mv;

@@ -136,6 +136,28 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1742")
+    @Test
+    fun preserveComment() = assertChanged(
+        before = """
+            class Test {
+                Long method() {
+                    // Keep comment
+                    String foo;
+                    return Long.parseLong("123");
+                }
+            }
+        """,
+        after = """
+            class Test {
+                Long method() {
+                    // Keep comment
+                    return Long.parseLong("123");
+                }
+            }
+        """
+    )
+
     @Test
     fun removeUnusedLocalVariablesReassignedButNeverUsed() = assertChanged(
         before = """
