@@ -116,9 +116,14 @@ public class ChangePropertyKey extends Recipe {
                     String value = propertyEntry.getKey().getValue();
 
                     if (!propertyToTest.startsWith(value) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
+                        doAfterVisit(new InsertSubpropertyVisitor<>(
+                                propertyEntry,
+                                propertyToTest,
+                                entry
+                        ));
+                        doAfterVisit(new DeletePropertyVisitor<>(entry));
                         //noinspection ConstantConditions
-                        if(!nonScalarMappingEntryExists(getCursor().firstEnclosing(Yaml.Document.class), propertyEntry, propertyToTest, p)) {
-                            doAfterVisit(new InsertSubpropertyVisitor<>(propertyEntry, propertyToTest, e));
+                        if (!nonScalarMappingEntryExists(getCursor().firstEnclosing(Yaml.Document.class), propertyEntry, propertyToTest, p)) {
                             maybeCoalesceProperties();
                         }
                         break;

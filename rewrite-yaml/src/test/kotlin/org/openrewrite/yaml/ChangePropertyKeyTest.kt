@@ -157,7 +157,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1249")
     @Test
-    fun doesNotMergeToSibling() = assertUnchanged(
+    fun updateKeyAndDoesNotMergeToSibling() = assertChanged(
         recipe = ChangePropertyKey(
             "i",
             "a.b.c",
@@ -172,11 +172,21 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             i:
               f0: v0
               f1: v1
+        """,
+        after = """
+            a:
+              b:
+                f0: v0
+                f1: v1
+            a.b.c:
+              f0: v0
+              f1: v1
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1249")
     @Test
-    fun doesNotMergeToSiblingWithCoalescedProperty() = assertUnchanged(
+    fun updateKeyAndDoesNotMergeToSiblingWithCoalescedProperty() = assertChanged(
         recipe = ChangePropertyKey(
             "old-property",
             "new-property.sub-property.super-sub",
@@ -191,11 +201,20 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             oldProperty:
               f0: v0
               f1: v1
+        """,
+        after = """
+            newProperty.subProperty:
+                superSub:
+                  f0: v0
+                  f1: v1
+            new-property.sub-property.super-sub:
+              f0: v0
+              f1: v1
         """
     )
 
     @Test
-    fun doesNotChangeKeyWhithSequenceInPath() = assertUnchanged(
+    fun doesNotChangeKeyWithSequenceInPath() = assertUnchanged(
         recipe = ChangePropertyKey(
             "a.b.c.a0",
             "a.b.a0",
@@ -232,6 +251,26 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         newDescription: desc
         other: whatever
     """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1744")
+    @Test
+    fun updatePropertyWithMapping() = assertChanged(
+        recipe = ChangePropertyKey("app.foo.change.from", "app.bar.change.to", null, null),
+        before = """
+            app:
+              foo.change.from: hi
+              bar:
+                other:
+                  property: bye
+        """,
+        after = """
+            app:
+              bar.change.to: hi
+              bar:
+                other:
+                  property: bye
+        """
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
