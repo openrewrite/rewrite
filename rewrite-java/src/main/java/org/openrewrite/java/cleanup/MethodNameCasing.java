@@ -15,22 +15,38 @@
  */
 package org.openrewrite.java.cleanup;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+@Value
+@EqualsAndHashCode(callSuper = true)
 public class MethodNameCasing extends Recipe {
+
+    @Option(displayName = "Apply recipe to test source set",
+            description = "Changes only apply to main by default. `includeTestSources` will apply the recipe to `test` source files.",
+            required = false,
+            example = "true")
+    @Nullable
+    Boolean includeTestSources;
+
     @Override
     public String getDisplayName() {
         return "Method name casing";
@@ -55,6 +71,16 @@ public class MethodNameCasing extends Recipe {
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern standardMethodName = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
         return new JavaIsoVisitor<ExecutionContext>() {
+
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+                if (sourceSet.isPresent() && (Boolean.TRUE.equals(includeTestSources) || "main".equals(sourceSet.get().getName()))) {
+                    return super.visitCompilationUnit(cu, executionContext);
+                }
+                return cu;
+            }
+
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 if (method.getMethodType() != null &&

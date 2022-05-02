@@ -24,11 +24,39 @@ import org.openrewrite.java.JavaRecipeTest
 @Issue("https://github.com/openrewrite/rewrite/issues/466")
 interface MethodNameCasingTest: JavaRecipeTest {
     override val recipe: Recipe?
-        get() = MethodNameCasing()
+        get() = MethodNameCasing(false)
 
+    override val parser: JavaParser
+        get() {
+            val jp = JavaParser.fromJavaVersion().build()
+            jp.setSourceSet("main")
+            return jp
+        }
+
+    val testParser: JavaParser
+        get() {
+            val jp = JavaParser.fromJavaVersion().build()
+            jp.setSourceSet("test")
+            return jp
+        }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1741")
     @Test
-    fun changeMethodDeclaration(jp: JavaParser) = assertChanged(
-        jp,
+    fun doNotApplyToTest() = assertUnchanged(
+        testParser,
+        before = """
+            class Test {
+                void MyMethod_with_über() {
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1741")
+    @Test
+    fun applyChangeToTest() = assertChanged(
+        testParser,
+        recipe = MethodNameCasing(true),
         before = """
             class Test {
                 void MyMethod_with_über() {
@@ -44,8 +72,24 @@ interface MethodNameCasingTest: JavaRecipeTest {
     )
 
     @Test
-    fun changeMethodInvocations(jp: JavaParser) = assertChanged(
-        jp,
+    fun changeMethodDeclaration() = assertChanged(
+        
+        before = """
+            class Test {
+                void MyMethod_with_über() {
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void myMethodWithBer() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun changeMethodInvocations() = assertChanged(
         dependsOn = arrayOf("""
             class Test {
                 void MyMethod_with_über() {
@@ -69,8 +113,7 @@ interface MethodNameCasingTest: JavaRecipeTest {
     )
 
     @Test
-    fun dontChangeCorrectlyCasedMethods(jp: JavaParser) = assertUnchanged(
-        jp,
+    fun dontChangeCorrectlyCasedMethods() = assertUnchanged(
         before = """
             class Test {
                 void dontChange() {
