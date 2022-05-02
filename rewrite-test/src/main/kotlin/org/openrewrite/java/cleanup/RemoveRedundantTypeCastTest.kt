@@ -42,6 +42,25 @@ interface RemoveRedundantTypeCastTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1739")
+    @Test
+    fun doNotChangeGenericTypeCast() = assertUnchanged(
+        before = """
+            import java.util.Collection;
+            
+            class Test {
+                public <T extends Collection<String>> T test() {
+                    //noinspection unchecked
+                    return (T) get();
+                }
+
+                public static Collection<String> get() {
+                    return null;
+                }
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1647")
     @Test
     fun redundantTypeCast() = assertChanged(

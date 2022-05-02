@@ -58,7 +58,7 @@ public class RemoveRedundantTypeCast extends Recipe {
                         is instanceof J.MethodInvocation ||
                         is instanceof J.ClassDeclaration);
 
-                // Not currently supported. This will be easier with dataflow analysis.
+                // Not currently supported, this will be more accurate with dataflow analysis.
                 if (parent.getValue() instanceof J.NewClass ||
                         parent.getValue() instanceof J.Lambda ||
                         parent.getValue() instanceof J.MethodInvocation) {
@@ -66,6 +66,11 @@ public class RemoveRedundantTypeCast extends Recipe {
                 }
 
                 JavaType cast = typeCast.getType();
+                // Not currently supported, this will be more accurate with dataflow analysis.
+                if (cast instanceof JavaType.GenericTypeVariable) {
+                    return typeCast;
+                }
+
                 JavaType expressionType = typeCast.getExpression().getType();
 
                 // Reduce the expressionType from array to its type.
