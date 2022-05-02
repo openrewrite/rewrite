@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.cleanup;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -22,6 +24,7 @@ import org.openrewrite.java.ChangeFieldName;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
@@ -30,7 +33,16 @@ import org.openrewrite.java.tree.JavaType;
 import java.time.Duration;
 import java.util.*;
 
+@Value
+@EqualsAndHashCode(callSuper = true)
 public class ReplaceDuplicateStringLiterals extends Recipe {
+
+    @Option(displayName = "Apply recipe to test source set",
+            description = "Changes only apply to main by default. `includeTestSources` will apply the recipe to `test` source files.",
+            required = false,
+            example = "true")
+    @Nullable
+    Boolean includeTestSources;
 
     @Override
     public String getDisplayName() {
@@ -52,7 +64,6 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
         return Duration.ofMinutes(2);
     }
 
-    @Nullable
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return new UsesType<>("java.lang.String");
@@ -61,6 +72,15 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
+
+            @Override
+            public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+                if (sourceSet.isPresent() && (Boolean.TRUE.equals(includeTestSources) || "main".equals(sourceSet.get().getName()))) {
+                    return super.visitCompilationUnit(cu, executionContext);
+                }
+                return cu;
+            }
 
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {

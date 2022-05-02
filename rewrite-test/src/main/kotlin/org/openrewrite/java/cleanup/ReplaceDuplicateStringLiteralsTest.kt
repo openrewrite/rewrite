@@ -16,12 +16,28 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
 interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
     override val recipe: Recipe?
-        get() = ReplaceDuplicateStringLiterals()
+        get() = ReplaceDuplicateStringLiterals(false)
+
+    override val parser: JavaParser
+        get() {
+            val jp = JavaParser.fromJavaVersion().build()
+            jp.setSourceSet("main")
+            return jp
+        }
+
+    val testParser: JavaParser
+        get() {
+            val jp = JavaParser.fromJavaVersion().build()
+            jp.setSourceSet("test")
+            return jp
+        }
 
     @Test
     fun doesNotMeetCharacterLimit() = assertUnchanged(
@@ -30,6 +46,41 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String val1 = "val";
                 final String val2 = "val";
                 final String val3 = "val";
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1740")
+    @Test
+    fun doesNotApplyToTest() = assertUnchanged(
+        testParser,
+        before = """
+            class A {
+                final String val1 = "value";
+                final String val2 = "value";
+                final String val3 = "value";
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1740")
+    @Test
+    fun testSourcesEnabled() = assertChanged(
+        testParser,
+        recipe = ReplaceDuplicateStringLiterals(true),
+        before = """
+            class A {
+                final String val1 = "value";
+                final String val2 = "value";
+                final String val3 = "value";
+            }
+        """,
+        after = """
+            class A {
+                private static final String VALUE = "value";
+                final String val1 = VALUE;
+                final String val2 = VALUE;
+                final String val3 = VALUE;
             }
         """
     )
