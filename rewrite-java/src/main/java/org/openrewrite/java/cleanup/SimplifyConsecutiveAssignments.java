@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.TypeValidation;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -51,7 +52,9 @@ public class SimplifyConsecutiveAssignments extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             // TODO if we had a `replace()` coordinate on every `Expression`, we wouldn't need the left side of this
             final JavaTemplate combinedAssignment = JavaTemplate
-                    .builder(this::getCursor, "#{} o = (#{any()} #{} #{any()});")
+                    .builder(this::getCursor, "o = (#{any()} #{} #{any()});")
+                    // ok to ignore invalid type info on left-hand side of assignment.
+                    .typeValidation(TypeValidation.getDefault().identifiers(false))
                     .build();
 
             @Override
@@ -186,19 +189,15 @@ public class SimplifyConsecutiveAssignments extends Recipe {
             private Statement combine(Statement s, String op, Expression right) {
                 if (s instanceof J.Assignment) {
                     J.Assignment assign = (J.Assignment) s;
-                    //noinspection ConstantConditions
                     J.Assignment after = s.withTemplate(combinedAssignment, s.getCoordinates().replace(),
-                            TypeUtils.asPrimitive(assign.getType()).getKeyword(), assign.getAssignment(), op, right);
+                            assign.getAssignment(), op, right);
                     return assign.withAssignment(after.getAssignment());
                 } else if (s instanceof J.VariableDeclarations) {
                     J.VariableDeclarations variables = (J.VariableDeclarations) s;
-                    //noinspection ConstantConditions
-                    J.VariableDeclarations after = s.withTemplate(combinedAssignment, s.getCoordinates().replace(),
-                            TypeUtils.asPrimitive(variables.getType()).getKeyword(),
+                    J.Assignment after = s.withTemplate(combinedAssignment, s.getCoordinates().replace(),
                             variables.getVariables().get(0).getInitializer(), op, right);
-
                     return variables.withVariables(ListUtils.map(variables.getVariables(), (i, namedVar) -> i == 0 ?
-                            namedVar.withInitializer(after.getVariables().get(0).getInitializer()) : namedVar));
+                            namedVar.withInitializer(after.getAssignment()) : namedVar));
                 }
                 throw new UnsupportedOperationException("Attempted to combine assignments into a " +
                         "single statement with type " + s.getClass().getSimpleName());
