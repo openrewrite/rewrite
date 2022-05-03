@@ -26,6 +26,7 @@ import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.maven.MavenParser;
@@ -284,6 +285,13 @@ public interface RewriteTest extends SourceSpecs {
 
                 //noinspection unchecked
                 ((Consumer<SourceFile>) resultSpec.afterRecipe).accept(result.getAfter());
+                if (result.getAfter() instanceof JavaSourceFile) {
+                    TypeValidation typeValidation = testMethodSpec.typeValidation != null ? testMethodSpec.typeValidation : testClassSpec.typeValidation;
+                    if (typeValidation == null) {
+                        typeValidation = new TypeValidation();
+                    }
+                    typeValidation.assertValidTypes((JavaSourceFile) result.getAfter());
+                }
             }
         }
 

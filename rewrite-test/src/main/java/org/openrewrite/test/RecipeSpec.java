@@ -51,6 +51,9 @@ public class RecipeSpec {
     @Nullable
     Integer expectedCyclesThatMakeChanges;
 
+    @Nullable
+    TypeValidation typeValidation;
+
     Consumer<List<SourceFile>> beforeRecipe = s -> {
     };
 
@@ -114,6 +117,11 @@ public class RecipeSpec {
     int getExpectedCyclesThatMakeChanges(int cycles) {
         return expectedCyclesThatMakeChanges == null ? cycles - 1 :
                 expectedCyclesThatMakeChanges;
+    }
+
+    public RecipeSpec typeValidationOptions(TypeValidation typeValidation) {
+        this.typeValidation = typeValidation;
+        return this;
     }
 
     ExecutionContext getExecutionContext() {
