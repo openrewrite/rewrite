@@ -51,7 +51,7 @@ public class SimplifyConsecutiveAssignments extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             // TODO if we had a `replace()` coordinate on every `Expression`, we wouldn't need the left side of this
             final JavaTemplate combinedAssignment = JavaTemplate
-                    .builder(this::getCursor, "o = (#{any()} #{} #{any()});")
+                    .builder(this::getCursor, "#{} o = (#{any()} #{} #{any()});")
                     .build();
 
             @Override
@@ -186,15 +186,19 @@ public class SimplifyConsecutiveAssignments extends Recipe {
             private Statement combine(Statement s, String op, Expression right) {
                 if (s instanceof J.Assignment) {
                     J.Assignment assign = (J.Assignment) s;
+                    //noinspection ConstantConditions
                     J.Assignment after = s.withTemplate(combinedAssignment, s.getCoordinates().replace(),
-                            assign.getAssignment(), op, right);
+                            TypeUtils.asPrimitive(assign.getType()).getKeyword(), assign.getAssignment(), op, right);
                     return assign.withAssignment(after.getAssignment());
                 } else if (s instanceof J.VariableDeclarations) {
                     J.VariableDeclarations variables = (J.VariableDeclarations) s;
-                    J.Assignment after = s.withTemplate(combinedAssignment, s.getCoordinates().replace(),
+                    //noinspection ConstantConditions
+                    J.VariableDeclarations after = s.withTemplate(combinedAssignment, s.getCoordinates().replace(),
+                            TypeUtils.asPrimitive(variables.getType()).getKeyword(),
                             variables.getVariables().get(0).getInitializer(), op, right);
+
                     return variables.withVariables(ListUtils.map(variables.getVariables(), (i, namedVar) -> i == 0 ?
-                            namedVar.withInitializer(after.getAssignment()) : namedVar));
+                            namedVar.withInitializer(after.getVariables().get(0).getInitializer()) : namedVar));
                 }
                 throw new UnsupportedOperationException("Attempted to combine assignments into a " +
                         "single statement with type " + s.getClass().getSimpleName());
