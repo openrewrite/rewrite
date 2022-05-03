@@ -19,56 +19,61 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
+import org.openrewrite.test.TypeValidation
 
 @Suppress("SwitchStatementWithTooFewBranches", "ConstantConditions")
-interface MinimumSwitchCasesTest : JavaRecipeTest {
-    override val recipe: Recipe
-        get() = MinimumSwitchCases()
-
+interface MinimumSwitchCasesTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(MinimumSwitchCases())
+    }
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun primitiveAndDefault(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
-            class Test {
-                int variable;
-                void test() {
-                    switch (variable) {
-                      case 0:
-                          doSomething();
-                          break;
-                      default:
-                          doSomethingElse();
-                          break;
+    fun primitiveAndDefault(jp: JavaParser) = rewriteRun(
+        {
+            s -> s.parser(jp)
+            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        }, java(
+            """
+                class Test {
+                    int variable;
+                    void test() {
+                        switch (variable) {
+                          case 0:
+                              doSomething();
+                              break;
+                          default:
+                              doSomethingElse();
+                              break;
+                        }
                     }
                 }
-            }
-        """,
-        after = """
-            class Test {
-                int variable;
-                void test() {
-                    if (variable == 0) {
-                        doSomething();
-                    } else {
-                        doSomethingElse();
+            """,
+            """
+                class Test {
+                    int variable;
+                    void test() {
+                        if (variable == 0) {
+                            doSomething();
+                        } else {
+                            doSomethingElse();
+                        }
                     }
                 }
-            }
-        """,
-        typeValidation = {
-            methodInvocations = false
-        }
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun twoPrimitives(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun twoPrimitives(jp: JavaParser) = rewriteRun(
+        { s ->
+            s.parser(jp)
+            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        }, java(
+            """
             class Test {
                 int variable;
                 void test() {
@@ -83,7 +88,7 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+            """
             class Test {
                 int variable;
                 void test() {
@@ -94,17 +99,17 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                     }
                 }
             }
-        """,
-        typeValidation = {
-            methodInvocations = false
-        }
+        """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun stringAndDefault(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun stringAndDefault(jp: JavaParser) = rewriteRun(
+        { s ->
+            s.parser(jp)
+            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        }, java("""
             class Test {
                 String name;
                 void test() {
@@ -119,7 +124,7 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 String name;
                 void test() {
@@ -130,17 +135,16 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                     }
                 }
             }
-        """,
-        typeValidation = {
-            methodInvocations = false
-        }
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun twoStrings(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun twoStrings(jp: JavaParser) = rewriteRun(
+        { s ->
+            s.parser(jp)
+            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        }, java("""
             class Test {
                 String name;
                 void test() {
@@ -155,7 +159,7 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 String name;
                 void test() {
@@ -166,17 +170,16 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                     }
                 }
             }
-        """,
-        typeValidation = {
-            methodInvocations = false
-        }
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun onePrimitive(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun onePrimitive(jp: JavaParser) = rewriteRun(
+        { s ->
+            s.parser(jp)
+            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        }, java("""
             class Test {
                 int variable;
                 void test() {
@@ -188,7 +191,7 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int variable;
                 void test() {
@@ -197,17 +200,16 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                     }
                 }
             }
-        """,
-        typeValidation = {
-            methodInvocations = false
-        }
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun oneString(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun oneString(jp: JavaParser) = rewriteRun(
+        { s ->
+            s.parser(jp)
+            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        }, java("""
             class Test {
                 String name;
                 void test() {
@@ -219,7 +221,7 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 String name;
                 void test() {
@@ -228,18 +230,16 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                     }
                 }
             }
-        """,
-        typeValidation = {
-            methodInvocations = false
-        }
+        """)
     )
 
     @Suppress("StatementWithEmptyBody")
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun noCases(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun noCases(jp: JavaParser) = rewriteRun(
+        { s ->
+            s.parser(jp)
+        }, java("""
             class Test {
                 int variable;
                 void test() {
@@ -247,13 +247,15 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1212")
-    fun importsOnEnum() = assertChanged(
-        before = """
+    fun importsOnEnum(jp: JavaParser) = rewriteRun(
+        { s ->
+            s.parser(jp)
+        }, java("""
             import java.time.DayOfWeek;
 
             class Test {
@@ -286,7 +288,7 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.time.DayOfWeek;
 
             class Test {
@@ -311,13 +313,16 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 void someMethod() {
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1701")
     @Test
-    fun removeBreaksFromCaseBody() = assertChanged(
-        before = """
+    fun removeBreaksFromCaseBody(jp: JavaParser)  = rewriteRun(
+        { s ->
+            s.parser(jp)
+            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        }, java("""
             class Test {
                 String name;
                 void test() {
@@ -330,7 +335,7 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 String name;
                 void test() {
@@ -339,9 +344,6 @@ interface MinimumSwitchCasesTest : JavaRecipeTest {
                     }
                 }
             }
-        """,
-        typeValidation = {
-            methodInvocations = false
-        }
+        """)
     )
 }

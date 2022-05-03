@@ -15,10 +15,8 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.fail
-
-import org.openrewrite.java.search.FindMissingTypes
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.TypeValidation
 
 /**
  * Produces a report about missing type attributions within a CompilationUnit.
@@ -56,44 +54,13 @@ class TypeValidator {
         private val defaultOptions = ValidationOptions()
 
         @JvmStatic
-        fun analyzeTypes(
-            cu: J.CompilationUnit,
-            options: ValidationOptions = defaultOptions
-        ): List<FindMissingTypes.MissingTypeResult> {
-            val report = FindMissingTypes.findMissingTypes(cu)
-            return report.filter {
-                if (it.j is J.Identifier && !options.identifiers) {
-                    return@filter false
-                } else if (it.j is J.ClassDeclaration && !options.classDeclarations) {
-                    return@filter false
-                } else if (it.j is J.MethodDeclaration && !options.methodDeclarations) {
-                    return@filter false
-                } else if (it.j is J.MethodInvocation && !options.methodInvocations) {
-                    return@filter false
-                }
-                return@filter true
-            }
-        }
-
-        @JvmStatic
         fun assertTypesValid(
             cu: J.CompilationUnit,
             options: ValidationOptions = defaultOptions
         ) {
-            val report = analyzeTypes(cu, options)
-            if (report.isNotEmpty()) {
-
-                val reportText = report.asSequence()
-                    .map {
-                        """
-                            |  ${it.message}
-                            |  AT:  ${it.path}
-                            |  AST: ${it.printedTree}
-                        """.trimMargin()
-                    }
-                    .joinToString("\n")
-                fail("AST contains missing or invalid type information: \n$reportText")
-            }
+            TypeValidation.assertValidTypes(cu, TypeValidation.ValidationOptions()
+                .identifiers(options.identifiers).methodInvocations(options.methodInvocations)
+                .methodDeclarations(options.methodDeclarations).classDeclarations(options.classDeclarations))
         }
     }
 

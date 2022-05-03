@@ -80,8 +80,6 @@ public class FindMissingTypes extends Recipe {
 
     static class FindMissingTypesVisitor extends JavaIsoVisitor<ExecutionContext> {
 
-
-
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
             J.Identifier ident = super.visitIdentifier(identifier, ctx);
