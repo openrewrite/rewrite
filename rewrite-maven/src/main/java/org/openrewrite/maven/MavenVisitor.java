@@ -93,11 +93,24 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (dependencies.containsKey(scope)) {
                 for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
                     if (matchesGlob(resolvedDependency.getGroupId(), groupId) && matchesGlob(resolvedDependency.getArtifactId(), artifactId)) {
+                        String scopeName = tag.getChildValue("scope").orElse(null);
+                        Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : null;
+                        if (tagScope == null) {
+                            tagScope = getResolutionResult().getPom().getManagedScope(
+                                    groupId,
+                                    artifactId,
+                                    tag.getChildValue("type").orElse(null),
+                                    tag.getChildValue("classifier").orElse(null)
+                            );
+                            if (tagScope == null) {
+                                tagScope = Scope.Compile;
+                            }
+                        }
                         Dependency req = resolvedDependency.getRequested();
                         String reqGroup = req.getGroupId();
                         if  ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
                                 req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                                scope == Scope.fromName(tag.getChildValue("scope").orElse("compile"))) {
+                                scope == tagScope) {
                             return true;
                         }
                     }

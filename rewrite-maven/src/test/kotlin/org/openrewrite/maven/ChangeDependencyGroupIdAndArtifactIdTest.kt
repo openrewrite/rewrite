@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.test.RewriteTest
 import java.nio.file.Paths
 
@@ -509,7 +509,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
     )
 
     @Test
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1717")
     fun changeDependencyGroupIdAndArtifactIdWithDependencyManagementScopeTest() = rewriteRun(
         { spec ->
             spec.recipe(
@@ -585,7 +585,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                             <artifactId>quarkus-arc</artifactId>
                         </dependency>
                     </dependencies>
-                </project>                
+                </project>
             """
         ) { p -> p.path(Paths.get("child/pom.xml")) },
     )
