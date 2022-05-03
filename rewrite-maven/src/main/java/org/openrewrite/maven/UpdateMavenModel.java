@@ -24,10 +24,7 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
 
@@ -51,6 +48,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                         parent.get().getChildValue("version").orElse(null)
                 ), parent.get().getChildValue("relativePath").orElse(null));
                 requested = requested.withParent(updatedParent);
+            } else if (requested.getParent() != null) {
+                requested = requested.withParent(null);
             }
 
             Optional<Xml.Tag> dependencies = document.getRoot().getChild("dependencies");
@@ -72,6 +71,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     ));
                 }
                 requested = requested.withDependencies(requestedDependencies);
+            } else if (!requested.getDependencies().isEmpty()) {
+                requested = requested.withDependencies(Collections.emptyList());
             }
 
             Optional<Xml.Tag> dependencyManagement = document.getRoot().getChild("dependencyManagement");
@@ -99,6 +100,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     }
                     requested = requested.withDependencyManagement(requestedManagedDependencies);
                 }
+            } else if (!requested.getDependencyManagement().isEmpty()) {
+                requested = requested.withDependencyManagement(Collections.emptyList());
             }
 
             return updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),

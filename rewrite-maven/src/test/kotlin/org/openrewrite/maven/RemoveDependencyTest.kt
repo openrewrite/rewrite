@@ -18,73 +18,85 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.maven.tree.MavenResolutionResult
+import org.openrewrite.maven.tree.Scope
+import org.openrewrite.test.RewriteTest
 
-class RemoveDependencyTest : MavenRecipeTest {
-    override val recipe = RemoveDependency("junit","junit", null)
+class RemoveDependencyTest : MavenRecipeTest, RewriteTest {
 
     @Test
-    fun removeDependency() = assertChanged(
-        before = """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>29.0-jre</version>
-                </dependency>
-                <dependency>
-                  <groupId>junit</groupId>
-                  <artifactId>junit</artifactId>
-                  <version>4.13.1</version>
-                  <scope>test</scope>
-                </dependency>
-              </dependencies>
-            </project>
-        """,
-        after = """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>29.0-jre</version>
-                </dependency>
-              </dependencies>
-            </project>
-        """
+    fun removeDependency() = rewriteRun(
+        { spec ->
+            spec.recipe(RemoveDependency("junit","junit", null))
+        },
+        pomXml(
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.1</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """,
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+        )
     )
 
     @Test
-    fun noDependencyToRemove() = assertUnchanged(
-        before = """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>29.0-jre</version>
-                </dependency>
-              </dependencies>
-            </project>
-        """
+    fun noDependencyToRemove() = rewriteRun(
+        { spec ->
+            spec.recipe(RemoveDependency("junit","junit", null))
+        },
+        pomXml(
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+        )
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
@@ -115,116 +127,163 @@ class RemoveDependencyTest : MavenRecipeTest {
     }
 
     @Test
-    fun shouldRemoveScopedDependency() = assertChanged(
-        recipe = RemoveDependency("org.junit.jupiter","junit-jupiter", "compile"),
-        before = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencyManagement>
+    fun shouldRemoveScopedDependency() = rewriteRun(
+        { spec ->
+          spec.recipe(RemoveDependency("org.junit.jupiter","junit-jupiter", "compile"))
+        },
+        pomXml(
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                           <dependency>
+                                <groupId>org.junit.jupiter</groupId>
+                                <artifactId>junit-jupiter</artifactId>
+                                <version>5.7.1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
                     <dependencies>
-                       <dependency>
+                        <dependency>
                             <groupId>org.junit.jupiter</groupId>
                             <artifactId>junit-jupiter</artifactId>
-                            <version>5.7.1</version>
                         </dependency>
-                    </dependencies>
-                </dependencyManagement>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.junit.jupiter</groupId>
-                        <artifactId>junit-jupiter</artifactId>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.junit.jupiter</groupId>
-                        <artifactId>junit-jupiter</artifactId>
-                        <scope>test</scope>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.junit.jupiter</groupId>
-                        <artifactId>junit-jupiter-api</artifactId>
-                        <version>5.6.3</version>
-                        <scope>test</scope>
-                    </dependency>
-                </dependencies>
-            </project>
-        """,
-        after = """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencyManagement>
-                    <dependencies>
-                       <dependency>
+                        <dependency>
                             <groupId>org.junit.jupiter</groupId>
                             <artifactId>junit-jupiter</artifactId>
-                            <version>5.7.1</version>
+                            <scope>test</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-api</artifactId>
+                            <version>5.6.3</version>
+                            <scope>test</scope>
                         </dependency>
                     </dependencies>
-                </dependencyManagement>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.junit.jupiter</groupId>
-                        <artifactId>junit-jupiter</artifactId>
-                        <scope>test</scope>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.junit.jupiter</groupId>
-                        <artifactId>junit-jupiter-api</artifactId>
-                        <version>5.6.3</version>
-                        <scope>test</scope>
-                    </dependency>
-                </dependencies>
-            </project>
-        """
+                </project>
+            """,
+            """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                           <dependency>
+                                <groupId>org.junit.jupiter</groupId>
+                                <artifactId>junit-jupiter</artifactId>
+                                <version>5.7.1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter</artifactId>
+                            <scope>test</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-api</artifactId>
+                            <version>5.6.3</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/422")
     @Test
-    fun removeDependencyByEffectiveScope() = assertChanged(
-        recipe = RemoveDependency("junit","junit", "runtime"),
-        before = """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>29.0-jre</version>
-                </dependency>
-                <dependency>
-                  <groupId>junit</groupId>
-                  <artifactId>junit</artifactId>
-                  <version>4.13.1</version>
-                </dependency>
-              </dependencies>
-            </project>
-        """,
-        after = """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>29.0-jre</version>
-                </dependency>
-              </dependencies>
-            </project>
-        """
+    fun removeDependencyByEffectiveScope() = rewriteRun(
+        { spec ->
+            spec.recipe(RemoveDependency("junit", "junit", "runtime"))
+        },
+        pomXml(
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.1</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """,
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+        )
+    )
+
+    @Test
+    fun updateModelWhenAllDependenciesRemoved() = rewriteRun(
+        { spec ->
+            spec.recipe(RemoveDependency("com.google.guava", "guava", null))
+        },
+        pomXml(
+            """
+                <project>
+                   <modelVersion>4.0.0</modelVersion>
+                   <groupId>foo</groupId>
+                   <artifactId>bar</artifactId>
+                   <version>0.0.1-SNAPSHOT</version>
+                   <dependencies>
+                       <dependency>
+                           <groupId>com.google.guava</groupId>
+                           <artifactId>guava</artifactId>
+                           <version>29.0-jre</version>
+                           <type>pom</type>
+                       </dependency>
+                   </dependencies>
+               </project>
+            """,
+            """
+                <project>
+                   <modelVersion>4.0.0</modelVersion>
+                   <groupId>foo</groupId>
+                   <artifactId>bar</artifactId>
+                   <version>0.0.1-SNAPSHOT</version>
+               </project>
+            """
+        ) { spec ->
+            spec.afterRecipe { doc ->
+                val mavenModel = doc.markers.findFirst(MavenResolutionResult::class.java)
+                    .orElseThrow { java.lang.IllegalStateException("The maven must should exist on the document.") }
+                assertThat(mavenModel.dependencies[Scope.Compile]).isEmpty()
+            }
+        }
     )
 }
