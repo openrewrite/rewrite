@@ -72,7 +72,6 @@ public interface RewriteTest extends SourceSpecs {
 
     default void defaults(RecipeSpec spec) {
         spec.recipe(Recipe.noop());
-        spec.typeValidationOptions(new TypeValidation.ValidationOptions());
     }
 
     default void rewriteRun(SourceSpecs... sourceSpecs) {
@@ -261,7 +260,7 @@ public interface RewriteTest extends SourceSpecs {
 
         testMethodSpec.afterRecipe.accept(results);
         testClassSpec.afterRecipe.accept(results);
-        TypeValidation.ValidationOptions validationOptions = testMethodSpec.typeValidationOptions != null ? testMethodSpec.typeValidationOptions : testClassSpec.typeValidationOptions;
+
         for (Result result : results) {
             SourceFile before = result.getBefore();
             SourceSpec<?> resultSpec = specBySourceFile.get(before);
@@ -287,7 +286,11 @@ public interface RewriteTest extends SourceSpecs {
                 //noinspection unchecked
                 ((Consumer<SourceFile>) resultSpec.afterRecipe).accept(result.getAfter());
                 if (result.getAfter() instanceof JavaSourceFile) {
-                    TypeValidation.assertValidTypes((JavaSourceFile) result.getAfter(), validationOptions == null ? new TypeValidation.ValidationOptions() : validationOptions);
+                    TypeValidation typeValidation = testMethodSpec.typeValidation != null ? testMethodSpec.typeValidation : testClassSpec.typeValidation;
+                    if (typeValidation == null) {
+                        typeValidation = new TypeValidation();
+                    }
+                    typeValidation.assertValidTypes((JavaSourceFile) result.getAfter());
                 }
             }
         }

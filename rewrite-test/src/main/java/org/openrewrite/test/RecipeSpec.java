@@ -52,7 +52,7 @@ public class RecipeSpec {
     Integer expectedCyclesThatMakeChanges;
 
     @Nullable
-    TypeValidation.ValidationOptions typeValidationOptions;
+    TypeValidation typeValidation;
 
     Consumer<List<SourceFile>> beforeRecipe = s -> {
     };
@@ -119,8 +119,8 @@ public class RecipeSpec {
                 expectedCyclesThatMakeChanges;
     }
 
-    public RecipeSpec typeValidationOptions(TypeValidation.ValidationOptions validationOptions) {
-        this.typeValidationOptions = validationOptions;
+    public RecipeSpec typeValidationOptions(TypeValidation typeValidation) {
+        this.typeValidation = typeValidation;
         return this;
     }
 

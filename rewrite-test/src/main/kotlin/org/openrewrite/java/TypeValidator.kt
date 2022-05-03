@@ -58,9 +58,9 @@ class TypeValidator {
             cu: J.CompilationUnit,
             options: ValidationOptions = defaultOptions
         ) {
-            TypeValidation.assertValidTypes(cu, TypeValidation.ValidationOptions()
-                .identifiers(options.identifiers).methodInvocations(options.methodInvocations)
-                .methodDeclarations(options.methodDeclarations).classDeclarations(options.classDeclarations))
+            TypeValidation().identifiers(options.identifiers).methodInvocations(options.methodInvocations)
+                .methodDeclarations(options.methodDeclarations).classDeclarations(options.classDeclarations)
+                .assertValidTypes(cu)
         }
     }
 

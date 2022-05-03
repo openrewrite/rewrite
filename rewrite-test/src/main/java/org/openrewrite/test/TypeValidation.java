@@ -15,7 +15,6 @@
  */
 package org.openrewrite.test;
 
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -27,45 +26,39 @@ import static org.assertj.core.api.Assertions.fail;
 
 public class TypeValidation {
 
-    public static class ValidationOptions {
-        private boolean classDeclarations = true;
-        private boolean identifiers = true;
-        private boolean methodDeclarations = true;
-        private boolean methodInvocations = true;
-
-        public ValidationOptions() {
-        }
-
-        public ValidationOptions classDeclarations(boolean classDeclarations) {
-            this.classDeclarations = classDeclarations;
-            return this;
-        }
-        public ValidationOptions methodDeclarations(boolean methodDeclarations) {
-            this.methodDeclarations = methodDeclarations;
-            return this;
-        }
-        public ValidationOptions methodInvocations(boolean methodInvocations) {
-            this.methodInvocations = methodInvocations;
-            return this;
-        }
-        public ValidationOptions identifiers(boolean identifiers) {
-            this.identifiers = identifiers;
-            return this;
-        }
+    private boolean classDeclarations = true;
+    private boolean identifiers = true;
+    private boolean methodDeclarations = true;
+    private boolean methodInvocations = true;
+    public TypeValidation classDeclarations(boolean classDeclarations) {
+        this.classDeclarations = classDeclarations;
+        return this;
+    }
+    public TypeValidation methodDeclarations(boolean methodDeclarations) {
+        this.methodDeclarations = methodDeclarations;
+        return this;
+    }
+    public TypeValidation methodInvocations(boolean methodInvocations) {
+        this.methodInvocations = methodInvocations;
+        return this;
+    }
+    public TypeValidation identifiers(boolean identifiers) {
+        this.identifiers = identifiers;
+        return this;
     }
 
-    public static void assertValidTypes(JavaSourceFile sf, ValidationOptions validationOptions) {
+    public void assertValidTypes(JavaSourceFile sf) {
 
         List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
         missingTypeResults = missingTypeResults.stream()
                 .filter(missingType -> {
-                    if (validationOptions.identifiers && missingType.getJ() instanceof J.Identifier) {
+                    if (identifiers && missingType.getJ() instanceof J.Identifier) {
                         return true;
-                    } else if (validationOptions.classDeclarations && missingType.getJ() instanceof J.ClassDeclaration) {
+                    } else if (classDeclarations && missingType.getJ() instanceof J.ClassDeclaration) {
                         return true;
-                    } else if (validationOptions.methodInvocations && missingType.getJ() instanceof J.MethodInvocation) {
+                    } else if (methodInvocations && missingType.getJ() instanceof J.MethodInvocation) {
                         return true;
-                    } else return validationOptions.methodDeclarations && missingType.getJ() instanceof J.MethodDeclaration;
+                    } else return methodDeclarations && missingType.getJ() instanceof J.MethodDeclaration;
                 })
                 .collect(Collectors.toList());
         if (!missingTypeResults.isEmpty()) {

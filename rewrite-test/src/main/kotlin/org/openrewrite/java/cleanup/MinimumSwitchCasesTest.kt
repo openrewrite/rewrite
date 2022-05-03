@@ -32,9 +32,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun primitiveAndDefault(jp: JavaParser) = rewriteRun(
-        {
-            s -> s.parser(jp)
-            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        { s -> s.parser(jp)
+            s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java(
             """
                 class Test {
@@ -69,9 +68,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun twoPrimitives(jp: JavaParser) = rewriteRun(
-        { s ->
-            s.parser(jp)
-            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        { s -> s.parser(jp)
+            s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java(
             """
             class Test {
@@ -106,9 +104,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun stringAndDefault(jp: JavaParser) = rewriteRun(
-        { s ->
-            s.parser(jp)
-            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        { s -> s.parser(jp)
+            s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java("""
             class Test {
                 String name;
@@ -141,9 +138,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun twoStrings(jp: JavaParser) = rewriteRun(
-        { s ->
-            s.parser(jp)
-            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        { s -> s.parser(jp)
+            s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java("""
             class Test {
                 String name;
@@ -176,9 +172,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun onePrimitive(jp: JavaParser) = rewriteRun(
-        { s ->
-            s.parser(jp)
-            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        { s -> s.parser(jp)
+            s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java("""
             class Test {
                 int variable;
@@ -206,9 +201,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun oneString(jp: JavaParser) = rewriteRun(
-        { s ->
-            s.parser(jp)
-            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        { s -> s.parser(jp)
+            s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java("""
             class Test {
                 String name;
@@ -237,9 +231,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun noCases(jp: JavaParser) = rewriteRun(
-        { s ->
-            s.parser(jp)
-        }, java("""
+        { s -> s.parser(jp) }
+        , java("""
             class Test {
                 int variable;
                 void test() {
@@ -253,9 +246,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1212")
     fun importsOnEnum(jp: JavaParser) = rewriteRun(
-        { s ->
-            s.parser(jp)
-        }, java("""
+        { s -> s.parser(jp) },
+        java("""
             import java.time.DayOfWeek;
 
             class Test {
@@ -319,9 +311,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1701")
     @Test
     fun removeBreaksFromCaseBody(jp: JavaParser)  = rewriteRun(
-        { s ->
-            s.parser(jp)
-            s.typeValidationOptions(TypeValidation.ValidationOptions().methodInvocations(false))
+        { s -> s.parser(jp)
+            s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java("""
             class Test {
                 String name;
