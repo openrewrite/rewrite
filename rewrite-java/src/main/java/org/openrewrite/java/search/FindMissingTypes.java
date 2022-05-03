@@ -48,10 +48,10 @@ public class FindMissingTypes extends Recipe {
         return new FindMissingTypesVisitor();
     }
 
-    public static List<MissingTypeResult> findMissingTypes(JavaSourceFile sf) {
-        JavaSourceFile sf1 = (JavaSourceFile) new FindMissingTypesVisitor().visit(sf, new InMemoryExecutionContext());
+    public static List<MissingTypeResult> findMissingTypes(J j) {
+        J j1 = new FindMissingTypesVisitor().visit(j, new InMemoryExecutionContext());
         List<MissingTypeResult> results = new ArrayList<>();
-        if (sf1 != sf) {
+        if (j1 != j) {
             new JavaIsoVisitor<List<MissingTypeResult>>() {
                 @Override
                 public <M extends Marker> M visitMarker(Marker marker, List<MissingTypeResult> missingTypeResults) {
@@ -59,12 +59,17 @@ public class FindMissingTypes extends Recipe {
                         String message = ((SearchResult) marker).getDescription();
                         String path = getCursor().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
                         J j = getCursor().firstEnclosing(J.class);
-                        String printedTree = j != null ? j.withMarkers(Markers.EMPTY).printTrimmed(getCursor()) : "";
+                        String printedTree;
+                        if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
+                            printedTree = j != null ? j.printTrimmed(new InMemoryExecutionContext(), getCursor()) : "";
+                        } else {
+                            printedTree = String.valueOf(j);
+                        }
                         missingTypeResults.add(new MissingTypeResult(message,path, printedTree, j));
                     }
                     return super.visitMarker(marker, missingTypeResults);
                 }
-            }.visit(sf1, results);
+            }.visit(j1, results);
         }
         return results;
     }
@@ -126,11 +131,13 @@ public class FindMissingTypes extends Recipe {
                 cd = cd.withMarkers(cd.getMarkers().searchResult(
                         " J.ClassDeclaration kind " + cd.getKind() + " does not match the kind in its type information " + t.getKind()));
             }
-            @SuppressWarnings("ConstantConditions")
-            J.Package pkg = getCursor().firstEnclosing(J.CompilationUnit.class).getPackageDeclaration();
-            if (pkg != null && t.getPackageName().equals(pkg.printTrimmed(getCursor()))) {
-                cd = cd.withMarkers(cd.getMarkers().searchResult(
-                         " J.ClassDeclaration package " + pkg + " does not match the package in its type information " + pkg.printTrimmed(getCursor())));
+            J.CompilationUnit jc = getCursor().firstEnclosing(J.CompilationUnit.class);
+            if (jc != null) {
+                J.Package pkg = jc.getPackageDeclaration();
+                if (pkg != null && t.getPackageName().equals(pkg.printTrimmed(getCursor()))) {
+                    cd = cd.withMarkers(cd.getMarkers().searchResult(
+                            " J.ClassDeclaration package " + pkg + " does not match the package in its type information " + pkg.printTrimmed(getCursor())));
+                }
             }
             return cd;
         }

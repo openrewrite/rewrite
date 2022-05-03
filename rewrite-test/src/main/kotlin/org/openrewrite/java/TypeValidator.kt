@@ -16,7 +16,6 @@
 package org.openrewrite.java
 
 import org.openrewrite.java.tree.J
-import org.openrewrite.test.TypeValidation
 
 /**
  * Produces a report about missing type attributions within a CompilationUnit.

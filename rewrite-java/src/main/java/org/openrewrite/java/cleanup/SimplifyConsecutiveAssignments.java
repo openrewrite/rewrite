@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.TypeValidation;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -52,6 +53,8 @@ public class SimplifyConsecutiveAssignments extends Recipe {
             // TODO if we had a `replace()` coordinate on every `Expression`, we wouldn't need the left side of this
             final JavaTemplate combinedAssignment = JavaTemplate
                     .builder(this::getCursor, "o = (#{any()} #{} #{any()});")
+                    // ok to ignore invalid type info on left-hand side of assignment.
+                    .typeValidation(new TypeValidation().identifiers(false))
                     .build();
 
             @Override

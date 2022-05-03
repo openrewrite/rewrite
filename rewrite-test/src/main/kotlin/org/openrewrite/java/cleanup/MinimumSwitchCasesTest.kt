@@ -22,7 +22,7 @@ import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
-import org.openrewrite.test.TypeValidation
+import org.openrewrite.java.TypeValidation
 
 @Suppress("SwitchStatementWithTooFewBranches", "ConstantConditions")
 interface MinimumSwitchCasesTest : RewriteTest {

@@ -17,6 +17,7 @@ package org.openrewrite.test;
 
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.TypeValidation;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
