@@ -517,7 +517,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private Consumer<String> onBeforeParseTemplate = s -> {
         };
 
-        private TypeValidation typeValidation = TypeValidation.getDefault();
+        private TypeValidation typeValidation = new TypeValidation();
 
         Builder(Supplier<Cursor> parentScope, String code) {
             this.parentScope = parentScope;

@@ -15,12 +15,20 @@
  */
 package org.openrewrite.java;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Accessors(fluent = true)
 public class TypeValidation {
 
     private boolean classDeclarations = true;
@@ -28,34 +36,8 @@ public class TypeValidation {
     private boolean methodDeclarations = true;
     private boolean methodInvocations = true;
 
-    public static TypeValidation getDefault() {
-        return new TypeValidation();
-    }
-
     public static TypeValidation none() {
-        return new TypeValidation()
-                .identifiers(false).methodInvocations(false)
-                .methodDeclarations(false).classDeclarations(false);
-    }
-
-    public TypeValidation classDeclarations(boolean classDeclarations) {
-        this.classDeclarations = classDeclarations;
-        return this;
-    }
-
-    public TypeValidation methodDeclarations(boolean methodDeclarations) {
-        this.methodDeclarations = methodDeclarations;
-        return this;
-    }
-
-    public TypeValidation methodInvocations(boolean methodInvocations) {
-        this.methodInvocations = methodInvocations;
-        return this;
-    }
-
-    public TypeValidation identifiers(boolean identifiers) {
-        this.identifiers = identifiers;
-        return this;
+        return new TypeValidation(false,false,false,false);
     }
 
     private boolean enabled() {

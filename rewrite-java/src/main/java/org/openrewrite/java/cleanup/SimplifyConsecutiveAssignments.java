@@ -54,7 +54,7 @@ public class SimplifyConsecutiveAssignments extends Recipe {
             final JavaTemplate combinedAssignment = JavaTemplate
                     .builder(this::getCursor, "o = (#{any()} #{} #{any()});")
                     // ok to ignore invalid type info on left-hand side of assignment.
-                    .typeValidation(TypeValidation.getDefault().identifiers(false))
+                    .typeValidation(new TypeValidation().identifiers(false))
                     .build();
 
             @Override
