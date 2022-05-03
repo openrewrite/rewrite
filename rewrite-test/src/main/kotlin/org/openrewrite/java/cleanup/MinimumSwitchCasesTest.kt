@@ -231,8 +231,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun noCases(jp: JavaParser) = rewriteRun(
-        { s -> s.parser(jp) }
-        , java("""
+        { s -> s.parser(jp) },
+        java("""
             class Test {
                 int variable;
                 void test() {
