@@ -17,17 +17,11 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.JavaType.Primitive;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 @Value
@@ -72,7 +66,7 @@ public class ReplaceConstant extends Recipe {
 
             @Override
             public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
-                if (isConstant(ident.getFieldType())) {
+                if (isConstant(ident.getFieldType()) && !isVariableDeclaration()) {
                     maybeRemoveImport(owningType);
                     return buildLiteral().withPrefix(ident.getPrefix());
                 }
@@ -84,19 +78,36 @@ public class ReplaceConstant extends Recipe {
                         varType.getName().equals(constantName);
             }
 
+            private boolean isVariableDeclaration() {
+                Cursor maybeVariable = getCursor().dropParentUntil(is -> is instanceof J.VariableDeclarations || is instanceof J.CompilationUnit);
+                JavaType.Variable variableType = ((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getVariableType();
+                if (variableType == null) {
+                    return true;
+                }
+
+                JavaType.FullyQualified ownerFqn = TypeUtils.asFullyQualified(variableType.getOwner());
+                if (ownerFqn == null) {
+                    return true;
+                }
+
+                return maybeVariable.getValue() instanceof J.VariableDeclarations &&
+                        constantName.equals(((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getSimpleName()) &&
+                        owningType.equals(ownerFqn.getFullyQualifiedName());
+            }
+
             private J.Literal buildLiteral() {
                 Object value = literalValue;
                 Primitive type;
-                if(literalValue.startsWith("\"")) {
+                if (literalValue.startsWith("\"")) {
                     value = literalValue.substring(0, literalValue.length() - 1);
                     type = Primitive.String;
-                } else if(literalValue.startsWith("'")) {
+                } else if (literalValue.startsWith("'")) {
                     value = literalValue.substring(0, literalValue.length() - 1);
                     type = Primitive.Char;
-                } else if(StringUtils.isNumeric(literalValue)) {
+                } else if (StringUtils.isNumeric(literalValue)) {
                     value = Integer.parseInt(literalValue);
                     type = Primitive.Int;
-                } else if(StringUtils.isNumeric(literalValue.replace(".", ""))) {
+                } else if (StringUtils.isNumeric(literalValue.replace(".", ""))) {
                     value = Double.parseDouble(literalValue);
                     type = Primitive.Double;
                 } else {
