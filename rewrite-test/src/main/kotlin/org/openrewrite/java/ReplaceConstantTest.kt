@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 
 interface ReplaceConstantTest : JavaRecipeTest {
@@ -50,6 +51,34 @@ interface ReplaceConstantTest : JavaRecipeTest {
         after = """
             class Test {
                 Object o = "UTF_8";
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1752")
+    @Test
+    fun doesNotChangeOriginalVariableDeclaration() = assertChanged(
+        dependsOn = arrayOf("""
+            package com.constant;
+            public class B {
+                public static final String VAR = "default";
+                void method() {
+                    String VAR = "";
+                }
+            }
+        """),
+        recipe = ReplaceConstant("com.constant.B", "VAR", "\"newValue\""),
+        before = """
+            package com.abc;
+            import com.constant.B;
+            class A {
+                String v = B.VAR;
+            }
+        """,
+        after = """
+            package com.abc;
+            class A {
+                String v = "newValue";
             }
         """
     )
