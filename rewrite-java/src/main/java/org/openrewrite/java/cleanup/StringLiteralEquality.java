@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
@@ -80,7 +77,7 @@ public class StringLiteralEquality extends Recipe {
         private static J.MethodInvocation asEqualsMethodInvocation(J.Binary binary) {
             return new J.MethodInvocation(
                     Tree.randomId(),
-                    Space.EMPTY,
+                    binary.getPrefix(),
                     Markers.EMPTY,
                     new JRightPadded<>(binary.getLeft().withPrefix(Space.EMPTY), Space.EMPTY, Markers.EMPTY),
                     null,
@@ -118,15 +115,18 @@ public class StringLiteralEquality extends Recipe {
         @Override
         public J visitBinary(J.Binary binary, ExecutionContext ctx) {
             if (isStringLiteral(binary.getLeft()) || isStringLiteral(binary.getRight())) {
-                switch (binary.getOperator()) {
-                    case Equal:
-                        return asEqualsMethodInvocation(binary);
-                    case NotEqual:
-                        J.MethodInvocation mi = asEqualsMethodInvocation(binary);
-                        return asNegatedUnary(mi);
+                J after = null;
+                if (binary.getOperator() == J.Binary.Type.Equal) {
+                    after = asEqualsMethodInvocation(binary);
+                } else if (binary.getOperator() == J.Binary.Type.NotEqual) {
+                    J.MethodInvocation mi = asEqualsMethodInvocation(binary);
+                    after = asNegatedUnary(mi);
+                }
+                if (after != null) {
+                    doAfterVisit(new EqualsAvoidsNull());
+                    return after;
                 }
             }
-
             return super.visitBinary(binary, ctx);
         }
 

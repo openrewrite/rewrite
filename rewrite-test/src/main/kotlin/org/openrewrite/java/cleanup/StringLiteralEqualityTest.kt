@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("StringEquality")
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
@@ -25,7 +27,7 @@ import org.openrewrite.java.JavaRecipeTest
     "NewObjectEquality",
     "StatementWithEmptyBody",
     "LoopConditionNotUpdatedInsideLoop",
-    "EqualsWithItself"
+    "EqualsWithItself", "ResultOfMethodCallIgnored"
 )
 interface StringLiteralEqualityTest : JavaRecipeTest {
     override val recipe: Recipe?
@@ -34,6 +36,7 @@ interface StringLiteralEqualityTest : JavaRecipeTest {
     @Test
     fun stringLiteralEqualityReplacedWithEquals() = assertChanged(
         before = """
+            import java.util.List;
             class Test {
                 public String getString() {
                     return "stringy";
@@ -49,23 +52,40 @@ interface StringLiteralEqualityTest : JavaRecipeTest {
                     while ("test" == str) {
                     }
                 }
+                
+                public void findPeter(List<Friend> friends) {
+                    friends.stream().filter(e -> e.name == "peter");
+                }
+                
+                class Friend {
+                    String name;
+                }
             }
         """,
         after = """
+            import java.util.List;
             class Test {
                 public String getString() {
                     return "stringy";
                 }
 
                 public void method(String str) {
-                    if (str.equals("test")) ;
+                    if ("test".equals(str)) ;
                     if ("test".equals(str)) ;
                     if ("test".equals("test")) ;
                     if ("test".equals(new String("test"))) ;
                     if ("test".equals(getString()));
-                    boolean flag = (str.equals("test"));
+                    boolean flag = ("test".equals(str));
                     while ("test".equals(str)) {
                     }
+                }
+                
+                public void findPeter(List<Friend> friends) {
+                    friends.stream().filter(e -> "peter".equals(e.name));
+                }
+                
+                class Friend {
+                    String name;
                 }
             }
         """
@@ -98,12 +118,12 @@ interface StringLiteralEqualityTest : JavaRecipeTest {
                 }
 
                 public void method(String str) {
-                    if (!str.equals("test")) ;
+                    if (!"test".equals(str)) ;
                     if (!"test".equals(str)) ;
                     if (!"test".equals("test")) ;
                     if (!"test".equals(new String("test"))) ;
                     if (!"test".equals(getString()));
-                    boolean flag = (!str.equals("test"));
+                    boolean flag = (!"test".equals(str));
                     while (!"test".equals(str)) {
                     }
                 }
