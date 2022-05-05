@@ -63,6 +63,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             example = "500")
     String attributeValue;
 
+    @Option(displayName = "Add Only",
+            description = "When set to `true` will not change existing annotation attribute values.")
+    @Nullable
+    Boolean addOnly;
+
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return new UsesType<>(annotationType);
@@ -105,7 +110,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 return it;
                             }
                             J.Literal value = (J.Literal) as.getAssignment();
-                            if (newAttributeValue.equals(value.getValueSource())) {
+                            if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
                                 foundAttributeWithDesiredValue.set(true);
                                 return it;
                             }
@@ -114,7 +119,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
                             if (attributeName == null || "value".equals(attributeName)) {
                                 J.Literal value = (J.Literal) it;
-                                if (newAttributeValue.equals(value.getValueSource())) {
+                                if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
                                     foundAttributeWithDesiredValue.set(true);
                                     return it;
                                 }

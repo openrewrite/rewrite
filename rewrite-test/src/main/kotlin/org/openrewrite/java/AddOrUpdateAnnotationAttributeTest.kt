@@ -16,14 +16,15 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
 
-interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest {
+interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest, RewriteTest {
 
     @Test
     fun addValueAttribute(jp: JavaParser) = assertChanged(
         jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello"),
+        recipe = AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", null),
         dependsOn = arrayOf("""
             package org.example;
             public @interface Foo {
@@ -49,7 +50,7 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest {
     @Test
     fun updateValueAttribute(jp: JavaParser) = assertChanged(
         jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello"),
+        recipe = AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", null),
         dependsOn = arrayOf("""
             package org.example;
             public @interface Foo {
@@ -75,7 +76,7 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest {
     @Test
     fun addNamedAttribute(jp: JavaParser) = assertChanged(
         jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500"),
+        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null),
         dependsOn = arrayOf("""
             package org.junit;
             public @interface Test {
@@ -107,7 +108,7 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest {
     @Test
     fun replaceAttribute(jp: JavaParser) = assertChanged(
         jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500"),
+        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null),
         dependsOn = arrayOf("""
             package org.junit;
             public @interface Test {
@@ -139,7 +140,7 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest {
     @Test
     fun preserveExistingAttributes(jp: JavaParser) = assertChanged(
         jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500"),
+        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null),
         dependsOn = arrayOf("""
             package org.junit;
             public @interface Test {
@@ -172,7 +173,7 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest {
     @Test
     fun implicitValueToExplicitValue(jp: JavaParser)  = assertChanged(
         jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1"),
+        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null),
         cycles = 3,
         dependsOn = arrayOf("""
             package org.junit;
@@ -201,5 +202,28 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest {
                 }
             }
         """
+    )
+
+    @Test
+    fun dontChangeWhenSetToAddOnly(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp)
+            .recipe(AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", true))
+        },
+        java("""
+            package org.junit;
+            public @interface Test {
+                long other() default 0L;
+                long value() default "";
+            }
+        """),
+        java("""
+            import org.junit.Test;
+            
+            class SomeTestClass {
+                @Test(other = 0)
+                void foo() {
+                }
+            }
+        """)
     )
 }
