@@ -389,6 +389,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RenameMethodsNamedHashcodeEqualOrTostringTck : RenameMethodsNamedHashcodeEqualOrTostringTest
 
     @Nested
+    inner class ReferentialEqualityToObjectEqualsTck : ReferentialEqualityToObjectEqualsTest
+
+    @Nested
     inner class ReplaceDuplicateStringLiteralsTestTck : ReplaceDuplicateStringLiteralsTest
 
     @Nested

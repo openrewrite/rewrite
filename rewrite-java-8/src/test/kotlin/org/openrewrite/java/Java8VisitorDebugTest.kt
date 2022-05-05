@@ -559,6 +559,10 @@ class Java8UseStringReplaceTest : Java8Test, UseStringReplaceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8ReferentialEqualityToObjectEqualsTest : Java8Test, ReferentialEqualityToObjectEqualsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8StringLiteralEqualityTest : Java8Test, StringLiteralEqualityTest
 
 @DebugOnly
