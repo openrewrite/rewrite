@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.tree.*
@@ -206,6 +207,10 @@ class Java11TypeCastTest: Java11Test, TypeCastTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11TypeParameterAndWildcardTest: Java11Test, TypeParameterAndWildcardTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11TypeUtilsTest: Java11Test, TypeUtilsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

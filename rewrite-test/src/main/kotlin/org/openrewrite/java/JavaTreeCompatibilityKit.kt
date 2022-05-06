@@ -167,6 +167,9 @@ abstract class JavaTreeCompatibilityKit {
     inner class TypeParameterAndWildcardTck : TypeParameterAndWildcardTest
 
     @Nested
+    inner class TypeUtilsTck: TypeUtilsTest
+
+    @Nested
     inner class UnaryTck : UnaryTest
 
     @Nested

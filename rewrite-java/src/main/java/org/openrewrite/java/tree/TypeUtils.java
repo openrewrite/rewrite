@@ -240,7 +240,7 @@ public class TypeUtils {
             return Optional.empty();
         }
         for (JavaType.Method method : clazz.getMethods()) {
-            if (methodHasSignature(method, name, argumentTypes)) {
+            if (methodHasSignature(clazz, method, name, argumentTypes)) {
                 return Optional.of(method);
             }
         }
@@ -259,7 +259,7 @@ public class TypeUtils {
         return Optional.empty();
     }
 
-    private static boolean methodHasSignature(JavaType.Method m, String name, List<JavaType> argTypes) {
+    private static boolean methodHasSignature(JavaType.FullyQualified clazz, JavaType.Method m, String name, List<JavaType> argTypes) {
         if (!name.equals(m.getName())) {
             return false;
         }
@@ -268,7 +268,20 @@ public class TypeUtils {
             return false;
         }
         for (int i = 0; i < mArgs.size(); i++) {
-            if (!TypeUtils.isOfType(mArgs.get(i), argTypes.get(i))) {
+            JavaType declared = mArgs.get(i);
+            JavaType actual = argTypes.get(i);
+            if (!TypeUtils.isOfType(declared, actual)) {
+                // Types might look like they don't match because we're comparing a concrete type like "String" with a generic type parameter "T"
+                if(clazz instanceof JavaType.Parameterized && declared instanceof JavaType.GenericTypeVariable) {
+                    JavaType.Parameterized parameterizedClass = (JavaType.Parameterized) clazz;
+                    // At this point we can't tell _which_ of the class's potentially many type parameters this might be
+                    // Or even if it might be a type parameter exclusive to the method itself, not the class
+                    // But if the concrete type being provided does match one of the type parameters there's a good-enough chance that it should be a match
+                    // To be 100% sure JavaType.GenericTypeVariable would have to know its origins, which it currently does not
+                    if(parameterizedClass.getTypeParameters().stream().anyMatch(it -> TypeUtils.isOfType(actual, it))) {
+                        continue;
+                    }
+                }
                 return false;
             }
         }

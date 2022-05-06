@@ -205,6 +205,10 @@ class Java8TypeParameterAndWildcardTest: Java8Test, TypeParameterAndWildcardTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8TypeUtilsTest: Java8Test, TypeUtilsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UnaryTest: Java8Test, UnaryTest
 
 @DebugOnly
