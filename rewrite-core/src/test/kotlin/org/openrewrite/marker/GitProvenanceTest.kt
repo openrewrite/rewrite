@@ -104,7 +104,7 @@ class GitProvenanceTest {
         val git = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()
         projectDir.resolve("test.txt").writeText("hi")
         git.add().addFilepattern("*").call()
-        git.commit().setMessage("init").call()
+        git.commit().setMessage("init").setSign(false).call()
         git.remoteAdd().setName("origin").setUri(URIish("git@github.com:openrewrite/doesnotexist.git")).call()
 
         // origins are still present in .git/config on Jenkins
@@ -121,12 +121,12 @@ class GitProvenanceTest {
         val git = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()
         projectDir.resolve("test.txt").writeText("hi")
         git.add().addFilepattern("*").call()
-        git.commit().setMessage("init").call()
+        git.commit().setMessage("init").setSign(false).call()
         val commit1 = git.repository.resolve(Constants.HEAD).name
 
         projectDir.resolve("test.txt").writeText("hi")
         git.add().addFilepattern("*").call()
-        git.commit().setMessage("init").call()
+        git.commit().setMessage("init").setSign(false).call()
 
         assertThat(git.repository.resolve(Constants.HEAD).name).isNotEqualTo(commit1)
 
@@ -148,7 +148,7 @@ class GitProvenanceTest {
         var git = Git.cloneRepository().setURI(remoteRepo.directory.absolutePath).setDirectory(cloneDir.toFile()).call()
         projectDir.resolve("test.txt").writeText("hi")
         git.add().addFilepattern("*").call()
-        git.commit().setMessage("init").call()
+        git.commit().setMessage("init").setSign(false).call()
 
         try {
             "git push -u origin main".runCommand(cloneDir)
