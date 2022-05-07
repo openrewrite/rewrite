@@ -26,6 +26,7 @@ import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.TypeValidation;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.json.JsonParser;
@@ -239,6 +240,13 @@ public interface RewriteTest extends SourceSpecs {
                 sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
                         sourceFile.getMarkers().getMarkers(), spec.markers)));
 
+                // Update the default 'main' JavaSourceSet Marker added by the JavaParser with the specs sourceSetName
+                sourceFile = sourceFile.withMarkers((sourceFile.getMarkers().withMarkers(ListUtils.map(sourceFile.getMarkers().getMarkers(), m -> {
+                    if (m instanceof JavaSourceSet){
+                        m = ((JavaSourceSet)m).withName(spec.sourceSetName);
+                    }
+                    return m;
+                }))));
                 //noinspection unchecked
                 ((Consumer<SourceFile>) spec.beforeRecipe).accept(sourceFile);
 
