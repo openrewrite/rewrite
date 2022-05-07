@@ -17,6 +17,7 @@ package org.openrewrite.test;
 
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.TypeValidation;
 
 import java.nio.file.Path;
@@ -126,8 +127,10 @@ public class RecipeSpec {
     }
 
     ExecutionContext getExecutionContext() {
-        return executionContext == null ?
-                new InMemoryExecutionContext(t -> fail("Failed to run parse sources or recipe", t)) :
-                executionContext;
+        if (executionContext == null) {
+            executionContext = new InMemoryExecutionContext(t -> fail("Failed to run parse sources or recipe", t));
+            executionContext.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        }
+        return executionContext;
     }
 }
