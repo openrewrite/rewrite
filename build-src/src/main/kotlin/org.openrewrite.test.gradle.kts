@@ -7,6 +7,6 @@ tasks.withType<Test>().configureEach {
     // scheduled builds and releases
 
     predictiveSelection {
-        enabled.set(providers.gradleProperty("enablePredictiveTestSelection").map(String::toBoolean).orElse(true))
+        enabled.set(true)
     }
 }
