@@ -18,7 +18,6 @@ package org.openrewrite.yaml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
@@ -127,10 +126,6 @@ public class DeleteProperty extends Recipe {
                 } else {
                     entries.add(entry);
                 }
-            }
-
-            if (entries.size() == 1) {
-                entries = ListUtils.map(entries, e -> e.withPrefix(""));
             }
 
             if (changed) {

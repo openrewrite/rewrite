@@ -92,4 +92,23 @@ class DeletePropertyKeyTest : YamlRecipeTest {
         assertUnchanged(recipe = recipe, before = nonMatchingFile)
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1769")
+    @Test
+    fun `DeleteProperty preserves original indent structure of existing hierarchy`() = assertChanged(
+        recipe = DeleteProperty("my.old.key", false, null, null),
+        before = """
+          my:
+            old:
+              key:
+                color: blue
+                style: retro
+            other:
+              key: qwe
+        """,
+        after = """
+          my:
+            other:
+              key: qwe
+        """
+    )
 }
