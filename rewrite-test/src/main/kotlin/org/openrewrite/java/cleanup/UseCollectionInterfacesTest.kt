@@ -15,10 +15,13 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.marker.JavaVersion
+import java.util.*
 
 interface UseCollectionInterfacesTest : JavaRecipeTest {
     override val recipe: Recipe
@@ -713,4 +716,23 @@ interface UseCollectionInterfacesTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1771")
+    @Test
+    fun variableWithVar() {
+        val javaRuntimeVersion = System.getProperty("java.runtime.version")
+        val javaVendor = System.getProperty("java.vm.vendor")
+        if (JavaVersion(UUID.randomUUID(), javaRuntimeVersion, javaVendor, javaRuntimeVersion, javaRuntimeVersion).majorVersion >= 10) {
+            assertUnchanged(parser, recipe, executionContext,
+            """
+            import java.util.ArrayList;
+            
+            class Test {
+                public void method() {
+                    var list = new ArrayList<>();
+                }
+            }
+            """.trimIndent())
+        }
+    }
 }

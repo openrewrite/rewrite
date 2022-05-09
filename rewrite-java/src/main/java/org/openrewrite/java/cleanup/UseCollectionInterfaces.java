@@ -146,6 +146,9 @@ public class UseCollectionInterfaces extends Recipe {
                 JavaType.FullyQualified originalType = TypeUtils.asFullyQualified(mv.getType());
                 if ((mv.hasModifier(J.Modifier.Type.Public) || mv.hasModifier(J.Modifier.Type.Private) || mv.getModifiers().isEmpty()) &&
                         originalType != null && rspecRulesReplaceTypeMap.containsKey(originalType.getFullyQualifiedName())) {
+                    if (mv.getTypeExpression() instanceof J.Identifier && "var".equals(((J.Identifier) mv.getTypeExpression()).getSimpleName())) {
+                        return mv;
+                    }
 
                     JavaType.FullyQualified newType = TypeUtils.asFullyQualified(
                             JavaType.buildType(rspecRulesReplaceTypeMap.get(originalType.getFullyQualifiedName())));
