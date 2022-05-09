@@ -205,6 +205,7 @@ public class RawPom {
         List<Plugin> plugins;
 
         @Nullable
+        @JacksonXmlProperty(localName = "pluginManagement")
         PluginManagement pluginManagement;
 
         public Build() {

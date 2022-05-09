@@ -10,6 +10,7 @@ dependencies {
     implementation("org.gradle:test-retry-gradle-plugin:1.2.1")
     implementation("com.gradle.enterprise:test-distribution-gradle-plugin:2.3")
     implementation("com.gradle:gradle-enterprise-gradle-plugin:3.10")
+    implementation("org.jetbrains.kotlin:kotlin-script-runtime:1.6.21")
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:1.6.21")
     implementation("org.owasp:dependency-check-gradle:7.1.0.1")
     implementation("gradle.plugin.com.hierynomus.gradle.plugins:license-gradle-plugin:0.16.1")
