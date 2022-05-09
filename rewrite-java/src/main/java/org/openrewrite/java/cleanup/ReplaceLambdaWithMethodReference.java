@@ -74,13 +74,15 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                         code = "#{}.class::isInstance";
                     }
                 } else if (body instanceof J.TypeCast) {
-                    J j = ((J.TypeCast) body).getClazz();
-                    if (j != null) {
-                        @SuppressWarnings("rawtypes")
-                        J tree = ((J.ControlParentheses) j).getTree();
-                        if (tree instanceof J.Identifier) {
-                            body = tree;
-                            code = "#{}.class::cast";
+                    if (!(((J.TypeCast) body).getExpression() instanceof J.MethodInvocation)) {
+                        J j = ((J.TypeCast) body).getClazz();
+                        if (j != null) {
+                            @SuppressWarnings("rawtypes")
+                            J tree = ((J.ControlParentheses) j).getTree();
+                            if (tree instanceof J.Identifier) {
+                                body = tree;
+                                code = "#{}.class::cast";
+                            }
                         }
                     }
                 }

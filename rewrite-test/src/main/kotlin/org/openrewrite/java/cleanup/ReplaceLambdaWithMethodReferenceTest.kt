@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.tree.J
@@ -37,6 +38,25 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                         if (n % 2 == 0) return n;
                         return n * 2;
                     }).collect(Collectors.toList());
+                }
+            }
+        """
+    )
+
+    @Suppress("RedundantCast")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1772")
+    @Test
+    fun typeCastOnMethodInvocationReturnType() = assertUnchanged(
+        before = """
+            import java.util.List;
+            import java.util.stream.Collectors;
+            import java.util.stream.Stream;
+
+            class Test {
+                public void foo() {
+                    List<String> bar = Stream.of("A", "b")
+                            .map(s -> (String) s.toLowerCase())
+                            .collect(Collectors.toList());
                 }
             }
         """
