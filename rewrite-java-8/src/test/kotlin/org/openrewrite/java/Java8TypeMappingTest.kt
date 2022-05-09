@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,9 @@ import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 import java.util.concurrent.atomic.AtomicReference
 
-class Java11TypeMappingTest : JavaParserTypeMappingTest {
+class Java8TypeMappingTest : JavaParserTypeMappingTest {
     companion object {
-        private val goat = Java11TypeMappingTest::class.java.getResourceAsStream("/JavaTypeGoat.java")!!
+        private val goat = Java8TypeMappingTest::class.java.getResourceAsStream("/JavaTypeGoat.java")!!
             .bufferedReader().readText()
 
         private val goatCu = JavaParser.fromJavaVersion()
