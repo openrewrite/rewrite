@@ -18,7 +18,11 @@ package org.openrewrite.test;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.marker.Marker;
 
 import java.nio.file.Path;
@@ -36,9 +40,6 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     @Nullable
     final String dsl;
-
-    @Nullable
-    protected String sourceSetName;
 
     final String before;
 
@@ -100,7 +101,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         }
 
         public Java sourceSet(String sourceSet) {
-            sourceSetName = sourceSet;
+            markers(SourceSpecMarkers.javaSourceSet(sourceSet));
             return this;
         }
     }
