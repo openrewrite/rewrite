@@ -133,24 +133,13 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     @Nullable
     @Override
     public Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
-        try {
-            return deserializeMavenMetadata(cache.get(serialize((repo.toString() + "/" + gav).getBytes(StandardCharsets.UTF_8))));
-        } catch (RocksDBException e) {
-            throw new MavenDownloadingException(e);
-        }
+        //The Maven metadata is not something that should be stored long term, as it will change over time.
+        return null;
     }
 
     @Override
     public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
-        if (metadata == null) {
-            return;
-        }
-
-        try {
-            cache.put(serialize((repo.toString() + "/" + gav).getBytes(StandardCharsets.UTF_8)), serialize(metadata));
-        } catch (RocksDBException e) {
-            throw new MavenDownloadingException(e);
-        }
+        //The Maven metadata is not something that should be stored long term, as it will change over time.
     }
 
     @Override
