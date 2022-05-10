@@ -16,13 +16,19 @@
 package org.openrewrite.test;
 
 import org.openrewrite.*;
+import org.openrewrite.config.Environment;
+import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.TypeValidation;
 
+import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Properties;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.AssertionsForClassTypes.fail;
@@ -75,6 +81,17 @@ public class RecipeSpec {
     public RecipeSpec recipe(Recipe recipe) {
         this.recipe = recipe;
         return this;
+    }
+
+    public RecipeSpec yamlRecipe(InputStream yaml, String... recipes) {
+        return recipe(Environment.builder()
+                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
+                .build()
+                .activateRecipes(recipes));
+    }
+
+    public RecipeSpec yamlRecipe(String yamlResource, String... recipes) {
+        return yamlRecipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), recipes);
     }
 
     public RecipeSpec parser(Parser<?> parser) {
