@@ -59,8 +59,8 @@ class DeletePropertyTest : PropertiesRecipeTest {
         after = "spring.datasource.schema=classpath*:db/database/schema.sql"
     )
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    @Test
     fun exactMatch() = assertChanged(
         recipe = DeleteProperty("acme.my-project.person.first-name", false, null),
         before = """
@@ -76,4 +76,18 @@ class DeletePropertyTest : PropertiesRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    @Test
+    fun updatePrefix() = assertChanged(
+        recipe = DeleteProperty("acme.my-project.person.first-name", false, null),
+        before = """
+            acme.my-project.person.first-name=example
+            acme.myProject.person.firstName=example
+            acme.my_project.person.first_name=example
+        """,
+        after = """
+            acme.myProject.person.firstName=example
+            acme.my_project.person.first_name=example
+        """
+    )
 }

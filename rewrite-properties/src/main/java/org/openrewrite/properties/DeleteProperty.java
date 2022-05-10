@@ -22,6 +22,9 @@ import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class DeleteProperty extends Recipe {
@@ -68,12 +71,30 @@ public class DeleteProperty extends Recipe {
     protected PropertiesVisitor<ExecutionContext> getVisitor() {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
-            public Properties visitEntry(Properties.Entry entry, ExecutionContext context) {
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), propertyKey) : entry.getKey().equals(propertyKey)) {
-                    //noinspection ConstantConditions
-                    return null;
+            public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
+                Properties.File f = (Properties.File) super.visitFile(file, executionContext);
+
+                String prefix = null;
+                List<Properties.Content> fileContent = new ArrayList<>();
+                for (int i = 0; i < f.getContent().size(); i++) {
+                    Properties.Content content = f.getContent().get(i);
+                    if (content instanceof Properties.Entry &&
+                            (!Boolean.FALSE.equals(relaxedBinding) ?
+                                    NameCaseConvention.equalsRelaxedBinding(((Properties.Entry) content).getKey(), propertyKey) :
+                                    ((Properties.Entry) content).getKey().equals(propertyKey))) {
+                        if (i == 0) {
+                            prefix = ((Properties.Entry) content).getPrefix();
+                        }
+                    } else {
+                        if (prefix != null) {
+                            content = (Properties.Content) content.withPrefix(prefix);
+                            prefix = null;
+                        }
+                        fileContent.add(content);
+                    }
                 }
-                return super.visitEntry(entry, context);
+
+                return f.getContent().size() == fileContent.size() ? f : f.withContent(fileContent);
             }
         };
     }
