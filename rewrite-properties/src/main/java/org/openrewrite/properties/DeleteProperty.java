@@ -18,12 +18,16 @@ package org.openrewrite.properties;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.NameCaseConvention;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+
+import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -39,9 +43,9 @@ public class DeleteProperty extends Recipe {
         return "Deletes key/value pairs from properties files.";
     }
 
-    @Option(displayName = "Property key",
-            description = "The key to be deleted.",
-            example = "management.metrics.binders.files.enabled")
+    @Option(displayName = "Property key matcher",
+            description = "The key(s) to be deleted. This is a glob expression.",
+            example = "management.metrics.binders.files.enabled or management.metrics.*")
     String propertyKey;
 
     @Incubating(since = "7.17.0")
@@ -78,10 +82,7 @@ public class DeleteProperty extends Recipe {
                 List<Properties.Content> fileContent = new ArrayList<>();
                 for (int i = 0; i < f.getContent().size(); i++) {
                     Properties.Content content = f.getContent().get(i);
-                    if (content instanceof Properties.Entry &&
-                            (!Boolean.FALSE.equals(relaxedBinding) ?
-                                    NameCaseConvention.equalsRelaxedBinding(((Properties.Entry) content).getKey(), propertyKey) :
-                                    ((Properties.Entry) content).getKey().equals(propertyKey))) {
+                    if (content instanceof Properties.Entry && isMatch(((Properties.Entry) content).getKey())) {
                         if (i == 0) {
                             prefix = ((Properties.Entry) content).getPrefix();
                         }
@@ -95,6 +96,16 @@ public class DeleteProperty extends Recipe {
                 }
 
                 return f.getContent().size() == fileContent.size() ? f : f.withContent(fileContent);
+            }
+
+            private boolean isMatch(String key) {
+                if (!Boolean.FALSE.equals(relaxedBinding)) {
+                    String newKey = Arrays.stream(key.split("\\.")).map(LOWER_CAMEL::format).collect(Collectors.joining("."));
+                    String newPropertyKey = Arrays.stream(propertyKey.split("\\.")).map(LOWER_CAMEL::format).collect(Collectors.joining("."));
+                    return StringUtils.matchesGlob(newKey, newPropertyKey);
+                } else {
+                    return StringUtils.matchesGlob(key, propertyKey);
+                }
             }
         };
     }

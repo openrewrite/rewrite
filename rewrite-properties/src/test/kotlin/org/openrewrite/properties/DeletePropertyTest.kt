@@ -39,6 +39,7 @@ class DeletePropertyTest : PropertiesRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     @ParameterizedTest
     @ValueSource(
         strings = [
@@ -47,7 +48,6 @@ class DeletePropertyTest : PropertiesRecipeTest {
             "acme.my_project.person.first_name",
         ]
     )
-    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     fun relaxedBinding(propertyKey: String) = assertChanged(
         recipe = DeleteProperty(propertyKey, true, null),
         before = """
@@ -88,6 +88,44 @@ class DeletePropertyTest : PropertiesRecipeTest {
         after = """
             acme.myProject.person.firstName=example
             acme.my_project.person.first_name=example
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1776")
+    @Test
+    fun matchesGlob() = assertChanged(
+        recipe = DeleteProperty("management.metrics.export.dynatrace.*", false, null),
+        before = """
+            management.metrics.export.dynatrace.api-token=YOUR_TOKEN
+            management.metrics.export.dynatrace.device-id=YOUR_DEVICE_ID
+            management.metrics.export.dynatrace.uri=YOUR_URI
+            management.metrics.export.datadog.api-key=YOUR_KEY
+            management.metrics.export.datadog.step=30s
+        """,
+        after = """
+            management.metrics.export.datadog.api-key=YOUR_KEY
+            management.metrics.export.datadog.step=30s
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1776")
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "acme.my-project.*.first-name",
+            "acme.myProject.person.*"
+        ]
+    )
+    fun matchesGlobWithRelaxedBinding(propertyKey: String) = assertChanged(
+        recipe = DeleteProperty(propertyKey, true, null),
+        before = """
+            acme.notMyProject.person=example
+            acme.my-project.person.first-name=example
+            acme.myProject.person.firstName=example
+            acme.my_project.person.first_name=example
+        """,
+        after = """
+            acme.notMyProject.person=example
         """
     )
 }
