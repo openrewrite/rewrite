@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.time.Duration;
 import java.util.*;
 
 import static java.util.Collections.singletonList;
@@ -47,6 +49,11 @@ public class ReferentialEqualityToObjectEquals extends Recipe {
     }
 
     @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(2);
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ReferentialEqualityToObjectEqualityVisitor();
     }
@@ -54,7 +61,7 @@ public class ReferentialEqualityToObjectEquals extends Recipe {
     private static class ReferentialEqualityToObjectEqualityVisitor extends JavaVisitor<ExecutionContext> {
         private static final JavaType TYPE_OBJECT = JavaType.buildType("java.lang.Object");
 
-        private static J.MethodInvocation asEqualsMethodInvocation(J.Binary binary, JavaType.FullyQualified selectType) {
+        private static J.MethodInvocation asEqualsMethodInvocation(J.Binary binary, @Nullable JavaType.FullyQualified selectType) {
             return new J.MethodInvocation(
                     Tree.randomId(),
                     binary.getPrefix(),
@@ -91,9 +98,9 @@ public class ReferentialEqualityToObjectEquals extends Recipe {
         public J visitBinary(J.Binary binary, ExecutionContext ctx) {
             if (!isExcludedBinary(binary)) {
                 JavaType.FullyQualified leftType = TypeUtils.asFullyQualified(binary.getLeft().getType());
-                Optional<JavaType.Method> leftEqualsMethod = TypeUtils.findDeclaredMethod(leftType, "equals", Arrays.asList(TYPE_OBJECT));
+                Optional<JavaType.Method> leftEqualsMethod = TypeUtils.findDeclaredMethod(leftType, "equals", singletonList(TYPE_OBJECT));
                 JavaType.FullyQualified rightType = TypeUtils.asFullyQualified(binary.getRight().getType());
-                Optional<JavaType.Method> rightEqualsMethod = TypeUtils.findDeclaredMethod(rightType, "equals", Arrays.asList(TYPE_OBJECT));
+                Optional<JavaType.Method> rightEqualsMethod = TypeUtils.findDeclaredMethod(rightType, "equals", singletonList(TYPE_OBJECT));
 
                 if (leftEqualsMethod.isPresent() && rightEqualsMethod.isPresent()) {
                     JavaType.Method leftEqualsOverride = TypeUtils.findOverriddenMethod(leftEqualsMethod.get()).orElse(null);

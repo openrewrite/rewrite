@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,7 @@ import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
 @Suppress("ConstantConditions", "StatementWithEmptyBody", "NewObjectEquality", "StringEquality",
-    "com.haulmont.jpb.EqualsDoesntCheckParameterClass"
-)
+    "EqualsWhichDoesntCheckParameterClass")
 interface ReferentialEqualityToObjectEqualsTest : RewriteTest {
 
     override fun defaults(spec: RecipeSpec) {
