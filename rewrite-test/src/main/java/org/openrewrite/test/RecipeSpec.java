@@ -83,15 +83,15 @@ public class RecipeSpec {
         return this;
     }
 
-    public RecipeSpec yamlRecipe(InputStream yaml, String... recipes) {
+    public RecipeSpec recipe(InputStream yaml, String... recipes) {
         return recipe(Environment.builder()
                 .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
                 .build()
                 .activateRecipes(recipes));
     }
 
-    public RecipeSpec yamlRecipe(String yamlResource, String... recipes) {
-        return yamlRecipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), recipes);
+    public RecipeSpec recipe(String yamlResource, String... recipes) {
+        return recipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), recipes);
     }
 
     public RecipeSpec parser(Parser<?> parser) {
