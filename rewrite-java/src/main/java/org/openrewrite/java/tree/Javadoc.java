@@ -27,6 +27,7 @@ import org.openrewrite.java.JavadocPrinter;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -329,7 +330,7 @@ public interface Javadoc extends Tree {
         List<Javadoc> spaceBeforeTree;
 
         @Nullable
-        J tree;
+        Reference tree;
 
         List<Javadoc> label;
 
@@ -368,7 +369,7 @@ public interface Javadoc extends Tree {
 
         Markers markers;
         List<Javadoc> spaceBeforeName;
-        J name;
+        Reference name;
         List<Javadoc> description;
 
         @Override
@@ -422,7 +423,7 @@ public interface Javadoc extends Tree {
         List<Javadoc> spaceBeforeTree;
 
         @Nullable
-        J tree;
+        Reference tree;
 
         List<Javadoc> reference;
 
@@ -640,6 +641,29 @@ public interface Javadoc extends Tree {
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
             return v.visitVersion(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Reference implements Javadoc {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Nullable
+        J tree;
+
+        @Nullable
+        List<Javadoc> lineBreaks;
+
+        public List<Javadoc> getLineBreaks() {
+            return lineBreaks == null ? Collections.emptyList() : lineBreaks;
+        }
+
+        @Override
+        public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
+            return v.visitReference(this, p);
         }
     }
 }

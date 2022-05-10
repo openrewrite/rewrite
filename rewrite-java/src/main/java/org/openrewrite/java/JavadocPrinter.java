@@ -146,7 +146,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         visitMarkers(link.getMarkers(), p);
         p.append(link.isPlain() ? "{@linkplain" : "{@link");
         visit(link.getSpaceBeforeTree(), p);
-        javaVisitor.visit(link.getTree(), p);
+        visit(link.getTree(), p);
         visit(link.getLabel(), p);
         visit(link.getEndBrace(), p);
         return link;
@@ -166,7 +166,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         visitMarkers(parameter.getMarkers(), p);
         p.append("@param");
         visit(parameter.getSpaceBeforeName(), p);
-        javaVisitor.visit(parameter.getName(), p);
+        visit(parameter.getName(), p);
         visit(parameter.getDescription(), p);
         return parameter;
     }
@@ -194,7 +194,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         visitMarkers(see.getMarkers(), p);
         p.append("@see");
         visit(see.getSpaceBeforeTree(), p);
-        javaVisitor.visit(see.getTree(), p);
+        visit(see.getTree(), p);
         visit(see.getReference(), p);
         return see;
     }
@@ -315,6 +315,14 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         }
     }
 
+    @Override
+    public Javadoc visitReference(Javadoc.Reference reference, PrintOutputCapture<P> p) {
+        getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "LINE_BREAKS", reference.getLineBreaks());
+        getCursor().putMessage("INDEX", 0);
+        javaVisitor.visit(reference.getTree(), p, getCursor());
+        return reference;
+    }
+
     static class JavadocJavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
@@ -376,8 +384,31 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
         @Override
         public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
-            p.append(space.getWhitespace());
+            List<Javadoc.LineBreak> lineBreaks = getCursor().getNearestMessage("LINE_BREAKS");
+            Integer index = getCursor().getNearestMessage("INDEX");
+
+            if (lineBreaks != null && index != null && space.getWhitespace().contains("\n")) {
+                for (char c : space.getWhitespace().toCharArray()) {
+                    // The Space from a JavaDoc will not contain a CR because the JavaDoc parser
+                    // filters out other new line characters. CRLF is detected through the source
+                    // and only exists through LineBreaks.
+                    if (c == '\n') {
+                        visitLineBreak(lineBreaks.get(index), p);
+                        index++;
+                    } else {
+                        p.append(c);
+                    }
+                }
+                getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "INDEX", index);
+            } else {
+                p.append(space.getWhitespace());
+            }
             return space;
+        }
+
+        private void visitLineBreak(Javadoc.LineBreak lineBreak, PrintOutputCapture<P> p) {
+            visitMarkers(lineBreak.getMarkers(), p);
+            p.append(lineBreak.getMargin());
         }
 
         private void visitLeftPadded(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, JLeftPadded.Location location, PrintOutputCapture<P> p) {

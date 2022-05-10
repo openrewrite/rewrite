@@ -15,13 +15,13 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
+@Suppress("JavadocDeclaration")
 interface JavadocTest : JavaTreeTest {
 
     @Test
@@ -637,6 +637,34 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/963")
+    @Test
+    fun blankLink(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * {@link}
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/968")
+    @Test
+    fun missingBracket(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * {@link missing.bracket
+             */
+            class Test {
+            }
+        """.trimIndent()
+    )
+
     @Test
     fun methodReferenceNoParameters(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
@@ -714,6 +742,20 @@ interface JavadocTest : JavaTreeTest {
 
     // param
     @Test
+    fun emptyParam(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            public class A {
+                /**
+                 * @param
+                 */
+                void method(int val) {}
+            }
+        """.trimIndent()
+    )
+
+    @Test
     fun param(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
@@ -738,23 +780,6 @@ interface JavadocTest : JavaTreeTest {
     )
 
     @Test
-    fun paramWithoutMargin(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            public class Test {
-                /** Text
-                 @return No margin
-                 */
-                public int test() {
-                    return 0;
-                }
-            }
-        """.trimIndent()
-    )
-
-    @Disabled
-    @Test
     fun lineBreakInParam(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
@@ -763,8 +788,10 @@ interface JavadocTest : JavaTreeTest {
                 /**
                  * @param <
                  *   T> t hi
+                 * @param 
+                 *   val
                  */
-                <T> boolean test();
+                <T> boolean test(int val);
             }
         """.trimIndent()
     )
@@ -818,34 +845,6 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/963")
-    @Test
-    fun blankLink(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * {@link}
-             */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/968")
-    @Test
-    fun missingBracket(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            /**
-             * {@link missing.bracket
-             */
-            class Test {
-            }
-        """.trimIndent()
-    )
-
     // provides
     @Test
     fun provide(jp: JavaParser) = assertParsePrintAndProcess(
@@ -872,6 +871,22 @@ interface JavadocTest : JavaTreeTest {
                  * @return id
                  */
                 int method(int val) {}
+            }
+        """.trimIndent()
+    )
+
+    @Test
+    fun returnWithoutMargin(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            public class Test {
+                /** Text
+                 @return No margin
+                 */
+                public int test() {
+                    return 0;
+                }
             }
         """.trimIndent()
     )
@@ -1272,6 +1287,31 @@ interface JavadocTest : JavaTreeTest {
                  * 
                  */
                 void method();
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1078")
+    @Test
+    fun seeWithMultilineMethodInvocation(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            import java.lang.Math;
+            
+            interface Test {
+                /**
+                 * @see Math#pow(
+                 * 
+                 *    double   
+                 * 
+                 *
+                 *    ,    
+                 * double
+                 * 
+                 * )
+                 */
+                boolean test();
             }
         """.trimIndent()
     )

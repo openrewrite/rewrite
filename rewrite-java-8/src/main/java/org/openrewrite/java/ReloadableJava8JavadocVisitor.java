@@ -36,6 +36,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -440,7 +441,13 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         body.addAll(sourceBefore(node.getKind() == DocTree.Kind.LINK ? "{@link" : "{@linkplain"));
 
         List<Javadoc> spaceBeforeRef = whitespaceBefore();
+        Javadoc.Reference reference = null;
         J ref = visitReference(node.getReference(), body);
+        //noinspection ConstantConditions
+        if (ref != null) {
+            reference = new Javadoc.Reference(randomId(), ref, lineBreaksInMultilineJReference());
+        }
+
         List<Javadoc> label = convertMultiline(node.getLabel());
 
         return new Javadoc.Link(
@@ -448,7 +455,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 Markers.EMPTY,
                 node.getKind() != DocTree.Kind.LINK,
                 spaceBeforeRef,
-                ref,
+                reference,
                 label,
                 endBrace()
         );
@@ -474,32 +481,37 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     public Tree visitParam(ParamTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("@param"));
         DCTree.DCParam param = (DCTree.DCParam) node;
+
+        List<Javadoc> spaceBefore;
         J typeName;
 
-        List<Javadoc> beforeName;
         if (param.isTypeParameter) {
-            beforeName = sourceBefore("<");
+            spaceBefore = sourceBefore("<");
+
+            String beforeName = whitespaceBeforeAsString();
+            Space namePrefix = beforeName.isEmpty() ? Space.EMPTY : Space.build(beforeName, emptyList());
             typeName = new J.TypeParameter(
                     randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
                     emptyList(),
-                    visitIdentifier(node.getName(), whitespaceBefore()),
+                    visitIdentifier(node.getName(), whitespaceBefore()).withPrefix(namePrefix),
                     null
             );
-
-            // FIXME could be space here
+            // The node will not be considered a type parameter if whitespace exists before `>`.
             sourceBefore(">");
         } else {
-            beforeName = whitespaceBefore();
+            spaceBefore = whitespaceBefore();
             typeName = (J) scan(node.getName(), body);
         }
 
+        List<Javadoc> beforeReference = lineBreaksInMultilineJReference();
+        Javadoc.Reference reference = new Javadoc.Reference(randomId(), typeName, beforeReference);
         return new Javadoc.Parameter(
                 randomId(),
                 Markers.EMPTY,
-                beforeName,
-                typeName,
+                spaceBefore,
+                reference,
                 convertMultiline(param.getDescription())
         );
     }
@@ -678,17 +690,24 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     @Override
     public Tree visitSee(SeeTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("@see"));
-        J ref = null;
+
+        Javadoc.Reference reference = null;
+
+        J ref;
         List<Javadoc> spaceBeforeTree = whitespaceBefore();
         List<Javadoc> docs;
         if (node.getReference().get(0) instanceof DCTree.DCReference) {
             ref = visitReference((ReferenceTree) node.getReference().get(0), body);
+            //noinspection ConstantConditions
+            if (ref != null) {
+                reference = new Javadoc.Reference(randomId(), ref, lineBreaksInMultilineJReference());
+            }
             docs = convertMultiline(node.getReference().subList(1, node.getReference().size()));
         } else {
             docs = convertMultiline(node.getReference());
         }
 
-        return new Javadoc.See(randomId(), Markers.EMPTY, spaceBeforeTree, ref, docs);
+        return new Javadoc.See(randomId(), Markers.EMPTY, spaceBeforeTree, reference, docs);
     }
 
     @Override
@@ -954,6 +973,29 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             }
         }
         return js;
+    }
+
+    /**
+     * A {@link J} may contain new lines in each {@link Space} and each new line will have a corresponding
+     * {@link org.openrewrite.java.tree.Javadoc.LineBreak}.
+     *
+     * This method collects the linebreaks associated to new lines in a Space, and removes the applicable linebreaks
+     * from the map.
+     */
+    private List<Javadoc> lineBreaksInMultilineJReference() {
+        List<Integer> linebreakIndexes = lineBreaks.keySet().stream()
+                .filter(o -> o <= cursor)
+                .collect(Collectors.toList());
+
+        List<Javadoc> referenceLineBreaks = linebreakIndexes.stream()
+                .sorted()
+                .map(lineBreaks::get)
+                .collect(Collectors.toList());
+
+        for (Integer key : linebreakIndexes) {
+            lineBreaks.remove(key);
+        }
+        return referenceLineBreaks;
     }
 
     class JavaVisitor extends TreeScanner<J, Space> {
