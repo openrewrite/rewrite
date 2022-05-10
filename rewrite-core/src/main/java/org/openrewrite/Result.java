@@ -230,10 +230,17 @@ public class Result {
                     .map(l -> {
                         if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
                             addedComment.set(true);
-                            return l + recipesThatMadeChanges.stream()
-                                    .map(Recipe::getName)
-                                    .sorted()
-                                    .collect(Collectors.joining(", ", " ", ""));
+
+                            Set<String> sortedRecipeNames = new LinkedHashSet<>();
+                            for (Recipe recipesThatMadeChange : recipesThatMadeChanges) {
+                                sortedRecipeNames.add(recipesThatMadeChange.getName());
+                            }
+                            StringJoiner joinedRecipeNames = new StringJoiner(", ", " ", "");
+                            for (String name : sortedRecipeNames) {
+                                joinedRecipeNames.add(name);
+                            }
+
+                            return l + joinedRecipeNames.toString();
                         }
                         return l;
                     })
