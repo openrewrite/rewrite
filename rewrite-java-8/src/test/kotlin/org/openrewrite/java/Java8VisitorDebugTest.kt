@@ -627,6 +627,10 @@ class Java8UsesJavaVersionTest : Java8Test, UsesJavaVersionTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8UriCreatedWithHttpSchemeTest : Java8Test, UriCreatedWithHttpSchemeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8UseJavaStyleArrayDeclarationsTck : Java8Test, UseJavaStyleArrayDeclarationsTest
 
 @DebugOnly

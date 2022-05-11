@@ -476,6 +476,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UsesJavaVersionTck : UsesJavaVersionTest
 
     @Nested
+    inner class UriCreatedWithHttpSchemeTck : UriCreatedWithHttpSchemeTest
+
+    @Nested
     inner class UseJavaStyleArrayDeclarationsTck : UseJavaStyleArrayDeclarationsTest
 
     @Nested

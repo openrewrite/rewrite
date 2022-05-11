@@ -635,6 +635,10 @@ class Java11UsesJavaVersionTest : Java11Test, UsesJavaVersionTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11UriCreatedWithHttpSchemeTest : Java11Test, UriCreatedWithHttpSchemeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11UsesMethodTest : Java11Test, UsesMethodTest
 
 @DebugOnly

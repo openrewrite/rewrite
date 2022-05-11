@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.dataflow.Dataflow;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -48,6 +49,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      */
     protected JavadocVisitor<P> getJavadocVisitor() {
         return new JavadocVisitor<>(this);
+    }
+    @Incubating(since = "7.24.0")
+    public Dataflow dataflow() {
+        return new Dataflow(getCursor());
     }
 
     /**
@@ -644,7 +649,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         e = e.getPadding().withBody(visitRightPadded(e.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p));
         return e;
     }
-
     public J visitIf(J.If iff, P p) {
         J.If i = iff;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IF_PREFIX, p));
