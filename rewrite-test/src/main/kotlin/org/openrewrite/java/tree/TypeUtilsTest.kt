@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
@@ -92,6 +93,31 @@ interface TypeUtilsTest : RewriteTest {
         """) { s -> s.beforeRecipe { cu ->
             val fooMethodType = (cu.classes[0].body.statements[0] as J.MethodDeclaration).methodType
             assertThat(TypeUtils.findOverriddenMethod(fooMethodType)).isPresent
+        }}
+    )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1782")
+    @Test
+    fun isOverrideConsidersTypeParameterPositions(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            interface Interface <T, Y> {
+                 void foo(Y y, T t);
+            }
+        """),
+        java("""
+            class Clazz implements Interface<Integer, String> {
+                
+                void foo(Integer t, String y) { }
+                
+                @Override
+                void foo(String y, Integer t) { }
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val methods = cu.classes[0].body.statements.filterIsInstance<J.MethodDeclaration>()
+            assertThat(TypeUtils.findOverriddenMethod((methods[0]).methodType)).isEmpty
+            assertThat(TypeUtils.findOverriddenMethod((methods[0]).methodType)).isPresent
         }}
     )
 }
