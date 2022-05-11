@@ -23,9 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
@@ -100,9 +98,7 @@ public class DeleteProperty extends Recipe {
 
             private boolean isMatch(String key) {
                 if (!Boolean.FALSE.equals(relaxedBinding)) {
-                    String newKey = Arrays.stream(key.split("\\.")).map(LOWER_CAMEL::format).collect(Collectors.joining("."));
-                    String newPropertyKey = Arrays.stream(propertyKey.split("\\.")).map(LOWER_CAMEL::format).collect(Collectors.joining("."));
-                    return StringUtils.matchesGlob(newKey, newPropertyKey);
+                    return StringUtils.matchesGlob(LOWER_CAMEL.format(key), LOWER_CAMEL.format(propertyKey));
                 } else {
                     return StringUtils.matchesGlob(key, propertyKey);
                 }
