@@ -117,7 +117,7 @@ interface TypeUtilsTest : RewriteTest {
         """) { s -> s.beforeRecipe { cu ->
             val methods = cu.classes[0].body.statements.filterIsInstance<J.MethodDeclaration>()
             assertThat(TypeUtils.findOverriddenMethod((methods[0]).methodType)).isEmpty
-            assertThat(TypeUtils.findOverriddenMethod((methods[0]).methodType)).isPresent
+            assertThat(TypeUtils.findOverriddenMethod((methods[1]).methodType)).isPresent
         }}
     )
 }
