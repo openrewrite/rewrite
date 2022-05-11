@@ -102,17 +102,21 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         Cursor parentCursor = parentCursorRef.get();
 
-        J2 j2 = (J2) new JavaVisitor<Integer>() {
+        //noinspection ConstantConditions
+        return  (J2) new JavaVisitor<Integer>() {
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
                 if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
                         annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
+                    typeValidation.assertValidTypes(gen);
                     return gen.get(0).withPrefix(annotation.getPrefix());
                 } else if (loc.equals(ANNOTATION_ARGUMENTS) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
                         annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
-                    return annotation.withArguments(gen.get(0).getArguments());
+                    annotation = annotation.withArguments(gen.get(0).getArguments());
+                    typeValidation.assertValidTypes(annotation);
+                    return annotation;
                 }
 
                 return super.visitAnnotation(annotation, integer);
@@ -127,7 +131,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     new Cursor(getCursor(), insertionPoint),
                                     Statement.class,
                                     substitutedTemplate, loc));
-
+                            typeValidation.assertValidTypes(gen);
                             if (coordinates.getComparator() != null) {
                                 if (gen.size() != 1) {
                                     throw new IllegalArgumentException("Expected a template that would generate exactly one " +
@@ -159,7 +163,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                         new Cursor(getCursor(), insertionPoint),
                                         Statement.class,
                                         substitutedTemplate, loc));
-
+                                typeValidation.assertValidTypes(gen);
                                 Cursor parent = getCursor();
                                 for (int i = 0; i < gen.size(); i++) {
                                     Statement s = gen.get(i);
@@ -189,6 +193,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     switch (loc) {
                         case ANNOTATIONS: {
                             List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
+                            typeValidation.assertValidTypes(gen);
                             J.ClassDeclaration c = classDecl;
                             if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                                 c = c.withLeadingAnnotations(gen);
@@ -208,6 +213,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         }
                         case EXTENDS: {
                             TypeTree anExtends = substitutions.unsubstitute(templateParser.parseExtends(substitutedTemplate));
+                            typeValidation.assertValidTypes(anExtends);
                             J.ClassDeclaration c = classDecl.withExtends(anExtends);
 
                             //noinspection ConstantConditions
@@ -216,6 +222,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         }
                         case IMPLEMENTS: {
                             List<TypeTree> implementings = substitutions.unsubstitute(templateParser.parseImplements(substitutedTemplate));
+                            typeValidation.assertValidTypes(implementings);
                             List<JavaType.FullyQualified> implementsTypes = implementings.stream()
                                     .map(TypedTree::getType)
                                     .map(TypeUtils::asFullyQualified)
@@ -262,6 +269,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate));
+                            typeValidation.assertValidTypes(typeParameters);
                             return classDecl.withTypeParameters(typeParameters);
                         }
                     }
@@ -283,6 +291,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     switch (loc) {
                         case ANNOTATIONS: {
                             List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
+                            typeValidation.assertValidTypes(gen);
                             J.MethodDeclaration m = method;
                             if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                                 m = method.withLeadingAnnotations(gen);
@@ -306,6 +315,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         case BLOCK_PREFIX: {
                             List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(), Statement.class,
                                     substitutedTemplate, loc));
+                            typeValidation.assertValidTypes(gen);
                             J.Block body = method.getBody();
                             if (body == null) {
                                 body = EMPTY_BLOCK;
@@ -368,11 +378,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
                                 type = type.withParameterNames(paramNames).withParameterTypes(paramTypes);
                             }
-
+                            typeValidation.assertValidTypes(parameters);
                             return method.withParameters(parameters).withMethodType(type);
                         }
                         case THROWS: {
-                            J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(substitutedTemplate)));
+                            List<NameTree> gen = substitutions.unsubstitute(templateParser.parseThrows(substitutedTemplate));
+                            typeValidation.assertValidTypes(gen);
+                            J.MethodDeclaration m = method.withThrows(gen);
 
                             // Update method type information to reflect the new checked exceptions
                             JavaType.Method type = m.getMethodType();
@@ -385,7 +397,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 }
                                 type = type.withThrownExceptions(newThrows);
                             }
-
                             //noinspection ConstantConditions
                             m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")))
                                     .withMethodType(type);
@@ -393,6 +404,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate));
+                            typeValidation.assertValidTypes(typeParameters);
                             J.MethodDeclaration m = method.withTypeParameters(typeParameters);
                             return autoFormat(m, typeParameters.get(typeParameters.size() - 1), p,
                                     getCursor().getParentOrThrow());
@@ -434,6 +446,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         mt = mt.withParameterTypes(argTypes);
                         m = m.withMethodType(mt);
                     }
+                    typeValidation.assertValidTypes(m);
                     return m;
                 }
                 return maybeReplaceStatement(method, J.class, 0);
@@ -463,6 +476,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     "statement to replace one statement, but generated " + gen.size() +
                                     ". Template:\n" + substitutedTemplate);
                         }
+                        typeValidation.assertValidTypes(gen);
                         return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p, getCursor().getParentOrThrow());
                     }
                     throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");
@@ -476,6 +490,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     if (loc == ANNOTATIONS) {
                         J.VariableDeclarations v = multiVariable;
                         final List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
+                        typeValidation.assertValidTypes(gen);
                         if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                             v = v.withLeadingAnnotations(gen);
                             if (v.getTypeExpression() instanceof J.AnnotatedType) {
@@ -495,9 +510,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 return super.visitVariableDeclarations(multiVariable, p);
             }
         }.visit(changing, 0, parentCursor);
-        //noinspection ConstantConditions
-        typeValidation.assertValidTypes(j2);
-        return j2;
     }
 
     public static Builder builder(Supplier<Cursor> parentScope, String code) {

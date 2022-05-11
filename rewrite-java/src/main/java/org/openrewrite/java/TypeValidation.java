@@ -44,9 +44,14 @@ public class TypeValidation {
         return identifiers || methodInvocations || methodDeclarations || classDeclarations;
     }
 
-    public void assertValidTypes(J sf) {
+    public void assertValidTypes(List<? extends J> trees) {
+        for (J tree : trees) {
+            assertValidTypes(tree);
+        }
+    }
+    public void assertValidTypes(J tree) {
         if (enabled()) {
-            List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
+            List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(tree);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
                         if (identifiers && missingType.getJ() instanceof J.Identifier) {
