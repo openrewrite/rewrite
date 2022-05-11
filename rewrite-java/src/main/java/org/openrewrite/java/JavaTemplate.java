@@ -51,16 +51,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private final TypeValidation typeValidation;
-
     private JavaTemplate(Supplier<Cursor> parentScopeGetter, Supplier<JavaParser> parser, String code, Set<String> imports,
-                         Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate, TypeValidation typeValidation) {
+                         Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.parentScopeGetter = parentScopeGetter;
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.parameterCount = StringUtils.countOccurrences(code, "#{");
         this.templateParser = new JavaTemplateParser(parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
-        this.typeValidation = typeValidation;
     }
 
     @Override
@@ -102,7 +99,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         Cursor parentCursor = parentCursorRef.get();
 
-        J2 j2 = (J2) new JavaVisitor<Integer>() {
+        //noinspection ConstantConditions
+        return  (J2) new JavaVisitor<Integer>() {
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
                 if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
@@ -495,9 +493,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 return super.visitVariableDeclarations(multiVariable, p);
             }
         }.visit(changing, 0, parentCursor);
-        //noinspection ConstantConditions
-        typeValidation.assertValidTypes(j2);
-        return j2;
     }
 
     public static Builder builder(Supplier<Cursor> parentScope, String code) {
@@ -516,8 +511,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         };
         private Consumer<String> onBeforeParseTemplate = s -> {
         };
-
-        private TypeValidation typeValidation = new TypeValidation();
 
         Builder(Supplier<Cursor> parentScope, String code) {
             this.parentScope = parentScope;
@@ -563,14 +556,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             return this;
         }
 
-        public Builder typeValidation(TypeValidation typeValidation) {
-            this.typeValidation = typeValidation;
-            return this;
-        }
-
         public JavaTemplate build() {
             return new JavaTemplate(parentScope, javaParser, code, imports,
-                    onAfterVariableSubstitution, onBeforeParseTemplate, typeValidation);
+                    onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }
 }
