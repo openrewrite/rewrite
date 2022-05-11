@@ -28,7 +28,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
-@Incubating(since = "7.0.24")
+@Incubating(since = "7.24.0")
 public class RemoveRedundantTypeCast extends Recipe {
     @Override
     public String getDisplayName() {
