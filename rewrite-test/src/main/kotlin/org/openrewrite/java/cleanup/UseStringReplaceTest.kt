@@ -17,12 +17,32 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaRecipeTest
 
 interface UseStringReplaceTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = UseStringReplace()
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1781")
+    @Test
+    fun replaceAllContainsEscapedQuotes() = assertChanged(
+        before = """
+            class Test {
+                public String method(String input) {
+                    return input.replaceAll("\"test\"\"", "");
+                }
+            }
+        """,
+        after = """
+            class Test {
+                public String method(String input) {
+                    return input.replace("\"test\"\"", "");
+                }
+            }
+        """
+    )
 
     @Test
     @DisplayName("String#repalaceAll replaced by String#replace, 'cause fist argument is not a regular expression")

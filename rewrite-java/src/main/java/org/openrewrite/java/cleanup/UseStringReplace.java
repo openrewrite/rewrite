@@ -95,6 +95,9 @@ public class UseStringReplace extends Recipe {
                     if (Objects.nonNull(value) && !mayBeRegExp(value)) {
                         List<Expression> arguments = new ArrayList<>(invocation.getArguments());
                         String unEscapedLiteral = unEscapeCharacters(value);
+                        if (unEscapedLiteral.contains("\"")) {
+                            unEscapedLiteral = unEscapedLiteral.replace("\"", "\\\"");
+                        }
                         arguments.set(0, literal.withValue(unEscapedLiteral).withValueSource(String.format("\"%s\"", unEscapedLiteral)));
 
                         return invocation
