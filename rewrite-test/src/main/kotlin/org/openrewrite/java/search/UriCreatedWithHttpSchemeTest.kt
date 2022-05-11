@@ -36,7 +36,6 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
                 class Test {
                     void test() {
                         String s = "http://test";
-                        s = s.replace("http://", "https://");
                         if(System.currentTimeMillis() > 0) {
                             System.out.println(URI.create(s));
                         } else {
@@ -49,6 +48,28 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
                 class Test {
                     void test() {
                         String s = "https://test";
+                        if(System.currentTimeMillis() > 0) {
+                            System.out.println(URI.create(s));
+                        } else {
+                            System.out.println(URI.create(s));
+                        }
+                    }
+                }
+            """
+        )
+    )
+
+    @Disabled
+    @Test
+    fun replaceBarrierGuard(javaParser: JavaParser) = rewriteRun(
+        { spec -> spec.parser(javaParser) },
+        java(
+            """
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "http://test";
+                        s = s.replace("http://", "https://");
                         if(System.currentTimeMillis() > 0) {
                             System.out.println(URI.create(s));
                         } else {
