@@ -26,7 +26,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 public class UriCreatedWithHttpScheme extends Recipe {
-    private static final MethodMatcher URI_CREATE = new MethodMatcher("java.net.URI");
+    private static final MethodMatcher URI_CREATE = new MethodMatcher("java.net.URI create(..)");
     private static final MethodMatcher STRING_REPLACE = new MethodMatcher("java.lang.String replace(..)");
 
     private static final LocalFlowSpec<J.Literal, J.MethodInvocation> INSECURE_URI = new LocalFlowSpec<J.Literal, J.MethodInvocation>() {
