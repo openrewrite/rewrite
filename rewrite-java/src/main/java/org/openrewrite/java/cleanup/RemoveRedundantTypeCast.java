@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -27,6 +28,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
+@Incubating(since = "7.0.24")
 public class RemoveRedundantTypeCast extends Recipe {
     @Override
     public String getDisplayName() {

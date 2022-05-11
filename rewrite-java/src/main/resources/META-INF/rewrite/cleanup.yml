@@ -36,4 +36,4 @@ recipeList:
   - org.openrewrite.java.cleanup.NeedBraces
   - org.openrewrite.java.cleanup.OperatorWrap
   - org.openrewrite.java.cleanup.UnnecessaryParentheses
-  - org.openrewrite.java.cleanup.RemoveRedundantTypeCast
+#  - org.openrewrite.java.cleanup.RemoveRedundantTypeCast
