@@ -69,7 +69,7 @@ public class RemoveRedundantTypeCast extends Recipe {
                 JavaType expressionType = typeCast.getExpression().getType();
 
                 JavaType namedVariableType = ((J.VariableDeclarations) parent.getValue()).getVariables().get(0).getType();
-                if (TypeUtils.isOfClassType(namedVariableType, "java.lang.Object") ||
+                if (!(namedVariableType instanceof JavaType.Array) && TypeUtils.isOfClassType(namedVariableType, "java.lang.Object") ||
                         (!(typeTree instanceof J.ParameterizedType) && (TypeUtils.isOfType(namedVariableType, expressionType) || TypeUtils.isAssignableTo(namedVariableType, expressionType)))) {
                     return typeCast.getExpression();
                 }

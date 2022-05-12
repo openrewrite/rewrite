@@ -72,7 +72,7 @@ public class AddDelegatesToGradleApi extends Recipe {
                         return it;
                     }
                     J.VariableDeclarations param = (J.VariableDeclarations) it;
-                    if (!(TypeUtils.isOfType(CLOSURE_TYPE, param.getType()) && FindAnnotations.find(param, "@groovy.lang.DelegatesTo").isEmpty())) {
+                    if (!(TypeUtils.isOfType(param.getType(), param.getType()) && FindAnnotations.find(param, "@groovy.lang.DelegatesTo").isEmpty())) {
                         return param;
                     }
                     if (method.getMethodType() == null || !(method.getMethodType().getDeclaringType() instanceof JavaType.Class)) {
@@ -81,7 +81,7 @@ public class AddDelegatesToGradleApi extends Recipe {
                     // Construct a matcher that will identify methods identical to this one except they accept Action instead of Closure
                     MethodMatcher matcher = new MethodMatcher(method.getMethodType().withParameterTypes(
                             ListUtils.map(method.getMethodType().getParameterTypes(), p -> {
-                                if (TypeUtils.isOfType(CLOSURE_TYPE, p)) {
+                                if (TypeUtils.isOfClassType(p, CLOSURE_TYPE.getFullyQualifiedName())) {
                                     return ACTION_TYPE;
                                 }
                                 return p;
@@ -93,7 +93,7 @@ public class AddDelegatesToGradleApi extends Recipe {
                     Optional<JavaType> maybeDelegateType = declaringClass.getMethods().stream()
                             .filter(matcher::matches)
                             .map(m -> (JavaType.Parameterized) m.getParameterTypes().stream()
-                                    .filter(mp -> TypeUtils.isOfType(ACTION_TYPE, mp))
+                                    .filter(mp -> TypeUtils.isOfClassType(mp, ACTION_TYPE.getFullyQualifiedName()))
                                     .findFirst().get())
                             .filter(m -> m.getTypeParameters().size() == 1)
                             .map(m -> m.getTypeParameters().get(0))
@@ -102,7 +102,7 @@ public class AddDelegatesToGradleApi extends Recipe {
                         return param;
                     }
                     JavaType.FullyQualified delegateType = unwrapGenericTypeVariable(maybeDelegateType.get());
-                    if(delegateType == null) {
+                    if (delegateType == null) {
                         return param;
                     }
                     String simpleName =  delegateType.getFullyQualifiedName().substring( delegateType.getFullyQualifiedName().lastIndexOf('.') + 1);
@@ -127,7 +127,7 @@ public class AddDelegatesToGradleApi extends Recipe {
     private static JavaType.FullyQualified unwrapGenericTypeVariable(JavaType type) {
         if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable)type;
-            if(genericType.getBounds().size() == 1) {
+            if (genericType.getBounds().size() == 1) {
                 return unwrapGenericTypeVariable(genericType.getBounds().get(0));
             } else {
                 return null;
@@ -144,6 +144,6 @@ public class AddDelegatesToGradleApi extends Recipe {
 
     private static boolean hasClosureParameter(J.MethodDeclaration methodDeclaration) {
         return methodDeclaration.getParameters().stream()
-                .anyMatch(param -> param instanceof J.VariableDeclarations && TypeUtils.isOfType(CLOSURE_TYPE, ((J.VariableDeclarations)param).getType()));
+                .anyMatch(param -> param instanceof J.VariableDeclarations && TypeUtils.isOfClassType(((J.VariableDeclarations)param).getType(), CLOSURE_TYPE.getFullyQualifiedName()));
     }
 }
