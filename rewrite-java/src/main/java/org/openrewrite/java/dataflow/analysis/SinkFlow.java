@@ -68,6 +68,10 @@ public class SinkFlow<Sink extends Expression> extends FlowGraph {
         Iterator<Cursor> cursorPath = cursor.getPathAsCursors();
         while (cursorPath.hasNext()) {
             Cursor c = cursorPath.next();
+            if (c.getValue() instanceof Expression && spec.isBarrierGuard(c.getValue())) {
+                return;
+            }
+
             boolean isSinkType = spec.getSinkType().isAssignableFrom(c.getValue().getClass());
             if (isSinkType && spec.isSink(c.getValue(), c)) {
                 List<Cursor> flow = new ArrayList<>(pathToHere);

@@ -30,15 +30,15 @@ import java.util.Iterator;
 public class Dataflow {
     final Cursor cursor;
 
-    public <E extends Expression> SinkFlow<E> findSinks(LocalFlowSpec<?, E> spec) {
-        SinkFlow<E> root = new SinkFlow<>(spec, cursor);
+    public <Source extends Expression, Sink extends Expression> SinkFlow<Sink> findSinks(LocalFlowSpec<Source, Sink> spec) {
+        SinkFlow<Sink> root = new SinkFlow<>(spec, cursor);
 
         Iterator<Object> cursorPath = cursor.getPath();
         while (cursorPath.hasNext()) {
             Object value = cursorPath.next();
             boolean isSourceType = spec.getSourceType().isAssignableFrom(value.getClass());
             //noinspection unchecked
-            if (isSourceType && ((LocalFlowSpec<Expression, E>) spec).isSource((Expression) value, cursor)) {
+            if (isSourceType && ((LocalFlowSpec<Expression, Sink>) spec).isSource((Expression) value, cursor)) {
                 ForwardFlow.findSinks(root);
             }
         }

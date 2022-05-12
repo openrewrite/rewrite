@@ -21,6 +21,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
+@Suppress("UnnecessaryLocalVariable")
 interface UriCreatedWithHttpSchemeTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(UriCreatedWithHttpScheme())
@@ -60,7 +61,6 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
         )
     )
 
-    @Disabled
     @Test
     fun replaceIsABarrierGuard(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },

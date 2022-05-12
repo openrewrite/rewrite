@@ -16,11 +16,13 @@
 package org.openrewrite.java.dataflow;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.Expression;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
+@Incubating(since = "7.24.0")
 public abstract class LocalFlowSpec<Source extends Expression, Sink extends Expression> {
     protected final Type sourceType;
     protected final Type sinkType;
@@ -30,8 +32,8 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends Expr
         if (superClass instanceof Class) {
             throw new IllegalArgumentException("Internal error: LocalFlowSpec constructed without actual type information");
         } else {
-            this.sourceType = ((ParameterizedType)superClass).getActualTypeArguments()[0];
-            this.sinkType = ((ParameterizedType)superClass).getActualTypeArguments()[1];
+            this.sourceType = ((ParameterizedType) superClass).getActualTypeArguments()[0];
+            this.sinkType = ((ParameterizedType) superClass).getActualTypeArguments()[1];
         }
     }
 
