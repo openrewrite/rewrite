@@ -22,6 +22,7 @@ import org.openrewrite.java.dataflow.analysis.ForwardFlow;
 import org.openrewrite.java.dataflow.analysis.SinkFlow;
 import org.openrewrite.java.dataflow.analysis.SourceFlow;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
 
 import java.util.Iterator;
 
@@ -30,7 +31,7 @@ import java.util.Iterator;
 public class Dataflow {
     final Cursor cursor;
 
-    public <Source extends Expression, Sink extends Expression> SinkFlow<Sink> findSinks(LocalFlowSpec<Source, Sink> spec) {
+    public <Source extends Expression, Sink extends J> SinkFlow<Sink> findSinks(LocalFlowSpec<Source, Sink> spec) {
         SinkFlow<Sink> root = new SinkFlow<>(spec, cursor);
 
         Iterator<Object> cursorPath = cursor.getPath();

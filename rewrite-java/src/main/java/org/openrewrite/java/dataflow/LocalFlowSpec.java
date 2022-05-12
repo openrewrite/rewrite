@@ -18,12 +18,13 @@ package org.openrewrite.java.dataflow;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
 @Incubating(since = "7.24.0")
-public abstract class LocalFlowSpec<Source extends Expression, Sink extends Expression> {
+public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
     protected final Type sourceType;
     protected final Type sinkType;
 

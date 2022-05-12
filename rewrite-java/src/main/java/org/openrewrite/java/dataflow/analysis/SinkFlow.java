@@ -18,12 +18,13 @@ package org.openrewrite.java.dataflow.analysis;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
 
 import java.util.*;
 
 import static java.util.Collections.emptyList;
 
-public class SinkFlow<Sink extends Expression> extends FlowGraph {
+public class SinkFlow<Sink extends J> extends FlowGraph {
     private final LocalFlowSpec<?, Sink> spec;
 
     public SinkFlow(LocalFlowSpec<?, Sink> spec, Cursor cursor) {
