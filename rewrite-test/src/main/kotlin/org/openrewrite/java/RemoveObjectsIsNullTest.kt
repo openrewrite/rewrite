@@ -32,20 +32,22 @@ interface RemoveObjectsIsNullTest : JavaRecipeTest {
     fun transformCallToIsNull(jp: JavaParser) = assertChanged(
         jp,
         before = """
+            import static java.util.Objects.isNull;
             public class A {
                 public void test() {
                     boolean a = true;
-                    if (isNull(a)) {
+                    if (java.util.Objects.isNull(a)) {
                         System.out.println("a is null");
                     };
                 }
             }        
         """,
         after = """
+            import static java.util.Objects.isNull;
             public class A {
                 public void test() {
-                    boolean a = true, b = false;
-                    if (a == null){
+                    boolean a = true;
+                    if (a == null) {
                         System.out.println("a is null");
                     };
                 }
@@ -58,20 +60,22 @@ interface RemoveObjectsIsNullTest : JavaRecipeTest {
     fun transformCallToIsNullNeedsParentheses(jp: JavaParser) = assertChanged(
         jp,
         before = """
+            import static java.util.Objects.isNull;
             public class A {
                 public void test() {
                     boolean a = true, b = false;
-                    if (isNull(a || b)){
+                    if (isNull(a || b)) {
                         System.out.println("a || b is null");
                     };
                 }
             }        
         """,
         after = """
+            import static java.util.Objects.isNull;
             public class A {
                 public void test() {
                     boolean a = true, b = false;
-                    if ((a || b) == null){
+                    if ((a || b) == null) {
                         System.out.println("a || b is null");
                     };
                 }

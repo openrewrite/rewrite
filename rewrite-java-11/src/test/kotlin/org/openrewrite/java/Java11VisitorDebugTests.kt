@@ -484,6 +484,10 @@ class Java11RemoveImportTest : Java11Test, RemoveImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RemoveObjectsIsNullTest : Java11Test, RemoveObjectsIsNullTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RemoveTrailingWhitespaceTest : Java11Test, RemoveTrailingWhitespaceTest
 
 @DebugOnly

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
+import org.openrewrite.java.cleanup.UnnecessaryParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -11,6 +12,7 @@ public class RemoveObjectsIsNull extends Recipe {
 
     @JsonCreator
     public RemoveObjectsIsNull() {
+        doNext(new UnnecessaryParentheses());
     }
 
     @Override
@@ -28,15 +30,22 @@ public class RemoveObjectsIsNull extends Recipe {
         return new TransformCallsToObjectsIsNullVisitor();
     }
 
-    private static MethodMatcher isNullmatcher = new MethodMatcher("java.lang.Objects isNull()");
-    private static MethodMatcher nonNullmatcher = new MethodMatcher("java.lang.Objects nonNull()");
+    private static MethodMatcher isNullmatcher = new MethodMatcher("java.util.Objects isNull(..)");
+    private static MethodMatcher nonNullmatcher = new MethodMatcher("java.util.Objects nonNull(..)");
+
+
 
     private class TransformCallsToObjectsIsNullVisitor extends JavaVisitor<ExecutionContext> {
         @Override
         public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-            if(isNullmatcher.matches(method)) {
+            J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
+            if(isNullmatcher.matches(m)) {
+                JavaTemplate template = JavaTemplate.builder(this::getCursor, "(#{any(boolean)}) == null").build();
+                Expression e = m.getArguments().get(0);
+                Expression result = m.withTemplate(template, m.getCoordinates().replace(), e);
+                return result;
+                /*
                 // isNull(e) --> e == null
-                Expression e = method.getArguments().get(0);
                 J.Literal nullLiteral = new J.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY, "null", "null", null, JavaType.Primitive.Null);
                 return new J.Binary(Tree.randomId(),
                         Space.EMPTY,
@@ -45,8 +54,10 @@ public class RemoveObjectsIsNull extends Recipe {
                         new JLeftPadded<>(Space.EMPTY, J.Binary.Type.Equal, Markers.EMPTY),
                         nullLiteral,
                         JavaType.Primitive.Boolean);
+                        */
+
             }
-            return method;
+            return m;
         }
     }
 

@@ -448,6 +448,10 @@ class Java8RemoveJavaDocAuthorTagTest : Java8Test, RemoveJavaDocAuthorTagTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java8RemoveObjectsIsNullTest : Java8Test, RemoveObjectsIsNullTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java8RemoveRedundantTypeCastTest : Java8Test, RemoveRedundantTypeCastTest
 
 @DebugOnly
