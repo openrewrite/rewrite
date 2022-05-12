@@ -31,6 +31,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                     "javax.activation-api",
                     "jakarta.activation",
                     "jakarta.activation-api",
+                    null,
                     null
                 )
             )
@@ -103,6 +104,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                     "jakarta.activation",
                     "jakarta.activation-api",
                     "1.2.2",
+                    null,
                     true
                 )
             )
@@ -178,6 +180,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                     "jakarta.activation",
                     "jakarta.activation-api",
                     "1.2.2",
+                    null,
                     false
                 )
             )
@@ -243,6 +246,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                     "jakarta.activation",
                     "jakarta.activation-api",
                     "1.2.2",
+                    null,
                     false
                 )
             )
@@ -307,6 +311,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                     "rewrite-java-8",
                     "org.openrewrite",
                     "rewrite-java-11",
+                    null,
                     null
                 )
             )
@@ -354,6 +359,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                     "rewrite-testing-frameworks",
                     "org.openrewrite.recipe",
                     "rewrite-migrate-java",
+                    null,
                     null
                 )
             )
@@ -386,7 +392,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                     "javax.activation-api",
                     "jakarta.activation",
                     "jakarta.activation-api",
-                    "2.1.0"
+                    "2.1.0",
+                    null
                 )
             )
         },
@@ -433,6 +440,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                     "quarkus-core",
                     "io.quarkus",
                     "quarkus-arc",
+                    null,
                     null
                 )
             )
@@ -518,6 +526,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                     "quarkus-core",
                     "io.quarkus",
                     "quarkus-arc",
+                    null,
                     null
                 )
             )
@@ -588,5 +597,53 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
                 </project>
             """
         ) { p -> p.path(Paths.get("child/pom.xml")) },
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1751")
+    fun `allow the newVersion to be expressed as a semver selector`() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "com.google.guava",
+                    "guava-gwt",
+                    "com.google.guava",
+                    "guava",
+                    "30.1.x",
+                    "-jre"
+                )
+            )
+        },
+        pomXml(
+            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava-gwt</artifactId>
+                  <version>27.0-jre</version>
+                </dependency>
+              </dependencies>
+            </project>
+            """,
+            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>30.1.1-jre</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """)
     )
 }
