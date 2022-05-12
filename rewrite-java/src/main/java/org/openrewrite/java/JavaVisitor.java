@@ -55,6 +55,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return new Dataflow(getCursor());
     }
 
+    @Incubating(since = "7.24.0")
+    public Dataflow dataflow(Cursor cursor) {
+        return new Dataflow(cursor);
+    }
+
     /**
      * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
      * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent

@@ -29,22 +29,29 @@ import java.util.Iterator;
 @Incubating(since = "7.24.0")
 @RequiredArgsConstructor
 public class Dataflow {
-    final Cursor cursor;
+    final Cursor start;
 
-    public <Source extends Expression, Sink extends J> SinkFlow<Sink> findSinks(LocalFlowSpec<Source, Sink> spec) {
-        SinkFlow<Sink> root = new SinkFlow<>(spec, cursor);
-
-        Iterator<Object> cursorPath = cursor.getPath();
+    public <Source extends Expression, Sink extends J> SinkFlow<Source, Sink> findSinks(LocalFlowSpec<Source, Sink> spec) {
+        Iterator<Cursor> cursorPath = start.getPathAsCursors();
         while (cursorPath.hasNext()) {
-            Object value = cursorPath.next();
-            boolean isSourceType = spec.getSourceType().isAssignableFrom(value.getClass());
-            //noinspection unchecked
-            if (isSourceType && ((LocalFlowSpec<Expression, Sink>) spec).isSource((Expression) value, cursor)) {
-                ForwardFlow.findSinks(root);
+            Cursor cursor = cursorPath.next();
+            Object value = cursor.getValue();
+            if (spec.getSourceType().isAssignableFrom(value.getClass())) {
+                //noinspection unchecked
+                Source source = (Source) value;
+
+                SinkFlow<Source, Sink> flow = new SinkFlow<>(cursor, spec, start);
+                if (spec.isSource(source, start)) {
+                    ForwardFlow.findSinks(flow);
+                }
+
+                if (flow.isNotEmpty()) {
+                    return flow;
+                }
             }
         }
 
-        return root;
+        return new SinkFlow<>(null, spec, start);
     }
 
     public <E extends Expression> SourceFlow<E> findSources(LocalFlowSpec<E, ?> spec) {

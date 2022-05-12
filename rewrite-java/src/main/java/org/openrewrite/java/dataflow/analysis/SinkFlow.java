@@ -16,20 +16,37 @@
 package org.openrewrite.java.dataflow.analysis;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Stack;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 
-public class SinkFlow<Sink extends J> extends FlowGraph {
-    private final LocalFlowSpec<?, Sink> spec;
+public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGraph {
+    @Nullable
+    private final Cursor source;
 
-    public SinkFlow(LocalFlowSpec<?, Sink> spec, Cursor cursor) {
+    private final LocalFlowSpec<Source, Sink> spec;
+
+    public SinkFlow(@Nullable Cursor source, LocalFlowSpec<Source, Sink> spec, Cursor cursor) {
         super(cursor);
+        this.source = source;
         this.spec = spec;
+    }
+
+    public Cursor getSourceCursor() {
+        return requireNonNull(source);
+    }
+
+    public Source getSource() {
+        return requireNonNull(source).getValue();
     }
 
     public List<Sink> getSinks() {

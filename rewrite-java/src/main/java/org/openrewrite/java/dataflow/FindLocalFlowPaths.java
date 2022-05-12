@@ -40,8 +40,8 @@ public class FindLocalFlowPaths extends JavaIsoVisitor<ExecutionContext> {
         JavaSourceFile c = super.visitJavaSourceFile(cu, ctx);
 
         Set<Expression> flowSteps = Collections.newSetFromMap(new IdentityHashMap<>());
-        List<SinkFlow<?>> sinkFlows = getCursor().getMessage(FLOW_GRAPHS);
-        for (SinkFlow<?> flowGraph : requireNonNull(sinkFlows)) {
+        List<SinkFlow<?, ?>> sinkFlows = getCursor().getMessage(FLOW_GRAPHS);
+        for (SinkFlow<?, ?> flowGraph : requireNonNull(sinkFlows)) {
             for (List<Cursor> flow : flowGraph.getFlows()) {
                 for (Cursor step : flow) {
                     flowSteps.add(step.getValue());
@@ -64,9 +64,9 @@ public class FindLocalFlowPaths extends JavaIsoVisitor<ExecutionContext> {
 
     @Override
     public Expression visitExpression(Expression expression, ExecutionContext ctx) {
-        SinkFlow<?> flow = dataflow().findSinks(spec);
+        SinkFlow<?, ?> flow = dataflow().findSinks(spec);
         if (flow.isNotEmpty()) {
-            List<SinkFlow<?>> flowGraphs = getCursor().getNearestMessage(FLOW_GRAPHS);
+            List<SinkFlow<?, ?>> flowGraphs = getCursor().getNearestMessage(FLOW_GRAPHS);
             assert flowGraphs != null;
             flowGraphs.add(flow);
         }
