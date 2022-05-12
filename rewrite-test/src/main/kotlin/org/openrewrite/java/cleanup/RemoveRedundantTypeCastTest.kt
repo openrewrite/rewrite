@@ -45,6 +45,19 @@ interface RemoveRedundantTypeCastTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1784")
+    @Test
+    fun objectToObjectArray() = assertUnchanged(
+        before = """
+            class Test {
+                void method(Object array) {
+                    Object[] o = (Object[]) array;
+                }
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1783")
     @Test
     fun parametersDoNotMatch() = assertUnchanged(
         before = """
@@ -175,13 +188,29 @@ interface RemoveRedundantTypeCastTest : JavaRecipeTest {
             @SuppressWarnings("RedundantCast")
             class ExtendTest extends Test {
                 Test extendTest = (ExtendTest) new ExtendTest();
-                Test[][] extendTestArray = (ExtendTest[][]) new ExtendTest[0][0];
             }
         """,
         after = """
             @SuppressWarnings("RedundantCast")
             class ExtendTest extends Test {
                 Test extendTest = new ExtendTest();
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1647")
+    @Test
+    fun downCastExtendedObjectArray() = assertChanged(
+        dependsOn = arrayOf(test),
+        before = """
+            @SuppressWarnings("RedundantCast")
+            class ExtendTest extends Test {
+                Test[][] extendTestArray = (ExtendTest[][]) new ExtendTest[0][0];
+            }
+        """,
+        after = """
+            @SuppressWarnings("RedundantCast")
+            class ExtendTest extends Test {
                 Test[][] extendTestArray = new ExtendTest[0][0];
             }
         """

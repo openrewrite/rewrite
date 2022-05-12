@@ -68,15 +68,9 @@ public class RemoveRedundantTypeCast extends Recipe {
                 TypeTree typeTree = typeCast.getClazz().getTree();
                 JavaType expressionType = typeCast.getExpression().getType();
 
-                if (typeCast.getClazz().getTree() instanceof J.ArrayType) {
-                    while (expressionType instanceof JavaType.Array) {
-                        expressionType = ((JavaType.Array) expressionType).getElemType();
-                    }
-                }
-
                 JavaType namedVariableType = ((J.VariableDeclarations) parent.getValue()).getVariables().get(0).getType();
                 if (TypeUtils.isOfClassType(namedVariableType, "java.lang.Object") ||
-                        (!(typeTree instanceof J.ParameterizedType) && TypeUtils.isOfType(typeTree.getType(), expressionType))) {
+                        (!(typeTree instanceof J.ParameterizedType) && (TypeUtils.isOfType(namedVariableType, expressionType) || TypeUtils.isAssignableTo(namedVariableType, expressionType)))) {
                     return typeCast.getExpression();
                 }
 
