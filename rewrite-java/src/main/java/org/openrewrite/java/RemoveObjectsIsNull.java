@@ -5,6 +5,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.java.cleanup.UnnecessaryParentheses;
+import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
+import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -42,7 +44,9 @@ public class RemoveObjectsIsNull extends Recipe {
             if(isNullmatcher.matches(m)) {
                 JavaTemplate template = JavaTemplate.builder(this::getCursor, "(#{any(boolean)}) == null").build();
                 Expression e = m.getArguments().get(0);
-                Expression result = m.withTemplate(template, m.getCoordinates().replace(), e);
+                Expression replaced = m.withTemplate(template, m.getCoordinates().replace(), e);
+                UnnecessaryParenthesesVisitor v = new UnnecessaryParenthesesVisitor<ExecutionContext>(Checkstyle.unnecessaryParentheses());
+                Expression result = (Expression) v.visitNonNull(replaced, executionContext, getCursor());
                 return result;
                 /*
                 // isNull(e) --> e == null
