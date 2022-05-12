@@ -34,10 +34,29 @@ interface RemoveRedundantTypeCastTest : JavaRecipeTest {
     @Test
     fun doNotChangeUpCast() = assertUnchanged(
         before = """
+            import java.util.List;
+            @SuppressWarnings({"ConstantConditions", "rawtypes", "unchecked"})
             class Test {
                 Object o = "";
                 String s = (String) o;
-                String[] sArray = (String[]) list.toArray(new String[0]);
+                List l;
+                String[] sArray = (String[]) l.toArray(new String[0]);
+            }
+        """
+    )
+
+    @Test
+    fun parametersDoNotMatch() = assertUnchanged(
+        before = """
+            import java.util.Collection;
+            
+            @SuppressWarnings("unchecked")
+            class Test {
+                Class<? extends Collection<String>> test = (Class<? extends Collection<String>>) get();
+
+                Class<?> get() {
+                    return null;
+                }
             }
         """
     )
@@ -50,12 +69,13 @@ interface RemoveRedundantTypeCastTest : JavaRecipeTest {
             
             class Test {
                 public <T extends Collection<String>> T test() {
-                    //noinspection unchecked
-                    return (T) get();
+                    @SuppressWarnings("UnnecessaryLocalVariable")
+                    T t = (T) get();
+                    return t;
                 }
 
-                public static Collection<String> get() {
-                    return null;
+                public List<String> get() {
+                    return Arrays.asList("a", "b", "c");
                 }
             }
         """

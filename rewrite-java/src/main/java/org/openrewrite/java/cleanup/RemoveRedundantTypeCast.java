@@ -15,13 +15,11 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Incubating;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
@@ -55,36 +53,30 @@ public class RemoveRedundantTypeCast extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitTypeCast(J.TypeCast typeCast, ExecutionContext executionContext) {
-                Cursor parent = getCursor().dropParentUntil(is -> is instanceof J.NewClass ||
+                Cursor parent = getCursor().dropParentUntil(is -> is instanceof J.VariableDeclarations ||
+                        is instanceof J.NewClass ||
                         is instanceof J.Lambda ||
                         is instanceof J.MethodInvocation ||
+                        is instanceof J.MethodDeclaration ||
                         is instanceof J.ClassDeclaration);
 
                 // Not currently supported, this will be more accurate with dataflow analysis.
-                if (parent.getValue() instanceof J.NewClass ||
-                        parent.getValue() instanceof J.Lambda ||
-                        parent.getValue() instanceof J.MethodInvocation) {
+                if (!(parent.getValue() instanceof J.VariableDeclarations)) {
                     return typeCast;
                 }
 
-                JavaType cast = typeCast.getType();
-                // Not currently supported, this will be more accurate with dataflow analysis.
-                if (cast instanceof JavaType.GenericTypeVariable) {
-                    return typeCast;
-                }
-
+                TypeTree typeTree = typeCast.getClazz().getTree();
                 JavaType expressionType = typeCast.getExpression().getType();
 
-                // Reduce the expressionType from array to its type.
                 if (typeCast.getClazz().getTree() instanceof J.ArrayType) {
                     while (expressionType instanceof JavaType.Array) {
                         expressionType = ((JavaType.Array) expressionType).getElemType();
                     }
                 }
 
-                if (cast != null && expressionType != null &&
-                        (TypeUtils.isOfType(cast, expressionType) || TypeUtils.isAssignableTo(cast, expressionType))) {
-                    // Return the expression without the type cast.
+                JavaType namedVariableType = ((J.VariableDeclarations) parent.getValue()).getVariables().get(0).getType();
+                if (TypeUtils.isOfClassType(namedVariableType, "java.lang.Object") ||
+                        (!(typeTree instanceof J.ParameterizedType) && TypeUtils.isOfType(typeTree.getType(), expressionType))) {
                     return typeCast.getExpression();
                 }
 
