@@ -26,7 +26,6 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
         spec.recipe(UriCreatedWithHttpScheme())
     }
 
-    @Disabled
     @Test
     fun findInsecureUri(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -36,10 +35,11 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
                 class Test {
                     void test() {
                         String s = "http://test";
+                        String t = s;
                         if(System.currentTimeMillis() > 0) {
-                            System.out.println(URI.create(s));
+                            System.out.println(URI.create(t));
                         } else {
-                            System.out.println(URI.create(s));
+                            System.out.println(URI.create(t));
                         }
                     }
                 }
@@ -48,10 +48,11 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
                 class Test {
                     void test() {
                         String s = "https://test";
+                        String t = s;
                         if(System.currentTimeMillis() > 0) {
-                            System.out.println(URI.create(s));
+                            System.out.println(URI.create(t));
                         } else {
-                            System.out.println(URI.create(s));
+                            System.out.println(URI.create(t));
                         }
                     }
                 }
@@ -61,7 +62,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
 
     @Disabled
     @Test
-    fun replaceBarrierGuard(javaParser: JavaParser) = rewriteRun(
+    fun replaceIsABarrierGuard(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """

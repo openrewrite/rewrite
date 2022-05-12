@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.cleanup.*
+import org.openrewrite.java.dataflow.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.recipes.ExecutionContextParameterNameTest
 import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
@@ -248,6 +249,10 @@ class Java11FindMethodsTest : Java11Test, FindMethodsTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11FindLiteralsTest : Java11Test, FindLiteralsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindLocalFlowPathsTest : Java11Test, FindLocalFlowPathsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

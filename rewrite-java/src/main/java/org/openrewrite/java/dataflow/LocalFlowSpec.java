@@ -15,13 +15,39 @@
  */
 package org.openrewrite.java.dataflow;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.java.tree.Expression;
 
-public interface LocalFlowSpec<Source extends Expression, Sink extends Expression> {
-    boolean isSource(Source expr);
-    boolean isSink(Sink expr);
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 
-    default boolean isBarrierGuard(Expression expr) {
+public abstract class LocalFlowSpec<Source extends Expression, Sink extends Expression> {
+    protected final Type sourceType;
+    protected final Type sinkType;
+
+    protected LocalFlowSpec() {
+        Type superClass = this.getClass().getGenericSuperclass();
+        if (superClass instanceof Class) {
+            throw new IllegalArgumentException("Internal error: LocalFlowSpec constructed without actual type information");
+        } else {
+            this.sourceType = ((ParameterizedType)superClass).getActualTypeArguments()[0];
+            this.sinkType = ((ParameterizedType)superClass).getActualTypeArguments()[1];
+        }
+    }
+
+    public Class<?> getSourceType() {
+        return (Class<?>) sourceType;
+    }
+
+    public Class<?> getSinkType() {
+        return (Class<?>) sinkType;
+    }
+
+    public abstract boolean isSource(Source source, Cursor cursor);
+
+    public abstract boolean isSink(Sink sink, Cursor cursor);
+
+    public boolean isBarrierGuard(Expression expr) {
         return false;
     }
 }

@@ -49,6 +49,10 @@ public class Cursor {
         return c;
     }
 
+    public Iterator<Cursor> getPathAsCursors() {
+        return new CursorPathIterator(this);
+    }
+
     public Iterator<Object> getPath() {
         return new CursorIterator(this);
     }
@@ -64,6 +68,29 @@ public class Cursor {
     public Stream<Object> getPathAsStream(Predicate<Object> filter) {
         return stream(Spliterators.spliteratorUnknownSize(getPath(filter),
                 Spliterator.IMMUTABLE), false);
+    }
+
+    private static class CursorPathIterator implements Iterator<Cursor> {
+        private Cursor cursor;
+
+        private CursorPathIterator(Cursor cursor) {
+            this.cursor = cursor;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return cursor != null;
+        }
+
+        @Override
+        public Cursor next() {
+            Cursor next = cursor;
+            cursor = cursor.parent;
+            if(next == null) {
+                throw new NoSuchElementException();
+            }
+            return next;
+        }
     }
 
     private static class CursorIterator implements Iterator<Object> {

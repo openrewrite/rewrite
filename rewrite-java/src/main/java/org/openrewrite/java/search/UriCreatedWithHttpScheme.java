@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -31,12 +32,12 @@ public class UriCreatedWithHttpScheme extends Recipe {
 
     private static final LocalFlowSpec<J.Literal, J.MethodInvocation> INSECURE_URI = new LocalFlowSpec<J.Literal, J.MethodInvocation>() {
         @Override
-        public boolean isSource(J.Literal expr) {
-            return expr.getValue() != null && expr.getValue().toString().startsWith("http://");
+        public boolean isSource(J.Literal source, Cursor cursor) {
+            return source.getValue() != null && source.getValue().toString().startsWith("http://");
         }
 
         @Override
-        public boolean isSink(J.MethodInvocation expr) {
+        public boolean isSink(J.MethodInvocation expr, Cursor cursor) {
             return URI_CREATE.matches(expr);
         }
 
@@ -52,6 +53,11 @@ public class UriCreatedWithHttpScheme extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "This is a sample recipe demonstrating a simple application of local data flow analysis.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return new UsesMethod<>(URI_CREATE);
     }
@@ -60,22 +66,14 @@ public class UriCreatedWithHttpScheme extends Recipe {
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Literal visitLiteral(J.Literal literal, ExecutionContext executionContext) {
-                J.Literal l = super.visitLiteral(literal, executionContext);
-                if (!dataflow().findSinks(INSECURE_URI).isEmpty()) {
+            public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                J.Literal l = super.visitLiteral(literal, ctx);
+                if (dataflow().findSinks(INSECURE_URI).isNotEmpty()) {
                     //noinspection ConstantConditions
-                    return l.withValue(l.getValue().toString().replace("http://", "https://"));
+                    return l.withValue(l.getValue().toString().replace("http://", "https://"))
+                            .withValueSource(l.getValueSource().replace("http://", "https://"));
                 }
                 return l;
-            }
-
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
-                if (!dataflow().findSources(INSECURE_URI).isEmpty()) {
-//                    m = "URI.createSecure()";
-                }
-                return m;
             }
         };
     }

@@ -16,39 +16,37 @@
 package org.openrewrite.java.dataflow;
 
 import lombok.RequiredArgsConstructor;
-import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.java.dataflow.analysis.ForwardFlow;
+import org.openrewrite.java.dataflow.analysis.SinkFlow;
+import org.openrewrite.java.dataflow.analysis.SourceFlow;
 import org.openrewrite.java.tree.Expression;
 
-import java.util.Collections;
-import java.util.List;
+import java.util.Iterator;
 
 @Incubating(since = "7.24.0")
 @RequiredArgsConstructor
 public class Dataflow {
     final Cursor cursor;
 
-    public <E extends Expression> List<Flow<?, E>> findSinks(LocalFlowSpec<?, E> spec) {
-        return Collections.emptyList();
-    }
+    public <E extends Expression> SinkFlow<E> findSinks(LocalFlowSpec<?, E> spec) {
+        SinkFlow<E> root = new SinkFlow<>(spec, cursor);
 
-    public <E extends Expression> List<Flow<E, ?>> findSources(LocalFlowSpec<E, ?> spec) {
-        return Collections.emptyList();
-    }
-
-    @Value
-    public static class Flow<Source extends Expression, Sink extends Expression> {
-        List<Expression> path;
-
-        public Source getSource() {
+        Iterator<Object> cursorPath = cursor.getPath();
+        while (cursorPath.hasNext()) {
+            Object value = cursorPath.next();
+            boolean isSourceType = spec.getSourceType().isAssignableFrom(value.getClass());
             //noinspection unchecked
-            return (Source) path.get(0);
+            if (isSourceType && ((LocalFlowSpec<Expression, E>) spec).isSource((Expression) value, cursor)) {
+                ForwardFlow.findSinks(root);
+            }
         }
 
-        public Sink getSink() {
-            //noinspection unchecked
-            return (Sink) path.get(path.size() - 1);
-        }
+        return root;
+    }
+
+    public <E extends Expression> SourceFlow<E> findSources(LocalFlowSpec<E, ?> spec) {
+        throw new UnsupportedOperationException("Not yet implemented.");
     }
 }
