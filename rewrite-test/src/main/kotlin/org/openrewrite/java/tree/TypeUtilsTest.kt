@@ -120,4 +120,18 @@ interface TypeUtilsTest : RewriteTest {
             assertThat(TypeUtils.findOverriddenMethod((methods[1]).methodType)).isPresent
         }}
     )
+
+    @Test
+    fun arrayIsAssignableTo(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("class Test {}"),
+        java("""
+            class ExtendTest extends Test {
+                Test[] extendTestArray = new ExtendTest[0];
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
+            assertThat(TypeUtils.isAssignableTo(variable.variableType?.type, ((variable.initializer as J.NewArray).type))).isTrue
+        }}
+    )
 }
