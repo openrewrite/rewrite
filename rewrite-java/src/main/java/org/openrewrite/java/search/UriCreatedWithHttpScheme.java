@@ -30,7 +30,7 @@ public class UriCreatedWithHttpScheme extends Recipe {
     private static final MethodMatcher URI_CREATE = new MethodMatcher("java.net.URI create(..)");
     private static final MethodMatcher STRING_REPLACE = new MethodMatcher("java.lang.String replace(..)");
 
-    private static final LocalFlowSpec<J.Literal, J.MethodInvocation> INSECURE_URI = new LocalFlowSpec<J.Literal, J.MethodInvocation>() {
+    private static final LocalFlowSpec<J.Literal, J.MethodInvocation> INSECURE_URI_CREATE = new LocalFlowSpec<J.Literal, J.MethodInvocation>() {
         @Override
         public boolean isSource(J.Literal source, Cursor cursor) {
             return source.getValue() != null && source.getValue().toString().startsWith("http://");
@@ -68,7 +68,7 @@ public class UriCreatedWithHttpScheme extends Recipe {
             @Override
             public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
                 J.Literal l = super.visitLiteral(literal, ctx);
-                if (dataflow().findSinks(INSECURE_URI).isNotEmpty()) {
+                if (dataflow().findSinks(INSECURE_URI_CREATE).isNotEmpty()) {
                     //noinspection ConstantConditions
                     return l.withValue(l.getValue().toString().replace("http://", "https://"))
                             .withValueSource(l.getValueSource().replace("http://", "https://"));
