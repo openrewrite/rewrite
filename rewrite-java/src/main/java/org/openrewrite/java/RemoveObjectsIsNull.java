@@ -34,12 +34,12 @@ public class RemoveObjectsIsNull extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Transform calls to Objects.isNull() and Objects.nonNull()";
+        return "Transform calls to `Objects.isNull(..)` and `Objects.nonNull(..)`";
     }
 
     @Override
     public String getDescription() {
-        return "Replace calls to Objects.isNull and Objects.nonNull with a simple null check. Using these methods outside of stream predicates is not idiomatic.";
+        return "Replace calls to `Objects.isNull(..)` and `Objects.nonNull(..)` with a simple null check. Using these methods outside of stream predicates is not idiomatic.";
     }
 
     @Override
