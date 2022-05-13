@@ -164,7 +164,7 @@ public abstract class Recipe {
      */
     @Incubating(since = "7.3.0")
     public boolean causesAnotherCycle() {
-        return false;
+        return recipeList.stream().anyMatch(Recipe::causesAnotherCycle);
     }
 
     @JsonIgnore
