@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.cleanup.UnnecessaryParentheses;
@@ -56,26 +57,20 @@ public class RemoveObjectsIsNull extends Recipe {
         public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
             if(isNullmatcher.matches(m)) {
-                JavaTemplate template = JavaTemplate.builder(this::getCursor, "(#{any(boolean)}) == null").build();
-                Expression e = m.getArguments().get(0);
-                Expression replaced = m.withTemplate(template, m.getCoordinates().replace(), e);
-                UnnecessaryParenthesesVisitor<ExecutionContext> v = new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses());
-                Expression result = (Expression) v.visitNonNull(replaced, executionContext, getCursor());
-                return result;
-                /*
-                // isNull(e) --> e == null
-                J.Literal nullLiteral = new J.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY, "null", "null", null, JavaType.Primitive.Null);
-                return new J.Binary(Tree.randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        e,
-                        new JLeftPadded<>(Space.EMPTY, J.Binary.Type.Equal, Markers.EMPTY),
-                        nullLiteral,
-                        JavaType.Primitive.Boolean);
-                        */
-
+                return replace(executionContext, m, "(#{any(boolean)}) == null");
+            } else if(nonNullmatcher.matches(m)) {
+                return replace(executionContext, m, "(#{any(boolean)}) != null");
             }
             return m;
+        }
+
+        @NotNull
+        private Expression replace(ExecutionContext executionContext, J.MethodInvocation m, String pattern) {
+            JavaTemplate template = JavaTemplate.builder(this::getCursor, pattern).build();
+            Expression e = m.getArguments().get(0);
+            Expression replaced = m.withTemplate(template, m.getCoordinates().replace(), e);
+            UnnecessaryParenthesesVisitor<ExecutionContext> v = new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses());
+            return (Expression) v.visitNonNull(replaced, executionContext, getCursor());
         }
     }
 

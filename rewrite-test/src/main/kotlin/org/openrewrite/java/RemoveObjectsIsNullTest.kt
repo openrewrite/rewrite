@@ -82,4 +82,60 @@ interface RemoveObjectsIsNullTest : JavaRecipeTest {
             }        
         """
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1547")
+    fun transformCallToNonNull(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import static java.util.Objects.nonNull;
+            public class A {
+                public void test() {
+                    boolean a = true;
+                    if (java.util.Objects.nonNull(a)) {
+                        System.out.println("a is non-null");
+                    };
+                }
+            }        
+        """,
+        after = """
+            import static java.util.Objects.nonNull;
+            public class A {
+                public void test() {
+                    boolean a = true;
+                    if (a != null) {
+                        System.out.println("a is non-null");
+                    };
+                }
+            }        
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1547")
+    fun transformCallToNonNullNeedsParentheses(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import static java.util.Objects.nonNull;
+            public class A {
+                public void test() {
+                    boolean a = true, b = false;
+                    if (nonNull(a || b)) {
+                        System.out.println("a || b is non-null");
+                    };
+                }
+            }        
+        """,
+        after = """
+            import static java.util.Objects.nonNull;
+            public class A {
+                public void test() {
+                    boolean a = true, b = false;
+                    if ((a || b) != null) {
+                        System.out.println("a || b is non-null");
+                    };
+                }
+            }        
+        """
+    )
 }
