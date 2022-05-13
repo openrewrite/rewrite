@@ -24,6 +24,7 @@ import org.openrewrite.test.RewriteTest
 
 interface TypeUtilsTest : RewriteTest {
 
+    /* isOverride */
     @Test
     fun isOverrideBasicInterface(jp: JavaParser) = rewriteRun(
         { spec -> spec.parser(jp) },
@@ -121,8 +122,107 @@ interface TypeUtilsTest : RewriteTest {
         }}
     )
 
+    /* isOfType */
     @Test
-    fun arrayIsAssignableTo(jp: JavaParser) = rewriteRun(
+    fun isFullyQualifiedOfType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                Integer integer1;
+                Integer integer2;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable1 = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
+            val variable2 = (cu.classes[0].body.statements[1] as J.VariableDeclarations).variables[0]
+            assertThat(variable1.variableType?.type).isInstanceOf(JavaType.Class::class.java)
+            assertThat(variable2.variableType?.type).isInstanceOf(JavaType.Class::class.java)
+            assertThat(TypeUtils.isOfType(variable1.variableType?.type, variable2.variableType?.type)).isTrue
+        }}
+    )
+
+    @Test
+    fun isParameterizedTypeOfType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                java.util.List<Integer> integer1;
+                java.util.List<Integer> integer2;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable1 = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
+            val variable2 = (cu.classes[0].body.statements[1] as J.VariableDeclarations).variables[0]
+
+            assertThat(variable1.variableType?.type).isInstanceOf(JavaType.Parameterized::class.java)
+            assertThat(variable2.variableType?.type).isInstanceOf(JavaType.Parameterized::class.java)
+            assertThat(TypeUtils.isOfType(variable1.variableType?.type, variable2.variableType?.type)).isTrue
+        }}
+    )
+
+    @Test
+    fun differentParameterizedTypesIsOfType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                java.util.List<Integer> integers;
+                java.util.List<String> strings;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable1 = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
+            val variable2 = (cu.classes[0].body.statements[1] as J.VariableDeclarations).variables[0]
+
+            assertThat(variable1.variableType?.type).isInstanceOf(JavaType.Parameterized::class.java)
+            assertThat(variable2.variableType?.type).isInstanceOf(JavaType.Parameterized::class.java)
+            assertThat(TypeUtils.isOfType(variable1.variableType?.type, variable2.variableType?.type)).isFalse
+        }}
+    )
+
+    @Test
+    fun isGenericTypeOfType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                java.util.List<? super Number> type1;
+                java.util.List<? super Number> type2;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable1 = ((cu.classes[0].body.statements[0] as J.VariableDeclarations)
+                .variables[0]?.type as JavaType.Parameterized)
+                .typeParameters[0]
+            val variable2 = ((cu.classes[0].body.statements[1] as J.VariableDeclarations)
+                .variables[0]?.type as JavaType.Parameterized)
+                .typeParameters[0]
+
+            assertThat(variable1).isInstanceOf(JavaType.GenericTypeVariable::class.java)
+            assertThat(variable2).isInstanceOf(JavaType.GenericTypeVariable::class.java)
+            assertThat(TypeUtils.isOfType(variable1, variable2)).isTrue
+        }}
+    )
+
+    @Test
+    fun differentVarianceOfGenericTypeOfType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                java.util.List<? super Number> type1;
+                java.util.List<? extends Number> type2;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable1 = ((cu.classes[0].body.statements[0] as J.VariableDeclarations)
+                .variables[0]?.type as JavaType.Parameterized)
+                .typeParameters[0]
+            val variable2 = ((cu.classes[0].body.statements[1] as J.VariableDeclarations)
+                .variables[0]?.type as JavaType.Parameterized)
+                .typeParameters[0]
+
+            assertThat(variable1).isInstanceOf(JavaType.GenericTypeVariable::class.java)
+            assertThat(variable2).isInstanceOf(JavaType.GenericTypeVariable::class.java)
+            assertThat(TypeUtils.isOfType(variable1, variable2)).isFalse
+        }}
+    )
+
+    /* isAssignableTo */
+    @Test
+    fun isJavaTypeArrayAssignableTo(jp: JavaParser) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("class Test {}"),
         java("""
@@ -132,6 +232,82 @@ interface TypeUtilsTest : RewriteTest {
         """) { s -> s.beforeRecipe { cu ->
             val variable = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
             assertThat(TypeUtils.isAssignableTo(variable.variableType?.type, ((variable.initializer as J.NewArray).type))).isTrue
+        }}
+    )
+
+    /* isOfClassType */
+    @Test
+    fun isFullyQualifiedTypeOfClassType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                Integer integer;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
+
+            assertThat(variable.variableType?.type).isInstanceOf(JavaType.Class::class.java)
+            assertThat(TypeUtils.isOfClassType(variable.variableType?.type, "java.lang.Integer")).isTrue
+        }}
+    )
+
+    @Test
+    fun isParameterizedTypeOfClassType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                java.util.List<Integer> list;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
+
+            assertThat(variable.variableType?.type).isInstanceOf(JavaType.Parameterized::class.java)
+            assertThat(TypeUtils.isOfClassType(variable.variableType?.type, "java.util.List")).isTrue
+        }}
+    )
+
+    @Test
+    fun isVariableTypeOfClassType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                java.util.List<Integer> list;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
+
+            assertThat(variable.variableType).isInstanceOf(JavaType.Variable::class.java)
+            assertThat(TypeUtils.isOfClassType(variable.variableType, "java.util.List")).isTrue
+        }}
+    )
+
+    @Test
+    fun isArrayTypeOfClassType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                Integer[] integer;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
+
+            assertThat(variable.variableType?.type).isInstanceOf(JavaType.Array::class.java)
+            assertThat(TypeUtils.isOfClassType(variable.variableType?.type, "java.lang.Integer")).isTrue
+        }}
+    )
+
+    @Test
+    fun isPrimitiveTypeOfClassType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                int i;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
+
+            assertThat(variable.variableType?.type).isInstanceOf(JavaType.Primitive::class.java)
+            assertThat(TypeUtils.isOfClassType(variable.variableType?.type, "int")).isTrue
         }}
     )
 }

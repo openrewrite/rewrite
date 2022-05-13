@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
@@ -40,6 +39,11 @@ public class TypeUtils {
         return fqn1 == null && fqn2 == null;
     }
 
+    /**
+     * Returns true if the JavaTypes are of the same type.
+     * {@link JavaType.Parameterized} will be checked for both the FQN and each of the parameters.
+     * {@link JavaType.GenericTypeVariable} will be checked for {@link JavaType.GenericTypeVariable.Variance} and each of the bounds.
+     */
     public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2) {
         if (type1 == type2) {
             return true;
@@ -47,7 +51,6 @@ public class TypeUtils {
         if (type1 == null || type2 == null) {
             return false;
         }
-
         // Strings, uniquely amongst all other types, can be either primitives or classes depending on the context
         if (TypeUtils.isString(type1) && TypeUtils.isString(type2)) {
             return true;
@@ -56,8 +59,23 @@ public class TypeUtils {
             return ((JavaType.Primitive) type1).getKeyword().equals(((JavaType.Primitive) type2).getKeyword());
         }
         if (type1 instanceof JavaType.FullyQualified && type2 instanceof JavaType.FullyQualified) {
-            return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type1).getFullyQualifiedName(),
-                    ((JavaType.FullyQualified) type2).getFullyQualifiedName());
+            if (TypeUtils.fullyQualifiedNamesAreEqual(
+                    ((JavaType.FullyQualified) type1).getFullyQualifiedName(),
+                    ((JavaType.FullyQualified) type2).getFullyQualifiedName())) {
+                if (type1 instanceof JavaType.Class && type2 instanceof JavaType.Class) {
+                    return true;
+                } else if (type1 instanceof JavaType.Parameterized && type2 instanceof JavaType.Parameterized) {
+                    JavaType.Parameterized parameterized1 = (JavaType.Parameterized) type1;
+                    JavaType.Parameterized parameterized2 = (JavaType.Parameterized) type2;
+                    if (parameterized1.getTypeParameters().size() == parameterized2.getTypeParameters().size()) {
+                        for (int index = 0; index < parameterized1.getTypeParameters().size(); index++) {
+                            if (!isOfType(parameterized1.getTypeParameters().get(index), parameterized2.getTypeParameters().get(index))) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
         }
         if (type1 instanceof JavaType.Array && type2 instanceof JavaType.Array) {
             return isOfType(((JavaType.Array) type1).getElemType(), ((JavaType.Array) type2).getElemType());
@@ -65,7 +83,7 @@ public class TypeUtils {
         if (type1 instanceof JavaType.GenericTypeVariable && type2 instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic1 = (JavaType.GenericTypeVariable) type1;
             JavaType.GenericTypeVariable generic2 = (JavaType.GenericTypeVariable) type2;
-            if (generic1.getBounds().size() == generic2.getBounds().size()) {
+            if (generic1.getBounds().size() == generic2.getBounds().size() && generic1.getVariance() == generic2.getVariance()) {
                 for (int index = 0; index < generic1.getBounds().size(); index++) {
                     if (!isOfType(generic1.getBounds().get(index), generic2.getBounds().get(index))) {
                         return false;
@@ -79,13 +97,20 @@ public class TypeUtils {
         return type1.equals(type2);
     }
 
+    /**
+     * Returns true if the JavaType matches the FQN.
+     */
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
-        if(type instanceof JavaType.FullyQualified) {
+        if (type instanceof JavaType.FullyQualified) {
             return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type).getFullyQualifiedName(), (fqn));
-        } else if(type instanceof JavaType.Variable) {
+        } else if (type instanceof JavaType.Variable) {
             return isOfClassType(((JavaType.Variable) type).getType(), fqn);
         } else if(type instanceof JavaType.Method) {
             return isOfClassType(((JavaType.Method) type).getReturnType(), fqn);
+        } else if (type instanceof JavaType.Array) {
+            return isOfClassType(((JavaType.Array) type).getElemType(), fqn);
+        } else if (type instanceof JavaType.Primitive) {
+            return type == JavaType.Primitive.fromKeyword(fqn);
         }
         return false;
     }
@@ -133,9 +158,9 @@ public class TypeUtils {
                     return true;
                 }
             }
-        } else if(from instanceof JavaType.Variable) {
+        } else if (from instanceof JavaType.Variable) {
             return isAssignableTo(to, ((JavaType.Variable) from).getType());
-        } else if(from instanceof JavaType.Method) {
+        } else if (from instanceof JavaType.Method) {
             return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
         }
         return false;
@@ -155,14 +180,13 @@ public class TypeUtils {
                     return true;
                 }
             }
-        } else if(from instanceof JavaType.Variable) {
+        } else if (from instanceof JavaType.Variable) {
             return isAssignableTo(to, ((JavaType.Variable) from).getType());
-        } else if(from instanceof JavaType.Method) {
+        } else if (from instanceof JavaType.Method) {
             return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
         }
         return false;
     }
-
 
     @Nullable
     public static JavaType.Class asClass(@Nullable JavaType type) {
@@ -274,13 +298,13 @@ public class TypeUtils {
             JavaType actual = argTypes.get(i);
             if (!TypeUtils.isOfType(declared, actual)) {
                 // Types might look like they don't match because we're comparing a concrete type like "String" with a generic type parameter "T"
-                if(clazz instanceof JavaType.Parameterized && declared instanceof JavaType.GenericTypeVariable) {
+                if (clazz instanceof JavaType.Parameterized && declared instanceof JavaType.GenericTypeVariable) {
                     JavaType.Parameterized parameterizedClass = (JavaType.Parameterized) clazz;
                     // At this point we can't tell _which_ of the class's potentially many type parameters this might be
                     // Or even if it might be a type parameter exclusive to the method itself, not the class
                     // But if the concrete type being provided does match one of the type parameters there's a good-enough chance that it should be a match
                     // To be 100% sure JavaType.GenericTypeVariable would have to know its origins, which it currently does not
-                    if(parameterizedClass.getTypeParameters().stream().anyMatch(it -> TypeUtils.isOfType(actual, it))) {
+                    if (parameterizedClass.getTypeParameters().stream().anyMatch(it -> TypeUtils.isOfType(actual, it))) {
                         continue;
                     }
                 }
