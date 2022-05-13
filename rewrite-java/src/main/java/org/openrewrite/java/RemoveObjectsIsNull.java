@@ -18,12 +18,11 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.java.cleanup.UnnecessaryParentheses;
 import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
 import org.openrewrite.java.style.Checkstyle;
-import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
 
 public class RemoveObjectsIsNull extends Recipe {
 
@@ -47,8 +46,8 @@ public class RemoveObjectsIsNull extends Recipe {
         return new TransformCallsToObjectsIsNullVisitor();
     }
 
-    private static MethodMatcher isNullmatcher = new MethodMatcher("java.util.Objects isNull(..)");
-    private static MethodMatcher nonNullmatcher = new MethodMatcher("java.util.Objects nonNull(..)");
+    private static final MethodMatcher isNullmatcher = new MethodMatcher("java.util.Objects isNull(..)");
+    private static final MethodMatcher nonNullmatcher = new MethodMatcher("java.util.Objects nonNull(..)");
 
 
 
@@ -60,7 +59,7 @@ public class RemoveObjectsIsNull extends Recipe {
                 JavaTemplate template = JavaTemplate.builder(this::getCursor, "(#{any(boolean)}) == null").build();
                 Expression e = m.getArguments().get(0);
                 Expression replaced = m.withTemplate(template, m.getCoordinates().replace(), e);
-                UnnecessaryParenthesesVisitor v = new UnnecessaryParenthesesVisitor<ExecutionContext>(Checkstyle.unnecessaryParentheses());
+                UnnecessaryParenthesesVisitor<ExecutionContext> v = new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses());
                 Expression result = (Expression) v.visitNonNull(replaced, executionContext, getCursor());
                 return result;
                 /*
