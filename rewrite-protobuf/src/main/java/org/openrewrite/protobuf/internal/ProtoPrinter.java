@@ -235,8 +235,10 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
         visitSpace(range.getPrefix(), p);
         visitMarkers(range.getMarkers(), p);
         visitRightPadded(range.getPadding().getFrom(), p);
-        p.out.append("to");
-        visit(range.getTo(), p);
+        if (range.getTo() != null) {
+            p.out.append("to");
+            visit(range.getTo(), p);
+        }
         return range;
     }
 

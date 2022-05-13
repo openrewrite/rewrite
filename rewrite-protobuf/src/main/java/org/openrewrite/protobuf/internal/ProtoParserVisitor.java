@@ -329,10 +329,12 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     @Override
     public Proto.Range visitRange(Protobuf2Parser.RangeContext ctx) {
-        Proto.Constant to = mapConstant(ctx.IntegerLiteral(0));
-        return new Proto.Range(randomId(), to.getPrefix(), Markers.EMPTY,
-                ProtoRightPadded.build(to.withPrefix(Space.EMPTY)).withAfter(sourceBefore("to")),
-                mapConstant(ctx.IntegerLiteral(1)));
+        Proto.Constant from = mapConstant(ctx.IntegerLiteral(0));
+        TerminalNode to = ctx.IntegerLiteral(1);
+        return new Proto.Range(randomId(), from.getPrefix(), Markers.EMPTY,
+                ProtoRightPadded.build(from.withPrefix(Space.EMPTY))
+                        .withAfter(to != null ? sourceBefore("to") : Space.EMPTY),
+                to != null ? mapConstant(to) : null);
     }
 
     @Override
