@@ -51,7 +51,7 @@ public abstract class CoordinateBuilder {
         }
 
         public JavaCoordinates replace() {
-            return replace(Space.Location.FIELD_ACCESS_PREFIX);
+            return replace(Space.Location.STATEMENT_PREFIX);
         }
     }
 

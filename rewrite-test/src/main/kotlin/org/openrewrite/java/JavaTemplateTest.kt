@@ -366,7 +366,9 @@ interface JavaTemplateTest : JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "Object::toString").build()
+                val t = JavaTemplate.builder({ cursor }, "Object::toString")
+                    .doAfterVariableSubstitution { t -> println(t) }
+                    .build()
 
                 override fun visitLambda(lambda: J.Lambda, p: ExecutionContext): J {
                     return lambda.withTemplate(t, lambda.coordinates.replace())
