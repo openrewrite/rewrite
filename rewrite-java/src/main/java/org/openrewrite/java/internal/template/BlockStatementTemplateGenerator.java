@@ -36,7 +36,7 @@ import static java.util.Collections.newSetFromMap;
 @RequiredArgsConstructor
 public class BlockStatementTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
-    private static final String EXPR_STATEMENT_PARAM = "" +
+    static final String EXPR_STATEMENT_PARAM = "" +
             "class __P__ {" +
             "  static native <T> T p();" +
             "  static native <T> T[] arrp();" +

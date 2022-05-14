@@ -2059,6 +2059,10 @@ public interface J extends Tree {
             return v.visitIdentifier(this, p);
         }
 
+        public CoordinateBuilder.Identifier getCoordinates() {
+            return new CoordinateBuilder.Identifier(this);
+        }
+
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());

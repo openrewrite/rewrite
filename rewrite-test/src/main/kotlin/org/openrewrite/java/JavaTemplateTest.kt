@@ -94,6 +94,49 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1796")
+    @Test
+    fun replaceIdentifierWithMethodInvocation() = assertChanged(
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
+                    return method.withBody(visit(method.body, p) as J.Block)
+                }
+
+                override fun visitIdentifier(identifier: J.Identifier, p: ExecutionContext): J {
+                    return if (identifier.simpleName == "f") {
+                        identifier.withTemplate(
+                            JavaTemplate.builder({ this.cursor }, "#{any(java.io.File)}.getCanonicalFile().toPath()").build(),
+                            identifier.coordinates.replace(),
+                            identifier
+                        )
+                    } else {
+                        identifier
+                    }
+                }
+            }
+        },
+        before = """
+            import java.io.File;
+            class Test {
+                void test(File f) {
+                    System.out.println(f);
+                }
+            }
+        """,
+        after = """
+            import java.io.File;
+            class Test {
+                void test(File f) {
+                    System.out.println(f.getCanonicalFile().toPath());
+                }
+            }
+        """,
+        expectedCyclesThatMakeChanges = 1,
+        cycles = 1
+    )
+
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1092")
     @Test
     fun methodInvocationReplacementHasContextAboutLocalVariables() = assertChanged(
@@ -488,14 +531,16 @@ interface JavaTemplateTest : JavaRecipeTest {
                 val t = JavaTemplate.builder({ cursor }, "acceptString(#{any()}.toString())")
                     .javaParser {
                         JavaParser.fromJavaVersion()
-                            .dependsOn("""
+                            .dependsOn(
+                                """
                             package org.openrewrite;
                             public class A {
                                 public A acceptInteger(Integer i) { return this; }
                                 public A acceptString(String s) { return this; }
                                 public A someOtherMethod() { return this; }
                             }
-                        """)
+                        """
+                            )
                             .build()
                     }
                     .build()
@@ -694,12 +739,16 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
                 .isEqualTo(JavaType.Primitive.Int)
             assertThat(type.parameterTypes[1])
-                .matches({
-                    it is JavaType.Parameterized
-                        && it.type.fullyQualifiedName == "java.util.List"
-                        && it.typeParameters.size == 1
-                        && it.typeParameters.first().asFullyQualified()!!.fullyQualifiedName == "java.lang.String"
-                }, "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
+                .matches(
+                    {
+                        it is JavaType.Parameterized
+                                && it.type.fullyQualifiedName == "java.util.List"
+                                && it.typeParameters.size == 1
+                                && it.typeParameters.first()
+                            .asFullyQualified()!!.fullyQualifiedName == "java.lang.String"
+                    },
+                    "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'"
+                )
         }
     )
 
@@ -851,8 +900,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 val t = JavaTemplate.builder(
                     { cursor },
                     "if(n != 1) {\n" +
-                        "  n++;\n" +
-                        "}"
+                            "  n++;\n" +
+                            "}"
                 )
                     .build()
 
@@ -1709,8 +1758,8 @@ interface JavaTemplateTest : JavaRecipeTest {
                 .`as`("The method declaration's type's genericSignature second argument should have type 'U' with bound 'java.lang.Object'")
                 .matches { uType ->
                     uType is JavaType.GenericTypeVariable &&
-                        uType.name == "U" &&
-                        uType.bounds.isEmpty()
+                            uType.name == "U" &&
+                            uType.bounds.isEmpty()
                 }
         }
     )
@@ -1816,8 +1865,13 @@ interface JavaTemplateTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
     @Test
-    @Suppress("UnnecessaryBoxing", "UnnecessaryLocalVariable", "CachedNumberConstructorCall", "UnnecessaryTemporaryOnConversionToString",
-        "deprecation", "ResultOfMethodCallIgnored"
+    @Suppress(
+        "UnnecessaryBoxing",
+        "UnnecessaryLocalVariable",
+        "CachedNumberConstructorCall",
+        "UnnecessaryTemporaryOnConversionToString",
+        "deprecation",
+        "ResultOfMethodCallIgnored"
     )
     fun replaceNamedVariableInitializerMethodInvocation(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
@@ -1893,7 +1947,13 @@ interface JavaTemplateTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
     @Test
-    @Suppress("UnnecessaryBoxing", "UnnecessaryLocalVariable", "CachedNumberConstructorCall", "UnnecessaryTemporaryOnConversionToString", "deprecation")
+    @Suppress(
+        "UnnecessaryBoxing",
+        "UnnecessaryLocalVariable",
+        "CachedNumberConstructorCall",
+        "UnnecessaryTemporaryOnConversionToString",
+        "deprecation"
+    )
     fun lambdaIsVariableInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
@@ -1930,16 +1990,21 @@ interface JavaTemplateTest : JavaRecipeTest {
                 override fun visitClassDeclaration(classDeclaration: J.ClassDeclaration, p: ExecutionContext): J {
                     var cd = classDeclaration
                     if (cd.body.statements.isEmpty()) {
-                        cd = cd.withBody(cd.body.withTemplate(
-                            JavaTemplate.builder(this::getCursor,"""
+                        cd = cd.withBody(
+                            cd.body.withTemplate(
+                                JavaTemplate.builder(
+                                    this::getCursor, """
                                 /**
                                  * comment
                                  */
                                 void foo() {
                                 }
-                            """)
-                                .build(),
-                            cd.body.coordinates.firstStatement()));
+                            """
+                                )
+                                    .build(),
+                                cd.body.coordinates.firstStatement()
+                            )
+                        );
                     }
                     return cd
                 }

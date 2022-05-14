@@ -100,7 +100,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         Cursor parentCursor = parentCursorRef.get();
 
         //noinspection ConstantConditions
-        return  (J2) new JavaVisitor<Integer>() {
+        return (J2) new JavaVisitor<Integer>() {
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
                 if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
@@ -265,6 +265,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     }
                 }
                 return super.visitClassDeclaration(classDecl, p);
+            }
+
+            @Override
+            public J visitIdentifier(J.Identifier ident, Integer p) {
+                if (loc.equals(IDENTIFIER_PREFIX) && ident.isScope(insertionPoint)) {
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
+                            .withPrefix(ident.getPrefix()), p, getCursor().getParentOrThrow());
+                }
+                return super.visitIdentifier(ident, p);
             }
 
             @Override

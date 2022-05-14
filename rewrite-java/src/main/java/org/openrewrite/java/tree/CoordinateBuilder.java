@@ -137,6 +137,16 @@ public abstract class CoordinateBuilder {
         }
     }
 
+    public static class Identifier extends CoordinateBuilder {
+        public Identifier(J.Identifier tree) {
+            super(tree);
+        }
+
+        public JavaCoordinates replace() {
+            return replace(Space.Location.IDENTIFIER_PREFIX);
+        }
+    }
+
     public static class Lambda {
         public static class Parameters extends CoordinateBuilder {
             Parameters(J.Lambda.Parameters tree) {
