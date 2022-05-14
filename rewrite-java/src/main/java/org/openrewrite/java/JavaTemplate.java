@@ -268,6 +268,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
 
             @Override
+            public J visitFieldAccess(J.FieldAccess fa, Integer p) {
+                if (loc.equals(FIELD_ACCESS_PREFIX) && fa.isScope(insertionPoint)) {
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
+                            .withPrefix(fa.getPrefix()), p, getCursor().getParentOrThrow());
+                }
+                return super.visitFieldAccess(fa, p);
+            }
+
+            @Override
             public J visitIdentifier(J.Identifier ident, Integer p) {
                 if (loc.equals(IDENTIFIER_PREFIX) && ident.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))

@@ -136,6 +136,49 @@ interface JavaTemplateTest : JavaRecipeTest {
         cycles = 1
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1796")
+    @Test
+    fun replaceFieldAccessWithMethodInvocation() = assertChanged(
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
+                    return method.withBody(visit(method.body, p) as J.Block)
+                }
+
+                override fun visitFieldAccess(fa: J.FieldAccess, p: ExecutionContext): J {
+                    return if (fa.simpleName == "f") {
+                        fa.withTemplate(
+                            JavaTemplate.builder({ this.cursor }, "#{any(java.io.File)}.getCanonicalFile().toPath()").build(),
+                            fa.coordinates.replace(),
+                            fa
+                        )
+                    } else {
+                        fa
+                    }
+                }
+            }
+        },
+        before = """
+            import java.io.File;
+            class Test {
+                File f;
+                void test() {
+                    System.out.println(this.f);
+                }
+            }
+        """,
+        after = """
+            import java.io.File;
+            class Test {
+                File f;
+                void test() {
+                    System.out.println(this.f.getCanonicalFile().toPath());
+                }
+            }
+        """,
+        expectedCyclesThatMakeChanges = 1,
+        cycles = 1
+    )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1092")
     @Test

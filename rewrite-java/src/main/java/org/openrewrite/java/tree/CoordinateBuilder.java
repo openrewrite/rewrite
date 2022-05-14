@@ -51,7 +51,7 @@ public abstract class CoordinateBuilder {
         }
 
         public JavaCoordinates replace() {
-            return replace(Space.Location.STATEMENT_PREFIX);
+            return replace(Space.Location.FIELD_ACCESS_PREFIX);
         }
     }
 
@@ -134,6 +134,16 @@ public abstract class CoordinateBuilder {
 
         public JavaCoordinates addImplementsClause() {
             return new JavaCoordinates(tree, Space.Location.IMPLEMENTS, JavaCoordinates.Mode.AFTER, null);
+        }
+    }
+
+    public static class FieldAccess extends CoordinateBuilder {
+        public FieldAccess(J.FieldAccess tree) {
+            super(tree);
+        }
+
+        public JavaCoordinates replace() {
+            return replace(Space.Location.FIELD_ACCESS_PREFIX);
         }
     }
 
