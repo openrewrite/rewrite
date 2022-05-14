@@ -80,4 +80,104 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun reassignmentBreaksDataFlowPath(javaParser: JavaParser) = rewriteRun(
+        { spec -> spec.parser(javaParser) },
+        java(
+            """
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "http://test";
+                        s = "https://example.com";
+                        if(System.currentTimeMillis() > 0) {
+                            System.out.println(URI.create(s));
+                        } else {
+                            System.out.println(URI.create(s));
+                        }
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun reassignmentInAlwaysEvaluatedPathBreaksDataFlowPath(javaParser: JavaParser) = rewriteRun(
+        { spec -> spec.parser(javaParser) },
+        java(
+            """
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "http://test";
+                        if (true) {
+                            s = "https://example.com";
+                        }
+                        if(System.currentTimeMillis() > 0) {
+                            System.out.println(URI.create(s));
+                        } else {
+                            System.out.println(URI.create(s));
+                        }
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun reassignmentWithinBlockDoesNotBreakPath(javaParser: JavaParser) = rewriteRun(
+        { spec -> spec.parser(javaParser) },
+        java(
+            """
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "http://test";
+                        if(System.currentTimeMillis() > 0) {
+                            s = "https://example.com";
+                            System.out.println(URI.create(s));
+                        } else {
+                            System.out.println(URI.create(s));
+                        }
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun dataflowThroughTernaryOperator(javaParser: JavaParser) = rewriteRun(
+        { spec -> spec.parser(javaParser) },
+        java(
+            """
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "http://test";
+                        String t = true ? s : null;
+                        if(System.currentTimeMillis() > 0) {
+                            System.out.println(URI.create(t));
+                        } else {
+                            System.out.println(URI.create(t));
+                        }
+                    }
+                }
+            """,
+            """
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "https://test";
+                        String t = true ? s : null;
+                        if(System.currentTimeMillis() > 0) {
+                            System.out.println(URI.create(t));
+                        } else {
+                            System.out.println(URI.create(t));
+                        }
+                    }
+                }
+            """
+        )
+    )
 }
