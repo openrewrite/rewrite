@@ -105,21 +105,27 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     static JavaParser.Builder<? extends JavaParser, ?> fromJavaVersion() {
         JavaParser.Builder<? extends JavaParser, ?> javaParser;
+        String version = System.getProperty("java.version");
         try {
-            if (System.getProperty("java.version").startsWith("1.8")) {
+            if (version.startsWith("1.8")) {
                 javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java8Parser")
                         .getDeclaredMethod("builder")
                         .invoke(null);
-            } else {
+            } else if (version.startsWith("11")) {
                 javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java11Parser")
+                        .getDeclaredMethod("builder")
+                        .invoke(null);
+            } else {
+                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
+                        .forName("org.openrewrite.java.Java17Parser")
                         .getDeclaredMethod("builder")
                         .invoke(null);
             }
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create a Java parser instance. " +
-                    "`rewrite-java-8` or `rewrite-java-11` must be on the classpath.", e);
+                    "`rewrite-java-8`, `rewrite-java-11`, or `rewrite-java-17` must be on the classpath.", e);
         }
 
         return javaParser;
