@@ -26,6 +26,29 @@ interface SimplifyBooleanExpressionTest : JavaRecipeTest {
         get() = SimplifyBooleanExpression()
 
     @Test
+    fun simplifyEqualsLiteralTrueIf(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class A {
+                boolean a;
+                {
+                    if(true == a) {
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                boolean a;
+                {
+                    if(a) {
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
     fun simplifyBooleanExpressionComprehensive(jp: JavaParser) = assertChanged(
         jp,
         before = """

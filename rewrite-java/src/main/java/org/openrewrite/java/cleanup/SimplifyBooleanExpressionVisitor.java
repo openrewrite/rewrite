@@ -51,7 +51,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
                 j = asBinary.getLeft();
             } else if (isLiteralFalse(asBinary.getRight())) {
                 maybeUnwrapParentheses();
-                j = asBinary.getRight();
+                j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (removeAllSpace(asBinary.getLeft()).printTrimmed(getCursor())
                     .equals(removeAllSpace(asBinary.getRight()).printTrimmed(getCursor()))) {
                 maybeUnwrapParentheses();
@@ -63,7 +63,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
                 j = asBinary.getLeft();
             } else if (isLiteralTrue(asBinary.getRight())) {
                 maybeUnwrapParentheses();
-                j = asBinary.getRight();
+                j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (removeAllSpace(asBinary.getLeft()).printTrimmed(getCursor())
                     .equals(removeAllSpace(asBinary.getRight()).printTrimmed(getCursor()))) {
                 maybeUnwrapParentheses();
@@ -72,7 +72,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
             if (isLiteralTrue(asBinary.getLeft())) {
                 maybeUnwrapParentheses();
-                j = asBinary.getRight();
+                j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (isLiteralTrue(asBinary.getRight())) {
                 maybeUnwrapParentheses();
                 j = asBinary.getLeft();
@@ -80,7 +80,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
         } else if (asBinary.getOperator() == J.Binary.Type.NotEqual) {
             if (isLiteralFalse(asBinary.getLeft())) {
                 maybeUnwrapParentheses();
-                j = asBinary.getRight();
+                j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (isLiteralFalse(asBinary.getRight())) {
                 maybeUnwrapParentheses();
                 j = asBinary.getLeft();
