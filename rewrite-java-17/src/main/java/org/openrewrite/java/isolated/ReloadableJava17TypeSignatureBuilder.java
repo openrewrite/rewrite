@@ -27,7 +27,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.StringJoiner;
 
-class Java17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
+class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     private Set<String> typeVariableNameStack;
 

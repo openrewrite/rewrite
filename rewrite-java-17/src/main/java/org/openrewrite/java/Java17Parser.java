@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.util.*;
@@ -76,7 +77,7 @@ public class Java17Parser implements JavaParser {
             }
 
             ClassLoader appClassLoader = Java17Parser.class.getClassLoader();
-            moduleClassLoader = new ModuleClassLoader(appClassLoader);
+            moduleClassLoader = new UnrestrictedModuleClassLoader(appClassLoader);
 
         }
 
@@ -85,8 +86,8 @@ public class Java17Parser implements JavaParser {
             lazyInitClassLoaders();
 
             try {
-                // need to reverse this parent/child relationship
-                Class<?> parserImplementation = Class.forName("org.openrewrite.java.isolated.IsolatedJava17Parser", true, moduleClassLoader);
+                //Load the parser implementation use the unrestricted module classloader.
+                Class<?> parserImplementation = Class.forName("org.openrewrite.java.isolated.ReloadableJava17Parser", true, moduleClassLoader);
 
                 Constructor<?> parserConstructor = parserImplementation
                         .getDeclaredConstructor(Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
@@ -105,14 +106,21 @@ public class Java17Parser implements JavaParser {
     }
 
     /**
-     * This classloader will attempt load classes from the list of modules first, if the class does not exist in the
-     * module, the loader will delegate to the parent classloader.
+     * Rewrite's JavaParser is reliant on java's compiler internal classes that are now encapsulated within Java's
+     * module system. Starting in Java 17, the JVM now enforces strong encapsulation of these internal classes and
+     * default behavior is to throw a security exception when attempting to use these internal classes. This classloader
+     * circumvents these security restrictions by isolating Rewrite's Java 17 parser implementation classes and then
+     * loading any of the internal classes directly from the .jmod files.
+     *
+     * NOTE: Any classes in the package "org.openrewrite.java.isolated" will be loaded into this isolated classloader.
      */
-    private static class ModuleClassLoader extends ClassLoader {
+    private static class UnrestrictedModuleClassLoader extends ClassLoader {
         final List<Path> modules;
 
-        private ModuleClassLoader(ClassLoader parentClassloader) {
+        private UnrestrictedModuleClassLoader(ClassLoader parentClassloader) {
             super(parentClassloader);
+
+            //A list of modules to load internal classes from
             final FileSystem fs = FileSystems.getFileSystem(URI.create("jrt:/"));
             modules = List.of(
                     fs.getPath("modules", "jdk.compiler"),
@@ -124,8 +132,15 @@ public class Java17Parser implements JavaParser {
         @Override
         public Class<?> loadClass(String name) throws ClassNotFoundException {
 
-
             String internalName = name.replace('.', '/') + ".class";
+
+            //If the class is in the package "org.openrewrite.java.internal", load it from this class loader.
+            Class<?> _class = loadIsolatedClass(name);
+            if (_class != null) {
+                return _class;
+            }
+
+            //Otherwise look for internal classes in the list of modules.
             if (name.startsWith("com.sun") || name.startsWith("sun")) {
                 try {
                     for (Path path : modules) {
@@ -139,12 +154,6 @@ public class Java17Parser implements JavaParser {
                     throw new RuntimeException(e);
                 }
             }
-
-            Class<?> _class = loadIsolatedClass(name);
-            if (_class != null) {
-                return _class;
-            }
-
             return super.loadClass(name);
         }
 
@@ -155,7 +164,11 @@ public class Java17Parser implements JavaParser {
             }
             try {
                 String internalName = className.replace('.', '/') + ".class";
-                Path classPath = Path.of(Java17Parser.class.getClassLoader().getResource(internalName).toURI());
+                URL url = Java17Parser.class.getClassLoader().getResource(internalName);
+                if (url == null) {
+                    return null;
+                }
+                Path classPath = Path.of(url.toURI());
                 byte[] bytes = Files.readAllBytes(classPath);
                 return defineClass(className, bytes, 0, bytes.length);
             } catch (URISyntaxException | IOException e) {

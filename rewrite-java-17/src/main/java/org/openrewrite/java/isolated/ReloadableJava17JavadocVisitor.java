@@ -41,7 +41,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
-public class Java17JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
+public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private final Attr attr;
 
     @Nullable
@@ -50,7 +50,7 @@ public class Java17JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     @Nullable
     private final Type enclosingClassType;
 
-    private final Java17TypeMapping typeMapping;
+    private final ReloadableJava17TypeMapping typeMapping;
     private final TreeScanner<J, Space> javaVisitor = new JavaVisitor();
     private final Map<Integer, Javadoc.LineBreak> lineBreaks = new HashMap<>();
 
@@ -62,7 +62,7 @@ public class Java17JavadocVisitor extends DocTreeScanner<Tree, List<Javadoc>> {
     private String source;
     private int cursor = 0;
 
-    public Java17JavadocVisitor(Context context, TreePath scope, Java17TypeMapping typeMapping, String source, JCTree tree) {
+    public ReloadableJava17JavadocVisitor(Context context, TreePath scope, ReloadableJava17TypeMapping typeMapping, String source, JCTree tree) {
         this.attr = Attr.instance(context);
         this.typeMapping = typeMapping;
         this.source = source;

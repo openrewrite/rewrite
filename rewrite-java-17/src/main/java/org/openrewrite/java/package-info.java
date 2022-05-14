@@ -13,26 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@NonNullApi
+@NonNullFields
 package org.openrewrite.java;
 
-import org.openrewrite.java.tree.J;
-
-import java.util.List;
-public final class Java17ModifierResults {
-
-    private final List<J.Annotation> leadingAnnotations;
-    private final List<J.Modifier> modifiers;
-
-    public Java17ModifierResults(List<J.Annotation> leadingAnnotations, List<J.Modifier> modifiers) {
-        this.leadingAnnotations = leadingAnnotations;
-        this.modifiers = modifiers;
-    }
-
-    public List<J.Annotation> getLeadingAnnotations() {
-        return leadingAnnotations;
-    }
-
-    public List<J.Modifier> getModifiers() {
-        return modifiers;
-    }
-}
+import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.internal.lang.NonNullFields;

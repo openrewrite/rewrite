@@ -65,7 +65,7 @@ import static java.util.stream.Collectors.toList;
  * This parser is NOT thread-safe, as the OpenJDK parser maintains in-memory caches in static state.
  */
 @NonNullApi
-public class IsolatedJava17Parser implements JavaParser {
+public class ReloadableJava17Parser implements JavaParser {
     private String sourceSet = "main";
     private final JavaTypeCache typeCache;
 
@@ -84,13 +84,13 @@ public class IsolatedJava17Parser implements JavaParser {
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
 
-    private IsolatedJava17Parser(boolean logCompilationWarningsAndErrors,
-                                 @Nullable Collection<Path> classpath,
-                                 Collection<byte[]> classBytesClasspath,
-                                 @Nullable Collection<Input> dependsOn,
-                                 Charset charset,
-                                 Collection<NamedStyles> styles,
-                                 JavaTypeCache typeCache) {
+    private ReloadableJava17Parser(boolean logCompilationWarningsAndErrors,
+                                   @Nullable Collection<Path> classpath,
+                                   Collection<byte[]> classBytesClasspath,
+                                   @Nullable Collection<Input> dependsOn,
+                                   Charset charset,
+                                   Collection<NamedStyles> styles,
+                                   JavaTypeCache typeCache) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -133,7 +133,7 @@ public class IsolatedJava17Parser implements JavaParser {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
                     if (!log.isBlank() && !log.contains("warning: a package-info.java file has already")) {
-                        org.slf4j.LoggerFactory.getLogger(IsolatedJava17Parser.class).warn(log);
+                        org.slf4j.LoggerFactory.getLogger(ReloadableJava17Parser.class).warn(log);
                     }
                 }
             }
@@ -164,7 +164,7 @@ public class IsolatedJava17Parser implements JavaParser {
                     Timer.Sample sample = Timer.start();
                     Input input = cuByPath.getKey();
                     try {
-                        Java17ParserVisitor parser = new Java17ParserVisitor(
+                        ReloadableJava17ParserVisitor parser = new ReloadableJava17ParserVisitor(
                                 input.getRelativePath(relativeTo),
                                 input.getSource(),
                                 styles,
@@ -237,7 +237,7 @@ public class IsolatedJava17Parser implements JavaParser {
                     .register(Metrics.globalRegistry)
                     .record(() -> {
                         try {
-                            return compiler.parse(new Java17ParserInputFileObject(input1));
+                            return compiler.parse(new ReloadableJava17ParserInputFileObject(input1));
                         } catch (IllegalStateException e) {
                             if ("endPosTable already set".equals(e.getMessage())) {
                                 throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
@@ -269,7 +269,7 @@ public class IsolatedJava17Parser implements JavaParser {
     }
 
     @Override
-    public IsolatedJava17Parser reset() {
+    public ReloadableJava17Parser reset() {
         typeCache.clear();
         compilerLog.reset();
         pfm.flush();
@@ -372,10 +372,10 @@ public class IsolatedJava17Parser implements JavaParser {
         }
     }
 
-    public static class Builder extends JavaParser.Builder<IsolatedJava17Parser, Builder> {
+    public static class Builder extends JavaParser.Builder<ReloadableJava17Parser, Builder> {
         @Override
-        public IsolatedJava17Parser build() {
-            return new IsolatedJava17Parser(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+        public ReloadableJava17Parser build() {
+            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
         }
     }
 

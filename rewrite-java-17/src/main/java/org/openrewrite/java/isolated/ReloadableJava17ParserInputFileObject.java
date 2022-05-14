@@ -33,7 +33,7 @@ import java.nio.file.Path;
  * other than a file on disk.
  */
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Java17ParserInputFileObject implements JavaFileObject {
+public class ReloadableJava17ParserInputFileObject implements JavaFileObject {
     @EqualsAndHashCode.Include
     @Nullable
     private final Path path;
@@ -41,7 +41,7 @@ public class Java17ParserInputFileObject implements JavaFileObject {
     @Getter
     private final Parser.Input input;
 
-    public Java17ParserInputFileObject(Parser.Input input) {
+    public ReloadableJava17ParserInputFileObject(Parser.Input input) {
         this.input = input;
         this.path = input.getPath();
     }

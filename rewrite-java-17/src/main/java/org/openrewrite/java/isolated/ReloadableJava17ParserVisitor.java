@@ -30,7 +30,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.Java17ModifierResults;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
@@ -66,7 +65,7 @@ import static org.openrewrite.java.tree.Space.format;
  * This visitor is not thread safe, as it maintains a {@link #cursor} and {@link #endPosTable}
  * for each compilation unit visited.
  */
-public class Java17ParserVisitor extends TreePathScanner<J, Space> {
+public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     private final static int SURR_FIRST = 0xD800;
     private final static int SURR_LAST = 0xDFFF;
 
@@ -77,7 +76,7 @@ public class Java17ParserVisitor extends TreePathScanner<J, Space> {
     private final Collection<NamedStyles> styles;
     private final ExecutionContext ctx;
     private final Context context;
-    private final Java17TypeMapping typeMapping;
+    private final ReloadableJava17TypeMapping typeMapping;
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     private EndPosTable endPosTable;
@@ -90,12 +89,12 @@ public class Java17ParserVisitor extends TreePathScanner<J, Space> {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public Java17ParserVisitor(Path sourcePath,
-                               EncodingDetectingInputStream source,
-                               Collection<NamedStyles> styles,
-                               JavaTypeCache typeCache,
-                               ExecutionContext ctx,
-                               Context context) {
+    public ReloadableJava17ParserVisitor(Path sourcePath,
+                                         EncodingDetectingInputStream source,
+                                         Collection<NamedStyles> styles,
+                                         JavaTypeCache typeCache,
+                                         ExecutionContext ctx,
+                                         Context context) {
         this.sourcePath = sourcePath;
         this.source = source.readFully();
         this.charset = source.getCharset();
@@ -103,7 +102,7 @@ public class Java17ParserVisitor extends TreePathScanner<J, Space> {
         this.styles = styles;
         this.ctx = ctx;
         this.context = context;
-        this.typeMapping = new Java17TypeMapping(typeCache);
+        this.typeMapping = new ReloadableJava17TypeMapping(typeCache);
     }
 
     @Override
@@ -371,7 +370,7 @@ public class Java17ParserVisitor extends TreePathScanner<J, Space> {
             annotationPosTable.put(annotation.pos, annotation);
         }
 
-        Java17ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
+        ReloadableJava17ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> kindAnnotations = collectAnnotations(annotationPosTable);
 
@@ -890,7 +889,7 @@ public class Java17ParserVisitor extends TreePathScanner<J, Space> {
             JCAnnotation annotation = (JCAnnotation) annotationNode;
             annotationPosTable.put(annotation.pos, annotation);
         }
-        Java17ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
+        ReloadableJava17ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         J.TypeParameters typeParams;
         if (node.getTypeParameters().isEmpty()) {
@@ -1339,7 +1338,7 @@ public class Java17ParserVisitor extends TreePathScanner<J, Space> {
         for (JCAnnotation annotationNode : node.getModifiers().getAnnotations()) {
             annotationPosTable.put(annotationNode.pos, annotationNode);
         }
-        Java17ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
+        ReloadableJava17ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
@@ -1797,7 +1796,7 @@ public class Java17ParserVisitor extends TreePathScanner<J, Space> {
      * Leading Annotations and modifiers in the order they appear in the source, which is not necessarily the same as the order in
      * which they appear in the OpenJDK AST
      */
-    private Java17ModifierResults sortedModifiersAndAnnotations(ModifiersTree modifiers, Map<Integer, JCAnnotation> annotationPosTable) {
+    private ReloadableJava17ModifierResults sortedModifiersAndAnnotations(ModifiersTree modifiers, Map<Integer, JCAnnotation> annotationPosTable) {
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Modifier> sortedModifiers = new ArrayList<>();
         List<J.Annotation> currentAnnotations = new ArrayList<>();
@@ -1863,7 +1862,7 @@ public class Java17ParserVisitor extends TreePathScanner<J, Space> {
         if (sortedModifiers.isEmpty()) {
             cursor = lastAnnotationPosition;
         }
-        return new Java17ModifierResults(
+        return new ReloadableJava17ModifierResults(
                 leadingAnnotations.isEmpty() ? emptyList() : leadingAnnotations,
                 sortedModifiers.isEmpty() ? emptyList() : sortedModifiers
         );
@@ -1967,7 +1966,7 @@ public class Java17ParserVisitor extends TreePathScanner<J, Space> {
             for (int j = 0; j < comments.size(); j++) {
                 Comment comment = comments.get(j);
                 if (i == j) {
-                    javadoc.set((Javadoc.DocComment) new Java17JavadocVisitor(
+                    javadoc.set((Javadoc.DocComment) new ReloadableJava17JavadocVisitor(
                             context,
                             getCurrentPath(),
                             typeMapping,

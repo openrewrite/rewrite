@@ -27,7 +27,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.Java17Parser;
 import org.openrewrite.java.JavaTypeSignatureBuilderTest;
 
 import java.io.ByteArrayInputStream;
@@ -40,7 +39,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
     private static final String goat = StringUtils.readFully(
             Java17TypeSignatureBuilderTest.class.getResourceAsStream("/JavaTypeGoat.java"));
 
-    private static final JCTree.JCCompilationUnit cu = IsolatedJava17Parser.builder()
+    private static final JCTree.JCCompilationUnit cu = ReloadableJava17Parser.builder()
             .logCompilationWarningsAndErrors(true)
             .build()
             .parseInputsToCompilerAst(
@@ -167,7 +166,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
     }
 
     @Override
-    public Java17TypeSignatureBuilder signatureBuilder() {
-        return new Java17TypeSignatureBuilder();
+    public ReloadableJava17TypeSignatureBuilder signatureBuilder() {
+        return new ReloadableJava17TypeSignatureBuilder();
     }
 }
