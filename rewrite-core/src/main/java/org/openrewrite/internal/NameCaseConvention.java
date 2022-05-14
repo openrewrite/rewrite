@@ -129,6 +129,16 @@ public enum NameCaseConvention {
      * @return The string formatted as {@link NameCaseConvention#LOWER_CAMEL}.
      */
     private static String toCamelCase(String str, boolean lowerCaseFirstLetter) {
+        boolean allUpperCase = true;
+        for (char c : str.toCharArray()) {
+            if(Character.isLowerCase(c)) {
+                allUpperCase = false;
+            }
+        }
+        if(allUpperCase) {
+            return str.toLowerCase();
+        }
+
         StringBuilder sb = new StringBuilder(str.length());
         for (String s : CAMEL_CASE_SPLIT.split(str)) {
             String capitalize = StringUtils.capitalize(s);

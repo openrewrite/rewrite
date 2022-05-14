@@ -70,6 +70,7 @@ class NameCaseConventionTest {
     @ParameterizedTest
     @CsvSource(
         value = [
+            "ID:id",
             "rename_one:renameOne",
             "RenameTwo:renameTwo",
             "__rename__three__:renameThree",

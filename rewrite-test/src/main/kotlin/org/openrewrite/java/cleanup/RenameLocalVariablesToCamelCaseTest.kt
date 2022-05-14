@@ -25,6 +25,54 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
         get() = RenameLocalVariablesToCamelCase()
 
     @Test
+    fun renameAllCapsAcronyms(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                void test() {
+                    String ID;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test() {
+                    String id;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun renameLocalVariables(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                int DoNoTChange;
+
+                public int addTen(int rename_one) {
+                    double RenameTwo = 2.0;
+                    float __rename__three__ = 2.0;
+                    long _Rename__Four = 2.0;
+                    return rename_one + RenameTwo + __rename__three__ + _Rename__Four + 10;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                int DoNoTChange;
+
+                public int addTen(int renameOne) {
+                    double renameTwo = 2.0;
+                    float renameThree = 2.0;
+                    long renameFour = 2.0;
+                    return renameOne + renameTwo + renameThree + renameFour + 10;
+                }
+            }
+        """
+    )
+
+    @Test
     fun doNotChangeStaticImports(jp: JavaParser) = assertUnchanged(
         jp,
         dependsOn = arrayOf("""
@@ -109,35 +157,6 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                     for (int do_not_change = 0; do_not_change < 10; do_not_change++) {
                        DoNoTChange += do_not_change; 
                     }
-                }
-            }
-        """
-    )
-
-    @Test
-    fun renameLocalVariables(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
-            class Test {
-                int DoNoTChange;
-
-                public int addTen(int rename_one) {
-                    double RenameTwo = 2.0;
-                    float __rename__three__ = 2.0;
-                    long _Rename__Four = 2.0;
-                    return rename_one + RenameTwo + __rename__three__ + _Rename__Four + 10;
-                }
-            }
-        """,
-        after = """
-            class Test {
-                int DoNoTChange;
-
-                public int addTen(int renameOne) {
-                    double renameTwo = 2.0;
-                    float renameThree = 2.0;
-                    long renameFour = 2.0;
-                    return renameOne + renameTwo + renameThree + renameFour + 10;
                 }
             }
         """
