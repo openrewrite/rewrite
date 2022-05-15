@@ -39,6 +39,7 @@ tasks.withType<JavaCompile> {
     )
 }
 
+//Javadoc compiler will complain about the use of the internal types.
 tasks.withType<Javadoc> {
     exclude(
         "**/Java11Parser**",

@@ -36,11 +36,13 @@ tasks.withType<JavaCompile> {
     )
 }
 
+//Javadoc compiler will complain about the use of the internal types.
 tasks.withType<Javadoc> {
     exclude(
-        "**/Java17Parser**",
-        "**/Java17JavadocVisitor**",
-        "**/Java17TypeMapping**",
-        "**/Java17TypeSignatureBuilder**"
+        "**/ReloadableJava17JavadocVisitor**",
+        "**/ReloadableJava17Parser**",
+        "**/ReloadableJava17ParserVisitor**",
+        "**/ReloadableJava17TypeMapping**",
+        "**/ReloadableJava17TypeSignatureBuilder**"
     )
 }
