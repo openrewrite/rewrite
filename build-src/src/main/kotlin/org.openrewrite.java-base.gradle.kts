@@ -11,10 +11,8 @@ plugins {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(11))
+        languageVersion.set(JavaLanguageVersion.of(17))
     }
 }
 
@@ -40,7 +38,7 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-parameters")
     options.isFork = true
     options.release.set(8)
-    sourceCompatibility = "1.8"
+    sourceCompatibility = "17"
     targetCompatibility = "1.8"
 }
 
