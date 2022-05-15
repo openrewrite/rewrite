@@ -41,6 +41,7 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.*;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
+
     /**
      * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to skip generation of
      * type attribution from the class in {@link JavaSourceSet} marker.
@@ -106,29 +107,41 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     static JavaParser.Builder<? extends JavaParser, ?> fromJavaVersion() {
         JavaParser.Builder<? extends JavaParser, ?> javaParser;
         String version = System.getProperty("java.version");
-        try {
-            if (version.startsWith("1.8")) {
-                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
-                        .forName("org.openrewrite.java.Java8Parser")
-                        .getDeclaredMethod("builder")
-                        .invoke(null);
-            } else if (version.startsWith("11")) {
-                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
-                        .forName("org.openrewrite.java.Java11Parser")
-                        .getDeclaredMethod("builder")
-                        .invoke(null);
-            } else {
+
+        if (version.startsWith("17")) {
+            try {
                 javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java17Parser")
                         .getDeclaredMethod("builder")
                         .invoke(null);
+                return javaParser;
+            } catch (Exception e) {
+                //Fall through, look for a parser on an older version.
             }
+        }
+
+        if (version.startsWith("11")) {
+            try {
+                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
+                        .forName("org.openrewrite.java.Java11Parser")
+                        .getDeclaredMethod("builder")
+                        .invoke(null);
+                return javaParser;
+            } catch (Exception e) {
+                //Fall through, look for a parser on an older version.
+            }
+        }
+
+        try {
+            javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
+                    .forName("org.openrewrite.java.Java8Parser")
+                    .getDeclaredMethod("builder")
+                    .invoke(null);
+            return javaParser;
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create a Java parser instance. " +
                     "`rewrite-java-8`, `rewrite-java-11`, or `rewrite-java-17` must be on the classpath.", e);
         }
-
-        return javaParser;
     }
 
     @Override
