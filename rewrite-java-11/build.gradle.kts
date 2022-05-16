@@ -48,9 +48,10 @@ tasks.withType<JavaCompile> {
 //Javadoc compiler will complain about the use of the internal types.
 tasks.withType<Javadoc> {
     exclude(
-        "**/Java11Parser**",
-        "**/Java11JavadocVisitor**",
-        "**/Java11TypeMapping**",
-        "**/Java11TypeSignatureBuilder**"
+        "**/ReloadableJava11JavadocVisitor**",
+        "**/ReloadableJava11Parser**",
+        "**/ReloadableJava11ParserVisitor**",
+        "**/ReloadableJava11TypeMapping**",
+        "**/ReloadableJava11TypeSignatureBuilder**"
     )
 }
