@@ -18,14 +18,14 @@ package org.openrewrite.maven.internal
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.maven.tree.ProfileActivation
-import kotlin.streams.toList
+import java.util.stream.Collectors
 
 class RawPomTest {
     @Test
     fun profileActivationByJdk() {
-        assertThat(ProfileActivation(false, "11", null).isActive).isTrue()
-        assertThat(ProfileActivation(false, "[,12)", null).isActive).isTrue()
-        assertThat(ProfileActivation(false, "[,11]", null).isActive).isFalse()
+        assertThat(ProfileActivation(false, "17", null).isActive).isTrue()
+        assertThat(ProfileActivation(false, "[,18)", null).isActive).isTrue()
+        assertThat(ProfileActivation(false, "[,17]", null).isActive).isFalse()
     }
 
     @Test
@@ -297,7 +297,7 @@ class RawPomTest {
 
         assertThat(model.plugins).hasSize(2)
         val surefirePlugin = model.plugins.stream()
-            .filter { p -> p.artifactId.equals("maven-surefire-plugin") }!!.toList()[0]
+            .filter { p -> p.artifactId.equals("maven-surefire-plugin") }!!.collect(Collectors.toList())[0]
         assertThat(surefirePlugin.getConfigurationList("includes", String::class.java))
             .hasSize(2)
             .contains("**/*Test.java", "**/*Tests.java")
@@ -308,12 +308,12 @@ class RawPomTest {
 
         assertThat(surefirePlugin.getConfigurationStringValue("argLine")).isEqualTo("hello")
         var jacocoPlugin = model.plugins.stream()
-            .filter { p -> p.artifactId.equals("jacoco-maven-plugin") }!!.toList()[0]
+            .filter { p -> p.artifactId.equals("jacoco-maven-plugin") }!!.collect(Collectors.toList())[0]
 
         assertThat(jacocoPlugin.executions).hasSize(2)
 
         var rewritePlugin = model.pluginManagement.stream()
-            .filter { p -> p.artifactId.equals("rewrite-maven-plugin") }!!.toList()[0]
+            .filter { p -> p.artifactId.equals("rewrite-maven-plugin") }!!.collect(Collectors.toList())[0]
 
         assertThat(rewritePlugin.dependencies).hasSize(1)
         assertThat(rewritePlugin.dependencies[0].groupId).isEqualTo("org.openrewrite.recipe")
@@ -333,21 +333,21 @@ class RawPomTest {
 
         assertThat(model.repositories.first()?.uri)
             .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots")
-        val java9Profile = model.profiles.stream().filter { p -> p.id!!.equals("java9+") }!!.toList()[0]
-        val java11Profile = model.profiles.stream().filter { p -> p.id!!.equals("java11+") }!!.toList()[0]
+        val java9Profile = model.profiles.stream().filter { p -> p.id!!.equals("java9+") }!!.collect(Collectors.toList())[0]
+        val java11Profile = model.profiles.stream().filter { p -> p.id!!.equals("java11+") }!!.collect(Collectors.toList())[0]
         assertThat(java9Profile.dependencies[0].groupId).isEqualTo("javax.xml.bind")
         assertThat(java11Profile.dependencies).isEmpty()
 
-        val rewriteProfile = model.profiles.stream().filter { p -> p.id!!.equals("plugin-stuff") }!!.toList()[0]
+        val rewriteProfile = model.profiles.stream().filter { p -> p.id!!.equals("plugin-stuff") }!!.collect(Collectors.toList())[0]
 
         assertThat(rewriteProfile.plugins).hasSize(2)
         jacocoPlugin = rewriteProfile.plugins.stream()
-            .filter { p -> p.artifactId.equals("jacoco-maven-plugin") }!!.toList()[0]
+            .filter { p -> p.artifactId.equals("jacoco-maven-plugin") }!!.collect(Collectors.toList())[0]
 
         assertThat(jacocoPlugin.executions).hasSize(2)
 
         rewritePlugin = rewriteProfile.pluginManagement.stream()
-            .filter { p -> p.artifactId.equals("rewrite-maven-plugin") }!!.toList()[0]
+            .filter { p -> p.artifactId.equals("rewrite-maven-plugin") }!!.collect(Collectors.toList())[0]
 
         assertThat(rewritePlugin.dependencies).hasSize(1)
         assertThat(rewritePlugin.dependencies[0].groupId).isEqualTo("org.openrewrite.recipe")
