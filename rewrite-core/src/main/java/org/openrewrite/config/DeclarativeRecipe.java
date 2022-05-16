@@ -16,7 +16,10 @@
 package org.openrewrite.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
@@ -30,7 +33,10 @@ import static org.openrewrite.Validated.invalid;
 @RequiredArgsConstructor
 public class DeclarativeRecipe extends Recipe {
     private final String name;
+    @Language("markdown")
     private final String displayName;
+
+    @Language("markdown")
     private final String description;
     private final Set<String> tags;
 
@@ -38,7 +44,8 @@ public class DeclarativeRecipe extends Recipe {
     private final Duration estimatedEffortPerOccurrence;
 
     private final URI source;
-    private final List<String> lazyNext = new ArrayList<>();
+
+    private final List<Recipe> uninitializedRecipes = new ArrayList<>();
 
     @Override
     public String getDisplayName() {
@@ -53,7 +60,7 @@ public class DeclarativeRecipe extends Recipe {
     @JsonIgnore
     private Validated validation = Validated.test("initialization",
             "initialize(..) must be called on DeclarativeRecipe prior to use.",
-            this, r -> lazyNext.isEmpty());
+            this, r -> uninitializedRecipes.isEmpty());
 
     @Override
     public Set<String> getTags() {
@@ -61,28 +68,33 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     void initialize(Collection<Recipe> availableRecipes) {
-        for (int i = 0; i < lazyNext.size(); i++) {
-            String nextName = lazyNext.get(i);
-            Optional<Recipe> next = availableRecipes.stream()
-                    .filter(r -> r.getName().equals(nextName)).findAny();
-            if (next.isPresent()) {
-                doNext(next.get());
+        for (int i = 0; i < uninitializedRecipes.size(); i++) {
+            Recipe recipe =  uninitializedRecipes.get(i);
+            if(recipe instanceof LazyLoadedRecipe) {
+                String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
+                Optional<Recipe> next = availableRecipes.stream()
+                        .filter(r -> r.getName().equals(recipeFqn)).findAny();
+                if (next.isPresent()) {
+                    doNext(next.get());
+                } else {
+                    validation = validation.and(
+                            invalid(name + ".recipeList[" + i + "] (in " + source + ")",
+                                    recipeFqn,
+                                    "recipe '" + recipeFqn + "' does not exist.",
+                                    null));
+                }
             } else {
-                validation = validation.and(
-                        invalid(name + ".recipeList[" + i + "] (in " + source + ")",
-                                nextName,
-                                "recipe '" + nextName + "' does not exist.",
-                                null));
+                doNext(recipe);
             }
         }
-        lazyNext.clear();
+        uninitializedRecipes.clear();
     }
 
     void doNext(String recipeName) {
         try {
-            doNext((Recipe) Class.forName(recipeName).getDeclaredConstructor().newInstance());
+            uninitializedRecipes.add((Recipe) Class.forName(recipeName).getDeclaredConstructor().newInstance());
         } catch (Exception e) {
-            lazyNext.add(recipeName);
+            uninitializedRecipes.add(new DeclarativeRecipe.LazyLoadedRecipe(recipeName));
         }
     }
 
@@ -98,5 +110,17 @@ public class DeclarativeRecipe extends Recipe {
     @Override
     public String getName() {
         return name;
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    private static class LazyLoadedRecipe extends Recipe {
+
+        String recipeFqn;
+
+        @Override
+        public String getDisplayName() {
+            return "Lazy loaded recipe";
+        }
     }
 }

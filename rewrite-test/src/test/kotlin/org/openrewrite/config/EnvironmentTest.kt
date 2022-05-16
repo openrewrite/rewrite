@@ -17,19 +17,16 @@ package org.openrewrite.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
-import org.openrewrite.Parser
-import org.openrewrite.RecipeTest
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
+import org.openrewrite.test.RewriteTest
 import org.openrewrite.text.PlainText
 import java.net.URI
-import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
 
-class EnvironmentTest : RecipeTest<PlainText> {
+class EnvironmentTest : RewriteTest {
     @Test
     fun listRecipes() {
         val env = Environment.builder()
@@ -257,53 +254,33 @@ class EnvironmentTest : RecipeTest<PlainText> {
         assertThat(sampleStyle.tags).containsExactly("testing")
     }
 
-    private val plainTextParser = object : Parser<PlainText> {
-        override fun parse(ctx: ExecutionContext, vararg sources: String): MutableList<PlainText> {
-            return sources.asSequence()
-                .map { PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, it) }
-                .toMutableList()
-        }
-
-        override fun parseInputs(
-            sources: MutableIterable<Parser.Input>,
-            relativeTo: Path?,
-            ctx: ExecutionContext
-        ): MutableList<PlainText> {
-            return sources.asSequence()
-                .map { it.source.toString() }
-                .map { PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, it) }
-                .toMutableList()
-        }
-
-        override fun accept(path: Path): Boolean {
-            return true
-        }
-
-        override fun sourcePathFromSourceText(prefix: Path, sourceCode: String): Path =
-            TODO("Not implemented")
-    }
-
     @Issue("https://github.com/openrewrite/rewrite/issues/343")
     @Test
-    fun environmentActivatedRecipeUsableInTests() = assertChangedBase(
-        parser = plainTextParser,
-        recipe = Environment.builder()
-            .scanRuntimeClasspath()
-            .build()
-            .activateRecipes("org.openrewrite.text.ChangeTextToJon"),
-        before = "some text that isn't jon",
-        after = "Hello Jon!"
+    fun environmentActivatedRecipeUsableInTests() = rewriteRun(
+        { spec ->
+            spec.recipe(Environment.builder()
+                .scanRuntimeClasspath()
+                .build()
+                .activateRecipes("org.openrewrite.text.ChangeTextToJon"))
+        },
+        plainText(
+            "some text that isn't jon",
+            "Hello Jon!"
+        )
     )
 
     @Test
-    fun deserializesKotlinRecipe() = assertChangedBase(
-        parser = plainTextParser,
-        recipe = Environment.builder()
-            .scanRuntimeClasspath()
-            .build()
-            .activateRecipes("org.openrewrite.text.HelloKotlin"),
-        before = "some text",
-        after = "Hello Kotlin"
+    fun deserializesKotlinRecipe() = rewriteRun(
+        { spec ->
+            spec.recipe(Environment.builder()
+                .scanRuntimeClasspath()
+                .build()
+                .activateRecipes("org.openrewrite.text.HelloKotlin"))
+        },
+        plainText(
+            "some text",
+            "Hello Kotlin"
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/543")
@@ -317,5 +294,62 @@ class EnvironmentTest : RecipeTest<PlainText> {
         assertThat(helloJon2!!.recipeList)
             .hasSize(1)
         assertThat(helloJon2.recipeList.first().name).isEqualTo("org.openrewrite.HelloJon")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1789")
+    @Test
+    fun preserveRecipeListOrder() {
+        val env = Environment.builder()
+            .load(YamlResourceLoader(
+                //language=yaml
+                """
+                    type: specs.openrewrite.org/v1beta/recipe
+                    name: test.FooOne
+                    displayName: Test
+                    recipeList:
+                      - org.openrewrite.config.RecipeAcceptingParameters:
+                            foo: "foo"
+                            bar: 1
+                """.trimIndent().byteInputStream(),
+                URI.create("rewrite.yml"),
+                Properties()
+            ))
+            .load(YamlResourceLoader(
+                //language=yaml
+                """
+                    type: specs.openrewrite.org/v1beta/recipe
+                    name: test.BarTwo
+                    displayName: Test
+                    recipeList:
+                      - org.openrewrite.config.RecipeAcceptingParameters:
+                            foo: "bar"
+                            bar: 2
+                """.trimIndent().byteInputStream(),
+                URI.create("rewrite.yml"),
+                Properties()
+            ))
+            .load(YamlResourceLoader(
+                //language=yaml
+                """
+                    type: specs.openrewrite.org/v1beta/recipe
+                    name: test.OrderPreserved
+                    displayName: Test
+                    recipeList:
+                      - org.openrewrite.config.RecipeNoParameters
+                      - test.FooOne
+                      - org.openrewrite.config.RecipeNoParameters
+                      - test.BarTwo
+                      - org.openrewrite.config.RecipeNoParameters
+                """.trimIndent().byteInputStream(),
+                URI.create("rewrite.yml"),
+                Properties()
+            ))
+            .build()
+        val recipeList = env.activateRecipes("test.OrderPreserved").recipeList[0].recipeList
+        assertThat(recipeList[0].name).isEqualTo("org.openrewrite.config.RecipeNoParameters")
+        assertThat(recipeList[1].name).isEqualTo("test.FooOne")
+        assertThat(recipeList[2].name).isEqualTo("org.openrewrite.config.RecipeNoParameters")
+        assertThat(recipeList[3].name).isEqualTo("test.BarTwo")
+        assertThat(recipeList[4].name).isEqualTo("org.openrewrite.config.RecipeNoParameters")
     }
 }

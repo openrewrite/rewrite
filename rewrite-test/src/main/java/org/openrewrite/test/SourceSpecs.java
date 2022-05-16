@@ -30,6 +30,7 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.function.Consumer;
 
+@SuppressWarnings("unused")
 public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     default SourceSpecs dir(String dir, SourceSpecs... sources) {
         return dir(dir, s -> {
@@ -61,6 +62,26 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
         SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, before, after);
         spec.accept(java);
         return java;
+    }
+
+    default SourceSpecs plainText(String before) {
+        return plainText(before, s -> {});
+    }
+
+    default  SourceSpecs plainText(String before, Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> plainText = new SourceSpec<>(PlainText.class, null, before, null);
+        spec.accept(plainText);
+        return plainText;
+    }
+
+    default SourceSpecs plainText(String before, String after) {
+        return plainText(before, after, s -> {});
+    }
+
+    default SourceSpecs plainText(String before, String after, Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> plainText = new SourceSpec<>(PlainText.class, null, before, after);
+        spec.accept(plainText);
+        return plainText;
     }
 
     default SourceSpecs pomXml(@Language("xml") String before) {

@@ -42,6 +42,8 @@ dependencies {
 
     implementation("org.apache.hbase:hbase-shaded-client:2.4.11")
     testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
+    testCompileOnly("org.projectlombok:lombok:1.18.24")
+    annotationProcessor("org.projectlombok:lombok:1.18.24")
 }
 
 tasks.withType<Javadoc> {
