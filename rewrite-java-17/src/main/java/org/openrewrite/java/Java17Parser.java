@@ -21,10 +21,11 @@ import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.*;
@@ -178,16 +179,21 @@ public class Java17Parser implements JavaParser {
             if (!className.startsWith("org.openrewrite.java.isolated")) {
                 return null;
             }
-            try {
-                String internalName = className.replace('.', '/') + ".class";
-                URL url = Java17Parser.class.getClassLoader().getResource(internalName);
-                if (url == null) {
-                    return null;
+            String internalName = className.replace('.', '/') + ".class";
+            URL url = Java17Parser.class.getClassLoader().getResource(internalName);
+            if (url == null) {
+                return null;
+            }
+
+            try (InputStream stream = url.openStream()) {
+                ByteArrayOutputStream classBytes = new ByteArrayOutputStream();
+                byte[] bytes = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = stream.read(bytes)) > 0) {
+                    classBytes.write(bytes, 0, bytesRead);
                 }
-                Path classPath = Path.of(url.toURI());
-                byte[] bytes = Files.readAllBytes(classPath);
-                return defineClass(className, bytes, 0, bytes.length);
-            } catch (URISyntaxException | IOException e) {
+                return defineClass(className, classBytes.toByteArray(), 0, classBytes.size());
+            } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
