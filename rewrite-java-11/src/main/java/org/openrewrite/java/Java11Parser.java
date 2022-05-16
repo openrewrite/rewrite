@@ -22,6 +22,7 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -104,7 +105,7 @@ public class Java11Parser implements JavaParser {
 
                 return new Java11Parser(delegate);
             } catch (Exception e) {
-                throw new IllegalStateException("Unable to construct Java17Parser.", e);
+                throw new IllegalStateException("Unable to construct Java11Parser.", e);
             }
         }
     }
@@ -159,6 +160,22 @@ public class Java11Parser implements JavaParser {
                 }
             }
             return super.loadClass(name);
+        }
+
+        @Override
+        @Nullable
+        public URL getResource(String name) {
+            try {
+                for (Path path : modules) {
+                    Path classFile = path.resolve(name);
+                    if (Files.exists(classFile)) {
+                        return classFile.toUri().toURL();
+                    }
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return super.getResource(name);
         }
 
         @Nullable

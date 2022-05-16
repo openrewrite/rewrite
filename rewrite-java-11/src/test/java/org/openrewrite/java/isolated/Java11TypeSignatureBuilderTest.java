@@ -23,6 +23,7 @@ import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
+import org.junit.jupiter.api.Disabled;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
@@ -35,6 +36,7 @@ import java.nio.file.Paths;
 
 import static java.util.Collections.singletonList;
 
+@Disabled("Test disabled until we can solve how to load the tests in a classloader that allows access to internal types.")
 public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(
             Java11TypeSignatureBuilderTest.class.getResourceAsStream("/JavaTypeGoat.java"));

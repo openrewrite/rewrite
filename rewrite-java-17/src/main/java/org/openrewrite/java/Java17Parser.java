@@ -157,6 +157,22 @@ public class Java17Parser implements JavaParser {
             return super.loadClass(name);
         }
 
+        @Override
+        @Nullable
+        public URL getResource(String name) {
+            try {
+                for (Path path : modules) {
+                    Path classFile = path.resolve(name);
+                    if (Files.exists(classFile)) {
+                        return classFile.toUri().toURL();
+                    }
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return super.getResource(name);
+        }
+
         @Nullable
         private Class<?> loadIsolatedClass(String className) {
             if (!className.startsWith("org.openrewrite.java.isolated")) {
