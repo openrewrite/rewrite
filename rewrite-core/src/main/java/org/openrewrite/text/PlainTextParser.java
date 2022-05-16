@@ -46,7 +46,13 @@ public class PlainTextParser implements Parser<PlainText> {
 
     @Override
     public boolean accept(Path path) {
-        return true;
+        String pathString = path.toString();
+
+        return  pathString.contains("/META-INF/services") ||
+                pathString.endsWith(".gitignore")||
+                pathString.endsWith(".gitattributes")||
+                pathString.endsWith(".java-version")||
+                pathString.endsWith(".sdkmanrc");
     }
 
     @Override
