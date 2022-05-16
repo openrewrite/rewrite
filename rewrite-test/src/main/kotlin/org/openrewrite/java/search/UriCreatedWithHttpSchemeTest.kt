@@ -180,4 +180,25 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun taintIsNotDataflow(javaParser: JavaParser) = rewriteRun(
+        { spec -> spec.parser(javaParser) },
+        java(
+            """
+                import java.io.File;
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "http://test" + File.separator;
+                        if(System.currentTimeMillis() > 0) {
+                            System.out.println(URI.create(s));
+                        } else {
+                            System.out.println(URI.create(s));
+                        }
+                    }
+                }
+            """
+        )
+    )
 }
