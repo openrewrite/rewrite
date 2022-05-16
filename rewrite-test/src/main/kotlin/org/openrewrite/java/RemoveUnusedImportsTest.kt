@@ -21,10 +21,16 @@ import org.openrewrite.Recipe
 import org.openrewrite.Tree
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface RemoveUnusedImportsTest : JavaRecipeTest {
+interface RemoveUnusedImportsTest : JavaRecipeTest, RewriteTest {
     override val recipe: Recipe
         get() = RemoveUnusedImports()
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(recipe)
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/969")
     @Test
@@ -36,6 +42,20 @@ interface RemoveUnusedImportsTest : JavaRecipeTest {
             public abstract class MyMapEntry<K, V> implements Entry<K, V> {
             }
         """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1798")
+    @Test
+    fun doNotRemoveInnerClassInSamePackage(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            package java.util;
+
+            import java.util.Map.Entry;
+
+            public abstract class MyMapEntry<K, V> implements Entry<K, V> {
+            }
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1052")

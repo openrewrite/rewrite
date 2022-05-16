@@ -184,7 +184,8 @@ public class RemoveUnusedImports extends Recipe {
                     }
                 } else {
                     Set<JavaType.FullyQualified> types = typesByPackage.get(elem.getPackageName());
-                    if (types == null || sourcePackage.equals(elem.getPackageName())) {
+                    JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
+                    if (types == null || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
