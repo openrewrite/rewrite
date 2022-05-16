@@ -106,9 +106,13 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     static JavaParser.Builder<? extends JavaParser, ?> fromJavaVersion() {
         JavaParser.Builder<? extends JavaParser, ?> javaParser;
-        String version = System.getProperty("java.version");
+        String[] versionParts = System.getProperty("java.version").split("\\.");
+        int version = Integer.parseInt(versionParts[0]);
+        if (version == 1) {
+            version = 8;
+        }
 
-        if (version.startsWith("17")) {
+        if (version >= 17) {
             try {
                 javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java17Parser")
@@ -120,7 +124,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             }
         }
 
-        if (version.startsWith("11")) {
+        if (version >= 11) {
             try {
                 javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java11Parser")

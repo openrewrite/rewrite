@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.isolated;
 
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
@@ -27,6 +27,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaTypeSignatureBuilderTest;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -38,7 +39,7 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
     private static final String goat = StringUtils.readFully(
             Java11TypeSignatureBuilderTest.class.getResourceAsStream("/JavaTypeGoat.java"));
 
-    private static final JCTree.JCCompilationUnit cu = Java11Parser.builder()
+    private static final JCTree.JCCompilationUnit cu = ReloadableJava11Parser.builder()
             .logCompilationWarningsAndErrors(true)
             .build()
             .parseInputsToCompilerAst(
@@ -165,7 +166,7 @@ public class Java11TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
     }
 
     @Override
-    public Java11TypeSignatureBuilder signatureBuilder() {
-        return new Java11TypeSignatureBuilder();
+    public ReloadableJava11TypeSignatureBuilder signatureBuilder() {
+        return new ReloadableJava11TypeSignatureBuilder();
     }
 }

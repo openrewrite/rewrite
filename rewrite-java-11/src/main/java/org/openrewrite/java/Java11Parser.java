@@ -15,445 +15,169 @@
  */
 package org.openrewrite.java;
 
-import com.sun.tools.javac.comp.*;
-import com.sun.tools.javac.file.JavacFileManager;
-import com.sun.tools.javac.main.JavaCompiler;
-import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.Log;
-import com.sun.tools.javac.util.Options;
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.style.NamedStyles;
-import org.openrewrite.tree.ParsingEventListener;
-import org.openrewrite.tree.ParsingExecutionContextView;
 
-import javax.tools.JavaFileManager;
-import javax.tools.JavaFileObject;
-import javax.tools.SimpleJavaFileObject;
-import javax.tools.StandardLocation;
-import java.io.*;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
+import java.util.Collection;
+import java.util.List;
 
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
-
-/**
- * This parser is NOT thread-safe, as the OpenJDK parser maintains in-memory caches in static state.
- */
-@NonNullApi
 public class Java11Parser implements JavaParser {
-    private String sourceSet = "main";
-    private final JavaTypeCache typeCache;
+    private final JavaParser delegate;
 
-    @Nullable
-    private transient JavaSourceSet sourceSetProvenance;
+    Java11Parser(JavaParser delegate) {
+        this.delegate = delegate;
+    }
 
-    @Nullable
-    private Collection<Path> classpath;
+    @Override
+    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+        return delegate.parseInputs(sourceFiles, relativeTo, ctx);
+    }
 
-    @Nullable
-    private final Collection<Input> dependsOn;
+    @Override
+    public JavaParser reset() {
+        return delegate.reset();
+    }
 
-    private final JavacFileManager pfm;
-    private final Context context;
-    private final JavaCompiler compiler;
-    private final ResettableLog compilerLog;
-    private final Collection<NamedStyles> styles;
+    @Override
+    public void setClasspath(Collection<Path> classpath) {
+        delegate.setClasspath(classpath);
+    }
 
-    private Java11Parser(boolean logCompilationWarningsAndErrors,
-                         @Nullable Collection<Path> classpath,
-                         Collection<byte[]> classBytesClasspath,
-                         @Nullable Collection<Input> dependsOn,
-                         Charset charset,
-                         Collection<NamedStyles> styles,
-                         JavaTypeCache typeCache) {
-        this.classpath = classpath;
-        this.dependsOn = dependsOn;
-        this.styles = styles;
-        this.typeCache = typeCache;
+    @Override
+    public void setSourceSet(String sourceSet) {
+        delegate.setSourceSet(sourceSet);
+    }
 
-        this.context = new Context();
-        this.compilerLog = new ResettableLog(context);
-        this.pfm = new ByteArrayCapableJavacFileManager(context, true, charset, classBytesClasspath);
-
-        // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
-        // structure of the expression!
-        Options.instance(context).put("allowStringFolding", "false");
-        Options.instance(context).put("compilePolicy", "attr");
-
-        // JavaCompiler line 452 (call to ImplicitSourcePolicy.decode(..))
-        Options.instance(context).put("-implicit", "none");
-
-        // https://docs.oracle.com/en/java/javacard/3.1/guide/setting-java-compiler-options.html
-        Options.instance(context).put("-g", "-g");
-        Options.instance(context).put("-proc", "none");
-
-        // MUST be created ahead of compiler construction
-        new TimedTodo(context);
-
-        // MUST be created (registered with the context) after pfm and compilerLog
-        compiler = new JavaCompiler(context);
-
-        // otherwise, the JavacParser will use EmptyEndPosTable, effectively setting -1 as the end position
-        // for every tree element
-        compiler.genEndPos = true;
-
-        compiler.keepComments = true;
-
-        // we don't need this, so as a minor performance improvement, omit these compiler features
-        compiler.lineDebugInfo = false;
-
-        compilerLog.setWriters(new PrintWriter(new Writer() {
-            @Override
-            public void write(char[] cbuf, int off, int len) {
-                if (logCompilationWarningsAndErrors) {
-                    String log = new String(Arrays.copyOfRange(cbuf, off, len));
-                    if (!log.isBlank() && !log.contains("warning: a package-info.java file has already")) {
-                        org.slf4j.LoggerFactory.getLogger(Java11Parser.class).warn(log);
-                    }
-                }
-            }
-
-            @Override
-            public void flush() {
-            }
-
-            @Override
-            public void close() {
-            }
-        }));
-
-        compileDependencies();
+    @Override
+    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
+        return delegate.getSourceSet(ctx);
     }
 
     public static Builder builder() {
         return new Builder();
     }
 
-    @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
-        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
-
-        List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
-                .map(cuByPath -> {
-                    Timer.Sample sample = Timer.start();
-                    Input input = cuByPath.getKey();
-                    try {
-                        Java11ParserVisitor parser = new Java11ParserVisitor(
-                                input.getRelativePath(relativeTo),
-                                input.getSource(),
-                                styles,
-                                typeCache,
-                                ctx,
-                                context
-                        );
-
-                        J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
-                        sample.stop(MetricsHelper.successTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(3) Map to Rewrite AST"))
-                                .register(Metrics.globalRegistry));
-                        parsingListener.parsed(input, cu);
-                        return cu;
-                    } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(3) Map to Rewrite AST"), t)
-                                .register(Metrics.globalRegistry));
-
-                        ctx.getOnError().accept(t);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .collect(toList());
-
-        JavaSourceSet sourceSet = getSourceSet(ctx);
-        if (!ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-            List<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
-            for (J.CompilationUnit cu : mappedCus) {
-                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                    if (type instanceof JavaType.FullyQualified) {
-                        classpath.add((JavaType.FullyQualified) type);
-                    }
-                }
-            }
-            sourceSetProvenance = sourceSet.withClasspath(classpath);
-        }
-
-        assert sourceSetProvenance != null;
-        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
-    }
-
-    LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
-        if (classpath != null) { // override classpath
-            if (context.get(JavaFileManager.class) != pfm) {
-                throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
-            }
-
-            try {
-                pfm.setLocationFromPaths(StandardLocation.CLASS_PATH, new ArrayList<>(classpath));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-
-        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
-        for (Input input1 : acceptedInputs(sourceFiles)) {
-            cus.put(input1, MetricsHelper.successTags(
-                            Timer.builder("rewrite.parse")
-                                    .description("The time spent by the JDK in parsing and tokenizing the source file")
-                                    .tag("file.type", "Java")
-                                    .tag("step", "(1) JDK parsing"))
-                    .register(Metrics.globalRegistry)
-                    .record(() -> {
-                        try {
-                            return compiler.parse(new Java11ParserInputFileObject(input1));
-                        } catch (IllegalStateException e) {
-                            if ("endPosTable already set".equals(e.getMessage())) {
-                                throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
-                                        "set of source files that have some of the same fully qualified names", e);
-                            }
-                            throw e;
-                        }
-                    }));
-        }
-
-        try {
-            initModules(cus.values());
-            enterAll(cus.values());
-
-            // For some reason this is necessary in JDK 9+, where the internal block counter that
-            // annotationsBlocked() tests against remains >0 after attribution.
-            Annotate annotate = Annotate.instance(context);
-            while (annotate.annotationsBlocked()) {
-                annotate.unblockAnnotations(); // also flushes once unblocked
-            }
-
-            compiler.attribute(compiler.todo);
-        } catch (Throwable t) {
-            // when symbol entering fails on problems like missing types, attribution can often times proceed
-            // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
-            ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
-        }
-        return cus;
-    }
-
-    @Override
-    public Java11Parser reset() {
-        typeCache.clear();
-        compilerLog.reset();
-        pfm.flush();
-        Check.instance(context).newRound();
-        Annotate.instance(context).newRound();
-        Enter.instance(context).newRound();
-        Modules.instance(context).newRound();
-        compileDependencies();
-        return this;
-    }
-
-    public void setClasspath(Collection<Path> classpath) {
-        this.classpath = classpath;
-    }
-
-    @Override
-    public void setSourceSet(String sourceSet) {
-        this.sourceSetProvenance = null;
-        this.sourceSet = sourceSet;
-    }
-
-    @Override
-    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
-        if (sourceSetProvenance == null) {
-            if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList());
-            } else {
-                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                        typeCache, false);
-            }
-        }
-        return sourceSetProvenance;
-    }
-
-    private void compileDependencies() {
-        if (dependsOn != null) {
-            InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-            ctx.putMessage("org.openrewrite.java.skipSourceSetMarker", true);
-            parseInputs(dependsOn, null, ctx);
-        }
-        Modules.instance(context).newRound();
-    }
-
-    /**
-     * Initialize modules
-     */
-    private void initModules(Collection<JCTree.JCCompilationUnit> cus) {
-        Modules modules = Modules.instance(context);
-        // Creating a new round is necessary for multiple pass parsing, where we want to keep the symbol table from a
-        // previous parse intact
-        modules.newRound();
-        modules.initModules(com.sun.tools.javac.util.List.from(cus));
-    }
-
-    /**
-     * Enter symbol definitions into each compilation unit's scope
-     */
-    private void enterAll(Collection<JCTree.JCCompilationUnit> cus) {
-        Enter enter = Enter.instance(context);
-        com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> compilationUnits = com.sun.tools.javac.util.List.from(
-                cus.toArray(JCTree.JCCompilationUnit[]::new));
-        enter.main(compilationUnits);
-    }
-
-    private static class ResettableLog extends Log {
-        protected ResettableLog(Context context) {
-            super(context);
-        }
-
-        public void reset() {
-            sourceMap.clear();
-        }
-    }
-
-    private static class TimedTodo extends Todo {
-        @Nullable
-        private Timer.Sample sample;
-
-        private TimedTodo(Context context) {
-            super(context);
-        }
-
-        @Override
-        public boolean isEmpty() {
-            if (sample != null) {
-                sample.stop(MetricsHelper.successTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent by the JDK in type attributing the source file")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(2) Type attribution"))
-                        .register(Metrics.globalRegistry));
-            }
-            return super.isEmpty();
-        }
-
-        @Override
-        public Env<AttrContext> remove() {
-            this.sample = Timer.start();
-            return super.remove();
-        }
-    }
-
     public static class Builder extends JavaParser.Builder<Java11Parser, Builder> {
+
+        @Nullable
+        private static ClassLoader moduleClassLoader;
+
+        static synchronized void lazyInitClassLoaders() {
+            if (moduleClassLoader != null) {
+                return;
+            }
+
+            ClassLoader appClassLoader = Java11Parser.class.getClassLoader();
+            moduleClassLoader = new UnrestrictedModuleClassLoader(appClassLoader);
+
+        }
+
         @Override
         public Java11Parser build() {
-            return new Java11Parser(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+            lazyInitClassLoaders();
+
+            try {
+                //Load the parser implementation use the unrestricted module classloader.
+                Class<?> parserImplementation = Class.forName("org.openrewrite.java.isolated.ReloadableJava11Parser", true, moduleClassLoader);
+
+                Constructor<?> parserConstructor = parserImplementation
+                        .getDeclaredConstructor(Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
+                                Collection.class, JavaTypeCache.class);
+
+                parserConstructor.setAccessible(true);
+
+                JavaParser delegate = (JavaParser) parserConstructor
+                        .newInstance(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+
+                return new Java11Parser(delegate);
+            } catch (Exception e) {
+                throw new IllegalStateException("Unable to construct Java17Parser.", e);
+            }
         }
     }
 
-    private static class ByteArrayCapableJavacFileManager extends JavacFileManager {
-        private final List<PackageAwareJavaFileObject> classByteClasspath;
+    /**
+     * Rewrite's JavaParser is reliant on java's compiler internal classes that are now encapsulated within Java's
+     * module system. Starting in Java 17, the JVM now enforces strong encapsulation of these internal classes and
+     * default behavior is to throw a security exception when attempting to use these internal classes. This classloader
+     * circumvents these security restrictions by isolating Rewrite's Java 17 parser implementation classes and then
+     * loading any of the internal classes directly from the .jmod files.
+     *
+     * NOTE: Any classes in the package "org.openrewrite.java.isolated" will be loaded into this isolated classloader.
+     */
+    private static class UnrestrictedModuleClassLoader extends ClassLoader {
+        final List<Path> modules;
 
-        public ByteArrayCapableJavacFileManager(Context context,
-                                                boolean register,
-                                                Charset charset,
-                                                Collection<byte[]> classByteClasspath) {
-            super(context, register, charset);
-            this.classByteClasspath = classByteClasspath.stream()
-                    .map(PackageAwareJavaFileObject::new)
-                    .collect(toList());
+        private UnrestrictedModuleClassLoader(ClassLoader parentClassloader) {
+            super(parentClassloader);
+
+            //A list of modules to load internal classes from
+            final FileSystem fs = FileSystems.getFileSystem(URI.create("jrt:/"));
+            modules = List.of(
+                    fs.getPath("modules", "jdk.compiler"),
+                    fs.getPath("modules", "java.compiler"),
+                    fs.getPath("modules", "java.base")
+            );
         }
 
         @Override
-        public String inferBinaryName(Location location, JavaFileObject file) {
-            if (file instanceof PackageAwareJavaFileObject) {
-                return ((PackageAwareJavaFileObject) file).getClassName();
+        public Class<?> loadClass(String name) throws ClassNotFoundException {
+
+            String internalName = name.replace('.', '/') + ".class";
+
+            //If the class is in the package "org.openrewrite.java.internal", load it from this class loader.
+            Class<?> _class = loadIsolatedClass(name);
+            if (_class != null) {
+                return _class;
             }
-            return super.inferBinaryName(location, file);
-        }
 
-        @Override
-        public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
-            if (StandardLocation.CLASS_PATH.equals(location)) {
-                Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
-                return Stream.concat(
-                        classByteClasspath.stream()
-                                .filter(jfo -> jfo.getPackage().equals(packageName)),
-                        StreamSupport.stream(listed.spliterator(), false)
-                ).collect(toList());
-            }
-            return super.list(location, packageName, kinds, recurse);
-        }
-    }
-
-    private static class PackageAwareJavaFileObject extends SimpleJavaFileObject {
-        private final String pkg;
-        private final String className;
-        private final byte[] classBytes;
-
-        private PackageAwareJavaFileObject(byte[] classBytes) {
-            super(URI.create("file:///.byteArray"), Kind.CLASS);
-
-            AtomicReference<String> pkgRef = new AtomicReference<>();
-            AtomicReference<String> nameRef = new AtomicReference<>();
-
-            ClassReader classReader = new ClassReader(classBytes);
-            classReader.accept(new ClassVisitor(Opcodes.ASM9) {
-                @Override
-                public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-                    if (name.contains("/")) {
-                        pkgRef.set(name.substring(0, name.lastIndexOf('/'))
-                                .replace('/', '.'));
-                        nameRef.set(name.substring(name.lastIndexOf('/') + 1));
-                    } else {
-                        pkgRef.set(name);
-                        nameRef.set(name);
+            //Otherwise look for internal classes in the list of modules.
+            if (name.startsWith("com.sun") || name.startsWith("sun")) {
+                try {
+                    for (Path path : modules) {
+                        Path classFile = path.resolve(internalName);
+                        if (Files.exists(classFile)) {
+                            byte[] bytes = Files.readAllBytes(classFile);
+                            return defineClass(name, bytes, 0, bytes.length);
+                        }
                     }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
-            }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES);
-
-            this.pkg = pkgRef.get();
-            this.className = nameRef.get();
-            this.classBytes = classBytes;
+            }
+            return super.loadClass(name);
         }
 
-        public String getPackage() {
-            return pkg;
-        }
-
-        public String getClassName() {
-            return className;
-        }
-
-        @Override
-        public InputStream openInputStream() {
-            return new ByteArrayInputStream(classBytes);
+        @Nullable
+        private Class<?> loadIsolatedClass(String className) {
+            if (!className.startsWith("org.openrewrite.java.isolated")) {
+                return null;
+            }
+            try {
+                String internalName = className.replace('.', '/') + ".class";
+                URL url = Java11Parser.class.getClassLoader().getResource(internalName);
+                if (url == null) {
+                    return null;
+                }
+                Path classPath = Path.of(url.toURI());
+                byte[] bytes = Files.readAllBytes(classPath);
+                return defineClass(className, bytes, 0, bytes.length);
+            } catch (URISyntaxException | IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }

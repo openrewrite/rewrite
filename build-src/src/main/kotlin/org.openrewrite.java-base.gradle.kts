@@ -38,7 +38,7 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-parameters")
     options.isFork = true
     options.release.set(8)
-    sourceCompatibility = "17"
+    sourceCompatibility = "1.8"
     targetCompatibility = "1.8"
 }
 

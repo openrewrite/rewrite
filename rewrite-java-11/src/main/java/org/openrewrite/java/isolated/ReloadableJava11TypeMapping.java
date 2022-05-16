@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.isolated;
 
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.JCTree;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
@@ -35,12 +36,12 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
-class Java11TypeMapping implements JavaTypeMapping<Tree> {
+class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
     private static final int KIND_BITMASK_INTERFACE = 1 << 9;
     private static final int KIND_BITMASK_ANNOTATION = 1 << 13;
     private static final int KIND_BITMASK_ENUM = 1 << 14;
 
-    private final Java11TypeSignatureBuilder signatureBuilder = new Java11TypeSignatureBuilder();
+    private final ReloadableJava11TypeSignatureBuilder signatureBuilder = new ReloadableJava11TypeSignatureBuilder();
 
     private final JavaTypeCache typeCache;
 

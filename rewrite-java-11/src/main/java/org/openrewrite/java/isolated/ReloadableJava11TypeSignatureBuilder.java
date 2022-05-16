@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.isolated;
 
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 
 import javax.lang.model.type.NullType;
@@ -26,7 +27,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.StringJoiner;
 
-class Java11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
+class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     private Set<String> typeVariableNameStack;
 
