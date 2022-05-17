@@ -116,6 +116,11 @@ public class Java17Parser implements JavaParser {
      * NOTE: Any classes in the package "org.openrewrite.java.isolated" will be loaded into this isolated classloader.
      */
     private static class UnrestrictedModuleClassLoader extends ClassLoader {
+
+        static {
+            ClassLoader.registerAsParallelCapable();
+        }
+
         final List<Path> modules;
 
         private UnrestrictedModuleClassLoader(ClassLoader parentClassloader) {
@@ -133,26 +138,34 @@ public class Java17Parser implements JavaParser {
         @Override
         public Class<?> loadClass(String name) throws ClassNotFoundException {
 
-            String internalName = name.replace('.', '/') + ".class";
+            synchronized (getClassLoadingLock(name)) {
+                // First, check if the class has already been loaded
+                Class<?> c = findLoadedClass(name);
+                if (c != null) {
+                    return c;
+                }
 
-            //If the class is in the package "org.openrewrite.java.internal", load it from this class loader.
-            Class<?> _class = loadIsolatedClass(name);
-            if (_class != null) {
-                return _class;
-            }
+                String internalName = name.replace('.', '/') + ".class";
 
-            //Otherwise look for internal classes in the list of modules.
-            if (name.startsWith("com.sun") || name.startsWith("sun")) {
-                try {
-                    for (Path path : modules) {
-                        Path classFile = path.resolve(internalName);
-                        if (Files.exists(classFile)) {
-                            byte[] bytes = Files.readAllBytes(classFile);
-                            return defineClass(name, bytes, 0, bytes.length);
+                //If the class is in the package "org.openrewrite.java.internal", load it from this class loader.
+                Class<?> _class = loadIsolatedClass(name);
+                if (_class != null) {
+                    return _class;
+                }
+
+                //Otherwise look for internal classes in the list of modules.
+                if (name.startsWith("com.sun") || name.startsWith("sun")) {
+                    try {
+                        for (Path path : modules) {
+                            Path classFile = path.resolve(internalName);
+                            if (Files.exists(classFile)) {
+                                byte[] bytes = Files.readAllBytes(classFile);
+                                return defineClass(name, bytes, 0, bytes.length);
+                            }
                         }
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
                     }
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
                 }
             }
             return super.loadClass(name);
