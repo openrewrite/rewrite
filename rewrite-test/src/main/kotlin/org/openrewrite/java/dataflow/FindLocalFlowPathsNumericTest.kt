@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.RewriteTest.toRecipe
 
 @Suppress("UnnecessaryLocalVariable")
-interface FindLocalFlowPathsTest : RewriteTest {
+interface FindLocalFlowPathsNumericTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(toRecipe {
             FindLocalFlowPaths(object : LocalFlowSpec<J.Literal, J.MethodInvocation>() {

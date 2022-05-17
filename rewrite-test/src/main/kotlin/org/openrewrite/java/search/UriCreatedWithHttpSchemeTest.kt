@@ -199,6 +199,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
+    @Disabled("MISSING: This will require taint-tracking to work correctly")
     fun taintIsNotDataflow(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
@@ -208,6 +209,20 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
                 class Test {
                     void test() {
                         String s = "http://test" + File.separator;
+                        if(System.currentTimeMillis() > 0) {
+                            System.out.println(URI.create(s));
+                        } else {
+                            System.out.println(URI.create(s));
+                        }
+                    }
+                }
+            """,
+            """
+                import java.io.File;
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "https://test" + File.separator;
                         if(System.currentTimeMillis() > 0) {
                             System.out.println(URI.create(s));
                         } else {
