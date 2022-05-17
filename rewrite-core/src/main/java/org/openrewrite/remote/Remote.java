@@ -25,6 +25,8 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.binary.BinaryVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
 
 import java.io.ByteArrayOutputStream;
@@ -78,9 +80,16 @@ public class Remote implements SourceFile {
     @Override
     @Nullable
     public Checksum getChecksum() {
+        return getChecksum(new HttpUrlConnectionSender());
+    }
+
+    @Nullable
+    public Checksum getChecksum(HttpSender httpSender) {
         if (checksum == null) {
             if (checksumUri != null && checksumAlgorithm != null) {
-                checksum = new Checksum(checksumAlgorithm, download(checksumUri));
+                //noinspection resource
+                checksum = Checksum.fromHex(checksumAlgorithm, new String(
+                        httpSender.get(checksumUri.toString()).send().getBodyAsBytes()));
             }
         }
         return checksum;
@@ -118,39 +127,13 @@ public class Remote implements SourceFile {
 
     @Override
     public <P> byte[] printAllAsBytes(P p) {
-        return download(uri);
+        //noinspection resource
+        return new HttpUrlConnectionSender().get(uri.toString()).send().getBodyAsBytes();
     }
 
-    private byte[] download(URI url) {
-        try {
-            URLConnection urlConnection = uri.toURL().openConnection();
-            if (urlConnection instanceof HttpURLConnection) {
-                HttpURLConnection httpConnection = (HttpURLConnection) urlConnection;
-                httpConnection.setInstanceFollowRedirects(true);
-
-                int status = httpConnection.getResponseCode();
-                if (status != HttpURLConnection.HTTP_OK) {
-                    if (status == HttpURLConnection.HTTP_MOVED_TEMP
-                            || status == HttpURLConnection.HTTP_MOVED_PERM
-                            || status == HttpURLConnection.HTTP_SEE_OTHER) {
-                        String newUrl = httpConnection.getHeaderField("Location");
-                        String cookies = httpConnection.getHeaderField("Set-Cookie");
-                        return download(URI.create(newUrl));
-                    }
-                }
-            }
-
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            InputStream in = urlConnection.getInputStream();
-            int b;
-            while ((b = in.read()) != -1) {
-                bos.write(b);
-            }
-
-            return bos.toByteArray();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    public InputStream getBytes(HttpSender httpSender) {
+        //noinspection resource
+        return httpSender.get(uri.toString()).send().getBody();
     }
 
     @Override

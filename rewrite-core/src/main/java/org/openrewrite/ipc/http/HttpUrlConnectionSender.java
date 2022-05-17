@@ -39,7 +39,7 @@ public class HttpUrlConnectionSender implements HttpSender {
      * Creates a sender with the specified timeouts but uses the default proxy settings.
      *
      * @param connectTimeout connect timeout when establishing a connection
-     * @param readTimeout read timeout when receiving a response
+     * @param readTimeout    read timeout when receiving a response
      */
     public HttpUrlConnectionSender(Duration connectTimeout, Duration readTimeout) {
         this(connectTimeout, readTimeout, null);
@@ -49,8 +49,8 @@ public class HttpUrlConnectionSender implements HttpSender {
      * Creates a sender with the specified timeouts and proxy settings.
      *
      * @param connectTimeout connect timeout when establishing a connection
-     * @param readTimeout read timeout when receiving a response
-     * @param proxy proxy to use when establishing a connection
+     * @param readTimeout    read timeout when receiving a response
+     * @param proxy          proxy to use when establishing a connection
      * @since 1.2.0
      */
     public HttpUrlConnectionSender(Duration connectTimeout, Duration readTimeout, Proxy proxy) {
@@ -69,40 +69,40 @@ public class HttpUrlConnectionSender implements HttpSender {
     }
 
     @Override
-    public Response send(Request request) throws IOException {
-        HttpURLConnection con;
-        if (proxy != null) {
-            con = (HttpURLConnection) request.getUrl().openConnection(proxy);
-        } else {
-            con = (HttpURLConnection) request.getUrl().openConnection();
-        }
-        con.setConnectTimeout(connectTimeoutMs);
-        con.setReadTimeout(readTimeoutMs);
-        Method method = request.getMethod();
-        con.setRequestMethod(method.name());
-
-        for (Map.Entry<String, String> header : request.getRequestHeaders().entrySet()) {
-            con.setRequestProperty(header.getKey(), header.getValue());
-        }
-
-        if (method != Method.GET) {
-            con.setDoOutput(true);
-            try (OutputStream os = con.getOutputStream()) {
-                os.write(request.getEntity());
-                os.flush();
-            }
-        }
-
-        int status = con.getResponseCode();
-
-        Runnable onClose = () -> {
-            try {
-                con.disconnect();
-            } catch (Exception ignore) {
-            }
-        };
-
+    public Response send(Request request) {
         try {
+            HttpURLConnection con;
+            if (proxy != null) {
+                con = (HttpURLConnection) request.getUrl().openConnection(proxy);
+            } else {
+                con = (HttpURLConnection) request.getUrl().openConnection();
+            }
+            con.setConnectTimeout(connectTimeoutMs);
+            con.setReadTimeout(readTimeoutMs);
+            Method method = request.getMethod();
+            con.setRequestMethod(method.name());
+
+            for (Map.Entry<String, String> header : request.getRequestHeaders().entrySet()) {
+                con.setRequestProperty(header.getKey(), header.getValue());
+            }
+
+            if (method != Method.GET) {
+                con.setDoOutput(true);
+                try (OutputStream os = con.getOutputStream()) {
+                    os.write(request.getEntity());
+                    os.flush();
+                }
+            }
+
+            int status = con.getResponseCode();
+
+            Runnable onClose = () -> {
+                try {
+                    con.disconnect();
+                } catch (Exception ignore) {
+                }
+            };
+
             InputStream is;
             if (con.getErrorStream() != null) {
                 is = con.getErrorStream();

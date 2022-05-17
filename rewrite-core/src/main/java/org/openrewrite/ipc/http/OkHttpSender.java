@@ -20,6 +20,8 @@ import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Map;
 
 /**
@@ -40,7 +42,7 @@ public class OkHttpSender implements HttpSender {
     }
 
     @Override
-    public Response send(Request request) throws Throwable {
+    public Response send(Request request) {
         okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder().url(request.getUrl());
 
         for (Map.Entry<String, String> requestHeader : request.getRequestHeaders().entrySet()) {
@@ -66,9 +68,14 @@ public class OkHttpSender implements HttpSender {
             }
         }
 
-        okhttp3.Response response = client.newCall(requestBuilder.build()).execute();
-        ResponseBody body = response.body();
-        return new Response(response.code(), body == null ? null : body.byteStream(), response::close);
+        try {
+            //noinspection resource
+            okhttp3.Response response = client.newCall(requestBuilder.build()).execute();
+            ResponseBody body = response.body();
+            return new Response(response.code(), body == null ? null : body.byteStream(), response::close);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private static boolean requiresRequestBody(Method method) {

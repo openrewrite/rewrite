@@ -39,7 +39,7 @@ import java.util.zip.GZIPOutputStream;
  * etc. without requiring further additions to OpenRewrite components needing to make HTTP calls.
  */
 public interface HttpSender {
-    Response send(Request request) throws Throwable;
+    Response send(Request request);
 
     default Request.Builder post(String uri) {
         return newRequest(uri).withMethod(Method.POST);
@@ -169,7 +169,7 @@ public interface HttpSender {
              * No encoding will be performed on the {@code credentials}, so if the authentication scheme
              * expects {@code credentials} to be encoded, encode them before passing them to this method.
              *
-             * @param type authentication type
+             * @param type        authentication type
              * @param credentials authentication credentials
              * @return This request builder.
              * @since 1.8.0
@@ -298,7 +298,7 @@ public interface HttpSender {
                 return this;
             }
 
-            public Response send() throws Throwable {
+            public Response send() {
                 return sender.send(build());
             }
 
@@ -387,7 +387,7 @@ public interface HttpSender {
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() {
             onClose.run();
         }
     }

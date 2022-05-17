@@ -16,9 +16,11 @@
 package org.openrewrite;
 
 import lombok.Value;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
@@ -26,19 +28,19 @@ import java.security.NoSuchAlgorithmException;
 
 @Value
 public class Checksum {
+    private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
+
     String algorithm;
     byte[] value;
 
     public String getHexValue() {
-        StringBuilder hexString = new StringBuilder(2 * value.length);
-        for (byte b : value) {
-            String hex = Integer.toHexString(0xff & b);
-            if (hex.length() == 1) {
-                hexString.append('0');
-            }
-            hexString.append(hex);
+        byte[] hexChars = new byte[value.length * 2];
+        for (int j = 0; j < value.length; j++) {
+            int v = value[j] & 0xFF;
+            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
         }
-        return hexString.toString();
+        return new String(hexChars, StandardCharsets.UTF_8);
     }
 
     public static Checksum fromHex(String algorithm, String hex) {
@@ -57,14 +59,18 @@ public class Checksum {
     }
 
     public static SourceFile md5(SourceFile sourceFile) {
-        return checksum("MD5", sourceFile);
+        return checksum(sourceFile, "MD5");
     }
 
     public static SourceFile sha256(SourceFile sourceFile) {
-        return checksum("SHA-256", sourceFile);
+        return checksum(sourceFile, "SHA-256");
     }
 
-    public static SourceFile checksum(String algorithm, SourceFile sourceFile) {
+    public static SourceFile checksum(SourceFile sourceFile, @Nullable String algorithm) {
+        if(algorithm == null) {
+            return sourceFile;
+        }
+
         try {
             MessageDigest md = MessageDigest.getInstance(algorithm);
             try (InputStream is = Files.newInputStream(sourceFile.getSourcePath());
