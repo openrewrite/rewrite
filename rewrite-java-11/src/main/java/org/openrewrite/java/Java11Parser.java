@@ -87,7 +87,7 @@ public class Java11Parser implements JavaParser {
         }
 
         @Override
-        public synchronized Java11Parser build() {
+        public Java11Parser build() {
             lazyInitClassLoaders();
 
             try {
@@ -120,6 +120,11 @@ public class Java11Parser implements JavaParser {
      * NOTE: Any classes in the package "org.openrewrite.java.isolated" will be loaded into this isolated classloader.
      */
     private static class UnrestrictedModuleClassLoader extends ClassLoader {
+
+        static {
+            ClassLoader.registerAsParallelCapable();
+        }
+
         final List<Path> modules;
 
         private UnrestrictedModuleClassLoader(ClassLoader parentClassloader) {
