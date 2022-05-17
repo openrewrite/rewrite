@@ -503,6 +503,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 sourcePath,
                 charset.name(),
                 charsetBomMarked,
+                null,
                 packageDecl == null ? null : padRight(packageDecl, sourceBefore(";")),
                 convertAll(node.getImports(), this::statementDelim, this::statementDelim),
                 convertAll(node.getTypeDecls().stream().filter(JCClassDecl.class::isInstance).collect(toList())),
