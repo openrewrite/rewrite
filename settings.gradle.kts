@@ -17,6 +17,7 @@ include(
     "rewrite-java",
     "rewrite-java-8",
     "rewrite-java-11",
+    "rewrite-java-17",
     "rewrite-json",
     "rewrite-maven",
     "rewrite-properties",

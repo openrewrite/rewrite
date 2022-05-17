@@ -28,17 +28,13 @@ import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Collection;
-import java.util.List;
+import java.nio.file.*;
+import java.util.*;
 
-public class Java11Parser implements JavaParser {
+public class Java17Parser implements JavaParser {
     private final JavaParser delegate;
 
-    Java11Parser(JavaParser delegate) {
+    Java17Parser(JavaParser delegate) {
         this.delegate = delegate;
     }
 
@@ -71,7 +67,7 @@ public class Java11Parser implements JavaParser {
         return new Builder();
     }
 
-    public static class Builder extends JavaParser.Builder<Java11Parser, Builder> {
+    public static class Builder extends JavaParser.Builder<Java17Parser, Builder> {
 
         @Nullable
         private static ClassLoader moduleClassLoader;
@@ -81,18 +77,18 @@ public class Java11Parser implements JavaParser {
                 return;
             }
 
-            ClassLoader appClassLoader = Java11Parser.class.getClassLoader();
+            ClassLoader appClassLoader = Java17Parser.class.getClassLoader();
             moduleClassLoader = new UnrestrictedModuleClassLoader(appClassLoader);
 
         }
 
         @Override
-        public Java11Parser build() {
+        public Java17Parser build() {
             lazyInitClassLoaders();
 
             try {
                 //Load the parser implementation use the unrestricted module classloader.
-                Class<?> parserImplementation = Class.forName("org.openrewrite.java.isolated.ReloadableJava11Parser", true, moduleClassLoader);
+                Class<?> parserImplementation = Class.forName("org.openrewrite.java.isolated.ReloadableJava17Parser", true, moduleClassLoader);
 
                 Constructor<?> parserConstructor = parserImplementation
                         .getDeclaredConstructor(Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
@@ -103,9 +99,9 @@ public class Java11Parser implements JavaParser {
                 JavaParser delegate = (JavaParser) parserConstructor
                         .newInstance(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
 
-                return new Java11Parser(delegate);
+                return new Java17Parser(delegate);
             } catch (Exception e) {
-                throw new IllegalStateException("Unable to construct Java11Parser.", e);
+                throw new IllegalStateException("Unable to construct Java17Parser.", e);
             }
         }
     }
@@ -175,13 +171,29 @@ public class Java11Parser implements JavaParser {
             return super.loadClass(name);
         }
 
+        @Override
+        @Nullable
+        public URL getResource(String name) {
+            try {
+                for (Path path : modules) {
+                    Path classFile = path.resolve(name);
+                    if (Files.exists(classFile)) {
+                        return classFile.toUri().toURL();
+                    }
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return super.getResource(name);
+        }
+
         @Nullable
         private Class<?> loadIsolatedClass(String className) {
             if (!className.startsWith("org.openrewrite.java.isolated")) {
                 return null;
             }
             String internalName = className.replace('.', '/') + ".class";
-            URL url = Java11Parser.class.getClassLoader().getResource(internalName);
+            URL url = Java17Parser.class.getClassLoader().getResource(internalName);
             if (url == null) {
                 return null;
             }

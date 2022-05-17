@@ -1248,7 +1248,7 @@ class MavenParserTest {
                         <profile>
                             <id>old-jdk</id>
                             <activation>
-                                <jdk>11.0</jdk>
+                                <jdk>17.0</jdk>
                             </activation>
                             <dependencies>
                                 <dependency>

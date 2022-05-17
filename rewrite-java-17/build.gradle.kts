@@ -5,8 +5,6 @@ plugins {
 
 apply(plugin = "nebula.integtest-standalone")
 
-val integTestImplementation = configurations.getByName("integTestImplementation")
-
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
@@ -19,25 +17,11 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
 
-    integTestImplementation("io.micrometer:micrometer-registry-prometheus:1.+")
 }
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(11))
-    }
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-}
-
 
 tasks.withType<JavaCompile> {
-    sourceCompatibility = JavaVersion.VERSION_11.toString()
-    targetCompatibility = JavaVersion.VERSION_11.toString()
+    sourceCompatibility = JavaVersion.VERSION_17.toString()
+    targetCompatibility = JavaVersion.VERSION_17.toString()
 
     options.release.set(null as? Int) // remove `--release 8` set in `org.openrewrite.java-base`
     options.compilerArgs.addAll(
@@ -55,10 +39,10 @@ tasks.withType<JavaCompile> {
 //Javadoc compiler will complain about the use of the internal types.
 tasks.withType<Javadoc> {
     exclude(
-        "**/ReloadableJava11JavadocVisitor**",
-        "**/ReloadableJava11Parser**",
-        "**/ReloadableJava11ParserVisitor**",
-        "**/ReloadableJava11TypeMapping**",
-        "**/ReloadableJava11TypeSignatureBuilder**"
+        "**/ReloadableJava17JavadocVisitor**",
+        "**/ReloadableJava17Parser**",
+        "**/ReloadableJava17ParserVisitor**",
+        "**/ReloadableJava17TypeMapping**",
+        "**/ReloadableJava17TypeSignatureBuilder**"
     )
 }

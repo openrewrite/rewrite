@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.isolated;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaParser;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
@@ -32,7 +33,7 @@ import java.nio.file.Path;
  * other than a file on disk.
  */
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Java11ParserInputFileObject implements JavaFileObject {
+public class ReloadableJava17ParserInputFileObject implements JavaFileObject {
     @EqualsAndHashCode.Include
     @Nullable
     private final Path path;
@@ -40,7 +41,7 @@ public class Java11ParserInputFileObject implements JavaFileObject {
     @Getter
     private final Parser.Input input;
 
-    public Java11ParserInputFileObject(Parser.Input input) {
+    public ReloadableJava17ParserInputFileObject(Parser.Input input) {
         this.input = input;
         this.path = input.getPath();
     }

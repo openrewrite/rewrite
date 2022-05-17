@@ -27,7 +27,7 @@ import org.openrewrite.java.internal.JavaReflectionTypeMapping
 import org.openrewrite.java.internal.JavaTypeCache
 import org.openrewrite.java.tree.JavaType
 import java.util.*
-import kotlin.streams.toList
+import java.util.stream.Collectors
 
 interface JavaSourceSetTest {
 
@@ -58,7 +58,7 @@ interface JavaSourceSetTest {
         val typeCache = JavaTypeCache()
 
         val shaded = JavaSourceSet.build("test", JavaParser.dependenciesFromClasspath("hbase-shaded-client"), typeCache, false)
-            .classpath.stream().filter {o -> o.fullyQualifiedName.startsWith("org.apache.hadoop.hbase.shaded")}.toList()
+            .classpath.stream().filter {o -> o.fullyQualifiedName.startsWith("org.apache.hadoop.hbase.shaded")}.collect(Collectors.toList())
         assertThat(shaded).isNotEmpty
         assertThat(shaded[0]).isInstanceOf(JavaType.ShallowClass::class.java)
     }
