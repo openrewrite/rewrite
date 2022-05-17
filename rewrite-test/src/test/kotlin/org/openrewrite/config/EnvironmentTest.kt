@@ -337,6 +337,9 @@ class EnvironmentTest : RewriteTest {
                     recipeList:
                       - org.openrewrite.config.RecipeNoParameters
                       - test.FooOne
+                      - org.openrewrite.config.RecipeAcceptingParameters:
+                          foo: "bar"
+                          bar: 2
                       - org.openrewrite.config.RecipeNoParameters
                       - test.BarTwo
                       - org.openrewrite.config.RecipeNoParameters
@@ -348,8 +351,9 @@ class EnvironmentTest : RewriteTest {
         val recipeList = env.activateRecipes("test.OrderPreserved").recipeList[0].recipeList
         assertThat(recipeList[0].name).isEqualTo("org.openrewrite.config.RecipeNoParameters")
         assertThat(recipeList[1].name).isEqualTo("test.FooOne")
-        assertThat(recipeList[2].name).isEqualTo("org.openrewrite.config.RecipeNoParameters")
-        assertThat(recipeList[3].name).isEqualTo("test.BarTwo")
-        assertThat(recipeList[4].name).isEqualTo("org.openrewrite.config.RecipeNoParameters")
+        assertThat(recipeList[2].name).isEqualTo("org.openrewrite.config.RecipeAcceptingParameters")
+        assertThat(recipeList[3].name).isEqualTo("org.openrewrite.config.RecipeNoParameters")
+        assertThat(recipeList[4].name).isEqualTo("test.BarTwo")
+        assertThat(recipeList[5].name).isEqualTo("org.openrewrite.config.RecipeNoParameters")
     }
 }

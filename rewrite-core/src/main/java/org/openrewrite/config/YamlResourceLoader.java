@@ -16,7 +16,6 @@
 package org.openrewrite.config;
 
 import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -24,7 +23,6 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
-import org.openrewrite.RecipeSerializer;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
@@ -38,9 +36,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -189,7 +184,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     for (int i = 0; i < recipeList.size(); i++) {
                         Object next = recipeList.get(i);
                         if (next instanceof String) {
-                            recipe.doNext((String) next);
+                            recipe.addUninitialized((String) next);
                         } else if (next instanceof Map) {
                             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) next).entrySet().iterator().next();
                             try {
@@ -197,7 +192,7 @@ public class YamlResourceLoader implements ResourceLoader {
                                     Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
                                     withJsonType.put("@c", nameAndConfig.getKey());
                                     try {
-                                        recipe.doNext(mapper.convertValue(withJsonType, Recipe.class));
+                                        recipe.addUninitialized(mapper.convertValue(withJsonType, Recipe.class));
                                     } catch (IllegalArgumentException e) {
                                         if (e.getCause() instanceof InvalidTypeIdException) {
                                             recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),

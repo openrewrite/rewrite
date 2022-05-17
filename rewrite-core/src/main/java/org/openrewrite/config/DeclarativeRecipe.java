@@ -69,7 +69,7 @@ public class DeclarativeRecipe extends Recipe {
 
     void initialize(Collection<Recipe> availableRecipes) {
         for (int i = 0; i < uninitializedRecipes.size(); i++) {
-            Recipe recipe =  uninitializedRecipes.get(i);
+            Recipe recipe = uninitializedRecipes.get(i);
             if(recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
                 Optional<Recipe> next = availableRecipes.stream()
@@ -90,7 +90,11 @@ public class DeclarativeRecipe extends Recipe {
         uninitializedRecipes.clear();
     }
 
-    void doNext(String recipeName) {
+    public void addUninitialized(Recipe recipe) {
+        uninitializedRecipes.add(recipe);
+    }
+
+    void addUninitialized(String recipeName) {
         try {
             uninitializedRecipes.add((Recipe) Class.forName(recipeName).getDeclaredConstructor().newInstance());
         } catch (Exception e) {
