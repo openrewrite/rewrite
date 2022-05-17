@@ -16,8 +16,10 @@
 package org.openrewrite.java.dataflow.analysis;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -25,30 +27,13 @@ import org.openrewrite.java.tree.Statement;
 import java.util.*;
 
 public class ForwardFlow extends JavaVisitor<Integer> {
+    private static final MethodMatcher methodMatcherToString = new MethodMatcher("java.lang.String toString()");
 
     public static void findSinks(FlowGraph root) {
         Object taintStmt = null;
-        String taint = null;
         Iterator<Object> cursorPath = root.getCursor().getPath();
-        while (cursorPath.hasNext()) {
-            taintStmt = cursorPath.next();
-            if (taintStmt instanceof J.Assignment) {
-                Expression variable = ((J.Assignment) taintStmt).getVariable();
-                if (variable instanceof J.Identifier) {
-                    taint = ((J.Identifier) variable).getSimpleName();
-                    break;
-                }
-            } else if (taintStmt instanceof J.AssignmentOperation) {
-                Expression variable = ((J.AssignmentOperation) taintStmt).getVariable();
-                if (variable instanceof J.Identifier) {
-                    taint = ((J.Identifier) variable).getSimpleName();
-                    break;
-                }
-            } else if (taintStmt instanceof J.VariableDeclarations.NamedVariable) {
-                taint = ((J.VariableDeclarations.NamedVariable) taintStmt).getName().getSimpleName();
-                break;
-            }
-        }
+
+        String taint = computeVariableAssignment(cursorPath);
 
         if (taint != null) {
             while (cursorPath.hasNext()) {
@@ -118,27 +103,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                 flowGraph.getEdges().add(next);
                 flowsByIdentifier.peek().put(ident.getSimpleName(), next);
 
-                String newVariableName = null;
-                Iterator<Object> cursorPath = getCursor().getPath();
-                while (cursorPath.hasNext()) {
-                    Object ancestor = cursorPath.next();
-                    if (ancestor instanceof J.Assignment) {
-                        Expression variable = ((J.Assignment) ancestor).getVariable();
-                        if (variable instanceof J.Identifier) {
-                            newVariableName = ((J.Identifier) variable).getSimpleName();
-                            break;
-                        }
-                    } else if (ancestor instanceof J.AssignmentOperation) {
-                        Expression variable = ((J.AssignmentOperation) ancestor).getVariable();
-                        if (variable instanceof J.Identifier) {
-                            newVariableName = ((J.Identifier) variable).getSimpleName();
-                            break;
-                        }
-                    } else if (ancestor instanceof J.VariableDeclarations.NamedVariable) {
-                        newVariableName = ((J.VariableDeclarations.NamedVariable) ancestor).getName().getSimpleName();
-                        break;
-                    }
-                }
+                String newVariableName = computeVariableAssignment(getCursor().getPath());
 
                 if(newVariableName != null) {
                     flowsByIdentifier.peek().put(newVariableName, next);
@@ -154,5 +119,33 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             flowsByIdentifier.pop();
             return b;
         }
+    }
+
+    @Nullable
+    private static String computeVariableAssignment(Iterator<Object> cursorPath) {
+        while (cursorPath.hasNext()) {
+            Object ancestor = cursorPath.next();
+            if (ancestor instanceof J.Binary) {
+                return null;
+            } else if (ancestor instanceof J.MethodInvocation) {
+                if (!methodMatcherToString.matches((J.MethodInvocation) ancestor)) {
+                    // If the method invocation is not `toString` on a `String`, it's not dataflow
+                    return null;
+                }
+            } else if (ancestor instanceof J.Assignment) {
+                Expression variable = ((J.Assignment) ancestor).getVariable();
+                if (variable instanceof J.Identifier) {
+                    return ((J.Identifier) variable).getSimpleName();
+                }
+            } else if (ancestor instanceof J.AssignmentOperation) {
+                Expression variable = ((J.AssignmentOperation) ancestor).getVariable();
+                if (variable instanceof J.Identifier) {
+                    return ((J.Identifier) variable).getSimpleName();
+                }
+            } else if (ancestor instanceof J.VariableDeclarations.NamedVariable) {
+                return ((J.VariableDeclarations.NamedVariable) ancestor).getName().getSimpleName();
+            }
+        }
+        return null;
     }
 }

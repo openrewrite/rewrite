@@ -192,7 +192,10 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindLiteralsTck : FindLiteralsTest
 
     @Nested
-    inner class FindLocalFlowPathsTck : FindLocalFlowPathsTest
+    inner class FindLocalFlowPathsNumericTck : FindLocalFlowPathsNumericTest
+
+    @Nested
+    inner class FindLocalFlowPathsStringTck : FindLocalFlowPathsStringTest
 
     @Nested
     inner class FindMethodsTck : FindMethodsTest

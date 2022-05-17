@@ -252,7 +252,11 @@ class Java11FindLiteralsTest : Java11Test, FindLiteralsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11FindLocalFlowPathsTest : Java11Test, FindLocalFlowPathsTest
+class Java11FindLocalFlowPathsNumericTest : Java11Test, FindLocalFlowPathsNumericTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindLocalFlowPathsStringTest : Java11Test, FindLocalFlowPathsStringTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

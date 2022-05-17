@@ -248,7 +248,11 @@ class Java8FindLiteralsTest : Java8Test, FindLiteralsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java8FindLocalFlowPathsTest : Java8Test, FindLocalFlowPathsTest
+class Java8FindLocalFlowPathsNumericTest : Java8Test, FindLocalFlowPathsNumericTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java8FindLocalFlowPathsStringTest : Java8Test, FindLocalFlowPathsStringTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
