@@ -18,6 +18,7 @@ package org.openrewrite.java.dataflow
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
+import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
@@ -26,15 +27,20 @@ import org.openrewrite.test.RewriteTest
 interface FindLocalFlowPathsStringTest: RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(RewriteTest.toRecipe {
-            FindLocalFlowPaths(object : LocalFlowSpec<J.Literal, J.MethodInvocation>() {
-                override fun isSource(expr: J.Literal, cursor: Cursor) = expr.value == "42"
+            FindLocalFlowPaths(object : LocalFlowSpec<Expression, J.MethodInvocation>() {
+                override fun isSource(expr: Expression, cursor: Cursor) =
+                    when(expr){
+                        is J.Literal -> expr.value == "42"
+                        is J.MethodInvocation -> expr.name.simpleName == "source"
+                        else -> false
+                    }
                 override fun isSink(expr: J.MethodInvocation, cursor: Cursor) = true
             })
         })
     }
 
     @Test
-    fun transitiveAssignment() = rewriteRun(
+    fun `transitive assignment from literal`() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
             """
@@ -51,6 +57,41 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                 class Test {
                     void test() {
                         String n = /*~~>*/"42";
+                        String o = /*~~>*/n;
+                        /*~~>*/System.out.println(/*~~>*/o);
+                        String p = o;
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `transitive assignment from source method`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String source() {
+                        return null;
+                    }
+
+                    void test() {
+                        String n = source();
+                        String o = n;
+                        System.out.println(o);
+                        String p = o;
+                    }
+                }
+            """,
+            """
+                class Test {
+                    String source() {
+                        return null;
+                    }
+
+                    void test() {
+                        String n = /*~~>*/source();
                         String o = /*~~>*/n;
                         /*~~>*/System.out.println(/*~~>*/o);
                         String p = o;

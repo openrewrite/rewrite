@@ -123,6 +123,11 @@ public class ForwardFlow extends JavaVisitor<Integer> {
 
     @Nullable
     private static String computeVariableAssignment(Iterator<Object> cursorPath) {
+        if (cursorPath.hasNext()) {
+            // Must avoid inspecting the 'current' node to compute the variable assignment.
+            // This is because we perform filtering here, and filtered types may be valid 'source' types.
+            cursorPath.next();
+        }
         while (cursorPath.hasNext()) {
             Object ancestor = cursorPath.next();
             if (ancestor instanceof J.Binary) {
