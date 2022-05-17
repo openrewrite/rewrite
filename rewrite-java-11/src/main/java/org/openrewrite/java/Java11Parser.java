@@ -87,7 +87,7 @@ public class Java11Parser implements JavaParser {
         }
 
         @Override
-        public Java11Parser build() {
+        public synchronized Java11Parser build() {
             lazyInitClassLoaders();
 
             try {
