@@ -41,6 +41,21 @@ public class Checksum {
         return hexString.toString();
     }
 
+    public static Checksum fromHex(String algorithm, String hex) {
+        if(hex.length() % 2 != 0) {
+            throw new IllegalArgumentException("Hex string must contain a set of hex pairs (length divisible by 2).");
+        }
+
+        byte[] value = new byte[hex.length() / 2];
+        for (int i = 0; i < value.length; i++) {
+            int index = i * 2;
+            int n = Integer.parseInt(hex.substring(index, index + 2), 16);
+            value[i] = (byte) n;
+        }
+
+        return new Checksum(algorithm, value);
+    }
+
     public static SourceFile md5(SourceFile sourceFile) {
         return checksum("MD5", sourceFile);
     }

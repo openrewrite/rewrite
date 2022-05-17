@@ -23,11 +23,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
-import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
@@ -35,8 +34,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -79,7 +76,7 @@ public class ListDependencies extends Recipe {
             }.visit(sourceFile, ctx);
         }
 
-        return ListUtils.concat(before, new PlainText(randomId(), Paths.get("dependencies.txt"), Markers.EMPTY, null, false,null,
-                dependencies.stream().sorted().collect(Collectors.joining("\n"))));
+        return ListUtils.concat(before, new PlainTextParser().parse(dependencies.stream().sorted().collect(Collectors.joining("\n"))).get(0)
+                .withSourcePath(Paths.get("dependencies.txt")));
     }
 }

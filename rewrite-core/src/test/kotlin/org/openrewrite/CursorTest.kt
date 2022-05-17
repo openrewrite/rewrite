@@ -26,7 +26,7 @@ import kotlin.streams.toList
 class CursorTest {
     @Test
     fun peekMessages() {
-        val t = PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "test")
+        val t = PlainText(randomId(), Paths.get("test.txt"),  Markers.EMPTY, null, false, null, "test")
         val cursor = Cursor(null, t)
 
         cursor.putMessage("key", 1)
@@ -38,7 +38,7 @@ class CursorTest {
 
     @Test
     fun pollMessages() {
-        val t = PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "test")
+        val t = PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, "test")
         val cursor = Cursor(null, t)
 
         cursor.putMessage("key", 1)
@@ -54,14 +54,14 @@ class CursorTest {
 
     @Test
     fun pathPredicates() {
-        val t = PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "test")
+        val t = PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, "test")
         val cursor = Cursor(Cursor(Cursor(null, 1), t), 2)
         assertThat(cursor.getPath { it is PlainText }.next()).isSameAs(t)
     }
 
     @Test
     fun pathAsStreamPredicates() {
-        val t = PlainText(randomId(), Paths.get("test.txt"), null, false, Markers.EMPTY, "test")
+        val t = PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, "test")
         val cursor = Cursor(Cursor(Cursor(null, 1), t), 2)
         assertThat(cursor.getPathAsStream { it is PlainText }.toList()).containsExactly(t)
     }
