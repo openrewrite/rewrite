@@ -26,9 +26,9 @@ import java.nio.file.Paths
 
 @Suppress("UnusedProperty")
 class AddGradleWrapperTest {
-    private val gradleWrapperJar = Binary(Tree.randomId(), Paths.get("gradle/wrapper/gradle-wrapper.jar"), Markers.EMPTY, byteArrayOf());
-    private val gradlew = PlainText(Tree.randomId(), Paths.get("gradlew"), null, false, Markers.EMPTY, "")
-    private val gradlewBat = PlainText(Tree.randomId(), Paths.get("gradlew.bat"), null, false, Markers.EMPTY, "")
+    private val gradleWrapperJar = Binary(Tree.randomId(), Paths.get("gradle/wrapper/gradle-wrapper.jar"), Markers.EMPTY, null, byteArrayOf())
+    private val gradlew = PlainText(Tree.randomId(), Paths.get("gradlew"), Markers.EMPTY,null, false,null,"")
+    private val gradlewBat = PlainText(Tree.randomId(), Paths.get("gradlew.bat"), Markers.EMPTY,null, false, null,"")
 
     @Test
     fun addWrapper() {

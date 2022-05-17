@@ -28,8 +28,8 @@ import java.nio.file.Paths
 @Suppress("UnusedProperty")
 class UpdateGradleWrapperTest {
 
-    private val gradlew = PlainText(Tree.randomId(), Paths.get("gradlew"), null, false, Markers.EMPTY, "")
-    private val gradlewBat = PlainText(Tree.randomId(), Paths.get("gradlew.bat"), null, false, Markers.EMPTY, "")
+    private val gradlew = PlainText(Tree.randomId(), Paths.get("gradlew"), Markers.EMPTY,null, false, null,"")
+    private val gradlewBat = PlainText(Tree.randomId(), Paths.get("gradlew.bat"), Markers.EMPTY, null, false, null,"")
 
     @Test
     fun updateVersionAndDistribution() {
