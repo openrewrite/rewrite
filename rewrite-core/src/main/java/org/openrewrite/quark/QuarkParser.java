@@ -110,7 +110,8 @@ public class QuarkParser implements Parser<Quark> {
                     relativeTo == null ?
                             source.getPath() :
                             relativeTo.relativize(source.getPath()).normalize(),
-                    Markers.EMPTY));
+                    Markers.EMPTY,
+                    null));
         }
         return quarks;
     }

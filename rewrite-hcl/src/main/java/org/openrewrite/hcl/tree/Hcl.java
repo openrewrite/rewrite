@@ -485,6 +485,12 @@ public interface Hcl extends Tree {
         @With
         Path sourcePath;
 
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
         @Nullable // for backwards compatibility
         @With(AccessLevel.PRIVATE)
         String charsetName;
@@ -504,10 +510,9 @@ public interface Hcl extends Tree {
         }
 
         @With
-        Space prefix;
-
-        @With
-        Markers markers;
+        @Getter
+        @Nullable
+        Checksum checksum;
 
         @With
         List<BodyContent> body;

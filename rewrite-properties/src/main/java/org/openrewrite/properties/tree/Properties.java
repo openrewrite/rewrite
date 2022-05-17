@@ -75,6 +75,11 @@ public interface Properties extends Tree {
         @Getter
         boolean charsetBomMarked;
 
+        @With
+        @Getter
+        @Nullable
+        Checksum checksum;
+
         @Override
         public Charset getCharset() {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);

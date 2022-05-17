@@ -43,6 +43,7 @@ public class BinaryParser implements Parser<Binary> {
                             source.getPath() :
                             relativeTo.relativize(source.getPath()).normalize(),
                     Markers.EMPTY,
+                    null,
                     readAllBytes(source.getSource())));
         }
         return plainTexts;

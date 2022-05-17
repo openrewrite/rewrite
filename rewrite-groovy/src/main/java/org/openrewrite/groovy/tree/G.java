@@ -99,6 +99,11 @@ public interface G extends J {
         @Getter
         boolean charsetBomMarked;
 
+        @With
+        @Getter
+        @Nullable
+        Checksum checksum;
+
         @Override
         public Charset getCharset() {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
@@ -263,7 +268,7 @@ public interface G extends J {
             }
 
             public G.CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
-                return t.packageDeclaration == packageDeclaration ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, packageDeclaration, t.statements, t.eof);
+                return t.packageDeclaration == packageDeclaration ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, t.checksum, packageDeclaration, t.statements, t.eof);
             }
 
             @Override
@@ -287,7 +292,7 @@ public interface G extends J {
             }
 
             public G.CompilationUnit withStatements(List<JRightPadded<Statement>> statements) {
-                return t.statements == statements ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, t.packageDeclaration, statements, t.eof);
+                return t.statements == statements ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
             }
         }
     }

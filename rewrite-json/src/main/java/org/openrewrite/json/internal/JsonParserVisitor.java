@@ -91,6 +91,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 Markers.EMPTY,
                 charset.name(),
                 charsetBomMarked,
+                null,
                 visitValue(c.value()),
                 Space.format(source.substring(cursor))
         ));

@@ -18,6 +18,7 @@ package org.openrewrite.quark;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
@@ -30,6 +31,9 @@ public class Quark implements SourceFile {
     UUID id;
     Path sourcePath;
     Markers markers;
+
+    @Nullable
+    Checksum checksum;
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {

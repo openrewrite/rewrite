@@ -1171,6 +1171,11 @@ public interface J extends Tree {
         @Getter
         boolean charsetBomMarked;
 
+        @With
+        @Getter
+        @Nullable
+        Checksum checksum;
+
         @Override
         public Charset getCharset() {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
@@ -1265,7 +1270,7 @@ public interface J extends Tree {
             }
 
             public CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
-                return t.packageDeclaration == packageDeclaration ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, packageDeclaration, t.imports, t.classes, t.eof);
+                return t.packageDeclaration == packageDeclaration ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, null, packageDeclaration, t.imports, t.classes, t.eof);
             }
 
             @Override
@@ -1275,7 +1280,7 @@ public interface J extends Tree {
 
             @Override
             public CompilationUnit withImports(List<JRightPadded<Import>> imports) {
-                return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, t.packageDeclaration, imports, t.classes, t.eof);
+                return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, null, t.packageDeclaration, imports, t.classes, t.eof);
             }
         }
     }

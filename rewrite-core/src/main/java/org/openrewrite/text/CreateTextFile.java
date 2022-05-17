@@ -20,7 +20,6 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -62,7 +61,7 @@ public class CreateTextFile extends Recipe {
         Path path = Paths.get(relativeFileName);
         SourceFile matchingFile = null;
 
-        for (SourceFile sourceFile: before) {
+        for (SourceFile sourceFile : before) {
             if (path.toString().equals(sourceFile.getSourcePath().toString())) {
                 matchingFile = sourceFile;
             }
@@ -73,10 +72,12 @@ public class CreateTextFile extends Recipe {
             return before;
         }
 
-        PlainText brandNewFile = new PlainText(Tree.randomId(), path, null, false, Markers.EMPTY, fileContents);
+        PlainTextParser parser = new PlainTextParser();
+        PlainText brandNewFile = parser.parse(fileContents).get(0);
 
         if (matchingFile != null) {
-            brandNewFile = new PlainText(matchingFile.getId(), brandNewFile.getSourcePath(), null, false, brandNewFile.getMarkers(), brandNewFile.getText());
+            brandNewFile = new PlainText(matchingFile.getId(), brandNewFile.getSourcePath(), brandNewFile.getMarkers(),
+                    null, false, null, brandNewFile.getText());
         }
 
         return ListUtils.concat(before, brandNewFile);

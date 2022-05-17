@@ -23,7 +23,6 @@ import org.jetbrains.annotations.NotNull;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
 import org.openrewrite.hcl.internal.grammar.HCLParserBaseVisitor;
 import org.openrewrite.hcl.tree.*;
-import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -208,10 +207,11 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         return convert(ctx, (c, prefix) -> new Hcl.ConfigFile(
                 randomId(),
                 path,
-                charset.name(),
-                charsetBomMarked,
                 Space.format(prefix),
                 Markers.EMPTY,
+                charset.name(),
+                charsetBomMarked,
+                null,
                 c.body().bodyContent().stream()
                         .map(bc -> (BodyContent) visit(bc))
                         .collect(toList()),

@@ -107,24 +107,6 @@ public interface Xml extends Tree {
         @With
         Path sourcePath;
 
-        @Nullable // for backwards compatibility
-        @With(AccessLevel.PRIVATE)
-        String charsetName;
-
-        @With
-        @Getter
-        boolean charsetBomMarked;
-
-        @Override
-        public java.nio.charset.Charset getCharset() {
-            return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
-        }
-
-        @Override
-        public SourceFile withCharset(Charset charset) {
-            return withCharsetName(charset.name());
-        }
-
         @With
         String prefixUnsafe;
 
@@ -139,6 +121,29 @@ public interface Xml extends Tree {
         @Getter
         @With
         Markers markers;
+
+        @Nullable // for backwards compatibility
+        @With(AccessLevel.PRIVATE)
+        String charsetName;
+
+        @With
+        @Getter
+        boolean charsetBomMarked;
+
+        @With
+        @Getter
+        @Nullable
+        Checksum checksum;
+
+        @Override
+        public Charset getCharset() {
+            return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
+        }
+
+        @Override
+        public SourceFile withCharset(Charset charset) {
+            return withCharsetName(charset.name());
+        }
 
         @Getter
         @With
@@ -155,7 +160,7 @@ public interface Xml extends Tree {
             if (this.eof.equals(eof)) {
                 return this;
             }
-            return new Document(id, sourcePath, charsetName, charsetBomMarked, prefixUnsafe, markers, prolog, root, eof);
+            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, prolog, root, eof);
         }
 
         @Override

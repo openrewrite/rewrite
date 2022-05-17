@@ -39,6 +39,11 @@ public interface SourceFile extends Tree {
 
     SourceFile withCharsetBomMarked(boolean marked);
 
+    @Nullable
+    Checksum getChecksum();
+
+    SourceFile withChecksum(@Nullable Checksum checksum);
+
     Markers getMarkers();
 
     <T extends SourceFile> T withMarkers(Markers markers);

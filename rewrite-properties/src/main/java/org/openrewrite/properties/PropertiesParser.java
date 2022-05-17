@@ -100,7 +100,8 @@ public class PropertiesParser implements Parser<Properties.File> {
                 contents,
                 prefix.toString(),
                 source.getCharset().name(),
-                source.isCharsetBomMarked()
+                source.isCharsetBomMarked(),
+                null
         );
     }
 

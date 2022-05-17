@@ -143,6 +143,7 @@ public class GroovyParserVisitor {
                 sourcePath,
                 charset.name(),
                 charsetBomMarked,
+                null,
                 pkg,
                 statements,
                 format(source.substring(cursor))

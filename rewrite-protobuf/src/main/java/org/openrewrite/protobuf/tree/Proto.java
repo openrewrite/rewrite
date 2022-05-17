@@ -25,6 +25,8 @@ import org.openrewrite.protobuf.ProtoVisitor;
 import org.openrewrite.protobuf.internal.ProtoPrinter;
 
 import java.lang.ref.WeakReference;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -162,6 +164,14 @@ public interface Proto extends Tree {
         @Getter
         Path sourcePath;
 
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
         @Nullable // for backwards compatibility
         @With(AccessLevel.PRIVATE)
         String charsetName;
@@ -170,23 +180,20 @@ public interface Proto extends Tree {
         @Getter
         boolean charsetBomMarked;
 
+        @With
+        @Getter
+        @Nullable
+        Checksum checksum;
+
         @Override
-        public java.nio.charset.Charset getCharset() {
-            return charsetName == null ? java.nio.charset.StandardCharsets.UTF_8 : java.nio.charset.Charset.forName(charsetName);
+        public Charset getCharset() {
+            return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
         }
 
         @Override
-        public SourceFile withCharset(java.nio.charset.Charset charset) {
+        public SourceFile withCharset(Charset charset) {
             return withCharsetName(charset.name());
         }
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
 
         @With
         @Getter
@@ -240,7 +247,7 @@ public interface Proto extends Tree {
             }
 
             public Document withBody(List<ProtoRightPadded<Proto>> body) {
-                return t.body == body ? t : new Document(t.id, t.sourcePath, t.charsetName, t.charsetBomMarked, t.prefix, t.markers, t.syntax, body, t.eof);
+                return t.body == body ? t : new Document(t.id, t.sourcePath, t.prefix, t.markers, t.charsetName, t.charsetBomMarked, t.checksum, t.syntax, body, t.eof);
             }
         }
     }

@@ -38,6 +38,8 @@ public class PlainText implements SourceFile, Tree {
 
     Path sourcePath;
 
+    Markers markers;
+
     @Nullable // for backwards compatibility
     @With(AccessLevel.PRIVATE)
     String charsetName;
@@ -56,7 +58,11 @@ public class PlainText implements SourceFile, Tree {
         return withCharsetName(charset.name());
     }
 
-    Markers markers;
+    @With
+    @Getter
+    @Nullable
+    Checksum checksum;
+
     String text;
 
     @Override

@@ -36,9 +36,10 @@ public class PlainTextParser implements Parser<PlainText> {
                     relativeTo == null ?
                             source.getPath() :
                             relativeTo.relativize(source.getPath()).normalize(),
+                    Markers.EMPTY,
                     source.getSource().getCharset().name(),
                     source.getSource().isCharsetBomMarked(),
-                    Markers.EMPTY,
+                    null,
                     source.getSource().readFully()));
         }
         return plainTexts;

@@ -77,9 +77,10 @@ public interface Yaml extends Tree {
         @With(AccessLevel.PRIVATE)
         String charsetName;
 
-        @With
-        @Getter
         boolean charsetBomMarked;
+
+        @Nullable
+        Checksum checksum;
 
         @Override
         public Charset getCharset() {
@@ -101,7 +102,7 @@ public interface Yaml extends Tree {
         @Override
         public Documents copyPaste() {
             return new Documents(randomId(), Markers.EMPTY,
-                    sourcePath, charsetName, charsetBomMarked, documents.stream().map(Document::copyPaste).collect(toList()));
+                    sourcePath, charsetName, charsetBomMarked, checksum, documents.stream().map(Document::copyPaste).collect(toList()));
         }
 
         /**
@@ -159,7 +160,7 @@ public interface Yaml extends Tree {
         }
 
         /**
-         * https://yaml.org/spec/1.1/#c-document-end
+         * <a href="https://yaml.org/spec/1.1/#c-document-end">Document end</a> specification.
          */
         @Value
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -175,7 +176,7 @@ public interface Yaml extends Tree {
              * Yaml documents may be explicitly ended with "..."
              * When this is set to "true" the "..." will be printed out.
              * When this is set to "false" no "..." will be printed, but a comment at the end of the document still will be
-             * See: https://yaml.org/spec/1.2/spec.html#id2800401
+             * @see <a href="https://yaml.org/spec/1.2/spec.html#id2800401">YAML specification</a>
              */
             boolean explicit;
 
