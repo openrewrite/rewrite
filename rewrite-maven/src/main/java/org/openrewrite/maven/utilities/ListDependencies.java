@@ -79,7 +79,7 @@ public class ListDependencies extends Recipe {
             }.visit(sourceFile, ctx);
         }
 
-        return ListUtils.concat(before, new PlainText(randomId(), Paths.get("dependencies.txt"), null, false, Markers.EMPTY,
+        return ListUtils.concat(before, new PlainText(randomId(), Paths.get("dependencies.txt"), Markers.EMPTY, null, false,null,
                 dependencies.stream().sorted().collect(Collectors.joining("\n"))));
     }
 }
