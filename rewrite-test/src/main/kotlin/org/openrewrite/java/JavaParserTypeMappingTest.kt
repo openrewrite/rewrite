@@ -15,12 +15,13 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.java.tree.JavaType
 
 interface JavaParserTypeMappingTest : JavaTypeMappingTest {
 
@@ -33,6 +34,50 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
     @AfterEach
     fun afterRecipe() {
         parser.reset()
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1782")
+    @Test
+    fun parameterizedTypesAreDeeplyBasedOnBounds() {
+        // The sources intentionally do not import to prevent the import from being processed first.
+
+        //language=java
+        val sources = arrayOf(
+            """
+                abstract class TypeA<T extends Number> extends java.util.ArrayList<T> {}
+            """.trimIndent(),
+            """
+                class TypeB extends TypeA<Integer> {
+                    // Attempt to force a race condition in the JavaTypeCache.
+                    java.util.List<String> list = new java.util.ArrayList<>();
+                }
+            """.trimIndent(),
+            """
+                class TypeC<T extends String> extends java.util.ArrayList<T> {
+                    // Attempt to force a race condition in the JavaTypeCache.
+                    java.util.List<Object> list = new java.util.ArrayList<>();
+                }
+            """.trimIndent()
+        )
+
+        val cus = parser.parse(InMemoryExecutionContext { t -> fail(t) }, *sources)
+
+        val typeA = cus[0].classes[0].type as JavaType.Parameterized
+        assertThat((typeA.typeParameters[0] as JavaType.GenericTypeVariable).toString()).isEqualTo("Generic{T extends java.lang.Number}")
+        val typeASuperType = typeA.supertype as JavaType.Parameterized
+        assertThat(typeASuperType.toString()).isEqualTo("java.util.ArrayList<Generic{T extends java.lang.Number}>")
+        assertThat(((typeASuperType).type as JavaType.Class).typeParameters[0].toString()).isEqualTo("Generic{E}")
+
+        val typeB = cus[1].classes[0].type as JavaType.Class
+        assertThat(typeB.supertype!!.toString()).isEqualTo("TypeA<java.lang.Integer>")
+        val typeBSuperType = typeB.supertype as JavaType.Parameterized
+        assertThat(((typeBSuperType).type as JavaType.Class).typeParameters[0].toString()).isEqualTo("Generic{T extends java.lang.Number}")
+
+        val typeC = cus[2].classes[0].type as JavaType.Parameterized
+        assertThat((typeC.typeParameters[0] as JavaType.GenericTypeVariable).toString()).isEqualTo("Generic{T extends java.lang.String}")
+        val typeCSuperType = typeC.supertype as JavaType.Parameterized
+        assertThat(typeCSuperType.toString()).isEqualTo("java.util.ArrayList<Generic{T extends java.lang.String}>")
+        assertThat(((typeCSuperType).type as JavaType.Class).typeParameters[0].toString()).isEqualTo("Generic{E}")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
@@ -62,7 +107,7 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
             }
             """.trimIndent()
         val cu = parser.parse(InMemoryExecutionContext { t -> fail(t) }, source)
-        Assertions.assertThat(cu).isNotNull
+        assertThat(cu).isNotNull
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1318")
@@ -94,6 +139,6 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
             }
             """.trimIndent()
         val cu = parser.parse(InMemoryExecutionContext { t -> fail(t) }, source)
-        Assertions.assertThat(cu).isNotNull
+        assertThat(cu).isNotNull
     }
 }

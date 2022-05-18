@@ -23,9 +23,7 @@ import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 
 import javax.lang.model.type.NullType;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.StringJoiner;
+import java.util.*;
 
 class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
@@ -41,9 +39,9 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return "{undefined}";
         } else if (type instanceof Type.ClassType) {
             try {
-                return (type.isParameterized() && ((Type.ClassType) type).typarams_field.length() > 0) ? parameterizedSignature(type) : classSignature(type);
+                return classTypeSignature(type);
             } catch (Symbol.CompletionFailure ignored) {
-                return (type.isParameterized() && ((Type.ClassType) type).typarams_field.length() > 0) ? parameterizedSignature(type) : classSignature(type);
+                return classTypeSignature(type);
             }
         } else if (type instanceof Type.CapturedType) { // CapturedType must be evaluated before TypeVar
             return signature(((Type.CapturedType) type).wildcard);
@@ -98,6 +96,52 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return sym.flatName().toString();
     }
 
+    public String classTypeSignature(Object type) {
+        if (type instanceof Type.JCVoidType) {
+            return "void";
+        } else if (type instanceof Type.JCPrimitiveType) {
+            return primitiveSignature(type);
+        } else if (type instanceof Type.JCNoType) {
+            return "{undefined}";
+        }
+
+        Symbol.ClassSymbol sym = (Symbol.ClassSymbol) ((Type.ClassType) type).tsym;
+        if (!sym.completer.isTerminal()) {
+            completeClassSymbol(sym);
+        }
+
+        Type.ClassType classType = (Type.ClassType) type;
+        Type.ClassType symType = (Type.ClassType) classType.tsym.type;
+        StringBuilder s = new StringBuilder(classType.tsym.flatName().toString());
+
+        boolean sourceFile = true;
+        if (symType.typarams_field != null && symType.typarams_field.length() > 0) {
+            List<String> classTypeParameters = new ArrayList<>(classType.typarams_field.length());
+            List<String> symTypeParameters = new ArrayList<>(symType.typarams_field.length());
+            boolean useClassTypeParameters = symType.typarams_field.length() == classType.typarams_field.length();
+            for (int i = 0; i < symType.typarams_field.length(); i++) {
+                Type sParam = symType.typarams_field.get(i);
+                symTypeParameters.add(signature(sParam));
+                if (useClassTypeParameters) {
+                    Type cParam = classType.typarams_field.get(i);
+                    classTypeParameters.add(signature(cParam));
+                    if (!classTypeParameters.get(i).equals(symTypeParameters.get(i))) {
+                        sourceFile = false;
+                    }
+                }
+            }
+
+            StringJoiner joiner = new StringJoiner(", ", "<", ">");
+            if (sourceFile) {
+                symTypeParameters.forEach(joiner::add);
+            } else {
+                classTypeParameters.forEach(joiner::add);
+            }
+            s.append(joiner);
+        }
+        return s.toString();
+    }
+
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
@@ -144,14 +188,7 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     @Override
     public String parameterizedSignature(Object type) {
-        StringBuilder s = new StringBuilder(classSignature(type));
-        StringJoiner joiner = new StringJoiner(", ", "<", ">");
-        for (Type tp : ((Type.ClassType) type).typarams_field) {
-            String signature = signature(tp);
-            joiner.add(signature);
-        }
-        s.append(joiner);
-        return s.toString();
+        throw new UnsupportedOperationException("Use classTypeSignature instead.");
     }
 
     @Override
@@ -188,7 +225,6 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String methodSignature(Type selectType, Symbol.MethodSymbol symbol) {
-        Type genericType = symbol.type;
         String s = classSignature(symbol.owner.type);
         if (symbol.isConstructor()) {
             s += "{name=<constructor>,return=" + s;
@@ -201,11 +237,10 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String methodSignature(Symbol.MethodSymbol symbol) {
-        Type genericType = symbol.type;
         String s = classSignature(symbol.owner.type);
 
         String returnType;
-        if(symbol.isStaticOrInstanceInit()) {
+        if (symbol.isStaticOrInstanceInit()) {
             returnType = "void";
         } else {
             returnType = signature(symbol.getReturnType());
@@ -222,7 +257,7 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String methodArgumentSignature(Symbol.MethodSymbol sym) {
-        if(sym.isStaticOrInstanceInit()) {
+        if (sym.isStaticOrInstanceInit()) {
             return "[]";
         }
 
@@ -260,7 +295,7 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             owner = methodSignature((Symbol.MethodSymbol) symbol.owner);
         } else {
             owner = signature(symbol.owner.type);
-            if(owner.contains("<")) {
+            if (owner.contains("<")) {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
         }

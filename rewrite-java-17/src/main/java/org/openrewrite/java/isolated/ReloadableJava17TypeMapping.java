@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -160,14 +160,12 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     sym.flags_field,
                     sym.flatName().toString(),
                     getKind(sym),
-                    null, null, null, null, null, null
+                    null, null, null, null, null, null, null
             );
 
             typeCache.put(sym.flatName().toString(), clazz);
 
-            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(
-                    JavaType.FullyQualified.Kind.Enum.equals(clazz.getKind()) && isTypeAttributedGeneric(symType.supertype_field) ?
-                            symType.supertype_field.tsym.type : symType.supertype_field));
+            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
             JavaType.FullyQualified owner = null;
             if (sym.owner instanceof Symbol.ClassSymbol) {
@@ -217,25 +215,41 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
 
-            clazz.unsafeSet(supertype, owner, listAnnotations(sym), interfaces, fields, methods);
+            List<JavaType> typeParameters = null;
+            if (symType.typarams_field != null && symType.typarams_field.length() > 0) {
+                typeParameters = new ArrayList<>(symType.typarams_field.length());
+                for (Type tParam : symType.typarams_field) {
+                    typeParameters.add(type(tParam));
+                }
+            }
+            clazz.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
         }
 
-        if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
-            JavaType.Parameterized pt = typeCache.get(signature);
+        if (symType.typarams_field != null && symType.typarams_field.length() > 0) {
+            JavaType.FullyQualified pt = typeCache.get(signature);
             if (pt == null) {
                 pt = new JavaType.Parameterized(null, null, null);
                 typeCache.put(signature, pt);
 
-                List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
-                for (Type tParam : classType.typarams_field) {
-                    typeParameters.add(type(tParam));
+                List<JavaType> classTypeParameters = new ArrayList<>(classType.typarams_field.length());
+                List<JavaType> symTypeParameters = new ArrayList<>(symType.typarams_field.length());
+                boolean useClassTypeParameters = symType.typarams_field.length() == classType.typarams_field.length();
+                boolean sourceFile = true;
+                for (int i = 0; i < symType.typarams_field.length(); i++) {
+                    Type sParam = symType.typarams_field.get(i);
+                    symTypeParameters.add(type(sParam));
+                    if (useClassTypeParameters) {
+                        Type cParam = classType.typarams_field.get(i);
+                        classTypeParameters.add(type(cParam));
+                        if (classTypeParameters.get(0) != symTypeParameters.get(0)) {
+                            sourceFile = false;
+                        }
+                    }
                 }
-
-                pt.unsafeSet(clazz, typeParameters);
+                ((JavaType.Parameterized) pt).unsafeSet(clazz, sourceFile ? symTypeParameters : classTypeParameters);
             }
             return pt;
         }
-
         return clazz;
     }
 
@@ -439,7 +453,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                         if (exceptionType instanceof Type.ClassType) {
                             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
                             javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                    null, null, null, null, null, null);
+                                    null, null, null, null, null, null, null);
                         }
                     }
                     if (javaType != null) {
@@ -527,7 +541,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                             if (exceptionType instanceof Type.ClassType) {
                                 Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
                                 javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                        null, null, null, null, null, null);
+                                        null, null, null, null, null, null, null);
                             }
                         }
                         if (javaType != null) {

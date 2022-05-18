@@ -17,7 +17,9 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -289,26 +291,34 @@ public class TypeUtils {
         if (!name.equals(m.getName())) {
             return false;
         }
+
         List<JavaType> mArgs = m.getParameterTypes();
         if (mArgs.size() != argTypes.size()) {
             return false;
         }
+
+        Map<JavaType, JavaType> parameterMap = new IdentityHashMap<>();
+        List<JavaType> declaringTypeParams = null;
+        JavaType.FullyQualified fullyQualified = m.getDeclaringType();
+        if (fullyQualified instanceof JavaType.Class) {
+            declaringTypeParams = ((JavaType.Class) fullyQualified).getTypeParameters();
+        }
+        if (declaringTypeParams != null) {
+            List<JavaType> typeParameters = clazz.getTypeParameters();
+            for (int j = 0; j < typeParameters.size(); j++) {
+                JavaType typeAttributed = typeParameters.get(j);
+                JavaType generic = declaringTypeParams.get(j);
+                parameterMap.put(generic, typeAttributed);
+            }
+        }
+
         for (int i = 0; i < mArgs.size(); i++) {
             JavaType declared = mArgs.get(i);
             JavaType actual = argTypes.get(i);
             if (!TypeUtils.isOfType(declared, actual)) {
-                // Types might look like they don't match because we're comparing a concrete type like "String" with a generic type parameter "T"
-                if (clazz instanceof JavaType.Parameterized && declared instanceof JavaType.GenericTypeVariable) {
-                    JavaType.Parameterized parameterizedClass = (JavaType.Parameterized) clazz;
-                    // At this point we can't tell _which_ of the class's potentially many type parameters this might be
-                    // Or even if it might be a type parameter exclusive to the method itself, not the class
-                    // But if the concrete type being provided does match one of the type parameters there's a good-enough chance that it should be a match
-                    // To be 100% sure JavaType.GenericTypeVariable would have to know its origins, which it currently does not
-                    if (parameterizedClass.getTypeParameters().stream().anyMatch(it -> TypeUtils.isOfType(actual, it))) {
-                        continue;
-                    }
+                if (parameterMap.get(declared) != actual) {
+                    return false;
                 }
-                return false;
             }
         }
         return true;

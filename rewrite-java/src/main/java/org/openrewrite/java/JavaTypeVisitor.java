@@ -119,6 +119,7 @@ public class JavaTypeVisitor<P> {
         c = c.withInterfaces(ListUtils.map(c.getInterfaces(), i -> (JavaType.FullyQualified) visit(i, p)));
         c = c.withMembers(ListUtils.map(c.getMembers(), m -> (JavaType.Variable) visit(m, p)));
         c = c.withMethods(ListUtils.map(c.getMethods(), m -> (JavaType.Method) visit(m, p)));
+        c = c.withTypeParameters(ListUtils.map(c.getTypeParameters(), t -> visit(t, p)));
         return c;
     }
 

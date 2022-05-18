@@ -422,6 +422,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             c = (J.ClassDeclaration) temp;
         }
+        c = c.withTypeParameters(ListUtils.map(c.getTypeParameters(), t -> visitAndCast(t, p)));
         c = c.withLeadingAnnotations(ListUtils.map(c.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         c = c.withModifiers(ListUtils.map(c.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));

@@ -90,7 +90,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             clazz = (JavaType.Class) (type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type);
         } catch (GroovyBugError | NoClassDefFoundError ignored1) {
             clazz = new JavaType.Class(null, Flag.Public.getBitMask(), node.getName(), JavaType.Class.Kind.Class,
-                    null, null, null, null, null, null);
+                    null, null, null, null, null, null, null);
             typeCache.put(signature, clazz);
 
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(node.getSuperClass()));
@@ -129,7 +129,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
 
             List<JavaType.FullyQualified> annotations = getAnnotations(node);
 
-            clazz.unsafeSet(supertype, owner, annotations, interfaces, fields, methods);
+            clazz.unsafeSet(null, supertype, owner, annotations, interfaces, fields, methods);
         }
 
         return clazz;
