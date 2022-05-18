@@ -176,8 +176,6 @@ public class MethodMatcher {
     public boolean matches(J.MethodInvocation method) {
         if (method.getMethodType() == null) {
             return false;
-        } else {
-            method.getMethodType().getDeclaringType();
         }
 
         if (!matchesTargetType(method.getMethodType().getDeclaringType()) || !methodNamePattern.matcher(method.getSimpleName()).matches()) {
