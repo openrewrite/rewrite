@@ -35,4 +35,14 @@ class CompilationUnitTest : GroovyTreeTest {
             List l = null
         """.trimIndent()
     )
+
+    @Test
+    fun shellScript() = assertParsePrintAndProcess(
+        """
+           #!/usr/bin/env groovy
+           
+           def a = 'hello'
+        """.trimIndent()
+    )
+
 }

@@ -46,6 +46,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitJavaSourceFile(JavaSourceFile sourceFile, PrintOutputCapture<P> p) {
         G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
+        if(cu.getShebang() != null) {
+            p.append(cu.getShebang());
+        }
         visitSpace(cu.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p);
         visitMarkers(cu.getMarkers(), p);
 
