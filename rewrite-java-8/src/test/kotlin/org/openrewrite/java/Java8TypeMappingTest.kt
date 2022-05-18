@@ -26,9 +26,7 @@ class Java8TypeMappingTest : JavaParserTypeMappingTest {
         private val goat = Java8TypeMappingTest::class.java.getResourceAsStream("/JavaTypeGoat.java")!!
             .bufferedReader().readText()
 
-        private val goatCu = JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true)
-            .build()
+        private val goatCu = JavaParserTypeMappingTest.parser
             .parse(InMemoryExecutionContext { t -> fail(t) }, goat)[0]
     }
 

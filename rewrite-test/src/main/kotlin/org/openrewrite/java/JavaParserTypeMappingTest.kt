@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
@@ -23,10 +24,15 @@ import org.openrewrite.Issue
 
 interface JavaParserTypeMappingTest : JavaTypeMappingTest {
 
-    private fun parser(): JavaParser {
-        return JavaParser.fromJavaVersion()
+    companion object {
+        val parser: JavaParser = JavaParser.fromJavaVersion()
             .logCompilationWarningsAndErrors(true)
             .build()
+    }
+
+    @AfterEach
+    fun afterRecipe() {
+        parser.reset()
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
@@ -55,7 +61,7 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
                 }
             }
             """.trimIndent()
-        val cu = parser().parse(InMemoryExecutionContext { t -> fail(t) }, source)
+        val cu = parser.parse(InMemoryExecutionContext { t -> fail(t) }, source)
         Assertions.assertThat(cu).isNotNull
     }
 
@@ -87,7 +93,7 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
                 }
             }
             """.trimIndent()
-        val cu = parser().parse(InMemoryExecutionContext { t -> fail(t) }, source)
+        val cu = parser.parse(InMemoryExecutionContext { t -> fail(t) }, source)
         Assertions.assertThat(cu).isNotNull
     }
 }
