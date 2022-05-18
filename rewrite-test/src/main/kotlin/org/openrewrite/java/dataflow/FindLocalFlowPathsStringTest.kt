@@ -103,7 +103,7 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
 
     @Test
     @Disabled("This isn't finding the search results for `String o = n + '/';` for some reason")
-    fun `taint flow is not data flow`() = rewriteRun(
+    fun `taint flow via append is not data flow`() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
             """
@@ -151,6 +151,68 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                         String o = /*~~>*/n.toString() + '/';
                         System.out.println(o);
                         String p = o;
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `taint flow via constructor call is not data flow`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    void test() {
+                        String n = "42";
+                        java.io.File o = new java.io.File(n);
+                        System.out.println(o);
+                    }
+                }
+            """,
+            """
+                class Test {
+                    void test() {
+                        String n = /*~~>*/"42";
+                        java.io.File o = new java.io.File(/*~~>*/n);
+                        System.out.println(o);
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `the source is also a sink`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        source();
+                        source().toString();
+                        source().toString().toString();
+                        source().toLowerCase(Locale.ROOT);
+                        source().toString().toLowerCase(Locale.ROOT);
+                    }
+                }
+            """,
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        /*~~>*/source();
+                        /*~~>*/source()/*~~>*/.toString();
+                        /*~~>*/source()/*~~>*/.toString()/*~~>*/.toString();
+                        /*~~>*/source().toLowerCase(Locale.ROOT);
+                        /*~~>*/source()/*~~>*/.toString().toLowerCase(Locale.ROOT);
                     }
                 }
                 """
