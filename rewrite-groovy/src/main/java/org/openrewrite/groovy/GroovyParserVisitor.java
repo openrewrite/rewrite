@@ -83,7 +83,15 @@ public class GroovyParserVisitor {
                 sortedByPosition.computeIfAbsent(pos(s), i -> new ArrayList<>()).add(s);
             }
         }
-
+        String shebang = null;
+        if(source.startsWith("#!")) {
+            int i = 0;
+            while(i < source.length() && source.charAt(i) != '\n' && source.charAt(i) != '\r') {
+                i++;
+            }
+            shebang = source.substring(0, i);
+            cursor += i;
+        }
         JRightPadded<J.Package> pkg = null;
         if (ast.getPackage() != null) {
             Space prefix = whitespace();
@@ -138,6 +146,7 @@ public class GroovyParserVisitor {
 
         return new G.CompilationUnit(
                 randomId(),
+                shebang,
                 Space.EMPTY,
                 Markers.EMPTY,
                 sourcePath,

@@ -81,6 +81,11 @@ public interface G extends J {
 
         @With
         @Getter
+        @Nullable
+        String shebang;
+
+        @With
+        @Getter
         Space prefix;
 
         @With
@@ -268,7 +273,7 @@ public interface G extends J {
             }
 
             public G.CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
-                return t.packageDeclaration == packageDeclaration ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, t.checksum, packageDeclaration, t.statements, t.eof);
+                return t.packageDeclaration == packageDeclaration ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, t.checksum, packageDeclaration, t.statements, t.eof);
             }
 
             @Override
@@ -284,7 +289,7 @@ public interface G extends J {
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 // TODO implement me!
                 return t;
-//                return t.imports == imports ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, imports, t.classes, t.eof);
+//                return t.imports == imports ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, imports, t.classes, t.eof);
             }
 
             public List<JRightPadded<Statement>> getStatements() {
@@ -292,7 +297,7 @@ public interface G extends J {
             }
 
             public G.CompilationUnit withStatements(List<JRightPadded<Statement>> statements) {
-                return t.statements == statements ? t : new G.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                return t.statements == statements ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
             }
         }
     }
