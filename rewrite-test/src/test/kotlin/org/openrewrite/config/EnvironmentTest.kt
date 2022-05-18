@@ -356,4 +356,25 @@ class EnvironmentTest : RewriteTest {
         assertThat(recipeList[4].name).isEqualTo("test.BarTwo")
         assertThat(recipeList[5].name).isEqualTo("org.openrewrite.config.RecipeNoParameters")
     }
+
+    @Test
+    fun canCauseAnotherCycle() {
+        val env = Environment.builder()
+            .load(YamlResourceLoader(
+                //language=yaml
+                """
+                    type: specs.openrewrite.org/v1beta/recipe
+                    name: test.Foo
+                    displayName: Test
+                    causesAnotherCycle: true
+                    recipeList:
+                      - org.openrewrite.config.RecipeNoParameters
+                    
+                """.trimIndent().byteInputStream(),
+                URI.create("rewrite.yml"),
+                Properties()
+            )).build()
+        val recipe = env.activateRecipes("test.Foo")
+        assertThat(recipe.causesAnotherCycle()).isTrue
+    }
 }

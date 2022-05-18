@@ -175,8 +175,8 @@ public class YamlResourceLoader implements ResourceLoader {
                     if(estimatedEffortPerOccurrenceStr != null) {
                         estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
                     }
-
-                    DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags, estimatedEffortPerOccurrence, source);
+                    DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags,
+                            estimatedEffortPerOccurrence, source, (boolean) r.getOrDefault("causesAnotherCycle", false));
                     List<Object> recipeList = (List<Object>) r.get("recipeList");
                     if (recipeList == null) {
                         throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
