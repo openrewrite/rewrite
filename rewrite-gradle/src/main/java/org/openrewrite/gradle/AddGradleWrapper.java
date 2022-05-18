@@ -28,6 +28,7 @@ import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.text.PlainText;
 
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -115,20 +116,27 @@ public class AddGradleWrapper extends Recipe {
         }
 
         if (needsGradleShellScript) {
-            PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY, null, false, null,
+            URL wrapperScriptPath = AddGradleWrapper.class.getResource("/gradlew");
+            FileAttributes wrapperScriptAttributes = wrapperScriptPath != null ? FileAttributes.fromPath(Paths.get(wrapperScriptPath.getPath())) : null;
+            PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, wrapperScriptAttributes, Markers.EMPTY, null, false, null,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew")));
             gradleWrapper.add(gradlew);
         }
 
         if (needsGradleBatchScript) {
-            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY,null, false, null,
+            URL wrapperBatchUrl = AddGradleWrapper.class.getResource("/gradlew.bat");
+            FileAttributes wrapperBatchAttributes = wrapperBatchUrl != null ? FileAttributes.fromPath(Paths.get(wrapperBatchUrl.getPath())) : null;
+            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, wrapperBatchAttributes, Markers.EMPTY,null, false, null,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")));
             gradleWrapper.add(gradlewBat);
         }
 
         if (needsGradleWrapperProperties || needsGradleShellScript || needsGradleBatchScript) {
+            URL wrapperJarUrl = AddGradleWrapper.class.getResource("/gradle-wrapper.jar.dontunpack");
+            FileAttributes wrapperJarAttributes = wrapperJarUrl != null ? FileAttributes.fromPath(Paths.get(wrapperJarUrl.getPath())) : null;
+
             Binary gradleWrapperJar = new BinaryParser().parseInputs(singletonList(
-                    new Parser.Input(WRAPPER_JAR_LOCATION,
+                    new Parser.Input(WRAPPER_JAR_LOCATION, wrapperJarAttributes,
                             () -> AddGradleWrapper.class.getResourceAsStream("/gradle-wrapper.jar.dontunpack"))), null, ctx).get(0);
             gradleWrapper.add(gradleWrapperJar);
         }

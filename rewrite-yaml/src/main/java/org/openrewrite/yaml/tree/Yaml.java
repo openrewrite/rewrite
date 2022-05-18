@@ -73,6 +73,9 @@ public interface Yaml extends Tree {
         Markers markers;
         Path sourcePath;
 
+        @Nullable
+        FileAttributes fileAttributes;
+
         @Nullable // for backwards compatibility
         @With(AccessLevel.PRIVATE)
         String charsetName;
@@ -102,7 +105,7 @@ public interface Yaml extends Tree {
         @Override
         public Documents copyPaste() {
             return new Documents(randomId(), Markers.EMPTY,
-                    sourcePath, charsetName, charsetBomMarked, checksum, documents.stream().map(Document::copyPaste).collect(toList()));
+                    sourcePath, fileAttributes, charsetName, charsetBomMarked, checksum, documents.stream().map(Document::copyPaste).collect(toList()));
         }
 
         /**

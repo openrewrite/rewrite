@@ -38,14 +38,15 @@ public class PlainText implements SourceFile, Tree {
 
     Path sourcePath;
 
+    @Nullable
+    FileAttributes fileAttributes;
+
     Markers markers;
 
     @Nullable // for backwards compatibility
     @With(AccessLevel.PRIVATE)
     String charsetName;
 
-    @With
-    @Getter
     boolean charsetBomMarked;
 
     @Override

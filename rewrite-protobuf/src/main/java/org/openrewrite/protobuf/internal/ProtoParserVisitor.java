@@ -19,6 +19,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Parser;
@@ -35,14 +36,18 @@ import static org.openrewrite.Tree.randomId;
 
 public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     private final Path path;
+
+    @Nullable
+    private final FileAttributes fileAttributes;
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
 
     private int cursor = 0;
 
-    public ProtoParserVisitor(Path path, String source, Charset charset, boolean charsetBomMarked) {
+    public ProtoParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
+        this.fileAttributes = fileAttributes;
         this.source = source;
         this.charset = charset;
         this.charsetBomMarked = charsetBomMarked;
@@ -325,6 +330,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         return new Proto.Document(
                 randomId(),
                 path,
+                fileAttributes,
                 syntax.getPrefix(),
                 Markers.EMPTY,
                 charset.name(),

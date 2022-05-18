@@ -63,6 +63,7 @@ public class ProtoParser implements Parser<Proto.Document> {
 
                         Proto.Document document = new ProtoParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
+                                sourceFile.getFileAttributes(),
                                 sourceStr,
                                 is.getCharset(),
                                 is.isCharsetBomMarked()

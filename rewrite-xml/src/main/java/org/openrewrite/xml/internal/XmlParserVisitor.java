@@ -19,6 +19,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
@@ -40,14 +41,18 @@ import static org.openrewrite.Tree.randomId;
 @SuppressWarnings("ConstantConditions")
 public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     private final Path path;
+
+    @Nullable
+    private final FileAttributes fileAttributes;
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
 
     private int cursor = 0;
 
-    public XmlParserVisitor(Path path, String source, Charset charset, boolean charsetBomMarked) {
+    public XmlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
+        this.fileAttributes = fileAttributes;
         this.source = source;
         this.charset = charset;
         this.charsetBomMarked = charsetBomMarked;
@@ -63,6 +68,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 charset.name(),
                 charsetBomMarked,
                 null,
+                fileAttributes,
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
                 source.substring(cursor))

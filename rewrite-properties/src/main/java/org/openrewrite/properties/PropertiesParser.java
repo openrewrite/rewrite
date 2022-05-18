@@ -19,6 +19,7 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -29,8 +30,6 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,7 +54,8 @@ public class PropertiesParser implements Parser<Properties.File> {
                             .tag("file.type", "Properties");
                     Timer.Sample sample = Timer.start();
                     try (EncodingDetectingInputStream is = sourceFile.getSource()) {
-                        Properties.File file = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
+                        Properties.File file = parseFromInput(sourceFile.getRelativePath(relativeTo), is)
+                                .withFileAttributes(sourceFile.getFileAttributes());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, file);
                         return file;
@@ -97,6 +97,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                 "",
                 Markers.EMPTY,
                 sourceFile,
+                FileAttributes.fromPath(sourceFile),
                 contents,
                 prefix.toString(),
                 source.getCharset().name(),

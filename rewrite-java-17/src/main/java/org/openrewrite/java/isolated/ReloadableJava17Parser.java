@@ -166,6 +166,7 @@ public class ReloadableJava17Parser implements JavaParser {
                     try {
                         ReloadableJava17ParserVisitor parser = new ReloadableJava17ParserVisitor(
                                 input.getRelativePath(relativeTo),
+                                input.getFileAttributes(),
                                 input.getSource(),
                                 styles,
                                 typeCache,

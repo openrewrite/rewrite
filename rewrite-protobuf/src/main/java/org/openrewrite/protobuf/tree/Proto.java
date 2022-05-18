@@ -166,6 +166,11 @@ public interface Proto extends Tree {
 
         @With
         @Getter
+        @Nullable
+        FileAttributes fileAttributes;
+
+        @With
+        @Getter
         Space prefix;
 
         @With
@@ -184,7 +189,6 @@ public interface Proto extends Tree {
         @Getter
         @Nullable
         Checksum checksum;
-
         @Override
         public Charset getCharset() {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
@@ -247,7 +251,7 @@ public interface Proto extends Tree {
             }
 
             public Document withBody(List<ProtoRightPadded<Proto>> body) {
-                return t.body == body ? t : new Document(t.id, t.sourcePath, t.prefix, t.markers, t.charsetName, t.charsetBomMarked, t.checksum, t.syntax, body, t.eof);
+                return t.body == body ? t : new Document(t.id, t.sourcePath, t.fileAttributes, t.prefix, t.markers, t.charsetName, t.charsetBomMarked, t.checksum, t.syntax, body, t.eof);
             }
         }
     }

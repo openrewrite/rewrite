@@ -20,6 +20,7 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jetbrains.annotations.NotNull;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
 import org.openrewrite.hcl.internal.grammar.HCLParserBaseVisitor;
 import org.openrewrite.hcl.tree.*;
@@ -44,13 +45,17 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     private final Charset charset;
     private final boolean charsetBomMarked;
 
+    @Nullable
+    private final FileAttributes fileAttributes;
+
     private int cursor = 0;
 
-    public HclParserVisitor(Path path, String source, Charset charset, boolean charsetBomMarked) {
+    public HclParserVisitor(Path path, String source, Charset charset, boolean charsetBomMarked, @Nullable FileAttributes fileAttributes) {
         this.path = path;
         this.source = source;
         this.charset = charset;
         this.charsetBomMarked = charsetBomMarked;
+        this.fileAttributes = fileAttributes;
     }
 
     @Override
@@ -207,6 +212,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         return convert(ctx, (c, prefix) -> new Hcl.ConfigFile(
                 randomId(),
                 path,
+                fileAttributes,
                 Space.format(prefix),
                 Markers.EMPTY,
                 charset.name(),

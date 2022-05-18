@@ -42,6 +42,7 @@ public class BinaryParser implements Parser<Binary> {
                     relativeTo == null ?
                             source.getPath() :
                             relativeTo.relativize(source.getPath()).normalize(),
+                    source.getFileAttributes(),
                     Markers.EMPTY,
                     null,
                     readAllBytes(source.getSource())));

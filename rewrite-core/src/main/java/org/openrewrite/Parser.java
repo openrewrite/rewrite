@@ -62,7 +62,7 @@ public interface Parser<S extends SourceFile> {
         return parseInputs(
                 Arrays.stream(sources).map(source ->
                         new Input(
-                                sourcePathFromSourceText(Paths.get(Long.toString(System.nanoTime())), source),
+                                sourcePathFromSourceText(Paths.get(Long.toString(System.nanoTime())), source), null,
                                 () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
                                 true
                         )
@@ -112,12 +112,20 @@ public interface Parser<S extends SourceFile> {
         private final Path path;
         private final Supplier<InputStream> source;
 
+        @Nullable
+        private final FileAttributes fileAttributes;
+
         public Input(Path path, Supplier<InputStream> source) {
-            this(path, source, false);
+            this(path, FileAttributes.fromPath(path), source, false);
         }
 
-        public Input(Path path, Supplier<InputStream> source, boolean synthetic) {
+        public Input(Path path, @Nullable FileAttributes fileAttributes, Supplier<InputStream> source) {
+            this(path, fileAttributes, source, false);
+        }
+
+        public Input(Path path, @Nullable FileAttributes fileAttributes, Supplier<InputStream> source, boolean synthetic) {
             this.path = path;
+            this.fileAttributes = fileAttributes;
             this.source = source;
             this.synthetic = synthetic;
         }
@@ -128,7 +136,7 @@ public interface Parser<S extends SourceFile> {
 
         public static Input fromString(String source, Charset charset) {
             return new Input(
-                    Paths.get(Long.toString(System.nanoTime())),
+                    Paths.get(Long.toString(System.nanoTime())), null,
                     () -> new ByteArrayInputStream(source.getBytes(charset)),
                     true
             );
@@ -136,7 +144,7 @@ public interface Parser<S extends SourceFile> {
 
         public static Input fromResource(String resource) {
             return new Input(
-                    Paths.get(Long.toString(System.nanoTime())),
+                    Paths.get(Long.toString(System.nanoTime())), null,
                     () -> Input.class.getResourceAsStream(resource),
                     true
             );
@@ -145,7 +153,7 @@ public interface Parser<S extends SourceFile> {
         public static List<Input> fromResource(String resource, String delimiter) {
             return Arrays.stream(StringUtils.readFully(Input.class.getResourceAsStream(resource)).split(delimiter))
                     .map(source -> new Parser.Input(
-                            Paths.get(Long.toString(System.nanoTime())),
+                            Paths.get(Long.toString(System.nanoTime())), null,
                             () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
                             true
                     ))
@@ -166,6 +174,11 @@ public interface Parser<S extends SourceFile> {
 
         public boolean isSynthetic() {
             return synthetic;
+        }
+
+        @Nullable
+        public FileAttributes getFileAttributes() {
+            return fileAttributes;
         }
 
         @Override

@@ -57,6 +57,7 @@ public class JsonParser implements Parser<Json.Document> {
 
                         Json.Document document = new JsonParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
+                                sourceFile.getFileAttributes(),
                                 sourceFile.getSource()
                         ).visitJson5(parser.json5());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));

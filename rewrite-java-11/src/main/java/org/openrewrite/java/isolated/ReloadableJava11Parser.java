@@ -166,6 +166,7 @@ public class ReloadableJava11Parser implements JavaParser {
                     try {
                         ReloadableJava11ParserVisitor parser = new ReloadableJava11ParserVisitor(
                                 input.getRelativePath(relativeTo),
+                                input.getFileAttributes(),
                                 input.getSource(),
                                 styles,
                                 typeCache,

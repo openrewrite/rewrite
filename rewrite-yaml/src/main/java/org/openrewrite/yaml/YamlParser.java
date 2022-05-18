@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
@@ -69,6 +70,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         Yaml.Documents yaml = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, yaml);
+                        yaml.withFileAttributes(sourceFile.getFileAttributes());
                         return yaml;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
@@ -315,7 +317,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 }
             }
 
-            return new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, source.getCharset().name(), source.isCharsetBomMarked(), null, documents);
+            return new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, documents);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -64,6 +64,12 @@ public interface Properties extends Tree {
         String prefix;
         Markers markers;
         Path sourcePath;
+
+        @With
+        @Getter
+        @Nullable
+        FileAttributes fileAttributes;
+
         List<Content> content;
         String eof;
 

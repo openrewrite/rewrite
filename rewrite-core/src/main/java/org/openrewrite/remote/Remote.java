@@ -132,6 +132,16 @@ public class Remote implements SourceFile {
     }
 
     @Override
+    public @Nullable FileAttributes getFileAttributes() {
+        throw new UnsupportedOperationException("Remote files do not have a file attributes.");
+    }
+
+    @Override
+    public SourceFile withFileAttributes(@Nullable FileAttributes fileAttributes) {
+        throw new UnsupportedOperationException("Remote files do not have a file attributes.");
+    }
+
+    @Override
     public <P> byte[] printAllAsBytes(P p) {
         //noinspection resource
         return new HttpUrlConnectionSender().get(uri.toString()).send().getBodyAsBytes();

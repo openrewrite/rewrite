@@ -153,8 +153,8 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         return parseInputs(
                 Arrays.stream(sources)
                         .map(sourceFile -> new Input(
-                                sourcePathFromSourceText(Paths.get(""), sourceFile),
-                                () -> new ByteArrayInputStream(sourceFile.getBytes(StandardCharsets.UTF_8))
+                                sourcePathFromSourceText(Paths.get(""), sourceFile), null,
+                                () -> new ByteArrayInputStream(sourceFile.getBytes(StandardCharsets.UTF_8)), true
                         ))
                         .collect(toList()),
                 null,
