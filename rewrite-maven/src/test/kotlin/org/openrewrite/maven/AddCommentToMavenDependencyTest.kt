@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest
 class AddCommentToMavenDependencyTest : RewriteTest {
 
     @Test
-    fun removeDependency() = rewriteRun(
+    fun addCommentToMavenDependency() = rewriteRun(
         { spec ->
             spec.recipe(
                 AddCommentToMavenDependency(
