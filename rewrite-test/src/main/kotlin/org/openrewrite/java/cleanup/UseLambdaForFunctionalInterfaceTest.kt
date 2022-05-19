@@ -98,4 +98,43 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun nestedLambdaInMethodArgument(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.Consumer;
+            
+            class Test {
+                void bar(Consumer<Integer> c) {
+                }
+                void foo() {
+                    bar(new Consumer<Integer>() {
+                        @Override
+                        public void accept(Integer i) {
+                            Object inner = new Consumer<Integer>() {
+                                @Override
+                                public void accept(Integer i2) {
+                                }
+                            };
+                        }
+                    });
+                }
+            }
+        """,
+        after = """
+            import java.util.function.Consumer;
+            
+            class Test {
+                void bar(Consumer<Integer> c) {
+                }
+                void foo() {
+                    bar(i -> {
+                        Object inner = i2 -> {
+                        };
+                    });
+                }
+            }
+        """
+    )
 }

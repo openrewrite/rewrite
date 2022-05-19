@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.Space
 import java.util.Comparator.comparing
 
-@Suppress("Convert2MethodRef")
+@Suppress("Convert2MethodRef", "UnnecessaryBoxing")
 interface JavaTemplateTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1339")
@@ -2072,6 +2072,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1821")
     @Test
     fun assignmentNotPartOfVariableDeclaration() = assertChanged(
         recipe = toRecipe {
