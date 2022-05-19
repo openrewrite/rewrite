@@ -133,19 +133,10 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        Binary gradleWrapperJar = new BinaryParser().parseInputs(singletonList(
-                new Parser.Input(Paths.get("gradle/wrapper/gradle-wrapper.jar"), null,
-                        () -> UpdateGradleWrapper.class.getResourceAsStream("/gradle-wrapper.jar.dontunpack"))),null, ctx).get(0);
-
-        return ListUtils.concat(
-                ListUtils.map(before, sourceFile -> {
-                    if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
-                        PlainText gradlew = (PlainText)sourceFile;
-                        String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"));
-                        if(!gradlewText.equals(gradlew.getText())) {
-                            gradlew = gradlew.withText(gradlewText);
-                        }
-                        return gradlew;
+        return ListUtils.map(before, sourceFile -> {
+                    if (sourceFile instanceof Quark && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
+                        // Gradle Wrappers are generated and customizable.
+                        // return a new TextFile having contents equal to a configuration option?
                     }
                     if (sourceFile instanceof Quark && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
                         URI remoteUri = distributionUrl != null ? URI.create(distributionUrl) : URI.create("https://services.gradle.org/distributions/gradle-" + DEFAULT_VERSION + "-bin.zip");
@@ -160,9 +151,7 @@ public class UpdateGradleWrapper extends Recipe {
                         return (Properties.File) new UpdateWrapperPropsVisitor().visitNonNull(sourceFile, ctx);
                     }
                     return sourceFile;
-                }),
-                gradleWrapperJar
-        );
+                });
     }
 
     private class UpdateWrapperPropsVisitor extends PropertiesVisitor<ExecutionContext> {
