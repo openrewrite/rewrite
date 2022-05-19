@@ -270,6 +270,12 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, "boolean __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");
             }
+        } else if(j instanceof J.Assignment) {
+            J.Assignment as = (J.Assignment)j;
+            if(prior == as.getAssignment()) {
+                before.insert(0, as.getVariable() + " = ");
+                after.append(";");
+            }
         }
         template(next(cursor), j, before, after, templated);
     }
