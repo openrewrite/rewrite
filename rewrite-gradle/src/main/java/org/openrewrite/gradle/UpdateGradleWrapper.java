@@ -25,11 +25,14 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
+import org.openrewrite.quark.Quark;
+import org.openrewrite.remote.Remote;
 import org.openrewrite.text.PlainText;
 
-import java.net.URL;
+import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Collections.singletonList;
@@ -130,14 +133,13 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        Path gradleWrapperJarPath = Paths.get("gradle/wrapper/gradle-wrapper.jar");
         Binary gradleWrapperJar = new BinaryParser().parseInputs(singletonList(
-                new Parser.Input(gradleWrapperJarPath, FileAttributes.fromPath(gradleWrapperJarPath),
+                new Parser.Input(Paths.get("gradle/wrapper/gradle-wrapper.jar"), null,
                         () -> UpdateGradleWrapper.class.getResourceAsStream("/gradle-wrapper.jar.dontunpack"))),null, ctx).get(0);
 
         return ListUtils.concat(
                 ListUtils.map(before, sourceFile -> {
-                    if(sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
+                    if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                         PlainText gradlew = (PlainText)sourceFile;
                         String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"));
                         if(!gradlewText.equals(gradlew.getText())) {
@@ -145,13 +147,14 @@ public class UpdateGradleWrapper extends Recipe {
                         }
                         return gradlew;
                     }
-                    if(sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
-                        PlainText gradlewBat = (PlainText)sourceFile;
-                        String gradlewBatText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat"));
-                        if(!gradlewBatText.equals(gradlewBat.getText())) {
-                            gradlewBat = gradlewBat.withText(gradlewBatText);
+                    if (sourceFile instanceof Quark && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
+                        URI remoteUri = distributionUrl != null ? URI.create(distributionUrl) : URI.create("https://services.gradle.org/distributions/gradle-" + DEFAULT_VERSION + "-bin.zip");
+                        URI remoteShaUri = URI.create(remoteUri.getPath() + ".sha256");
+                        Remote remote = Remote.builder(sourceFile, remoteUri).checksum("sha256", remoteShaUri).build();
+                        if (sourceFile.getChecksum() != null && remote.getChecksum() != null
+                                && !Arrays.equals(sourceFile.getChecksum().getValue(), remote.getChecksum().getValue())) {
+                            return remote;
                         }
-                        return gradlewBat;
                     }
                     if (sourceFile instanceof Properties.File) {
                         return (Properties.File) new UpdateWrapperPropsVisitor().visitNonNull(sourceFile, ctx);
