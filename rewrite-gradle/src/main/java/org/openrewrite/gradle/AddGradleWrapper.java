@@ -118,7 +118,8 @@ public class AddGradleWrapper extends Recipe {
         if (needsGradleShellScript) {
             URL wrapperScriptPath = AddGradleWrapper.class.getResource("/gradlew");
             FileAttributes wrapperScriptAttributes = wrapperScriptPath != null ? FileAttributes.fromPath(Paths.get(wrapperScriptPath.getPath())) : null;
-            PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, wrapperScriptAttributes, Markers.EMPTY, null, false, null,
+            PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY, null, false,
+                    wrapperScriptAttributes, null,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew")));
             gradleWrapper.add(gradlew);
         }
@@ -126,7 +127,8 @@ public class AddGradleWrapper extends Recipe {
         if (needsGradleBatchScript) {
             URL wrapperBatchUrl = AddGradleWrapper.class.getResource("/gradlew.bat");
             FileAttributes wrapperBatchAttributes = wrapperBatchUrl != null ? FileAttributes.fromPath(Paths.get(wrapperBatchUrl.getPath())) : null;
-            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, wrapperBatchAttributes, Markers.EMPTY,null, false, null,
+            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY,null, false,
+                    wrapperBatchAttributes, null,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")));
             gradleWrapper.add(gradlewBat);
         }

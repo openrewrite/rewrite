@@ -38,9 +38,6 @@ public class PlainText implements SourceFile, Tree {
 
     Path sourcePath;
 
-    @Nullable
-    FileAttributes fileAttributes;
-
     Markers markers;
 
     @Nullable // for backwards compatibility
@@ -58,6 +55,9 @@ public class PlainText implements SourceFile, Tree {
     public SourceFile withCharset(Charset charset) {
         return withCharsetName(charset.name());
     }
+
+    @Nullable
+    FileAttributes fileAttributes;
 
     @With
     @Getter

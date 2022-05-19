@@ -48,7 +48,7 @@ class RecipeLifecycleTest {
                     }
                 }
             }
-        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, Markers.EMPTY, null, false, null, "hello world")), ctx)
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null,"hello world")), ctx)
 
         assertThat(visited.get()).isEqualTo(0)
     }
@@ -66,7 +66,7 @@ class RecipeLifecycleTest {
             }
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
-                before + PlainText(randomId(), Paths.get("test.txt"), null, Markers.EMPTY, null, false, null, "test")
+                before + PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")
         }.run(emptyList())
 
         assertThat(results).isEmpty()
@@ -81,7 +81,7 @@ class RecipeLifecycleTest {
             }
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
-                before + PlainText(randomId(), Paths.get("test.txt"), null, Markers.EMPTY, null, false, null, "test")
+                before + PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")
         }.run(emptyList())
 
         assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }
@@ -99,7 +99,7 @@ class RecipeLifecycleTest {
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
                 emptyList<SourceFile>()
-        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, Markers.EMPTY, null, false, null, "test")))
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")))
 
         assertThat(results.map {
             it.recipesThatMadeChanges.map { r -> r.name }.first()
@@ -122,7 +122,7 @@ class RecipeLifecycleTest {
 
             }
 
-        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), null, Markers.EMPTY, null, false, null, "test")))
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")))
 
         assertThat(results.map {
             it.recipesThatMadeChanges.map { r -> r.name }.first()
@@ -169,7 +169,7 @@ class RecipeLifecycleTest {
     // https://github.com/openrewrite/rewrite/issues/389
     @Test
     fun sourceFilesAcceptOnlyApplicableVisitors() {
-        val sources = listOf(FooSource(), PlainText(randomId(), Paths.get("test.txt"), null, Markers.build(listOf()), null, false, null, "Hello"))
+        val sources = listOf(FooSource(), PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), null, false, null, null, "Hello"))
         val fooVisitor = FooVisitor<ExecutionContext>()
         val textVisitor = PlainTextVisitor<ExecutionContext>()
         val ctx = InMemoryExecutionContext {
@@ -183,7 +183,7 @@ class RecipeLifecycleTest {
 
     @Test
     fun accurateReportingOfRecipesMakingChanges() {
-        val sources = listOf(PlainText(randomId(), Paths.get("test.txt"), null, Markers.build(listOf()), null, false, null, "Hello"))
+        val sources = listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), null, false, null, null, "Hello"))
         // Set up a composite recipe which prepends "Change1" and appends "Change2" to the input text
         val recipe = object : Recipe() {
             override fun getDisplayName() = "root"
@@ -202,7 +202,7 @@ class RecipeLifecycleTest {
     @Test
     fun recipeDescriptorsReturnCorrectStructure() {
         val sources = listOf(
-            PlainText(randomId(), Paths.get("test.txt"), null, Markers.build(listOf()), null, false, null,"Hello")
+            PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), null, false, null, null,"Hello")
         )
         // Set up a composite recipe which with a nested structure of recipes
         val recipe = object : Recipe() {

@@ -97,13 +97,13 @@ public class PropertiesParser implements Parser<Properties.File> {
                 "",
                 Markers.EMPTY,
                 sourceFile,
-                FileAttributes.fromPath(sourceFile),
                 contents,
                 prefix.toString(),
                 source.getCharset().name(),
                 source.isCharsetBomMarked(),
+                FileAttributes.fromPath(sourceFile),
                 null
-        );
+                );
     }
 
     @Nullable

@@ -30,11 +30,10 @@ import java.util.UUID;
 public class Binary implements SourceFile, Tree {
     UUID id;
     Path sourcePath;
+    Markers markers;
 
     @Nullable
     FileAttributes fileAttributes;
-
-    Markers markers;
 
     @Nullable
     Checksum checksum;

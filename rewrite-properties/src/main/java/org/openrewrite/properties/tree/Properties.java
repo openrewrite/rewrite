@@ -65,11 +65,6 @@ public interface Properties extends Tree {
         Markers markers;
         Path sourcePath;
 
-        @With
-        @Getter
-        @Nullable
-        FileAttributes fileAttributes;
-
         List<Content> content;
         String eof;
 
@@ -77,12 +72,11 @@ public interface Properties extends Tree {
         @With(AccessLevel.PRIVATE)
         String charsetName;
 
-        @With
-        @Getter
         boolean charsetBomMarked;
 
-        @With
-        @Getter
+        @Nullable
+        FileAttributes fileAttributes;
+
         @Nullable
         Checksum checksum;
 

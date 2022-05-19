@@ -76,8 +76,8 @@ public class CreateTextFile extends Recipe {
         PlainText brandNewFile = parser.parse(fileContents).get(0);
 
         if (matchingFile != null) {
-            brandNewFile = new PlainText(matchingFile.getId(), brandNewFile.getSourcePath(), null, brandNewFile.getMarkers(),
-                    null, false, null, brandNewFile.getText());
+            brandNewFile = new PlainText(matchingFile.getId(), brandNewFile.getSourcePath(), brandNewFile.getMarkers(),
+                    null, false, null, null, brandNewFile.getText());
         }
 
         return ListUtils.concat(before, brandNewFile);

@@ -131,8 +131,9 @@ public class Remote implements SourceFile {
         throw new UnsupportedOperationException("Remote files do not have a character encoding.");
     }
 
+    @Nullable
     @Override
-    public @Nullable FileAttributes getFileAttributes() {
+    public FileAttributes getFileAttributes() {
         throw new UnsupportedOperationException("Remote files do not have a file attributes.");
     }
 

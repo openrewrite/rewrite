@@ -24,22 +24,25 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
-import java.util.Set;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Value
 public class FileAttributes {
 
     @Nullable
-    Set<PosixFilePermission> posixFilePermissions;
+    List<PosixFilePermission> posixFilePermissions;
 
     @Nullable
-    Long creationTime;
+    ZonedDateTime creationTime;
 
     @Nullable
-    Long lastModifiedTime;
+    ZonedDateTime lastModifiedTime;
 
     @Nullable
-    Long lastAccessTime;
+    ZonedDateTime lastAccessTime;
 
     @Nullable
     Long size;
@@ -48,9 +51,13 @@ public class FileAttributes {
     public static FileAttributes fromPath(Path path) {
         if (Files.exists(path)) {
             try {
-                Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS);
+                List<PosixFilePermission> permissions = new ArrayList<>(Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS));
                 BasicFileAttributes basicFileAttributes = Files.readAttributes(path, BasicFileAttributes.class);
-                return new FileAttributes(permissions, basicFileAttributes.creationTime().toMillis(), basicFileAttributes.lastAccessTime().toMillis(), basicFileAttributes.lastModifiedTime().toMillis(), basicFileAttributes.size());
+                return new FileAttributes(permissions,
+                        ZonedDateTime.from(basicFileAttributes.creationTime().toInstant().atZone(ZoneId.systemDefault())),
+                        ZonedDateTime.from(basicFileAttributes.lastAccessTime().toInstant().atZone(ZoneId.systemDefault())),
+                        ZonedDateTime.from(basicFileAttributes.lastModifiedTime().toInstant().atZone(ZoneId.systemDefault())),
+                        basicFileAttributes.size());
             } catch (IOException ignored) {}
         }
         return null;

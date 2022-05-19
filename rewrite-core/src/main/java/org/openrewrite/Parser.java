@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -112,6 +113,7 @@ public interface Parser<S extends SourceFile> {
         private final Path path;
         private final Supplier<InputStream> source;
 
+        @Getter
         @Nullable
         private final FileAttributes fileAttributes;
 
@@ -174,11 +176,6 @@ public interface Parser<S extends SourceFile> {
 
         public boolean isSynthetic() {
             return synthetic;
-        }
-
-        @Nullable
-        public FileAttributes getFileAttributes() {
-            return fileAttributes;
         }
 
         @Override
