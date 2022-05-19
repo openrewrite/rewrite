@@ -397,7 +397,7 @@ public class BlockStatementTemplateGenerator {
         return c.dropParentUntil(J.class::isInstance);
     }
 
-    private static boolean referToSameElement(Tree t1, Tree t2) {
-        return t1 == t2 || t1.getId().equals(t2.getId());
+    private static boolean referToSameElement(@Nullable Tree t1, @Nullable Tree t2) {
+        return t1 == t2 || (t1 != null && t2 != null && t1.getId().equals(t2.getId()));
     }
 }
