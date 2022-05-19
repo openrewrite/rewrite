@@ -71,7 +71,8 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
                                 sourceFile.getRelativePath(relativeTo),
                                 sourceStr,
                                 is.getCharset(),
-                                is.isCharsetBomMarked()
+                                is.isCharsetBomMarked(),
+                                sourceFile.getFileAttributes()
                         ).visitConfigFile(parser.configFile());
 
                         configFile = configFile.withMarkers(Markers.build(styles));

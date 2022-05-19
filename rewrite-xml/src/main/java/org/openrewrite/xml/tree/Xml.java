@@ -135,6 +135,11 @@ public interface Xml extends Tree {
         @Nullable
         Checksum checksum;
 
+        @With
+        @Getter
+        @Nullable
+        FileAttributes fileAttributes;
+
         @Override
         public Charset getCharset() {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
@@ -160,7 +165,7 @@ public interface Xml extends Tree {
             if (this.eof.equals(eof)) {
                 return this;
             }
-            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, prolog, root, eof);
+            return new Document(id, sourcePath, prefixUnsafe, markers, charsetName, charsetBomMarked, checksum, fileAttributes, prolog, root, eof);
         }
 
         @Override

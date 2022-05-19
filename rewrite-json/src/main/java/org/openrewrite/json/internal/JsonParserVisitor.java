@@ -18,6 +18,7 @@ package org.openrewrite.json.internal;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.internal.grammar.JSON5BaseVisitor;
@@ -42,10 +43,14 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     private final Charset charset;
     private final boolean charsetBomMarked;
 
+    @Nullable
+    private final FileAttributes fileAttributes;
+
     private int cursor = 0;
 
-    public JsonParserVisitor(Path path, EncodingDetectingInputStream source) {
+    public JsonParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
         this.path = path;
+        this.fileAttributes = fileAttributes;
         this.source = source.readFully();
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
@@ -92,6 +97,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 charset.name(),
                 charsetBomMarked,
                 null,
+                fileAttributes,
                 visitValue(c.value()),
                 Space.format(source.substring(cursor))
         ));

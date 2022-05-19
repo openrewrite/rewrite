@@ -44,8 +44,6 @@ public class PlainText implements SourceFile, Tree {
     @With(AccessLevel.PRIVATE)
     String charsetName;
 
-    @With
-    @Getter
     boolean charsetBomMarked;
 
     @Override
@@ -57,6 +55,9 @@ public class PlainText implements SourceFile, Tree {
     public SourceFile withCharset(Charset charset) {
         return withCharsetName(charset.name());
     }
+
+    @Nullable
+    FileAttributes fileAttributes;
 
     @With
     @Getter

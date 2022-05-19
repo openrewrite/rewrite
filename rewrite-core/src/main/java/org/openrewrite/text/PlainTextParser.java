@@ -39,6 +39,7 @@ public class PlainTextParser implements Parser<PlainText> {
                     Markers.EMPTY,
                     source.getSource().getCharset().name(),
                     source.getSource().isCharsetBomMarked(),
+                    source.getFileAttributes(),
                     null,
                     source.getSource().readFully()));
         }

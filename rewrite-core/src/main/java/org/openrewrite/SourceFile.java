@@ -44,6 +44,11 @@ public interface SourceFile extends Tree {
 
     SourceFile withChecksum(@Nullable Checksum checksum);
 
+    @Nullable
+    FileAttributes getFileAttributes();
+
+    SourceFile withFileAttributes(@Nullable FileAttributes fileAttributes);
+
     Markers getMarkers();
 
     <T extends SourceFile> T withMarkers(Markers markers);

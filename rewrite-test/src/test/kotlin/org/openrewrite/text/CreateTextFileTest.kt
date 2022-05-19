@@ -41,7 +41,7 @@ class CreateTextFileTest : RecipeTest<PlainText> {
     @Test
     fun hasOverwrittenFile() {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERS", true)
-        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY,null, false, null, "hello")))
+        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY,null, false, null, null, "hello")))
 
         assertThat(results).hasSize(1)
         assertThat(results[0].after!!.printAll()).isEqualTo("foo")
@@ -50,7 +50,7 @@ class CreateTextFileTest : RecipeTest<PlainText> {
     @Test
     fun shouldNotChangeExistingFile() {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERS", false)
-        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, null, false, null, "hello")))
+        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY, null, false, null, null, "hello")))
 
         assertThat(results).hasSize(0)
     }
@@ -58,7 +58,7 @@ class CreateTextFileTest : RecipeTest<PlainText> {
     @Test
     fun shouldNotChangeExistingFileWhenOverwriteNull() {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERS", null)
-        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY,null, false, null, "hello")))
+        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY,null, false, null, null, "hello")))
 
         assertThat(results).hasSize(0)
     }
@@ -66,7 +66,7 @@ class CreateTextFileTest : RecipeTest<PlainText> {
     @Test
     fun shouldAddAnotherFile() {
         val overwriteRecipe: Recipe = CreateTextFile("foo", ".github/CODEOWNERSZ", false)
-        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY,null, false, null,"hello")))
+        val results = overwriteRecipe.run(listOf(PlainText(Tree.randomId(), Paths.get(".github/CODEOWNERS"), Markers.EMPTY,null, false, null,null, "hello")))
 
         assertThat(results).hasSize(1)
         assertThat(results[0].after!!.printAll()).isEqualTo("foo")

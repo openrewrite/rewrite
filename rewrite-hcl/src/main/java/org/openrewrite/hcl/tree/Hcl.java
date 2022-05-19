@@ -486,6 +486,10 @@ public interface Hcl extends Tree {
         Path sourcePath;
 
         @With
+        @Nullable
+        FileAttributes fileAttributes;
+
+        @With
         Space prefix;
 
         @With

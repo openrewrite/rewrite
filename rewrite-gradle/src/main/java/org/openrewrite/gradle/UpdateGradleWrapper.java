@@ -27,6 +27,7 @@ import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.text.PlainText;
 
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -129,9 +130,10 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+        Path gradleWrapperJarPath = Paths.get("gradle/wrapper/gradle-wrapper.jar");
         Binary gradleWrapperJar = new BinaryParser().parseInputs(singletonList(
-                new Parser.Input(Paths.get("gradle/wrapper/gradle-wrapper.jar"),
-                        () -> UpdateGradleWrapper.class.getResourceAsStream("/gradle-wrapper.jar.dontunpack"))), null, ctx).get(0);
+                new Parser.Input(gradleWrapperJarPath, FileAttributes.fromPath(gradleWrapperJarPath),
+                        () -> UpdateGradleWrapper.class.getResourceAsStream("/gradle-wrapper.jar.dontunpack"))),null, ctx).get(0);
 
         return ListUtils.concat(
                 ListUtils.map(before, sourceFile -> {

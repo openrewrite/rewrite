@@ -27,6 +27,7 @@ import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -56,6 +57,8 @@ import static org.openrewrite.java.tree.Space.format;
  */
 public class GroovyParserVisitor {
     private final Path sourcePath;
+    @Nullable
+    private final FileAttributes fileAttributes;
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
@@ -67,8 +70,9 @@ public class GroovyParserVisitor {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public GroovyParserVisitor(Path sourcePath, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
+    public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
+        this.fileAttributes = fileAttributes;
         this.source = source.readFully();
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
@@ -150,6 +154,7 @@ public class GroovyParserVisitor {
                 Space.EMPTY,
                 Markers.EMPTY,
                 sourcePath,
+                fileAttributes,
                 charset.name(),
                 charsetBomMarked,
                 null,

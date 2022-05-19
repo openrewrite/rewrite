@@ -28,6 +28,7 @@ import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.text.PlainText;
 
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -115,20 +116,26 @@ public class AddGradleWrapper extends Recipe {
         }
 
         if (needsGradleShellScript) {
-            PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY, null, false, null,
+            FileAttributes wrapperScriptAttributes = FileAttributes.fromPath(WRAPPER_SCRIPT_LOCATION);
+            PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY, null, false,
+                    wrapperScriptAttributes, null,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew")));
             gradleWrapper.add(gradlew);
         }
 
         if (needsGradleBatchScript) {
-            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY,null, false, null,
+            FileAttributes wrapperBatchAttributes = FileAttributes.fromPath(WRAPPER_BATCH_LOCATION);
+            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY,null, false,
+                    wrapperBatchAttributes, null,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")));
             gradleWrapper.add(gradlewBat);
         }
 
         if (needsGradleWrapperProperties || needsGradleShellScript || needsGradleBatchScript) {
+            FileAttributes wrapperJarAttributes = FileAttributes.fromPath(WRAPPER_JAR_LOCATION);
+
             Binary gradleWrapperJar = new BinaryParser().parseInputs(singletonList(
-                    new Parser.Input(WRAPPER_JAR_LOCATION,
+                    new Parser.Input(WRAPPER_JAR_LOCATION, wrapperJarAttributes,
                             () -> AddGradleWrapper.class.getResourceAsStream("/gradle-wrapper.jar.dontunpack"))), null, ctx).get(0);
             gradleWrapper.add(gradleWrapperJar);
         }

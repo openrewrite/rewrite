@@ -24,6 +24,7 @@ import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
 import org.junit.jupiter.api.Disabled;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;

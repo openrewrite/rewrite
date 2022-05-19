@@ -17,10 +17,7 @@ package org.openrewrite.binary;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.Checksum;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -34,6 +31,9 @@ public class Binary implements SourceFile, Tree {
     UUID id;
     Path sourcePath;
     Markers markers;
+
+    @Nullable
+    FileAttributes fileAttributes;
 
     @Nullable
     Checksum checksum;

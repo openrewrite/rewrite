@@ -80,8 +80,9 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
                             Path path = Paths.get(pkg + className);
                             return new Input(
-                                    path,
-                                    () -> new ByteArrayInputStream(sourceFile.getBytes(StandardCharsets.UTF_8))
+                                    path, null,
+                                    () -> new ByteArrayInputStream(sourceFile.getBytes(StandardCharsets.UTF_8)),
+                                    true
                             );
                         })
                         .collect(toList()),
@@ -100,6 +101,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             try {
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                         compiled.getInput().getPath(),
+                        compiled.getInput().getFileAttributes(),
                         compiled.getInput().getSource(),
                         typeCache,
                         ctx

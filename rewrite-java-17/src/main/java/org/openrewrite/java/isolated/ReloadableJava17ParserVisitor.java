@@ -27,6 +27,7 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -70,6 +71,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     private final static int SURR_LAST = 0xDFFF;
 
     private final Path sourcePath;
+
+    @Nullable
+    private final FileAttributes fileAttributes;
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
@@ -90,12 +94,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava17ParserVisitor(Path sourcePath,
+                                         @Nullable FileAttributes fileAttributes,
                                          EncodingDetectingInputStream source,
                                          Collection<NamedStyles> styles,
                                          JavaTypeCache typeCache,
                                          ExecutionContext ctx,
                                          Context context) {
         this.sourcePath = sourcePath;
+        this.fileAttributes = fileAttributes;
         this.source = source.readFully();
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
@@ -501,6 +507,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 fmt,
                 Markers.build(styles),
                 sourcePath,
+                fileAttributes,
                 charset.name(),
                 charsetBomMarked,
                 null,

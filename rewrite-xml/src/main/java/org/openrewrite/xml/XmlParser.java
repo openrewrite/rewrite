@@ -61,6 +61,7 @@ public class XmlParser implements Parser<Xml.Document> {
 
                         Xml.Document document = new XmlParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
+                                sourceFile.getFileAttributes(),
                                 sourceStr,
                                 is.getCharset(),
                                 is.isCharsetBomMarked()

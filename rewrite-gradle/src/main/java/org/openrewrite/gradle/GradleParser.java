@@ -59,7 +59,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
         Iterable<Input> gradleWrapped = StreamSupport.stream(sources.spliterator(), false)
                 .map(source ->
                         new Parser.Input(
-                                source.getPath(),
+                                source.getPath(), source.getFileAttributes(),
                                 () -> new SequenceInputStream(
                                         Collections.enumeration(Arrays.asList(
                                                 new ByteArrayInputStream(PREAMBLE),

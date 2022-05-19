@@ -111,7 +111,8 @@ public class QuarkParser implements Parser<Quark> {
                             source.getPath() :
                             relativeTo.relativize(source.getPath()).normalize(),
                     Markers.EMPTY,
-                    null));
+                    null,
+                    source.getFileAttributes()));
         }
         return quarks;
     }

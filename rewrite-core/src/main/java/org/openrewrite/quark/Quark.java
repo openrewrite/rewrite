@@ -35,6 +35,9 @@ public class Quark implements SourceFile {
     @Nullable
     Checksum checksum;
 
+    @Nullable
+    FileAttributes fileAttributes;
+
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return true;
