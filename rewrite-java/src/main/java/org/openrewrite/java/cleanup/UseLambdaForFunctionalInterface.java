@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
@@ -55,7 +54,8 @@ public class UseLambdaForFunctionalInterface extends Recipe {
     public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
-            public J visitNewClass(J.NewClass n, ExecutionContext ctx) {
+            public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                J.NewClass n = (J.NewClass) super.visitNewClass(newClass, ctx);
                 if (n.getBody() != null &&
                         n.getBody().getStatements().size() == 1 &&
                         n.getBody().getStatements().get(0) instanceof J.MethodDeclaration &&
@@ -109,10 +109,10 @@ public class UseLambdaForFunctionalInterface extends Recipe {
 
                         lambda = (J.Lambda) new LambdaBlockToExpression().getVisitor().visitNonNull(lambda, ctx);
 
-                        return super.visitLambda(autoFormat(lambda, ctx, getCursor().getParentOrThrow()), ctx);
+                        return autoFormat(lambda, ctx, getCursor().getParentOrThrow());
                     }
                 }
-                return super.visitNewClass(n, ctx);
+                return n;
             }
 
             private String valueOfType(@Nullable JavaType type) {
