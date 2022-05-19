@@ -2071,4 +2071,41 @@ interface JavaTemplateTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun assignmentNotPartOfVariableDeclaration() = assertChanged(
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                override fun visitAssignment(assignment: J.Assignment, p: ExecutionContext): J.Assignment {
+                    var a = assignment
+
+                    if(a.assignment is J.MethodInvocation) {
+                        val mi = a.assignment as J.MethodInvocation
+                        a = a.withAssignment(mi.withTemplate(
+                            JavaTemplate.builder(this::getCursor, "1")
+                                .build(),
+                            mi.coordinates.replace()
+                        ))
+                    }
+                    return a
+                }
+            }
+        },
+        before = """
+            class A {
+                void foo() {
+                    int i;
+                    i = Integer.valueOf(1);
+                }
+            }
+        """,
+        after = """
+            class A {
+                void foo() {
+                    int i;
+                    i = 1;
+                }
+            }
+        """
+    )
 }

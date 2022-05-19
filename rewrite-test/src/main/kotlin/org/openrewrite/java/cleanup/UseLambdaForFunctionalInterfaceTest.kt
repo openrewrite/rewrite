@@ -68,4 +68,34 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun emptyLambda(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.Consumer;
+            
+            class Test {
+                void foo() {
+                    Consumer<Integer> s;
+                    s = new Consumer<Integer>() {
+                        @Override
+                        public void accept(Integer i) {
+                        }
+                    };
+                }
+            }
+        """,
+        after = """
+            import java.util.function.Consumer;
+            
+            class Test {
+                void foo() {
+                    Consumer<Integer> s;
+                    s = i -> {
+                    };
+                }
+            }
+        """
+    )
 }
