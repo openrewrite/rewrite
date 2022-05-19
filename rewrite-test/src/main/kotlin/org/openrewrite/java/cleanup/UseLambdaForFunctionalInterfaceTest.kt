@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -94,6 +95,46 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
                     Consumer<Integer> s;
                     s = i -> {
                     };
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1828")
+    @Test
+    fun nestedLambdaInMethodArgument(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.Consumer;
+            
+            class Test {
+                void bar(Consumer<Integer> c) {
+                }
+                void foo() {
+                    bar(new Consumer<Integer>() {
+                        @Override
+                        public void accept(Integer i) {
+                            bar(new Consumer<Integer>() {
+                                @Override
+                                public void accept(Integer i2) {
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+        """,
+        after = """
+            import java.util.function.Consumer;
+            
+            class Test {
+                void bar(Consumer<Integer> c) {
+                }
+                void foo() {
+                    bar(i -> {
+                        bar(i2 -> {
+                        });
+                    });
                 }
             }
         """

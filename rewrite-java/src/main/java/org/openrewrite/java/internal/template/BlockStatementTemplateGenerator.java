@@ -161,7 +161,7 @@ public class BlockStatementTemplateGenerator {
                 // variable declarations up to the point of insertion
                 assert m.getBody() != null;
                 for (Statement statement : m.getBody().getStatements()) {
-                    if (statement == prior) {
+                    if (referToSameElement(prior, statement)) {
                         break;
                     } else if (statement instanceof J.VariableDeclarations) {
                         before.insert(0, "\n" +
@@ -187,7 +187,7 @@ public class BlockStatementTemplateGenerator {
 
                 // variable declarations up to the point of insertion
                 for (Statement statement : b.getStatements()) {
-                    if (statement == prior) {
+                    if (referToSameElement(prior, statement)) {
                         break;
                     } else if (statement instanceof J.VariableDeclarations) {
                         before.insert(0, "\n" +
@@ -210,7 +210,7 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
-            if (n.getArguments() != null && n.getArguments().stream().noneMatch(arg -> arg == prior)) {
+            if (n.getArguments() != null && n.getArguments().stream().noneMatch(arg -> referToSameElement(prior, arg))) {
                 n = n.withBody(null).withPrefix(Space.EMPTY);
                 before.insert(0, n.printTrimmed(cursor).trim());
                 after.append(';');
@@ -246,14 +246,14 @@ public class BlockStatementTemplateGenerator {
             // If prior is a type parameter, wrap in __M__.anyT<prior>()
             // For anything else, ignore the invocation
             J.MethodInvocation m = (J.MethodInvocation) j;
-            if(m.getArguments().stream().anyMatch(arg -> arg == prior)) {
+            if(m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 before.insert(0, "__M__.any(");
                 if(cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
                     after.append(");");
                 } else {
                     after.append(")");
                 }
-            } else if(m.getTypeParameters() != null && m.getTypeParameters().stream().anyMatch(tp -> tp == prior)) {
+            } else if(m.getTypeParameters() != null && m.getTypeParameters().stream().anyMatch(tp -> referToSameElement(prior, tp))) {
                 before.insert(0, "__M__.anyT<");
                 if(cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
                     after.append(">();");
@@ -266,13 +266,13 @@ public class BlockStatementTemplateGenerator {
             after.append(";");
         } else if(j instanceof J.If) {
             J.If iff = (J.If)j;
-            if(prior == iff.getIfCondition()) {
+            if(referToSameElement(prior, iff.getIfCondition())) {
                 before.insert(0, "boolean __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");
             }
         } else if(j instanceof J.Assignment) {
             J.Assignment as = (J.Assignment)j;
-            if(prior == as.getAssignment()) {
+            if(referToSameElement(prior, as.getAssignment())) {
                 before.insert(0, as.getVariable() + " = ");
                 after.append(";");
             }
@@ -293,7 +293,7 @@ public class BlockStatementTemplateGenerator {
             if (statement instanceof J.VariableDeclarations) {
                 before.insert(0, variable((J.VariableDeclarations) statement, false, cursor) + ";\n");
             } else if (statement instanceof J.MethodDeclaration) {
-                if (statement != prior) {
+                if (!referToSameElement(statement, prior)) {
                     before.insert(0, method((J.MethodDeclaration) statement, cursor));
                 }
             } else if (statement instanceof J.ClassDeclaration) {
@@ -395,5 +395,9 @@ public class BlockStatementTemplateGenerator {
 
     private Cursor next(Cursor c) {
         return c.dropParentUntil(J.class::isInstance);
+    }
+
+    private static boolean referToSameElement(@Nullable Tree t1, @Nullable Tree t2) {
+        return t1 == t2 || (t1 != null && t2 != null && t1.getId().equals(t2.getId()));
     }
 }
