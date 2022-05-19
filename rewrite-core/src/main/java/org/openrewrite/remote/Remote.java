@@ -19,10 +19,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Checksum;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.binary.BinaryVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -131,8 +128,8 @@ public class Remote implements SourceFile {
         throw new UnsupportedOperationException("Remote files do not have a character encoding.");
     }
 
-    @Nullable
     @Override
+    @Nullable
     public FileAttributes getFileAttributes() {
         throw new UnsupportedOperationException("Remote files do not have a file attributes.");
     }
