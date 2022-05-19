@@ -18,6 +18,7 @@ package org.openrewrite.remote;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.Checksum;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -29,13 +30,8 @@ import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -62,6 +58,16 @@ public class Remote implements SourceFile {
     @With
     @Getter
     URI uri;
+
+    /**
+     * Any text describing what this remote URI represents. This will only
+     * be used to present results to an end user in a way that is more human
+     * readable then just a raw URI.
+     */
+    @With
+    @Getter
+    @Language("markdown")
+    String description;
 
     @Getter
     @With
@@ -172,6 +178,10 @@ public class Remote implements SourceFile {
         @Nullable
         private String checksumAlgorithm;
 
+        @Nullable
+        @Language("markdown")
+        private String description;
+
         Builder(UUID id, Path sourcePath, Markers markers, URI uri) {
             this.id = id;
             this.sourcePath = sourcePath;
@@ -185,8 +195,13 @@ public class Remote implements SourceFile {
             return this;
         }
 
+        public Builder description(@Language("markdown") String description) {
+            this.description = description;
+            return this;
+        }
+
         public Remote build() {
-            return new Remote(id, sourcePath, markers, uri, checksumUri, checksumAlgorithm);
+            return new Remote(id, sourcePath, markers, uri, description, checksumUri, checksumAlgorithm);
         }
     }
 }
