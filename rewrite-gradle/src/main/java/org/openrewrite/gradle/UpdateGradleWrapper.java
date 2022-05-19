@@ -130,10 +130,9 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        URL wrapperJarUrl = AddGradleWrapper.class.getResource("/gradle-wrapper.jar.dontunpack");
-        FileAttributes wrapperJarAttributes = wrapperJarUrl != null ? FileAttributes.fromPath(Paths.get(wrapperJarUrl.getPath())) : null;
+        Path gradleWrapperJarPath = Paths.get("gradle/wrapper/gradle-wrapper.jar");
         Binary gradleWrapperJar = new BinaryParser().parseInputs(singletonList(
-                new Parser.Input(Paths.get("gradle/wrapper/gradle-wrapper.jar"), wrapperJarAttributes,
+                new Parser.Input(gradleWrapperJarPath, FileAttributes.fromPath(gradleWrapperJarPath),
                         () -> UpdateGradleWrapper.class.getResourceAsStream("/gradle-wrapper.jar.dontunpack"))),null, ctx).get(0);
 
         return ListUtils.concat(

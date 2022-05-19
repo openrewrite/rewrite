@@ -116,8 +116,7 @@ public class AddGradleWrapper extends Recipe {
         }
 
         if (needsGradleShellScript) {
-            URL wrapperScriptPath = AddGradleWrapper.class.getResource("/gradlew");
-            FileAttributes wrapperScriptAttributes = wrapperScriptPath != null ? FileAttributes.fromPath(Paths.get(wrapperScriptPath.getPath())) : null;
+            FileAttributes wrapperScriptAttributes = FileAttributes.fromPath(WRAPPER_SCRIPT_LOCATION);
             PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY, null, false,
                     wrapperScriptAttributes, null,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew")));
@@ -125,8 +124,7 @@ public class AddGradleWrapper extends Recipe {
         }
 
         if (needsGradleBatchScript) {
-            URL wrapperBatchUrl = AddGradleWrapper.class.getResource("/gradlew.bat");
-            FileAttributes wrapperBatchAttributes = wrapperBatchUrl != null ? FileAttributes.fromPath(Paths.get(wrapperBatchUrl.getPath())) : null;
+            FileAttributes wrapperBatchAttributes = FileAttributes.fromPath(WRAPPER_BATCH_LOCATION);
             PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY,null, false,
                     wrapperBatchAttributes, null,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")));
@@ -134,8 +132,7 @@ public class AddGradleWrapper extends Recipe {
         }
 
         if (needsGradleWrapperProperties || needsGradleShellScript || needsGradleBatchScript) {
-            URL wrapperJarUrl = AddGradleWrapper.class.getResource("/gradle-wrapper.jar.dontunpack");
-            FileAttributes wrapperJarAttributes = wrapperJarUrl != null ? FileAttributes.fromPath(Paths.get(wrapperJarUrl.getPath())) : null;
+            FileAttributes wrapperJarAttributes = FileAttributes.fromPath(WRAPPER_JAR_LOCATION);
 
             Binary gradleWrapperJar = new BinaryParser().parseInputs(singletonList(
                     new Parser.Input(WRAPPER_JAR_LOCATION, wrapperJarAttributes,
