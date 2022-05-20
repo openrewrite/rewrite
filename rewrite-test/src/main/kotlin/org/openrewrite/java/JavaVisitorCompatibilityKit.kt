@@ -48,6 +48,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class AddSerialVersionUidToSerializableTck : AddSerialVersionUidToSerializableTest
 
     @Nested
+    inner class ArrayHashCodeAndToStringTck : ArrayHashCodeAndToStringTest
+
+    @Nested
     inner class AnnotationTemplateGeneratorTck : AnnotationTemplateGeneratorTest
 
     @Nested
@@ -112,6 +115,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class CovariantEqualsTck : CovariantEqualsTest
+
+    @Nested
+    inner class DateFormatWeekYearTck : DateFormatWeekYearTest
 
     @Nested
     inner class DefaultComesLastTck : DefaultComesLastTest
