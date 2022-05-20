@@ -31,32 +31,31 @@ import java.util.List;
 
 @Value
 public class FileAttributes {
-
-    @Nullable
-    List<PosixFilePermission> posixFilePermissions;
-
-    @Nullable
     ZonedDateTime creationTime;
 
-    @Nullable
     ZonedDateTime lastModifiedTime;
 
-    @Nullable
     ZonedDateTime lastAccessTime;
 
-    @Nullable
-    Long size;
+    boolean isReadable;
+
+    boolean isWritable;
+
+    boolean isExecutable;
+
+    long size;
 
     @Nullable
     public static FileAttributes fromPath(Path path) {
         if (Files.exists(path)) {
             try {
-                List<PosixFilePermission> permissions = new ArrayList<>(Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS));
                 BasicFileAttributes basicFileAttributes = Files.readAttributes(path, BasicFileAttributes.class);
-                return new FileAttributes(permissions,
-                        ZonedDateTime.from(basicFileAttributes.creationTime().toInstant().atZone(ZoneId.systemDefault())),
+                return new FileAttributes(ZonedDateTime.from(basicFileAttributes.creationTime().toInstant().atZone(ZoneId.systemDefault())),
                         ZonedDateTime.from(basicFileAttributes.lastAccessTime().toInstant().atZone(ZoneId.systemDefault())),
                         ZonedDateTime.from(basicFileAttributes.lastModifiedTime().toInstant().atZone(ZoneId.systemDefault())),
+                        Files.isReadable(path),
+                        Files.isWritable(path),
+                        Files.isExecutable(path),
                         basicFileAttributes.size());
             } catch (IOException ignored) {}
         }
