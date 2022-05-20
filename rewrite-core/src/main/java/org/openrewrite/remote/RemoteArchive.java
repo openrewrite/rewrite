@@ -20,6 +20,7 @@ import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.Checksum;
+import org.openrewrite.PathUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.Markers;
@@ -65,7 +66,7 @@ public class RemoteArchive implements Remote {
         try {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
-                if (entry.getName().equals(path.toString())) {
+                if (PathUtils.equalIgnoringSeparators(entry.getName(), path.toString())) {
                     return new InputStream() {
                         @Override
                         public int read() throws IOException {

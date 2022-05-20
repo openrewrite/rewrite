@@ -41,4 +41,23 @@ public class PathUtils {
 
         return true;
     }
+
+    /**
+     * Compare two strings representing file paths, returning tre if they indicate the same path regardless of separators
+     */
+    public static boolean equalIgnoringSeparators(String a , String b) {
+        String[] aSegments = a.split("[\\\\/]+");
+        String[] bSegments = b.split("[\\\\/]+");
+
+        if(aSegments.length != bSegments.length) {
+            return false;
+        }
+        for(int i = 0; i < aSegments.length; i++) {
+            if(!aSegments[i].equals(bSegments[i])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
