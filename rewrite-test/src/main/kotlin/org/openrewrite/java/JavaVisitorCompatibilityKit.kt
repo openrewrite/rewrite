@@ -255,6 +255,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class LambdaBlockToExpressionTck : LambdaBlockToExpressionTest
 
     @Nested
+    inner class LowercasePackageTck: LowercasePackageTest
+
+    @Nested
     inner class LineCounterTck : LineCounterTest
 
     @Nested
