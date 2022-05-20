@@ -102,7 +102,7 @@ interface UseStaticImportTest : JavaRecipeTest {
                     p: ExecutionContext
                 ): J.MethodInvocation {
                     val mi = super.visitMethodInvocation(method, p)
-                    return mi.withDeclaringType(JavaType.Class.build("asserts.Assert"))
+                    return mi.withDeclaringType(JavaType.ShallowClass.build("asserts.Assert"))
                 }
 
                 override fun visitCompilationUnit(cu: J.CompilationUnit, p: ExecutionContext): J.CompilationUnit {

@@ -119,7 +119,7 @@ public class AnnotationMatcher {
                 if ("class".equals(fa.getSimpleName()) && matchText.endsWith(".class")) {
                     JavaType argType = fa.getTarget().getType();
                     if (argType instanceof JavaType.FullyQualified) {
-                        String queryTypeFqn = JavaType.Class.build(matchText.replaceAll("\\.class$", "")).getFullyQualifiedName();
+                        String queryTypeFqn = JavaType.ShallowClass.build(matchText.replaceAll("\\.class$", "")).getFullyQualifiedName();
                         String targetTypeFqn = ((JavaType.FullyQualified) argType).getFullyQualifiedName();
                         return queryTypeFqn.equals(targetTypeFqn);
                     }

@@ -35,17 +35,17 @@ interface MethodMatcherTest {
         assertTrue(MethodMatcher("java.util.Collection size()", true).matchesTargetType(listType))
         assertFalse(MethodMatcher("java.util.Collection size()").matchesTargetType(listType))
         // ensuring subtypes do not match parents, regardless of matchOverrides
-        assertFalse(MethodMatcher("java.util.List size()", true).matchesTargetType(JavaType.Class.build("java.util.Collection")))
-        assertFalse(MethodMatcher("java.util.List size()").matchesTargetType(JavaType.Class.build("java.util.Collection")))
+        assertFalse(MethodMatcher("java.util.List size()", true).matchesTargetType(JavaType.ShallowClass.build("java.util.Collection")))
+        assertFalse(MethodMatcher("java.util.List size()").matchesTargetType(JavaType.ShallowClass.build("java.util.Collection")))
     }
 
     @Test
     fun matchesSuperclassTypeOfClasses(jp: JavaParser) {
-        assertTrue(MethodMatcher("Object equals(Object)", true).matchesTargetType(JavaType.Class.build("java.lang.String")))
-        assertFalse(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.Class.build("java.lang.String")))
+        assertTrue(MethodMatcher("Object equals(Object)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
+        assertFalse(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
         // ensuring subtypes do not match parents, regardless of matchOverrides
-        assertFalse(MethodMatcher("String equals(String)", true).matchesTargetType(JavaType.Class.build("java.lang.Object")))
-        assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.Class.build("java.lang.Object")))
+        assertFalse(MethodMatcher("String equals(String)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
+        assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
     }
 
     @Test
@@ -113,11 +113,11 @@ interface MethodMatcherTest {
 
     @Test
     fun matchesSuperclassArgumentTypes(jp: JavaParser) {
-        assertTrue(MethodMatcher("Object equals(Object)", true).matchesTargetType(JavaType.Class.build("java.lang.String")))
-        assertFalse(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.Class.build("java.lang.String")))
+        assertTrue(MethodMatcher("Object equals(Object)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
+        assertFalse(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
         // ensuring subtypes do not match parents, regardless of matchOverrides
-        assertFalse(MethodMatcher("String equals(String)", true).matchesTargetType(JavaType.Class.build("java.lang.Object")))
-        assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.Class.build("java.lang.Object")))
+        assertFalse(MethodMatcher("String equals(String)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
+        assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
     }
 
     @Test
@@ -265,7 +265,7 @@ interface MethodMatcherTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/629")
     @Test
     fun wildcardType(jp: JavaParser) {
-        assertTrue(MethodMatcher("*..* build()").matchesTargetType(JavaType.Class.build("javax.ws.rs.core.Response")))
-        assertTrue(MethodMatcher("javax..* build()").matchesTargetType(JavaType.Class.build("javax.ws.rs.core.Response")))
+        assertTrue(MethodMatcher("*..* build()").matchesTargetType(JavaType.ShallowClass.build("javax.ws.rs.core.Response")))
+        assertTrue(MethodMatcher("javax..* build()").matchesTargetType(JavaType.ShallowClass.build("javax.ws.rs.core.Response")))
     }
 }

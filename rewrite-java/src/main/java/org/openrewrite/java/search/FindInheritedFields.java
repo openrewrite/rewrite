@@ -69,7 +69,7 @@ public class FindInheritedFields {
         if (type instanceof JavaType.Array) {
             return hasElementTypeAssignable(((JavaType.Array) type).getElemType(), fullyQualifiedName);
         } else if (type instanceof JavaType.Class) {
-            return TypeUtils.isAssignableTo(JavaType.Class.build(fullyQualifiedName), type);
+            return TypeUtils.isAssignableTo(JavaType.ShallowClass.build(fullyQualifiedName), type);
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
             for (JavaType bound : generic.getBounds()) {

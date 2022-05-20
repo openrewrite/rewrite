@@ -23,6 +23,7 @@ import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -80,8 +81,13 @@ public class Result {
         List<RecipeDescriptor> recipesToDisplay = new ArrayList<>();
 
         for (Stack<Recipe> currentStack : recipes) {
-            // The first recipe is an Environment.CompositeRecipe and should not be included in the list of RecipeDescriptors
-            Recipe root = currentStack.get(1);
+            Recipe root;
+            if(currentStack.size() > 1) {
+                // The first recipe is typically an Environment.CompositeRecipe and should not be included in the list of RecipeDescriptors
+                root = currentStack.get(1);
+            } else {
+                root = currentStack.get(0);
+            }
             RecipeDescriptor rootDescriptor = root.getDescriptor().withRecipeList(new ArrayList<>());
 
             RecipeDescriptor index;

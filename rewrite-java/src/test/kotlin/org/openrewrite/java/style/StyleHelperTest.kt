@@ -33,6 +33,7 @@ class StyleHelperTest {
 
     @Test
     fun mergeSpacesStyles() {
+        @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
         val merged = StyleHelper.merge(
             IntelliJ.spaces(),
             SpacesStyle(

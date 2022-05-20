@@ -58,6 +58,7 @@ import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 import static org.openrewrite.test.ParserTypeUtils.parserType;
 
+@SuppressWarnings("unused")
 @Incubating(since = "7.20.1")
 public interface RewriteTest extends SourceSpecs {
     static Recipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {

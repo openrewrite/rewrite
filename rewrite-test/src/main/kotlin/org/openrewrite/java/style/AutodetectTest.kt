@@ -43,7 +43,7 @@ interface AutodetectTest {
             }
         """.trimIndent())
         val styles = Autodetect.detect(cus)
-        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))
+        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))!!
         assertThat(tabsAndIndents.useTabCharacter).isTrue
     }
 
@@ -55,6 +55,7 @@ interface AutodetectTest {
             
             import static org.springframework.cloud.netflix.eureka.EurekaConstants.DEFAULT_PREFIX;
             
+            @SuppressWarnings("ALL")
             @ConfigurationProperties(EurekaClientConfigBean.PREFIX)
             public class EurekaClientConfigBean implements EurekaClientConfig, Ordered {
             	private static final int MINUTES = 60;
@@ -74,7 +75,7 @@ interface AutodetectTest {
         )
 
         val styles = Autodetect.detect(cus)
-        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))
+        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))!!
 
         assertThat(tabsAndIndents.useTabCharacter).isTrue
         assertThat(tabsAndIndents.tabSize).isEqualTo(1)
@@ -88,6 +89,7 @@ interface AutodetectTest {
             """
             package com.netflix.kayenta.orca.controllers;
             
+            @SuppressWarnings("ALL")
             @RestController
             public class AdminController {
               private final ApplicationEventPublisher publisher;
@@ -113,7 +115,7 @@ interface AutodetectTest {
         )
 
         val styles = Autodetect.detect(cus)
-        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))
+        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))!!
 
         assertThat(tabsAndIndents.useTabCharacter).isFalse
         assertThat(tabsAndIndents.tabSize).isEqualTo(1)
@@ -144,7 +146,7 @@ interface AutodetectTest {
         )
 
         val styles = Autodetect.detect(cus)
-        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))
+        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))!!
 
         assertThat(tabsAndIndents.useTabCharacter).isFalse
         assertThat(tabsAndIndents.tabSize).isEqualTo(1)
@@ -169,7 +171,7 @@ interface AutodetectTest {
         )
 
         val styles = Autodetect.detect(cus)
-        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))
+        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))!!
         assertThat(tabsAndIndents.useTabCharacter).isTrue
         assertThat(tabsAndIndents.tabSize).isEqualTo(1)
         assertThat(tabsAndIndents.indentSize).isEqualTo(1)
@@ -197,7 +199,7 @@ interface AutodetectTest {
         )
 
         val styles = Autodetect.detect(cus)
-        val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))
+        val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))!!
 
         assertThat(importLayout.layout[0]).isInstanceOf(ImportLayoutStyle.Block.AllOthers::class.java)
 
@@ -245,7 +247,7 @@ interface AutodetectTest {
         )
 
         val styles = Autodetect.detect(cus)
-        val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))
+        val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))!!
 
         assertThat(importLayout.classCountToUseStarImport).isEqualTo(6)
     }
@@ -280,7 +282,7 @@ interface AutodetectTest {
         )
 
         val styles = Autodetect.detect(cus)
-        val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))
+        val importLayout = NamedStyles.merge(ImportLayoutStyle::class.java, listOf(styles))!!
 
         assertThat(importLayout.classCountToUseStarImport).isEqualTo(2147483647)
         assertThat(importLayout.nameCountToUseStarImport).isEqualTo(2147483647)

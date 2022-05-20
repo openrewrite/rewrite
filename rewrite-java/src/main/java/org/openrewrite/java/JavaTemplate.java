@@ -364,7 +364,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                                 List<TypeTree> bounds = typeParameter.getBounds();
                                                 JavaType.FullyQualified bound;
                                                 if (bounds == null || bounds.isEmpty()) {
-                                                    bound = JavaType.Class.build("java.lang.Object");
+                                                    bound = JavaType.ShallowClass.build("java.lang.Object");
                                                 } else {
                                                     bound = (JavaType.FullyQualified) bounds.get(0);
                                                 }
@@ -442,7 +442,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 .map(it -> {
                                     // Invoking a method with a string literal still means the invocation has the class type
                                     if (it == JavaType.Primitive.String) {
-                                        return JavaType.Class.build("java.lang.String");
+                                        return JavaType.ShallowClass.build("java.lang.String");
                                     }
                                     return it;
                                 })

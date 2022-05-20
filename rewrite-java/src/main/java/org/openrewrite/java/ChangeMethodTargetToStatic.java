@@ -83,7 +83,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
 
     private class ChangeMethodTargetToStaticVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
-        private final JavaType.FullyQualified classType = JavaType.Class.build(fullyQualifiedTargetTypeName);
+        private final JavaType.FullyQualified classType = JavaType.ShallowClass.build(fullyQualifiedTargetTypeName);
 
         public ChangeMethodTargetToStaticVisitor(MethodMatcher methodMatcher) {
             this.methodMatcher = methodMatcher;
@@ -107,7 +107,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
                         transformedType = transformedType.withFlags(flags);
                     }
                     if (returnType != null) {
-                        JavaType returnTypeType = JavaType.Class.build(returnType);
+                        JavaType returnTypeType = JavaType.ShallowClass.build(returnType);
                         transformedType = transformedType.withReturnType(returnTypeType);
                     }
                 }

@@ -27,7 +27,7 @@ interface TypeTreeTest {
     fun buildFullyQualifiedClassName(jp: JavaParser) {
         val name = TypeTree.build("java.util.List") as J.FieldAccess
 
-        assertEquals("java.util.List", name.printTrimmed())
+        assertEquals("java.util.List", name.toString())
         assertEquals("List", name.simpleName)
     }
 
@@ -35,14 +35,14 @@ interface TypeTreeTest {
     fun buildFullyQualifiedClassNameWithSpacing(jp: JavaParser) {
         val name = TypeTree.build("java . util . List") as J.FieldAccess
 
-        assertEquals("java . util . List", name.printTrimmed())
+        assertEquals("java . util . List", name.toString())
     }
 
     @Test
     fun buildFullyQualifiedInnerClassName(jp: JavaParser) {
         val name = TypeTree.build("a.Outer.Inner") as J.FieldAccess
 
-        assertEquals("a.Outer.Inner", name.printTrimmed())
+        assertEquals("a.Outer.Inner", name.toString())
         assertEquals("Inner", name.simpleName)
         assertEquals("a.Outer.Inner", name.type.asFullyQualified()?.fullyQualifiedName)
 
@@ -55,7 +55,7 @@ interface TypeTreeTest {
     fun buildStaticImport(jp: JavaParser) {
         val name = TypeTree.build("a.A.*") as J.FieldAccess
 
-        assertEquals("a.A.*", name.printTrimmed())
+        assertEquals("a.A.*", name.toString())
         assertEquals("*", name.simpleName)
     }
 }

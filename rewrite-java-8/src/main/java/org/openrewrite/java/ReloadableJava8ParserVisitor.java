@@ -1253,7 +1253,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         expr,
                         padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, part.trim(), null, null)),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
-                                JavaType.Class.build(fullName) :
+                                JavaType.ShallowClass.build(fullName) :
                                 null
                 );
             }

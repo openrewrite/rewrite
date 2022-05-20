@@ -20,7 +20,7 @@ import org.openrewrite.java.tree.JavaType
 
 interface ChangeFieldTypeTest : JavaRecipeTest {
     fun changeFieldType(from: String, to: String) = toRecipe {
-        ChangeFieldType(JavaType.Class.build(from), JavaType.Class.build(to))
+        ChangeFieldType(JavaType.ShallowClass.build(from), JavaType.ShallowClass.build(to))
     }
 
     @Suppress("rawtypes")

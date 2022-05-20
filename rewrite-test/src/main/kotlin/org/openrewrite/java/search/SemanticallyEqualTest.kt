@@ -223,7 +223,7 @@ interface SemanticallyEqualTest {
                 Space.EMPTY,
                 Markers.EMPTY,
                 "FastTest",
-                JavaType.Class.build("FastTest"), null
+                JavaType.ShallowClass.build("FastTest"), null
             ),
             JLeftPadded(
                 Space.EMPTY,
@@ -236,7 +236,7 @@ interface SemanticallyEqualTest {
                 ),
                 Markers.EMPTY
             ),
-            JavaType.Class.build("java.lang.Class")
+            JavaType.ShallowClass.build("java.lang.Class")
         )
         val thirdFieldAccess = cu[0].classes[0].leadingAnnotations[1].arguments!!.first()
 

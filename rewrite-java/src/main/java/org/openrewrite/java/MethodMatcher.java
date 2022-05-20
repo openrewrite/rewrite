@@ -224,7 +224,7 @@ public class MethodMatcher {
         }
 
         if (matchOverrides) {
-            if (!"java.lang.Object".equals(type.getFullyQualifiedName()) && matchesTargetType(JavaType.Class.build("java.lang.Object"))) {
+            if (!"java.lang.Object".equals(type.getFullyQualifiedName()) && matchesTargetType(JavaType.ShallowClass.build("java.lang.Object"))) {
                 return true;
             }
 

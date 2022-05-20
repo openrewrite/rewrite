@@ -25,23 +25,24 @@ import org.openrewrite.maven.internal.MavenPomDownloader
 import org.openrewrite.maven.mavenResolutionResult
 import org.openrewrite.maven.tree.GroupArtifactVersion
 import java.nio.file.Path
+import java.nio.file.Paths
 
 class RocksdbMavenPomCacheTest {
 
     @Test
     fun rocksCacheSerialization(@TempDir tempDir: Path) {
-        val ctx = MavenExecutionContextView.view(InMemoryExecutionContext());
+        val ctx = MavenExecutionContextView.view(InMemoryExecutionContext())
         ctx.pomCache = RocksdbMavenPomCache(tempDir.resolve("rewrite-cache"))
 
         val downloader = MavenPomDownloader(emptyMap(), ctx)
-        val gav = GroupArtifactVersion("org.springframework.cloud", "spring-cloud-dataflow-build", "2.9.0");
+        val gav = GroupArtifactVersion("org.springframework.cloud", "spring-cloud-dataflow-build", "2.9.0")
 
         downloader.download(gav, "", null, emptyList())
         downloader.download(gav, "", null, emptyList())
     }
 
     @Test
-    fun rocksCache(@TempDir tempDir: Path) {
+    fun rocksCache() {
         val pom = """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -186,7 +187,7 @@ class RocksdbMavenPomCacheTest {
                 """
         //This is not much of a test, it just ensures the maven parser works correctly with the rocksdb caching
         //implementation. This does work as a good place to experiment with the various configuration settings.
-        val workspace = Path.of(System.getProperty("user.home") + "/.rewrite/cache/")
+        val workspace =  Paths.get(System.getProperty("user.home"), ".rewrite/cache/")
 
         val mavenCache = RocksdbMavenPomCache(workspace)
         val pomAst = MavenParser.builder()

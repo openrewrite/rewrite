@@ -82,10 +82,10 @@ public class UnnecessaryThrows extends Recipe {
 
                             JavaType.FullyQualified resourceType = TypeUtils.asFullyQualified(resource.getType());
                             if (resourceType != null) {
-                                if (TypeUtils.isAssignableTo(JavaType.Class.build("java.io.Closeable"), resourceType)) {
-                                    unusedThrows.remove(JavaType.Class.build("java.io.IOException"));
-                                } else if (TypeUtils.isAssignableTo(JavaType.Class.build("java.lang.AutoCloseable"), resourceType)) {
-                                    unusedThrows.remove(JavaType.Class.build("java.lang.Exception"));
+                                if (TypeUtils.isAssignableTo(JavaType.ShallowClass.build("java.io.Closeable"), resourceType)) {
+                                    unusedThrows.remove(JavaType.ShallowClass.build("java.io.IOException"));
+                                } else if (TypeUtils.isAssignableTo(JavaType.ShallowClass.build("java.lang.AutoCloseable"), resourceType)) {
+                                    unusedThrows.remove(JavaType.ShallowClass.build("java.lang.Exception"));
                                 }
                             }
 
@@ -149,7 +149,7 @@ public class UnnecessaryThrows extends Recipe {
         //Collect all checked exceptions.
         Set<JavaType.FullyQualified> candidates = new TreeSet<>(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName));
         for (JavaType.FullyQualified exception : method.getMethodType().getThrownExceptions()) {
-            if (!TypeUtils.isAssignableTo(JavaType.Class.build("java.lang.RuntimeException"), exception)) {
+            if (!TypeUtils.isAssignableTo(JavaType.ShallowClass.build("java.lang.RuntimeException"), exception)) {
                 candidates.add(exception);
             }
         }

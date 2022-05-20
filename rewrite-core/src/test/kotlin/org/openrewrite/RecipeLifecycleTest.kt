@@ -42,7 +42,7 @@ class RecipeLifecycleTest {
 
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object : TreeVisitor<Tree, ExecutionContext>() {
-                    override fun visit(tree: Tree, p: ExecutionContext): Tree {
+                    override fun visit(tree: Tree?, p: ExecutionContext): Tree? {
                         visited.incrementAndGet()
                         return tree
                     }
@@ -84,7 +84,7 @@ class RecipeLifecycleTest {
                 before + PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")
         }.run(emptyList())
 
-        assertThat(results.map { it.recipesThatMadeChanges.map { r -> r.name }.first() }
+        assertThat(results.map { it.recipeDescriptorsThatMadeChanges.map { r -> r.name }.first() }
             .distinct()).containsExactly("test.GeneratingRecipe")
     }
 
@@ -102,7 +102,7 @@ class RecipeLifecycleTest {
         }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")))
 
         assertThat(results.map {
-            it.recipesThatMadeChanges.map { r -> r.name }.first()
+            it.recipeDescriptorsThatMadeChanges.map { r -> r.name }.first()
         }).containsExactly("test.DeletingRecipe")
     }
 
@@ -125,7 +125,7 @@ class RecipeLifecycleTest {
         }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")))
 
         assertThat(results.map {
-            it.recipesThatMadeChanges.map { r -> r.name }.first()
+            it.recipeDescriptorsThatMadeChanges.map { r -> r.name }.first()
         }).containsExactly("test.DeletingRecipe")
     }
 
@@ -159,11 +159,11 @@ class RecipeLifecycleTest {
         override fun getCharset() = throw NotImplementedError()
         override fun withCharset(charset: Charset) = throw NotImplementedError()
         override fun isCharsetBomMarked() = throw NotImplementedError()
-        override fun <T : SourceFile?> withCharsetBomMarked(marked: Boolean) = throw NotImplementedError()
+        override fun <T : SourceFile?> withCharsetBomMarked(marked: Boolean): T = throw NotImplementedError()
         override fun getChecksum(): Checksum = throw NotImplementedError()
-        override fun <T : SourceFile?> withChecksum(checksum: Checksum?) = throw NotImplementedError()
+        override fun <T : SourceFile?> withChecksum(checksum: Checksum?): T = throw NotImplementedError()
         override fun getFileAttributes(): FileAttributes = throw NotImplementedError()
-        override fun <T : SourceFile?> withFileAttributes(fileAttributes: FileAttributes?) = throw NotImplementedError()
+        override fun <T : SourceFile?> withFileAttributes(fileAttributes: FileAttributes?): T = throw NotImplementedError()
     }
 
     // https://github.com/openrewrite/rewrite/issues/389
@@ -195,7 +195,7 @@ class RecipeLifecycleTest {
         val results = recipe.run(sources, InMemoryExecutionContext { throw it })
         assertThat(results.size)
             .isEqualTo(1)
-        assertThat(results.first().recipesThatMadeChanges.map { it.name })
+        assertThat(results.first().recipeDescriptorsThatMadeChanges.map { it.name })
             .containsExactlyInAnyOrder("Change1", "Change2")
     }
 

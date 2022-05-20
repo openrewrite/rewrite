@@ -95,7 +95,7 @@ public class Substitutions {
                             fqn = params.get(0).FullyQualifiedName().getText();
                         } else {
                             if (!(parameter instanceof TypedTree)) {
-                                // any should only be used on TypedTree parameters, but will give it a best effort
+                                // any should only be used on TypedTree parameters, but will give it best effort
                                 fqn = "java.lang.Object";
                             } else {
                                 fqn = getTypeName(((TypedTree) parameter).getType());
@@ -148,6 +148,7 @@ public class Substitutions {
             } else if (parameter instanceof J.Block) {
                 return "/*__p" + index + "__*/{}";
             } else if (parameter instanceof J.Literal || parameter instanceof J.VariableDeclarations) {
+                //noinspection deprecation
                 return ((J) parameter).printTrimmed();
             } else {
                 throw new IllegalArgumentException("Template parameter " + index + " cannot be used in an untyped template substitution. " +
@@ -177,10 +178,12 @@ public class Substitutions {
         return "";
     }
 
+    @SuppressWarnings("SpellCheckingInspection")
     public <J2 extends J> List<J2> unsubstitute(List<J2> js) {
         return ListUtils.map(js, this::unsubstitute);
     }
 
+    @SuppressWarnings("SpellCheckingInspection")
     public <J2 extends J> J2 unsubstitute(J2 j) {
         if (parameters.length == 0) {
             return j;

@@ -1061,8 +1061,7 @@ class MavenDependencyResolutionIntegTest {
         }
 
         private fun printTreeRecursive(
-            node: DependencyNode,
-            originalScope: String = "compile"
+            node: DependencyNode
         ): String =
             dependencyString(node) + (node.children
                 .filter { n -> n.dependency.scope != "system" }
@@ -1075,11 +1074,6 @@ class MavenDependencyResolutionIntegTest {
                         d1.groupId.compareTo(d2.groupId)
                 }
                 .joinToString("\n") {
-                    val scope =
-                        if (it.data["conflict.originalScope"] != it.dependency.scope)
-                            it.data["conflict.originalScope"] as String
-                        else it.dependency.scope
-
                     printTreeRecursive(
                         it.data["conflict.winner"] as DefaultDependencyNode?
                             ?: it
