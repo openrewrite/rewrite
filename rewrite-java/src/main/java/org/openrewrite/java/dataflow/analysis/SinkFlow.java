@@ -21,10 +21,7 @@ import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Stack;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -50,9 +47,6 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     }
 
     public List<Sink> getSinks() {
-        if (getEdges().isEmpty()) {
-            return emptyList();
-        }
         List<List<Cursor>> flows = getFlows();
         List<Sink> sinks = new ArrayList<>(flows.size());
         for (List<Cursor> flow : flows) {
@@ -62,10 +56,23 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     }
 
     public List<List<Cursor>> getFlows() {
+        List<Cursor> sourceFlow = null;
+        if (source != null &&
+                spec.getSinkType().isAssignableFrom(getSource().getClass()) &&
+                spec.isSink((Sink) getSource(), getSourceCursor())) {
+            // If the source is a sink, then generate a single-step flow for it
+            sourceFlow = Collections.singletonList(getSourceCursor());
+        }
         if (getEdges().isEmpty()) {
+            if (sourceFlow != null) {
+                return Collections.singletonList(sourceFlow);
+            }
             return emptyList();
         }
         List<List<Cursor>> flows = new ArrayList<>();
+        if (sourceFlow != null) {
+            flows.add(sourceFlow);
+        }
         Stack<Cursor> path = new Stack<>();
         path.push(getCursor());
         recurseGetFlows(this, path, flows);

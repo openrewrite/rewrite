@@ -102,8 +102,7 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
     )
 
     @Test
-    @Disabled("This isn't finding the search results for `String o = n + '/';` for some reason")
-    fun `taint flow via append is not data flow`() = rewriteRun(
+    fun `taint flow via append is not data flow 2`() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
             """
@@ -130,8 +129,7 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
     )
 
     @Test
-    @Disabled("MISSING: I don't know what's wrong here, but I'm getting weird results here")
-    fun `taint flow is not data flow but it is tracked to call site`() = rewriteRun(
+    fun `taint flow is not data flow but it is tracked to call site 2`() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
             """
@@ -183,6 +181,39 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
     )
 
     @Test
+    fun `the source is also a sink simple`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void sink(Object any) {
+                        // do nothing
+                    }
+                    void test() {
+                        sink(source());
+                    }
+                }
+            """,
+            """
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void sink(Object any) {
+                        // do nothing
+                    }
+                    void test() {
+                        sink(/*~~>*/source());
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
     fun `the source is also a sink`() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
@@ -194,10 +225,60 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                     }
                     void test() {
                         source();
-                        source().toString();
-                        source().toString().toString();
-                        source().toLowerCase(Locale.ROOT);
-                        source().toString().toLowerCase(Locale.ROOT);
+                        source()
+                            .toString();
+                        source()
+                            .toString()
+                            .toString();
+                        source()
+                            .toLowerCase(Locale.ROOT);
+                        source()
+                            .toString()
+                            .toLowerCase(Locale.ROOT);
+                    }
+                }
+            """,
+        """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        /*~~>*/source();
+                        /*~~>*/source()
+                            /*~~>*/.toString();
+                        /*~~>*/source()
+                            /*~~>*/.toString()
+                            /*~~>*/.toString();
+                        /*~~>*/source()
+                            .toLowerCase(Locale.ROOT);
+                        /*~~>*/source()
+                            /*~~>*/.toString()
+                            .toLowerCase(Locale.ROOT);
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `the source can be tracked through wrapped parentheses`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        (source()).toLowerCase(Locale.ROOT);
+                        ((source())).toLowerCase(Locale.ROOT);
+                        ((Object) source()).equals(null);
+                        ((String)((Object) source())).toString();
+                        ((String)((Object) source())).toString();
+
                     }
                 }
             """,
@@ -208,11 +289,11 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                         return null;
                     }
                     void test() {
-                        /*~~>*/source();
-                        /*~~>*/source()/*~~>*/.toString();
-                        /*~~>*/source()/*~~>*/.toString()/*~~>*/.toString();
-                        /*~~>*/source().toLowerCase(Locale.ROOT);
-                        /*~~>*/source()/*~~>*/.toString().toLowerCase(Locale.ROOT);
+                        /*~~>*/(/*~~>*/source()).toLowerCase(Locale.ROOT);
+                        /*~~>*/(/*~~>*/(/*~~>*/source())).toLowerCase(Locale.ROOT);
+                        /*~~>*/(/*~~>*/(Object) source()).equals(null);
+                        /*~~>*/(/*~~>*/(String)(/*~~>*/(Object) source()))/*~~>*/.toString();
+                        /*~~>*/(/*~~>*/(String)(/*~~>*/(Object) source()))/*~~>*/.toString();
                     }
                 }
                 """
