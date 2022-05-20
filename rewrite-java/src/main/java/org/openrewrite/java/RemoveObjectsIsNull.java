@@ -29,7 +29,6 @@ public class RemoveObjectsIsNull extends Recipe {
 
     @JsonCreator
     public RemoveObjectsIsNull() {
-        doNext(new UnnecessaryParentheses());
     }
 
     @Override
