@@ -44,9 +44,9 @@ class ChecksumTest {
                 Markers.EMPTY,
                 URI.create("https://services.gradle.org/distributions/gradle-7.4.2-wrapper.jar")
             )
-            .checksum(
+            .checksum(Checksum.fromHex(
                 "SHA-256",
-                URI.create("https://services.gradle.org/distributions/gradle-7.4.2-wrapper.jar.sha256")
+                URL("https://services.gradle.org/distributions/gradle-7.4.2-wrapper.jar.sha256").readText())
             )
             .build()
 

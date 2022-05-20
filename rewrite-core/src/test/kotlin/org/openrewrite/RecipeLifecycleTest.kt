@@ -159,11 +159,11 @@ class RecipeLifecycleTest {
         override fun getCharset() = throw NotImplementedError()
         override fun withCharset(charset: Charset) = throw NotImplementedError()
         override fun isCharsetBomMarked() = throw NotImplementedError()
-        override fun withCharsetBomMarked(marked: Boolean) = throw NotImplementedError()
+        override fun <T : SourceFile?> withCharsetBomMarked(marked: Boolean) = throw NotImplementedError()
         override fun getChecksum(): Checksum = throw NotImplementedError()
-        override fun withChecksum(checksum: Checksum?) = throw NotImplementedError()
+        override fun <T : SourceFile?> withChecksum(checksum: Checksum?) = throw NotImplementedError()
         override fun getFileAttributes(): FileAttributes = throw NotImplementedError()
-        override fun withFileAttributes(fileAttributes: FileAttributes?) = throw NotImplementedError()
+        override fun <T : SourceFile?> withFileAttributes(fileAttributes: FileAttributes?) = throw NotImplementedError()
     }
 
     // https://github.com/openrewrite/rewrite/issues/389

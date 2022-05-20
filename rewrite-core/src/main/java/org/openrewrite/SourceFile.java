@@ -37,17 +37,17 @@ public interface SourceFile extends Tree {
 
     boolean isCharsetBomMarked();
 
-    SourceFile withCharsetBomMarked(boolean marked);
+    <T extends SourceFile> T withCharsetBomMarked(boolean marked);
 
     @Nullable
     Checksum getChecksum();
 
-    SourceFile withChecksum(@Nullable Checksum checksum);
+    <T extends SourceFile> T withChecksum(@Nullable Checksum checksum);
 
     @Nullable
     FileAttributes getFileAttributes();
 
-    SourceFile withFileAttributes(@Nullable FileAttributes fileAttributes);
+    <T extends SourceFile> T withFileAttributes(@Nullable FileAttributes fileAttributes);
 
     Markers getMarkers();
 

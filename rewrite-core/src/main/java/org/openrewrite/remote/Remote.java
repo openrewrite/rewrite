@@ -33,17 +33,6 @@ public interface Remote extends SourceFile {
     URI getUri();
     <R extends Remote> R withUri(URI uri);
 
-    @Nullable
-    @Override
-    default Checksum getChecksum() {
-        return null;
-    }
-
-    @Override
-    default SourceFile withChecksum(@Nullable Checksum checksum) {
-        return this;
-    }
-
     String getDescription();
     <R extends Remote> R withDescription(String description);
 
@@ -118,6 +107,9 @@ public interface Remote extends SourceFile {
         @Language("markdown")
         protected String description;
 
+        @Nullable
+        protected Checksum checksum;
+
         Builder(UUID id, Path sourcePath, Markers markers, URI uri) {
             this.id = id;
             this.sourcePath = sourcePath;
@@ -130,12 +122,17 @@ public interface Remote extends SourceFile {
             return this;
         }
 
+        public Builder checksum(Checksum checksum) {
+            this.checksum = checksum;
+            return this;
+        }
+
         public RemoteFile build() {
-            return new RemoteFile(id, sourcePath, markers, uri, description);
+            return new RemoteFile(id, sourcePath, markers, uri, checksum, description);
         }
 
         public RemoteArchive build(Path path) {
-            return new RemoteArchive(id, sourcePath, markers, uri, path, description);
+            return new RemoteArchive(id, sourcePath, markers, uri, checksum, description, path);
         }
     }
 }

@@ -19,6 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.Checksum;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
@@ -38,6 +40,9 @@ public class RemoteFile implements Remote {
     Path sourcePath;
     Markers markers;
     URI uri;
+
+    @Nullable
+    Checksum checksum;
 
     /**
      * Any text describing what this remote URI represents. This will only
