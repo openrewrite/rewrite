@@ -27,3 +27,11 @@ dependencies {
 
     testRuntimeOnly("ch.qos.logback:logback-classic:1.2.10")
 }
+
+tasks.withType<Javadoc>().configureEach {
+    isVerbose = false
+    options {
+        this as CoreJavadocOptions
+        addStringOption("Xdoclint:none", "-quiet")
+    }
+}
