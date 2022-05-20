@@ -674,8 +674,8 @@ public interface JavaType {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             GenericTypeVariable that = (GenericTypeVariable) o;
-            assert bounds != null;
-            return name.equals(that.name) && variance == that.variance && bounds.equals(that.bounds);
+            return name.equals(that.name) && variance == that.variance &&
+                    (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && bounds.equals(that.bounds));
         }
 
         @Override
