@@ -42,6 +42,7 @@ recipeList:
   - org.openrewrite.java.cleanup.IndexOfShouldNotCompareGreaterThanZero
   - org.openrewrite.java.cleanup.IsEmptyCallOnCollections
   - org.openrewrite.java.cleanup.LambdaBlockToExpression
+  - org.openrewrite.java.cleanup.LowercasePackage
   - org.openrewrite.java.cleanup.MethodNameCasing
   - org.openrewrite.java.cleanup.MinimumSwitchCases
   - org.openrewrite.java.cleanup.ModifierOrder
