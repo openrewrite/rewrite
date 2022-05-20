@@ -93,6 +93,9 @@ public interface Remote extends SourceFile {
         return new Builder(before.getId(), before.getSourcePath(), before.getMarkers(), uri);
     }
 
+    static Builder builder(Path sourcePath, URI uri) {
+        return new Builder(Tree.randomId(), sourcePath, Markers.EMPTY, uri);
+    }
     static Builder builder(UUID id, Path sourcePath, Markers markers, URI uri) {
         return new Builder(id, sourcePath, markers, uri);
     }

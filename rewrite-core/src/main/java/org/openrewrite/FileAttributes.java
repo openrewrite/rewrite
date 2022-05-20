@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Value
+@With
 public class FileAttributes {
     ZonedDateTime creationTime;
 
