@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
@@ -21,11 +22,37 @@ import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
-@Suppress("Convert2Lambda")
+@Suppress("Convert2Lambda", "Anonymous2MethodRef", "CodeBlock2Expr")
 interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = UseLambdaForFunctionalInterface()
 
+    @Test
+    fun useLambdaThenSimplifyFurther(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = UseLambdaForFunctionalInterface().doNext(ReplaceLambdaWithMethodReference()),
+        before = """
+        import java.util.function.Function;
+        class Test {
+            Runnable r = new Runnable() {
+                @Override public void run() {
+                    Test.this.execute();
+                }
+            };
+            
+            void execute() {}
+        }
+    """,
+        after = """
+        import java.util.function.Function;
+        class Test {
+            Runnable r = Test.this::execute;
+            
+            void execute() {}
+        }
+    """
+
+    )
     @Test
     fun useLambda(jp: JavaParser) = assertChanged(
         jp,
@@ -70,6 +97,7 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnusedAssignment")
     @Test
     fun emptyLambda(jp: JavaParser) = assertChanged(
         jp,

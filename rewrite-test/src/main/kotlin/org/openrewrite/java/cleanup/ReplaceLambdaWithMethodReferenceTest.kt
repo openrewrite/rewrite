@@ -258,4 +258,107 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
             }
         """
     )
+
+    @Suppress("Convert2MethodRef", "CodeBlock2Expr")
+    @Test
+    fun voidMethodReference() = assertChanged(
+        before =
+            """
+                class Test {
+                    Runnable r = () -> {
+                        this.execute();
+                    };
+
+                    void execute() {}
+                }
+            """,
+        after =
+            """
+                class Test {
+                    Runnable r = this::execute;
+
+                    void execute() {}
+                }
+            """
+    )
+
+    @Suppress("Convert2MethodRef", "CodeBlock2Expr")
+    @Test
+    fun functionReference() = assertChanged(
+        before =
+            """
+                import java.util.function.Function;
+
+                class Test {
+                    Function<Integer, String> f = (i) -> {
+                        return this.execute(i);
+                    };
+                    
+                    String execute(Integer i) {
+                        return i.toString();
+                    }
+                }
+            """,
+        after =
+            """
+                import java.util.function.Function;
+
+                class Test {
+                    Function<Integer, String> f = this::execute;
+                    
+                    String execute(Integer i) {
+                        return i.toString();
+                    }
+                }
+            """
+    )
+
+    @Suppress("Convert2MethodRef")
+    @Test
+    fun functionMultiParamReference() = assertChanged(
+        dependsOn = arrayOf(
+            """
+                public interface ObservableValue<T> {
+                }
+            """,
+            """
+                @FunctionalInterface
+                public interface ChangeListener<T> {
+                    void changed(ObservableValue<? extends T> observable, T oldValue, T newValue);
+                }
+            """.trimIndent()
+        ),
+        before =
+        """
+                import java.util.function.Function;
+
+                class Test {
+                
+                    ChangeListener listener = (o, oldVal, newVal) -> {
+                        onChange(o, oldVal, newVal);
+                    };
+                    
+                    protected void onChange(ObservableValue<?> o, Object oldVal, Object newVal) {
+                        String strVal = newVal.toString();
+                        System.out.println(strVal);
+                    }
+                }
+            """,
+        after =
+        """
+                import java.util.function.Function;
+
+                class Test {
+                
+                    ChangeListener listener = this::onChange;
+                    
+                    protected void onChange(ObservableValue<?> o, Object oldVal, Object newVal) {
+                        String strVal = newVal.toString();
+                        System.out.println(strVal);
+                    }
+                }
+            """
+    )
+
+
 }

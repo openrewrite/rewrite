@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
@@ -75,13 +76,24 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                         if (sam == null) {
                             return n;
                         }
+                        //The interface may be parameterized and that is needed to maintain type attribution:
+                        JavaType.FullyQualified typedInterface = null;
+                        JavaType.FullyQualified annoymousClass = TypeUtils.asFullyQualified(n.getType());
+                        if (annoymousClass != null) {
+                            typedInterface = annoymousClass.getInterfaces().stream().filter(i -> i.getFullyQualifiedName().equals(type.getFullyQualifiedName())).findFirst().orElse(null);
+                        }
+                        if (typedInterface == null) {
+                            return n;
+                        }
 
                         StringBuilder templateBuilder = new StringBuilder();
                         J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) n.getBody().getStatements().get(0);
 
+                        boolean hasParameters = false;
                         if (methodDeclaration.getParameters().get(0) instanceof J.Empty) {
                             templateBuilder.append("() -> {");
                         } else {
+                            hasParameters = true;
                             templateBuilder.append(methodDeclaration.getParameters().stream()
                                     .map(param -> ((J.VariableDeclarations) param).getVariables().get(0).getSimpleName())
                                     .collect(Collectors.joining(",", "(", ") -> {")));
@@ -98,7 +110,17 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                                         .build(),
                                 n.getCoordinates().replace()
                         );
-
+                        lambda = lambda.withType(typedInterface);
+                        if (hasParameters) {
+                            lambda = lambda.withParameters(lambda.getParameters().withParameters(
+                                    methodDeclaration.getParameters().stream()
+                                            .map(p -> {
+                                                J.VariableDeclarations decl = (J.VariableDeclarations) p;
+                                                decl = decl.withVariables(ListUtils.map(decl.getVariables(), v -> v.withPrefix(Space.EMPTY)));
+                                                return decl.withTypeExpression(null);
+                                            }).collect(Collectors.toList())
+                            ));
+                        }
                         lambda = (J.Lambda) new UnnecessaryParenthesesVisitor<ExecutionContext>(Checkstyle.unnecessaryParentheses())
                                 .visitNonNull(lambda, ctx);
 

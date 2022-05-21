@@ -28,6 +28,7 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ReplaceLambdaWithMethodReference extends Recipe {
 
@@ -53,11 +54,11 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
-        MethodMatcher printStreamMethod = new MethodMatcher("java.io.PrintStream println(..)");
 
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
+
                 J.Lambda l = (J.Lambda) super.visitLambda(lambda, executionContext);
 
                 String code = "";
@@ -66,6 +67,8 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     Statement statement = ((J.Block) body).getStatements().get(0);
                     if (statement instanceof J.MethodInvocation) {
                         body = statement;
+                    } else if (statement instanceof J.Return) {
+                        body = ((J.Return) statement).getExpression();
                     }
                 } else if (body instanceof J.InstanceOf) {
                     J j = ((J.InstanceOf) body).getClazz();
@@ -108,12 +111,51 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                         return l.withTemplate(JavaTemplate.builder(this::getCursor, code).imports("java.util.Objects").build(), l.getCoordinates().replace());
                     }
                 } else if (body instanceof J.MethodInvocation) {
-                    if (printStreamMethod.matches((J.MethodInvocation) body)) {
-                        return l.withTemplate(JavaTemplate.builder(this::getCursor, "System.out::println").build(), l.getCoordinates().replace());
+                    J.MethodInvocation i = (J.MethodInvocation) body;
+                    if (i.getMethodType() != null && methodMatchesLambda(l, i)) {
+                        JavaType.FullyQualified methodTargetClass = i.getMethodType().getDeclaringType();
+
+                        @Language("java")
+                        String stub = "package " + methodTargetClass.getPackageName() + "; public class " + methodTargetClass.getClassName() + "{ public void "
+                                + i.getSimpleName() + "();}";
+
+                        JavaTemplate template = JavaTemplate
+                                .builder(this::getCursor, i.getSelect() == null ? "this::#{}" : "#{any()}::#{}")
+                                .javaParser(() -> JavaParser.fromJavaVersion()
+                                        .dependsOn(stub)
+                                        .build())
+                                .imports(methodTargetClass.getFullyQualifiedName())
+                                .build();
+                        if (i.getSelect() == null) {
+                            return ((J.MemberReference) l.withTemplate(template, l.getCoordinates().replace(), i.getSimpleName()))
+                                    .withMethodType(i.getMethodType());
+                        } else {
+                            return ((J.MemberReference) l.withTemplate(template, l.getCoordinates().replace(), i.getSelect(), i.getSimpleName()))
+                                    .withMethodType(i.getMethodType());
+                        }
                     }
                 }
 
                 return l;
+            }
+
+            private boolean methodMatchesLambda(J.Lambda lambda, J.MethodInvocation invocation) {
+                if (invocation.getMethodType() == null) {
+                    return false;
+                }
+                //Lambda parameters may not have a type, need to extract the type from the first named variable.
+                List<JavaType> parameters = lambda.getParameters().getParameters().stream().filter(J.VariableDeclarations.class::isInstance).map(p -> ((J.VariableDeclarations) p).getVariables().get(0).getType()).collect(Collectors.toList());
+                List<JavaType> methodArguments = invocation.getMethodType().getParameterTypes();
+                if (parameters.size() != methodArguments.size()) {
+                    return false;
+                }
+
+                for (int index = 0; index < parameters.size(); index ++) {
+                    if (!TypeUtils.isAssignableTo(methodArguments.get(index), parameters.get(index))) {
+                        return false;
+                    }
+                }
+                return true;
             }
 
             private boolean isNullCheck(J j1, J j2) {
@@ -122,4 +164,5 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
             }
         };
     }
+
 }
