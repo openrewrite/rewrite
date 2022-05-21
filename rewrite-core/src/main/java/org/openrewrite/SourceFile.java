@@ -29,11 +29,11 @@ public interface SourceFile extends Tree {
      */
     Path getSourcePath();
 
-    SourceFile withSourcePath(Path path);
+    <T extends SourceFile> T withSourcePath(Path path);
 
     Charset getCharset();
 
-    SourceFile withCharset(Charset charset);
+    <T extends SourceFile> T withCharset(Charset charset);
 
     boolean isCharsetBomMarked();
 

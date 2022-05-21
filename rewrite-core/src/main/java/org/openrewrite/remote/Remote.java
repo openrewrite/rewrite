@@ -29,13 +29,33 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.UUID;
 
+/**
+ * Represents a source hosted at a remote URI.
+ *
+ * Downloading the remote file is not handled during Recipe execution. Post-processing of Recipe results by a build
+ * plugin or other caller of OpenRewrite is responsible for this.
+ *
+ * Metadata like Charset or FileAttributes are supplied by the Recipe creating the Remote so that when the file is
+ * later downloaded it can be configured correctly.
+ * If no Charset is configured the downloaded file will be interpreted as binary data.
+ * If no FileAttributes are set the downloaded file will be marked as readable and writable but not executable.
+ */
 public interface Remote extends SourceFile {
     URI getUri();
     <R extends Remote> R withUri(URI uri);
 
+    /**
+     * Any text describing what this remote URI represents. Used to present human-readable results to an end user.
+     */
     String getDescription();
+
     <R extends Remote> R withDescription(String description);
 
+    /**
+     * Download the remote file
+     *
+     * @param httpSender used to download the file represented by this Remote
+     */
     InputStream getInputStream(HttpSender httpSender);
 
     @Override
@@ -48,16 +68,6 @@ public interface Remote extends SourceFile {
         return StringUtils.trimIndentPreserveCRLF(printAll(p));
     }
 
-    @Nullable
-    default FileAttributes getFileAttributes() {
-        throw new UnsupportedOperationException("Remote files do not have a file attributes.");
-    }
-
-    @Override
-    default SourceFile withFileAttributes(@Nullable FileAttributes fileAttributes) {
-        throw new UnsupportedOperationException("Remote files do not have a file attributes.");
-    }
-
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
@@ -67,26 +77,6 @@ public interface Remote extends SourceFile {
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return v instanceof BinaryVisitor;
-    }
-
-    @Override
-    default Charset getCharset() {
-        throw new UnsupportedOperationException("Remote files do not have a character encoding.");
-    }
-
-    @Override
-    default SourceFile withCharset(Charset charset) {
-        throw new UnsupportedOperationException("Remote files do not have a character encoding.");
-    }
-
-    @Override
-    default boolean isCharsetBomMarked() {
-        throw new UnsupportedOperationException("Remote files do not have a character encoding.");
-    }
-
-    @Override
-    default SourceFile withCharsetBomMarked(boolean marked) {
-        throw new UnsupportedOperationException("Remote files do not have a character encoding.");
     }
 
     static Builder builder(SourceFile before, URI uri) {
@@ -113,6 +103,14 @@ public interface Remote extends SourceFile {
         @Nullable
         protected Checksum checksum;
 
+        @Nullable
+        Charset charset;
+
+        boolean charsetBomMarked;
+
+        @Nullable
+        FileAttributes fileAttributes;
+
         Builder(UUID id, Path sourcePath, Markers markers, URI uri) {
             this.id = id;
             this.sourcePath = sourcePath;
@@ -130,12 +128,26 @@ public interface Remote extends SourceFile {
             return this;
         }
 
+        public Builder charset(Charset charset) {
+            this.charset = charset;
+            return this;
+        }
+
+        public Builder charsetBomMarked(boolean charsetBomMarked) {
+            this.charsetBomMarked = charsetBomMarked;
+            return this;
+        }
+        public Builder fileAttributes(FileAttributes fileAttributes) {
+            this.fileAttributes = fileAttributes;
+            return this;
+        }
+
         public RemoteFile build() {
-            return new RemoteFile(id, sourcePath, markers, uri, checksum, description);
+            return new RemoteFile(id, sourcePath, markers, uri, checksum, charset, charsetBomMarked, fileAttributes, description);
         }
 
         public RemoteArchive build(Path path) {
-            return new RemoteArchive(id, sourcePath, markers, uri, checksum, description, path);
+            return new RemoteArchive(id, sourcePath, markers, uri, checksum, charset, charsetBomMarked, fileAttributes, description, path);
         }
     }
 }

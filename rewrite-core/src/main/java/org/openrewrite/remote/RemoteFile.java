@@ -20,6 +20,7 @@ import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.Checksum;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
@@ -27,6 +28,7 @@ import org.openrewrite.marker.Markers;
 
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.UUID;
 
@@ -44,11 +46,14 @@ public class RemoteFile implements Remote {
     @Nullable
     Checksum checksum;
 
-    /**
-     * Any text describing what this remote URI represents. This will only
-     * be used to present results to an end user in a way that is more human
-     * readable then just a raw URI.
-     */
+    @Nullable
+    Charset charset;
+
+    boolean charsetBomMarked;
+
+    @Nullable
+    FileAttributes fileAttributes;
+
     @Language("markdown")
     String description;
 

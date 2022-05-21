@@ -20,6 +20,7 @@ import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.Checksum;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.PathUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
@@ -28,11 +29,21 @@ import org.openrewrite.marker.Markers;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+/**
+ * Represents a source to be extracted from within an archive hosted at a remote URI.
+ * If you want to download and retain the entire archive, use {@link RemoteFile}.
+ * Useful when a Recipe wishes to create a SourceFile based on something specific from within a remote archive, but not
+ * the entire archive.
+ *
+ * Downloading and extracting the correct file from within the archive are not handled during Recipe execution.
+ * Post-processing of Recipe results by a build plugin or other caller of OpenRewrite is responsible for this.
+ */
 @Value
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
@@ -43,14 +54,18 @@ public class RemoteArchive implements Remote {
     Path sourcePath;
     Markers markers;
     URI uri;
+
     @Nullable
     Checksum checksum;
 
-    /**
-     * Any text describing what this remote URI represents. This will only
-     * be used to present results to an end user in a way that is more human
-     * readable then just a raw URI.
-     */
+    @Nullable
+    Charset charset;
+
+    boolean charsetBomMarked;
+
+    @Nullable
+    FileAttributes fileAttributes;
+
     @Language("markdown")
     String description;
 
