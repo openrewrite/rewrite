@@ -64,11 +64,13 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
 
     @Test
     fun instanceOf() = assertChanged(
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package org.test;
             public class CheckType {
             }
-        """),
+        """
+        ),
         before = """
             import java.util.List;
             import java.util.stream.Collectors;
@@ -103,6 +105,113 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 .target as J.Identifier).type!!.toString()
             assertThat(value).isEqualTo("org.test.CheckType")
         }
+    )
+
+    @Suppress("Convert2MethodRef")
+    @Test
+    fun functionMultiParamReference() = assertChanged(
+        dependsOn = arrayOf(
+            """
+                public interface ObservableValue<T> {
+                }
+            """,
+            """
+                @FunctionalInterface
+                public interface ChangeListener<T> {
+                    void changed(ObservableValue<? extends T> observable, T oldValue, T newValue);
+                }
+            """.trimIndent()
+        ),
+        before = """
+            import java.util.function.Function;
+            class Test {
+            
+                ChangeListener listener = (o, oldVal, newVal) -> {
+                    onChange(o, oldVal, newVal);
+                };
+                
+                protected void onChange(ObservableValue<?> o, Object oldVal, Object newVal) {
+                    String strVal = newVal.toString();
+                    System.out.println(strVal);
+                }
+            }
+        """,
+        after = """
+            import java.util.function.Function;
+            class Test {
+            
+                ChangeListener listener = this::onChange;
+                
+                protected void onChange(ObservableValue<?> o, Object oldVal, Object newVal) {
+                    String strVal = newVal.toString();
+                    System.out.println(strVal);
+                }
+            }
+        """
+    )
+
+    @Suppress("Convert2MethodRef")
+    @Test
+    fun nonStaticMethods() = assertChanged(
+        before = """
+            import java.util.Collections;
+            class Test {
+                Runnable r = () -> run();
+                public void run() {
+                    Collections.singletonList(1).forEach(n -> run());
+                }
+            }
+            
+            class Test2 {
+                Test t = new Test();
+                Runnable r = () -> t.run();
+            }
+        """,
+        after = """
+            import java.util.Collections;
+            class Test {
+                Runnable r = this::run;
+                public void run() {
+                    Collections.singletonList(1).forEach(n -> run());
+                }
+            }
+            
+            class Test2 {
+                Test t = new Test();
+                Runnable r = t::run;
+            }
+        """
+    )
+
+    @Suppress("Convert2MethodRef")
+    @Test
+    fun staticMethods() = assertChanged(
+        before = """
+            import java.util.Collections;
+            class Test {
+                Runnable r = () -> run();
+                public static void run() {
+                    Collections.singletonList(1).forEach(n -> run());
+                }
+            }
+            
+            class Test2 {
+                Runnable r = () -> Test.run();
+            }
+        """,
+        after = """
+            import java.util.Collections;
+            class Test {
+                Runnable r = Test::run;
+                public static void run() {
+                    Collections.singletonList(1).forEach(n -> run());
+                }
+            }
+            
+            class Test2 {
+                Runnable r = Test::run;
+            }
+        """
     )
 
     @Suppress("Convert2MethodRef")
@@ -154,11 +263,13 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
     @Suppress("RedundantCast")
     @Test
     fun castType() = assertChanged(
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             package org.test;
             public class CheckType {
             }
-        """),
+        """
+        ),
         before = """
             import java.util.List;
             import java.util.stream.Collectors;
@@ -312,53 +423,4 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 }
             """
     )
-
-    @Suppress("Convert2MethodRef")
-    @Test
-    fun functionMultiParamReference() = assertChanged(
-        dependsOn = arrayOf(
-            """
-                public interface ObservableValue<T> {
-                }
-            """,
-            """
-                @FunctionalInterface
-                public interface ChangeListener<T> {
-                    void changed(ObservableValue<? extends T> observable, T oldValue, T newValue);
-                }
-            """.trimIndent()
-        ),
-        before =
-        """
-                import java.util.function.Function;
-
-                class Test {
-                
-                    ChangeListener listener = (o, oldVal, newVal) -> {
-                        onChange(o, oldVal, newVal);
-                    };
-                    
-                    protected void onChange(ObservableValue<?> o, Object oldVal, Object newVal) {
-                        String strVal = newVal.toString();
-                        System.out.println(strVal);
-                    }
-                }
-            """,
-        after =
-        """
-                import java.util.function.Function;
-
-                class Test {
-                
-                    ChangeListener listener = this::onChange;
-                    
-                    protected void onChange(ObservableValue<?> o, Object oldVal, Object newVal) {
-                        String strVal = newVal.toString();
-                        System.out.println(strVal);
-                    }
-                }
-            """
-    )
-
-
 }
