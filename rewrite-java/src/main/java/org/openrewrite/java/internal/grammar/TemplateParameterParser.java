@@ -136,7 +136,7 @@ public class TemplateParameterParser extends Parser {
 			setState(11);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while (_la==FullyQualifiedName || _la==Number) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << FullyQualifiedName) | (1L << Number) | (1L << Identifier))) != 0)) {
 				{
 				{
 				setState(8);
@@ -164,6 +164,7 @@ public class TemplateParameterParser extends Parser {
 
 	public static class MatcherParameterContext extends ParserRuleContext {
 		public TerminalNode FullyQualifiedName() { return getToken(TemplateParameterParser.FullyQualifiedName, 0); }
+		public TerminalNode Identifier() { return getToken(TemplateParameterParser.Identifier, 0); }
 		public TerminalNode Number() { return getToken(TemplateParameterParser.Number, 0); }
 		public MatcherParameterContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -193,7 +194,7 @@ public class TemplateParameterParser extends Parser {
 			{
 			setState(16);
 			_la = _input.LA(1);
-			if ( !(_la==FullyQualifiedName || _la==Number) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << FullyQualifiedName) | (1L << Number) | (1L << Identifier))) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -259,7 +260,7 @@ public class TemplateParameterParser extends Parser {
 	public static final String _serializedATN =
 		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\f\27\4\2\t\2\4\3"+
 		"\t\3\4\4\t\4\3\2\3\2\3\2\7\2\f\n\2\f\2\16\2\17\13\2\3\2\3\2\3\3\3\3\3"+
-		"\4\3\4\3\4\2\2\5\2\4\6\2\3\3\2\n\13\2\24\2\b\3\2\2\2\4\22\3\2\2\2\6\24"+
+		"\4\3\4\3\4\2\2\5\2\4\6\2\3\3\2\n\f\2\24\2\b\3\2\2\2\4\22\3\2\2\2\6\24"+
 		"\3\2\2\2\b\t\5\6\4\2\t\r\7\3\2\2\n\f\5\4\3\2\13\n\3\2\2\2\f\17\3\2\2\2"+
 		"\r\13\3\2\2\2\r\16\3\2\2\2\16\20\3\2\2\2\17\r\3\2\2\2\20\21\7\4\2\2\21"+
 		"\3\3\2\2\2\22\23\t\2\2\2\23\5\3\2\2\2\24\25\7\f\2\2\25\7\3\2\2\2\3\r";

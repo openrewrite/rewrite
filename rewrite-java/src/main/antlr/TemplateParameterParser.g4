@@ -8,6 +8,7 @@ matcherPattern
 
 matcherParameter
     :   FullyQualifiedName
+    |   Identifier
     |   Number
     ;
 

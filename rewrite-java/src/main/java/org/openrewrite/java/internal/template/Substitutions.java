@@ -92,7 +92,11 @@ public class Substitutions {
                         String fqn;
 
                         if (params.size() == 1) {
-                            fqn = params.get(0).FullyQualifiedName().getText();
+                            if(params.get(0).Identifier() != null) {
+                                fqn = params.get(0).Identifier().getText();
+                            } else {
+                                fqn = params.get(0).FullyQualifiedName().getText();
+                            }
                         } else {
                             if (!(parameter instanceof TypedTree)) {
                                 // any should only be used on TypedTree parameters, but will give it best effort

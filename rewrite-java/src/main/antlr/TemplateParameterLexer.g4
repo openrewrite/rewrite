@@ -20,7 +20,7 @@ FullyQualifiedName
     |   'short'
     |   'String'
     |   'Object'
-    |   Identifier (DOT Identifier)*
+    |   Identifier (DOT Identifier)+
     ;
 
 Number
