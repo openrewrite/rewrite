@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -77,6 +78,10 @@ public interface Remote extends SourceFile {
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return v instanceof BinaryVisitor;
+    }
+
+    static void applyPatch(List<Remote> remotes, Path projectDir) {
+        
     }
 
     static Builder builder(SourceFile before, URI uri) {
