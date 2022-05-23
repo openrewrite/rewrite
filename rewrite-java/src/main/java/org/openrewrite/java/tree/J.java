@@ -2288,7 +2288,8 @@ public interface J extends Tree {
                         possibleInnerClassName = possibleInnerClassName.substring(possibleInnerClassName.indexOf('$') + 1);
                     }
 
-                    JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
+                    boolean isParameterizedType = qualid.getTarget().getType() instanceof JavaType.Parameterized;
+                    JavaType.Class owner = TypeUtils.asClass(isParameterizedType ? ((JavaType.Parameterized) qualid.getTarget().getType()).getType() : qualid.getTarget().getType());
                     if (owner != null && !(qualid.getTarget().getType() instanceof JavaType.ShallowClass)) {
                         Iterator<JavaType.Method> visibleMethods = owner.getVisibleMethods();
                         while (visibleMethods.hasNext()) {
