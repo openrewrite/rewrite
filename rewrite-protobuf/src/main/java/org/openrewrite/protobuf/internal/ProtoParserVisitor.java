@@ -61,6 +61,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
             statements.add(ProtoRightPadded.build(s).withAfter(
                     (s instanceof Proto.Empty ||
                             s instanceof Proto.Field ||
+                            s instanceof Proto.EnumField ||
                             s instanceof Proto.Import ||
                             s instanceof Proto.MapField ||
                             s instanceof Proto.OptionDeclaration ||

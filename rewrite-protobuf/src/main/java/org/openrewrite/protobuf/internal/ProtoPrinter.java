@@ -387,6 +387,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
                 s instanceof Proto.Field ||
                 s instanceof Proto.Import ||
                 s instanceof Proto.MapField ||
+                s instanceof Proto.EnumField ||
                 s instanceof Proto.OptionDeclaration ||
                 s instanceof Proto.Package ||
                 s instanceof Proto.Reserved ||

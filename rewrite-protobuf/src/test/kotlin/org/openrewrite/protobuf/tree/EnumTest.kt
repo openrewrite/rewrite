@@ -16,6 +16,7 @@
 package org.openrewrite.protobuf.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.protobuf.ProtoParserTest
 
 class EnumTest : ProtoParserTest() {
@@ -26,6 +27,19 @@ class EnumTest : ProtoParserTest() {
             syntax = 'proto2';
             enum MyEnum {
               One = 1;
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1807")
+    @Test
+    fun multipleValues() = assertUnchanged(
+        before = """
+            syntax = 'proto2';
+            enum MyEnum {
+              One = 1;
+              Two = 2;
+              Three = 3;
             }
         """
     )
