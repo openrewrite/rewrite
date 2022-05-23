@@ -13,7 +13,7 @@ dependencies {
     implementation("com.gradle:gradle-enterprise-gradle-plugin:3.10")
     implementation("org.jetbrains.kotlin:kotlin-script-runtime")
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin")
-    implementation("org.owasp:dependency-check-gradle:7.1.0.1")
+    implementation("org.owasp:dependency-check-gradle:latest.release")
     implementation("gradle.plugin.com.hierynomus.gradle.plugins:license-gradle-plugin:0.16.1")
     implementation("com.github.jk1:gradle-license-report:2.0")
     implementation("com.netflix.nebula:gradle-contacts-plugin:6.0.0")
