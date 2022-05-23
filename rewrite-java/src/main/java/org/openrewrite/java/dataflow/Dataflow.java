@@ -25,33 +25,32 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 import java.util.Iterator;
+import java.util.Optional;
 
 @Incubating(since = "7.24.0")
 @RequiredArgsConstructor
 public class Dataflow {
     final Cursor start;
 
-    public <Source extends Expression, Sink extends J> SinkFlow<Source, Sink> findSinks(LocalFlowSpec<Source, Sink> spec) {
-        Iterator<Cursor> cursorPath = start.getPathAsCursors();
-        while (cursorPath.hasNext()) {
-            Cursor cursor = cursorPath.next();
-            Object value = cursor.getValue();
-            if (spec.getSourceType().isAssignableFrom(value.getClass())) {
-                //noinspection unchecked
-                Source source = (Source) value;
+    public <Source extends Expression, Sink extends J> Optional<SinkFlow<Source, Sink>> findSinks(LocalFlowSpec<Source, Sink> spec) {;
+        Object value = start.getValue();
+        if (spec.getSourceType().isAssignableFrom(value.getClass())) {
+            //noinspection unchecked
+            Source source = (Source) value;
+            if (!spec.isSource(source, start)) {
+                return Optional.empty();
+            }
 
-                SinkFlow<Source, Sink> flow = new SinkFlow<>(cursor, spec, start);
-                if (spec.isSource(source, start)) {
-                    ForwardFlow.findSinks(flow);
-                }
+            SinkFlow<Source, Sink> flow = new SinkFlow<>(start, spec);
 
-                if (flow.isNotEmpty()) {
-                    return flow;
-                }
+            ForwardFlow.findSinks(flow);
+
+            if (flow.isNotEmpty()) {
+                return Optional.of(flow);
             }
         }
 
-        return new SinkFlow<>(null, spec, start);
+        return Optional.empty();
     }
 
     public <E extends Expression> SourceFlow<E> findSources(LocalFlowSpec<E, ?> spec) {

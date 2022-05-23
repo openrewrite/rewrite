@@ -64,12 +64,13 @@ public class FindLocalFlowPaths extends JavaIsoVisitor<ExecutionContext> {
 
     @Override
     public Expression visitExpression(Expression expression, ExecutionContext ctx) {
-        SinkFlow<?, ?> flow = dataflow().findSinks(spec);
-        if (flow.isNotEmpty()) {
-            List<SinkFlow<?, ?>> flowGraphs = getCursor().getNearestMessage(FLOW_GRAPHS);
-            assert flowGraphs != null;
-            flowGraphs.add(flow);
-        }
+        dataflow().findSinks(spec).ifPresent(flow -> {
+            if (flow.isNotEmpty()) {
+                List<SinkFlow<?, ?>> flowGraphs = getCursor().getNearestMessage(FLOW_GRAPHS);
+                assert flowGraphs != null;
+                flowGraphs.add(flow);
+            }
+        });
         return expression;
     }
 }

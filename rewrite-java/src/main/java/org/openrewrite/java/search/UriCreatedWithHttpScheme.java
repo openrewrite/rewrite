@@ -68,7 +68,7 @@ public class UriCreatedWithHttpScheme extends Recipe {
             @Override
             public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
                 J.Literal l = super.visitLiteral(literal, ctx);
-                if (dataflow().findSinks(INSECURE_URI_CREATE).isNotEmpty()) {
+                if (dataflow().findSinks(INSECURE_URI_CREATE).isPresent()) {
                     //noinspection ConstantConditions
                     return l.withValue(l.getValue().toString().replace("http://", "https://"))
                             .withValueSource(l.getValueSource().replace("http://", "https://"));
