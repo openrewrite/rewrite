@@ -59,44 +59,44 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
         private static final String ADDED_EXPLICIT_TYPE_KEY = "ADDED_EXPLICIT_TYPE";
 
         @Nullable
-        private TypeTree buildTypeTree(@Nullable JavaType type) {
+        private TypeTree buildTypeTree(@Nullable JavaType type, Space space) {
             if (type == null || type instanceof JavaType.Unknown) {
                 return null;
             } else if (type instanceof JavaType.Primitive) {
                 return new J.Primitive(
                         Tree.randomId(),
-                        Space.EMPTY,
+                        space,
                         Markers.EMPTY,
                         (JavaType.Primitive) type
                 );
             } else if (type instanceof JavaType.Parameterized) {
                 return new J.ParameterizedType(
                         Tree.randomId(),
-                        Space.EMPTY,
+                        space,
                         Markers.EMPTY,
-                        buildTypeTree(((JavaType.Parameterized) type).getType()),
+                        buildTypeTree(((JavaType.Parameterized) type).getType(), Space.EMPTY),
                         buildTypeParameters(((JavaType.Parameterized) type).getTypeParameters())
                 );
             } else if (type instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
                 maybeAddImport(fq);
                 return new J.Identifier(Tree.randomId(),
-                        Space.EMPTY,
+                        space,
                         Markers.EMPTY,
                         fq.getClassName(),
                         type,
                         null
                 );
             } else if (type instanceof JavaType.Array) {
-                return (buildTypeTree(((JavaType.Array) type).getElemType()));
+                return (buildTypeTree(((JavaType.Array) type).getElemType(), space));
             } else if(type instanceof JavaType.Variable) {
-                return buildTypeTree(((JavaType.Variable) type).getType());
+                return buildTypeTree(((JavaType.Variable) type).getType(), space);
             } else if (type instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
 
                 if (!genericType.getName().equals("?")) {
                     return new J.Identifier(Tree.randomId(),
-                            Space.EMPTY,
+                            space,
                             Markers.EMPTY,
                             genericType.getName(),
                             type,
@@ -112,12 +112,12 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
                 }
 
                 if (!genericType.getBounds().isEmpty()) {
-                    boundedType = buildTypeTree(genericType.getBounds().get(0));
+                    boundedType = buildTypeTree(genericType.getBounds().get(0), Space.format(" "));
                 }
 
                 return new J.Wildcard(
                         Tree.randomId(),
-                        Space.EMPTY,
+                        space,
                         Markers.EMPTY,
                         bound,
                         boundedType
@@ -129,9 +129,9 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
         private JContainer<Expression> buildTypeParameters(List<JavaType> typeParameters) {
             List<JRightPadded<Expression>> typeExpressions = new ArrayList<>();
 
-            for (JavaType fred : typeParameters) {
+            for (JavaType type : typeParameters) {
                 typeExpressions.add(new JRightPadded<>(
-                        (Expression) buildTypeTree(fred),
+                        (Expression) buildTypeTree(type, Space.EMPTY),
                         Space.EMPTY,
                         Markers.EMPTY
                 ));
@@ -144,7 +144,7 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
             // if the type expression is null, it implies the types on the lambda arguments are implicit.
             if (multiVariable.getTypeExpression() == null && getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Lambda) {
                 J.VariableDeclarations.NamedVariable nv = multiVariable.getVariables().get(0);
-                TypeTree typeExpression = buildTypeTree(nv.getType());
+                TypeTree typeExpression = buildTypeTree(nv.getType(), Space.EMPTY);
                 if (typeExpression != null) {
                     multiVariable = multiVariable.withTypeExpression(typeExpression);
                     int arrayDimensions = countDimensions(nv.getType());
