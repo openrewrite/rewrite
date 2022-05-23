@@ -58,11 +58,11 @@ interface ExplicitLambdaArgumentTypesTest : JavaRecipeTest {
             import java.util.function.Consumer;
 
             class Test {
-                static void run(Consumer<String> c) {
+                static void run(Consumer<List<String>> c) {
                 }
 
                 static void method() {
-                    run((String a) -> a.length());
+                    run(a -> a.size());
                 }
             }
         """
@@ -470,4 +470,36 @@ interface ExplicitLambdaArgumentTypesTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun parameterizedType(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.Consumer;
+            import java.util.List;
+
+            class Test {
+                static void run(Consumer<List<String>> c) {
+                }
+
+                static void method() {
+                    run(a -> {a.size();});
+                }
+            }
+        """,
+        after = """
+            import java.util.function.Consumer;
+            import java.util.List;
+
+            class Test {
+                static void run(Consumer<List<String>> c) {
+                }
+        
+                static void method() {
+                    run((List<String> a) -> {a.size();});
+                }
+            }
+        """
+    )
+
 }
