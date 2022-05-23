@@ -158,14 +158,12 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     sym.flags_field,
                     sym.flatName().toString(),
                     getKind(sym),
-                    null, null, null, null, null, null
+                    null, null, null, null, null, null, null
             );
 
             typeCache.put(sym.flatName().toString(), clazz);
 
-            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(
-                    JavaType.FullyQualified.Kind.Enum.equals(clazz.getKind()) && isTypeAttributedGeneric(symType.supertype_field) ?
-                            symType.supertype_field.tsym.type : symType.supertype_field));
+            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
             JavaType.FullyQualified owner = null;
             if (sym.owner instanceof Symbol.ClassSymbol) {
@@ -215,7 +213,14 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
 
-            clazz.unsafeSet(supertype, owner, listAnnotations(sym), interfaces, fields, methods);
+            List<JavaType> typeParameters = null;
+            if (symType.typarams_field != null && symType.typarams_field.length() > 0) {
+                typeParameters = new ArrayList<>(symType.typarams_field.length());
+                for (Type tParam : symType.typarams_field) {
+                    typeParameters.add(type(tParam));
+                }
+            }
+            clazz.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
         }
 
         if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
@@ -235,16 +240,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             }
             return pt;
         }
-
         return clazz;
-    }
-
-    private boolean isTypeAttributedGeneric(Type type) {
-        return type.tsym != null && type.tsym.type != null &&
-                type instanceof Type.ClassType &&
-                ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 &&
-                signatureBuilder.classSignature(type).equals(signatureBuilder.classSignature(type.tsym.type)) &&
-                !signatureBuilder.parameterizedSignature(type).equals(signatureBuilder.parameterizedSignature(type.tsym.type));
     }
 
     private JavaType.Class.Kind getKind(Symbol.ClassSymbol sym) {
@@ -439,7 +435,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                         if (exceptionType instanceof Type.ClassType) {
                             Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
                             javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                    null, null, null, null, null, null);
+                                    null, null, null, null, null, null, null);
                         }
                     }
                     if (javaType != null) {
@@ -528,7 +524,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                             if (exceptionType instanceof Type.ClassType) {
                                 Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
                                 javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                        null, null, null, null, null, null);
+                                        null, null, null, null, null, null, null);
                             }
                         }
                         if (javaType != null) {
@@ -601,7 +597,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     continue;
                 }
                 Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if(retention != null && retention.value() == RetentionPolicy.SOURCE) {
+                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
                     continue;
                 }
                 annotations.add(annotType);

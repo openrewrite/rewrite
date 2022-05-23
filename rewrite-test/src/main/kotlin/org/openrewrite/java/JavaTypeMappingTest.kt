@@ -184,7 +184,7 @@ interface JavaTypeMappingTest {
 
         val supertype = clazz.supertype
         assertThat(supertype).isNotNull
-        assertThat(supertype!!.toString()).isEqualTo("java.lang.Enum<Generic{E extends }>")
+        assertThat(supertype!!.toString()).isEqualTo("java.lang.Enum<org.openrewrite.java.JavaTypeGoat${"$"}EnumTypeA>")
     }
 
     @Issue("https://github.com/openrewrite/rewrite/pull/1453")
@@ -196,7 +196,7 @@ interface JavaTypeMappingTest {
 
         val supertype = clazz.supertype
         assertThat(supertype).isNotNull
-        assertThat(supertype!!.toString()).isEqualTo("java.lang.Enum<Generic{E extends }>")
+        assertThat(supertype!!.toString()).isEqualTo("java.lang.Enum<org.openrewrite.java.JavaTypeGoat${"$"}EnumTypeB>")
     }
 
     @Test
