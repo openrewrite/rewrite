@@ -298,18 +298,13 @@ public class TypeUtils {
         }
 
         Map<JavaType, JavaType> parameterMap = new IdentityHashMap<>();
-        List<JavaType> declaringTypeParams = null;
-        JavaType.FullyQualified fullyQualified = m.getDeclaringType();
-        if (fullyQualified instanceof JavaType.Class) {
-            declaringTypeParams = ((JavaType.Class) fullyQualified).getTypeParameters();
-        }
-        if (declaringTypeParams != null) {
-            List<JavaType> typeParameters = clazz.getTypeParameters();
-            for (int j = 0; j < typeParameters.size(); j++) {
-                JavaType typeAttributed = typeParameters.get(j);
-                JavaType generic = declaringTypeParams.get(j);
-                parameterMap.put(generic, typeAttributed);
-            }
+        List<JavaType> declaringTypeParams = m.getDeclaringType().getTypeParameters();
+
+        List<JavaType> typeParameters = clazz.getTypeParameters();
+        for (int j = 0; j < typeParameters.size(); j++) {
+            JavaType typeAttributed = typeParameters.get(j);
+            JavaType generic = declaringTypeParams.get(j);
+            parameterMap.put(generic, typeAttributed);
         }
 
         for (int i = 0; i < mArgs.size(); i++) {
