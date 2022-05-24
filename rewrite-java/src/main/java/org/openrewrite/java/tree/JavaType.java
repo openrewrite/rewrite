@@ -125,6 +125,8 @@ public interface JavaType {
 
         public abstract List<Method> getMethods();
 
+        public abstract List<JavaType> getTypeParameters();
+
         public Iterator<Method> getVisibleMethods() {
             return getVisibleMethods(getPackageName());
         }
@@ -293,6 +295,10 @@ public interface JavaType {
         @With
         Kind kind;
 
+        @NonFinal
+        @Nullable
+        List<JavaType> typeParameters;
+
         @With
         @Nullable
         @NonFinal
@@ -308,13 +314,14 @@ public interface JavaType {
         List<FullyQualified> annotations;
 
         public Class(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName,
-                     Kind kind, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+                     Kind kind, @Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
                      @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
                      @Nullable List<Variable> members, @Nullable List<Method> methods) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_CLASS_FLAGS;
             this.fullyQualifiedName = fullyQualifiedName;
             this.kind = kind;
+            this.typeParameters = nullIfEmpty(typeParameters);
             this.supertype = supertype;
             this.owningClass = owningClass;
             this.annotations = nullIfEmpty(annotations);
@@ -339,8 +346,8 @@ public interface JavaType {
             if (annotations == this.annotations) {
                 return this;
             }
-            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
-                    this.owningClass, annotations, this.interfaces, this.members, this.methods);
+            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.typeParameters,
+                    this.supertype, this.owningClass, annotations, this.interfaces, this.members, this.methods);
         }
 
         @Nullable
@@ -358,8 +365,8 @@ public interface JavaType {
             if (interfaces == this.interfaces) {
                 return this;
             }
-            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
-                    this.owningClass, this.annotations, interfaces, this.members, this.methods);
+            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.typeParameters,
+                    this.supertype, this.owningClass, this.annotations, interfaces, this.members, this.methods);
         }
 
         @Nullable
@@ -377,8 +384,8 @@ public interface JavaType {
             if (members == this.members) {
                 return this;
             }
-            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
-                    this.owningClass, this.annotations, this.interfaces, members, this.methods);
+            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.typeParameters,
+                    this.supertype, this.owningClass, this.annotations, this.interfaces, members, this.methods);
         }
 
         @Nullable
@@ -396,8 +403,8 @@ public interface JavaType {
             if (methods == this.methods) {
                 return this;
             }
-            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.supertype,
-                    this.owningClass, this.annotations, this.interfaces, this.members, methods);
+            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, this.typeParameters,
+                    this.supertype, this.owningClass, this.annotations, this.interfaces, this.members, methods);
         }
 
         @Override
@@ -411,14 +418,35 @@ public interface JavaType {
         }
 
         @Override
+        public List<JavaType> getTypeParameters() {
+            return typeParameters == null ? emptyList() : typeParameters;
+        }
+
+        public Class withTypeParameters(@Nullable List<JavaType> typeParameters) {
+            if (typeParameters != null && typeParameters.isEmpty()) {
+                typeParameters = null;
+            }
+            if (typeParameters == this.typeParameters) {
+                return this;
+            }
+            return new Class(this.managedReference, this.flagsBitMap, this.fullyQualifiedName, this.kind, typeParameters,
+                    this.supertype, this.owningClass, this.annotations, this.interfaces, this.members, methods);
+        }
+
+        public boolean isParameterized() {
+            return typeParameters != null && !typeParameters.isEmpty();
+        }
+
+        @Override
         public Class unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
             return this;
         }
 
-        public Class unsafeSet(@Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+        public Class unsafeSet(@Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
                                @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
                                @Nullable List<Variable> members, @Nullable List<Method> methods) {
+            this.typeParameters = nullIfEmpty(typeParameters);
             this.supertype = supertype;
             this.owningClass = owningClass;
             this.annotations = nullIfEmpty(annotations);
@@ -433,7 +461,8 @@ public interface JavaType {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Class aClass = (Class) o;
-            return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName);
+            return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName) &&
+                    (typeParameters == null && aClass.typeParameters == null || typeParameters != null && typeParameters.equals(aClass.typeParameters));
         }
 
         @Override
@@ -443,8 +472,10 @@ public interface JavaType {
     }
 
     class ShallowClass extends Class {
-        public ShallowClass(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName, Kind kind, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass, @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces, @Nullable List<Variable> members, @Nullable List<Method> methods) {
-            super(managedReference, flagsBitMap, fullyQualifiedName, kind, supertype, owningClass, annotations, interfaces, members, methods);
+        public ShallowClass(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName, Kind kind,
+                            @Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+                            @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces, @Nullable List<Variable> members, @Nullable List<Method> methods) {
+            super(managedReference, flagsBitMap, fullyQualifiedName, kind, typeParameters, supertype, owningClass, annotations, interfaces, members, methods);
         }
 
         /**
@@ -475,7 +506,7 @@ public interface JavaType {
                 owningClass = build(fullyQualifiedName.substring(0, lastDot));
             }
 
-            return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, null, owningClass,
+            return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, emptyList(), null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
         }
     }
@@ -509,6 +540,7 @@ public interface JavaType {
             return type;
         }
 
+        @Override
         public List<JavaType> getTypeParameters() {
             return typeParameters == null ? emptyList() : typeParameters;
         }
@@ -1225,6 +1257,11 @@ public interface JavaType {
         @Override
         public FullyQualified getSupertype() {
             return null;
+        }
+
+        @Override
+        public List<JavaType> getTypeParameters() {
+            return emptyList();
         }
 
         @Override

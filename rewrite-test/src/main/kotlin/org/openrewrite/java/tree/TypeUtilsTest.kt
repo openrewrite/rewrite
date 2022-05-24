@@ -16,7 +16,6 @@
 package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
@@ -97,7 +96,6 @@ interface TypeUtilsTest : RewriteTest {
         }}
     )
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1782")
     @Test
     fun isOverrideConsidersTypeParameterPositions(jp: JavaParser) = rewriteRun(

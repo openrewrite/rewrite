@@ -23,6 +23,7 @@ public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
     @Override
     public JavaType visitClass(JavaType.Class aClass, P p) {
         return aClass.unsafeSet(
+                ListUtils.map(aClass.getTypeParameters(), t -> visit(t, p)),
                 (JavaType.FullyQualified) visit(aClass.getSupertype(), p),
                 (JavaType.FullyQualified) visit(aClass.getOwningClass(), p),
                 ListUtils.map(aClass.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)),

@@ -134,7 +134,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                     clazz.getModifiers(),
                     className,
                     kind,
-                    null, null, null, null, null, null
+                    null, null, null, null, null, null, null
             );
 
             typeCache.put(className, mappedClazz);
@@ -200,7 +200,14 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
             }
 
-            mappedClazz.unsafeSet(supertype, owner, annotations, interfaces, members, methods);
+            List<JavaType> typeParameters = null;
+            if (clazz.getTypeParameters().length > 0) {
+                typeParameters = new ArrayList<>(clazz.getTypeParameters().length);
+                for (Type tParam : clazz.getTypeParameters()) {
+                    typeParameters.add(type(tParam));
+                }
+            }
+            mappedClazz.unsafeSet(typeParameters, supertype, owner, annotations, interfaces, members, methods);
         }
 
         return mappedClazz;
