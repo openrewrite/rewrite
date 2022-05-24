@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.dataflow
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.java.tree.Expression
@@ -257,9 +256,6 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                         source()
                             .toString();
                         source()
-                            .toString()
-                            .toString();
-                        source()
                             .toLowerCase(Locale.ROOT);
                         source()
                             .toString()
@@ -276,9 +272,6 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                     void test() {
                         /*~~>*/source();
                         /*~~>*//*~~>*/source()
-                            .toString();
-                        /*~~>*//*~~>*//*~~>*/source()
-                            .toString()
                             .toString();
                         /*~~>*/source()
                             .toLowerCase(Locale.ROOT);
@@ -406,6 +399,117 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                         ).toString();
                     }
                 }
+                """
+        )
+    )
+
+    @Test
+    fun `source is tracked when assigned in while loop control parentheses`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    @SuppressWarnings("SillyAssignment")
+                    void test() {
+                        String a;
+                        a = a;
+                        while ((a = source()) != null) {
+                            System.out.println(a);
+                        }
+                    }
+                }
+            """,
+            """
+            class Test {
+                String source() {
+                    return null;
+                }
+                @SuppressWarnings("SillyAssignment")
+                void test() {
+                    String a;
+                    a = a;
+                    while ((a = /*~~>*/source()) != null) {
+                        System.out.println(/*~~>*/a);
+                    }
+                }
+            }
+                """
+        )
+    )
+
+    @Test
+    fun `source is tracked when assigned in do while loop control parentheses`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    @SuppressWarnings("SillyAssignment")
+                    void test() {
+                        String a = null;
+                        a = a;
+                        do {
+                            System.out.println(a);
+                        } while ((a = source()) != null);
+                    }
+                }
+            """,
+            """
+            class Test {
+                String source() {
+                    return null;
+                }
+                @SuppressWarnings("SillyAssignment")
+                void test() {
+                    String a = null;
+                    a = a;
+                    do {
+                        System.out.println(/*~~>*/a);
+                    } while ((a = /*~~>*/source()) != null);
+                }
+            }
+                """
+        )
+    )
+
+    @Test
+    fun `source is tracked when assigned in for loop`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String source(int i) {
+                        return null;
+                    }
+                    @SuppressWarnings("SillyAssignment")
+                    void test() {
+                        String a = null;
+                        a = a;
+                        for (int i = 0; i < 10 && (a = source(i)) != null; i++) {
+                            System.out.println(a);
+                        }
+                    }
+                }
+            """,
+            """
+            class Test {
+                String source(int i) {
+                    return null;
+                }
+                @SuppressWarnings("SillyAssignment")
+                void test() {
+                    String a = null;
+                    a = a;
+                    for (int i = 0; i < 10 && (a = /*~~>*/source(i)) != null; i++) {
+                        System.out.println(/*~~>*/a);
+                    }
+                }
+            }
                 """
         )
     )

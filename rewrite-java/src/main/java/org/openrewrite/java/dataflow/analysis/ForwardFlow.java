@@ -39,8 +39,10 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         if (variableNameToFlowGraph.nextVariableName != null) {
             // The parent statement of the source. Data flow can not start before the source.
             Object taintStmt = null;
+            Cursor taintStmtCursorParent = null;
             while (cursorPath.hasNext()) {
-                Object next = cursorPath.next().getValue();
+                taintStmtCursorParent = cursorPath.next();
+                Object next = taintStmtCursorParent.getValue();
                 if (next instanceof J.Block) {
                     break;
                 }
@@ -53,14 +55,30 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             initialFlow.put(variableNameToFlowGraph.nextVariableName, variableNameToFlowGraph.nextFlowGraph);
             Analysis analysis = new Analysis(initialFlow);
 
-            boolean seenRoot = false;
-            Cursor blockCursor = root.getCursor().dropParentUntil(J.Block.class::isInstance);
-            for (Statement statement : ((J.Block) blockCursor.getValue()).getStatements()) {
-                if (seenRoot) {
-                    analysis.visit(statement,0, blockCursor);
+            if (taintStmt instanceof J.WhileLoop ||
+                    taintStmt instanceof J.DoWhileLoop ||
+                    taintStmt instanceof J.ForLoop) {
+                // This occurs when an assignment occurs within the control parenthesis of a loop
+                Statement body;
+                if (taintStmt instanceof J.WhileLoop) {
+                    body = ((J.WhileLoop) taintStmt).getBody();
+                } else if (taintStmt instanceof J.DoWhileLoop) {
+                    body = ((J.DoWhileLoop) taintStmt).getBody();
+                } else {
+                    body = ((J.ForLoop) taintStmt).getBody();
                 }
-                if (statement == taintStmt) {
-                    seenRoot = true;
+                analysis.visit(body, 0, taintStmtCursorParent);
+            } else {
+                // This is when assignment occurs within the body of a block
+                boolean seenRoot = false;
+                Cursor blockCursor = root.getCursor().dropParentUntil(J.Block.class::isInstance);
+                for (Statement statement : ((J.Block) blockCursor.getValue()).getStatements()) {
+                    if (seenRoot) {
+                        analysis.visit(statement, 0, blockCursor);
+                    }
+                    if (statement == taintStmt) {
+                        seenRoot = true;
+                    }
                 }
             }
         }
@@ -109,7 +127,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                 VariableNameToFlowGraph variableNameToFlowGraph =
                         computeVariableAssignment(getCursor().getPathAsCursors(), next);
 
-                if(variableNameToFlowGraph.nextVariableName != null) {
+                if (variableNameToFlowGraph.nextVariableName != null) {
                     flowsByIdentifier.peek().put(
                             variableNameToFlowGraph.nextVariableName,
                             variableNameToFlowGraph.nextFlowGraph
