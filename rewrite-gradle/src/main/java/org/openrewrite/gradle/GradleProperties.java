@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.regex.Pattern;
 
 class GradleProperties {
     private GradleProperties() {}
@@ -27,4 +28,6 @@ class GradleProperties {
     static final Path WRAPPER_PROPERTIES_LOCATION = Paths.get("gradle/wrapper/gradle-wrapper.properties");
     static final Path WRAPPER_SCRIPT_LOCATION = Paths.get("gradlew");
     static final Path WRAPPER_BATCH_LOCATION = Paths.get("gradlew.bat");
+
+    static final Pattern VERSION_EXTRACTING_PATTERN = Pattern.compile("/gradle-([-a-zA-Z\\d.+]+)-[a-zA-Z]+.zip");
 }

@@ -31,6 +31,7 @@ public interface SourceFile extends Tree {
 
     <T extends SourceFile> T withSourcePath(Path path);
 
+    @Nullable
     Charset getCharset();
 
     <T extends SourceFile> T withCharset(Charset charset);

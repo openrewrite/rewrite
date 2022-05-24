@@ -25,11 +25,9 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.remote.Remote;
-import org.openrewrite.remote.RemoteArchive;
 import org.openrewrite.text.PlainText;
 
 import java.net.URI;
-import java.nio.file.Paths;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -79,6 +77,17 @@ public class AddGradleWrapper extends Recipe {
     )
     @Nullable
     String distributionUrl;
+
+    @Option(displayName = "Skip checksum validation",
+            description = "All official Gradle builds have sha256 checksums for the gradle-wrapper.jar published " +
+                    "alongside the distribution. If your organization has a customized Gradle distribution, and you " +
+                    "don't publish gradle-wrapper.jar.sha256 alongside it, you can set this to `true` to opt-out of " +
+                    "checksum validation.",
+            example = "false",
+            required = false
+    )
+    @Nullable
+    Boolean skipChecksum;
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
@@ -130,8 +139,7 @@ public class AddGradleWrapper extends Recipe {
         }
 
         if (needsGradleWrapperJar) {
-            RemoteArchive gradleWrapperJar = Remote.builder(WRAPPER_JAR_LOCATION, URI.create(getDistributionUrl()))
-                    .build(Paths.get("gradle-" + getVersion() + "/lib/gradle-wrapper-" + getVersion() + ".jar"));
+            Remote gradleWrapperJar = RemoteGradleWrapperJar.build(URI.create(getDistributionUrl()), Boolean.TRUE.equals(skipChecksum));
             gradleWrapper.add(gradleWrapperJar);
         }
 

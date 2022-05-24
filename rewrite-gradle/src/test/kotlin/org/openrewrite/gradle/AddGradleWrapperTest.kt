@@ -17,12 +17,13 @@ package org.openrewrite.gradle
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Checksum
 import org.openrewrite.PathUtils
 import org.openrewrite.Tree.randomId
 import org.openrewrite.gradle.GradleProperties.WRAPPER_JAR_LOCATION
 import org.openrewrite.marker.Markers
 import org.openrewrite.properties.tree.Properties
-import org.openrewrite.remote.RemoteArchive
+import org.openrewrite.remote.Remote
 import org.openrewrite.text.PlainText
 import java.net.URI
 import java.nio.file.Paths
@@ -31,10 +32,12 @@ import java.nio.file.Paths
 class AddGradleWrapperTest {
     private val gradlew = PlainText(randomId(), Paths.get("gradlew"), Markers.EMPTY, null, false, null, null, "")
     private val gradlewBat = PlainText(randomId(), Paths.get("gradlew.bat"), Markers.EMPTY, null, false, null, null, "")
+    // Checksum from https://services.gradle.org/distributions/gradle-7.4.2-wrapper.jar.sha256
+    private val expectedChecksum = Checksum.fromHex("SHA-256", "575098db54a998ff1c6770b352c3b16766c09848bee7555dab09afc34e8cf590")
 
     @Test
     fun addWrapper() {
-        val result = AddGradleWrapper("7.4.2", "bin", null)
+        val result = AddGradleWrapper("7.4.2", "bin", null, null)
             .run(listOf())
             .map { it.after }
         assertThat(result.size).isEqualTo(4)
@@ -59,15 +62,15 @@ class AddGradleWrapperTest {
         assertThat(gradleBat.text).isNotBlank
         assertThat(gradleBat.fileAttributes!!.isExecutable).isTrue
 
-        val gradleWrapperJar = result.filterIsInstance<RemoteArchive>().first { it.sourcePath.endsWith("gradle-wrapper.jar") }
-        assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.path, Paths.get("gradle-7.4.2/lib/gradle-wrapper-7.4.2.jar"))).isTrue
+        val gradleWrapperJar = result.filterIsInstance<Remote>().first { it.sourcePath.endsWith("gradle-wrapper.jar") }
         assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.sourcePath, WRAPPER_JAR_LOCATION))
         assertThat(gradleWrapperJar.uri).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"))
+        assertThat(gradleWrapperJar.checksum).isEqualTo(expectedChecksum)
     }
 
     @Test
     fun addWrapperCustomDistributionUrl() {
-        val result = AddGradleWrapper(null, null, "https://downloads.example.com/distributions/gradle-7.4.2-bin.zip")
+        val result = AddGradleWrapper(null, null, "https://downloads.example.com/distributions/gradle-7.4.2-bin.zip", true)
             .run(listOf())
             .map { it.after }
         assertThat(result.size).isEqualTo(4)
@@ -90,15 +93,15 @@ class AddGradleWrapperTest {
         val gradleBat = result.filterIsInstance<PlainText>().first { it.sourcePath.endsWith("gradlew.bat") }
         assertThat(gradleBat.text).isNotBlank
 
-        val gradleWrapperJar = result.filterIsInstance<RemoteArchive>().first { it.sourcePath.endsWith("gradle-wrapper.jar") }
-        assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.path, Paths.get("gradle-7.4.2/lib/gradle-wrapper-7.4.2.jar"))).isTrue
+        val gradleWrapperJar = result.filterIsInstance<Remote>().first { it.sourcePath.endsWith("gradle-wrapper.jar") }
         assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.sourcePath, WRAPPER_JAR_LOCATION))
         assertThat(gradleWrapperJar.uri).isEqualTo(URI.create("https://downloads.example.com/distributions/gradle-7.4.2-bin.zip"))
+        assertThat(gradleWrapperJar.checksum).isEqualTo(null)
     }
 
     @Test
     fun addWrapperWhenIncomplete() {
-        val result = AddGradleWrapper("7.4.2", "bin", null)
+        val result = AddGradleWrapper("7.4.2", "bin", null, null)
             .run(listOf(gradlew, gradlewBat))
             .map { it.after }
         assertThat(result.size).isEqualTo(2)
@@ -115,9 +118,9 @@ class AddGradleWrapperTest {
             """.trimIndent()
         )
 
-        val gradleWrapperJar = result.filterIsInstance<RemoteArchive>().first { it.sourcePath.endsWith("gradle-wrapper.jar") }
-        assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.path, Paths.get("gradle-7.4.2/lib/gradle-wrapper-7.4.2.jar"))).isTrue
+        val gradleWrapperJar = result.filterIsInstance<Remote>().first { it.sourcePath.endsWith("gradle-wrapper.jar") }
         assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.sourcePath, WRAPPER_JAR_LOCATION))
         assertThat(gradleWrapperJar.uri).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"))
+        assertThat(gradleWrapperJar.checksum).isEqualTo(expectedChecksum)
     }
 }

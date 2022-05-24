@@ -24,15 +24,12 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.quark.Quark;
-import org.openrewrite.remote.Remote;
 import org.openrewrite.text.PlainText;
 
 import java.net.URI;
-import java.nio.file.Paths;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.GradleProperties.*;
@@ -60,6 +57,17 @@ public class UpdateGradleWrapper extends Recipe {
     )
     @Nullable
     String distributionUrl;
+
+    @Option(displayName = "Skip checksum validation",
+            description = "All official Gradle builds have sha256 checksums for the gradle-wrapper.jar published " +
+                    "alongside the distribution. If your organization has a customized Gradle distribution, and you " +
+                    "don't publish gradle-wrapper.jar.sha256 alongside it, you can set this to `true` to opt-out of " +
+                    "checksum validation.",
+            example = "false",
+            required = false
+    )
+    @Nullable
+    Boolean skipChecksum;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
@@ -95,7 +103,6 @@ public class UpdateGradleWrapper extends Recipe {
         return distributionUrl;
     }
 
-    private static final Pattern VERSION_EXTRACTING_PATTERN = Pattern.compile("/gradle-([-a-zA-Z\\d.+]+)-[a-zA-Z]+.zip");
     private String getVersion() {
         if(distributionUrl == null) {
             return DEFAULT_VERSION;
@@ -134,9 +141,10 @@ public class UpdateGradleWrapper extends Recipe {
                         return (Properties.File) new UpdateWrapperPropsVisitor().visitNonNull(sourceFile, ctx);
                     }
                     if(sourceFile instanceof Quark && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
-                        return Remote.builder(WRAPPER_JAR_LOCATION, URI.create(getDistributionUrl()))
-                                .build(Paths.get("gradle-" + getVersion() + "/lib/gradle-wrapper-" + getVersion() + ".jar"))
-                                .withId(sourceFile.getId());
+                        return RemoteGradleWrapperJar.build(URI.create(getDistributionUrl()), Boolean.TRUE.equals(skipChecksum))
+                                .withId(sourceFile.getId())
+                                .withMarkers(sourceFile.getMarkers());
+
                     }
                     return sourceFile;
                 });

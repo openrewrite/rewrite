@@ -21,7 +21,7 @@ import org.openrewrite.ipc.http.HttpSender;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.DigestInputStream;
@@ -58,6 +58,30 @@ public class Checksum {
         }
 
         return new Checksum(algorithm, value);
+    }
+
+    /**
+     * Interprets the URI as pointing to a UTF-8 encoded text file which contains only a base-16 number representing a
+     * checksum. The ending of the URL is used to determine the algorithm that should be used.
+     */
+    public static Checksum fromUri(HttpSender httpSender, URI uri) {
+       String uriStr = uri.toString();
+       if(uriStr.endsWith(".sha256")) {
+           return fromUri(httpSender, uri, "SHA-256");
+       } else if(uriStr.endsWith(".md5")) {
+           return fromUri(httpSender, uri, "MD5");
+       }
+       throw new IllegalArgumentException("Unable to automatically determine checksum type from URI: " + uriStr);
+    }
+
+    public static Checksum fromUri(HttpSender httpSender, URI uri, String algorithm) {
+        HttpSender.Request request = HttpSender.Request.build(uri.toString(), httpSender)
+                .withMethod(HttpSender.Method.GET)
+                .build();
+        try(HttpSender.Response response = httpSender.send(request)) {
+            String hexString = new String(response.getBodyAsBytes(), StandardCharsets.UTF_8);
+            return Checksum.fromHex(algorithm, hexString);
+        }
     }
 
     public static SourceFile md5(SourceFile sourceFile) {

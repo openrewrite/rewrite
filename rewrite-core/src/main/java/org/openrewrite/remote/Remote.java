@@ -40,6 +40,7 @@ import java.util.UUID;
  * later downloaded it can be configured correctly.
  * If no Charset is configured the downloaded file will be interpreted as binary data.
  * If no FileAttributes are set the downloaded file will be marked as readable and writable but not executable.
+ * If a Checksum is provided it will be used to validate the integrity of the downloaded file.
  */
 public interface Remote extends SourceFile {
     URI getUri();

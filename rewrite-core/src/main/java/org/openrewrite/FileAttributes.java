@@ -32,10 +32,13 @@ import java.util.List;
 @Value
 @With
 public class FileAttributes {
+    @Nullable
     ZonedDateTime creationTime;
 
+    @Nullable
     ZonedDateTime lastModifiedTime;
 
+    @Nullable
     ZonedDateTime lastAccessTime;
 
     boolean isReadable;
