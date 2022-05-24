@@ -36,14 +36,7 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                     }
 
                 override fun isSink(expr: Expression, cursor: Cursor) =
-                    when (expr) {
-                        is J.Literal -> true
-                        is J.Identifier -> true
-                        else -> {
-                            cursor.firstEnclosing(J.MethodInvocation::class.java)?.select == expr ||
-                                isSource(expr, cursor)
-                        }
-                    }
+                    true
             })
         })
     }
@@ -155,7 +148,7 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                 class Test {
                     void test() {
                         String n = /*~~>*/"42";
-                        String o = /*~~>*/n.toString() + '/';
+                        String o = /*~~>*//*~~>*/n.toString() + '/';
                         System.out.println(o);
                         String p = o;
                     }
@@ -282,16 +275,49 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                     }
                     void test() {
                         /*~~>*/source();
-                        /*~~>*/source()
-                            /*~~>*/.toString();
-                        /*~~>*/source()
-                            /*~~>*/.toString()
-                            /*~~>*/.toString();
+                        /*~~>*//*~~>*/source()
+                            .toString();
+                        /*~~>*//*~~>*//*~~>*/source()
+                            .toString()
+                            .toString();
                         /*~~>*/source()
                             .toLowerCase(Locale.ROOT);
-                        /*~~>*/source()
-                            /*~~>*/.toString()
+                        /*~~>*//*~~>*/source()
+                            .toString()
                             .toLowerCase(Locale.ROOT);
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `the source is also a sink double call chain`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        source()
+                            .toString()
+                            .toString();
+                    }
+                }
+            """,
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        /*~~>*//*~~>*//*~~>*/source()
+                            .toString()
+                            .toString();
                     }
                 }
                 """
@@ -373,7 +399,7 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                         return null;
                     }
                     void test() {
-                        /*~~>*/(
+                        /*~~>*//*~~>*/(
                             /*~~>*/(String)/*~~>*/(
                                 /*~~>*/(Object) /*~~>*/source()
                             )

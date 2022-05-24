@@ -156,9 +156,10 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                     FlowGraph next = new FlowGraph(ancestorCursor);
                     nextFlowGraph.getEdges().add(next);
                     nextFlowGraph = next;
+                } else {
+                    // If the method invocation is not `toString` on a `String`, it's not dataflow
+                    break;
                 }
-                // If the method invocation is not `toString` on a `String`, it's not dataflow
-                break;
             } else if (ancestor instanceof J.TypeCast || ancestor instanceof J.Parentheses || ancestor instanceof J.ControlParentheses) {
                 if (nextFlowGraph.getEdges().isEmpty()) {
                     nextFlowGraph.setEdges(new ArrayList<>(1));
