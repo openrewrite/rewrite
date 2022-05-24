@@ -13,21 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle;
+package org.openrewrite.gradle.util;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RemoteGradleWrapperJarTest {
+public class GradleWrapperTest {
 
     @Test
-    void gradleWrapper() {
-        RemoteGradleWrapperJar remoteArchive =
-                new GradleWrapper("7.4.2", GradleWrapper.DistributionType.Bin).asRemote();
-        assertThat(remoteArchive.getInputStream(new HttpUrlConnectionSender()))
-                .isNotEmpty();
+    void wrapper() {
+        GradleWrapper gw = GradleWrapper.validate("7.x", "bin", new HttpUrlConnectionSender()).getValue();
+        assertThat(gw).isNotNull();
+        assertThat(gw.getVersion()).startsWith("7.");
     }
 }

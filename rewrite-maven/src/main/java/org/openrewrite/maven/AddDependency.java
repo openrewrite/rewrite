@@ -59,7 +59,7 @@ public class AddDependency extends Recipe {
     private final String artifactId;
 
     @Option(displayName = "Version",
-            description = "An exact version number, or node-style semver selector used to select the version number.",
+            description = "An exact version number or node-style semver selector used to select the version number.",
             example = "29.X")
     private final String version;
 

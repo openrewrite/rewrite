@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Checksum
 import org.openrewrite.PathUtils
 import org.openrewrite.Tree.randomId
-import org.openrewrite.gradle.GradleProperties.*
+import org.openrewrite.gradle.util.GradleWrapper.*
 import org.openrewrite.marker.Markers
 import org.openrewrite.properties.PropertiesParser
 import org.openrewrite.properties.tree.Properties
@@ -36,8 +36,6 @@ class UpdateGradleWrapperTest {
     private val gradlew = PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY,null, false, null, null,"")
     private val gradlewBat = PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY, null, false, null, null,"")
     private val gradleWrapperJarQuark = Quark(randomId(), WRAPPER_JAR_LOCATION, Markers.EMPTY, null, null)
-    // Checksum from https://services.gradle.org/distributions/gradle-7.4.2-wrapper.jar.sha256
-    private val expectedChecksum = Checksum.fromHex("SHA-256", "575098db54a998ff1c6770b352c3b16766c09848bee7555dab09afc34e8cf590")
 
     @Test
     fun updateVersionAndDistribution() {
@@ -77,6 +75,5 @@ class UpdateGradleWrapperTest {
         val gradleWrapperJar = result.filterIsInstance<Remote>().first { it.sourcePath.endsWith("gradle-wrapper.jar") }
         assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.sourcePath, WRAPPER_JAR_LOCATION))
         assertThat(gradleWrapperJar.uri).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"))
-        assertThat(gradleWrapperJar.checksum).isEqualTo(expectedChecksum)
     }
 }

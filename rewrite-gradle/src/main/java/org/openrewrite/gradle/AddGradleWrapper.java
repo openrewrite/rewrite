@@ -15,28 +15,30 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.*;
+import lombok.experimental.NonFinal;
 import org.openrewrite.*;
+import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.properties.tree.Properties;
-import org.openrewrite.remote.Remote;
 import org.openrewrite.text.PlainText;
 
-import java.net.URI;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.gradle.GradleProperties.*;
+import static org.openrewrite.gradle.util.GradleWrapper.*;
 
 @Value
+@RequiredArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = true)
 public class AddGradleWrapper extends Recipe {
 
@@ -50,47 +52,38 @@ public class AddGradleWrapper extends Recipe {
         return "Add a Gradle wrapper where one does not exist.";
     }
 
-    @Option(displayName = "Version",
-            description = "The version of Gradle to use. Defaults to " + DEFAULT_VERSION,
-            example = DEFAULT_VERSION,
-            required = false
-    )
-    @Nullable
+    @Option(displayName = "New version",
+            description = "An exact version number or node-style semver selector used to select the version number.",
+            example = "7.x")
     String version;
 
     @Option(displayName = "Distribution type",
             description = "The distribution of Gradle to use. \"bin\" includes Gradle binaries. " +
                     "\"all\" includes Gradle binaries, source code, and documentation. " +
                     "Defaults to \"bin\".",
-            example = "bin",
+            valid = {"bin", "all"},
             required = false
     )
     @Nullable
     String distribution;
 
-    @Option(displayName = "Distribution Url",
-            description = "The URL to download the Gradle distribution from. Providing the distribution " +
-                    "url overrides the \"Version\" and \"Distribution type\" parameters. This is intended " +
-                    "to cover customized distributions of the Gradle wrapper.",
-            example = "https://services.gradle.org/distributions/gradle-" + DEFAULT_VERSION + "-" + DEFAULT_DISTRIBUTION + ".zip",
-            required = false
-    )
-    @Nullable
-    String distributionUrl;
+    @NonFinal
+    Validated gradleWrapper;
 
-    @Option(displayName = "Skip checksum validation",
-            description = "All official Gradle builds have sha256 checksums for the gradle-wrapper.jar published " +
-                    "alongside the distribution. If your organization has a customized Gradle distribution, and you " +
-                    "don't publish gradle-wrapper.jar.sha256 alongside it, you can set this to `true` to opt-out of " +
-                    "checksum validation.",
-            example = "false",
-            required = false
-    )
-    @Nullable
-    Boolean skipChecksum;
+    @Override
+    public Validated validate() {
+        if (gradleWrapper == null) {
+            gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution,
+                    new HttpUrlConnectionSender()));
+        }
+        return gradleWrapper;
+    }
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+        GradleWrapper gradleWrapper = validate().getValue();
+        assert gradleWrapper != null;
+
         boolean needsGradleWrapperProperties = true;
         boolean needsGradleWrapperJar = true;
         boolean needsGradleShellScript = true;
@@ -102,69 +95,49 @@ public class AddGradleWrapper extends Recipe {
                 needsGradleShellScript = false;
             } else if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
                 needsGradleBatchScript = false;
-            } else if(equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
+            } else if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
                 needsGradleWrapperJar = false;
             }
         }
-        if(!needsGradleWrapperProperties && !needsGradleWrapperJar && !needsGradleShellScript && !needsGradleBatchScript) {
+        if (!needsGradleWrapperProperties && !needsGradleWrapperJar && !needsGradleShellScript && !needsGradleBatchScript) {
             return before;
         }
 
-        List<SourceFile> gradleWrapper = new ArrayList<>();
+        List<SourceFile> gradleWrapperFiles = new ArrayList<>();
         ZonedDateTime now = ZonedDateTime.now();
         if (needsGradleWrapperProperties) {
             //noinspection UnusedProperty
             Properties.File gradleWrapperProperties = new PropertiesParser().parse(
                             "distributionBase=GRADLE_USER_HOME\n" +
                                     "distributionPath=wrapper/dists\n" +
-                                    "distributionUrl=" + getPropertiesFormattedUrl() + "\n" +
+                                    "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
                                     "zipStoreBase=GRADLE_USER_HOME\n" +
                                     "zipStorePath=wrapper/dists").get(0)
                     .withSourcePath(WRAPPER_PROPERTIES_LOCATION);
-            gradleWrapper.add(gradleWrapperProperties);
+            gradleWrapperFiles.add(gradleWrapperProperties);
         }
         FileAttributes wrapperScriptAttributes = new FileAttributes(now, now, now, true, true, true, 1L);
         if (needsGradleShellScript) {
             PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY, null, false,
                     wrapperScriptAttributes, null,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew")));
-            gradleWrapper.add(gradlew);
+            gradleWrapperFiles.add(gradlew);
         }
 
         if (needsGradleBatchScript) {
-            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY,null, false,
+            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY, null, false,
                     wrapperScriptAttributes, null,
                     StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")));
-            gradleWrapper.add(gradlewBat);
+            gradleWrapperFiles.add(gradlewBat);
         }
 
         if (needsGradleWrapperJar) {
-            Remote gradleWrapperJar = RemoteGradleWrapperJar.build(URI.create(getDistributionUrl()), Boolean.TRUE.equals(skipChecksum));
-            gradleWrapper.add(gradleWrapperJar);
+            gradleWrapperFiles.add(gradleWrapper.asRemote());
         }
 
         return ListUtils.concatAll(
                 before,
-                gradleWrapper
+                gradleWrapperFiles
         );
-    }
-
-    private String getVersion() {
-        if(version == null) {
-            return DEFAULT_VERSION;
-        }
-        return version;
-    }
-
-    private String getDistributionUrl() {
-        if(distributionUrl == null) {
-            String desiredDistribution = (distribution == null) ? DEFAULT_DISTRIBUTION : distribution;
-            return "https://services.gradle.org/distributions/gradle-" + getVersion() + "-" + desiredDistribution + ".zip";
-        }
-        return distributionUrl;
-    }
-
-    private String getPropertiesFormattedUrl() {
-        return getDistributionUrl().replaceAll("(?<!\\\\)://", "\\\\://");
     }
 }

@@ -19,13 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Checksum;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.remote.RemoteArchive;
@@ -37,7 +34,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
-import java.util.regex.Matcher;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -53,9 +49,6 @@ public class RemoteGradleWrapperJar implements Remote {
     URI uri;
 
     String gradleVersion;
-
-    @Nullable
-    Checksum checksum;
 
     @Override
     public Charset getCharset() {
@@ -106,7 +99,7 @@ public class RemoteGradleWrapperJar implements Remote {
         // The wrapper which gets placed in gradle/wrappers/gradle-wrapper.jar lives inside the versioned wrapper jar
         Path versionedWrapperJarPath = Paths.get("gradle-" + gradleVersion + "/lib/gradle-wrapper-" + gradleVersion + ".jar");
 
-        RemoteArchive remoteArchive = new RemoteArchive(id, sourcePath, markers, uri, checksum, getCharset(),
+        RemoteArchive remoteArchive = new RemoteArchive(id, sourcePath, markers, uri, getCharset(),
                 isCharsetBomMarked(), getFileAttributes(), getDescription(), versionedWrapperJarPath);
         ZipInputStream zis = new ZipInputStream(remoteArchive.getInputStream(httpSender));
         try {
@@ -132,30 +125,5 @@ public class RemoteGradleWrapperJar implements Remote {
             throw new IllegalArgumentException("Unable to locate gradle-wrapper.jar within " + uri, e);
         }
         throw new IllegalArgumentException("Unable to locate gradle-wrapper.jar within " + uri);
-    }
-
-    public static RemoteGradleWrapperJar build(URI uri) {
-        return build(uri, false);
-    }
-
-    public static RemoteGradleWrapperJar build(URI uri, boolean skipChecksum) {
-        String uriStr = uri.toString();
-        Matcher m = GradleProperties.VERSION_EXTRACTING_PATTERN.matcher(uriStr);
-        if(!m.find()) {
-            throw new IllegalArgumentException("Unable to determine Gradle version from URI " + uri);
-        }
-        String gradleVersion = m.group(1);
-        Checksum checksum = null;
-        if(!skipChecksum) {
-            String shaUriStr = uriStr.substring(0, uriStr.lastIndexOf('/') + 1);
-            URI shaUri = URI.create(shaUriStr + "gradle-" + gradleVersion + "-wrapper.jar.sha256");
-            checksum = Checksum.fromUri(new HttpUrlConnectionSender(), shaUri);
-        }
-
-        return build(uri, gradleVersion, checksum);
-    }
-
-    public static RemoteGradleWrapperJar build(URI uri, String gradleVersion, @Nullable Checksum checksum) {
-        return new RemoteGradleWrapperJar(Tree.randomId(), GradleProperties.WRAPPER_JAR_LOCATION, Markers.EMPTY, uri, gradleVersion, checksum);
     }
 }

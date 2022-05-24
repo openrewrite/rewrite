@@ -297,8 +297,8 @@ public interface Validated extends Iterable<Validated> {
     }
 
     class Both implements Validated {
-        private final Validated left;
-        private final Validated right;
+        protected final Validated left;
+        protected final Validated right;
 
         public Both(Validated left, Validated right) {
             this.left = left;

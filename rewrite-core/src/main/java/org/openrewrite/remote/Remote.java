@@ -53,6 +53,17 @@ public interface Remote extends SourceFile {
 
     <R extends Remote> R withDescription(String description);
 
+    @Nullable
+    default Checksum getChecksum() {
+        return null;
+    }
+
+    default <T extends SourceFile> T withChecksum(@Nullable Checksum checksum) {
+        //noinspection unchecked
+        return (T) this;
+    }
+
+
     /**
      * Download the remote file
      *
@@ -129,11 +140,6 @@ public interface Remote extends SourceFile {
             return this;
         }
 
-        public Builder checksum(Checksum checksum) {
-            this.checksum = checksum;
-            return this;
-        }
-
         public Builder charset(Charset charset) {
             this.charset = charset;
             return this;
@@ -149,11 +155,11 @@ public interface Remote extends SourceFile {
         }
 
         public RemoteFile build() {
-            return new RemoteFile(id, sourcePath, markers, uri, checksum, charset, charsetBomMarked, fileAttributes, description);
+            return new RemoteFile(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description);
         }
 
         public RemoteArchive build(Path path) {
-            return new RemoteArchive(id, sourcePath, markers, uri, checksum, charset, charsetBomMarked, fileAttributes, description, path);
+            return new RemoteArchive(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description, path);
         }
     }
 }

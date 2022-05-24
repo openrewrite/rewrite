@@ -60,7 +60,7 @@ public class UpgradeDependencyVersion extends Recipe {
     String artifactId;
 
     @Option(displayName = "New version",
-            description = "An exact version number, or node-style semver selector used to select the version number.",
+            description = "An exact version number or node-style semver selector used to select the version number.",
             example = "29.X")
     String newVersion;
 
