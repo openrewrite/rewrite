@@ -79,10 +79,10 @@ public class AddGradleWrapper extends Recipe {
         return gradleWrapper;
     }
 
-//    @Override
-//    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-//        return new HasSourcePath<>("**/*.gradle");
-//    }
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        return new HasSourcePath<>("regex", ".+\\.gradle(\\.kts)?$");
+    }
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {

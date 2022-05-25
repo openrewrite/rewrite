@@ -17,36 +17,43 @@ package org.openrewrite
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 import org.openrewrite.text.ChangeText
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextParser
 import java.nio.file.Path
 
-class HasSourcePathTest : RecipeTest<PlainText> {
-    override val parser: Parser<PlainText>
-        get() = PlainTextParser()
-
-    override val recipe: Recipe
-        get() = object : ChangeText("hello jon") {
+class HasSourcePathTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(object : ChangeText("hello jon") {
             override fun getSingleSourceApplicableTest() =
                 HasSourcePath<ExecutionContext>("**/hello.txt")
-        }
+        })
+    }
 
     @Example
     @Test
-    fun hasFileMatch(@TempDir tempDir: Path) = assertChangedBase(
-        before = tempDir.resolve("a/b/hello.txt").apply {
-            toFile().parentFile.mkdirs()
-            toFile().writeText("hello world")
-        }.toFile(),
-        after = "hello jon"
+    fun hasFileMatch() = rewriteRun(
+        text("hello world", "hello jon") { spec -> spec.path("a/b/hello.txt") },
+        text("hello world", "hello jon") { spec -> spec.path("hello.txt") }
     )
 
     @Test
-    fun hasNoFileMatch(@TempDir tempDir: Path) = assertUnchangedBase(
-        before = tempDir.resolve("a/b/goodbye.txt").apply {
-            toFile().parentFile.mkdirs()
-            toFile().writeText("hello world")
-        }.toFile()
+    fun hasNoFileMatch() = rewriteRun(
+        text("hello world") { spec -> spec.path("a/b/goodbye.txt") }
+    )
+
+    @Test
+    fun regexMatch() = rewriteRun(
+        { spec ->
+            spec.recipe(object : ChangeText("hello jon") {
+                override fun getSingleSourceApplicableTest() =
+                    HasSourcePath<ExecutionContext>("regex", ".+\\.gradle(\\.kts)?$")
+            })
+        },
+        text("", "hello jon") { spec -> spec.path("build.gradle") },
+        text("", "hello jon") { spec -> spec.path("build.gradle.kts") },
+        text("") { spec -> spec.path("pom.xml") }
     )
 }

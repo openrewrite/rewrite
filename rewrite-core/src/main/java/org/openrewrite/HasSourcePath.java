@@ -20,6 +20,7 @@ import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -49,7 +50,7 @@ public class HasSourcePath<P> extends TreeVisitor<Tree, P> {
 
         if (tree instanceof SourceFile) {
             SourceFile sourceFile = (SourceFile) tree;
-            Path sourcePath = sourceFile.getSourcePath();
+            Path sourcePath = Paths.get("./").resolve(sourceFile.getSourcePath());
             PathMatcher pathMatcher = sourcePath.getFileSystem().getPathMatcher(syntax + ":" + filePattern);
             if (pathMatcher.matches(sourcePath)) {
                 return sourceFile.withMarkers(sourceFile.getMarkers().searchResult("has file"));

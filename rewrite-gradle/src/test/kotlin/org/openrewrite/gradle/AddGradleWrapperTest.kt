@@ -85,4 +85,28 @@ class AddGradleWrapperTest : RewriteTest {
         other("") { spec -> spec.path("gradlew.bat") },
         buildGradle(""),
     )
+
+    @Test
+    fun addWrapperToGradleKotlin() = rewriteRun(
+        { spec ->
+            spec.afterRecipe { results -> results.isNotEmpty() }.expectedCyclesThatMakeChanges(1)
+        },
+        other("") { spec -> spec.path("build.gradle.kts") }
+    )
+
+    @Test
+    fun dontAddWrapperToMavenProject() = rewriteRun(
+        { spec ->
+            spec.afterRecipe { results -> results.isEmpty() }
+        },
+        pomXml(
+            """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """
+        )
+    )
 }
