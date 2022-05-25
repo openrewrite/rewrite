@@ -8,8 +8,6 @@ plugins {
     kotlin("jvm")
     id("org.openrewrite.base")
     id("org.gradle.test-retry")
-    id("com.gradle.enterprise")
-    id("com.gradle.enterprise.test-distribution")
 }
 
 java {
