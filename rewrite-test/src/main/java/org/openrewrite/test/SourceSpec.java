@@ -41,6 +41,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     @Nullable
     final String dsl;
 
+    @Nullable
     final String before;
 
     @Nullable

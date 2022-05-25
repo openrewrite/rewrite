@@ -15,6 +15,7 @@
  */
 package org.openrewrite.test;
 
+import org.assertj.core.api.SoftAssertions;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
@@ -37,6 +38,7 @@ import org.openrewrite.protobuf.ProtoParser;
 import org.openrewrite.protobuf.tree.Proto;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.quark.QuarkParser;
+import org.openrewrite.remote.Remote;
 import org.openrewrite.scheduling.DirectScheduler;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
@@ -215,6 +217,9 @@ public interface RewriteTest extends SourceSpecs {
         for (Map.Entry<ParserSupplier, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
             Map<SourceSpec<?>, Parser.Input> inputs = new HashMap<>(sourceSpecsForParser.getValue().size());
             for (SourceSpec<?> sourceSpec : sourceSpecsForParser.getValue()) {
+                if (sourceSpec.before == null) {
+                    continue;
+                }
                 String beforeTrimmed = trimIndentPreserveCRLF(sourceSpec.before);
                 Path sourcePath;
                 if (sourceSpec.sourcePath != null) {
@@ -263,8 +268,52 @@ public interface RewriteTest extends SourceSpecs {
         testMethodSpec.afterRecipe.accept(results);
         testClassSpec.afterRecipe.accept(results);
 
+        Collection<SourceSpec<?>> expectedNewSources = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (SourceSpec<?> sourceSpec : sourceSpecs) {
+            if (sourceSpec.before == null) {
+                expectedNewSources.add(sourceSpec);
+            }
+        }
+
+        // take one pass at this attempting to satisfy expected new sources, checking Remote last to optimize
+        // for not downloading huge files in unit tests if not necessary.
+        for (SourceSpec<?> sourceSpec : expectedNewSources) {
+            if (sourceSpec.before == null) {
+                for (Result result : results) {
+                    if (result.getAfter() != null && !(result.getAfter() instanceof Remote)) {
+                        assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
+                        String actual = result.getAfter().printAll();
+                        String expected = trimIndentPreserveCRLF(sourceSpec.after);
+                        if (actual.equals(expected)) {
+                            expectedNewSources.remove(sourceSpec);
+                            //noinspection unchecked
+                            ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                            break;
+                        }
+                    }
+                }
+
+                // we tried to avoid it, and now we'll try to match against remotes...
+                for (Result result : results) {
+                    if (result.getAfter() instanceof Remote) {
+                        assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
+                        String actual = result.getAfter().printAll();
+                        String expected = trimIndentPreserveCRLF(sourceSpec.after);
+                        if (actual.equals(expected)) {
+                            expectedNewSources.remove(sourceSpec);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         for (Result result : results) {
             SourceFile before = result.getBefore();
+            if (before == null) {
+                continue;
+            }
+
             SourceSpec<?> resultSpec = specBySourceFile.get(before);
 
             if (resultSpec.after == null) {
@@ -277,7 +326,7 @@ public interface RewriteTest extends SourceSpecs {
                 } else {
                     assertThat(after.printAll())
                             .as("The recipe must not make changes")
-                            .isEqualTo(before == null ? "" : before.printAll());
+                            .isEqualTo(before.printAll());
                 }
             } else {
                 assertThat(result.getAfter()).isNotNull();
@@ -316,6 +365,15 @@ public interface RewriteTest extends SourceSpecs {
                     break nextSourceFile;
                 }
             }
+
+            SoftAssertions newFilesGenerated = new SoftAssertions();
+            for (SourceSpec<?> expectedNewSource : expectedNewSources) {
+                newFilesGenerated.assertThat(expectedNewSource.after).as("No new source file was generated that matched.").isEmpty();
+            }
+            newFilesGenerated.assertAll();
+
+            assertThat(expectedNewSources).as("Did not find a source spec for a file that should be created whose " +
+                    "contents match this result's after.").isEmpty();
 
             if (after != null && results.isEmpty()) {
                 fail("The recipe must make changes");

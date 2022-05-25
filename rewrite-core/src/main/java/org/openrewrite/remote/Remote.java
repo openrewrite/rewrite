@@ -21,6 +21,7 @@ import org.openrewrite.binary.BinaryVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
 
 import java.io.InputStream;
@@ -32,10 +33,10 @@ import java.util.UUID;
 
 /**
  * Represents a source hosted at a remote URI.
- *
+ * <p>
  * Downloading the remote file is not handled during Recipe execution. Post-processing of Recipe results by a build
  * plugin or other caller of OpenRewrite is responsible for this.
- *
+ * <p>
  * Metadata like Charset or FileAttributes are supplied by the Recipe creating the Remote so that when the file is
  * later downloaded it can be configured correctly.
  * If no Charset is configured the downloaded file will be interpreted as binary data.
@@ -44,6 +45,7 @@ import java.util.UUID;
  */
 public interface Remote extends SourceFile {
     URI getUri();
+
     <R extends Remote> R withUri(URI uri);
 
     /**
@@ -73,7 +75,7 @@ public interface Remote extends SourceFile {
 
     @Override
     default <P> String printAll(P p) {
-        return new String(printAllAsBytes(p));
+        return StringUtils.readFully(getInputStream(new HttpUrlConnectionSender()));
     }
 
     @Override
@@ -93,7 +95,7 @@ public interface Remote extends SourceFile {
     }
 
     static void applyPatch(List<Remote> remotes, Path projectDir) {
-        
+
     }
 
     static Builder builder(SourceFile before, URI uri) {
@@ -103,6 +105,7 @@ public interface Remote extends SourceFile {
     static Builder builder(Path sourcePath, URI uri) {
         return new Builder(Tree.randomId(), sourcePath, Markers.EMPTY, uri);
     }
+
     static Builder builder(UUID id, Path sourcePath, Markers markers, URI uri) {
         return new Builder(id, sourcePath, markers, uri);
     }
@@ -149,6 +152,7 @@ public interface Remote extends SourceFile {
             this.charsetBomMarked = charsetBomMarked;
             return this;
         }
+
         public Builder fileAttributes(FileAttributes fileAttributes) {
             this.fileAttributes = fileAttributes;
             return this;

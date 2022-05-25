@@ -23,14 +23,38 @@ import org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION
 import org.openrewrite.marker.Markers
 import org.openrewrite.properties.tree.Properties
 import org.openrewrite.remote.Remote
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 import org.openrewrite.text.PlainText
 import java.net.URI
 import java.nio.file.Paths
 
 @Suppress("UnusedProperty")
-class AddGradleWrapperTest {
+class AddGradleWrapperTest : RewriteTest {
     private val gradlew = PlainText(randomId(), Paths.get("gradlew"), Markers.EMPTY, null, false, null, null, "")
     private val gradlewBat = PlainText(randomId(), Paths.get("gradlew.bat"), Markers.EMPTY, null, false, null, null, "")
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(AddGradleWrapper("7.4.2", "bin"))
+    }
+
+    @Test
+    fun addWrapper2() = rewriteRun(
+        buildGradle(""),
+        dir(
+            "gradle/wrapper",
+            properties(
+                null,
+                """
+                    distributionBase=GRADLE_USER_HOME
+                    distributionPath=wrapper/dists
+                    distributionUrl=https\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+                    zipStoreBase=GRADLE_USER_HOME
+                    zipStorePath=wrapper/dists
+                """
+            )
+        )
+    )
 
     @Test
     fun addWrapper() {
