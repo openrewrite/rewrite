@@ -53,6 +53,9 @@ public class GradleWrapper {
         //noinspection unchecked
         return new Validated.Both(
                 Validated.test("distributionType", "must be a valid distribution type", distributionTypeName, dt -> {
+                    if (distributionTypeName == null) {
+                        return true;
+                    }
                     try {
                         DistributionType.valueOf(dt);
                         return true;
@@ -83,10 +86,12 @@ public class GradleWrapper {
             }
 
             private GradleWrapper buildWrapper() {
-                DistributionType distributionType = Arrays.stream(DistributionType.values())
-                        .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
-                        .findAny()
-                        .orElseThrow(() -> new IllegalArgumentException("Unknown distribution type " + distributionTypeName));
+                DistributionType distributionType = distributionTypeName == null ?
+                        DistributionType.Bin :
+                        Arrays.stream(DistributionType.values())
+                                .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
+                                .findAny()
+                                .orElseThrow(() -> new IllegalArgumentException("Unknown distribution type " + distributionTypeName));
                 VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
 
                 //noinspection resource

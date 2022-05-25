@@ -49,7 +49,7 @@ class UpdateGradleWrapperTest {
             """.trimIndent())[0]!!
             .withSourcePath(Paths.get("gradle", "wrapper", "gradle-wrapper.properties"))
 
-        val result = UpdateGradleWrapper("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip", null)
+        val result = UpdateGradleWrapper("7.4.2", null)
             .run(listOf(gradleWrapperProps, gradlew, gradlewBat, gradleWrapperJarQuark))
             .map { it.after }
         assertThat(result.size).isEqualTo(4)
