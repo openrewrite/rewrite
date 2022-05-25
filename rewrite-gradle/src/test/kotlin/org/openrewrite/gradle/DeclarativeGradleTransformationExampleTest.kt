@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package org.openrewrite.gradle
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.config.Environment
 
 class DeclarativeGradleTransformationExampleTest : GradleRecipeTest {
 
@@ -88,6 +89,28 @@ class DeclarativeGradleTransformationExampleTest : GradleRecipeTest {
         after = """
             dependencies {
                 test group: 'new.groupid', name: 'rewrite-gradle', version: '1.0'
+            }
+        """
+    )
+
+    @Test
+    fun declarativeExample() = assertChanged(
+        recipe = Environment.builder()
+            .scanRuntimeClasspath("org.openrewrite.gradle")
+            .build()
+            .activateRecipes("org.openrewrite.gradle.OssJavaMigration"),
+        before = """
+            dependencies {
+                compile(bundle('ossjava', 'commons-compress', 'runtime'))
+                compile(group: 'ossjava', name: 'quartz', version: '2.2.1.1ms', configuration: 'runtime')
+                compile(bundle('ossjava', 'urlrewritefilter', 'runtime'))
+            }
+        """,
+        after = """
+            dependencies {
+                compile group: 'org.apache.commons', name: 'commons-compress', version: '1.19'
+                compile group: 'org.quartz-scheduler', name: 'quartz', version: '2.2.1'
+                compile group: 'org.turkey', name: 'urlrewritefilter', version: '3.2.0'
             }
         """
     )
