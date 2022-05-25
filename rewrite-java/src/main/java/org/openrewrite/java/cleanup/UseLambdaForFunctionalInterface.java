@@ -15,8 +15,10 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTemplate;
@@ -25,11 +27,14 @@ import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singleton;
+import static java.util.Objects.requireNonNull;
 
 public class UseLambdaForFunctionalInterface extends Recipe {
     @Override
@@ -78,18 +83,7 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                             return n;
                         }
 
-                        AtomicBoolean hasThis = new AtomicBoolean(false);
-                        new JavaVisitor<Integer>() {
-                            @Override
-                            public J visitIdentifier(J.Identifier ident, Integer integer) {
-                                if (ident.getSimpleName().equals("this")) {
-                                    hasThis.set(true);
-                                }
-                                return super.visitIdentifier(ident, integer);
-                            }
-                        }.visit(n.getBody().getStatements().get(0), 0);
-
-                        if (hasThis.get()) {
+                        if (usesThis(getCursor()) || shadowsLocalVariable(getCursor())) {
                             return n;
                         }
 
@@ -181,5 +175,112 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                 return "null";
             }
         };
+    }
+
+    private static boolean usesThis(Cursor cursor) {
+        J.NewClass n = cursor.getValue();
+        assert n.getBody() != null;
+        AtomicBoolean hasThis = new AtomicBoolean(false);
+        new JavaVisitor<Integer>() {
+            @Override
+            public J visitIdentifier(J.Identifier ident, Integer integer) {
+                if (ident.getSimpleName().equals("this")) {
+                    hasThis.set(true);
+                }
+                return super.visitIdentifier(ident, integer);
+            }
+        }.visit(n.getBody(), 0, cursor);
+        return hasThis.get();
+    }
+
+    // if the contents of the cursor value shadow a local variable in its containing name scope
+    private static boolean shadowsLocalVariable(Cursor cursor) {
+        J.NewClass n = cursor.getValue();
+        assert n.getBody() != null;
+        AtomicBoolean hasShadow = new AtomicBoolean(false);
+
+        List<String> localVariables = new ArrayList<>();
+        J.Block nameScope = cursor.firstEnclosing(J.Block.class);
+        new JavaVisitor<List<String>>() {
+            @Override
+            public J visitVariable(J.VariableDeclarations.NamedVariable variable, List<String> variables) {
+                variables.add(variable.getSimpleName());
+                return variable;
+            }
+
+            @Override
+            public J visitBlock(J.Block block, List<String> strings) {
+                return block == nameScope ? super.visitBlock(block, strings) : block;
+            }
+
+            @Override
+            public J visitIf(J.If iff, List<String> variables) {
+                return iff;
+            }
+
+            @Override
+            public J visitForLoop(J.ForLoop forLoop, List<String> variables) {
+                return forLoop;
+            }
+
+            @Override
+            public J visitForEachLoop(J.ForEachLoop forLoop, List<String> variables) {
+                return forLoop;
+            }
+
+            @Override
+            public J visitWhileLoop(J.WhileLoop whileLoop, List<String> variables) {
+                return whileLoop;
+            }
+
+            @Override
+            public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, List<String> variables) {
+                return doWhileLoop;
+            }
+
+            @Override
+            public J visitSwitch(J.Switch switzh, List<String> variables) {
+                return switzh;
+            }
+
+            @Override
+            public J visitTry(J.Try tryable, List<String> variables) {
+                return tryable;
+            }
+
+            @Override
+            public J visitSynchronized(J.Synchronized synch, List<String> variables) {
+                return synch;
+            }
+
+            @Override
+            public J visitNewClass(J.NewClass newClass, List<String> variables) {
+                if (newClass == n) {
+                    getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
+                }
+                return newClass;
+            }
+
+            @Nullable
+            @Override
+            public J visit(@Nullable Tree tree, List<String> variables) {
+                if (getCursor().getNearestMessage("stop") != null) {
+                    return (J) tree;
+                }
+                return super.visit(tree, variables);
+            }
+        }.visit(nameScope, localVariables, requireNonNull(cursor.dropParentUntil(J.Block.class::isInstance).getParent()));
+
+        new JavaVisitor<Integer>() {
+            @Override
+            public J visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
+                if (localVariables.contains(variable.getSimpleName())) {
+                    hasShadow.set(true);
+                }
+                return super.visitVariable(variable, integer);
+            }
+        }.visit(n.getBody(), 0, cursor);
+
+        return hasShadow.get();
     }
 }

@@ -16,6 +16,7 @@
 
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -27,6 +28,7 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = UseLambdaForFunctionalInterface()
 
+    @Disabled("The recipe currently avoids simplifying anonymous classes that use the this keyword.")
     @Test
     fun useLambdaThenSimplifyFurther(jp: JavaParser) = assertChanged(
         jp,
@@ -181,6 +183,27 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
                         return this.n;
                     }
                 };
+            }
+        """
+    )
+
+    @Suppress("UnnecessaryLocalVariable")
+    @Test
+    fun dontUseLambdaWhenShadowsLocalVariable(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.function.Supplier;
+            class Test {
+                void test() {
+                    int n = 1;
+                    Supplier<Integer> f = new Supplier<Integer>() {
+                        @Override
+                        public Integer get() {
+                            int n = 0;
+                            return n;
+                        }
+                    };
+                }
             }
         """
     )
