@@ -112,9 +112,29 @@ public class ForwardFlow extends JavaVisitor<Integer> {
 
             return super.visitLambda(lambda, p);
         }
-
         @Override
         public J visitIdentifier(J.Identifier ident, Integer p) {
+            // If the variable side of an assignment is not a flow step, so we don't need to do anything
+            J.Assignment parentAssignment = getCursor().firstEnclosing(J.Assignment.class);
+            if (parentAssignment != null && unwrap(parentAssignment.getVariable()) == ident) {
+                return ident;
+            }
+            // If the identifier is a field access then it is not local flow
+            J.FieldAccess parentFieldAccess = getCursor().firstEnclosing(J.FieldAccess.class);
+            if (parentFieldAccess != null && parentFieldAccess.getName() == ident) {
+                return ident;
+            }
+            // If the identifier is a new class name, then it is not local flow
+            J.NewClass parentNewClass = getCursor().firstEnclosing(J.NewClass.class);
+            if (parentNewClass != null && parentNewClass.getClazz() == ident) {
+                return ident;
+            }
+            // If the identifier is a method name, then it is not local flow
+            J.MethodInvocation parentMethodInvocation = getCursor().firstEnclosing(J.MethodInvocation.class);
+            if (parentMethodInvocation != null && parentMethodInvocation.getName() == ident) {
+                return ident;
+            }
+
             FlowGraph flowGraph = flowsByIdentifier.peek().get(ident.getSimpleName());
             if (flowGraph != null) {
                 FlowGraph next = new FlowGraph(getCursor());
@@ -143,6 +163,22 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             J b = super.visitBlock(block, p);
             flowsByIdentifier.pop();
             return b;
+        }
+
+        @Override
+        public J visitAssignment(J.Assignment assignment, Integer integer) {
+            J.Assignment a = (J.Assignment) super.visitAssignment(assignment, integer);
+            String variableName = ((J.Identifier) unwrap(a.getVariable())).getSimpleName();
+            // Remove the variable name from the flowsByIdentifier map when assignment occurs
+            if (a.getAssignment() != flowsByIdentifier.peek().get(variableName).getCursor().getValue()) {
+                flowsByIdentifier.peek().remove(variableName);
+            }
+            return a;
+        }
+
+        @Override
+        public J visitNewClass(J.NewClass newClass, Integer integer) {
+            return super.visitNewClass(newClass, integer);
         }
     }
 
@@ -187,23 +223,33 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                 nextFlowGraph = next;
             } else if (ancestor instanceof J.NewClass) {
                 break;
-            } else if (ancestor instanceof J.Assignment) {
-                Expression variable = ((J.Assignment) ancestor).getVariable();
+            } else if (ancestor instanceof J.Assignment ||
+                    ancestor instanceof J.AssignmentOperation ||
+                    ancestor instanceof J.VariableDeclarations.NamedVariable
+            ) {
+                Expression variable;
+                if (ancestor instanceof J.Assignment) {
+                    variable = ((J.Assignment) ancestor).getVariable();
+                } else if (ancestor instanceof J.AssignmentOperation) {
+                    variable = ((J.AssignmentOperation) ancestor).getVariable();
+                } else {
+                    variable = ((J.VariableDeclarations.NamedVariable) ancestor).getName();
+                }
+                variable = unwrap(variable);
                 if (variable instanceof J.Identifier) {
                     nextVariableName = ((J.Identifier) variable).getSimpleName();
                     break;
                 }
-            } else if (ancestor instanceof J.AssignmentOperation) {
-                Expression variable = ((J.AssignmentOperation) ancestor).getVariable();
-                if (variable instanceof J.Identifier) {
-                    nextVariableName = ((J.Identifier) variable).getSimpleName();
-                    break;
-                }
-            } else if (ancestor instanceof J.VariableDeclarations.NamedVariable) {
-                nextVariableName = ((J.VariableDeclarations.NamedVariable) ancestor).getName().getSimpleName();
-                break;
             }
         }
         return new VariableNameToFlowGraph(nextVariableName, nextFlowGraph);
+    }
+
+    private static Expression unwrap(Expression expression) {
+        if (expression instanceof J.Parentheses) {
+            return unwrap((Expression) ((J.Parentheses<?>) expression).getTree());
+        } else {
+            return expression;
+        }
     }
 }

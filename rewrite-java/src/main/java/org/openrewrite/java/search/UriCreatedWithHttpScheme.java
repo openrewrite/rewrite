@@ -30,15 +30,20 @@ public class UriCreatedWithHttpScheme extends Recipe {
     private static final MethodMatcher URI_CREATE = new MethodMatcher("java.net.URI create(..)");
     private static final MethodMatcher STRING_REPLACE = new MethodMatcher("java.lang.String replace(..)");
 
-    private static final LocalFlowSpec<J.Literal, J.MethodInvocation> INSECURE_URI_CREATE = new LocalFlowSpec<J.Literal, J.MethodInvocation>() {
+    private static final LocalFlowSpec<J.Literal, Expression> INSECURE_URI_CREATE = new LocalFlowSpec<J.Literal, Expression>() {
         @Override
         public boolean isSource(J.Literal source, Cursor cursor) {
             return source.getValue() != null && source.getValue().toString().startsWith("http://");
         }
 
         @Override
-        public boolean isSink(J.MethodInvocation expr, Cursor cursor) {
-            return URI_CREATE.matches(expr);
+        public boolean isSink(Expression sink, Cursor cursor) {
+            J.MethodInvocation maybeMethodInvocation = cursor.firstEnclosing(J.MethodInvocation.class);
+            if (maybeMethodInvocation != null && URI_CREATE.matches(maybeMethodInvocation)) {
+                return maybeMethodInvocation.getArguments().contains(sink);
+            } else {
+                return false;
+            }
         }
 
         @Override
