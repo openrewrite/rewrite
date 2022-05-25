@@ -570,7 +570,6 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
     )
 
     @Test
-    @Disabled("Broken parsing in dataflow logic")
     fun `reassignment of a variable with existing value wrapped in parentheses preserves flow`() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
@@ -596,4 +595,131 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `a class name in a constructor call is not considered as a part of dataflow`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    class n {}
+
+                    void test() {
+                        String n = "42";
+                        System.out.println(n);
+                        n = new n().toString();
+                        System.out.println(n);
+                    }
+                }
+            """,
+            """
+                class Test {
+                    class n {}
+
+                    void test() {
+                        String n = /*~~>*/"42";
+                        System.out.println(/*~~>*/n);
+                        n = new n().toString();
+                        System.out.println(n);
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `a class name in a constructor call on parent type is not considered as a part of dataflow`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    class n {}
+
+                    void test() {
+                        String n = "42";
+                        System.out.println(n);
+                        n = new Test.n().toString();
+                        System.out.println(n);
+                    }
+                }
+            """,
+            """
+                class Test {
+                    class n {}
+
+                    void test() {
+                        String n = /*~~>*/"42";
+                        System.out.println(/*~~>*/n);
+                        n = new Test.n().toString();
+                        System.out.println(n);
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `a method name is not considered as a part of dataflow`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String n() {
+                        return null;
+                    }
+
+                    void test() {
+                        String n = "42";
+                        System.out.println(n);
+                        n = n();
+                        System.out.println(n);
+                    }
+                }
+            """,
+            """
+                class Test {
+                    String n() {
+                        return null;
+                    }
+
+                    void test() {
+                        String n = /*~~>*/"42";
+                        System.out.println(/*~~>*/n);
+                        n = n();
+                        System.out.println(n);
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `a class variable access is not considered as a part of dataflow`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String n = "100";
+
+                    void test() {
+                        String n = "42";
+                        System.out.println(n);
+                        System.out.println(this.n);
+                    }
+                }
+            """,
+            """
+                class Test {
+                    String n = "100";
+
+                    void test() {
+                        String n = /*~~>*/"42";
+                        System.out.println(/*~~>*/n);
+                        System.out.println(this.n);
+                    }
+                }
+            """
+        )
+    )
+
 }
