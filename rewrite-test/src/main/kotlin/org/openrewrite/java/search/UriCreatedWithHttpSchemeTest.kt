@@ -21,15 +21,14 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
-@Suppress("UnnecessaryLocalVariable")
+@Suppress("UnnecessaryLocalVariable", "FunctionName")
 interface UriCreatedWithHttpSchemeTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(UriCreatedWithHttpScheme())
     }
 
-    @Disabled
     @Test
-    fun findInsecureUri(javaParser: JavaParser) = rewriteRun(
+    fun `find insecure uri`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """
@@ -63,7 +62,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
-    fun replaceIsABarrierGuard(javaParser: JavaParser) = rewriteRun(
+    fun `replace is a barrier guard`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """
@@ -84,8 +83,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
-    @Disabled("MISSING: Assignment dominance")
-    fun reassignmentBreaksDataFlowPath(javaParser: JavaParser) = rewriteRun(
+    fun `reassignment breaks data flow path`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """
@@ -107,7 +105,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
 
     @Test
     @Disabled("MISSING: Assignment dominance of conditional that will always evaluate to true")
-    fun reassignmentInAlwaysEvaluatedPathBreaksDataFlowPath(javaParser: JavaParser) = rewriteRun(
+    fun `reassignment in always evaluated path breaks data flow path`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """
@@ -129,9 +127,8 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
         )
     )
 
-    @Disabled
     @Test
-    fun reassignmentWithinBlockDoesNotBreakPath(javaParser: JavaParser) = rewriteRun(
+    fun `reassignment within block does not break path`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """
@@ -165,9 +162,8 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
         )
     )
 
-    @Disabled
     @Test
-    fun dataflowThroughTernaryOperator(javaParser: JavaParser) = rewriteRun(
+    fun `dataflow through ternary operator`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """
@@ -203,7 +199,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
 
     @Test
     @Disabled("MISSING: This will require taint-tracking to work correctly")
-    fun taintIsNotDataflow(javaParser: JavaParser) = rewriteRun(
+    fun `example of taint tracking`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """
@@ -238,7 +234,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
-    fun arbitraryMethodCallsAreNotDataflow(javaParser: JavaParser) = rewriteRun(
+    fun `arbitrary method calls are not dataflow`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """
@@ -264,7 +260,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
-    fun arbitraryMethodCallChainsAreNotDataFlow(javaParser: JavaParser) = rewriteRun(
+    fun `arbitrary method call chains are not dataflow`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """
@@ -286,9 +282,8 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
         )
     )
 
-    @Disabled
     @Test
-    fun specialCaseToStringOnStringTypeIsDataFlow(javaParser: JavaParser) = rewriteRun(
+    fun `special case toString on String type is DataFlow`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
             """

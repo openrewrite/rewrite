@@ -115,6 +115,12 @@ public class ForwardFlow extends JavaVisitor<Integer> {
 
         @Override
         public J visitIdentifier(J.Identifier ident, Integer p) {
+            J.Assignment parentAssignment = getCursor().firstEnclosing(J.Assignment.class);
+            // The variable side of an assignment is not a flow step, so we don't need to do anything
+            if (parentAssignment != null && parentAssignment.getVariable() == ident) {
+                return ident;
+            }
+
             FlowGraph flowGraph = flowsByIdentifier.peek().get(ident.getSimpleName());
             if (flowGraph != null) {
                 FlowGraph next = new FlowGraph(getCursor());
@@ -143,6 +149,17 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             J b = super.visitBlock(block, p);
             flowsByIdentifier.pop();
             return b;
+        }
+
+        @Override
+        public J visitAssignment(J.Assignment assignment, Integer integer) {
+            J.Assignment a = (J.Assignment) super.visitAssignment(assignment, integer);
+            String variableName = ((J.Identifier) a.getVariable()).getSimpleName();
+            // Remove the variable name from the flowsByIdentifier map when assignment occurs
+            if (a.getAssignment() != flowsByIdentifier.peek().get(variableName).getCursor().getValue()) {
+                flowsByIdentifier.peek().remove(variableName);
+            }
+            return a;
         }
     }
 

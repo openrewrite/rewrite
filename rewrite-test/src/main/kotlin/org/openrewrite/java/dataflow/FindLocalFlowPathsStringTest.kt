@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.dataflow
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.java.tree.Expression
@@ -511,6 +512,88 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                 }
             }
                 """
+        )
+    )
+
+    @Test
+    fun `reassignment of a variable breaks flow`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    void test() {
+                        String n = "42";
+                        System.out.println(n);
+                        n = "100";
+                        System.out.println(n);
+                    }
+                }
+            """,
+            """
+                class Test {
+                    void test() {
+                        String n = /*~~>*/"42";
+                        System.out.println(/*~~>*/n);
+                        n = "100";
+                        System.out.println(n);
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `reassignment of a variable with existing value preserves flow`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    void test() {
+                        String n = "42";
+                        System.out.println(n);
+                        n = n;
+                        System.out.println(n);
+                    }
+                }
+            """,
+            """
+                class Test {
+                    void test() {
+                        String n = /*~~>*/"42";
+                        System.out.println(/*~~>*/n);
+                        n = /*~~>*/n;
+                        System.out.println(/*~~>*/n);
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    @Disabled("Broken parsing in dataflow logic")
+    fun `reassignment of a variable with existing value wrapped in parentheses preserves flow`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    void test() {
+                        String n = "42";
+                        System.out.println(n);
+                        (n) = n;
+                        System.out.println(n);
+                    }
+                }
+            """,
+            """
+                class Test {
+                    void test() {
+                        String n = /*~~>*/"42";
+                        System.out.println(/*~~>*/n);
+                        (n) = /*~~>*/n;
+                        System.out.println(/*~~>*/n);
+                    }
+                }
+            """
         )
     )
 }

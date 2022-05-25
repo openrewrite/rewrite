@@ -18,6 +18,7 @@ package org.openrewrite.java.dataflow
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
+import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
@@ -27,14 +28,13 @@ import org.openrewrite.test.RewriteTest.toRecipe
 interface FindLocalFlowPathsNumericTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(toRecipe {
-            FindLocalFlowPaths(object : LocalFlowSpec<J.Literal, J.MethodInvocation>() {
+            FindLocalFlowPaths(object : LocalFlowSpec<J.Literal, Expression>() {
                 override fun isSource(expr: J.Literal, cursor: Cursor) = expr.value == 42
-                override fun isSink(expr: J.MethodInvocation, cursor: Cursor) = true
+                override fun isSink(expr: Expression, cursor: Cursor) = true
             })
         })
     }
 
-    @Disabled
     @Test
     fun transitiveAssignment() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
@@ -54,8 +54,8 @@ interface FindLocalFlowPathsNumericTest : RewriteTest {
                     void test() {
                         int n = /*~~>*/42;
                         int o = /*~~>*/n;
-                        /*~~>*/System.out.println(/*~~>*/o);
-                        int p = o;
+                        System.out.println(/*~~>*/o);
+                        int p = /*~~>*/o;
                     }
                 }
             """
