@@ -61,7 +61,7 @@ tasks.named<Test>("test").configure {
     val releasing = !project.hasProperty("releasing")
     logger.info("This ${if(releasing) "is" else "is not"} a release build")
 
-    val nightly = !System.getenv("GITHUB_WORKFLOW").equals("nightly-ci")
+    val nightly = System.getenv("GITHUB_WORKFLOW") == "nightly-ci"
     logger.info("This ${if(nightly) "is" else "is not"} a nightly build")
 
     // recently failed tests will get selected, so let's DISABLE for the nightly
