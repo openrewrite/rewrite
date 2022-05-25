@@ -27,6 +27,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
         spec.recipe(UriCreatedWithHttpScheme())
     }
 
+    @Disabled
     @Test
     fun findInsecureUri(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -128,6 +129,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun reassignmentWithinBlockDoesNotBreakPath(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -163,6 +165,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun dataflowThroughTernaryOperator(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -283,6 +286,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun specialCaseToStringOnStringTypeIsDataFlow(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },

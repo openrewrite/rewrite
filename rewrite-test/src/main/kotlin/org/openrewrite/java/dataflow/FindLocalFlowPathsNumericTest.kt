@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.dataflow
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.java.tree.J
@@ -33,6 +34,7 @@ interface FindLocalFlowPathsNumericTest : RewriteTest {
         })
     }
 
+    @Disabled
     @Test
     fun transitiveAssignment() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
