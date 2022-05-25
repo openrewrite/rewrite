@@ -9,8 +9,8 @@ repositories {
 dependencies {
     implementation(platform(kotlin("bom")))
     implementation("org.gradle:test-retry-gradle-plugin:1.2.1")
-    implementation("com.gradle.enterprise:test-distribution-gradle-plugin:2.3")
-    implementation("com.gradle:gradle-enterprise-gradle-plugin:3.10")
+    implementation("com.gradle.enterprise:test-distribution-gradle-plugin:2.3.1")
+    implementation("com.gradle:gradle-enterprise-gradle-plugin:3.10.1")
     implementation("org.jetbrains.kotlin:kotlin-script-runtime")
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin")
     implementation("org.owasp:dependency-check-gradle:latest.release")
