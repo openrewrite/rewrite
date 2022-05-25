@@ -1,16 +1,9 @@
 ---
-name: ci
+name: nightly-ci
 
 on:
-  push:
-    branches:
-      - main
-    tags-ignore:
-      - "*"
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch: {}
+  schedule:
+    - cron: 0 16 * * *
 
 concurrency:
   group: ci-${{ github.ref }}

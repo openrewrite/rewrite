@@ -57,4 +57,11 @@ tasks.named<Test>("test").configure {
         showCauses = true
         showStackTraces = true
     }
+
+    // recently failed tests will get selected, so let's DISABLE for the nightly
+    // scheduled builds and releases
+    predictiveSelection {
+        enabled.set(!project.hasProperty("releasing") &&
+            !System.getenv("GITHUB_WORKFLOW").equals("nightly-ci"))
+    }
 }
