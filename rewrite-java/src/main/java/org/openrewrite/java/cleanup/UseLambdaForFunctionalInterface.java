@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singleton;
@@ -76,6 +77,22 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                         if (sam == null) {
                             return n;
                         }
+
+                        AtomicBoolean hasThis = new AtomicBoolean(false);
+                        new JavaVisitor<Integer>() {
+                            @Override
+                            public J visitIdentifier(J.Identifier ident, Integer integer) {
+                                if (ident.getSimpleName().equals("this")) {
+                                    hasThis.set(true);
+                                }
+                                return super.visitIdentifier(ident, integer);
+                            }
+                        }.visit(n.getBody().getStatements().get(0), 0);
+
+                        if (hasThis.get()) {
+                            return n;
+                        }
+
                         //The interface may be parameterized and that is needed to maintain type attribution:
                         JavaType.FullyQualified typedInterface = null;
                         JavaType.FullyQualified annoymousClass = TypeUtils.asFullyQualified(n.getType());

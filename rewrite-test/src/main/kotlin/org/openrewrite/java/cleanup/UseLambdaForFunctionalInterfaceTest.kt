@@ -51,8 +51,8 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
             void execute() {}
         }
     """
-
     )
+
     @Test
     fun useLambda(jp: JavaParser) = assertChanged(
         jp,
@@ -164,6 +164,23 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
                         });
                     });
                 }
+            }
+        """
+    )
+
+    @Test
+    fun dontUseLambdaWhenThis(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.function.Function;
+            class Test {
+                int n;
+                Function<Integer, Integer> f = new Function<Integer, Integer>() {
+                    @Override 
+                    public Integer apply(Integer n) {
+                        return this.n;
+                    }
+                };
             }
         """
     )
