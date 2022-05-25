@@ -35,4 +35,18 @@ public interface Expression extends J {
     default List<J> getSideEffects() {
         return emptyList();
     }
+
+    /**
+     * If this expression is not a {@link J.Parentheses} then return {@code this}. Otherwise, return the
+     * expression inside the parentheses.
+     *
+     * @return The expression as if all surround parentheses were removed. Never a {@link J.Parentheses} instance.
+     */
+    default Expression getUnwrappedParentheses() {
+        if (this instanceof J.Parentheses<?> && ((J.Parentheses<?>) this).getTree() instanceof Expression) {
+            return ((Expression) ((J.Parentheses<?>) this).getTree()).getUnwrappedParentheses();
+        } else {
+            return this;
+        }
+    }
 }
