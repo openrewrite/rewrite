@@ -52,7 +52,7 @@ class AddGradleWrapperTest : RewriteTest {
                     zipStoreBase=GRADLE_USER_HOME
                     zipStorePath=wrapper/dists
                 """
-            )
+            ) { spec -> spec.path(Paths.get("gradle-wrapper.properties")) }
         )
     )
 

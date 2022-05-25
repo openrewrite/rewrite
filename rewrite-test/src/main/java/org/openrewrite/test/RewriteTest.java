@@ -288,6 +288,10 @@ public interface RewriteTest extends SourceSpecs {
                             expectedNewSources.remove(sourceSpec);
                             //noinspection unchecked
                             ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                            if (sourceSpec.sourcePath != null) {
+                                assertThat(result.getAfter().getSourcePath())
+                                        .isEqualTo(sourceSpec.dir.resolve(sourceSpec.sourcePath));
+                            }
                             break;
                         }
                     }
@@ -301,6 +305,12 @@ public interface RewriteTest extends SourceSpecs {
                         String expected = trimIndentPreserveCRLF(sourceSpec.after);
                         if (actual.equals(expected)) {
                             expectedNewSources.remove(sourceSpec);
+                            //noinspection unchecked
+                            ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                            if (sourceSpec.sourcePath != null) {
+                                assertThat(result.getAfter().getSourcePath())
+                                        .isEqualTo(sourceSpec.dir.resolve(sourceSpec.sourcePath));
+                            }
                             break;
                         }
                     }
