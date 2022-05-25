@@ -58,10 +58,16 @@ tasks.named<Test>("test").configure {
         showStackTraces = true
     }
 
+    val releasing = !project.hasProperty("releasing")
+    logger.info("This ${if(releasing) "is" else "is not"} a release build")
+
+    val nightly = !System.getenv("GITHUB_WORKFLOW").equals("nightly-ci")
+    logger.info("This ${if(nightly) "is" else "is not"} a nightly build")
+
     // recently failed tests will get selected, so let's DISABLE for the nightly
     // scheduled builds and releases
     predictiveSelection {
-        enabled.set(!project.hasProperty("releasing") &&
-            !System.getenv("GITHUB_WORKFLOW").equals("nightly-ci"))
+//        enabled.set(releasing && nightly)
+        enabled.set(true)
     }
 }
