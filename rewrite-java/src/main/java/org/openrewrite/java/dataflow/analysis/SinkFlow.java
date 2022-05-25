@@ -21,10 +21,7 @@ import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Stack;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -35,8 +32,8 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
 
     private final LocalFlowSpec<Source, Sink> spec;
 
-    public SinkFlow(@Nullable Cursor source, LocalFlowSpec<Source, Sink> spec, Cursor cursor) {
-        super(cursor);
+    public SinkFlow(@Nullable Cursor source, LocalFlowSpec<Source, Sink> spec) {
+        super(source);
         this.source = source;
         this.spec = spec;
     }
@@ -50,9 +47,6 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     }
 
     public List<Sink> getSinks() {
-        if (getEdges().isEmpty()) {
-            return emptyList();
-        }
         List<List<Cursor>> flows = getFlows();
         List<Sink> sinks = new ArrayList<>(flows.size());
         for (List<Cursor> flow : flows) {
@@ -62,9 +56,9 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     }
 
     public List<List<Cursor>> getFlows() {
-        if (getEdges().isEmpty()) {
-            return emptyList();
-        }
+        // IMPORTANT NOTE!
+        // A naive implementation would return emptyList if the edges are empty.
+        // But we need to consider that the source can also be a valid sink.
         List<List<Cursor>> flows = new ArrayList<>();
         Stack<Cursor> path = new Stack<>();
         path.push(getCursor());
@@ -83,19 +77,15 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     private void recurseGetFlows(FlowGraph flowGraph, Stack<Cursor> pathToHere,
                                  List<List<Cursor>> pathsToSinks) {
         Cursor cursor = flowGraph.getCursor();
-        Iterator<Cursor> cursorPath = cursor.getPathAsCursors();
-        while (cursorPath.hasNext()) {
-            Cursor c = cursorPath.next();
-            if (c.getValue() instanceof Expression && spec.isBarrierGuard(c.getValue())) {
-                return;
-            }
+        if (cursor.getValue() instanceof Expression && spec.isBarrierGuard(cursor.getValue())) {
+            return;
+        }
 
-            boolean isSinkType = spec.getSinkType().isAssignableFrom(c.getValue().getClass());
-            if (isSinkType && spec.isSink(c.getValue(), c)) {
-                List<Cursor> flow = new ArrayList<>(pathToHere);
-                flow.add(c);
-                pathsToSinks.add(flow);
-            }
+        boolean isSinkType = spec.getSinkType().isAssignableFrom(cursor.getValue().getClass());
+        if (isSinkType && spec.isSink(cursor.getValue(), cursor)) {
+            List<Cursor> flow = new ArrayList<>(pathToHere);
+            flow.add(cursor);
+            pathsToSinks.add(flow);
         }
 
         for (FlowGraph edge : flowGraph.getEdges()) {

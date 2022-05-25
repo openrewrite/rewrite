@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.dataflow
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.java.tree.Expression
@@ -27,14 +26,16 @@ import org.openrewrite.test.RewriteTest
 interface FindLocalFlowPathsStringTest: RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(RewriteTest.toRecipe {
-            FindLocalFlowPaths(object : LocalFlowSpec<Expression, J.MethodInvocation>() {
+            FindLocalFlowPaths(object : LocalFlowSpec<Expression, Expression>() {
                 override fun isSource(expr: Expression, cursor: Cursor) =
-                    when(expr){
+                    when(expr) {
                         is J.Literal -> expr.value == "42"
                         is J.MethodInvocation -> expr.name.simpleName == "source"
                         else -> false
                     }
-                override fun isSink(expr: J.MethodInvocation, cursor: Cursor) = true
+
+                override fun isSink(expr: Expression, cursor: Cursor) =
+                    true
             })
         })
     }
@@ -58,8 +59,8 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                     void test() {
                         String n = /*~~>*/"42";
                         String o = /*~~>*/n;
-                        /*~~>*/System.out.println(/*~~>*/o);
-                        String p = o;
+                        System.out.println(/*~~>*/o);
+                        String p = /*~~>*/o;
                     }
                 }
             """
@@ -93,8 +94,8 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                     void test() {
                         String n = /*~~>*/source();
                         String o = /*~~>*/n;
-                        /*~~>*/System.out.println(/*~~>*/o);
-                        String p = o;
+                        System.out.println(/*~~>*/o);
+                        String p = /*~~>*/o;
                     }
                 }
             """
@@ -102,8 +103,7 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
     )
 
     @Test
-    @Disabled("This isn't finding the search results for `String o = n + '/';` for some reason")
-    fun `taint flow is not data flow`() = rewriteRun(
+    fun `taint flow via append is not data flow`() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
             """
@@ -130,7 +130,6 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
     )
 
     @Test
-    @Disabled("MISSING: I don't know what's wrong here, but I'm getting weird results here")
     fun `taint flow is not data flow but it is tracked to call site`() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
@@ -148,11 +147,369 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                 class Test {
                     void test() {
                         String n = /*~~>*/"42";
-                        String o = /*~~>*/n.toString() + '/';
+                        String o = /*~~>*//*~~>*/n.toString() + '/';
                         System.out.println(o);
                         String p = o;
                     }
                 }
+                """
+        )
+    )
+
+    @Test
+    fun `taint flow via constructor call is not data flow`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    void test() {
+                        String n = "42";
+                        java.io.File o = new java.io.File(n);
+                        System.out.println(o);
+                    }
+                }
+            """,
+            """
+                class Test {
+                    void test() {
+                        String n = /*~~>*/"42";
+                        java.io.File o = new java.io.File(/*~~>*/n);
+                        System.out.println(o);
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `the source is also a sink simple`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void sink(Object any) {
+                        // do nothing
+                    }
+                    void test() {
+                        sink(source());
+                    }
+                }
+            """,
+            """
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void sink(Object any) {
+                        // do nothing
+                    }
+                    void test() {
+                        sink(/*~~>*/source());
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `the source as a literal is also a sink`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    void sink(Object any) {
+                        // do nothing
+                    }
+                    void test() {
+                        sink("42");
+                    }
+                }
+            """,
+            """
+                class Test {
+                    void sink(Object any) {
+                        // do nothing
+                    }
+                    void test() {
+                        sink(/*~~>*/"42");
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `the source is also a sink`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        source();
+                        source()
+                            .toString();
+                        source()
+                            .toLowerCase(Locale.ROOT);
+                        source()
+                            .toString()
+                            .toLowerCase(Locale.ROOT);
+                    }
+                }
+            """,
+        """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        /*~~>*/source();
+                        /*~~>*//*~~>*/source()
+                            .toString();
+                        /*~~>*/source()
+                            .toLowerCase(Locale.ROOT);
+                        /*~~>*//*~~>*/source()
+                            .toString()
+                            .toLowerCase(Locale.ROOT);
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `the source is also a sink double call chain`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        source()
+                            .toString()
+                            .toString();
+                    }
+                }
+            """,
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        /*~~>*//*~~>*//*~~>*/source()
+                            .toString()
+                            .toString();
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `the source can be tracked through wrapped parentheses`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        (
+                            source()
+                        ).toLowerCase(Locale.ROOT);
+                        (
+                            (
+                                source()
+                            )
+                        ).toLowerCase(Locale.ROOT);
+                        (
+                            (Object) source()
+                        ).equals(null);
+                    }
+                }
+            """,
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        /*~~>*/(
+                            /*~~>*/source()
+                        ).toLowerCase(Locale.ROOT);
+                        /*~~>*/(
+                            /*~~>*/(
+                                /*~~>*/source()
+                            )
+                        ).toLowerCase(Locale.ROOT);
+                        /*~~>*/(
+                            /*~~>*/(Object) /*~~>*/source()
+                        ).equals(null);
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `the source can be tracked through wrapped parentheses through casting`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        (
+                            (String)(
+                                (Object) source()
+                            )
+                        ).toString();
+                    }
+                }
+            """,
+            """
+                import java.util.Locale;
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    void test() {
+                        /*~~>*//*~~>*/(
+                            /*~~>*/(String)/*~~>*/(
+                                /*~~>*/(Object) /*~~>*/source()
+                            )
+                        ).toString();
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `source is tracked when assigned in while loop control parentheses`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    @SuppressWarnings("SillyAssignment")
+                    void test() {
+                        String a;
+                        a = a;
+                        while ((a = source()) != null) {
+                            System.out.println(a);
+                        }
+                    }
+                }
+            """,
+            """
+            class Test {
+                String source() {
+                    return null;
+                }
+                @SuppressWarnings("SillyAssignment")
+                void test() {
+                    String a;
+                    a = a;
+                    while ((a = /*~~>*/source()) != null) {
+                        System.out.println(/*~~>*/a);
+                    }
+                }
+            }
+                """
+        )
+    )
+
+    @Test
+    fun `source is tracked when assigned in do while loop control parentheses`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String source() {
+                        return null;
+                    }
+                    @SuppressWarnings("SillyAssignment")
+                    void test() {
+                        String a = null;
+                        a = a;
+                        do {
+                            System.out.println(a);
+                        } while ((a = source()) != null);
+                    }
+                }
+            """,
+            """
+            class Test {
+                String source() {
+                    return null;
+                }
+                @SuppressWarnings("SillyAssignment")
+                void test() {
+                    String a = null;
+                    a = a;
+                    do {
+                        System.out.println(/*~~>*/a);
+                    } while ((a = /*~~>*/source()) != null);
+                }
+            }
+                """
+        )
+    )
+
+    @Test
+    fun `source is tracked when assigned in for loop`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+                    String source(int i) {
+                        return null;
+                    }
+                    @SuppressWarnings("SillyAssignment")
+                    void test() {
+                        String a = null;
+                        a = a;
+                        for (int i = 0; i < 10 && (a = source(i)) != null; i++) {
+                            System.out.println(a);
+                        }
+                    }
+                }
+            """,
+            """
+            class Test {
+                String source(int i) {
+                    return null;
+                }
+                @SuppressWarnings("SillyAssignment")
+                void test() {
+                    String a = null;
+                    a = a;
+                    for (int i = 0; i < 10 && (a = /*~~>*/source(i)) != null; i++) {
+                        System.out.println(/*~~>*/a);
+                    }
+                }
+            }
                 """
         )
     )

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.dataflow.analysis;
 
+import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -30,14 +31,18 @@ public class ForwardFlow extends JavaVisitor<Integer> {
     private static final MethodMatcher methodMatcherToString = new MethodMatcher("java.lang.String toString()");
 
     public static void findSinks(FlowGraph root) {
-        Object taintStmt = null;
-        Iterator<Object> cursorPath = root.getCursor().getPath();
+        Iterator<Cursor> cursorPath = root.getCursor().getPathAsCursors();
 
-        String taint = computeVariableAssignment(cursorPath);
+        VariableNameToFlowGraph variableNameToFlowGraph =
+                computeVariableAssignment(cursorPath, root);
 
-        if (taint != null) {
+        if (variableNameToFlowGraph.nextVariableName != null) {
+            // The parent statement of the source. Data flow can not start before the source.
+            Object taintStmt = null;
+            Cursor taintStmtCursorParent = null;
             while (cursorPath.hasNext()) {
-                Object next = cursorPath.next();
+                taintStmtCursorParent = cursorPath.next();
+                Object next = taintStmtCursorParent.getValue();
                 if (next instanceof J.Block) {
                     break;
                 }
@@ -47,17 +52,33 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             }
 
             HashMap<String, FlowGraph> initialFlow = new HashMap<>();
-            initialFlow.put(taint, root);
+            initialFlow.put(variableNameToFlowGraph.nextVariableName, variableNameToFlowGraph.nextFlowGraph);
             Analysis analysis = new Analysis(initialFlow);
 
-            boolean seenRoot = false;
-            Cursor blockCursor = root.getCursor().dropParentUntil(J.Block.class::isInstance);
-            for (Statement statement : ((J.Block) blockCursor.getValue()).getStatements()) {
-                if (seenRoot) {
-                    analysis.visit(statement,0, blockCursor);
+            if (taintStmt instanceof J.WhileLoop ||
+                    taintStmt instanceof J.DoWhileLoop ||
+                    taintStmt instanceof J.ForLoop) {
+                // This occurs when an assignment occurs within the control parenthesis of a loop
+                Statement body;
+                if (taintStmt instanceof J.WhileLoop) {
+                    body = ((J.WhileLoop) taintStmt).getBody();
+                } else if (taintStmt instanceof J.DoWhileLoop) {
+                    body = ((J.DoWhileLoop) taintStmt).getBody();
+                } else {
+                    body = ((J.ForLoop) taintStmt).getBody();
                 }
-                if (statement == taintStmt) {
-                    seenRoot = true;
+                analysis.visit(body, 0, taintStmtCursorParent);
+            } else {
+                // This is when assignment occurs within the body of a block
+                boolean seenRoot = false;
+                Cursor blockCursor = root.getCursor().dropParentUntil(J.Block.class::isInstance);
+                for (Statement statement : ((J.Block) blockCursor.getValue()).getStatements()) {
+                    if (seenRoot) {
+                        analysis.visit(statement, 0, blockCursor);
+                    }
+                    if (statement == taintStmt) {
+                        seenRoot = true;
+                    }
                 }
             }
         }
@@ -103,10 +124,14 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                 flowGraph.getEdges().add(next);
                 flowsByIdentifier.peek().put(ident.getSimpleName(), next);
 
-                String newVariableName = computeVariableAssignment(getCursor().getPath());
+                VariableNameToFlowGraph variableNameToFlowGraph =
+                        computeVariableAssignment(getCursor().getPathAsCursors(), next);
 
-                if(newVariableName != null) {
-                    flowsByIdentifier.peek().put(newVariableName, next);
+                if (variableNameToFlowGraph.nextVariableName != null) {
+                    flowsByIdentifier.peek().put(
+                            variableNameToFlowGraph.nextVariableName,
+                            variableNameToFlowGraph.nextFlowGraph
+                    );
                 }
             }
             return ident;
@@ -121,36 +146,64 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         }
     }
 
-    @Nullable
-    private static String computeVariableAssignment(Iterator<Object> cursorPath) {
+    @AllArgsConstructor
+    private static final class VariableNameToFlowGraph {
+        @Nullable
+        String nextVariableName;
+        FlowGraph nextFlowGraph;
+    }
+
+    private static VariableNameToFlowGraph computeVariableAssignment(Iterator<Cursor> cursorPath, FlowGraph currentFlow) {
         if (cursorPath.hasNext()) {
             // Must avoid inspecting the 'current' node to compute the variable assignment.
             // This is because we perform filtering here, and filtered types may be valid 'source' types.
             cursorPath.next();
         }
+        String nextVariableName = null;
+        FlowGraph nextFlowGraph = currentFlow;
         while (cursorPath.hasNext()) {
-            Object ancestor = cursorPath.next();
+            Cursor ancestorCursor = cursorPath.next();
+            Object ancestor = ancestorCursor.getValue();
             if (ancestor instanceof J.Binary) {
-                return null;
+                break;
             } else if (ancestor instanceof J.MethodInvocation) {
-                if (!methodMatcherToString.matches((J.MethodInvocation) ancestor)) {
+                if (methodMatcherToString.matches((J.MethodInvocation) ancestor)) {
+                    if (nextFlowGraph.getEdges().isEmpty()) {
+                        nextFlowGraph.setEdges(new ArrayList<>(1));
+                    }
+                    FlowGraph next = new FlowGraph(ancestorCursor);
+                    nextFlowGraph.getEdges().add(next);
+                    nextFlowGraph = next;
+                } else {
                     // If the method invocation is not `toString` on a `String`, it's not dataflow
-                    return null;
+                    break;
                 }
+            } else if (ancestor instanceof J.TypeCast || ancestor instanceof J.Parentheses || ancestor instanceof J.ControlParentheses) {
+                if (nextFlowGraph.getEdges().isEmpty()) {
+                    nextFlowGraph.setEdges(new ArrayList<>(1));
+                }
+                FlowGraph next = new FlowGraph(ancestorCursor);
+                nextFlowGraph.getEdges().add(next);
+                nextFlowGraph = next;
+            } else if (ancestor instanceof J.NewClass) {
+                break;
             } else if (ancestor instanceof J.Assignment) {
                 Expression variable = ((J.Assignment) ancestor).getVariable();
                 if (variable instanceof J.Identifier) {
-                    return ((J.Identifier) variable).getSimpleName();
+                    nextVariableName = ((J.Identifier) variable).getSimpleName();
+                    break;
                 }
             } else if (ancestor instanceof J.AssignmentOperation) {
                 Expression variable = ((J.AssignmentOperation) ancestor).getVariable();
                 if (variable instanceof J.Identifier) {
-                    return ((J.Identifier) variable).getSimpleName();
+                    nextVariableName = ((J.Identifier) variable).getSimpleName();
+                    break;
                 }
             } else if (ancestor instanceof J.VariableDeclarations.NamedVariable) {
-                return ((J.VariableDeclarations.NamedVariable) ancestor).getName().getSimpleName();
+                nextVariableName = ((J.VariableDeclarations.NamedVariable) ancestor).getName().getSimpleName();
+                break;
             }
         }
-        return null;
+        return new VariableNameToFlowGraph(nextVariableName, nextFlowGraph);
     }
 }
