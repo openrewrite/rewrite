@@ -49,6 +49,10 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
 
     public abstract boolean isSink(Sink sink, Cursor cursor);
 
+    public boolean isAdditionalFlowStep(Expression startE, Cursor startC, Expression endE, Cursor endC) {
+        return false;
+    }
+
     public boolean isBarrierGuard(Expression expr) {
         return false;
     }
