@@ -15,11 +15,15 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
+import org.openrewrite.java.tree.TypeUtils
 
 @Suppress(
     "ComparatorCombinators",
@@ -472,34 +476,73 @@ interface ExplicitLambdaArgumentTypesTest : JavaRecipeTest {
     )
 
     @Test
-    fun parameterizedType(jp: JavaParser) = assertChanged(
+    fun parameterizedTypes(jp: JavaParser) = assertChanged(
         jp,
-        before = """
-            import java.util.function.Consumer;
-            import java.util.List;
+        dependsOn = arrayOf(
+            """
+                package javafx.beans.value;
 
-            class Test {
-                static void run(Consumer<List<String>> c) {
+                public interface ObservableValue<T> {
+                    void addListener(ChangeListener<? super T> listener);
                 }
+            """,
+            """
+                package javafx.beans.value;
+                
+                @FunctionalInterface
+                public interface ChangeListener<T> {
+                    void changed(ObservableValue<? extends T> observable, T oldValue, T newValue);
+                }                
+            """,
+            """
+                package example;
+                
+                import javafx.beans.value.ObservableValue;
+                import javafx.beans.value.ChangeListener;
 
-                static void method() {
-                    run(a -> {a.size();});
+                public class Fred implements ObservableValue<String>{
+                    public void addListener(ChangeListener<? super String> listener) {
+                    }
+                }
+            """.trimIndent()
+        ),
+        before = """
+            import javafx.beans.value.ObservableValue;
+            import example.Fred;
+            
+            class Test {
+                void foo() {
+                    Fred fred = new Fred();
+                    fred.addListener((ov, oldState, newState) -> {
+                    });
                 }
             }
         """,
         after = """
-            import java.util.function.Consumer;
-            import java.util.List;
-
+            import javafx.beans.value.ObservableValue;
+            import example.Fred;
+            
             class Test {
-                static void run(Consumer<List<String>> c) {
-                }
-        
-                static void method() {
-                    run((List<String> a) -> {a.size();});
+                void foo() {
+                    Fred fred = new Fred();
+                    fred.addListener((ObservableValue<? extends String> ov, String oldState, String newState) -> {
+                    });
                 }
             }
-        """
+        """,
+        afterConditions = {u ->
+            val fooMethod = u.classes[0].body.statements[0] as J.MethodDeclaration
+            val addListenerMethod = fooMethod.body!!.statements[1] as J.MethodInvocation
+            val lambda = addListenerMethod.arguments[0] as J.Lambda
+            val lambdaType = TypeUtils.asFullyQualified(lambda.type)
+            Assertions.assertThat((lambdaType!!.typeParameters[0] as JavaType.FullyQualified).fullyQualifiedName).isEqualTo("java.lang.String")
+            val ovVariableDecl = lambda.parameters.parameters[0] as J.VariableDeclarations
+            val ovType = TypeUtils.asFullyQualified(ovVariableDecl.variables[0].type)
+            val genericType = (ovType!!.typeParameters[0]) as JavaType.GenericTypeVariable
+            //This assertion should pass but the argument's type is not being correctly changed to match the signature of the
+            //parameterized type.
+            Assertions.assertThat((genericType.bounds[0] as JavaType.FullyQualified).fullyQualifiedName).isEqualTo("java.lang.String")
+        }
     )
 
 }

@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
@@ -56,7 +57,57 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
     }
 
     private static class ExplicitLambdaArgumentTypesVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private static final String ADDED_EXPLICIT_TYPE_KEY = "ADDED_EXPLICIT_TYPE";
+
+        @Override
+        public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+
+            J.Lambda l = super.visitLambda(lambda, ctx);
+            if (l.getParameters().getParameters().size() <= 2 && !(l.getBody() instanceof J.Block)) {
+                return l;
+            }
+
+            J.Lambda after = l.withParameters(
+                    l.getParameters().withParameters(
+                            ListUtils.map(l.getParameters().getParameters(), (parameter) -> {
+                                if (parameter instanceof J.VariableDeclarations) {
+                                    return maybeAddTypeExpression((J.VariableDeclarations) parameter);
+                                }
+                                return parameter;
+                            })
+                    )
+            );
+
+            if (after != l) {
+                after = after.withParameters(after.getParameters().withParenthesized(true));
+            }
+            return after;
+        }
+
+        private J.VariableDeclarations maybeAddTypeExpression(J.VariableDeclarations multiVariable) {
+            // if the type expression is null, it implies the types on the lambda arguments are implicit.
+            if (multiVariable.getTypeExpression() == null) {
+                J.VariableDeclarations.NamedVariable nv = multiVariable.getVariables().get(0);
+                TypeTree typeExpression = buildTypeTree(nv.getType(), Space.EMPTY);
+                if (typeExpression != null) {
+                    multiVariable = multiVariable.withTypeExpression(typeExpression);
+                    int arrayDimensions = countDimensions(nv.getType());
+                    if (arrayDimensions > 0) {
+                        List<JLeftPadded<Space>> dimensions = new ArrayList<>();
+                        for (int index = 0; index < arrayDimensions; index++) {
+                            dimensions.add(new JLeftPadded<>(Space.EMPTY, Space.EMPTY, Markers.EMPTY));
+                        }
+                        multiVariable = multiVariable.withDimensionsBeforeName(dimensions);
+                    }
+                    multiVariable = multiVariable.withVariables(ListUtils.map(multiVariable.getVariables(), (index, variable) -> {
+                        if (index == 0) {
+                            return variable.withPrefix(variable.getPrefix().withWhitespace(" "));
+                        }
+                        return variable;
+                    }));
+                }
+            }
+            return multiVariable;
+        }
 
         @Nullable
         private TypeTree buildTypeTree(@Nullable JavaType type, Space space) {
@@ -69,24 +120,37 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
                         Markers.EMPTY,
                         (JavaType.Primitive) type
                 );
-            } else if (type instanceof JavaType.Parameterized) {
-                return new J.ParameterizedType(
-                        Tree.randomId(),
-                        space,
-                        Markers.EMPTY,
-                        buildTypeTree(((JavaType.Parameterized) type).getType(), Space.EMPTY),
-                        buildTypeParameters(((JavaType.Parameterized) type).getTypeParameters())
-                );
             } else if (type instanceof JavaType.FullyQualified) {
+
                 JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
-                maybeAddImport(fq);
-                return new J.Identifier(Tree.randomId(),
+
+                J.Identifier identifier = new J.Identifier(Tree.randomId(),
                         space,
                         Markers.EMPTY,
                         fq.getClassName(),
                         type,
                         null
                 );
+
+                if (!fq.getTypeParameters().isEmpty()) {
+                    JContainer<Expression> typeParameters = buildTypeParameters(fq.getTypeParameters());
+                    if (typeParameters == null) {
+                        //If there is a problem resolving one of the type parameters, then do not return a type
+                        //expression for the fully-qualified type.
+                        return null;
+                    }
+                    return new J.ParameterizedType(
+                            Tree.randomId(),
+                            space,
+                            Markers.EMPTY,
+                            identifier,
+                            typeParameters
+                    );
+
+                } else {
+                    maybeAddImport(fq);
+                    return identifier;
+                }
             } else if (type instanceof JavaType.Array) {
                 return (buildTypeTree(((JavaType.Array) type).getElemType(), space));
             } else if(type instanceof JavaType.Variable) {
@@ -113,6 +177,9 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
 
                 if (!genericType.getBounds().isEmpty()) {
                     boundedType = buildTypeTree(genericType.getBounds().get(0), Space.format(" "));
+                    if (boundedType == null) {
+                        return null;
+                    }
                 }
 
                 return new J.Wildcard(
@@ -126,76 +193,36 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
             return null;
         }
 
+        @Nullable
         private JContainer<Expression> buildTypeParameters(List<JavaType> typeParameters) {
             List<JRightPadded<Expression>> typeExpressions = new ArrayList<>();
 
             for (JavaType type : typeParameters) {
+                Expression typeParameterExpression = (Expression) buildTypeTree(type, Space.EMPTY);
+                if (typeParameterExpression == null) {
+                    return null;
+                }
                 typeExpressions.add(new JRightPadded<>(
-                        (Expression) buildTypeTree(type, Space.EMPTY),
+                        typeParameterExpression,
                         Space.EMPTY,
                         Markers.EMPTY
                 ));
             }
             return JContainer.build(Space.EMPTY, typeExpressions, Markers.EMPTY);
         }
+    }
 
-        @Override
-        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-            // if the type expression is null, it implies the types on the lambda arguments are implicit.
-            if (multiVariable.getTypeExpression() == null && getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Lambda) {
-                J.VariableDeclarations.NamedVariable nv = multiVariable.getVariables().get(0);
-                TypeTree typeExpression = buildTypeTree(nv.getType(), Space.EMPTY);
-                if (typeExpression != null) {
-                    multiVariable = multiVariable.withTypeExpression(typeExpression);
-                    int arrayDimensions = countDimensions(nv.getType());
-                    if (arrayDimensions > 0) {
-                        List<JLeftPadded<Space>> dimensions = new ArrayList<>();
-                        for (int index = 0; index < arrayDimensions; index++) {
-                            dimensions.add(new JLeftPadded<>(Space.EMPTY, Space.EMPTY, Markers.EMPTY));
-                        }
-                        multiVariable = multiVariable.withDimensionsBeforeName(dimensions);
-                    }
-                    getCursor().dropParentUntil(J.Lambda.class::isInstance).putMessage(ADDED_EXPLICIT_TYPE_KEY, true);
-                }
-            }
-            return super.visitVariableDeclarations(multiVariable, ctx);
+    private static int countDimensions(JavaType type) {
+        if (!(type instanceof JavaType.Array)) {
+            return 0;
         }
 
-        public int countDimensions(JavaType type) {
-            if (!(type instanceof JavaType.Array)) {
-                return 0;
-            }
-
-            int count = 0;
-            while (type instanceof JavaType.Array) {
-                type = ((JavaType.Array) type).getElemType();
-                count++;
-            }
-            return count;
+        int count = 0;
+        while (type instanceof JavaType.Array) {
+            type = ((JavaType.Array) type).getElemType();
+            count++;
         }
-
-        @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
-            J.VariableDeclarations.NamedVariable nv = super.visitVariable(variable, ctx);
-            Cursor c = getCursor().dropParentUntil(J.class::isInstance).dropParentUntil(J.class::isInstance);
-            if (c.getValue() instanceof J.Lambda && c.getMessage(ADDED_EXPLICIT_TYPE_KEY) != null) {
-                nv = nv.withPrefix(nv.getPrefix().withWhitespace(" "));
-            }
-            return nv;
-        }
-
-        @Override
-        public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
-            if (lambda.getParameters().getParameters().size() <= 2 && !(lambda.getBody() instanceof J.Block)) {
-                return lambda;
-            }
-            J.Lambda l = super.visitLambda(lambda, ctx);
-            if (getCursor().getMessage(ADDED_EXPLICIT_TYPE_KEY) != null) {
-                l = l.withParameters(l.getParameters().withParenthesized(true));
-            }
-            return l;
-        }
-
+        return count;
     }
 
 }
