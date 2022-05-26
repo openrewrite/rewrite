@@ -110,10 +110,10 @@ public class YamlResourceLoader implements ResourceLoader {
         this.source = source;
 
         mapper = JsonMapper.builder()
+                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .build()
                 .registerModule(new ParameterNamesModule())
-                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         maybeAddKotlinModule(mapper);
 

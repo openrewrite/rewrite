@@ -40,8 +40,8 @@ class AddGradleWrapperTest : RewriteTest {
 
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(
-        //language=yaml
-        """
+            //language=yaml
+            """
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.test.AddGradleWrapper
@@ -50,8 +50,8 @@ class AddGradleWrapperTest : RewriteTest {
             recipeList:
               - org.openrewrite.gradle.AddGradleWrapper:
                   version: "7.4.2"
-        """.trimIndent().byteInputStream(), "org.openrewrite.test.AddGradleWrapper")
-//        spec.recipe(AddGradleWrapper("7.4.2", "bin"))
+        """.trimIndent().byteInputStream(), "org.openrewrite.test.AddGradleWrapper"
+        )
     }
 
     @Test
