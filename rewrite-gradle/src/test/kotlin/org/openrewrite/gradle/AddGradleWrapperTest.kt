@@ -39,7 +39,19 @@ class AddGradleWrapperTest : RewriteTest {
     }
 
     override fun defaults(spec: RecipeSpec) {
-        spec.recipe(AddGradleWrapper("7.4.2", "bin"))
+        spec.recipe(
+        //language=yaml
+        """
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.test.AddGradleWrapper
+            displayName: Adds a Gradle wrapper
+            description: Add wrapper for gradle version 7.4.2
+            recipeList:
+              - org.openrewrite.gradle.AddGradleWrapper:
+                  version: "7.4.2"
+        """.trimIndent().byteInputStream(), "org.openrewrite.test.AddGradleWrapper")
+//        spec.recipe(AddGradleWrapper("7.4.2", "bin"))
     }
 
     @Test

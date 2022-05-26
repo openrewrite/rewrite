@@ -25,7 +25,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import static java.util.Objects.requireNonNull;
@@ -42,8 +41,8 @@ public class RemoteArchiveTest {
 
         //noinspection NullableProblems
         byte[] actual = readAll(remoteArchive.getInputStream(new MockHttpSender(distributionUrl::openStream)));
-        byte[] expected = Files.readAllBytes(Paths.get(requireNonNull(RemoteArchiveTest.class.getClassLoader()
-                .getResource("gradle-wrapper.jar.dontunpack")).toURI()));
+        byte[] expected = readAll(requireNonNull(RemoteArchiveTest.class.getClassLoader()
+                .getResource("gradle-wrapper.jar.dontunpack")).openStream());
         assertThat(actual).isEqualTo(expected);
     }
 

@@ -37,8 +37,6 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
 
 @Value
-@RequiredArgsConstructor
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = true)
 public class AddGradleWrapper extends Recipe {
 
@@ -67,16 +65,9 @@ public class AddGradleWrapper extends Recipe {
     @Nullable
     String distribution;
 
-    @NonFinal
-    Validated gradleWrapper;
-
     @Override
     public Validated validate() {
-        if (gradleWrapper == null) {
-            gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution,
-                    new HttpUrlConnectionSender()));
-        }
-        return gradleWrapper;
+        return GradleWrapper.validate(version, distribution, new HttpUrlConnectionSender());
     }
 
     @Override

@@ -35,8 +35,6 @@ import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
 
 @Value
-@RequiredArgsConstructor
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = true)
 public class UpdateGradleWrapper extends Recipe {
 
@@ -65,16 +63,9 @@ public class UpdateGradleWrapper extends Recipe {
     @Nullable
     String distribution;
 
-    @NonFinal
-    Validated gradleWrapper;
-
     @Override
     public Validated validate() {
-        if (gradleWrapper == null) {
-            gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution,
-                    new HttpUrlConnectionSender()));
-        }
-        return gradleWrapper;
+        return GradleWrapper.validate(version, distribution, new HttpUrlConnectionSender());
     }
 
     @Override
