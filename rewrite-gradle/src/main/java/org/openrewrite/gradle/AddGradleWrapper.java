@@ -21,6 +21,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
@@ -81,6 +82,7 @@ public class AddGradleWrapper extends Recipe {
 
     //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.
     //      See https://github.com/projectlombok/lombok/issues/2372
+    @LoathingOfOthers("JavaDoc")
     @JsonCreator
     public AddGradleWrapper(String version, String distribution) {
         this.version = version;
