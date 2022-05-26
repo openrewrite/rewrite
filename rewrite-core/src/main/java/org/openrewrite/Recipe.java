@@ -311,6 +311,9 @@ public abstract class Recipe {
                 logger.warn("Unable to validate the field [{}] on the class [{}]", field.getName(), this.getClass().getName());
             }
         }
+        for(Recipe recipe : recipeList) {
+            validated = validated.and(recipe.validate());
+        }
         return validated;
     }
 
