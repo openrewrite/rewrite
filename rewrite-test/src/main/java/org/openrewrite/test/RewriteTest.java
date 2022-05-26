@@ -102,6 +102,10 @@ public interface RewriteTest extends SourceSpecs {
                 .as("A recipe must be specified")
                 .isNotNull();
 
+        assertThat(recipe.validate().isValid())
+                .as("Recipe validation must succeed")
+                .isTrue();
+
         if (!(recipe instanceof AdHocRecipe)) {
             RecipeSerializer recipeSerializer = new RecipeSerializer();
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
