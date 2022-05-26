@@ -198,7 +198,6 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
-    @Disabled("MISSING: This will require taint-tracking to work correctly")
     fun `example of taint tracking`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
         java(
@@ -222,6 +221,62 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
                 class Test {
                     void test() {
                         String s = "https://test" + File.separator;
+                        if(System.currentTimeMillis() > 0) {
+                            System.out.println(URI.create(s));
+                        } else {
+                            System.out.println(URI.create(s));
+                        }
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `example of taint tracking through an alternate flow path`(javaParser: JavaParser) = rewriteRun(
+        { spec -> spec.parser(javaParser) },
+        java(
+            """
+                import java.io.File;
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "http://test";
+                        if (System.currentTimeMillis() > 0) {
+                            System.out.println(URI.create(s + "/home"));
+                        } else {
+                            System.out.println(URI.create(s + "/away"));
+                        }
+                    }
+                }
+            """,
+            """
+                import java.io.File;
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "https://test";
+                        if (System.currentTimeMillis() > 0) {
+                            System.out.println(URI.create(s + "/home"));
+                        } else {
+                            System.out.println(URI.create(s + "/away"));
+                        }
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `example of negative taint tracking`(javaParser: JavaParser) = rewriteRun(
+        { spec -> spec.parser(javaParser) },
+        java(
+            """
+                import java.io.File;
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        String s = "https://example.com/?redirect=" + "http://test";
                         if(System.currentTimeMillis() > 0) {
                             System.out.println(URI.create(s));
                         } else {

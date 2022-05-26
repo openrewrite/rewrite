@@ -21,6 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -30,11 +31,11 @@ import java.util.*;
 public class ForwardFlow extends JavaVisitor<Integer> {
     private static final MethodMatcher methodMatcherToString = new MethodMatcher("java.lang.String toString()");
 
-    public static void findSinks(FlowGraph root) {
+    public static void findSinks(SinkFlow<?, ?> root) {
         Iterator<Cursor> cursorPath = root.getCursor().getPathAsCursors();
 
         VariableNameToFlowGraph variableNameToFlowGraph =
-                computeVariableAssignment(cursorPath, root);
+                computeVariableAssignment(cursorPath, root, root.getSpec());
 
         if (variableNameToFlowGraph.nextVariableName != null) {
             // The parent statement of the source. Data flow can not start before the source.
@@ -53,7 +54,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
 
             HashMap<String, FlowGraph> initialFlow = new HashMap<>();
             initialFlow.put(variableNameToFlowGraph.nextVariableName, variableNameToFlowGraph.nextFlowGraph);
-            Analysis analysis = new Analysis(initialFlow);
+            Analysis analysis = new Analysis(root.getSpec(), initialFlow);
 
             if (taintStmt instanceof J.WhileLoop ||
                     taintStmt instanceof J.DoWhileLoop ||
@@ -85,9 +86,11 @@ public class ForwardFlow extends JavaVisitor<Integer> {
     }
 
     private static class Analysis extends JavaVisitor<Integer> {
+        final LocalFlowSpec<?, ?> localFlowSpec;
         Stack<Map<String, FlowGraph>> flowsByIdentifier = new Stack<>();
 
-        Analysis(Map<String, FlowGraph> initial) {
+        Analysis(LocalFlowSpec<?, ?> localFlowSpec, Map<String, FlowGraph> initial) {
+            this.localFlowSpec = localFlowSpec;
             this.flowsByIdentifier.push(initial);
         }
 
@@ -112,6 +115,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
 
             return super.visitLambda(lambda, p);
         }
+
         @Override
         public J visitIdentifier(J.Identifier ident, Integer p) {
             // If the variable side of an assignment is not a flow step, so we don't need to do anything
@@ -137,15 +141,11 @@ public class ForwardFlow extends JavaVisitor<Integer> {
 
             FlowGraph flowGraph = flowsByIdentifier.peek().get(ident.getSimpleName());
             if (flowGraph != null) {
-                FlowGraph next = new FlowGraph(getCursor());
-                if (flowGraph.getEdges().isEmpty()) {
-                    flowGraph.setEdges(new ArrayList<>(2));
-                }
-                flowGraph.getEdges().add(next);
+                FlowGraph next = flowGraph.addEdge(getCursor());
                 flowsByIdentifier.peek().put(ident.getSimpleName(), next);
 
                 VariableNameToFlowGraph variableNameToFlowGraph =
-                        computeVariableAssignment(getCursor().getPathAsCursors(), next);
+                        computeVariableAssignment(getCursor().getPathAsCursors(), next, localFlowSpec);
 
                 if (variableNameToFlowGraph.nextVariableName != null) {
                     flowsByIdentifier.peek().put(
@@ -189,7 +189,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         FlowGraph nextFlowGraph;
     }
 
-    private static VariableNameToFlowGraph computeVariableAssignment(Iterator<Cursor> cursorPath, FlowGraph currentFlow) {
+    private static VariableNameToFlowGraph computeVariableAssignment(Iterator<Cursor> cursorPath, FlowGraph currentFlow, LocalFlowSpec<?, ?> spec) {
         if (cursorPath.hasNext()) {
             // Must avoid inspecting the 'current' node to compute the variable assignment.
             // This is because we perform filtering here, and filtered types may be valid 'source' types.
@@ -200,27 +200,35 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         while (cursorPath.hasNext()) {
             Cursor ancestorCursor = cursorPath.next();
             Object ancestor = ancestorCursor.getValue();
+            if (ancestor instanceof Expression) {
+                // Offer the cursor of the current flow graph, and a next possible expression to
+                // `isAdditionalFlowStep` to see if it should be added to the flow graph.
+                // This allows the API user to extend what the definition of 'flow' is.
+                Cursor previousCursor = nextFlowGraph.getCursor();
+                if (spec.isAdditionalFlowStep(
+                        previousCursor.getValue(),
+                        previousCursor,
+                        (Expression) ancestor,
+                        ancestorCursor
+                )) {
+                    nextFlowGraph = nextFlowGraph.addEdge(ancestorCursor);
+                    continue;
+                }
+            }
+
             if (ancestor instanceof J.Binary) {
                 break;
             } else if (ancestor instanceof J.MethodInvocation) {
                 if (methodMatcherToString.matches((J.MethodInvocation) ancestor)) {
-                    if (nextFlowGraph.getEdges().isEmpty()) {
-                        nextFlowGraph.setEdges(new ArrayList<>(1));
-                    }
-                    FlowGraph next = new FlowGraph(ancestorCursor);
-                    nextFlowGraph.getEdges().add(next);
-                    nextFlowGraph = next;
+                    nextFlowGraph = nextFlowGraph.addEdge(ancestorCursor);
                 } else {
                     // If the method invocation is not `toString` on a `String`, it's not dataflow
                     break;
                 }
-            } else if (ancestor instanceof J.TypeCast || ancestor instanceof J.Parentheses || ancestor instanceof J.ControlParentheses) {
-                if (nextFlowGraph.getEdges().isEmpty()) {
-                    nextFlowGraph.setEdges(new ArrayList<>(1));
-                }
-                FlowGraph next = new FlowGraph(ancestorCursor);
-                nextFlowGraph.getEdges().add(next);
-                nextFlowGraph = next;
+            } else if (ancestor instanceof J.TypeCast ||
+                    ancestor instanceof J.Parentheses ||
+                    ancestor instanceof J.ControlParentheses) {
+                nextFlowGraph = nextFlowGraph.addEdge(ancestorCursor);
             } else if (ancestor instanceof J.NewClass) {
                 break;
             } else if (ancestor instanceof J.Assignment ||

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.dataflow.analysis;
 
+import lombok.AccessLevel;
+import lombok.Getter;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
@@ -30,6 +32,7 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     @Nullable
     private final Cursor source;
 
+    @Getter(AccessLevel.PACKAGE)
     private final LocalFlowSpec<Source, Sink> spec;
 
     public SinkFlow(@Nullable Cursor source, LocalFlowSpec<Source, Sink> spec) {
