@@ -72,24 +72,42 @@ public class RemoteArchive implements Remote {
         //noinspection resource
         HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
         InputStream body = response.getBody();
+        return readIntoArchive(body, path.toString());
+    }
+
+    private InputStream readIntoArchive(InputStream body, String path) {
+        String pathBeforeBang;
+        String pathAfterBang = null;
+        int bangIndex = path.indexOf('!');
+        if(bangIndex == -1) {
+            pathBeforeBang = path;
+        } else {
+            pathBeforeBang = path.substring(0, bangIndex);
+            pathAfterBang = path.substring(bangIndex + 1);
+        }
+
         ZipInputStream zis = new ZipInputStream(body);
 
         try {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
-                if (PathUtils.equalIgnoringSeparators(entry.getName(), path.toString())) {
-                    return new InputStream() {
-                        @Override
-                        public int read() throws IOException {
-                            return zis.read();
-                        }
+                if (PathUtils.equalIgnoringSeparators(entry.getName(), pathBeforeBang)) {
+                    if(pathAfterBang == null) {
+                        return new InputStream() {
+                            @Override
+                            public int read() throws IOException {
+                                return zis.read();
+                            }
 
-                        @Override
-                        public void close() throws IOException {
-                            zis.closeEntry();
-                            zis.close();
-                        }
-                    };
+                            @Override
+                            public void close() throws IOException {
+                                zis.closeEntry();
+                                zis.close();
+                            }
+                        };
+                    } else {
+                        return readIntoArchive(zis, pathAfterBang);
+                    }
                 }
             }
 

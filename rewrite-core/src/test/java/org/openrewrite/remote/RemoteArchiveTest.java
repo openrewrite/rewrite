@@ -21,19 +21,40 @@ import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 
-import java.net.URI;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class RemoteArchiveTest {
 
     @Test
-    void gradleWrapper() {
+    void gradleWrapper() throws Exception {
         RemoteArchive remoteArchive = Remote.builder(new Quark(Tree.randomId(), Paths.get("gradle/wrapper/gradle-wrapper.jar"),
-                Markers.EMPTY, null, null), URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip")
-        ).build(Paths.get("gradle-7.4.2/lib/gradle-wrapper-7.4.2.jar"));
-        assertThat(remoteArchive.getInputStream(new HttpUrlConnectionSender()))
-                .isNotEmpty();
+                Markers.EMPTY, null, null), Objects.requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-7.4.2-bin.zip")).toURI()
+        ).build(Paths.get("gradle-7.4.2/lib/gradle-wrapper-7.4.2.jar!gradle-wrapper.jar"));
+
+        byte[] actual = readAll(remoteArchive.getInputStream(new HttpUrlConnectionSender()));
+        byte[] expected = Files.readAllBytes(Paths.get(Objects.requireNonNull(RemoteArchiveTest.class.getClassLoader()
+                .getResource("gradle-wrapper.jar.dontunpack")).toURI()));
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    private byte[] readAll(InputStream is) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            int count;
+            byte[] buf = new byte[4096];
+            while((count = is.read(buf)) != -1) {
+                baos.write(buf, 0, count);
+            }
+            return baos.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
