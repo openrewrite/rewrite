@@ -38,7 +38,6 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
 
 @Value
-@RequiredArgsConstructor(onConstructor = @__(@JsonCreator))
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = true)
 public class AddGradleWrapper extends Recipe {
@@ -78,6 +77,14 @@ public class AddGradleWrapper extends Recipe {
                     new HttpUrlConnectionSender()));
         }
         return gradleWrapper;
+    }
+
+    //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.
+    //      See https://github.com/projectlombok/lombok/issues/2372
+    @JsonCreator
+    public AddGradleWrapper(String version, String distribution) {
+        this.version = version;
+        this.distribution = distribution;
     }
 
     @Override

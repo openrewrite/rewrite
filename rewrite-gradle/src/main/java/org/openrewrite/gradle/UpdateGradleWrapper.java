@@ -36,7 +36,6 @@ import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
 
 @Value
-@RequiredArgsConstructor(onConstructor = @__(@JsonCreator))
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = true)
 public class UpdateGradleWrapper extends Recipe {
@@ -76,6 +75,14 @@ public class UpdateGradleWrapper extends Recipe {
                     new HttpUrlConnectionSender()));
         }
         return gradleWrapper;
+    }
+
+    //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.
+    //      See https://github.com/projectlombok/lombok/issues/2372
+    @JsonCreator
+    public UpdateGradleWrapper(String version, String distribution) {
+        this.version = version;
+        this.distribution = distribution;
     }
 
     @Override
