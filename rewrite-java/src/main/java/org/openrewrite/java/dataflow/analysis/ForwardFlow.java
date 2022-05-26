@@ -115,6 +115,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
 
             return super.visitLambda(lambda, p);
         }
+
         @Override
         public J visitIdentifier(J.Identifier ident, Integer p) {
             // If the variable side of an assignment is not a flow step, so we don't need to do anything
@@ -140,11 +141,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
 
             FlowGraph flowGraph = flowsByIdentifier.peek().get(ident.getSimpleName());
             if (flowGraph != null) {
-                FlowGraph next = new FlowGraph(getCursor());
-                if (flowGraph.getEdges().isEmpty()) {
-                    flowGraph.setEdges(new ArrayList<>(2));
-                }
-                flowGraph.getEdges().add(next);
+                FlowGraph next = flowGraph.addEdge(getCursor());
                 flowsByIdentifier.peek().put(ident.getSimpleName(), next);
 
                 VariableNameToFlowGraph variableNameToFlowGraph =
@@ -203,36 +200,30 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         while (cursorPath.hasNext()) {
             Cursor ancestorCursor = cursorPath.next();
             Object ancestor = ancestorCursor.getValue();
-            if (ancestor instanceof Expression
-                    && spec.isAdditionalFlowStep(nextFlowGraph.getCursor().getValue(),nextFlowGraph.getCursor(), (Expression) ancestor, ancestorCursor)) {
-                if (nextFlowGraph.getEdges().isEmpty()) {
-                    nextFlowGraph.setEdges(new ArrayList<>(1));
+            if (ancestor instanceof Expression) {
+                Cursor previousCursor = nextFlowGraph.getCursor();
+                if (spec.isAdditionalFlowStep(
+                        previousCursor.getValue(),
+                        previousCursor,
+                        (Expression) ancestor,
+                        ancestorCursor
+                )) {
+                    nextFlowGraph = nextFlowGraph.addEdge(ancestorCursor);
+                    continue;
                 }
-                FlowGraph next = new FlowGraph(ancestorCursor);
-                nextFlowGraph.getEdges().add(next);
-                nextFlowGraph = next;
             }
-            else if (ancestor instanceof J.Binary) {
+
+            if (ancestor instanceof J.Binary) {
                 break;
             } else if (ancestor instanceof J.MethodInvocation) {
                 if (methodMatcherToString.matches((J.MethodInvocation) ancestor)) {
-                    if (nextFlowGraph.getEdges().isEmpty()) {
-                        nextFlowGraph.setEdges(new ArrayList<>(1));
-                    }
-                    FlowGraph next = new FlowGraph(ancestorCursor);
-                    nextFlowGraph.getEdges().add(next);
-                    nextFlowGraph = next;
+                    nextFlowGraph = nextFlowGraph.addEdge(ancestorCursor);
                 } else {
                     // If the method invocation is not `toString` on a `String`, it's not dataflow
                     break;
                 }
             } else if (ancestor instanceof J.TypeCast || ancestor instanceof J.Parentheses || ancestor instanceof J.ControlParentheses) {
-                if (nextFlowGraph.getEdges().isEmpty()) {
-                    nextFlowGraph.setEdges(new ArrayList<>(1));
-                }
-                FlowGraph next = new FlowGraph(ancestorCursor);
-                nextFlowGraph.getEdges().add(next);
-                nextFlowGraph = next;
+                nextFlowGraph = nextFlowGraph.addEdge(ancestorCursor);
             } else if (ancestor instanceof J.NewClass) {
                 break;
             } else if (ancestor instanceof J.Assignment ||

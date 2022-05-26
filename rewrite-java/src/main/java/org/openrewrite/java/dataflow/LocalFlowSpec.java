@@ -45,11 +45,36 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
         return (Class<?>) sinkType;
     }
 
+    /**
+     * The following is always true: {@code  source == cursor.getValue()}.
+     *
+     * @param source The {@link Expression} to check to determine if it should be considered flow-graph source.
+     * @param cursor The current cursor position of the {@code source}.
+     * @return {@code true} if {@code source} and {@code cursor} should be considered the source or root of a flow graph.
+     */
     public abstract boolean isSource(Source source, Cursor cursor);
 
+    /**
+     * The following is always true: {@code  sink == cursor.getValue()}.
+     *
+     * @param sink The {@link Expression} to check to determine if it should be considered a flow-graph sink.
+     * @param cursor The current cursor position of the {@code sink}.
+     * @return {@code true} if {@code sink} and {@code cursor} should be considered the sink or leaf of a flow graph.
+     */
     public abstract boolean isSink(Sink sink, Cursor cursor);
 
-    public boolean isAdditionalFlowStep(Expression startE, Cursor startC, Expression endE, Cursor endC) {
+    /**
+     * Allows for ad-hoc taint tracking by allowing for additional, non-default flow steps to be added to the flow graph.
+     *
+     * The following is always true:
+     * {@code  startExpression == startCursor.getValue() && endExpression == endCursor.getValue()}.
+     */
+    public boolean isAdditionalFlowStep(
+            Expression startExpression,
+            Cursor startCursor,
+            Expression endExpression,
+            Cursor endCursor
+    ) {
         return false;
     }
 
