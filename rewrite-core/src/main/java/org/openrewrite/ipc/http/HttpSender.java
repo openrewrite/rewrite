@@ -38,6 +38,7 @@ import java.util.zip.GZIPOutputStream;
  * This interface can be used to inject more advanced customization like SSL verification, key loading,
  * etc. without requiring further additions to OpenRewrite components needing to make HTTP calls.
  */
+@SuppressWarnings("unused")
 public interface HttpSender {
     Response send(Request request);
 
@@ -114,6 +115,7 @@ public interface HttpSender {
             return printed.toString();
         }
 
+        @SuppressWarnings("UnusedReturnValue")
         public static class Builder {
             private static final String APPLICATION_JSON = "application/json";
             private static final String TEXT_PLAIN = "text/plain";

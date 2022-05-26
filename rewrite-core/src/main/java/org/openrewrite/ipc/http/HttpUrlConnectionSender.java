@@ -16,8 +16,10 @@
 package org.openrewrite.ipc.http;
 
 import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.Proxy;
+import java.net.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Map;
 
@@ -71,6 +73,14 @@ public class HttpUrlConnectionSender implements HttpSender {
     @Override
     public Response send(Request request) {
         try {
+            if("file".equals(request.getUrl().getProtocol())) {
+                try {
+                    Path path = Paths.get(request.getUrl().toURI());
+                    return new Response(200, Files.newInputStream(path), () -> {});
+                } catch (URISyntaxException e) {
+                    throw new RuntimeException(e);
+                }
+            }
             HttpURLConnection con;
             if (proxy != null) {
                 con = (HttpURLConnection) request.getUrl().openConnection(proxy);
