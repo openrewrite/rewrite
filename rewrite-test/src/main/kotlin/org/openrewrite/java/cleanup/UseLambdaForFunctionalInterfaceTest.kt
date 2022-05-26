@@ -290,7 +290,7 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
             class Test {
                 ChangeListener listener = new ChangeListener<String>() {
                     @Override
-                    public void changed(ObservableValue<? extends String> ov, String oldState, String newState) {
+                    public void changed(ObservableValue ov, String oldState, String newState) {
                     }
                 };
             }
