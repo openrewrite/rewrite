@@ -64,6 +64,10 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
     public abstract boolean isSink(Sink sink, Cursor cursor);
 
     /**
+     * takes an existing flow-step in the graph and offers a potential next flow step.
+     * The method can then decide if the offered potential next flow step should be considered a valid next flow step
+     * in the graph.
+     *
      * Allows for ad-hoc taint tracking by allowing for additional, non-default flow steps to be added to the flow graph.
      *
      * The following is always true:

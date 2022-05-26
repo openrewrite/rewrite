@@ -201,6 +201,9 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             Cursor ancestorCursor = cursorPath.next();
             Object ancestor = ancestorCursor.getValue();
             if (ancestor instanceof Expression) {
+                // Offer the cursor of the current flow graph, and a next possible expression to
+                // `isAdditionalFlowStep` to see if it should be added to the flow graph.
+                // This allows the API user to extend what the definition of 'flow' is.
                 Cursor previousCursor = nextFlowGraph.getCursor();
                 if (spec.isAdditionalFlowStep(
                         previousCursor.getValue(),
@@ -222,7 +225,9 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                     // If the method invocation is not `toString` on a `String`, it's not dataflow
                     break;
                 }
-            } else if (ancestor instanceof J.TypeCast || ancestor instanceof J.Parentheses || ancestor instanceof J.ControlParentheses) {
+            } else if (ancestor instanceof J.TypeCast ||
+                    ancestor instanceof J.Parentheses ||
+                    ancestor instanceof J.ControlParentheses) {
                 nextFlowGraph = nextFlowGraph.addEdge(ancestorCursor);
             } else if (ancestor instanceof J.NewClass) {
                 break;
