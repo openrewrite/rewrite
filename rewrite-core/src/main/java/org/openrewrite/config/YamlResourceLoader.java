@@ -198,6 +198,9 @@ public class YamlResourceLoader implements ResourceLoader {
                                             recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
                                                     nameAndConfig.getValue(), "Recipe class " +
                                                             nameAndConfig.getKey() + " cannot be found"));
+                                        } else {
+                                            recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
+                                                    "Unable to load Recipe: " + e));
                                         }
                                     }
                                 } else {
