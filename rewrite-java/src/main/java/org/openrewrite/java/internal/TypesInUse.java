@@ -47,6 +47,7 @@ public class TypesInUse {
                     if (!(tree instanceof J.ClassDeclaration) &&
                             !(tree instanceof J.MethodDeclaration) &&
                             !(tree instanceof J.MethodInvocation) &&
+                            !(tree instanceof J.Lambda) &&
                             !(tree instanceof J.VariableDeclarations)) {
                         types.add(((TypedTree) tree).getType());
                     }

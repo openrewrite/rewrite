@@ -704,4 +704,56 @@ interface RemoveUnusedImportsTest : JavaRecipeTest, RewriteTest {
         """
 
     )
+
+    @Test
+    fun removeImportUsedAsLambdaParameter(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.HashMap;
+            import java.util.function.Function;
+
+            public class Test {
+                public static void foo(){
+                    final HashMap<Integer,String> map = new HashMap<>();
+                    map.computeIfAbsent(3, integer -> String.valueOf(integer + 1));
+                }
+            }
+        """,
+        after = """
+            import java.util.HashMap;
+
+            public class Test {
+                public static void foo(){
+                    final HashMap<Integer,String> map = new HashMap<>();
+                    map.computeIfAbsent(3, integer -> String.valueOf(integer + 1));
+                }
+            }
+        """
+    )
+
+    @Test
+    fun removeImportUsedAsMethodParameter(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.HashMap;
+            import java.util.ArrayList;
+            import java.util.Set;
+
+            public class Test {
+                public static void foo(){
+                    new ArrayList<>(new HashMap<Integer, String>().keySet());
+                }
+            }
+        """,
+        after = """
+            import java.util.HashMap;
+            import java.util.ArrayList;
+
+            public class Test {
+                public static void foo(){
+                    new ArrayList<>(new HashMap<Integer, String>().keySet());
+                }
+            }
+        """
+    )
 }

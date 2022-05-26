@@ -23,7 +23,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
-@Suppress("Convert2Lambda", "Anonymous2MethodRef", "CodeBlock2Expr")
+@Suppress("Convert2Lambda", "Anonymous2MethodRef", "CodeBlock2Expr", "WriteOnlyObject")
 interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = UseLambdaForFunctionalInterface()
@@ -34,7 +34,6 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
         jp,
         recipe = UseLambdaForFunctionalInterface().doNext(ReplaceLambdaWithMethodReference()),
         before = """
-        import java.util.function.Function;
         class Test {
             Runnable r = new Runnable() {
                 @Override public void run() {
@@ -46,7 +45,6 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
         }
     """,
         after = """
-        import java.util.function.Function;
         class Test {
             Runnable r = Test.this::execute;
             
@@ -205,6 +203,57 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
                     };
                 }
             }
+        """
+    )
+
+    @Test
+    fun finalParameters(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.Function;
+            class Test {
+                Function<Integer, Integer> f = new Function<Integer, Integer>() {
+                    @Override 
+                    public Integer apply(final Integer n) {
+                        return n + 1;
+                    }
+                };
+            }
+        """,
+        after = """
+            import java.util.function.Function;
+            class Test {
+                Function<Integer, Integer> f = n -> n + 1;
+            }
+        """
+    )
+
+    @Test
+    fun useLambdaThenRemoveUnusedImports(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+        import java.util.HashMap;
+        import java.util.function.Function;
+
+        public class Temp {
+            public static void foo(){
+                new HashMap<Integer, String>().computeIfAbsent(3, new Function<Integer, String>() {
+                    @Override
+                    public String apply(Integer integer) {
+                        return String.valueOf(integer + 1);
+                    }
+                });
+            }
+        }
+        """,
+        after = """
+        import java.util.HashMap;
+
+        public class Temp {
+            public static void foo(){
+                new HashMap<Integer, String>().computeIfAbsent(3, integer -> String.valueOf(integer + 1));
+            }
+        }
         """
     )
 }

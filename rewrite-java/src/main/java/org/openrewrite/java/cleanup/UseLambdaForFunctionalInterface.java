@@ -23,12 +23,14 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.RemoveUnusedImports;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -128,7 +130,7 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                                             .map(p -> {
                                                 J.VariableDeclarations decl = (J.VariableDeclarations) p;
                                                 decl = decl.withVariables(ListUtils.map(decl.getVariables(), v -> v.withPrefix(Space.EMPTY)));
-                                                return decl.withTypeExpression(null);
+                                                return decl.withTypeExpression(null).withModifiers(Collections.emptyList());
                                             }).collect(Collectors.toList())
                             ));
                         }
@@ -141,6 +143,8 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                         lambda = lambda.withBody(lambdaBody.withPrefix(Space.format(" ")));
 
                         lambda = (J.Lambda) new LambdaBlockToExpression().getVisitor().visitNonNull(lambda, ctx);
+
+                        doAfterVisit(new RemoveUnusedImports());
 
                         return autoFormat(lambda, ctx, getCursor().getParentOrThrow());
                     }
