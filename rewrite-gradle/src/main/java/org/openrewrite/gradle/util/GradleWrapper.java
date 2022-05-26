@@ -16,12 +16,13 @@
 package org.openrewrite.gradle.util;
 
 import lombok.Value;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
-import org.openrewrite.gradle.RemoteGradleWrapperJar;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.remote.RemoteArchive;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
@@ -126,9 +127,13 @@ public class GradleWrapper {
         return getDistributionUrl().replaceAll("(?<!\\\\)://", "\\\\://");
     }
 
-    public RemoteGradleWrapperJar asRemote() {
-        return new RemoteGradleWrapperJar(Tree.randomId(), GradleWrapper.WRAPPER_JAR_LOCATION, Markers.EMPTY,
-                URI.create(getDistributionUrl()), version);
+    static final FileAttributes WRAPPER_JAR_FILE_ATTRIBUTES = new FileAttributes(null, null, null, true, true, false, 0);
+
+    public RemoteArchive asRemote() {
+        return new RemoteArchive(Tree.randomId(), GradleWrapper.WRAPPER_JAR_LOCATION, Markers.EMPTY,
+                URI.create(getDistributionUrl()), null, false, WRAPPER_JAR_FILE_ATTRIBUTES,
+                "gradle-wrapper.jar is part of the gradle wrapper",
+                Paths.get("gradle-" + version + "/lib/gradle-wrapper-" + version + ".jar!gradle-wrapper.jar"));
     }
 
     public enum DistributionType {
