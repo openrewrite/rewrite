@@ -16,12 +16,16 @@
 
 package org.openrewrite.java.cleanup
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
+import org.openrewrite.java.tree.TypeUtils
 
 @Suppress("Convert2Lambda", "Anonymous2MethodRef", "CodeBlock2Expr", "WriteOnlyObject")
 interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
@@ -256,4 +260,62 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
         }
         """
     )
+
+    @Test
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1852")
+    fun rawParameterizedType(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf(
+            """
+                package javafx.beans.value;
+
+                public interface ObservableValue<T> {
+                    void addListener(ChangeListener<? super T> listener);
+                }
+            """,
+            """
+                package javafx.beans.value;
+                
+                @FunctionalInterface
+                public interface ChangeListener<T> {
+                    void changed(ObservableValue<? extends T> observable, T oldValue, T newValue);
+                }                
+            """
+        ),
+        before = """
+            import javafx.beans.value.ObservableValue;
+            import javafx.beans.value.ChangeListener;
+            
+            class Test {
+                ChangeListener listener = new ChangeListener<String>() {
+                    @Override
+                    public void changed(ObservableValue<? extends String> ov, String oldState, String newState) {
+                    }
+                };
+            }
+        """,
+        after = """
+            import javafx.beans.value.ObservableValue;
+            import javafx.beans.value.ChangeListener;
+
+            class Test {
+                ChangeListener listener = (ov, oldState, newState) -> {
+                };
+            }
+        """,
+        afterConditions = {u ->
+            val variableDecl = u.classes[0].body.statements[0] as J.VariableDeclarations
+            val lambda = variableDecl.variables[0].initializer as J.Lambda
+            val lambdaType = TypeUtils.asFullyQualified(lambda.type)
+            Assertions.assertThat((lambdaType!!.typeParameters[0] as JavaType.FullyQualified).fullyQualifiedName).isEqualTo("java.lang.String")
+            val ovVariableDecl = lambda.parameters.parameters[0] as J.VariableDeclarations
+            val ovType = TypeUtils.asFullyQualified(ovVariableDecl.variables[0].type)
+            val genericType = (ovType!!.typeParameters[0]) as JavaType.GenericTypeVariable
+            //This assertion should pass but the argument's type is not being correctly changed to match the signature of the
+            //parameterized type.
+            Assertions.assertThat((genericType.bounds[0] as JavaType.FullyQualified).fullyQualifiedName).isEqualTo("java.lang.String")
+        }
+    )
+
 }
