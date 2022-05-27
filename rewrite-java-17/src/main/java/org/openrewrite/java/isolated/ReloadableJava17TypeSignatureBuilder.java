@@ -188,7 +188,6 @@ class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String methodSignature(Type selectType, Symbol.MethodSymbol symbol) {
-        Type genericType = symbol.type;
         String s = classSignature(symbol.owner.type);
         if (symbol.isConstructor()) {
             s += "{name=<constructor>,return=" + s;
@@ -201,11 +200,10 @@ class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String methodSignature(Symbol.MethodSymbol symbol) {
-        Type genericType = symbol.type;
         String s = classSignature(symbol.owner.type);
 
         String returnType;
-        if(symbol.isStaticOrInstanceInit()) {
+        if (symbol.isStaticOrInstanceInit()) {
             returnType = "void";
         } else {
             returnType = signature(symbol.getReturnType());
@@ -222,13 +220,17 @@ class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String methodArgumentSignature(Symbol.MethodSymbol sym) {
-        if(sym.isStaticOrInstanceInit()) {
+        if (sym.isStaticOrInstanceInit()) {
             return "[]";
         }
 
         StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
-        for (Symbol.VarSymbol parameter : sym.getParameters()) {
-            genericArgumentTypes.add(signature(parameter.type));
+        if (sym.type == null) {
+            genericArgumentTypes.add("{undefined}");
+        } else {
+            for (Symbol.VarSymbol parameter : sym.getParameters()) {
+                genericArgumentTypes.add(signature(parameter.type));
+            }
         }
         return genericArgumentTypes.toString();
     }
@@ -260,7 +262,7 @@ class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             owner = methodSignature((Symbol.MethodSymbol) symbol.owner);
         } else {
             owner = signature(symbol.owner.type);
-            if(owner.contains("<")) {
+            if (owner.contains("<")) {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
         }
