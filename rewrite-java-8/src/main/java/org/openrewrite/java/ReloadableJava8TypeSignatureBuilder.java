@@ -63,7 +63,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return s.append("}").toString();
         } else if (type instanceof Type.JCNoType) {
             return "{none}";
-        } else if(type instanceof Type.AnnotatedType) {
+        } else if (type instanceof Type.AnnotatedType) {
             return signature(type.unannotatedType());
         }
 
@@ -187,7 +187,6 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String methodSignature(Type selectType, Symbol.MethodSymbol symbol) {
-        Type genericType = symbol.type;
         String s = classSignature(symbol.owner.type);
         if (symbol.isConstructor()) {
             s += "{name=<constructor>,return=" + s;
@@ -200,7 +199,6 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String methodSignature(Symbol.MethodSymbol symbol) {
-        Type genericType = symbol.type;
         String s = classSignature(symbol.owner.type);
 
         String returnType;
@@ -226,8 +224,12 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
-        for (Symbol.VarSymbol parameter : sym.getParameters()) {
-            genericArgumentTypes.add(signature(parameter.type));
+        if (sym.type == null) {
+            genericArgumentTypes.add("{undefined}");
+        } else {
+            for (Symbol.VarSymbol parameter : sym.getParameters()) {
+                genericArgumentTypes.add(signature(parameter.type));
+            }
         }
         return genericArgumentTypes.toString();
     }
