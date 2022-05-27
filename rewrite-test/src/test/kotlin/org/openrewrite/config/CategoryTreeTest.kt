@@ -42,6 +42,7 @@ class CategoryTreeTest {
     fun getRecipeCount() {
         assertThat(categoryTree.getCategoryOrThrow("org", "openrewrite").recipeCount)
             .isGreaterThan(10)
+        assertThat(categoryTree.recipes.size).isEqualTo(categoryTree.recipeCount)
     }
 
     @Test

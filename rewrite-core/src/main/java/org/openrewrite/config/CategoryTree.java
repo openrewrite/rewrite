@@ -20,8 +20,8 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
+import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toList;
 
@@ -206,16 +206,16 @@ public class CategoryTree<G> {
 
     public Collection<RecipeDescriptor> getRecipes() {
         synchronized (lock) {
-            if (!subtrees.isEmpty()) {
-                return emptyList();
-            }
-            return recipesByGroup.values().stream()
-                    .flatMap(Collection::stream)
+            return Stream.concat(
+                            recipesByGroup.values().stream().flatMap(Collection::stream),
+                            subtrees.stream().flatMap(it -> it.getRecipes().stream())
+                    )
                     .distinct()
                     .collect(toList());
         }
     }
 
+    @SuppressWarnings("unused")
     public Map<G, Collection<RecipeDescriptor>> getRecipesByGroup() {
         synchronized (lock) {
             return Collections.unmodifiableMap(new HashMap<>(recipesByGroup));
