@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -49,6 +50,23 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                     Map<X,Y> map = new HashMap<>();
                     List<String> ls2 = new ArrayList<String>() {
                     };
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1297")
+    @Test
+    fun `do not use diamond operators for variables having null or unknown types`(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import lombok.val;
+            import java.util.ArrayList;
+
+            class Test<X, Y> {
+                void test() {
+                    val ls = new ArrayList<String>();
+                    UnknownThing o = new UnknownThing<String>();
                 }
             }
         """

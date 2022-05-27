@@ -20,10 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaVarKeyword;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
@@ -59,6 +56,14 @@ public class UseDiamondOperator extends Recipe {
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
 
         return new JavaIsoVisitor<ExecutionContext>() {
+
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+                if (multiVariable.getType() == null || multiVariable.getType() instanceof JavaType.Unknown) {
+                    return multiVariable;
+                }
+                return super.visitVariableDeclarations(multiVariable, executionContext);
+            }
 
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
