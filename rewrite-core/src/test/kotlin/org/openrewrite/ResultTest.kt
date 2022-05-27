@@ -157,7 +157,7 @@ class ResultTest {
     @Test
     fun addFile() {
         val diff = Result.InMemoryDiffEntry(
-            filePath, filePath, null,
+            null, filePath, null,
             "",
             """
                 |public void test() {
@@ -193,7 +193,7 @@ class ResultTest {
     @Test
     fun deleteFile() {
         val diff = Result.InMemoryDiffEntry(
-            filePath, filePath, null,
+            filePath, null, null,
             """
                 |public void test() {
                 |   logger.info("Hello Fred");

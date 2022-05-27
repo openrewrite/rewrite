@@ -152,23 +152,18 @@ public class Result {
     }
 
     private String computeDiff(@Nullable Path relativeTo) {
-        Path sourcePath;
-        if (after != null) {
-            sourcePath = after.getSourcePath();
-        } else if (before != null) {
-            sourcePath = before.getSourcePath();
-        } else {
-            sourcePath = (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + System.nanoTime());
-        }
 
-        Path originalSourcePath = sourcePath;
-        if (before != null && after != null && !before.getSourcePath().equals(after.getSourcePath())) {
-            originalSourcePath = before.getSourcePath();
+        Path beforePath = before == null ? null : before.getSourcePath();
+        Path afterPath = null;
+        if (before == null && after == null) {
+            afterPath = (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + System.nanoTime());
+        } else if (after != null) {
+            afterPath = after.getSourcePath();
         }
 
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
-                originalSourcePath,
-                sourcePath,
+                beforePath,
+                afterPath,
                 relativeTo,
                 before == null ? "" : before.printAll(),
                 after == null ? "" : after.printAll(),
@@ -181,8 +176,7 @@ public class Result {
 
     @Override
     public String toString() {
-        return "Fred";
-        //return diff();
+        return diff();
     }
 
     static class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
@@ -193,7 +187,7 @@ public class Result {
         private final InMemoryRepository repo;
         private final Set<Recipe> recipesThatMadeChanges;
 
-        InMemoryDiffEntry(Path originalFilePath, Path filePath, @Nullable Path relativeTo, String oldSource,
+        InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
                           String newSource, Set<Recipe> recipesThatMadeChanges) {
 
             this.recipesThatMadeChanges = recipesThatMadeChanges;
@@ -205,7 +199,7 @@ public class Result {
 
                 try (ObjectInserter inserter = repo.getObjectDatabase().newInserter()) {
 
-                    if (!oldSource.isEmpty()) {
+                    if (originalFilePath != null) {
                         this.oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
                         this.oldMode = FileMode.REGULAR_FILE;
                         this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString().replace("\\", "/");
@@ -215,7 +209,7 @@ public class Result {
                         this.oldPath = DEV_NULL;
                     }
 
-                    if (!newSource.isEmpty()) {
+                    if (filePath != null) {
                         this.newId = inserter.insert(Constants.OBJ_BLOB, newSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
                         this.newMode = FileMode.REGULAR_FILE;
                         this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString().replace("\\", "/");
@@ -230,12 +224,14 @@ public class Result {
                 throw new UncheckedIOException(e);
             }
 
-            if (oldSource.isEmpty() && !newSource.isEmpty()) {
+            if (this.oldMode == FileMode.MISSING && this.newMode != FileMode.MISSING) {
                 this.changeType = ChangeType.ADD;
-            } else if (!oldSource.isEmpty() && newSource.isEmpty()) {
+            } else if (this.oldMode != FileMode.MISSING && this.newMode == FileMode.MISSING)  {
                 this.changeType = ChangeType.DELETE;
+            } else if (!oldPath.equals(newPath)) {
+                this.changeType = ChangeType.RENAME;
             } else {
-                this.changeType = originalFilePath.equals(filePath) ? ChangeType.MODIFY : ChangeType.RENAME;
+                this.changeType = ChangeType.MODIFY;
             }
         }
 
