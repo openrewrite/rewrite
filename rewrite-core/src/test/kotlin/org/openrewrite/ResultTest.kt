@@ -150,7 +150,81 @@ class ResultTest {
                 |+   logger.info("some %s", 2);
                 | }
                 |
-        """.trimMargin()
+            """.trimMargin()
         ).isEqualTo(diff)
     }
+
+    @Test
+    fun addFile() {
+        val diff = Result.InMemoryDiffEntry(
+            filePath, filePath, null,
+            "",
+            """
+                |public void test() {
+                |   logger.info("Hello Fred");
+                |}
+                |
+            """.trimMargin(),
+            setOf(
+                object : Recipe() {
+                    override fun getName(): String = "logger.Fix1"
+                    override fun getDisplayName(): String {
+                        return name
+                    }
+                }
+            )).diff
+
+        assertThat(diff).isEqualTo(
+            """
+                |diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
+                |new file mode 100644
+                |index 0000000..efeb105
+                |--- /dev/null
+                |+++ b/com/netflix/MyJavaClass.java
+                |@@ -0,0 +1,3 @@ logger.Fix1
+                |+public void test() {
+                |+   logger.info("Hello Fred");
+                |+}
+                |
+            """.trimMargin()
+        )
+    }
+
+    @Test
+    fun deleteFile() {
+        val diff = Result.InMemoryDiffEntry(
+            filePath, filePath, null,
+            """
+                |public void test() {
+                |   logger.info("Hello Fred");
+                |}
+                |
+            """.trimMargin(),
+            "",
+            setOf(
+                object : Recipe() {
+                    override fun getName(): String = "logger.Fix1"
+                    override fun getDisplayName(): String {
+                        return name
+                    }
+                }
+            )).diff
+
+        assertThat(diff).isEqualTo(
+            """
+                |diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
+                |deleted file mode 100644
+                |index efeb105..0000000
+                |--- a/com/netflix/MyJavaClass.java
+                |+++ /dev/null
+                |@@ -1,3 +0,0 @@ logger.Fix1
+                |-public void test() {
+                |-   logger.info("Hello Fred");
+                |-}
+                |
+           """.trimMargin()
+        )
+
+    }
+
 }

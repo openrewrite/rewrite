@@ -20,9 +20,7 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
@@ -183,35 +181,61 @@ public class Result {
 
     @Override
     public String toString() {
-        return diff();
+        return "Fred";
+        //return diff();
     }
 
     static class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
+
+        static final AbbreviatedObjectId A_ZERO = AbbreviatedObjectId
+                .fromObjectId(ObjectId.zeroId());
+
         private final InMemoryRepository repo;
         private final Set<Recipe> recipesThatMadeChanges;
 
         InMemoryDiffEntry(Path originalFilePath, Path filePath, @Nullable Path relativeTo, String oldSource,
                           String newSource, Set<Recipe> recipesThatMadeChanges) {
-            this.changeType = originalFilePath.equals(filePath) ? ChangeType.MODIFY : ChangeType.RENAME;
-            this.recipesThatMadeChanges = recipesThatMadeChanges;
 
-            this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString().replace("\\", "/");
-            this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString().replace("\\", "/");
+            this.recipesThatMadeChanges = recipesThatMadeChanges;
 
             try {
                 this.repo = new InMemoryRepository.Builder()
                         .setRepositoryDescription(new DfsRepositoryDescription())
                         .build();
 
-                ObjectInserter inserter = repo.getObjectDatabase().newInserter();
-                oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
-                newId = inserter.insert(Constants.OBJ_BLOB, newSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
-                inserter.flush();
+                try (ObjectInserter inserter = repo.getObjectDatabase().newInserter()) {
 
-                oldMode = FileMode.REGULAR_FILE;
-                newMode = FileMode.REGULAR_FILE;
+                    if (!oldSource.isEmpty()) {
+                        this.oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
+                        this.oldMode = FileMode.REGULAR_FILE;
+                        this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString().replace("\\", "/");
+                    } else {
+                        this.oldId = A_ZERO;
+                        this.oldMode = FileMode.MISSING;
+                        this.oldPath = DEV_NULL;
+                    }
+
+                    if (!newSource.isEmpty()) {
+                        this.newId = inserter.insert(Constants.OBJ_BLOB, newSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
+                        this.newMode = FileMode.REGULAR_FILE;
+                        this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString().replace("\\", "/");
+                    } else {
+                        this.newId = A_ZERO;
+                        this.newMode = FileMode.MISSING;
+                        this.newPath = DEV_NULL;
+                    }
+                    inserter.flush();
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
+            }
+
+            if (oldSource.isEmpty() && !newSource.isEmpty()) {
+                this.changeType = ChangeType.ADD;
+            } else if (!oldSource.isEmpty() && newSource.isEmpty()) {
+                this.changeType = ChangeType.DELETE;
+            } else {
+                this.changeType = originalFilePath.equals(filePath) ? ChangeType.MODIFY : ChangeType.RENAME;
             }
         }
 
@@ -246,7 +270,7 @@ public class Result {
                                 joinedRecipeNames.add(name);
                             }
 
-                            return l + joinedRecipeNames.toString();
+                            return l + joinedRecipeNames;
                         }
                         return l;
                     })
