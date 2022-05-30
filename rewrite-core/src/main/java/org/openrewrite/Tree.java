@@ -114,4 +114,18 @@ public interface Tree {
     default boolean isScope(@Nullable Tree tree) {
         return tree != null && tree.getId().equals(getId());
     }
+
+    default <T2 extends Tree> T2 cast() {
+        //noinspection unchecked
+        return (T2) this;
+    }
+
+    @Nullable
+    default <T2 extends Tree> T2 safeCast() {
+        try {
+            return cast();
+        } catch (ClassCastException ignored) {
+            return null;
+        }
+    }
 }
