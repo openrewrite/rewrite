@@ -156,6 +156,23 @@ interface TypeUtilsTest : RewriteTest {
         }}
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1857")
+    @Test
+    fun isParameterizedTypeWithShallowClassesOfType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                java.util.List<Integer> integer1;
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val variable1 = (cu.classes[0].body.statements[0] as J.VariableDeclarations).variables[0]
+
+            assertThat(variable1.variableType?.type).isInstanceOf(JavaType.Parameterized::class.java)
+            val shallowParameterizedType = JavaType.Parameterized(null, JavaType.ShallowClass.build("java.util.List"), listOf(JavaType.ShallowClass.build("java.lang.Integer")))
+            assertThat(TypeUtils.isOfType(variable1.variableType?.type, shallowParameterizedType)).isTrue()
+        }}
+    )
+
     @Test
     fun differentParameterizedTypesIsOfType(jp: JavaParser) = rewriteRun(
         { spec -> spec.parser(jp) },
