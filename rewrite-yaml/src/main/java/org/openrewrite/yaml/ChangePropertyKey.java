@@ -122,10 +122,6 @@ public class ChangePropertyKey extends Recipe {
                                 entry
                         ));
                         doAfterVisit(new DeletePropertyVisitor<>(entry));
-                        //noinspection ConstantConditions
-                        if (!nonScalarMappingEntryExists(getCursor().firstEnclosing(Yaml.Document.class), propertyEntry, propertyToTest, p)) {
-                            maybeCoalesceProperties();
-                        }
                         break;
                     }
                     propertyToTest = propertyToTest.substring(value.length() + 1);
@@ -133,30 +129,6 @@ public class ChangePropertyKey extends Recipe {
             }
 
             return e;
-        }
-
-        private boolean nonScalarMappingEntryExists(Yaml.Mapping.Document document, Yaml.Mapping.Entry entry, String property, P p) {
-            AtomicBoolean exists = new AtomicBoolean(false);
-            String propertyToCheck = Boolean.TRUE.equals(relaxedBinding) ? NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL, property) : property;
-            new YamlIsoVisitor<P>() {
-                @Override
-                public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
-                    Yaml.Mapping m = super.visitMapping(mapping, p);
-                    if (m.getEntries().contains(entry)) {
-                        for (Yaml.Mapping.Entry mEntry : m.getEntries()) {
-                            if (!(mEntry.getValue() instanceof Yaml.Scalar)) {
-                                String mKey = Boolean.TRUE.equals(relaxedBinding) ? NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL, mEntry.getKey().getValue()) : mEntry.getKey().getValue();
-                                if (propertyToCheck.startsWith(mKey)) {
-                                    exists.set(true);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    return m;
-                }
-            }.visitDocument(document, p);
-            return exists.get();
         }
     }
 
@@ -223,10 +195,6 @@ public class ChangePropertyKey extends Recipe {
                 } else {
                     entries.add(entry);
                 }
-            }
-
-            if (entries.size() == 1) {
-                entries = ListUtils.map(entries, e -> e.withPrefix(""));
             }
 
             if (changed) {

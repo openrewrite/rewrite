@@ -25,7 +25,7 @@ import java.nio.file.Path
 
 class DeletePropertyKeyTest : YamlRecipeTest {
     override val recipe: Recipe
-        get() = DeleteProperty("management.metrics.binders.files.enabled", true, null, null)
+        get() = DeleteProperty("management.metrics.binders.files.enabled", null, null, null)
 
     @Test
     fun singleEntry() = assertChanged(
@@ -42,7 +42,8 @@ class DeletePropertyKeyTest : YamlRecipeTest {
           server.port: 8080
         """,
         after = """
-          management.metrics.enabled: true
+          management.metrics:
+            enabled: true
           server.port: 8080
         """
     )

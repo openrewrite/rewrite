@@ -39,9 +39,13 @@ public class DeleteProperty extends Recipe {
             example = "management.metrics.binders.files.enabled")
     String propertyKey;
 
+    @Deprecated
     @Option(displayName = "Coalesce",
-            description = "Simplify nested map hierarchies into their simplest dot separated property form.",
-            example = "true")
+            description = "(Deprecated: in a future version, this recipe will always use the `false` behavior)"
+                    + " Simplify nested map hierarchies into their simplest dot separated property form.",
+            example = "true",
+            required = false)
+    @Nullable
     Boolean coalesce;
 
     @Incubating(since = "7.17.0")
@@ -97,7 +101,7 @@ public class DeleteProperty extends Recipe {
 
                 if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
                     doAfterVisit(new DeletePropertyVisitor<>(entry));
-                    if (coalesce) {
+                    if (Boolean.TRUE.equals(coalesce)) {
                         maybeCoalesceProperties();
                     }
                 }
