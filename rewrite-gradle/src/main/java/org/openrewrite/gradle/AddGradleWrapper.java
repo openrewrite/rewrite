@@ -30,6 +30,7 @@ import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.text.PlainText;
 
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -75,7 +76,7 @@ public class AddGradleWrapper extends Recipe {
     public Validated validate() {
         if (gradleWrapper == null) {
             gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution,
-                    new HttpUrlConnectionSender()));
+                    new HttpUrlConnectionSender(Duration.ofSeconds(3), Duration.ofSeconds(10))));
         }
         return gradleWrapper;
     }
