@@ -3196,7 +3196,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MethodInvocation implements J, Statement, Expression, TypedTree {
+    final class MethodInvocation implements J, Statement, Expression, JCallable, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -3254,6 +3254,8 @@ public interface J extends Tree {
 
         JContainer<Expression> arguments;
 
+        @NonNull
+        @Override
         public List<Expression> getArguments() {
             return arguments.getElements();
         }
@@ -3662,7 +3664,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class NewClass implements J, Statement, Expression, TypedTree {
+    final class NewClass implements J, Statement, Expression, JCallable, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -3718,6 +3720,7 @@ public interface J extends Tree {
         JContainer<Expression> arguments;
 
         @Nullable
+        @Override
         public List<Expression> getArguments() {
             return arguments == null ? null : arguments.getElements();
         }
