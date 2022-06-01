@@ -47,6 +47,9 @@ public class TypeUtils {
      * {@link JavaType.GenericTypeVariable} will be checked for {@link JavaType.GenericTypeVariable.Variance} and each of the bounds.
      */
     public static boolean isOfType(@Nullable JavaType type1, @Nullable JavaType type2) {
+        if (type1 instanceof JavaType.Unknown || type2 instanceof JavaType.Unknown) {
+            return false;
+        }
         if (type1 == type2) {
             return true;
         }
@@ -119,6 +122,9 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
+        if (to instanceof JavaType.Unknown || from instanceof JavaType.Unknown) {
+            return false;
+        }
         if (to == from) {
             return true;
         } else if (to instanceof JavaType.FullyQualified) {
