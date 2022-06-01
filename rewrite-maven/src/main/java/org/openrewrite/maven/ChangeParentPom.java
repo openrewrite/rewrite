@@ -22,8 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.maven.tree.Parent;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -147,29 +146,37 @@ public class ChangeParentPom extends Recipe {
             @SuppressWarnings("OptionalGetWithoutIsPresent")
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+
                 if (isParentTag()) {
+
+                    ResolvedPom resolvedPom = getResolutionResult().getPom();
+
                     String targetGroupId = newGroupId == null ? oldGroupId : newGroupId;
                     String targetArtifactId = newArtifactId == null ? oldArtifactId : newArtifactId;
-                    if (oldGroupId.equals(tag.getChildValue("groupId").orElse(null)) &&
-                            oldArtifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
-                        tag.getChildValue("version")
-                                .flatMap(parentVersion -> findNewerDependencyVersion(targetGroupId, targetArtifactId, parentVersion, ctx))
-                                .ifPresent(newVersion -> {
-                                    if (!oldGroupId.equals(targetGroupId)) {
-                                        doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("groupId").get(), targetGroupId));
-                                    }
-                                    if (!oldArtifactId.equals(targetArtifactId)) {
-                                        doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("artifactId").get(), targetArtifactId));
-                                    }
-                                    if (!newVersion.equals(tag.getChildValue("version").orElse(null))) {
-                                        doAfterVisit(new ChangeTagValueVisitor<>(tag.getChild("version").get(), newVersion));
-                                    }
-                                    doAfterVisit(new RemoveRedundantDependencyVersions());
-                                });
+                    if (oldGroupId.equals(resolvedPom.getValue(tag.getChildValue("groupId").orElse(null))) &&
+                            oldArtifactId.equals(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)))) {
+
+                        String oldVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
+                        assert oldVersion != null;
+                        Optional<String> targetVersion = findNewerDependencyVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
+                        if (targetVersion.isPresent()) {
+                            if (!oldGroupId.equals(targetGroupId)) {
+                                t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId).visitNonNull(t, ctx);
+                            }
+
+                            if (!oldArtifactId.equals(targetArtifactId)) {
+                                t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), targetArtifactId).visitNonNull(t, ctx);
+                            }
+
+                            if (!oldVersion.equals(targetVersion.get())) {
+                                t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()).visitNonNull(t, ctx);
+                            }
+                            doAfterVisit(new RemoveRedundantDependencyVersions());
+                        }
                     }
                 }
-
-                return super.visitTag(tag, ctx);
+                return t;
             }
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
