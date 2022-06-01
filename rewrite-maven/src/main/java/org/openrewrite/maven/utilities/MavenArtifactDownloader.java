@@ -100,7 +100,7 @@ public class MavenArtifactDownloader {
 
                 InputStream bodyStream;
 
-                if (uri.startsWith("~/")) {
+                if (uri.startsWith("~")) {
                     bodyStream = new FileInputStream(System.getProperty("user.home") + uri.substring(1));
                 } else {
                     HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
