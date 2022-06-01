@@ -74,6 +74,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class CatchClauseOnlyRethrowsTcx : CatchClauseOnlyRethrowsTest
 
     @Nested
+    inner class CombineSemanticallyEqualCatchBlocksTcx : CombineSemanticallyEqualCatchBlocksTest
+
+    @Nested
     inner class CompareEnumWithEqualityOperatorTcx : CompareEnumWithEqualityOperatorTest
 
     @Nested
