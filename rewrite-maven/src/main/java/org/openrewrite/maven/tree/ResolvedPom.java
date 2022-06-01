@@ -44,6 +44,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @Getter
 public class ResolvedPom {
+
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
@@ -59,15 +60,16 @@ public class ResolvedPom {
     Iterable<String> activeProfiles;
 
     public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, emptyMap(), emptyList(), emptyList(), emptyList());
+        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList());
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, List<MavenRepository> repositories, List<Dependency> requestedDependencies) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
         this.dependencyManagement = dependencyManagement;
+        this.initialRepositories = initialRepositories;
         this.repositories = repositories;
         this.requestedDependencies = requestedDependencies;
     }
@@ -77,6 +79,9 @@ public class ResolvedPom {
 
     @NonFinal
     List<ResolvedManagedDependency> dependencyManagement;
+
+    @NonFinal
+    List<MavenRepository> initialRepositories;
 
     @NonFinal
     List<MavenRepository> repositories;
@@ -94,15 +99,11 @@ public class ResolvedPom {
 
         List<ResolvedManagedDependency> dedupMd = ListUtils.map(dependencyManagement, dm -> uniqueManagedDependencies.add(new UniqueDependencyKey(dm.getGav(), dm.getType(), dm.getClassifier(), dm.getScope())) ?
                 dm : null);
-//        System.out.println("dm:" + dedupMd.size() + "/" + dependencyManagement.size() + "=" +
-//                (dependencyManagement.size() == 0 ? 0 : 100*(dedupMd.size() / dependencyManagement.size())));
         dependencyManagement = dedupMd;
 
         uniqueManagedDependencies.clear();
         List<Dependency> dedupD = ListUtils.map(requestedDependencies, d -> uniqueManagedDependencies.add(new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())) ?
                 d : null);
-//        System.out.println("d:" + dedupD.size() + "/" + requestedDependencies.size() + "=" +
-//                (requestedDependencies.size() == 0 ? 0 : 100*(dedupD.size() / requestedDependencies.size())));
         requestedDependencies = dedupD;
         return this;
     }
@@ -130,7 +131,15 @@ public class ResolvedPom {
      * @throws MavenDownloadingException When problems are encountered downloading dependencies or parents.
      */
     public ResolvedPom resolve(ExecutionContext ctx, MavenPomDownloader downloader) throws MavenDownloadingException {
-        ResolvedPom resolved = new ResolvedPom(requested, activeProfiles).resolver(ctx, downloader).resolve();
+        ResolvedPom resolved = new ResolvedPom(
+                requested,
+                activeProfiles,
+                emptyMap(),
+                emptyList(),
+                initialRepositories,
+                emptyList(),
+                emptyList()
+        ).resolver(ctx, downloader).resolve();
 
         for (Map.Entry<String, String> property : resolved.getProperties().entrySet()) {
             if (property.getValue() != null && !property.getValue().equals(properties.get(property.getKey()))) {
@@ -292,7 +301,14 @@ public class ResolvedPom {
         void resolveParentsRecursively(Pom requested) {
             List<Pom> pomAncestry = new ArrayList<>();
             pomAncestry.add(requested);
+
+            if (initialRepositories != null) {
+                mergeRepositories(initialRepositories);
+            }
             resolveParentPropertiesAndRepositoriesRecursively(pomAncestry);
+            if (initialRepositories == null) {
+                initialRepositories = repositories;
+            }
 
             //Once properties have been merged, update any property placeholders in the resolved gav
             //coordinates. This is important to do early because any system properties used within the coordinates
@@ -451,7 +467,7 @@ public class ResolvedPom {
                 for (ManagedDependency d : incomingDependencyManagement) {
                     if (d instanceof Imported) {
                         ResolvedPom bom = downloader.download(getValues(((Imported) d).getGav()), null, ResolvedPom.this, repositories)
-                                .resolve(activeProfiles, downloader, ctx);
+                                .resolve(activeProfiles, downloader, initialRepositories, ctx);
                         MavenExecutionContextView.view(ctx)
                                 .getResolutionListener()
                                 .bomImport(bom.getGav(), pom);
@@ -549,7 +565,7 @@ public class ResolvedPom {
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
                         resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                emptyList(), emptyList(), emptyList());
+                                emptyList(), initialRepositories, emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }

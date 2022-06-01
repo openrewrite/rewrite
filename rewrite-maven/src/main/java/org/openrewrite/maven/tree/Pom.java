@@ -26,6 +26,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+
 /**
  * The minimum information required about a POM to resolve it.
  * The data model here is the cacheable representation of POMs.
@@ -87,6 +90,10 @@ public class Pom {
      */
     public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingException {
         return new ResolvedPom(this, activeProfiles).resolve(ctx, downloader);
+    }
+
+    public ResolvedPom resolve(Iterable<String> activeProfiles, MavenPomDownloader downloader, List<MavenRepository> initialRepositories, ExecutionContext ctx) throws MavenDownloadingException {
+        return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList()).resolve(ctx, downloader);
     }
 
 }
