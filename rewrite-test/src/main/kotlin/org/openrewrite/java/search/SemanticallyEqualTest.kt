@@ -47,7 +47,7 @@ interface SemanticallyEqualTest {
     }
 
     private fun parseSources(@Language("java") sources: Array<String>): List<J.CompilationUnit> {
-        jp.reset();
+        jp.reset()
         return jp.parse(InMemoryExecutionContext { t -> fail(t) }, *sources)
     }
 
@@ -102,6 +102,7 @@ interface SemanticallyEqualTest {
         assertThat(SemanticallyEqual.areEqual(secondAnnot,thirdAnnot)).isFalse
     }
 
+    @Suppress("rawtypes")
     @Test
     fun tagAnnotationEquality() {
         val clazz = parseSources(arrayOf(
@@ -181,6 +182,7 @@ interface SemanticallyEqualTest {
         assertThat(SemanticallyEqual.areEqual(firstIdent, thirdIdent)).isFalse
     }
 
+    @Suppress("rawtypes")
     @Test
     fun fieldAccessEquality() {
         val cus = parseSources(arrayOf(
@@ -1529,20 +1531,17 @@ interface SemanticallyEqualTest {
     fun newClass() {
         val body = parseSources(arrayOf(
             """
-                import java.util.ArrayList;
-                import java.util.HashSet;
-                import java.util.List;
-                import java.util.Set;
+                import java.util.*;
                 
                 class A {
-                    void original() {
-                        List<String> l = new ArrayList<>();
+                    void original(List<String> s) {
+                        List<String> l = new ArrayList<>(s);
                     }
-                    void isEqual() {
-                        List<String> l = new ArrayList<>();
+                    void isEqual(Collection<String> s) {
+                        List<String> l = new ArrayList<>(s);
                     }
-                    void notEqual() {
-                        Set<String> l = new HashSet<>();
+                    void notEqual(List<String> s) {
+                        Set<String> l = new HashSet<>(s);
                     }
                 }
             """
@@ -1828,14 +1827,14 @@ interface SemanticallyEqualTest {
         val body = parseSources(arrayOf(
             """
                 class A {
-                    void original() {
-                        throw new RuntimeException();
+                    void original(IllegalStateException ex) {
+                        throw new RuntimeException(ex);
                     }
-                    void isEqual() {
-                        throw new RuntimeException();
+                    void isEqual(IllegalArgumentException ex) {
+                        throw new RuntimeException(ex);
                     }
-                    void notEqual() {
-                        throw new IllegalStateException();
+                    void notEqual(IllegalStateException ex) {
+                        throw new IllegalStateException(ex);
                     }
                 }
             """
@@ -1989,7 +1988,7 @@ interface SemanticallyEqualTest {
         assertThat(SemanticallyEqual.areEqual(original, notEqual)).isFalse
     }
 
-    @Suppress("PointlessBooleanExpression")
+    @Suppress("PointlessBooleanExpression", "ConstantConditions")
     @Issue("https://github.com/openrewrite/rewrite/issues/1856")
     @Test
     fun unary() {

@@ -634,7 +634,8 @@ public class SemanticallyEqual {
                 }
 
                 J.Identifier compareTo = (J.Identifier) j;
-                if (!identifier.getSimpleName().equals(compareTo.getSimpleName())) {
+                if (!identifier.getSimpleName().equals(compareTo.getSimpleName()) ||
+                        !TypeUtils.isOfType(identifier.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return identifier;
                 }
@@ -866,8 +867,15 @@ public class SemanticallyEqual {
                 }
 
                 this.visit(method.getSelect(), compareTo.getSelect());
-                for (int i = 0; i < method.getArguments().size(); i++) {
-                    this.visit(method.getArguments().get(i), compareTo.getArguments().get(i));
+                if (method.getMethodType() != null && compareTo.getMethodType() != null) {
+                    if (!isMethodType(method.getMethodType(), compareTo.getMethodType())) {
+                        isEqual.set(false);
+                        return method;
+                    }
+                } else {
+                    for (int i = 0; i < method.getArguments().size(); i++) {
+                        this.visit(method.getArguments().get(i), compareTo.getArguments().get(i));
+                    }
                 }
 
                 if (method.getTypeParameters() != null && compareTo.getTypeParameters() != null) {
@@ -975,9 +983,16 @@ public class SemanticallyEqual {
                 if (newClass.getBody() != null && compareTo.getBody() != null) {
                     this.visit(newClass.getBody(), compareTo.getBody());
                 }
-                if (newClass.getArguments() != null && compareTo.getArguments() != null) {
-                    for (int i = 0; i < newClass.getArguments().size(); i++) {
-                        this.visit(newClass.getArguments().get(i), compareTo.getArguments().get(i));
+                if (newClass.getConstructorType() != null && compareTo.getConstructorType() != null) {
+                    if (!isMethodType(newClass.getConstructorType(), compareTo.getConstructorType())) {
+                        isEqual.set(false);
+                        return newClass;
+                    }
+                } else {
+                    if (newClass.getArguments() != null && compareTo.getArguments() != null) {
+                        for (int i = 0; i < newClass.getArguments().size(); i++) {
+                            this.visit(newClass.getArguments().get(i), compareTo.getArguments().get(i));
+                        }
                     }
                 }
             }
