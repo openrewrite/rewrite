@@ -379,4 +379,26 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `zero step flow is still considered and fixed`(javaParser: JavaParser) = rewriteRun(
+        { spec -> spec.parser(javaParser) },
+        java(
+            """
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        URI uri = URI.create("http://test");
+                    }
+                }
+            """, """
+                import java.net.URI;
+                class Test {
+                    void test() {
+                        URI uri = URI.create("https://test");
+                    }
+                }
+            """
+        )
+    )
 }
