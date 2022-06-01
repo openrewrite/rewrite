@@ -393,7 +393,9 @@ public class SemanticallyEqual {
                     return cu;
                 }
 
-                this.visit(cu.getPackageDeclaration(), compareTo.getPackageDeclaration());
+                if (cu.getPackageDeclaration() != null && compareTo.getPackageDeclaration() != null) {
+                    this.visit(cu.getPackageDeclaration(), compareTo.getPackageDeclaration());
+                }
                 for (int i = 0; i < cu.getImports().size(); i++) {
                     this.visit(cu.getImports().get(i), compareTo.getImports().get(i));
                 }
@@ -436,7 +438,9 @@ public class SemanticallyEqual {
                     isEqual.set(false);
                     return continueStatement;
                 }
-                this.visit(continueStatement.getLabel(), compareTo.getLabel());
+                if (continueStatement.getLabel() != null && compareTo.getLabel() != null) {
+                    this.visit(continueStatement.getLabel(), compareTo.getLabel());
+                }
             }
             return continueStatement;
         }
@@ -651,9 +655,15 @@ public class SemanticallyEqual {
                 }
 
                 J.If compareTo = (J.If) j;
+                if (nullMissMatch(iff.getElsePart(), compareTo.getElsePart())) {
+                    isEqual.set(false);
+                    return iff;
+                }
                 this.visit(iff.getIfCondition(), compareTo.getIfCondition());
                 this.visit(iff.getThenPart(), compareTo.getThenPart());
-                this.visit(iff.getElsePart(), compareTo.getElsePart());
+                if (iff.getElsePart() != null && compareTo.getElsePart() != null) {
+                    this.visit(iff.getElsePart(), compareTo.getElsePart());
+                }
             }
             return iff;
         }
@@ -859,17 +869,20 @@ public class SemanticallyEqual {
                 J.MethodInvocation compareTo = (J.MethodInvocation) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
                         !isMethodType(method.getMethodType(), compareTo.getMethodType()) ||
+                        nullMissMatch(method.getSelect(), compareTo.getSelect()) ||
                         method.getArguments().size() != compareTo.getArguments().size() ||
                         method.getTypeParameters() != null && compareTo.getTypeParameters() != null && method.getTypeParameters().size() != compareTo.getTypeParameters().size()) {
                     isEqual.set(false);
                     return method;
                 }
 
-                this.visit(method.getSelect(), compareTo.getSelect());
                 for (int i = 0; i < method.getArguments().size(); i++) {
                     this.visit(method.getArguments().get(i), compareTo.getArguments().get(i));
                 }
 
+                if (method.getSelect() != null && compareTo.getSelect() != null) {
+                    this.visit(method.getSelect(), compareTo.getSelect());
+                }
                 if (method.getTypeParameters() != null && compareTo.getTypeParameters() != null) {
                     for (int i = 0; i < method.getTypeParameters().size(); i++) {
                         this.visit(method.getTypeParameters().get(i), compareTo.getTypeParameters().get(i));
@@ -993,11 +1006,11 @@ public class SemanticallyEqual {
                 }
 
                 J.Package compareTo = (J.Package) j;
-                if (pkg.getAnnotations().size() != compareTo.getAnnotations().size()) {
+                if (pkg.getAnnotations().size() != compareTo.getAnnotations().size() ||
+                        !pkg.getExpression().toString().equals(compareTo.getExpression().toString())) {
                     isEqual.set(false);
                     return pkg;
                 }
-                this.visit(pkg.getExpression(), compareTo.getExpression());
                 for (int i = 0; i < pkg.getAnnotations().size(); i++) {
                     this.visit(pkg.getAnnotations().get(i), compareTo.getAnnotations().get(i));
                 }
@@ -1071,7 +1084,14 @@ public class SemanticallyEqual {
                 }
 
                 J.Return compareTo = (J.Return) j;
-                this.visit(_return.getExpression(), compareTo.getExpression());
+                if (nullMissMatch(_return.getExpression(), compareTo.getExpression())) {
+                    isEqual.set(false);
+                    return _return;
+                }
+
+                if (_return.getExpression() != null && compareTo.getExpression() != null) {
+                    this.visit(_return.getExpression(), compareTo.getExpression());
+                }
             }
             return _return;
         }
@@ -1263,13 +1283,16 @@ public class SemanticallyEqual {
 
                 J.VariableDeclarations compareTo = (J.VariableDeclarations) j;
                 if (!TypeUtils.isOfType(multiVariable.getType(), compareTo.getType()) ||
+                        nullMissMatch(multiVariable.getTypeExpression(), compareTo.getTypeExpression()) ||
                         multiVariable.getVariables().size() != compareTo.getVariables().size() ||
                         multiVariable.getLeadingAnnotations().size() != compareTo.getLeadingAnnotations().size()) {
                     isEqual.set(false);
                     return multiVariable;
                 }
 
-                this.visitTypeName(multiVariable.getTypeExpression(), compareTo.getTypeExpression());
+                if (multiVariable.getTypeExpression() != null && compareTo.getTypeExpression() != null) {
+                    this.visitTypeName(multiVariable.getTypeExpression(), compareTo.getTypeExpression());
+                }
                 for (int i = 0; i < multiVariable.getLeadingAnnotations().size(); i++) {
                     this.visit(multiVariable.getLeadingAnnotations().get(i), compareTo.getLeadingAnnotations().get(i));
                 }
@@ -1290,11 +1313,14 @@ public class SemanticallyEqual {
 
                 J.VariableDeclarations.NamedVariable compareTo = (J.VariableDeclarations.NamedVariable) j;
                 if (!variable.getSimpleName().equals(compareTo.getSimpleName()) ||
-                        !TypeUtils.isOfType(variable.getType(), compareTo.getType())) {
+                        !TypeUtils.isOfType(variable.getType(), compareTo.getType()) ||
+                        nullMissMatch(variable.getInitializer(), compareTo.getInitializer())) {
                     isEqual.set(false);
                     return variable;
                 }
-                this.visit(variable.getInitializer(), compareTo.getInitializer());
+                if (variable.getInitializer() != null && compareTo.getInitializer() != null) {
+                    this.visit(variable.getInitializer(), compareTo.getInitializer());
+                }
             }
             return variable;
         }
@@ -1328,7 +1354,9 @@ public class SemanticallyEqual {
                     isEqual.set(false);
                     return wildcard;
                 }
-                this.visitTypeName(wildcard.getBoundedType(), compareTo.getBoundedType());
+                if (wildcard.getBoundedType() != null && compareTo.getBoundedType() != null) {
+                    this.visitTypeName(wildcard.getBoundedType(), compareTo.getBoundedType());
+                }
             }
             return wildcard;
         }
