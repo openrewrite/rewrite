@@ -34,6 +34,42 @@ class DeletePropertyKeyTest : YamlRecipeTest {
     )
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1841")
+    fun firstItem() = assertChanged(
+        before = """
+          management.metrics.binders.files.enabled: true
+          server.port: 8080
+        """,
+        after = """
+          server.port: 8080
+        """
+    )
+
+    @Test
+    fun lastItem() = assertChanged(
+        before = """
+          server.port: 8080
+          management.metrics.binders.files.enabled: true
+        """,
+        after = """
+          server.port: 8080
+        """
+    )
+
+    @Test
+    fun middleItem() = assertChanged(
+        before = """
+          app.name: foo
+          management.metrics.binders.files.enabled: true
+          server.port: 8080
+        """,
+        after = """
+          app.name: foo
+          server.port: 8080
+        """
+    )
+
+    @Test
     fun downDeeper() = assertChanged(
         before = """
           management.metrics:

@@ -111,10 +111,10 @@ public class DeleteProperty extends Recipe {
         };
     }
 
-    private static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
+    public static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
         private final Yaml.Mapping.Entry scope;
 
-        private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
+        public DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
             this.scope = scope;
         }
 
@@ -124,10 +124,16 @@ public class DeleteProperty extends Recipe {
 
             boolean changed = false;
             List<Yaml.Mapping.Entry> entries = new ArrayList<>();
+            String deletedPrefix = null;
             for (Yaml.Mapping.Entry entry : m.getEntries()) {
                 if (entry == scope || (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
+                    deletedPrefix = entry.getPrefix();
                     changed = true;
                 } else {
+                    if (deletedPrefix != null) {
+                        entry = entry.withPrefix(deletedPrefix);
+                        deletedPrefix = null;
+                    }
                     entries.add(entry);
                 }
             }

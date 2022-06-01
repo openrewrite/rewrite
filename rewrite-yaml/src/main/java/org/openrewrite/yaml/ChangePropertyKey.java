@@ -121,7 +121,7 @@ public class ChangePropertyKey extends Recipe {
                                 propertyToTest,
                                 entry
                         ));
-                        doAfterVisit(new DeletePropertyVisitor<>(entry));
+                        doAfterVisit(new DeleteProperty.DeletePropertyVisitor<>(entry));
                         break;
                     }
                     propertyToTest = propertyToTest.substring(value.length() + 1);
@@ -168,47 +168,11 @@ public class ChangePropertyKey extends Recipe {
                     }));
                 } else {
                     m = m.withEntries(ListUtils.concat(m.getEntries(), newEntry));
-                    doAfterVisit(new DeletePropertyVisitor<>(entryToReplace));
+                    doAfterVisit(new DeleteProperty.DeletePropertyVisitor<>(entryToReplace));
                 }
             }
 
             return m;
         }
     }
-
-    private static class DeletePropertyVisitor<P> extends YamlIsoVisitor<P> {
-        private final Yaml.Mapping.Entry scope;
-
-        private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
-            this.scope = scope;
-        }
-
-        @Override
-        public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
-            Yaml.Mapping m = super.visitMapping(mapping, p);
-
-            boolean changed = false;
-            List<Yaml.Mapping.Entry> entries = new ArrayList<>();
-            for (Yaml.Mapping.Entry entry : m.getEntries()) {
-                if (entry == scope || (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
-                    changed = true;
-                } else {
-                    entries.add(entry);
-                }
-            }
-
-            if (changed) {
-                m = m.withEntries(entries);
-
-                if (getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) {
-                    Yaml.Document document = getCursor().getParentOrThrow().getValue();
-                    if (!document.isExplicit()) {
-                        m = m.withEntries(m.getEntries());
-                    }
-                }
-            }
-            return m;
-        }
-    }
-
 }

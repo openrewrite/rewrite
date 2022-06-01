@@ -341,7 +341,6 @@ class ChangePropertyKeyTest : YamlRecipeTest {
               else: qwe
         """,
         after = """
-
             something:
               else: qwe
             x.y.z: abc
