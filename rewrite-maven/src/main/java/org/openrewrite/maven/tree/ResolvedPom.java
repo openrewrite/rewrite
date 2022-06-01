@@ -45,8 +45,6 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Getter
 public class ResolvedPom {
 
-    //Marker list (different than emptyList) used to denote no initial repos.
-    private static final List<MavenRepository> NO_INITIAL_REPOSITORIES = new ArrayList<>(0);
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
@@ -62,11 +60,11 @@ public class ResolvedPom {
     Iterable<String> activeProfiles;
 
     public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, emptyMap(), emptyList(), NO_INITIAL_REPOSITORIES, emptyList(), emptyList());
+        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList());
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
@@ -304,9 +302,11 @@ public class ResolvedPom {
             List<Pom> pomAncestry = new ArrayList<>();
             pomAncestry.add(requested);
 
-            mergeRepositories(initialRepositories);
+            if (initialRepositories != null) {
+                mergeRepositories(initialRepositories);
+            }
             resolveParentPropertiesAndRepositoriesRecursively(pomAncestry);
-            if (initialRepositories == NO_INITIAL_REPOSITORIES) {
+            if (initialRepositories == null) {
                 initialRepositories = repositories;
             }
 
