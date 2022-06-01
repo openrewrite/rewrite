@@ -25,12 +25,48 @@ import java.nio.file.Path
 
 class DeletePropertyKeyTest : YamlRecipeTest {
     override val recipe: Recipe
-        get() = DeleteProperty("management.metrics.binders.files.enabled", true, null, null)
+        get() = DeleteProperty("management.metrics.binders.files.enabled", null, null, null)
 
     @Test
     fun singleEntry() = assertChanged(
         before = "management.metrics.binders.files.enabled: true",
         after = ""
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1841")
+    fun firstItem() = assertChanged(
+        before = """
+          management.metrics.binders.files.enabled: true
+          server.port: 8080
+        """,
+        after = """
+          server.port: 8080
+        """
+    )
+
+    @Test
+    fun lastItem() = assertChanged(
+        before = """
+          server.port: 8080
+          management.metrics.binders.files.enabled: true
+        """,
+        after = """
+          server.port: 8080
+        """
+    )
+
+    @Test
+    fun middleItem() = assertChanged(
+        before = """
+          app.name: foo
+          management.metrics.binders.files.enabled: true
+          server.port: 8080
+        """,
+        after = """
+          app.name: foo
+          server.port: 8080
+        """
     )
 
     @Test
@@ -42,7 +78,8 @@ class DeletePropertyKeyTest : YamlRecipeTest {
           server.port: 8080
         """,
         after = """
-          management.metrics.enabled: true
+          management.metrics:
+            enabled: true
           server.port: 8080
         """
     )
