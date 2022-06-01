@@ -225,6 +225,16 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                     // If the method invocation is not `toString` on a `String`, it's not dataflow
                     break;
                 }
+            } else if (ancestor instanceof J.Ternary) {
+                J.Ternary ternary = (J.Ternary) ancestor;
+                Object previousCursorValue = nextFlowGraph.getCursor().getValue();
+                if (ternary.getTruePart() == previousCursorValue ||
+                        ternary.getFalsePart() == previousCursorValue) {
+                    nextFlowGraph = nextFlowGraph.addEdge(ancestorCursor);
+                } else {
+                    // Data flow does not occur from the ternary conditional part
+                    break;
+                }
             } else if (ancestor instanceof J.TypeCast ||
                     ancestor instanceof J.Parentheses ||
                     ancestor instanceof J.ControlParentheses) {

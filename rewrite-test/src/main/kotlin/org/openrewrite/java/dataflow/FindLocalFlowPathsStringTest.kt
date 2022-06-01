@@ -722,4 +722,89 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
         )
     )
 
+    @Test
+    fun `a ternary operator is considered a data flow step`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+
+                    void test(boolean conditional) {
+                        String n = conditional ? "42" : "100";
+                        System.out.println(n);
+                    }
+                }
+            """,
+            """
+                class Test {
+
+                    void test(boolean conditional) {
+                        String n = /*~~>*/conditional ? /*~~>*/"42" : "100";
+                        System.out.println(/*~~>*/n);
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `a ternary operator is considered a data flow step 2`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+
+                    void test(boolean conditional) {
+                        String n = "42";
+                        String m = conditional ? "100" : n;
+                        System.out.println(m);
+                    }
+                }
+            """,
+            """
+                class Test {
+
+                    void test(boolean conditional) {
+                        String n = /*~~>*/"42";
+                        String m = /*~~>*/conditional ? "100" : /*~~>*/n;
+                        System.out.println(/*~~>*/m);
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `a ternary condition is not considered a data flow step`() = rewriteRun(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
+            """
+                class Test {
+
+                    Boolean source() {
+                        return null;
+                    }
+
+                    void test(String other) {
+                        String n = source() ? "102" : "100";
+                        System.out.println(n);
+                    }
+                }
+            """,
+            """
+                class Test {
+
+                    Boolean source() {
+                        return null;
+                    }
+
+                    void test(String other) {
+                        String n = /*~~>*/source() ? "102" : "100";
+                        System.out.println(n);
+                    }
+                }
+            """
+        )
+    )
+
 }
