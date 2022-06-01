@@ -634,8 +634,7 @@ public class SemanticallyEqual {
                 }
 
                 J.Identifier compareTo = (J.Identifier) j;
-                if (!identifier.getSimpleName().equals(compareTo.getSimpleName()) ||
-                        !TypeUtils.isOfType(identifier.getType(), compareTo.getType())) {
+                if (!identifier.getSimpleName().equals(compareTo.getSimpleName())) {
                     isEqual.set(false);
                     return identifier;
                 }
