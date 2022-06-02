@@ -23,9 +23,11 @@ import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Stack;
+import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGraph {
@@ -50,12 +52,19 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     }
 
     public List<Sink> getSinks() {
+        return getSinkCursors()
+                .stream()
+                .map(Cursor::<Sink>getValue)
+                .collect(Collectors.toList());
+    }
+
+    public List<Cursor> getSinkCursors() {
         List<List<Cursor>> flows = getFlows();
-        List<Sink> sinks = new ArrayList<>(flows.size());
+        List<Cursor> sinkCursors = new ArrayList<>(flows.size());
         for (List<Cursor> flow : flows) {
-            sinks.add(flow.get(flow.size() - 1).getValue());
+            sinkCursors.add(flow.get(flow.size() - 1));
         }
-        return sinks;
+        return sinkCursors;
     }
 
     public List<List<Cursor>> getFlows() {
