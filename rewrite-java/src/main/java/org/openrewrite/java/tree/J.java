@@ -3196,7 +3196,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MethodInvocation implements J, Statement, Expression, JCallable, TypedTree {
+    final class MethodInvocation implements J, Statement, Expression, Call, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -3664,7 +3664,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class NewClass implements J, Statement, Expression, JCallable, TypedTree {
+    final class NewClass implements J, Statement, Expression, Call, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
