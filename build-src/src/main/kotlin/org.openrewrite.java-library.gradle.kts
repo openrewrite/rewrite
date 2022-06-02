@@ -1,3 +1,5 @@
+import org.openrewrite.gradle.Delombok
+
 plugins {
     `java-library`
     id("org.openrewrite.java-base")
@@ -28,7 +30,14 @@ dependencies {
     testRuntimeOnly("ch.qos.logback:logback-classic:1.2.10")
 }
 
+val delombok: Delombok by tasks.creating(Delombok::class) {
+    source(java.sourceSets.main.get().allJava)
+    compileClasspath.from(java.sourceSets.main.get().compileClasspath)
+    outputDirectory.value(layout.buildDirectory.dir("generated/delombok"))
+}
+
 tasks.withType<Javadoc>().configureEach {
+    setSource(delombok.outputDirectory)
     isVerbose = false
     options {
         this as CoreJavadocOptions

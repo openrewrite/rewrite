@@ -48,16 +48,7 @@ dependencies {
     testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
-
-    // ChangePackage and OrderImports due to lombok error which looks similar to this:
-    //     openrewrite/rewrite/rewrite-java/src/main/java/org/openrewrite/java/OrderImports.java:42: error: cannot find symbol
-    // @AllArgsConstructor(onConstructor_=@JsonCreator)
-    //                     ^
-    //   symbol:   method onConstructor_()
-    //   location: @interface AllArgsConstructor
-    // 1 error
-    exclude("**/JavaParser**", "**/ChangePackage**", "**/OrderImports**")
 }

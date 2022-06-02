@@ -81,18 +81,18 @@ tasks.register<JavaExec>("generateAntlrSources") {
     classpath = sourceSets["main"].runtimeClasspath
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
 
     // TODO
-    // openrewrite/rewrite/rewrite-maven/src/main/java/org/openrewrite/maven/AddDependency.java:29: error: cannot find symbol
-    // @AllArgsConstructor(onConstructor_=@JsonCreator)
-    //                     ^
-    //   symbol:   method onConstructor_()
-    //   location: @interface AllArgsConstructor
+    // openrewrite/rewrite-maven/build/generated/delombok/org/openrewrite/maven/internal/RawPom.java:309: error: cannot find symbol
+    //         @NonFinal
+    //          ^
+    //   symbol:   class NonFinal
+    //   location: class Build
     // 1 error
-    exclude("**/VersionRangeParser**", "**/AddDependency**")
+    exclude("**/RawPom**")
 }
 
 configure<LicenseExtension> {
