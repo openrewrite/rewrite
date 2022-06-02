@@ -57,12 +57,12 @@ interface JavaTemplateTest : JavaRecipeTest {
         before = """
             import java.io.*;
             import java.nio.charset.StandardCharsets;
-            
+
             class Test {
                 ByteArrayInputStream createBis(byte[] bytes) {
                     return new ByteArrayInputStream(bytes);
                 }
-                
+
                 void doSomething() {
                     String sout = "";
                     try (BufferedReader br = new BufferedReader(new FileReader(null))) {
@@ -76,12 +76,12 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             import java.io.*;
             import java.nio.charset.StandardCharsets;
-            
+
             class Test {
                 ByteArrayInputStream createBis(byte[] bytes) {
                     return new ByteArrayInputStream(bytes);
                 }
-                
+
                 void doSomething() {
                     String sout = "";
                     try (BufferedReader br = new BufferedReader(new FileReader(null))) {
@@ -240,20 +240,20 @@ interface JavaTemplateTest : JavaRecipeTest {
             class A {
                 public enum Type {
                     One;
-            
+
                     public Type(String t) {
                     }
-            
+
                     String t;
-            
+
                     public static Type fromType(String type) {
                         return null;
                     }
                 }
-            
+
                 public A(Type type) {}
                 public A() {}
-            
+
                 public void method(Type type) {
                     new A(type);
                 }
@@ -263,20 +263,20 @@ interface JavaTemplateTest : JavaRecipeTest {
             class A {
                 public enum Type {
                     One;
-            
+
                     public Type(String t) {
                     }
-            
+
                     String t;
-            
+
                     public static Type fromType(String type) {
                         return null;
                     }
                 }
-            
+
                 public A(Type type) {}
                 public A() {}
-            
+
                 public void method(Type type) {
                     new A();
                 }
@@ -348,7 +348,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         after = """
             class Test {
-            
+
                 int test2(int n) {
                     return n;
                 }
@@ -614,7 +614,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         ),
         before = """
             package org.openrewrite;
-            
+
             public class Foo {
                 {
                     Integer i = 1;
@@ -626,7 +626,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         after = """
             package org.openrewrite;
-            
+
             public class Foo {
                 {
                     Integer i = 1;
@@ -710,10 +710,10 @@ interface JavaTemplateTest : JavaRecipeTest {
 
             class Test {
                 Function<Object, String> toString = getToString();
-                
+
                 static Function<Object, String> getToString() {
                     return Object::toString;
-                } 
+                }
             }
         """,
         after = """
@@ -721,10 +721,10 @@ interface JavaTemplateTest : JavaRecipeTest {
 
             class Test {
                 Function<Object, String> toString = Object::toString;
-                
+
                 static Function<Object, String> getToString() {
                     return Object::toString;
-                } 
+                }
             }
         """
     )
@@ -1241,7 +1241,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         after = """
             import java.util.List;
-            
+
             class Test {
                 int n;
                 void test() {
@@ -1340,13 +1340,13 @@ interface JavaTemplateTest : JavaRecipeTest {
         before = """
             class Test {
                 static final String WARNINGS = "ALL";
-            
+
                 public @SuppressWarnings(WARNINGS) Test() {
                 }
-            
+
                 public void test1() {
                 }
-            
+
                 public @SuppressWarnings(WARNINGS) void test2() {
                 }
             }
@@ -1354,15 +1354,15 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             class Test {
                 static final String WARNINGS = "ALL";
-            
+
                 @SuppressWarnings("other")
                 public Test() {
                 }
-            
+
                 @SuppressWarnings("other")
                 public void test1() {
                 }
-            
+
                 @SuppressWarnings("other")
                 public void test2() {
                 }
@@ -1392,7 +1392,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         before = """
             class Test {
                 static final String WARNINGS = "ALL";
-                
+
                 class Inner1 {
                 }
             }
@@ -1400,7 +1400,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             class Test {
                 static final String WARNINGS = "ALL";
-            
+
                 @SuppressWarnings("other")
                 class Inner1 {
                 }
@@ -1663,7 +1663,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         after = """
             import java.io.Closeable;
             import java.io.Serializable;
-            
+
             class Test implements Serializable, Closeable {
             }
         """
@@ -1696,7 +1696,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """,
         after = """
             import java.util.List;
-            
+
             class Test extends List<String> {
             }
         """
@@ -1769,18 +1769,18 @@ interface JavaTemplateTest : JavaRecipeTest {
         },
         before = """
             import java.util.List;
-            
+
             class Test {
-            
+
                 void test() {
                 }
             }
         """,
         after = """
             import java.util.List;
-            
+
             class Test {
-            
+
                 <T, U> void test(List<T> t, U u) {
                 }
             }
@@ -1922,7 +1922,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val matcher = MethodMatcher("Integer valueOf(..)")
+                val matcher = MethodMatcher.create("Integer valueOf(..)")
                 val t = JavaTemplate.builder({ cursor }, "new Integer(#{any()})").build()
                 override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                     if (matcher.matches(method)) {
@@ -2003,7 +2003,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val matcher = MethodMatcher("Integer valueOf(..)")
+                val matcher = MethodMatcher.create("Integer valueOf(..)")
                 val t = JavaTemplate.builder({ cursor }, "new Integer(#{any()})").build()
                 override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                     if (matcher.matches(method)) {
@@ -2057,7 +2057,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         },
         before = """
             class A {
-            
+
             }
         """,
         after = """

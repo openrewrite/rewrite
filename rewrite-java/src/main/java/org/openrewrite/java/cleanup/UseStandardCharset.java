@@ -55,7 +55,7 @@ public class UseStandardCharset extends Recipe {
     }
 
     private static class UseStandardCharsetVisitor extends JavaVisitor<ExecutionContext> {
-        MethodMatcher CHARSET_FOR_NAME = new MethodMatcher("java.nio.charset.Charset forName(java.lang.String)");
+        MethodMatcher CHARSET_FOR_NAME = MethodMatcher.create("java.nio.charset.Charset forName(java.lang.String)");
         Map<String, String> charsetValueToCode = new HashMap<>();
 
         public UseStandardCharsetVisitor() {

@@ -33,8 +33,8 @@ import java.util.Set;
 
 @Incubating(since = "7.10.0")
 public class IndexOfReplaceableByContains extends Recipe {
-    private static final MethodMatcher STRING_INDEX_MATCHER = new MethodMatcher("java.lang.String indexOf(String)");
-    private static final MethodMatcher LIST_INDEX_MATCHER = new MethodMatcher("java.util.List indexOf(Object)");
+    private static final MethodMatcher STRING_INDEX_MATCHER = MethodMatcher.create("java.lang.String indexOf(String)");
+    private static final MethodMatcher LIST_INDEX_MATCHER = MethodMatcher.create("java.util.List indexOf(Object)");
 
     @Override
     public String getDisplayName() {

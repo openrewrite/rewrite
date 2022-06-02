@@ -54,7 +54,7 @@ public class NoFinalizer extends Recipe {
     }
 
     private static class NoFinalizerVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private static final MethodMatcher FINALIZER = new MethodMatcher("java.lang.Object finalize()", true);
+        private static final MethodMatcher FINALIZER = MethodMatcher.create("java.lang.Object finalize()", true);
 
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {

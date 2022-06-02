@@ -29,11 +29,11 @@ public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
     }
 
     public DeclaresMethod(String methodPattern, @Nullable Boolean matchesOverrides) {
-        this(new MethodMatcher(methodPattern, Boolean.TRUE.equals(matchesOverrides)));
+        this(MethodMatcher.create(methodPattern, Boolean.TRUE.equals(matchesOverrides)));
     }
 
     public DeclaresMethod(String methodPattern, boolean matchesOverrides) {
-        this(new MethodMatcher(methodPattern, matchesOverrides));
+        this(MethodMatcher.create(methodPattern, matchesOverrides));
     }
 
     public DeclaresMethod(MethodMatcher methodMatcher) {

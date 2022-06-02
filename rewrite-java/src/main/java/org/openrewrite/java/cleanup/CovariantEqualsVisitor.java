@@ -28,7 +28,7 @@ import java.util.stream.Stream;
 
 @Incubating(since = "7.0.0")
 public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
-    private static final MethodMatcher OBJECT_EQUALS = new MethodMatcher("* equals(java.lang.Object)");
+    private static final MethodMatcher OBJECT_EQUALS = MethodMatcher.create("* equals(java.lang.Object)");
 
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
@@ -68,7 +68,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
             }
 
             String ecfqn = type.getFullyQualifiedName();
-            if (new MethodMatcher(ecfqn + " equals(" + ecfqn + ")").matches(m, enclosingClass) &&
+            if (MethodMatcher.create(ecfqn + " equals(" + ecfqn + ")").matches(m, enclosingClass) &&
                     m.hasModifier(J.Modifier.Type.Public) &&
                     m.getReturnTypeExpression() != null &&
                     JavaType.Primitive.Boolean.equals(m.getReturnTypeExpression().getType())) {

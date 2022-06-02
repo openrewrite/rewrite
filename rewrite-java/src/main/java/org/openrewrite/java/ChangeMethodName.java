@@ -88,7 +88,7 @@ public class ChangeMethodName extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodNameVisitor(new MethodMatcher(methodPattern, matchOverrides));
+        return new ChangeMethodNameVisitor(MethodMatcher.create(methodPattern, matchOverrides));
     }
 
     private class ChangeMethodNameVisitor extends JavaIsoVisitor<ExecutionContext> {

@@ -25,15 +25,15 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     private final MethodMatcher methodMatcher;
 
     public UsesMethod(String methodPattern) {
-        this(new MethodMatcher(methodPattern));
+        this(MethodMatcher.create(methodPattern));
     }
 
     public UsesMethod(String methodPattern, boolean matchOverrides) {
-        this(new MethodMatcher(methodPattern, matchOverrides));
+        this(MethodMatcher.create(methodPattern, matchOverrides));
     }
 
     public UsesMethod(String methodPattern, @Nullable Boolean matchOverrides) {
-        this(new MethodMatcher(methodPattern, Boolean.TRUE.equals(matchOverrides)));
+        this(MethodMatcher.create(methodPattern, Boolean.TRUE.equals(matchOverrides)));
     }
 
     public UsesMethod(MethodMatcher methodMatcher) {

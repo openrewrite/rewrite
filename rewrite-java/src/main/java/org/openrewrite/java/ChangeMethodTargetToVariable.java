@@ -79,7 +79,7 @@ public class ChangeMethodTargetToVariable extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodTargetToVariableVisitor(new MethodMatcher(methodPattern, matchOverrides), JavaType.ShallowClass.build(variableType));
+        return new ChangeMethodTargetToVariableVisitor(MethodMatcher.create(methodPattern, matchOverrides), JavaType.ShallowClass.build(variableType));
     }
 
     private class ChangeMethodTargetToVariableVisitor extends JavaIsoVisitor<ExecutionContext> {

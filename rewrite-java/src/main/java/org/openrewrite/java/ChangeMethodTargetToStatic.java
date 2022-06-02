@@ -78,7 +78,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern, matchOverrides));
+        return new ChangeMethodTargetToStaticVisitor(MethodMatcher.create(methodPattern, matchOverrides));
     }
 
     private class ChangeMethodTargetToStaticVisitor extends JavaIsoVisitor<ExecutionContext> {

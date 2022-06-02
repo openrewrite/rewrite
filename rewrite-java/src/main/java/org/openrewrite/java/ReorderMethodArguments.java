@@ -107,7 +107,7 @@ public class ReorderMethodArguments extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ReorderMethodArgumentsVisitor(new MethodMatcher(methodPattern));
+        return new ReorderMethodArgumentsVisitor(MethodMatcher.create(methodPattern));
     }
 
     private class ReorderMethodArgumentsVisitor extends JavaIsoVisitor<ExecutionContext> {

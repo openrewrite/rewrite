@@ -33,7 +33,7 @@ import java.util.Collections;
 import java.util.Set;
 
 public class IndexOfChecksShouldUseAStartPosition extends Recipe {
-    private static final MethodMatcher STRING_INDEX_MATCHER = new MethodMatcher("java.lang.String indexOf(String)");
+    private static final MethodMatcher STRING_INDEX_MATCHER = MethodMatcher.create("java.lang.String indexOf(String)");
 
     @Override
     public String getDisplayName() {

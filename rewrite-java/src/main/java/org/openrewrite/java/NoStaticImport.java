@@ -60,7 +60,7 @@ public class NoStaticImport extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
+                MethodMatcher methodMatcher = MethodMatcher.create(methodPattern);
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(m) && m.getSelect() == null) {
                     if (m.getMethodType() != null) {

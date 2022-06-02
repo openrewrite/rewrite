@@ -49,7 +49,7 @@ public class ResultOfMethodCallIgnored extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
+        MethodMatcher methodMatcher = MethodMatcher.create(methodPattern);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {

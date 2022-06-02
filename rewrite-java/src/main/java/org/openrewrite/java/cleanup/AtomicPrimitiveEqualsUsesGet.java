@@ -64,7 +64,7 @@ public class AtomicPrimitiveEqualsUsesGet extends Recipe {
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
-            private final MethodMatcher aiMethodMatcher = new MethodMatcher("java.lang.Object equals(java.lang.Object)");
+            private final MethodMatcher aiMethodMatcher = MethodMatcher.create("java.lang.Object equals(java.lang.Object)");
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {

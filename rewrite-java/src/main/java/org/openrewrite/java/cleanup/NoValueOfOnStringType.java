@@ -31,7 +31,7 @@ import java.util.Collections;
 import java.util.Set;
 
 public class NoValueOfOnStringType extends Recipe {
-    private static final MethodMatcher VALUE_OF = new MethodMatcher("java.lang.String valueOf(..)");
+    private static final MethodMatcher VALUE_OF = MethodMatcher.create("java.lang.String valueOf(..)");
 
     @Override
     public String getDisplayName() {

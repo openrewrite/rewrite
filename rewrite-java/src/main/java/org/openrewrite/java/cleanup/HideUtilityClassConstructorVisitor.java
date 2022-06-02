@@ -118,7 +118,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
             }
 
             ChangeMethodAccessLevelVisitor<P> changeMethodAccessLevelVisitor = new ChangeMethodAccessLevelVisitor<>(
-                    new MethodMatcher(method),
+                    MethodMatcher.create(method),
                     J.Modifier.Type.Private
             );
             md = (J.MethodDeclaration) changeMethodAccessLevelVisitor.visit(md, p, getCursor());
@@ -180,7 +180,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
                             JavaType.Primitive.Void.equals(md.getReturnTypeExpression().getType()) &&
 
                             // note that the matcher for "main(String)" will match on "main(String[]) as expected.
-                            new MethodMatcher(c.getType().getFullyQualifiedName() + " main(String)")
+                            MethodMatcher.create(c.getType().getFullyQualifiedName() + " main(String)")
                                     .matches(md, c)) {
                         return true;
                     }

@@ -29,11 +29,11 @@ import java.time.Duration;
 import java.util.*;
 
 public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
-    private static final MethodMatcher NUMBER_TO_STRING_MATCHER = new MethodMatcher("java.lang.Number toString()", true);
-    private static final MethodMatcher BOOLEAN_TO_STRING_MATCHER = new MethodMatcher("java.lang.Boolean toString()", true);
+    private static final MethodMatcher NUMBER_TO_STRING_MATCHER = MethodMatcher.create("java.lang.Number toString()", true);
+    private static final MethodMatcher BOOLEAN_TO_STRING_MATCHER = MethodMatcher.create("java.lang.Boolean toString()", true);
 
-    private static final MethodMatcher NUMBER_COMPARE_TO_MATCHER = new MethodMatcher("java.lang.Number compareTo(..)", true);
-    private static final MethodMatcher BOOLEAN_COMPARE_TO_MATCHER = new MethodMatcher("java.lang.Boolean compareTo(..)", true);
+    private static final MethodMatcher NUMBER_COMPARE_TO_MATCHER = MethodMatcher.create("java.lang.Number compareTo(..)", true);
+    private static final MethodMatcher BOOLEAN_COMPARE_TO_MATCHER = MethodMatcher.create("java.lang.Boolean compareTo(..)", true);
 
     @Override
     public String getDisplayName() {
@@ -76,8 +76,8 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
 
     private static class NoPrimitiveWrapperVisitor extends JavaIsoVisitor<ExecutionContext> {
 
-        private static final MethodMatcher VALUE_OF_NUMBER_MATCHER = new MethodMatcher("java.lang.Number valueOf(*)", true);
-        private static final MethodMatcher VALUE_OF_BOOLEAN_MATCHER = new MethodMatcher("java.lang.Boolean valueOf(*)", true);
+        private static final MethodMatcher VALUE_OF_NUMBER_MATCHER = MethodMatcher.create("java.lang.Number valueOf(*)", true);
+        private static final MethodMatcher VALUE_OF_BOOLEAN_MATCHER = MethodMatcher.create("java.lang.Boolean valueOf(*)", true);
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {

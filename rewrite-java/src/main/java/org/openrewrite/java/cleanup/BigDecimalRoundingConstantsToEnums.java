@@ -33,9 +33,9 @@ import java.util.Collections;
 import java.util.Set;
 
 public class BigDecimalRoundingConstantsToEnums extends Recipe {
-    private static final MethodMatcher BIG_DECIMAL_DIVIDE = new MethodMatcher("java.math.BigDecimal divide(java.math.BigDecimal, int)");
-    private static final MethodMatcher BIG_DECIMAL_DIVIDE_WITH_SCALE = new MethodMatcher("java.math.BigDecimal divide(java.math.BigDecimal, int, int)");
-    private static final MethodMatcher BIG_DECIMAL_SET_SCALE = new MethodMatcher("java.math.BigDecimal setScale(int, int)");
+    private static final MethodMatcher BIG_DECIMAL_DIVIDE = MethodMatcher.create("java.math.BigDecimal divide(java.math.BigDecimal, int)");
+    private static final MethodMatcher BIG_DECIMAL_DIVIDE_WITH_SCALE = MethodMatcher.create("java.math.BigDecimal divide(java.math.BigDecimal, int, int)");
+    private static final MethodMatcher BIG_DECIMAL_SET_SCALE = MethodMatcher.create("java.math.BigDecimal setScale(int, int)");
 
     @Override
     public String getDisplayName() {

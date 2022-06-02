@@ -80,7 +80,7 @@ public class ChangeDependencyArtifactId extends Recipe {
     protected GroovyVisitor<ExecutionContext> getVisitor() {
         return new GroovyVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = DependencyMatcher.build(dependencyPattern).getValue();
-            final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
+            final MethodMatcher dependencyDsl = MethodMatcher.create("DependencyHandlerSpec *(..)");
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {

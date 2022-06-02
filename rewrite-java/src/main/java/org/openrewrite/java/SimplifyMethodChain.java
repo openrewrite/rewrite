@@ -70,7 +70,7 @@ public class SimplifyMethodChain extends Recipe {
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
         List<MethodMatcher> matchers = methodPatternChain.stream()
-                .map(MethodMatcher::new)
+                .map(MethodMatcher::create)
                 .collect(Collectors.toList());
         Collections.reverse(matchers);
 

@@ -29,7 +29,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ObjectFinalizeCallsSuper extends Recipe {
-    private static final MethodMatcher FINALIZE_METHOD_MATCHER = new MethodMatcher("java.lang.Object finalize()", true);
+    private static final MethodMatcher FINALIZE_METHOD_MATCHER = MethodMatcher.create("java.lang.Object finalize()", true);
 
     @Override
     public String getDisplayName() {

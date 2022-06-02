@@ -50,7 +50,7 @@ public class DependencyUseMapNotation extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
+        final MethodMatcher dependencyDsl = MethodMatcher.create("DependencyHandlerSpec *(..)");
         return new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {

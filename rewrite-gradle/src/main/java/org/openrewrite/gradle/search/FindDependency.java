@@ -69,7 +69,7 @@ public class FindDependency extends Recipe {
 
     @Override
     protected GroovyVisitor<ExecutionContext> getVisitor() {
-        MethodMatcher dependency = new MethodMatcher("DependencyHandlerSpec *(..)");
+        MethodMatcher dependency = MethodMatcher.create("DependencyHandlerSpec *(..)");
         return new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {

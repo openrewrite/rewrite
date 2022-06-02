@@ -24,28 +24,28 @@ import org.openrewrite.java.tree.JavaType
 
 @Suppress("ClassInitializerMayBeStatic")
 interface MethodMatcherTest {
-    fun typeRegex(signature: String) = MethodMatcher(signature).targetTypePattern.toRegex()
-    fun nameRegex(signature: String) = MethodMatcher(signature).methodNamePattern.toRegex()
-    fun argRegex(signature: String) = MethodMatcher(signature).argumentPattern.toRegex()
+    fun typeRegex(signature: String) = MethodMatcher.create(signature).targetTypePattern.toRegex()
+    fun nameRegex(signature: String) = MethodMatcher.create(signature).methodNamePattern.toRegex()
+    fun argRegex(signature: String) = MethodMatcher.create(signature).argumentPattern.toRegex()
 
     @Test
     @Suppress("rawtypes")
     fun matchesSuperclassTypeOfInterfaces(jp: JavaParser) {
         val listType = (jp.parse("class Test { java.util.List l; }")[0].classes[0].body.statements[0] as J.VariableDeclarations).typeAsFullyQualified
-        assertTrue(MethodMatcher("java.util.Collection size()", true).matchesTargetType(listType))
-        assertFalse(MethodMatcher("java.util.Collection size()").matchesTargetType(listType))
+        assertTrue(MethodMatcher.create("java.util.Collection size()", true).matchesTargetType(listType))
+        assertFalse(MethodMatcher.create("java.util.Collection size()").matchesTargetType(listType))
         // ensuring subtypes do not match parents, regardless of matchOverrides
-        assertFalse(MethodMatcher("java.util.List size()", true).matchesTargetType(JavaType.ShallowClass.build("java.util.Collection")))
-        assertFalse(MethodMatcher("java.util.List size()").matchesTargetType(JavaType.ShallowClass.build("java.util.Collection")))
+        assertFalse(MethodMatcher.create("java.util.List size()", true).matchesTargetType(JavaType.ShallowClass.build("java.util.Collection")))
+        assertFalse(MethodMatcher.create("java.util.List size()").matchesTargetType(JavaType.ShallowClass.build("java.util.Collection")))
     }
 
     @Test
     fun matchesSuperclassTypeOfClasses(jp: JavaParser) {
-        assertTrue(MethodMatcher("Object equals(Object)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
-        assertFalse(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
+        assertTrue(MethodMatcher.create("Object equals(Object)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
+        assertFalse(MethodMatcher.create("Object equals(Object)").matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
         // ensuring subtypes do not match parents, regardless of matchOverrides
-        assertFalse(MethodMatcher("String equals(String)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
-        assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
+        assertFalse(MethodMatcher.create("String equals(String)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
+        assertFalse(MethodMatcher.create("String equals(String)").matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
     }
 
     @Test
@@ -113,11 +113,11 @@ interface MethodMatcherTest {
 
     @Test
     fun matchesSuperclassArgumentTypes(jp: JavaParser) {
-        assertTrue(MethodMatcher("Object equals(Object)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
-        assertFalse(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
+        assertTrue(MethodMatcher.create("Object equals(Object)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
+        assertFalse(MethodMatcher.create("Object equals(Object)").matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
         // ensuring subtypes do not match parents, regardless of matchOverrides
-        assertFalse(MethodMatcher("String equals(String)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
-        assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
+        assertFalse(MethodMatcher.create("String equals(String)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
+        assertFalse(MethodMatcher.create("String equals(String)").matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
     }
 
     @Test
@@ -147,14 +147,14 @@ interface MethodMatcherTest {
         val cu = jp.parse(
             """
             package a;
-            class A { 
-                A a = new A(); 
+            class A {
+                A a = new A();
             }
         """.trimIndent()
         )[0]
 
         assertTrue(
-            MethodMatcher("a.A <constructor>()").matches(
+            MethodMatcher.create("a.A <constructor>()").matches(
                 (cu.classes.first().body.statements.first() as J.VariableDeclarations)
                     .variables.first().initializer as J.NewClass
             )
@@ -166,7 +166,7 @@ interface MethodMatcherTest {
         val cu = jp.parse(
             """
             package a;
-            
+
             class A {
                 void setInt(int value) {}
                 int getInt() {}
@@ -180,10 +180,10 @@ interface MethodMatcherTest {
         val getIntMethod = classDecl.body.statements[1] as J.MethodDeclaration
         val setIntegerMethod = classDecl.body.statements[2] as J.MethodDeclaration
         val getIntegerMethod = classDecl.body.statements[3] as J.MethodDeclaration
-        assertTrue(MethodMatcher("a.A setInt(int)").matches(setIntMethod, classDecl))
-        assertTrue(MethodMatcher("a.A getInt()").matches(getIntMethod, classDecl))
-        assertTrue(MethodMatcher("a.A setInteger(Integer)").matches(setIntegerMethod, classDecl))
-        assertTrue(MethodMatcher("a.A getInteger()").matches(getIntegerMethod, classDecl))
+        assertTrue(MethodMatcher.create("a.A setInt(int)").matches(setIntMethod, classDecl))
+        assertTrue(MethodMatcher.create("a.A getInt()").matches(getIntMethod, classDecl))
+        assertTrue(MethodMatcher.create("a.A setInteger(Integer)").matches(setIntegerMethod, classDecl))
+        assertTrue(MethodMatcher.create("a.A getInteger()").matches(getIntegerMethod, classDecl))
     }
 
     @Test
@@ -212,16 +212,16 @@ interface MethodMatcherTest {
         ).first()
         val parentMethodDefinition = (cu.classes[0].body.statements[0] as J.MethodDeclaration).methodType
         val childMethodOverride = (cu.classes[1].body.statements[0] as J.MethodDeclaration).methodType
-        assertFalse(MethodMatcher("com.abc.Parent method(String)", false).matches(childMethodOverride))
-        assertTrue(MethodMatcher("com.abc.Parent method(String)", true).matches(parentMethodDefinition))
-        assertTrue(MethodMatcher("com.abc.Parent method(String)", true).matches(childMethodOverride))
-        assertTrue(MethodMatcher("com.abc.Parent method(String)", false).matches(parentMethodDefinition))
-        assertFalse(MethodMatcher("com.abc.Test method(String)", true).matches(parentMethodDefinition))
+        assertFalse(MethodMatcher.create("com.abc.Parent method(String)", false).matches(childMethodOverride))
+        assertTrue(MethodMatcher.create("com.abc.Parent method(String)", true).matches(parentMethodDefinition))
+        assertTrue(MethodMatcher.create("com.abc.Parent method(String)", true).matches(childMethodOverride))
+        assertTrue(MethodMatcher.create("com.abc.Parent method(String)", false).matches(parentMethodDefinition))
+        assertFalse(MethodMatcher.create("com.abc.Test method(String)", true).matches(parentMethodDefinition))
 
         val parentToStringDefinition = (cu.classes[0].body.statements[1] as J.MethodDeclaration).methodType
-        assertTrue(MethodMatcher("com.abc.Parent toString()", true).matches(parentToStringDefinition))
-        assertTrue(MethodMatcher("java.lang.Object toString()", true).matches(parentToStringDefinition))
-        assertFalse(MethodMatcher("java.lang.Object toString()", false).matches(parentToStringDefinition))
+        assertTrue(MethodMatcher.create("com.abc.Parent toString()", true).matches(parentToStringDefinition))
+        assertTrue(MethodMatcher.create("java.lang.Object toString()", true).matches(parentToStringDefinition))
+        assertFalse(MethodMatcher.create("java.lang.Object toString()", false).matches(parentToStringDefinition))
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/383")
@@ -230,7 +230,7 @@ interface MethodMatcherTest {
         val cu = jp.parse(
             """
             package a;
-            
+
             class A {
                 void foo() {}
             }
@@ -238,7 +238,7 @@ interface MethodMatcherTest {
         ).first()
         val classDecl = cu.classes.first()
         val fooMethod = classDecl.body.statements[0] as J.MethodDeclaration
-        assertTrue(MethodMatcher("* foo(..)").matches(fooMethod, classDecl))
+        assertTrue(MethodMatcher.create("* foo(..)").matches(fooMethod, classDecl))
     }
 
     @Test
@@ -252,7 +252,7 @@ interface MethodMatcherTest {
         ).first()
         val classDecl = cu.classes.first()
         val fooMethod = classDecl.body.statements[0] as J.MethodDeclaration
-        assertTrue(MethodMatcher("* foo(..)").matches(fooMethod, classDecl))
+        assertTrue(MethodMatcher.create("* foo(..)").matches(fooMethod, classDecl))
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/492")
@@ -265,7 +265,7 @@ interface MethodMatcherTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/629")
     @Test
     fun wildcardType(jp: JavaParser) {
-        assertTrue(MethodMatcher("*..* build()").matchesTargetType(JavaType.ShallowClass.build("javax.ws.rs.core.Response")))
-        assertTrue(MethodMatcher("javax..* build()").matchesTargetType(JavaType.ShallowClass.build("javax.ws.rs.core.Response")))
+        assertTrue(MethodMatcher.create("*..* build()").matchesTargetType(JavaType.ShallowClass.build("javax.ws.rs.core.Response")))
+        assertTrue(MethodMatcher.create("javax..* build()").matchesTargetType(JavaType.ShallowClass.build("javax.ws.rs.core.Response")))
     }
 }

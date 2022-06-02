@@ -74,7 +74,7 @@ public class DeleteMethodArgument extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new DeleteMethodArgumentVisitor(new MethodMatcher(methodPattern));
+        return new DeleteMethodArgumentVisitor(MethodMatcher.create(methodPattern));
     }
 
     private class DeleteMethodArgumentVisitor extends JavaIsoVisitor<ExecutionContext> {

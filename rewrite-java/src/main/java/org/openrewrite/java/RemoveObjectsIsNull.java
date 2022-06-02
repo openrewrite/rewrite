@@ -46,8 +46,8 @@ public class RemoveObjectsIsNull extends Recipe {
         return new TransformCallsToObjectsIsNullVisitor();
     }
 
-    private static final MethodMatcher isNullmatcher = new MethodMatcher("java.util.Objects isNull(..)");
-    private static final MethodMatcher nonNullmatcher = new MethodMatcher("java.util.Objects nonNull(..)");
+    private static final MethodMatcher isNullmatcher = MethodMatcher.create("java.util.Objects isNull(..)");
+    private static final MethodMatcher nonNullmatcher = MethodMatcher.create("java.util.Objects nonNull(..)");
 
 
 

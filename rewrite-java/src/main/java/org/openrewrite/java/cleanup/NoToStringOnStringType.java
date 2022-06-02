@@ -29,7 +29,7 @@ import java.util.Collections;
 import java.util.Set;
 
 public class NoToStringOnStringType extends Recipe {
-    private static final MethodMatcher TO_STRING = new MethodMatcher("java.lang.String toString()");
+    private static final MethodMatcher TO_STRING = MethodMatcher.create("java.lang.String toString()");
 
     @Override
     public String getDisplayName() {

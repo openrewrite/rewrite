@@ -51,7 +51,7 @@ public class FindPlugin extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
+        MethodMatcher pluginMatcher = MethodMatcher.create("PluginSpec id(..)", false);
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {

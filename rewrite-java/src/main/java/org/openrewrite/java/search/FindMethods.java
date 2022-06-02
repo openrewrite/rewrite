@@ -69,7 +69,7 @@ public class FindMethods extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
+        MethodMatcher methodMatcher = MethodMatcher.create(methodPattern, matchOverrides);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -106,7 +106,7 @@ public class FindMethods extends Recipe {
      * @return A set of {@link J.MethodInvocation} and {@link J.MemberReference} representing calls to this method.
      */
     public static Set<J> find(J j, String methodPattern) {
-        MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
+        MethodMatcher methodMatcher = MethodMatcher.create(methodPattern);
         JavaIsoVisitor<Set<J>> findVisitor = new JavaIsoVisitor<Set<J>>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Set<J> ms) {

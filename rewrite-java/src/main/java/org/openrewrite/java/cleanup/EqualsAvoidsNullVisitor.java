@@ -32,8 +32,8 @@ import static java.util.Collections.singletonList;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class EqualsAvoidsNullVisitor<P> extends JavaIsoVisitor<P> {
-    private static final MethodMatcher STRING_EQUALS = new MethodMatcher("String equals(java.lang.Object)");
-    private static final MethodMatcher STRING_EQUALS_IGNORE_CASE = new MethodMatcher("String equalsIgnoreCase(java.lang.String)");
+    private static final MethodMatcher STRING_EQUALS = MethodMatcher.create("String equals(java.lang.Object)");
+    private static final MethodMatcher STRING_EQUALS_IGNORE_CASE = MethodMatcher.create("String equalsIgnoreCase(java.lang.String)");
 
     EqualsAvoidsNullStyle style;
 

@@ -113,8 +113,8 @@ public class UpgradePluginVersion extends Recipe {
         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         assert versionComparator != null;
 
-        MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
-        MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
+        MethodMatcher pluginMatcher = MethodMatcher.create("PluginSpec id(..)", false);
+        MethodMatcher versionMatcher = MethodMatcher.create("Plugin version(..)", false);
         return new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {

@@ -31,7 +31,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class IsEmptyCallOnCollections extends Recipe {
-    private static final MethodMatcher COLLECTION_SIZE = new MethodMatcher("java.util.Collection size()", true);
+    private static final MethodMatcher COLLECTION_SIZE = MethodMatcher.create("java.util.Collection size()", true);
 
     @Override
     public String getDisplayName() {

@@ -64,7 +64,7 @@ public class UnnecessaryCloseInTryWithResources extends Recipe {
     }
 
     private static class UnnecessaryAutoCloseableVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private static final MethodMatcher AUTO_CLOSEABLE_METHOD_MATCHER = new MethodMatcher( "java.lang.AutoCloseable close()", true);
+        private static final MethodMatcher AUTO_CLOSEABLE_METHOD_MATCHER = MethodMatcher.create( "java.lang.AutoCloseable close()", true);
 
         @Override
         public J.Try visitTry(J.Try _try, ExecutionContext executionContext) {

@@ -60,9 +60,9 @@ public class CaseInsensitiveComparisonsDoNotChangeCase extends Recipe {
     }
 
     private static class CaseInsensitiveComparisonVisitor<ExecutionContext> extends JavaIsoVisitor<ExecutionContext> {
-        private static final MethodMatcher COMPARE_IGNORE_CASE_METHOD_MATCHER = new MethodMatcher("java.lang.String equalsIgnoreCase(java.lang.String)");
-        private static final MethodMatcher TO_LOWER_CASE_METHOD_MATCHER = new MethodMatcher("java.lang.String toLowerCase()");
-        private static final MethodMatcher TO_UPPER_CASE_METHOD_MATCHER = new MethodMatcher("java.lang.String toUpperCase()");
+        private static final MethodMatcher COMPARE_IGNORE_CASE_METHOD_MATCHER = MethodMatcher.create("java.lang.String equalsIgnoreCase(java.lang.String)");
+        private static final MethodMatcher TO_LOWER_CASE_METHOD_MATCHER = MethodMatcher.create("java.lang.String toLowerCase()");
+        private static final MethodMatcher TO_UPPER_CASE_METHOD_MATCHER = MethodMatcher.create("java.lang.String toUpperCase()");
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {

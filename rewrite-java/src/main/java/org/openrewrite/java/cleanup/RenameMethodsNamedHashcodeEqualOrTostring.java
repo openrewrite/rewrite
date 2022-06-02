@@ -32,8 +32,8 @@ import java.util.Collections;
 import java.util.Set;
 
 public class RenameMethodsNamedHashcodeEqualOrTostring extends Recipe {
-    private static final MethodMatcher NO_ARGS = new MethodMatcher("*..* *()", true);
-    private static final MethodMatcher OBJECT_ARG = new MethodMatcher("*..* *(java.lang.Object)", true);
+    private static final MethodMatcher NO_ARGS = MethodMatcher.create("*..* *()", true);
+    private static final MethodMatcher OBJECT_ARG = MethodMatcher.create("*..* *(java.lang.Object)", true);
 
     @Override
     public String getDisplayName() {

@@ -60,7 +60,7 @@ public class FindDeprecatedMethods extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        MethodMatcher methodMatcher = methodPattern == null ? null : new MethodMatcher(methodPattern, true);
+        MethodMatcher methodMatcher = methodPattern == null ? null : MethodMatcher.create(methodPattern, true);
 
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override

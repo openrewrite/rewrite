@@ -79,7 +79,7 @@ public class AddDelegatesToGradleApi extends Recipe {
                         return param;
                     }
                     // Construct a matcher that will identify methods identical to this one except they accept Action instead of Closure
-                    MethodMatcher matcher = new MethodMatcher(method.getMethodType().withParameterTypes(
+                    MethodMatcher matcher = MethodMatcher.create(method.getMethodType().withParameterTypes(
                             ListUtils.map(method.getMethodType().getParameterTypes(), p -> {
                                 if (TypeUtils.isOfClassType(p, CLOSURE_TYPE.getFullyQualifiedName())) {
                                     return ACTION_TYPE;

@@ -30,7 +30,7 @@ import java.util.Collections;
 import java.util.Set;
 
 public class UseHttpsForRepositories extends Recipe {
-    private static final MethodMatcher REPO_URL = new MethodMatcher("MavenArtifactRepositorySpec url(..)");
+    private static final MethodMatcher REPO_URL = MethodMatcher.create("MavenArtifactRepositorySpec url(..)");
 
     @Override
     public String getDisplayName() {

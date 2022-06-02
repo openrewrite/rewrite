@@ -29,7 +29,7 @@ import org.openrewrite.java.tree.Statement;
 import java.util.*;
 
 public class ForwardFlow extends JavaVisitor<Integer> {
-    private static final MethodMatcher methodMatcherToString = new MethodMatcher("java.lang.String toString()");
+    private static final MethodMatcher methodMatcherToString = MethodMatcher.create("java.lang.String toString()");
 
     public static void findSinks(SinkFlow<?, ?> root) {
         Iterator<Cursor> cursorPath = root.getCursor().getPathAsCursors();

@@ -62,7 +62,7 @@ import static java.util.stream.Collectors.joining;
  * </PRE>
  */
 @SuppressWarnings("NotNullFieldNotInitialized")
-@Getter
+@Getter(onMethod_={@Deprecated})
 public class MethodMatcher {
     private Pattern targetTypePattern;
     private Pattern methodNamePattern;
@@ -73,10 +73,18 @@ public class MethodMatcher {
      */
     private final boolean matchOverrides;
 
+    /**
+     * @deprecated Use {@link MethodMatcher#create(String, Boolean)} instead.
+     */
+    @Deprecated
     public MethodMatcher(String signature, @Nullable Boolean matchOverrides) {
         this(signature, Boolean.TRUE.equals(matchOverrides));
     }
 
+    /**
+     * @deprecated Use {@link MethodMatcher#create(String, boolean)} instead.
+     */
+    @Deprecated
     public MethodMatcher(String signature, boolean matchOverrides) {
         this.matchOverrides = matchOverrides;
 
@@ -97,18 +105,34 @@ public class MethodMatcher {
         }.visit(parser.methodPattern());
     }
 
+    /**
+     * @deprecated Use {@link MethodMatcher#create(J.MethodDeclaration, boolean)} instead.
+     */
+    @Deprecated
     public MethodMatcher(J.MethodDeclaration method, boolean matchOverrides) {
         this(methodPattern(method), matchOverrides);
     }
 
+    /**
+     * @deprecated Use {@link MethodMatcher#create(String)} instead.
+     */
+    @Deprecated
     public MethodMatcher(String signature) {
         this(signature, false);
     }
 
+    /**
+     * @deprecated Use {@link MethodMatcher#create(J.MethodDeclaration)} instead.
+     */
+    @Deprecated
     public MethodMatcher(J.MethodDeclaration method) {
         this(method, false);
     }
 
+    /**
+     * @deprecated Use {@link MethodMatcher#create(JavaType.Method)} instead.
+     */
+    @Deprecated
     public MethodMatcher(JavaType.Method method) {
         this(methodPattern(method), false);
     }
@@ -141,7 +165,7 @@ public class MethodMatcher {
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
         boolean matchesTargetType = "[^.]*".equals(targetTypePattern.toString()) || matchesTargetType(enclosing.getType());
-        if(!matchesTargetType) {
+        if (!matchesTargetType) {
             return false;
         }
 
@@ -284,6 +308,30 @@ public class MethodMatcher {
 
         return typePattern(method.getDeclaringType()) + " " +
                 method.getName() + "(" + parameters + ")";
+    }
+
+    public static MethodMatcher create(String signature, @Nullable Boolean matchOverrides) {
+        return create(signature, Boolean.TRUE.equals(matchOverrides));
+    }
+
+    public static MethodMatcher create(String signature, boolean matchOverrides) {
+        return new MethodMatcher(signature, matchOverrides);
+    }
+
+    public static MethodMatcher create(J.MethodDeclaration method, boolean matchOverrides) {
+        return new MethodMatcher(MethodMatcher.methodPattern(method), matchOverrides);
+    }
+
+    public static MethodMatcher create(String signature) {
+        return new MethodMatcher(signature, false);
+    }
+
+    public static MethodMatcher create(J.MethodDeclaration method) {
+        return new MethodMatcher(method, false);
+    }
+
+    public static MethodMatcher create(JavaType.Method method) {
+        return new MethodMatcher(MethodMatcher.methodPattern(method), false);
     }
 }
 
