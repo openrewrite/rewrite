@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
@@ -147,8 +148,8 @@ interface MethodMatcherTest {
         val cu = jp.parse(
             """
             package a;
-            class A { 
-                A a = new A(); 
+            class A {
+                A a = new A();
             }
         """.trimIndent()
         )[0]
@@ -162,11 +163,36 @@ interface MethodMatcherTest {
     }
 
     @Test
+    fun matchesConstructorAsExpressionUsage(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+            package a;
+            class A {
+                A a = new A();
+            }
+        """.trimIndent()
+        )[0]
+
+        assertTrue(
+            MethodMatcher("a.A <constructor>()").matches(
+                (cu.classes.first().body.statements.first() as J.VariableDeclarations)
+                    .variables.first().initializer!!
+            )
+        )
+        assertTrue(
+            MethodMatcher("a.A *()").matches(
+                (cu.classes.first().body.statements.first() as J.VariableDeclarations)
+                    .variables.first().initializer!!
+            )
+        )
+    }
+
+    @Test
     fun matchesMethod(jp: JavaParser) {
         val cu = jp.parse(
             """
             package a;
-            
+
             class A {
                 void setInt(int value) {}
                 int getInt() {}
@@ -230,7 +256,7 @@ interface MethodMatcherTest {
         val cu = jp.parse(
             """
             package a;
-            
+
             class A {
                 void foo() {}
             }

@@ -170,7 +170,8 @@ public class MethodMatcher {
     }
 
     public boolean matches(Expression maybeMethod) {
-        return maybeMethod instanceof J.MethodInvocation && matches((J.MethodInvocation) maybeMethod);
+        return (maybeMethod instanceof J.MethodInvocation && matches((J.MethodInvocation) maybeMethod)) ||
+                (maybeMethod instanceof J.NewClass && matches((J.NewClass) maybeMethod));
     }
 
     public boolean matches(J.MethodInvocation method) {
