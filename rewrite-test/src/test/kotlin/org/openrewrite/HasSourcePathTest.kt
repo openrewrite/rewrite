@@ -56,4 +56,16 @@ class HasSourcePathTest : RewriteTest {
         text("", "hello jon") { spec -> spec.path("build.gradle.kts") },
         text("") { spec -> spec.path("pom.xml") }
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1878")
+    @Test
+    fun githubYaml() = rewriteRun(
+        { spec ->
+            spec.recipe(object : ChangeText("hello jon") {
+                override fun getSingleSourceApplicableTest() =
+                    HasSourcePath<ExecutionContext>(".github/workflows/*.yml")
+            })
+        },
+        text("", "hello jon") { spec -> spec.path(".github/workflows/ci.yml") },
+    )
 }
