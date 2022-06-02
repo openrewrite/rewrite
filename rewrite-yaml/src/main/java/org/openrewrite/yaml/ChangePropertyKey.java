@@ -121,7 +121,11 @@ public class ChangePropertyKey extends Recipe {
                                 propertyToTest,
                                 entry
                         ));
-                        doAfterVisit(new DeleteProperty.DeletePropertyVisitor<>(entry));
+                        doAfterVisit(new DeletePropertyVisitor<>(entry));
+                        //noinspection ConstantConditions
+                        if (!nonScalarMappingEntryExists(getCursor().firstEnclosing(Yaml.Document.class), propertyEntry, propertyToTest, p)) {
+                            maybeCoalesceProperties();
+                        }
                         break;
                     }
                     propertyToTest = propertyToTest.substring(value.length() + 1);
@@ -129,6 +133,30 @@ public class ChangePropertyKey extends Recipe {
             }
 
             return e;
+        }
+
+        private boolean nonScalarMappingEntryExists(Yaml.Mapping.Document document, Yaml.Mapping.Entry entry, String property, P p) {
+            AtomicBoolean exists = new AtomicBoolean(false);
+            String propertyToCheck = Boolean.TRUE.equals(relaxedBinding) ? NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL, property) : property;
+            new YamlIsoVisitor<P>() {
+                @Override
+                public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
+                    Yaml.Mapping m = super.visitMapping(mapping, p);
+                    if (m.getEntries().contains(entry)) {
+                        for (Yaml.Mapping.Entry mEntry : m.getEntries()) {
+                            if (!(mEntry.getValue() instanceof Yaml.Scalar)) {
+                                String mKey = Boolean.TRUE.equals(relaxedBinding) ? NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL, mEntry.getKey().getValue()) : mEntry.getKey().getValue();
+                                if (propertyToCheck.startsWith(mKey)) {
+                                    exists.set(true);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    return m;
+                }
+            }.visitDocument(document, p);
+            return exists.get();
         }
     }
 
@@ -168,11 +196,51 @@ public class ChangePropertyKey extends Recipe {
                     }));
                 } else {
                     m = m.withEntries(ListUtils.concat(m.getEntries(), newEntry));
-                    doAfterVisit(new DeleteProperty.DeletePropertyVisitor<>(entryToReplace));
+                    doAfterVisit(new DeletePropertyVisitor<>(entryToReplace));
                 }
             }
 
             return m;
         }
     }
+
+    private static class DeletePropertyVisitor<P> extends YamlIsoVisitor<P> {
+        private final Yaml.Mapping.Entry scope;
+
+        private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
+            this.scope = scope;
+        }
+
+        @Override
+        public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
+            Yaml.Mapping m = super.visitMapping(mapping, p);
+
+            boolean changed = false;
+            List<Yaml.Mapping.Entry> entries = new ArrayList<>();
+            for (Yaml.Mapping.Entry entry : m.getEntries()) {
+                if (entry == scope || (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
+                    changed = true;
+                } else {
+                    entries.add(entry);
+                }
+            }
+
+            if (entries.size() == 1) {
+                entries = ListUtils.map(entries, e -> e.withPrefix(""));
+            }
+
+            if (changed) {
+                m = m.withEntries(entries);
+
+                if (getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) {
+                    Yaml.Document document = getCursor().getParentOrThrow().getValue();
+                    if (!document.isExplicit()) {
+                        m = m.withEntries(m.getEntries());
+                    }
+                }
+            }
+            return m;
+        }
+    }
+
 }

@@ -39,13 +39,9 @@ public class DeleteProperty extends Recipe {
             example = "management.metrics.binders.files.enabled")
     String propertyKey;
 
-    @Deprecated
     @Option(displayName = "Coalesce",
-            description = "(Deprecated: in a future version, this recipe will always use the `false` behavior)"
-                    + " Simplify nested map hierarchies into their simplest dot separated property form.",
-            example = "true",
-            required = false)
-    @Nullable
+            description = "Simplify nested map hierarchies into their simplest dot separated property form.",
+            example = "true")
     Boolean coalesce;
 
     @Incubating(since = "7.17.0")
@@ -101,7 +97,7 @@ public class DeleteProperty extends Recipe {
 
                 if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
                     doAfterVisit(new DeletePropertyVisitor<>(entry));
-                    if (Boolean.TRUE.equals(coalesce)) {
+                    if (coalesce) {
                         maybeCoalesceProperties();
                     }
                 }
@@ -111,10 +107,10 @@ public class DeleteProperty extends Recipe {
         };
     }
 
-    public static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
+    private static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
         private final Yaml.Mapping.Entry scope;
 
-        public DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
+        private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
             this.scope = scope;
         }
 
@@ -124,16 +120,10 @@ public class DeleteProperty extends Recipe {
 
             boolean changed = false;
             List<Yaml.Mapping.Entry> entries = new ArrayList<>();
-            String deletedPrefix = null;
             for (Yaml.Mapping.Entry entry : m.getEntries()) {
                 if (entry == scope || (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
-                    deletedPrefix = entry.getPrefix();
                     changed = true;
                 } else {
-                    if (deletedPrefix != null) {
-                        entry = entry.withPrefix(deletedPrefix);
-                        deletedPrefix = null;
-                    }
                     entries.add(entry);
                 }
             }
