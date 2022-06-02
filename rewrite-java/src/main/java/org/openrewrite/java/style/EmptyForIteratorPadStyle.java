@@ -25,8 +25,8 @@ import org.openrewrite.style.StyleHelper;
 public class EmptyForIteratorPadStyle implements Style {
     /**
      * Track whether empty for loop iterators should have a space or not.
-     * When true: for (int i = 0; i < 10; )
-     * When false: for(int i = 0; i < 10;)
+     * When true: {@code for (int i = 0; i < 10; )}
+     * When false: {@code for(int i = 0; i < 10;)}
      */
     Boolean space;
 

@@ -1,5 +1,6 @@
 package org.openrewrite.gradle
 
+import org.gradle.api.AntBuilder
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
@@ -64,10 +65,13 @@ abstract class Delombok @Inject constructor(
 
             "delombok"(
                 "to" to outputDirectory.asFile.get().absolutePath,
-                "classpath" to compileClasspath.asPath
+                "classpath" to compileClasspath.asPath,
+                "encoding" to "UTF-8"
             ) {
                 sourceFiles.addToAntBuilder(this, "fileset", FileCollection.AntType.FileSet)
+                "format"("value" to "suppressWarnings:skip")
             }
         }
+        ant.lifecycleLogLevel = AntBuilder.AntMessagePriority.INFO
     }
 }

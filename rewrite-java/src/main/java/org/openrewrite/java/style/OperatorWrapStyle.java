@@ -33,182 +33,182 @@ public class OperatorWrapStyle implements Style {
     WrapOption wrapOption;
 
     /**
-     * The ? (conditional) operator.
+     * The {@code ?} (conditional) operator.
      */
     Boolean question;
 
     /**
-     * The : (colon) operator.
+     * The {@code :} (colon) operator.
      */
     Boolean colon;
 
     /**
-     * The == (equal) operator.
+     * The {@code ==} (equal) operator.
      */
     Boolean equal;
 
     /**
-     * The != (not equal) operator.
+     * The {@code !=} (not equal) operator.
      */
     Boolean notEqual;
 
     /**
-     * The / (division) operator.
+     * The {@code /} (division) operator.
      */
     Boolean div;
 
     /**
-     * The + (addition) operator.
+     * The {@code +} (addition) operator.
      */
     Boolean plus;
 
     /**
-     * The - (subtraction) operator.
+     * The {@code -} (subtraction) operator.
      */
     Boolean minus;
 
     /**
-     * The * (multiplication or wildcard) operator.
+     * The {@code *} (multiplication or wildcard) operator.
      */
     Boolean star;
 
     /**
-     * The % (remainder) operator.
+     * The {@code %} (remainder) operator.
      */
     Boolean mod;
 
     /**
-     * The >> (signed shift right) operator.
+     * The {@code >>} (signed shift right) operator.
      */
     Boolean sr;
 
     /**
-     * The >>> (unsigned shift right) operator.
+     * The {@code >>>} (unsigned shift right) operator.
      */
     Boolean bsr;
 
     /**
-     * The >= (greater than or equal) operator.
+     * The {@code >=} (greater than or equal) operator.
      */
     Boolean ge;
 
     /**
-     * The > (greater than) operator.
+     * The {@code >} (greater than) operator.
      */
     Boolean gt;
 
     /**
-     * The << (shift left) operator.
+     * The {@code <<} (shift left) operator.
      */
     Boolean sl;
 
     /**
-     * The <= (less than or equal) operator.
+     * The {@code <=} (less than or equal) operator.
      */
     Boolean le;
 
     /**
-     * The < (less than) operator.
+     * The {@code <} (less than) operator.
      */
     Boolean lt;
 
     /**
-     * The ^ (bitwise exclusive OR) operator.
+     * The {@code ^} (bitwise exclusive OR) operator.
      */
     Boolean bxor;
 
     /**
-     * The | (bitwise OR) operator.
+     * The {@code |} (bitwise OR) operator.
      */
     Boolean bor;
 
     /**
-     * The || (conditional OR) operator.
+     * The {@code ||} (conditional OR) operator.
      */
     Boolean lor;
 
     /**
-     * The & (bitwise AND) operator.
+     * The {@code &} (bitwise AND) operator.
      */
     Boolean band;
 
     /**
-     * The && (conditional AND) operator.
+     * The {@code &&} (conditional AND) operator.
      */
     Boolean land;
 
     /**
-     * The & symbol when used to extend a generic upper or lower bounds constrain or a type cast expression with an additional interface.
+     * The {@code &} symbol when used to extend a generic upper or lower bounds constrain or a type cast expression with an additional interface.
      */
     Boolean typeExtensionAnd;
 
     /**
-     * The instanceof operator.
+     * The {@code instanceof} operator.
      */
     Boolean literalInstanceof;
 
     /**
-     * A :: reference to a method or constructor without arguments.
+     * A {@code ::} reference to a method or constructor without arguments.
      */
     Boolean methodRef;
 
     /**
-     * The = (assignment) operator.
+     * The {@code =} (assignment) operator.
      */
     Boolean assign;
 
     /**
-     * The += (addition assignment) operator.
+     * The {@code +=} (addition assignment) operator.
      */
     Boolean plusAssign;
 
     /**
-     * The -= (subtraction assignment) operator.
+     * The {@code -=} (subtraction assignment) operator.
      */
     Boolean minusAssign;
 
     /**
-     * The *= (multiplication assignment) operator.
+     * The {@code *=} (multiplication assignment) operator.
      */
     Boolean starAssign;
 
     /**
-     * The /= (division assignment) operator.
+     * The {@code /=} (division assignment) operator.
      */
     Boolean divAssign;
 
     /**
-     * The %= (remainder assignment) operator.
+     * The {@code %=} (remainder assignment) operator.
      */
     Boolean modAssign;
 
     /**
-     * The >>= (signed right shift assignment) operator.
+     * The {@code >>=} (signed right shift assignment) operator.
      */
     Boolean srAssign;
 
     /**
-     * The >>>= (unsigned right shift assignment) operator.
+     * The {@code >>>=} (unsigned right shift assignment) operator.
      */
     Boolean bsrAssign;
 
     /**
-     * The <<= (left shift assignment) operator.
+     * The {@code <<=} (left shift assignment) operator.
      */
     Boolean slAssign;
 
     /**
-     * The &= (bitwise AND assignment) operator.
+     * The {@code &=} (bitwise AND assignment) operator.
      */
     Boolean bandAssign;
 
     /**
-     * The ^= (bitwise exclusive OR assignment) operator.
+     * The {@code ^=} (bitwise exclusive OR assignment) operator.
      */
     Boolean bxorAssign;
 
     /**
-     * The |= (bitwise OR assignment) operator.
+     * The {@code |=} (bitwise OR assignment) operator.
      */
     Boolean borAssign;
 

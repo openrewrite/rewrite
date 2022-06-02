@@ -29,12 +29,12 @@ public class NoWhitespaceBeforeStyle implements Style {
     Boolean allowLineBreaks;
 
     /**
-     * The . (dot) operator.
+     * The {@code .} (dot) operator.
      */
     Boolean dot;
 
     /**
-     * The , (comma) operator.
+     * The {@code ,} (comma) operator.
      */
     Boolean comma;
 
@@ -44,27 +44,27 @@ public class NoWhitespaceBeforeStyle implements Style {
     Boolean semi;
 
     /**
-     * A < symbol signifying the start of type arguments or type parameters.
+     * A {@code <} symbol signifying the start of type arguments or type parameters.
      */
     Boolean genericStart;
 
     /**
-     * A > symbol signifying the end of type arguments or type parameters.
+     * A {@code >} symbol signifying the end of type arguments or type parameters.
      */
     Boolean genericEnd;
 
     /**
-     * A :: reference to a method or constructor.
+     * A {@code ::} reference to a method or constructor.
      */
     Boolean methodRef;
 
     /**
-     * The ++ (postfix increment) operator.
+     * The {@code ++} (postfix increment) operator.
      */
     Boolean postInc;
 
     /**
-     * The -- (postfix decrement) operator.
+     * The {@code --} (postfix decrement) operator.
      */
     Boolean postDec;
 

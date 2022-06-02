@@ -42,5 +42,7 @@ tasks.withType<Javadoc>().configureEach {
     options {
         this as CoreJavadocOptions
         addStringOption("Xdoclint:none", "-quiet")
+        addStringOption("Xmaxwarns", "1")
+        addStringOption("Xmaxerrs", "1")
     }
 }

@@ -25,8 +25,8 @@ import org.openrewrite.style.StyleHelper;
 public class EmptyForInitializerPadStyle implements Style {
     /**
      * Track whether empty for loop initializers should have a space or not.
-     * When true: for ( ; i < 10; i++)
-     * When false: for(; i < 10; i++)
+     * When true: {@code for ( ; i < 10; i++) }
+     * When false: {@code for(; i < 10; i++) }
      */
     Boolean space;
 
