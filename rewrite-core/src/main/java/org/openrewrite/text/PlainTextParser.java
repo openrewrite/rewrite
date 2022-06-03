@@ -19,6 +19,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -31,8 +33,9 @@ public class PlainTextParser implements Parser<PlainText> {
     public List<PlainText> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                        ExecutionContext ctx) {
         List<PlainText> plainTexts = new ArrayList<>();
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         for (Input source : sources) {
-            plainTexts.add(new PlainText(randomId(),
+            PlainText plainText = new PlainText(randomId(),
                     relativeTo == null ?
                             source.getPath() :
                             relativeTo.relativize(source.getPath()).normalize(),
@@ -41,7 +44,9 @@ public class PlainTextParser implements Parser<PlainText> {
                     source.getSource().isCharsetBomMarked(),
                     source.getFileAttributes(),
                     null,
-                    source.getSource().readFully()));
+                    source.getSource().readFully());
+            plainTexts.add(plainText);
+            parsingListener.parsed(source, plainText);
         }
         return plainTexts;
     }
