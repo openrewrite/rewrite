@@ -33,6 +33,8 @@ dependencies {
 
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv:latest.release")
+
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
 

@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.dataflow.*
@@ -196,6 +197,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class FindLocalFlowPathsStringTck : FindLocalFlowPathsStringTest
+
+    @Nested
+    inner class FindLocalTaintFlowTck : FindLocalTaintFlowTest
 
     @Nested
     inner class FindMethodsTck : FindMethodsTest
