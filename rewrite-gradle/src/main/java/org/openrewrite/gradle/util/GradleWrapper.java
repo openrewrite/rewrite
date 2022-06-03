@@ -15,6 +15,12 @@
  */
 package org.openrewrite.gradle.util;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
+import io.vavr.CheckedFunction1;
 import lombok.Value;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.Tree;
@@ -32,6 +38,7 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -46,6 +53,20 @@ public class GradleWrapper {
     public static final Path WRAPPER_PROPERTIES_LOCATION = Paths.get("gradle/wrapper/gradle-wrapper.properties");
     public static final Path WRAPPER_SCRIPT_LOCATION = Paths.get("gradlew");
     public static final Path WRAPPER_BATCH_LOCATION = Paths.get("gradlew.bat");
+
+    private static final String GRADLE_VERSIONS_CACHE_KEY = "GRADLE_VERSIONS";
+    private static final Cache<String, List<String>> VALIDATION_CACHE =
+            Caffeine.newBuilder()
+                    .expireAfterAccess(Duration.ofDays(1))
+                    .build();
+
+    private static final RetryConfig retryConfig = RetryConfig.custom()
+            .retryOnException(throwable -> throwable instanceof UncheckedIOException)
+            .build();
+
+    private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
+
+    private static final Retry gradleDistributionsRetry = retryRegistry.retry("GradleDistributions");
 
     String version;
     DistributionType distributionType;
@@ -66,7 +87,6 @@ public class GradleWrapper {
                 }),
                 Semver.validate(version, null)
         ) {
-            GradleWrapper wrapper;
 
             @Override
             public boolean isValid() {
@@ -95,26 +115,43 @@ public class GradleWrapper {
                                 .orElseThrow(() -> new IllegalArgumentException("Unknown distribution type " + distributionTypeName));
                 VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
 
-                //noinspection resource
-                try (InputStream is = httpSender.send(httpSender.get("https://services.gradle.org/distributions").build()).getBody()) {
-                    Scanner scanner = new Scanner(is);
-                    Pattern wrapperPattern = Pattern.compile("gradle-(.+)-" +
-                            distributionType.toString().toLowerCase() + "\\.zip(?!\\.sha)");
+                List<String> allVersions = VALIDATION_CACHE.getIfPresent(GRADLE_VERSIONS_CACHE_KEY);
 
-                    List<String> allVersions = new ArrayList<>();
-                    while (scanner.findWithinHorizon(wrapperPattern, 0) != null) {
-                        allVersions.add(scanner.match().group(1));
+                if (allVersions == null) {
+                    HttpSender.Request distributionsRequest = httpSender.get("https://services.gradle.org/distributions").build();
+                    CheckedFunction1<HttpSender.Request, HttpSender.Response> sendRequest = Retry.decorateCheckedFunction(
+                            gradleDistributionsRetry,
+                            httpSender::send);
+
+                    try (HttpSender.Response response = sendRequest.apply(distributionsRequest)){
+                        try (InputStream is = response.getBody()) {
+
+                            allVersions = new ArrayList<>();
+                            Scanner scanner = new Scanner(is);
+                            Pattern wrapperPattern = Pattern.compile("gradle-(.+)-" +
+                                    distributionType.toString().toLowerCase() + "\\.zip(?!\\.sha)");
+
+                            while (scanner.findWithinHorizon(wrapperPattern, 0) != null) {
+                                allVersions.add(scanner.match().group(1));
+                            }
+
+                            scanner.close();
+
+                            VALIDATION_CACHE.put(GRADLE_VERSIONS_CACHE_KEY, allVersions);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
                     }
-                    scanner.close();
-
-                    String version = allVersions.stream()
-                            .filter(v -> versionComparator.isValid(null, v))
-                            .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-                            .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
-                    return new GradleWrapper(version, distributionType);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
                 }
+
+                String version = allVersions.stream()
+                        .filter(v -> versionComparator.isValid(null, v))
+                        .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                        .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
+
+                return new GradleWrapper(version, distributionType);
             }
         };
     }

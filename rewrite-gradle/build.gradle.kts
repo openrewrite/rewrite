@@ -17,6 +17,8 @@ dependencies {
 
     implementation(project(":rewrite-properties"))
 
+    implementation("com.github.ben-manes.caffeine:caffeine:2.+")
+
     runtimeOnly("org.codehaus.groovy:groovy-ant:latest.release")
     runtimeOnly("org.codehaus.groovy:groovy-xml:latest.release")
 
