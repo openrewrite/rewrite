@@ -21,15 +21,19 @@ import java.lang.ref.WeakReference;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 
 class ExternalFlowModels {
     private static final ExternalFlowModels instance = new ExternalFlowModels();
+
     public static ExternalFlowModels instance() {
         return instance;
     }
+
     private WeakReference<FlowModels> flowModels;
 
     private FlowModels getFlowModels() {
@@ -45,6 +49,17 @@ class ExternalFlowModels {
             }
         }
         return f;
+    }
+
+    boolean isAdditionalFlowStep(
+            Expression startExpression,
+            Cursor startCursor,
+            Expression endExpression,
+            Cursor endCursor
+    ) {
+        return getFlowModels().value.stream().map(FlowModel::asAdditionalFlowStepPredicate).anyMatch(
+                taint -> taint.isAdditionalFlowStep(startExpression, startCursor, endExpression, endCursor)
+        );
     }
 
     boolean isAdditionalTaintStep(
@@ -87,6 +102,7 @@ class ExternalFlowModels {
 
     @AllArgsConstructor
     static class FlowModel {
+        private static final Pattern ARGUMENT_MATCHER = Pattern.compile("Argument\\[(\\d+)\\]");
         // namespace, type, subtypes, name, signature, ext, input, output, kind
         String namespace;
         String type;
@@ -99,23 +115,28 @@ class ExternalFlowModels {
         String kind;
 
         AdditionalFlowStepPredicate asAdditionalFlowStepPredicate() {
+            final String signature;
+            if (this.signature.isEmpty()) {
+                signature = "(..)";
+            } else {
+                signature = this.signature;
+            }
+            CallMatcher matcher = CallMatcher.fromMethodMatcher(
+                    new MethodMatcher(
+                            namespace + '.' + type + ' ' + name + signature,
+                            subtypes
+                    )
+            );
+            Matcher argumentMatcher = ARGUMENT_MATCHER.matcher(input);
             if ("Argument[-1]".equals(input) && "ReturnValue".equals(output)) {
-                final String signature;
-                if (this.signature.isEmpty()) {
-                    signature = "(..)";
-                } else {
-                    signature = this.signature;
-                }
-                CallMatcher matcher =
-                        CallMatcher.fromMethodMatcher(
-                                new MethodMatcher(
-                                        namespace + '.' + type + ' ' + name + signature,
-                                        subtypes
-                                )
-                        );
                 return (startExpression, startCursor, endExpression, endCursor) ->
                         matcher.advanced().isSelect(startExpression, startCursor);
+            } else if (argumentMatcher.matches() && "ReturnValue".equals(output)) {
+                int argumentIndex = Integer.parseInt(argumentMatcher.group(1));
+                return (startExpression, startCursor, endExpression, endCursor) ->
+                        matcher.advanced().isArgument(startExpression, startCursor, argumentIndex);
             }
+
             return (startExpression, startCursor, endExpression, endCursor) -> false;
         }
     }

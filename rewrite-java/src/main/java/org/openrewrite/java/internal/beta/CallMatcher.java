@@ -3,6 +3,7 @@ package org.openrewrite.java.internal.beta;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -43,7 +44,8 @@ public interface CallMatcher {
 
         public boolean isSelect(Expression expression, Cursor cursor) {
             assert expression == cursor.getValue() : "expression != cursor.getValue()";
-            J.MethodInvocation maybeMethodInvocation = cursor.firstEnclosing(J.MethodInvocation.class);
+            J.MethodInvocation maybeMethodInvocation =
+                    cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
             return maybeMethodInvocation != null &&
                     maybeMethodInvocation.getSelect() == expression &&
                     matcher.matches(maybeMethodInvocation); // Do the matcher.matches(...) last as this can be expensive
@@ -51,15 +53,28 @@ public interface CallMatcher {
 
         public boolean isAnyArgument(Expression expression, Cursor cursor) {
             assert expression == cursor.getValue() : "expression != cursor.getValue()";
-            J stop = cursor.dropParentUntil(v -> {
-                return v instanceof J.MethodInvocation || v instanceof J.NewClass || v instanceof J.Block;
-            }).getValue();
+            J stop = cursor.dropParentUntil(v -> v instanceof J.MethodInvocation || v instanceof J.NewClass || v instanceof J.Block).getValue();
             if (stop instanceof J.Block) {
                 return false;
             }
             Expression call = (Expression) stop;
-            return call != null &&
-                    getCallArguments(call).contains(expression) &&
+            return getCallArguments(call).contains(expression) && matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
+        }
+
+        public boolean isFirstArgument(Expression expression, Cursor cursor) {
+            return isArgument(expression, cursor, 0);
+        }
+
+        public boolean isArgument(Expression expression, Cursor cursor, int argumentIndex) {
+            assert expression == cursor.getValue() : "expression != cursor.getValue()";
+            J stop = cursor.dropParentUntil(v -> v instanceof J.MethodInvocation || v instanceof J.NewClass || v instanceof J.Block).getValue();
+            if (stop instanceof J.Block) {
+                return false;
+            }
+            Expression call = (Expression) stop;
+            List<Expression> arguments = getCallArguments(call);
+            return  arguments.size() > argumentIndex &&
+                    arguments.get(argumentIndex) == expression &&
                     matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
         }
 

@@ -39,11 +39,11 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                     true
             })
         })
+        spec.expectedCyclesThatMakeChanges(1).cycles(1)
     }
 
     @Test
     fun `transitive assignment from literal`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
             """
                 class Test {
@@ -776,7 +776,6 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
 
     @Test
     fun `a ternary condition is not considered a data flow step`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
             """
                 class Test {
@@ -801,6 +800,36 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                     void test(String other) {
                         String n = /*~~>*/source() ? "102" : "100";
                         System.out.println(n);
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `Objects requireNotNull is a valid flow step`() = rewriteRun(
+        java(
+            """
+                import java.util.Objects;
+                @SuppressWarnings({"ObviousNullCheck", "RedundantSuppression"})
+                class Test {
+                    void test() {
+                        String n = Objects.requireNonNull("42");
+                        String o = n;
+                        System.out.println(Objects.requireNonNull(o));
+                        String p = o;
+                    }
+                }
+            """,
+            """
+                import java.util.Objects;
+                @SuppressWarnings({"ObviousNullCheck", "RedundantSuppression"})
+                class Test {
+                    void test() {
+                        String n = /*~~>*/Objects.requireNonNull(/*~~>*/"42");
+                        String o = /*~~>*/n;
+                        System.out.println(/*~~>*/Objects.requireNonNull(/*~~>*/o));
+                        String p = /*~~>*/o;
                     }
                 }
             """
