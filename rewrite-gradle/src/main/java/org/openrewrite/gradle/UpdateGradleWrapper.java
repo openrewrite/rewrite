@@ -83,7 +83,7 @@ public class UpdateGradleWrapper extends Recipe {
     //      See https://github.com/projectlombok/lombok/issues/2372
     @LoathingOfOthers("JavaDoc")
     @JsonCreator
-    public UpdateGradleWrapper(String version, String distribution) {
+    public UpdateGradleWrapper(String version, @Nullable String distribution) {
         this.version = version;
         this.distribution = distribution;
     }

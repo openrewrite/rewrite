@@ -17,7 +17,6 @@ package org.openrewrite.gradle
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.Checksum
 import org.openrewrite.PathUtils
 import org.openrewrite.Tree.randomId
 import org.openrewrite.gradle.util.GradleWrapper.*
