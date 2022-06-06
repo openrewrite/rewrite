@@ -87,6 +87,10 @@ public class GradleWrapper {
             }
 
             private GradleWrapper buildWrapper() {
+                if (wrapper != null) {
+                    return wrapper;
+                }
+
                 DistributionType distributionType = distributionTypeName == null ?
                         DistributionType.Bin :
                         Arrays.stream(DistributionType.values())
@@ -96,7 +100,7 @@ public class GradleWrapper {
                 VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
 
                 //noinspection resource
-                try (InputStream is = httpSender.send(httpSender.get("https://services.gradle.org/distributions").build()).getBody()) {
+                try (InputStream is = httpSender.send(httpSender.get("https://services.gradle.org/distributions/").build()).getBody()) {
                     Scanner scanner = new Scanner(is);
                     Pattern wrapperPattern = Pattern.compile("gradle-(.+)-" +
                             distributionType.toString().toLowerCase() + "\\.zip(?!\\.sha)");
@@ -111,7 +115,8 @@ public class GradleWrapper {
                             .filter(v -> versionComparator.isValid(null, v))
                             .max((v1, v2) -> versionComparator.compare(null, v1, v2))
                             .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
-                    return new GradleWrapper(version, distributionType);
+                    wrapper = new GradleWrapper(version, distributionType);
+                    return wrapper;
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
