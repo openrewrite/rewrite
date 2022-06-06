@@ -24,6 +24,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesParser;
@@ -73,10 +74,13 @@ public class AddGradleWrapper extends Recipe {
     Validated gradleWrapper;
 
     @Override
-    public Validated validate() {
+    public Validated validate(ExecutionContext ctx) {
         if (gradleWrapper == null) {
-            gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution,
-                    new HttpUrlConnectionSender(Duration.ofSeconds(3), Duration.ofSeconds(10))));
+            HttpSender httpSender = ctx.getMessage("httpSender");
+            if (httpSender == null) {
+                httpSender = new HttpUrlConnectionSender(Duration.ofSeconds(3), Duration.ofSeconds(10));
+            }
+            gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution, httpSender));
         }
         return gradleWrapper;
     }
@@ -97,7 +101,7 @@ public class AddGradleWrapper extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        GradleWrapper gradleWrapper = validate().getValue();
+        GradleWrapper gradleWrapper = validate(ctx).getValue();
         assert gradleWrapper != null;
 
         boolean needsGradleWrapperProperties = true;

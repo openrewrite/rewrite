@@ -24,6 +24,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
@@ -71,10 +72,13 @@ public class UpdateGradleWrapper extends Recipe {
     Validated gradleWrapper;
 
     @Override
-    public Validated validate() {
+    public Validated validate(ExecutionContext ctx) {
         if (gradleWrapper == null) {
-            gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution,
-                    new HttpUrlConnectionSender(Duration.ofSeconds(3), Duration.ofSeconds(10))));
+            HttpSender httpSender = ctx.getMessage("httpSender");
+            if (httpSender == null) {
+                httpSender = new HttpUrlConnectionSender(Duration.ofSeconds(3), Duration.ofSeconds(10));
+            }
+            gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution, httpSender));
         }
         return gradleWrapper;
     }
@@ -90,8 +94,6 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        GradleWrapper gradleWrapper = validate().getValue();
-        assert gradleWrapper != null;
 
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
@@ -105,6 +107,9 @@ public class UpdateGradleWrapper extends Recipe {
                 if (!"distributionUrl".equals(entry.getKey())) {
                     return entry;
                 }
+
+                GradleWrapper gradleWrapper = validate(context).getValue();
+
                 // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip
                 String currentDistributionUrl = entry.getValue().getText();
                 if (!gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
@@ -117,7 +122,7 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        GradleWrapper gradleWrapper = validate().getValue();
+        GradleWrapper gradleWrapper = validate(ctx).getValue();
         assert gradleWrapper != null;
 
         return ListUtils.map(before, sourceFile -> {

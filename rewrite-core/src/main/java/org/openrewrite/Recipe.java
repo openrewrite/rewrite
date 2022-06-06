@@ -288,10 +288,13 @@ public abstract class Recipe {
         return recipeScheduler.scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
-    @SuppressWarnings("unused")
-    @Incubating(since = "7.0.0")
     public Validated validate(ExecutionContext ctx) {
-        return validate();
+        Validated validated = validate();
+
+        for(Recipe recipe : recipeList) {
+            validated = validated.and(recipe.validate(ctx));
+        }
+        return validated;
     }
 
     /**
