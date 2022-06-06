@@ -32,6 +32,7 @@ import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.logging.Logger;
@@ -196,7 +197,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             if (p instanceof ExecutionContext) {
                 cursor.putMessage("org.openrewrite.ExecutionContext", p);
             }
-            afterVisit = new ArrayList<>();
+            afterVisit = new CopyOnWriteArrayList<>();
         }
 
         visitCount++;
