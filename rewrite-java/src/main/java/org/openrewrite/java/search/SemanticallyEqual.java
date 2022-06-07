@@ -33,14 +33,30 @@ public class SemanticallyEqual {
     }
 
     public static boolean areEqual(J firstElem, J secondElem) {
-        SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor();
+        SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor(true);
+        semanticallyEqualVisitor.visit(firstElem, secondElem);
+        return semanticallyEqualVisitor.isEqual.get();
+    }
+
+    /**
+     * Compares method invocations and new class constructors based on the `JavaType.Method` instead of checking
+     * each types of each parameter.
+     * I.E. void foo(Object obj) {} invoked with `java.lang.String` or `java.lang.Integer` will return true.
+     */
+    public static boolean areSemanticallyEqual(J firstElem, J secondElem) {
+        SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor(false);
         semanticallyEqualVisitor.visit(firstElem, secondElem);
         return semanticallyEqualVisitor.isEqual.get();
     }
 
     @SuppressWarnings("ConstantConditions")
     private static class SemanticallyEqualVisitor extends JavaIsoVisitor<J> {
+        private final boolean compareMethodArguments;
+
         AtomicBoolean isEqual = new AtomicBoolean(true);
+        public SemanticallyEqualVisitor(boolean compareMethodArguments) {
+            this.compareMethodArguments = compareMethodArguments;
+        }
 
         private boolean nullMissMatch(Object obj1, Object obj2) {
             return (obj1 == null && obj2 != null || obj1 != null && obj2 == null);
@@ -779,7 +795,7 @@ public class SemanticallyEqual {
                         !TypeUtils.isOfType(memberRef.getReference().getType(), compareTo.getReference().getType()) ||
                         !TypeUtils.isOfType(memberRef.getType(), compareTo.getType()) ||
                         !TypeUtils.isOfType(memberRef.getVariableType(), compareTo.getVariableType()) ||
-                        !isMethodType(memberRef.getMethodType(), compareTo.getMethodType()) ||
+                        !TypeUtils.isOfType(memberRef.getMethodType(), compareTo.getMethodType()) ||
                         nullMissMatch(memberRef.getTypeParameters(), compareTo.getTypeParameters()) ||
                         memberRef.getTypeParameters() != null && compareTo.getTypeParameters() != null && memberRef.getTypeParameters().size() != compareTo.getTypeParameters().size()) {
                     isEqual.set(false);
@@ -806,7 +822,7 @@ public class SemanticallyEqual {
 
                 J.MethodDeclaration compareTo = (J.MethodDeclaration) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
-                        !isMethodType(method.getMethodType(), compareTo.getMethodType()) ||
+                        !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
                         method.getModifiers().size() != compareTo.getModifiers().size() ||
                         !new HashSet<>(method.getModifiers()).containsAll(compareTo.getModifiers()) ||
 
@@ -868,7 +884,7 @@ public class SemanticallyEqual {
 
                 J.MethodInvocation compareTo = (J.MethodInvocation) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
-                        !isMethodType(method.getMethodType(), compareTo.getMethodType()) ||
+                        !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
                         nullMissMatch(method.getSelect(), compareTo.getSelect()) ||
                         method.getArguments().size() != compareTo.getArguments().size() ||
                         method.getTypeParameters() != null && compareTo.getTypeParameters() != null && method.getTypeParameters().size() != compareTo.getTypeParameters().size()) {
@@ -876,12 +892,27 @@ public class SemanticallyEqual {
                     return method;
                 }
 
-                for (int i = 0; i < method.getArguments().size(); i++) {
-                    this.visit(method.getArguments().get(i), compareTo.getArguments().get(i));
+                this.visit(method.getSelect(), compareTo.getSelect());
+                boolean containsLiteral = false;
+                if (!compareMethodArguments) {
+                    for (int i = 0; i < method.getArguments().size(); i++) {
+                        if (method.getArguments().get(i) instanceof J.Literal || compareTo.getArguments().get(i) instanceof J.Literal) {
+                            containsLiteral = true;
+                            break;
+                        }
+                    }
+                    if (!containsLiteral) {
+                        if (nullMissMatch(method.getMethodType(), compareTo.getMethodType()) ||
+                                !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType())) {
+                            isEqual.set(false);
+                            return method;
+                        }
+                    }
                 }
-
-                if (method.getSelect() != null && compareTo.getSelect() != null) {
-                    this.visit(method.getSelect(), compareTo.getSelect());
+                if (compareMethodArguments || containsLiteral) {
+                    for (int i = 0; i < method.getArguments().size(); i++) {
+                        this.visit(method.getArguments().get(i), compareTo.getArguments().get(i));
+                    }
                 }
                 if (method.getTypeParameters() != null && compareTo.getTypeParameters() != null) {
                     for (int i = 0; i < method.getTypeParameters().size(); i++) {
@@ -989,8 +1020,26 @@ public class SemanticallyEqual {
                     this.visit(newClass.getBody(), compareTo.getBody());
                 }
                 if (newClass.getArguments() != null && compareTo.getArguments() != null) {
-                    for (int i = 0; i < newClass.getArguments().size(); i++) {
-                        this.visit(newClass.getArguments().get(i), compareTo.getArguments().get(i));
+                    boolean containsLiteral = false;
+                    if (!compareMethodArguments) {
+                        for (int i = 0; i < newClass.getArguments().size(); i++) {
+                            if (newClass.getArguments().get(i) instanceof J.Literal || compareTo.getArguments().get(i) instanceof J.Literal) {
+                                containsLiteral = true;
+                                break;
+                            }
+                        }
+                        if (!containsLiteral) {
+                            if (nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
+                                    newClass.getConstructorType() != null && compareTo.getConstructorType() != null && !TypeUtils.isOfType(newClass.getConstructorType(), compareTo.getConstructorType())) {
+                                isEqual.set(false);
+                                return newClass;
+                            }
+                        }
+                    }
+                    if (compareMethodArguments || containsLiteral) {
+                        for (int i = 0; i < newClass.getArguments().size(); i++) {
+                            this.visit(newClass.getArguments().get(i), compareTo.getArguments().get(i));
+                        }
                     }
                 }
             }
@@ -1370,37 +1419,6 @@ public class SemanticallyEqual {
                 }
             }
             return firstTypeName;
-        }
-
-        @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-        private boolean isMethodType(JavaType.Method method1, JavaType.Method method2) {
-            if (!method1.getName().equals(method2.getName()) ||
-                    method1.getFlags().size() != method2.getFlags().size() ||
-                    !method1.getFlags().containsAll(method2.getFlags()) ||
-                    !TypeUtils.isOfType(method1.getDeclaringType(), method2.getDeclaringType()) ||
-                    !TypeUtils.isOfType(method1.getReturnType(), method2.getReturnType()) ||
-                    method1.getAnnotations().size() != method2.getAnnotations().size() ||
-                    method1.getThrownExceptions().size() != method2.getThrownExceptions().size() ||
-                    method1.getParameterTypes().size() != method2.getParameterTypes().size()) {
-                return false;
-            }
-
-            for (int index = 0; index < method1.getParameterTypes().size(); index++) {
-                if (!TypeUtils.isOfType(method1.getParameterTypes().get(index), method2.getParameterTypes().get(index))) {
-                    return false;
-                }
-            }
-            for (int index = 0; index < method1.getThrownExceptions().size(); index++) {
-                if (!TypeUtils.isOfType(method1.getThrownExceptions().get(index), method2.getThrownExceptions().get(index))) {
-                    return false;
-                }
-            }
-            for (int index = 0; index < method1.getAnnotations().size(); index++) {
-                if (!TypeUtils.isOfType(method1.getAnnotations().get(index), method2.getAnnotations().get(index))) {
-                    return false;
-                }
-            }
-            return true;
         }
     }
 }

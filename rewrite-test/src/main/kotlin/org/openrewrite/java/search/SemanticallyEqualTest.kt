@@ -47,7 +47,7 @@ interface SemanticallyEqualTest {
     }
 
     private fun parseSources(@Language("java") sources: Array<String>): List<J.CompilationUnit> {
-        jp.reset();
+        jp.reset()
         return jp.parse(InMemoryExecutionContext { t -> fail(t) }, *sources)
     }
 
@@ -102,6 +102,7 @@ interface SemanticallyEqualTest {
         assertThat(SemanticallyEqual.areEqual(secondAnnot,thirdAnnot)).isFalse
     }
 
+    @Suppress("rawtypes")
     @Test
     fun tagAnnotationEquality() {
         val clazz = parseSources(arrayOf(
@@ -181,6 +182,7 @@ interface SemanticallyEqualTest {
         assertThat(SemanticallyEqual.areEqual(firstIdent, thirdIdent)).isFalse
     }
 
+    @Suppress("rawtypes")
     @Test
     fun fieldAccessEquality() {
         val cus = parseSources(arrayOf(
@@ -631,7 +633,8 @@ interface SemanticallyEqualTest {
     fun compilationUnit() {
         val originalCu = parseSources(arrayOf(
             """
-                package foo;
+                package foo.bar;
+                
                 import java.util.ArrayList;
                 import java.util.List;
                 
@@ -642,7 +645,8 @@ interface SemanticallyEqualTest {
         ))[0]
         val isEqualCu = parseSources(arrayOf(
             """
-                package foo;
+                package foo.bar;
+                
                 import java.util.ArrayList;
                 import java.util.List;
                 
@@ -653,7 +657,8 @@ interface SemanticallyEqualTest {
         ))[0]
         val notEqualCu = parseSources(arrayOf(
             """
-                package foo;
+                package foo.bar;
+                
                 import java.util.ArrayList;
                 import java.util.List;
                 
@@ -1411,30 +1416,24 @@ interface SemanticallyEqualTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1856")
     @Test
-    fun methodInvocation() {
+    fun methodInvocationAreEqual() {
         val body = parseSources(arrayOf(
             """
-                class A {
-                    public static void func0(String s) {}
-                    public static void func1(String s) {}
-                }
-            """,
-            """
-                import java.util.stream.Stream;
-
                 class Test {
-                    void original() {
-                        Stream.of("s").forEach(A::func0);
+                    void original(Object o) {
+                        method(o);
                     }
-                    void isEqual() {
-                        Stream.of("s").forEach(A::func0);
+                    void isEqual(Object o) {
+                        method(o);
                     }
-                    void notEqual() {
-                        Stream.of("s").forEach(A::func1);
+                    void notEqual(Integer o) {
+                        method(o);
                     }
+                    void method(Object o) {}
+                    void method(Integer o) {}
                 }
             """
-        ))[1].classes[0].body
+        ))[0].classes[0].body
 
         val original = ((body.statements[0] as J.MethodDeclaration)
             .body!!.statements[0] as J.MethodInvocation)
@@ -1445,6 +1444,38 @@ interface SemanticallyEqualTest {
         val notEqual = ((body.statements[2] as J.MethodDeclaration)
             .body!!.statements[0] as J.MethodInvocation)
         assertThat(SemanticallyEqual.areEqual(original, notEqual)).isFalse
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1856")
+    @Test
+    fun methodInvocationAreSemanticallyEqual() {
+        val body = parseSources(arrayOf(
+            """
+                class Test {
+                    void original(String o) {
+                        method(o);
+                    }
+                    void isEqual(Object o) {
+                        method(o);
+                    }
+                    void notEqual(Integer o) {
+                        method(o);
+                    }
+                    void method(Object o) {}
+                    void method(Integer o) {}
+                }
+            """
+        ))[0].classes[0].body
+
+        val original = ((body.statements[0] as J.MethodDeclaration)
+            .body!!.statements[0] as J.MethodInvocation)
+        val isEqual = ((body.statements[1] as J.MethodDeclaration)
+            .body!!.statements[0] as J.MethodInvocation)
+        assertThat(SemanticallyEqual.areSemanticallyEqual(original, isEqual)).isTrue
+
+        val notEqual = ((body.statements[2] as J.MethodDeclaration)
+            .body!!.statements[0] as J.MethodInvocation)
+        assertThat(SemanticallyEqual.areSemanticallyEqual(original, notEqual)).isFalse
     }
 
     @Suppress("EmptyTryBlock", "CatchMayIgnoreException")
@@ -1824,7 +1855,7 @@ interface SemanticallyEqualTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1856")
     @Test
-    fun throws() {
+    fun throwsAreEqual() {
         val body = parseSources(arrayOf(
             """
                 class A {
@@ -1847,6 +1878,33 @@ interface SemanticallyEqualTest {
 
         val notEqual = (body.statements[2] as J.MethodDeclaration).body!!.statements[0] as J.Throw
         assertThat(SemanticallyEqual.areEqual(original, notEqual)).isFalse
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1856")
+    @Test
+    fun throwsAreSemanticallyEqual() {
+        val body = parseSources(arrayOf(
+            """
+                class A {
+                    void original(IllegalStateException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                    void isEqual(IllegalArgumentException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                    void notEqual() {
+                        throw new RuntimeException();
+                    }
+                }
+            """
+        ))[0].classes[0].body
+
+        val original = (body.statements[0] as J.MethodDeclaration).body!!.statements[0] as J.Throw
+        val isEqual = (body.statements[1] as J.MethodDeclaration).body!!.statements[0] as J.Throw
+        assertThat(SemanticallyEqual.areSemanticallyEqual(original, isEqual)).isTrue
+
+        val notEqual = (body.statements[2] as J.MethodDeclaration).body!!.statements[0] as J.Throw
+        assertThat(SemanticallyEqual.areSemanticallyEqual(original, notEqual)).isFalse
     }
 
     @Suppress("EmptyTryBlock", "CatchMayIgnoreException")
@@ -1989,7 +2047,7 @@ interface SemanticallyEqualTest {
         assertThat(SemanticallyEqual.areEqual(original, notEqual)).isFalse
     }
 
-    @Suppress("PointlessBooleanExpression")
+    @Suppress("PointlessBooleanExpression", "ConstantConditions")
     @Issue("https://github.com/openrewrite/rewrite/issues/1856")
     @Test
     fun unary() {
