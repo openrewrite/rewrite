@@ -290,7 +290,6 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
         java(
             """
-                import java.util.Locale;
                 class Test {
                     String source() {
                         return null;
@@ -303,7 +302,6 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                 }
             """,
             """
-                import java.util.Locale;
                 class Test {
                     String source() {
                         return null;
