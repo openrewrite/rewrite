@@ -3,7 +3,6 @@ package org.openrewrite.java.internal.beta;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -26,7 +25,7 @@ public interface CallMatcher {
         return methodMatcher::matches;
     }
 
-    static CallMatcher from(Collection<CallMatcher> matchers) {
+    static CallMatcher fromCallMatchers(Collection<CallMatcher> matchers) {
         if (matchers.size() > 750) {
             return expression -> matchers.parallelStream().anyMatch(matcher -> matcher.matches(expression));
         } else {
@@ -34,8 +33,12 @@ public interface CallMatcher {
         }
     }
 
-    static CallMatcher from(MethodMatcher... methodMatchers) {
-        return from(Stream.of(methodMatchers).map(CallMatcher::fromMethodMatcher).collect(Collectors.toList()));
+    static CallMatcher fromCallMatchers(MethodMatcher... methodMatchers) {
+        return fromCallMatchers(Stream.of(methodMatchers).map(CallMatcher::fromMethodMatcher).collect(Collectors.toList()));
+    }
+
+    static CallMatcher fromMethodMatchers(Collection<MethodMatcher> matchers) {
+        return fromCallMatchers(matchers.stream().map(CallMatcher::fromMethodMatcher).collect(Collectors.toList()));
     }
 
     @AllArgsConstructor(access = AccessLevel.PRIVATE)

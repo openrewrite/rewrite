@@ -101,4 +101,36 @@ interface FindLocalTaintFlowTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `taint tracking through file constructor`() = rewriteRun(
+        java(
+            """
+                import java.io.File;
+                import java.net.URI;
+                class Test {
+                    String source() { return null; }
+                    void test() {
+                        String n = source();
+                        File o = new File(n);
+                        URI p = o.toURI();
+                        System.out.println(p);
+                    }
+                }
+            """,
+            """
+                import java.io.File;
+                import java.net.URI;
+                class Test {
+                    String source() { return null; }
+                    void test() {
+                        String n = /*~~>*/source();
+                        File o = /*~~>*/new File(/*~~>*/n);
+                        URI p = /*~~>*//*~~>*/o.toURI();
+                        System.out.println(/*~~>*/p);
+                    }
+                }
+            """
+        )
+    )
 }
