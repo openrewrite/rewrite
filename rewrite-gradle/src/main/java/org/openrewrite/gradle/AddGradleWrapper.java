@@ -73,7 +73,7 @@ public class AddGradleWrapper extends Recipe {
     @Override
     public Validated validate(ExecutionContext ctx) {
         if (gradleWrapper == null) {
-            org.openrewrite.ipc.http.HttpSender httpSender = GradleExecutionContextView.view(ctx).getHttpSender();
+            org.openrewrite.ipc.http.HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
             gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution, httpSender));
         }
         return gradleWrapper;

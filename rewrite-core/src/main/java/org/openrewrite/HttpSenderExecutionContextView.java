@@ -13,25 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle;
+package org.openrewrite;
 
-import org.openrewrite.DelegatingExecutionContext;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 
-public class GradleExecutionContextView extends DelegatingExecutionContext {
+public class HttpSenderExecutionContextView extends DelegatingExecutionContext {
 
-    private static final String HTTP_SENDER = "httpSender";
+    private static final String HTTP_SENDER = "org.openrewrite.httpSender";
 
-    public GradleExecutionContextView(ExecutionContext delegate) {
+    public HttpSenderExecutionContextView(ExecutionContext delegate) {
         super(delegate);
     }
 
-    public static GradleExecutionContextView view(ExecutionContext ctx) {
-        if(ctx instanceof GradleExecutionContextView) {
-            return (GradleExecutionContextView) ctx;
+    public static HttpSenderExecutionContextView view(ExecutionContext ctx) {
+        if(ctx instanceof HttpSenderExecutionContextView) {
+            return (HttpSenderExecutionContextView) ctx;
         }
-        return new GradleExecutionContextView(ctx);
+        return new HttpSenderExecutionContextView(ctx);
     }
 
     public void setHttpSender(org.openrewrite.ipc.http.HttpSender httpSender) {
