@@ -174,6 +174,57 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
+    fun isMethodTypeIsOfType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                void stringArg(String arg) {
+                    objectArg(arg);
+                }
+                void integerArg(Integer arg) {
+                    objectArg(arg);
+                }
+                void objectArg(Object arg) {}
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val methodInvocation1 = (cu.classes[0].body.statements[0] as J.MethodDeclaration)
+                .body!!.statements[0] as J.MethodInvocation
+            val methodInvocation2 = (cu.classes[0].body.statements[1] as J.MethodDeclaration)
+                .body!!.statements[0] as J.MethodInvocation
+
+            assertThat(methodInvocation1.methodType).isInstanceOf(JavaType.Method::class.java)
+            assertThat(methodInvocation2.methodType).isInstanceOf(JavaType.Method::class.java)
+            assertThat(TypeUtils.isOfType(methodInvocation1.methodType, methodInvocation2.methodType)).isTrue
+        }}
+    )
+
+    @Test
+    fun differentMethodTypeIsOfType(jp: JavaParser) = rewriteRun(
+        { spec -> spec.parser(jp) },
+        java("""
+            class Test {
+                void stringArg(String arg) {
+                    foo(arg);
+                }
+                void integerArg(Integer arg) {
+                    foo(arg);
+                }
+                void foo(Integer arg) {}
+                void foo(Object arg) {}
+            }
+        """) { s -> s.beforeRecipe { cu ->
+            val methodInvocation1 = (cu.classes[0].body.statements[0] as J.MethodDeclaration)
+                .body!!.statements[0] as J.MethodInvocation
+            val methodInvocation2 = (cu.classes[0].body.statements[1] as J.MethodDeclaration)
+                .body!!.statements[0] as J.MethodInvocation
+
+            assertThat(methodInvocation1.methodType).isInstanceOf(JavaType.Method::class.java)
+            assertThat(methodInvocation2.methodType).isInstanceOf(JavaType.Method::class.java)
+            assertThat(TypeUtils.isOfType(methodInvocation1.methodType, methodInvocation2.methodType)).isFalse
+        }}
+    )
+
+    @Test
     fun differentParameterizedTypesIsOfType(jp: JavaParser) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
@@ -190,7 +241,6 @@ interface TypeUtilsTest : RewriteTest {
             assertThat(TypeUtils.isOfType(variable1.variableType?.type, variable2.variableType?.type)).isFalse
         }}
     )
-
     @Test
     fun isGenericTypeOfType(jp: JavaParser) = rewriteRun(
         { spec -> spec.parser(jp) },
