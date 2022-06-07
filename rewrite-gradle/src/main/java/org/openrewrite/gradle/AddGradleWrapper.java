@@ -24,13 +24,11 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.text.PlainText;
 
-import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -73,10 +71,10 @@ public class AddGradleWrapper extends Recipe {
     Validated gradleWrapper;
 
     @Override
-    public Validated validate() {
+    public Validated validate(ExecutionContext ctx) {
         if (gradleWrapper == null) {
-            gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution,
-                    new HttpUrlConnectionSender(Duration.ofSeconds(3), Duration.ofSeconds(10))));
+            org.openrewrite.ipc.http.HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+            gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution, httpSender));
         }
         return gradleWrapper;
     }
@@ -97,7 +95,7 @@ public class AddGradleWrapper extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        GradleWrapper gradleWrapper = validate().getValue();
+        GradleWrapper gradleWrapper = validate(ctx).getValue();
         assert gradleWrapper != null;
 
         boolean needsGradleWrapperProperties = true;
