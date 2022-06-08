@@ -136,6 +136,11 @@ public interface G extends J {
             return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
         }
 
+        @Override
+        public Module getModule() {
+            return null;
+        }
+
         List<JRightPadded<Statement>> statements;
 
         public List<Statement> getStatements() {

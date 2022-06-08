@@ -34,6 +34,9 @@ public interface JavaSourceFile extends J {
 
     List<J.ClassDeclaration> getClasses();
 
+    @Nullable
+    J.Module getModule();
+
     Space getEof();
 
     JavaSourceFile withEof(Space eof);

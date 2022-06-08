@@ -513,6 +513,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 packageDecl == null ? null : padRight(packageDecl, sourceBefore(";")),
                 convertAll(node.getImports(), this::statementDelim, this::statementDelim),
                 convertAll(node.getTypeDecls().stream().filter(JCClassDecl.class::isInstance).collect(toList())),
+                null,
                 format(source.substring(cursor))
         );
     }

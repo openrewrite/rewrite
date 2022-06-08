@@ -231,6 +231,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.Module visitModule(J.Module module, P p) {
+        return (J.Module) super.visitModule(module, p);
+    }
+
+    @Override
     public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch, P p) {
         return (J.MultiCatch) super.visitMultiCatch(multiCatch, p);
     }

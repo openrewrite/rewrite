@@ -45,7 +45,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         JavaSourceFile j = cu;
-        if (j.getPackageDeclaration() != null) {
+        if (j.getPackageDeclaration() != null || j.getModule() != null) {
             if (!j.getPrefix().getComments().isEmpty()) {
                 j = j.withComments(ListUtils.mapLast(j.getComments(), c -> {
                     String suffix = keepMaximumLines(c.getSuffix(), style.getKeepMaximum().getBetweenHeaderAndPackage());
@@ -61,7 +61,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        if (j.getPackageDeclaration() == null) {
+        if (j.getPackageDeclaration() == null && j.getModule() == null) {
             if (j.getComments().isEmpty()) {
                 /*
                 if package decl and comments are null/empty, leading whitespace is on the

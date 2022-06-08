@@ -454,6 +454,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             p.append(";");
         }
         visit(cu.getClasses(), p);
+        visit(cu.getModule(), p);
         visitSpace(cu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         return cu;
     }
@@ -713,6 +714,80 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(method.getName(), p);
         visitContainer("(", method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
         return method;
+    }
+
+    @Override
+    public J visitModule(J.Module module, PrintOutputCapture<P> p) {
+        visitMarkers(module.getMarkers(), p);
+        p.append("module");
+        visitFieldAccess(module.getName(), p);
+        visitSpace(module.getPrefix(), Space.Location.MODULE_DIRECTIVE_PREFIX, p);
+        p.append("{");
+        for (Directive directive : module.getDirectives()) {
+            visit(directive, p);
+        }
+        visitSpace(module.getEnd(), Space.Location.BLOCK_END, p);
+        p.append("}");
+        return module;
+    }
+
+    @Override
+    public J visitRequires(Requires requires, PrintOutputCapture<P> p) {
+        visitMarkers(requires.getMarkers(), p);
+        visitSpace(requires.getPrefix(), Space.Location.MODULE_DIRECTIVE_PREFIX, p);
+        p.append("requires");
+        visit(requires.getModuleName(), p);
+        p.append(';');
+        return requires;
+    }
+
+    @Override
+    public J visitExports(Exports exports, PrintOutputCapture<P> p) {
+        visitMarkers(exports.getMarkers(), p);
+        visitSpace(exports.getPrefix(), Space.Location.STATEMENT_PREFIX, p);
+        p.append("exports");
+        visit(exports.getPackageName(), p);
+        if (exports.getModuleNames() != null && !exports.getModuleNames().isEmpty()) {
+            visitContainer("to", exports.getPadding().getModuleNames(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", null, p);
+        }
+        p.append(';');
+        return exports;
+    }
+
+    @Override
+    public J visitOpens(Opens opens, PrintOutputCapture<P> p) {
+        visitMarkers(opens.getMarkers(), p);
+        visitSpace(opens.getPrefix(), Space.Location.STATEMENT_PREFIX, p);
+        p.append("opens");
+        visit(opens.getPackageName(), p);
+        if (opens.getModuleNames() != null && !opens.getModuleNames().isEmpty()) {
+            visitContainer("to", opens.getPadding().getModuleNames(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", null, p);
+        }
+        p.append(';');
+        return opens;
+    }
+
+    @Override
+    public J visitProvides(Provides provides, PrintOutputCapture<P> p) {
+        visitMarkers(provides.getMarkers(), p);
+        visitSpace(provides.getPrefix(), Space.Location.STATEMENT_PREFIX, p);
+        p.append("provides");
+        visit(provides.getServiceName(), p);
+        if (provides.getImplementationNames() != null && !provides.getImplementationNames().getBefore().isEmpty()) {
+            visitContainer("with", provides.getPadding().getImplementationNames(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", null, p);
+        }
+        p.append(';');
+        return provides;
+    }
+
+    @Override
+    public J visitUses(Uses uses, PrintOutputCapture<P> p) {
+        visitMarkers(uses.getMarkers(), p);
+        visitSpace(uses.getPrefix(), Space.Location.STATEMENT_PREFIX, p);
+        p.append("uses");
+        visit(uses.getServiceName(), p);
+        p.append(';');
+        return uses;
     }
 
     @Override

@@ -514,6 +514,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 packageDecl == null ? null : padRight(packageDecl, sourceBefore(";")),
                 convertAll(node.getImports(), this::statementDelim, this::statementDelim),
                 convertAll(node.getTypeDecls().stream().filter(JCClassDecl.class::isInstance).collect(toList())),
+                cu.getModuleDecl() != null ? convert(cu.getModuleDecl()) : null,
                 format(source.substring(cursor))
         );
     }
@@ -1462,6 +1463,82 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     /**
      * --------------
+     * Module Info
+     * --------------
+     */
+    @Override
+    public J visitModule(ModuleTree node, Space space) {
+        skip("module");
+        J.FieldAccess name = convert(node.getName());
+        Space prefix = sourceBefore("{");
+        List<J.Annotation> annotations = convertAll(node.getAnnotations());
+        J.Module.ModuleKind kind = J.Module.ModuleKind.valueOf(node.getModuleType().name());
+        List<JRightPadded<Directive>> directives = new ArrayList<>();
+        if (node.getDirectives() != null) {
+            for (Tree t : node.getDirectives()) {
+                directives.add(convert(t, this::statementDelim));
+            }
+        }
+        Space moduleEnd = sourceBefore("}");
+        return new J.Module(UUID.randomUUID(), prefix, Markers.EMPTY, annotations, kind, name, directives, moduleEnd);
+    }
+
+    @Override
+    public J visitExports(ExportsTree node, Space space) {
+        skip("exports");
+        J.FieldAccess packageName = convert(node.getPackageName());
+        JContainer<J.FieldAccess> moduleNames = null;
+        if (node.getModuleNames() != null && !node.getModuleNames().isEmpty()) {
+            moduleNames = JContainer.build(sourceBefore("to"),
+                    convertAll(node.getModuleNames(), commaDelim, noDelim), Markers.EMPTY);
+        }
+        return new J.Exports(UUID.randomUUID(), space, Markers.EMPTY, packageName, moduleNames);
+    }
+
+    @Override
+    public J visitOpens(OpensTree node, Space space) {
+        skip("opens");
+        J.FieldAccess packageName = convert(node.getPackageName());
+        JContainer<J.FieldAccess> moduleNames = null;
+        if (node.getModuleNames() != null && !node.getModuleNames().isEmpty()) {
+            moduleNames = JContainer.build(sourceBefore("to"),
+                    convertAll(node.getModuleNames(), commaDelim, noDelim), Markers.EMPTY);
+        }
+        return new J.Opens(UUID.randomUUID(), space, Markers.EMPTY, packageName, moduleNames);
+    }
+
+    @Override
+    public J visitRequires(RequiresTree node, Space space) {
+        skip("requires");
+        skip("static");
+        skip("transitive");
+        J.FieldAccess moduleName = convert(node.getModuleName());
+        return new J.Requires(UUID.randomUUID(), space, Markers.EMPTY, node.isStatic() ? J.Requires.RequiresModifier.statik : J.Requires.RequiresModifier.transitive, moduleName);
+    }
+
+
+
+    @Override
+    public J visitProvides(ProvidesTree node, Space space) {
+        skip("provides");
+        J.FieldAccess serviceName = convert(node.getServiceName());
+        JContainer<J.FieldAccess> implementationNames = null;
+        if (node.getImplementationNames() != null && !node.getImplementationNames().isEmpty()) {
+            implementationNames = JContainer.build(sourceBefore("with"),
+                    convertAll(node.getImplementationNames(), commaDelim, noDelim), Markers.EMPTY);
+        }
+        return new J.Provides(UUID.randomUUID(), space, Markers.EMPTY, serviceName, implementationNames);
+    }
+
+    @Override
+    public J visitUses(UsesTree node, Space space) {
+        skip("uses");
+        J.FieldAccess serviceName = convert(node.getServiceName());
+        return new J.Uses(UUID.randomUUID(), space, Markers.EMPTY, serviceName);
+    }
+
+    /**
+     * --------------
      * Conversion utilities
      * --------------
      */
@@ -1573,7 +1650,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 t instanceof JCThrow ||
                 t instanceof JCUnary ||
                 t instanceof JCExpressionStatement ||
-                t instanceof JCVariableDecl) {
+                t instanceof JCVariableDecl ||
+                t instanceof JCDirective) {
             return sourceBefore(";");
         }
 

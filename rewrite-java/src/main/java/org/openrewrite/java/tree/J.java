@@ -1219,6 +1219,10 @@ public interface J extends Tree {
 
         @With
         @Getter
+        Module module;
+
+        @With
+        @Getter
         Space eof;
 
         @Override
@@ -1276,7 +1280,7 @@ public interface J extends Tree {
 
             public CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
                 return t.packageDeclaration == packageDeclaration ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
-                        packageDeclaration, t.imports, t.classes, t.eof);
+                        packageDeclaration, t.imports, t.classes, t.module, t.eof);
             }
 
             @Override
@@ -1287,7 +1291,7 @@ public interface J extends Tree {
             @Override
             public CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
-                        t.packageDeclaration, imports, t.classes, t.eof);
+                        t.packageDeclaration, imports, t.classes, t.module, t.eof);
             }
         }
     }
@@ -5272,6 +5276,375 @@ public interface J extends Tree {
 
             public Wildcard withBound(@Nullable JLeftPadded<Bound> bound) {
                 return t.bound == bound ? t : new Wildcard(t.id, t.prefix, t.markers, bound, t.boundedType);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor
+    final class Module implements J {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        List<Annotation> annotations;
+
+        @With
+        @Getter
+        ModuleKind moduleType;
+
+        @With
+        @Getter
+        J.FieldAccess name;
+
+        List<JRightPadded<Directive>> directives;
+
+        @Getter
+        @With
+        Space end;
+
+        public Module withDirectives(List<Directive> directives) {
+            return getPadding().withDirectives(JRightPadded.withElements(this.directives, directives));
+        }
+
+        public List<Directive> getDirectives() {
+            return JRightPadded.getElements(directives);
+        }
+
+        public enum ModuleKind {
+            OPEN,
+            STRONG
+        }
+
+        public Padding getPadding() {
+            Module.Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Module t;
+
+            public Module withDirectives(@Nullable List<JRightPadded<Directive>> directives) {
+                return t.directives == directives ? t : new Module(t.id, t.prefix, t.markers, t.annotations,
+                        t.moduleType, t.name, directives, t.end);
+            }
+
+
+            public List<JRightPadded<Directive>> getDirectives() {
+                return t.directives;
+            }
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitModule(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class Requires implements Directive {
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        RequiresModifier modifier;
+
+        @With
+        @Getter
+        J.FieldAccess moduleName;
+        public enum RequiresModifier {
+            transitive,
+            statik
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitRequires(this, p);
+        }
+
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor
+    final class Exports implements Directive {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        J.FieldAccess packageName;
+
+        @Nullable
+        JContainer<J.FieldAccess> moduleNames;
+
+        public List<J.FieldAccess> getModuleNames() {
+            return moduleNames != null ? moduleNames.getElements() : null;
+        }
+
+        public Exports withModuleNames(List<FieldAccess> moduleNames) {
+            return getPadding().withModuleNames(moduleNames != null ? JContainer.withElements(this.moduleNames, moduleNames) : null);
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitExports(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Exports t;
+
+            public JContainer<FieldAccess> getModuleNames() {
+                return t.moduleNames;
+            }
+            public Exports withModuleNames(JContainer<FieldAccess> moduleNames) {
+                return t.moduleNames == moduleNames ? t : new Exports(t.id, t.prefix, t.markers, t.packageName, moduleNames);
+            }
+        }
+
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor
+    final class Opens implements Directive {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        J.FieldAccess packageName;
+
+        @Nullable
+        JContainer<J.FieldAccess> moduleNames;
+
+        @Nullable
+        public List<J.FieldAccess> getModuleNames() {
+            return moduleNames != null ? moduleNames.getElements() : null;
+        }
+
+        public Opens withModuleNames(List<FieldAccess> moduleNames) {
+            return getPadding().withModuleNames(moduleNames != null ? JContainer.withElements(this.moduleNames, moduleNames) : null);
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitOpens(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Opens t;
+
+            public JContainer<FieldAccess> getModuleNames() {
+                return t.moduleNames;
+            }
+            public Opens withModuleNames(JContainer<FieldAccess> moduleNames) {
+                return t.moduleNames == moduleNames ? t : new Opens(t.id, t.prefix, t.markers, t.packageName, moduleNames);
+            }
+        }
+
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class Uses implements Directive {
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        J.FieldAccess serviceName;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitUses(this, p);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor
+    final class Provides implements Directive {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        J.FieldAccess serviceName;
+
+        @With
+        @Getter
+        JContainer<J.FieldAccess> implementationNames;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitProvides(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Provides t;
+
+            public JContainer<FieldAccess> getImplementationNames() {
+                return t.implementationNames;
+            }
+            public Provides withImplementationNames(JContainer<FieldAccess> implementationNames) {
+                return t.implementationNames == implementationNames ? t : new Provides(t.id, t.prefix, t.markers, t.serviceName, implementationNames);
             }
         }
     }

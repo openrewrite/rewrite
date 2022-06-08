@@ -16,6 +16,7 @@
 package org.openrewrite.java.format
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -51,6 +52,37 @@ interface BlankLinesTest : JavaRecipeTest {
                 }
             }
         """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1895")
+    @Test
+    fun handleModuleFile2(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        recipe = AutoFormat(),
+        parser = jp.styles(blankLines()).build(),
+        before = """
+            module com.example.application{
+                requires spring.boot;
+                requires spring.boot.autoconfigure;
+                requires spring.web;
+            
+                opens com.example.app to spring.core;
+            
+                exports com.example.app;
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1895")
+    @Test
+    fun handlePackageInfo(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        recipe = BlankLines(),
+        parser = jp.styles(blankLines()).build(),
+        before = """
+            @NonNullApi
+            package org.openrewrite.java.cleanup;
+            
+            import org.openrewrite.internal.lang.NonNullApi;
+        """
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/620")

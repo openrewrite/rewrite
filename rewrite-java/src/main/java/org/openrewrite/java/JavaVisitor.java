@@ -469,8 +469,57 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         c = c.getPadding().withImports(ListUtils.map(c.getPadding().getImports(), t -> visitRightPadded(t, JRightPadded.Location.IMPORT, p)));
         c = c.withClasses(ListUtils.map(c.getClasses(), e -> visitAndCast(e, p)));
+        c = c.withModule(visitAndCast(c.getModule(), p));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
         return c;
+    }
+
+    public J visitModule(J.Module module, P p) {
+        J.Module m = module;
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> visitAndCast(a, p)));
+        m = m.withName(visitAndCast(m.getName(), p));
+        m = m.getPadding().withDirectives(ListUtils.map(m.getPadding().getDirectives(), d -> visitRightPadded(d, JRightPadded.Location.BLOCK_STATEMENT, p)));
+        return m;
+    }
+
+    public J visitProvides(J.Provides provides, P p) {
+        J.Provides pvd = provides;
+        pvd = pvd.withMarkers(visitMarkers(pvd.getMarkers(), p));
+        pvd = pvd.withServiceName(visitAndCast(pvd.getServiceName(), p));
+        return pvd;
+    }
+
+    public J visitUses(J.Uses uses, P p) {
+        J.Uses us = uses;
+        us = us.withMarkers(visitMarkers(us.getMarkers(), p));
+        us = us.withServiceName(visitAndCast(us.getServiceName(), p));
+        return us;
+    }
+
+    public J visitExports(J.Exports exports, P p) {
+        J.Exports me = exports;
+        me = me.withMarkers(visitMarkers(me.getMarkers(), p));
+        me = me.withPackageName(visitAndCast(me.getPackageName(), p));
+        me = me.withModuleNames(ListUtils.map(me.getModuleNames(), mn -> visitAndCast(mn, p)));
+        return me;
+    }
+
+    public J visitRequires(J.Requires requires, P p) {
+        J.Requires mr = requires;
+        mr = mr.withMarkers(visitMarkers(mr.getMarkers(), p));
+        mr = mr.withModuleName(visitAndCast(mr.getModuleName(), p));
+        return mr;
+    }
+
+    public J visitOpens(J.Opens opens, P p) {
+        J.Opens mo = opens;
+        mo = mo.withMarkers(visitMarkers(mo.getMarkers(), p));
+        mo = mo.withPackageName(visitAndCast(mo.getPackageName(), p));
+        if (mo.getModuleNames() != null) {
+            mo = mo.withModuleNames(ListUtils.map(mo.getModuleNames(), mn -> visitAndCast(mn, p)));
+        }
+        return mo;
     }
 
     public J visitContinue(J.Continue continueStatement, P p) {
