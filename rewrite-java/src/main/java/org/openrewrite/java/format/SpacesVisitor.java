@@ -302,6 +302,28 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch, P p) {
+        J.MultiCatch mc = super.visitMultiCatch(multiCatch, p);
+        final int argsSize = mc.getAlternatives().size();
+        mc = mc.getPadding().withAlternatives(
+                ListUtils.map(mc.getPadding().getAlternatives(),
+                        (index, arg) -> {
+                            if (index > 0) {
+                                arg = arg.withElement(
+                                        spaceBefore(arg.getElement(), style.getAroundOperators().getBitwise())
+                                );
+                            }
+                            if (index != argsSize - 1) {
+                                arg = spaceAfter(arg, style.getAroundOperators().getBitwise());
+                            }
+                            return arg;
+                        }
+                )
+        );
+        return mc;
+    }
+
+    @Override
     public J.If visitIf(J.If iff, P p) {
         J.If i = super.visitIf(iff, p);
         i = i.withIfCondition(spaceBefore(i.getIfCondition(), style.getBeforeParentheses().getIfParentheses()));

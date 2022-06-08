@@ -1758,6 +1758,68 @@ interface SpacesTest : JavaRecipeTest {
             """
     )
 
+        @Suppress("CatchMayIgnoreException", "EmptyTryBlock")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1896")
+    @Test
+    fun aroundExceptionDelimiterFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
+        parser = jp.styles(
+            namedStyles(listOf(IntelliJ.spaces().run {
+                withAroundOperators(aroundOperators.run {
+                    withBitwise(false)
+                })
+            }))
+        ).build(),
+        before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (IllegalAccessException | IllegalStateException | IllegalArgumentException e) {
+                        }
+                    }
+                }
+            """,
+        after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (IllegalAccessException|IllegalStateException|IllegalArgumentException e) {
+                        }
+                    }
+                }
+            """
+    )
+
+    @Suppress("CatchMayIgnoreException", "EmptyTryBlock")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1896")
+    @Test
+    fun aroundExceptionDelimiterTrue(jp: JavaParser.Builder<*, *>) = assertChanged(
+        parser = jp.styles(
+            namedStyles(listOf(IntelliJ.spaces().run {
+                withAroundOperators(aroundOperators.run {
+                    withBitwise(true)
+                })
+            }))
+        ).build(),
+        before = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (IllegalAccessException|IllegalStateException|IllegalArgumentException e) {
+                        }
+                    }
+                }
+            """,
+        after = """
+                class Test {
+                    public void foo() {
+                        try {
+                        } catch (IllegalAccessException | IllegalStateException | IllegalArgumentException e) {
+                        }
+                    }
+                }
+            """
+    )
+
     @Test
     fun beforeLeftBraceFinallyLeftBraceFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
             parser = jp.styles(
