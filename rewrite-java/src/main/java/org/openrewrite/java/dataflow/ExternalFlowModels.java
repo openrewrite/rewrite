@@ -25,11 +25,9 @@ import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.net.URI;
 import java.util.*;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 
@@ -160,7 +158,6 @@ class ExternalFlowModels {
 
         private List<AdditionalFlowStepPredicate> optimize(Collection<FlowModel> models) {
             Map<Integer, List<FlowModel>> flowFromArgumentIndexToReturn = new HashMap<>();
-            long start = System.currentTimeMillis();
             models.forEach(model -> {
                 Matcher argumentMatcher = ARGUMENT_MATCHER.matcher(model.input);
 
@@ -349,30 +346,6 @@ class ExternalFlowModels {
                     "\"" + kind + "\"" +
                     ")";
         }
-
-        static FlowModel from(
-                String namespace,
-                String type,
-                boolean subtypes,
-                String name,
-                String signature,
-                String ext,
-                String input,
-                String output,
-                String kind
-        ) {
-            return new FlowModel(
-                    namespace,
-                    type,
-                    subtypes,
-                    name,
-                    signature,
-                    ext,
-                    input,
-                    output,
-                    kind
-            );
-        }
     }
 
     private static class Loader {
@@ -381,22 +354,8 @@ class ExternalFlowModels {
             return new Loader();
         }
 
-
-        private String dumpToStringSource(FullyQualifiedNameToFlowModels fullyQualifiedNameToFlowModels) {
-            return Stream
-                    .concat(
-                            fullyQualifiedNameToFlowModels.value.values().stream(),
-                            fullyQualifiedNameToFlowModels.taint.values().stream()
-                    ).map(Loader::dumpToStringSource)
-                    .collect(Collectors.joining(",\n"));
-        }
-
-        private static String dumpToStringSource(List<FlowModel> flowModels) {
-            return flowModels.stream().map(FlowModel::toConstructorSource).collect(Collectors.joining(",\n"));
-        }
-
         FullyQualifiedNameToFlowModels load() {
-            return timeItReturning("Loading File from Classpath", () -> loadModelFromFile());
+            return loadModelFromFile();
         }
 
         private FullyQualifiedNameToFlowModels loadModelFromFile() {
@@ -442,14 +401,5 @@ class ExternalFlowModels {
             }
         }
         return new FullyQualifiedNameToFlowModels(value, taint);
-    }
-
-    private static <T> T timeItReturning(String what, Supplier<T> timed) {
-        System.out.println("Starting " + what);
-        long start = System.currentTimeMillis();
-        T result = timed.get();
-        long end = System.currentTimeMillis();
-        System.out.println(what + " took " + (end - start) + "ms");
-        return result;
     }
 }
