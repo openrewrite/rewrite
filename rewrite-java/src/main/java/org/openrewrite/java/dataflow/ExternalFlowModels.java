@@ -33,6 +33,9 @@ import java.util.stream.Stream;
 
 import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 
+/**
+ * Loads and stores models from the `model.csv` file to be used for data flow and taint tracking analysis.
+ */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 class ExternalFlowModels {
     private static final String CURSOR_MESSAGE_KEY = "OPTIMIZED_FLOW_MODELS";
@@ -148,10 +151,10 @@ class ExternalFlowModels {
             if (argumentIndex == -1) {
                 // Argument[-1] is the 'select' or 'qualifier' of a method call
                 return (startExpression, startCursor, endExpression, endCursor) ->
-                        callMatcher.advanced().isSelect(startExpression, startCursor);
+                        callMatcher.advanced().isSelect(startCursor);
             } else {
                 return (startExpression, startCursor, endExpression, endCursor) ->
-                        callMatcher.advanced().isParameter(startExpression, startCursor, argumentIndex);
+                        callMatcher.advanced().isParameter(startCursor, argumentIndex);
             }
         }
 
@@ -298,11 +301,11 @@ class ExternalFlowModels {
             Matcher argumentMatcher = ARGUMENT_MATCHER.matcher(input);
             if ("Argument[-1]".equals(input) && "ReturnValue".equals(output)) {
                 return (startExpression, startCursor, endExpression, endCursor) ->
-                        matcher.advanced().isSelect(startExpression, startCursor);
+                        matcher.advanced().isSelect(startCursor);
             } else if (argumentMatcher.matches() && "ReturnValue".equals(output)) {
                 int argumentIndex = Integer.parseInt(argumentMatcher.group(1));
                 return (startExpression, startCursor, endExpression, endCursor) ->
-                        matcher.advanced().isParameter(startExpression, startCursor, argumentIndex);
+                        matcher.advanced().isParameter(startCursor, argumentIndex);
             }
 
             return (startExpression, startCursor, endExpression, endCursor) -> false;

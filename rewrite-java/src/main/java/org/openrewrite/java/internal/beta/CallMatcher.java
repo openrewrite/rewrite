@@ -3,6 +3,7 @@ package org.openrewrite.java.internal.beta;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Flag;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@Incubating(since = "7.25.0")
 @FunctionalInterface
 public interface CallMatcher {
     boolean matches(Expression expression);
@@ -47,7 +49,8 @@ public interface CallMatcher {
     class AdvancedCallMatcher {
         CallMatcher matcher;
 
-        public boolean isSelect(Expression expression, Cursor cursor) {
+        public boolean isSelect(Cursor cursor) {
+            Expression expression = ensureCursorIsExpression(cursor);
             assert expression == cursor.getValue() : "expression != cursor.getValue()";
             J.MethodInvocation maybeMethodInvocation =
                     cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
@@ -56,8 +59,8 @@ public interface CallMatcher {
                     matcher.matches(maybeMethodInvocation); // Do the matcher.matches(...) last as this can be expensive
         }
 
-        public boolean isAnyArgument(Expression expression, Cursor cursor) {
-            assert expression == cursor.getValue() : "expression != cursor.getValue()";
+        public boolean isAnyArgument(Cursor cursor) {
+            Expression expression = ensureCursorIsExpression(cursor);
             J stop = cursor.dropParentUntil(v -> v instanceof J.MethodInvocation || v instanceof J.NewClass || v instanceof J.Block).getValue();
             if (stop instanceof J.Block) {
                 return false;
@@ -67,11 +70,11 @@ public interface CallMatcher {
         }
 
         public boolean isFirstParameter(Expression expression, Cursor cursor) {
-            return isParameter(expression, cursor, 0);
+            return isParameter(cursor, 0);
         }
 
-        public boolean isParameter(Expression expression, Cursor cursor, int parameterIndex) {
-            assert expression == cursor.getValue() : "expression != cursor.getValue()";
+        public boolean isParameter(Cursor cursor, int parameterIndex) {
+            Expression expression = ensureCursorIsExpression(cursor);
             J stop = cursor.dropParentUntil(v -> v instanceof J.MethodInvocation || v instanceof J.NewClass || v instanceof J.Block).getValue();
             if (stop instanceof J.Block) {
                 return false;
@@ -82,7 +85,9 @@ public interface CallMatcher {
                 return false;
             }
             if (doesMethodHaveVarargs(call)) {
-                int finalParameterIndex = getType(call).getParameterTypes().size() - 1;
+                // The varargs parameter is the last one, so we need to check if the expression is the last
+                // parameter or any further argument
+                final int finalParameterIndex = getType(call).getParameterTypes().size() - 1;
                 if (finalParameterIndex == parameterIndex) {
                     List<Expression> varargs = arguments.subList(finalParameterIndex, arguments.size());
                     return varargs.contains(expression) &&
@@ -98,25 +103,18 @@ public interface CallMatcher {
         }
 
         private static JavaType.Method getType(Expression expression) {
+            final JavaType.Method type;
             if (expression instanceof J.MethodInvocation) {
-                assert ((J.MethodInvocation) expression).getMethodType() != null;
-                return ((J.MethodInvocation) expression).getMethodType();
+                type = ((J.MethodInvocation) expression).getMethodType();
             } else if (expression instanceof J.NewClass) {
-                assert ((J.NewClass) expression).getConstructorType() != null;
-                return ((J.NewClass) expression).getConstructorType();
+                type = ((J.NewClass) expression).getConstructorType();
             } else {
-                throw new IllegalArgumentException("expression is not a method invocation or new class");
+                throw new IllegalArgumentException("Expression is not a method invocation or new class");
             }
-        }
-
-        public static String getName(Expression e) {
-            if (e instanceof J.MethodInvocation) {
-                J.MethodInvocation m = (J.MethodInvocation) e;
-                return m.getSimpleName();
-            } else {
-                J.NewClass c = (J.NewClass) e;
-                return c.getConstructorType().getName();
+            if (type == null) {
+                throw new IllegalArgumentException("Type information is missing for " + expression);
             }
+            return type;
         }
 
         private static List<Expression> getCallArguments(Expression call) {
@@ -127,6 +125,14 @@ public interface CallMatcher {
                 return arguments == null ? Collections.emptyList() : arguments;
             } else {
                 throw new IllegalArgumentException("Unknown call type: " + call.getClass());
+            }
+        }
+
+        private static Expression ensureCursorIsExpression(Cursor cursor) {
+            if (cursor.getValue() instanceof Expression) {
+                return cursor.getValue();
+            } else {
+                throw new IllegalArgumentException("Cursor is not an expression");
             }
         }
     }
