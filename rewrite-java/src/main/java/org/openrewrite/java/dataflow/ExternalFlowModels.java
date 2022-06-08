@@ -33,7 +33,7 @@ import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 class ExternalFlowModels {
     private static final String CURSOR_MESSAGE_KEY = "OPTIMIZED_FLOW_MODELS";
-    private static final Pattern ARGUMENT_MATCHER = Pattern.compile("Argument\\[(-?\\d+)\\]");
+    private static final Pattern ARGUMENT_MATCHER = Pattern.compile("Argument\\[(-?\\d+)\\.?\\.?(\\d+)?\\]");
     private static final ExternalFlowModels instance = new ExternalFlowModels();
 
     public static ExternalFlowModels instance() {
@@ -148,7 +148,7 @@ class ExternalFlowModels {
                         callMatcher.advanced().isSelect(startExpression, startCursor);
             } else {
                 return (startExpression, startCursor, endExpression, endCursor) ->
-                        callMatcher.advanced().isArgument(startExpression, startCursor, argumentIndex);
+                        callMatcher.advanced().isParameter(startExpression, startCursor, argumentIndex);
             }
         }
 
@@ -157,10 +157,21 @@ class ExternalFlowModels {
 
             models.forEach(model -> {
                 Matcher argumentMatcher = ARGUMENT_MATCHER.matcher(model.input);
+
                 if (argumentMatcher.matches() && ("ReturnValue".equals(model.output) || model.isConstructor())) {
-                    int argumentIndex = Integer.parseInt(argumentMatcher.group(1));
-                    flowFromArgumentIndexToReturn.computeIfAbsent(argumentIndex, k -> new ArrayList<>())
+                    int argumentIndexStart = Integer.parseInt(argumentMatcher.group(1));
+                    flowFromArgumentIndexToReturn.computeIfAbsent(argumentIndexStart, k -> new ArrayList<>())
                             .add(model);
+                    // argumentMatcher.group(2) is null for Argument[x] since ARGUMENT_MATCHER matches Argument[x] and
+                    // Argument[x..y], and so the null check below ensures that no exception is thrown when Argument[x]
+                    // is matched
+                    if (argumentMatcher.group(2) != null) {
+                        int argumentIndexEnd = Integer.parseInt(argumentMatcher.group(2));
+                        for (int i = argumentIndexStart + 1; i <= argumentIndexEnd; i++) {
+                            flowFromArgumentIndexToReturn.computeIfAbsent(i, k -> new ArrayList<>())
+                                    .add(model);
+                        }
+                    }
                 }
             });
 
@@ -282,7 +293,7 @@ class ExternalFlowModels {
             } else if (argumentMatcher.matches() && "ReturnValue".equals(output)) {
                 int argumentIndex = Integer.parseInt(argumentMatcher.group(1));
                 return (startExpression, startCursor, endExpression, endCursor) ->
-                        matcher.advanced().isArgument(startExpression, startCursor, argumentIndex);
+                        matcher.advanced().isParameter(startExpression, startCursor, argumentIndex);
             }
 
             return (startExpression, startCursor, endExpression, endCursor) -> false;

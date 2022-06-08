@@ -5,7 +5,9 @@ import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -64,11 +66,11 @@ public interface CallMatcher {
             return getCallArguments(call).contains(expression) && matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
         }
 
-        public boolean isFirstArgument(Expression expression, Cursor cursor) {
-            return isArgument(expression, cursor, 0);
+        public boolean isFirstParameter(Expression expression, Cursor cursor) {
+            return isParameter(expression, cursor, 0);
         }
 
-        public boolean isArgument(Expression expression, Cursor cursor, int argumentIndex) {
+        public boolean isParameter(Expression expression, Cursor cursor, int parameterIndex) {
             assert expression == cursor.getValue() : "expression != cursor.getValue()";
             J stop = cursor.dropParentUntil(v -> v instanceof J.MethodInvocation || v instanceof J.NewClass || v instanceof J.Block).getValue();
             if (stop instanceof J.Block) {
@@ -76,9 +78,45 @@ public interface CallMatcher {
             }
             Expression call = (Expression) stop;
             List<Expression> arguments = getCallArguments(call);
-            return  arguments.size() > argumentIndex &&
-                    arguments.get(argumentIndex) == expression &&
+            if (parameterIndex >= arguments.size()) {
+                return false;
+            }
+            if (doesMethodHaveVarargs(call)) {
+                int finalParameterIndex = getType(call).getParameterTypes().size() - 1;
+                if (finalParameterIndex == parameterIndex) {
+                    List<Expression> varargs = arguments.subList(finalParameterIndex, arguments.size());
+                    return varargs.contains(expression) &&
+                            matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
+                }
+            }
+            return arguments.get(parameterIndex) == expression &&
                     matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
+        }
+
+        private static boolean doesMethodHaveVarargs(Expression expression) {
+            return getType(expression).hasFlags(Flag.Varargs);
+        }
+
+        private static JavaType.Method getType(Expression expression) {
+            if (expression instanceof J.MethodInvocation) {
+                assert ((J.MethodInvocation) expression).getMethodType() != null;
+                return ((J.MethodInvocation) expression).getMethodType();
+            } else if (expression instanceof J.NewClass) {
+                assert ((J.NewClass) expression).getConstructorType() != null;
+                return ((J.NewClass) expression).getConstructorType();
+            } else {
+                throw new IllegalArgumentException("expression is not a method invocation or new class");
+            }
+        }
+
+        public static String getName(Expression e) {
+            if (e instanceof J.MethodInvocation) {
+                J.MethodInvocation m = (J.MethodInvocation) e;
+                return m.getSimpleName();
+            } else {
+                J.NewClass c = (J.NewClass) e;
+                return c.getConstructorType().getName();
+            }
         }
 
         private static List<Expression> getCallArguments(Expression call) {

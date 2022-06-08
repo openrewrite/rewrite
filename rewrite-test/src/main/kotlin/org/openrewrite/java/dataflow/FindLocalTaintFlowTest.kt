@@ -133,4 +133,34 @@ interface FindLocalTaintFlowTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `taint tracking through String join`() = rewriteRun(
+            java(
+                """
+                class Test {
+                    String source() { return null; }
+                    void test() {
+                        String n = source();
+                        String o = String.join(", ", n);
+                        String p = String.join(o, ", ");
+                        String q = String.join(" ", "hello", p);
+                        System.out.println(q);
+                    }
+                }
+                """,
+            """
+                class Test {
+                    String source() { return null; }
+                    void test() {
+                        String n = /*~~>*/source();
+                        String o = /*~~>*/String.join(", ", /*~~>*/n);
+                        String p = /*~~>*/String.join(/*~~>*/o, ", ");
+                        String q = /*~~>*/String.join(" ", "hello", /*~~>*/p);
+                        System.out.println(/*~~>*/q);
+                    }
+                }
+                """
+            )
+    )
 }
