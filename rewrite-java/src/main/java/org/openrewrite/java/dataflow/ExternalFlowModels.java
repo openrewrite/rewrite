@@ -17,6 +17,7 @@ import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.internal.beta.CallMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,9 +25,11 @@ import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
 import java.net.URI;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 
@@ -45,12 +48,12 @@ class ExternalFlowModels {
     private FullyQualifiedNameToFlowModels getFullyQualifiedNameToFlowModels() {
         FullyQualifiedNameToFlowModels f;
         if (this.fullyQualifiedNameToFlowModels == null) {
-            f = Loader.create().loadModel();
+            f = Loader.create().load();
             this.fullyQualifiedNameToFlowModels = new WeakReference<>(f);
         } else {
             f = this.fullyQualifiedNameToFlowModels.get();
             if (f == null) {
-                f = Loader.create().loadModel();
+                f = Loader.create().load();
                 this.fullyQualifiedNameToFlowModels = new WeakReference<>(f);
             }
         }
@@ -152,9 +155,9 @@ class ExternalFlowModels {
             }
         }
 
-        private List<AdditionalFlowStepPredicate> optimize(List<FlowModel> models) {
+        private List<AdditionalFlowStepPredicate> optimize(Collection<FlowModel> models) {
             Map<Integer, List<FlowModel>> flowFromArgumentIndexToReturn = new HashMap<>();
-
+            long start = System.currentTimeMillis();
             models.forEach(model -> {
                 Matcher argumentMatcher = ARGUMENT_MATCHER.matcher(model.input);
 
@@ -199,8 +202,8 @@ class ExternalFlowModels {
 
     @AllArgsConstructor
     static class FlowModels {
-        List<FlowModel> value;
-        List<FlowModel> taint;
+        Set<FlowModel> value;
+        Set<FlowModel> taint;
     }
 
     @AllArgsConstructor
@@ -219,9 +222,9 @@ class ExternalFlowModels {
                 return this;
             }
             Map<String, List<FlowModel>> value = new HashMap<>(this.value);
-            other.value.forEach((k, v) -> value.computeIfAbsent(k, kk -> new ArrayList<>()).addAll(v));
+            other.value.forEach((k, v) -> value.computeIfAbsent(k, kk -> new ArrayList<>(v.size())).addAll(v));
             Map<String, List<FlowModel>> taint = new HashMap<>(this.taint);
-            other.taint.forEach((k, v) -> taint.computeIfAbsent(k, kk -> new ArrayList<>()).addAll(v));
+            other.taint.forEach((k, v) -> taint.computeIfAbsent(k, kk -> new ArrayList<>(v.size())).addAll(v));
             return new FullyQualifiedNameToFlowModels(value, taint);
         }
 
@@ -232,18 +235,24 @@ class ExternalFlowModels {
          * for method signatures that aren't even present in {@link J.CompilationUnit}.
          */
         FlowModels forTypesInUse(TypesInUse typesInUse) {
-            List<FlowModel> value = new ArrayList<>();
-            List<FlowModel> taint = new ArrayList<>();
-            typesInUse.getUsedMethods().forEach(method -> {
-                value.addAll(this.value.getOrDefault(
-                        method.getDeclaringType().getFullyQualifiedName(),
-                        Collections.emptyList()
-                ));
-                taint.addAll(this.taint.getOrDefault(
-                        method.getDeclaringType().getFullyQualifiedName(),
-                        Collections.emptyList()
-                ));
-            });
+            Set<FlowModel> value = new HashSet<>();
+            Set<FlowModel> taint = new HashSet<>();
+            typesInUse
+                    .getUsedMethods()
+                    .stream()
+                    .map(JavaType.Method::getDeclaringType)
+                    .map(JavaType.FullyQualified::getFullyQualifiedName)
+                    .distinct()
+                    .forEach(fqn -> {
+                        value.addAll(this.value.getOrDefault(
+                                fqn,
+                                Collections.emptyList()
+                        ));
+                        taint.addAll(this.taint.getOrDefault(
+                                fqn,
+                                Collections.emptyList()
+                        ));
+                    });
             return new FlowModels(
                     value,
                     taint
@@ -256,7 +265,7 @@ class ExternalFlowModels {
     }
 
     @AllArgsConstructor
-    private static class FlowModel {
+    static class FlowModel {
         // namespace, type, subtypes, name, signature, ext, input, output, kind
         String namespace;
         String type;
@@ -323,6 +332,44 @@ class ExternalFlowModels {
             final String signature;
             final boolean matchOverrides;
         }
+
+        String toConstructorSource() {
+            return "ExternalFlowModels.FlowModel.from(" +
+                    "\"" + namespace + "\", " +
+                    "\"" + type + "\", " +
+                    subtypes + ", " +
+                    "\"" + name + "\", " +
+                    "\"" + signature + "\", " +
+                    "\"" + ext + "\", " +
+                    "\"" + input + "\", " +
+                    "\"" + output + "\", " +
+                    "\"" + kind + "\"" +
+                    ")";
+        }
+
+        static FlowModel from(
+                String namespace,
+                String type,
+                boolean subtypes,
+                String name,
+                String signature,
+                String ext,
+                String input,
+                String output,
+                String kind
+        ) {
+            return new FlowModel(
+                    namespace,
+                    type,
+                    subtypes,
+                    name,
+                    signature,
+                    ext,
+                    input,
+                    output,
+                    kind
+            );
+        }
     }
 
     private static class Loader {
@@ -331,7 +378,25 @@ class ExternalFlowModels {
             return new Loader();
         }
 
-        FullyQualifiedNameToFlowModels loadModel() {
+
+        private String dumpToStringSource(FullyQualifiedNameToFlowModels fullyQualifiedNameToFlowModels) {
+            return Stream
+                    .concat(
+                            fullyQualifiedNameToFlowModels.value.values().stream(),
+                            fullyQualifiedNameToFlowModels.taint.values().stream()
+                    ).map(Loader::dumpToStringSource)
+                    .collect(Collectors.joining(",\n"));
+        }
+
+        private static String dumpToStringSource(List<FlowModel> flowModels) {
+            return flowModels.stream().map(FlowModel::toConstructorSource).collect(Collectors.joining(",\n"));
+        }
+
+        FullyQualifiedNameToFlowModels load() {
+            return timeItReturning("Loading File from Classpath", () -> loadModelFromFile());
+        }
+
+        private FullyQualifiedNameToFlowModels loadModelFromFile() {
             final FullyQualifiedNameToFlowModels[] models = {FullyQualifiedNameToFlowModels.empty()};
             try (ScanResult scanResult = new ClassGraph().acceptPaths("data-flow").enableMemoryMapping().scan()) {
                 scanResult.getResourcesWithLeafName("model.csv").forEachInputStreamIgnoringIOException((res, input) -> {
@@ -354,21 +419,34 @@ class ExternalFlowModels {
                     .withColumnSeparator(';');
             try (MappingIterator<FlowModel> iterator =
                          mapper.readerFor(FlowModel.class).with(schema).readValues(input)) {
-                Map<String, List<FlowModel>> value = new HashMap<>();
-                Map<String, List<FlowModel>> taint = new HashMap<>();
-                for (FlowModel model : (Iterable<FlowModel>) () -> iterator) {
-                    if ("value".equals(model.kind)) {
-                        value.computeIfAbsent(model.getFullyQualifiedName(), k -> new ArrayList<>()).add(model);
-                    } else if ("taint".equals(model.kind)) {
-                        taint.computeIfAbsent(model.getFullyQualifiedName(), k -> new ArrayList<>()).add(model);
-                    } else {
-                        throw new IllegalArgumentException("Unknown kind: " + model.kind + " in " + source);
-                    }
-                }
-                return new FullyQualifiedNameToFlowModels(value, taint);
+                return createFullyQualifiedNameToFlowModels(() -> iterator);
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to read values from " + source, e);
             }
         }
+    }
+
+    private static FullyQualifiedNameToFlowModels createFullyQualifiedNameToFlowModels(Iterable<FlowModel> flowModels) {
+        Map<String, List<FlowModel>> value = new HashMap<>();
+        Map<String, List<FlowModel>> taint = new HashMap<>();
+        for (FlowModel model : flowModels) {
+            if ("value".equals(model.kind)) {
+                value.computeIfAbsent(model.getFullyQualifiedName(), k -> new ArrayList<>()).add(model);
+            } else if ("taint".equals(model.kind)) {
+                taint.computeIfAbsent(model.getFullyQualifiedName(), k -> new ArrayList<>()).add(model);
+            } else {
+                throw new IllegalArgumentException("Unknown kind: " + model.kind);
+            }
+        }
+        return new FullyQualifiedNameToFlowModels(value, taint);
+    }
+
+    private static <T> T timeItReturning(String what, Supplier<T> timed) {
+        System.out.println("Starting " + what);
+        long start = System.currentTimeMillis();
+        T result = timed.get();
+        long end = System.currentTimeMillis();
+        System.out.println(what + " took " + (end - start) + "ms");
+        return result;
     }
 }
