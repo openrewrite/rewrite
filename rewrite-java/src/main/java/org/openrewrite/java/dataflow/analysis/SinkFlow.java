@@ -89,7 +89,7 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     private void recurseGetFlows(FlowGraph flowGraph, Stack<Cursor> pathToHere,
                                  List<List<Cursor>> pathsToSinks) {
         Cursor cursor = flowGraph.getCursor();
-        if (cursor.getValue() instanceof Expression && spec.isBarrierGuard(cursor.getValue())) {
+        if (cursor.getValue() instanceof Expression && spec.isBarrierGuard(cursor.getValue(), cursor)) {
             return;
         }
 

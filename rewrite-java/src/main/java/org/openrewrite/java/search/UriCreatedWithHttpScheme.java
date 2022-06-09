@@ -57,7 +57,7 @@ public class UriCreatedWithHttpScheme extends Recipe {
         }
 
         @Override
-        public boolean isBarrierGuard(Expression expr) {
+        public boolean isBarrierGuard(Expression expr, Cursor cursor) {
             return STRING_REPLACE.matches(expr);
         }
     };

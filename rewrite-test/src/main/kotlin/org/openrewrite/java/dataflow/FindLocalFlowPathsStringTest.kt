@@ -24,12 +24,12 @@ import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
 @Suppress("FunctionName")
-interface FindLocalFlowPathsStringTest: RewriteTest {
+interface FindLocalFlowPathsStringTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(RewriteTest.toRecipe {
             FindLocalFlowPaths(object : LocalFlowSpec<Expression, Expression>() {
                 override fun isSource(expr: Expression, cursor: Cursor) =
-                    when(expr) {
+                    when (expr) {
                         is J.Literal -> expr.value == "42"
                         is J.MethodInvocation -> expr.name.simpleName == "source"
                         else -> false
@@ -37,6 +37,12 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
 
                 override fun isSink(expr: Expression, cursor: Cursor) =
                     true
+
+                override fun isBarrierGuard(expr: Expression, cursor: Cursor): Boolean =
+                    when (expr) {
+                        is J.MethodInvocation -> expr.name.simpleName == "guard"
+                        else -> false
+                    }
             })
         })
         spec.expectedCyclesThatMakeChanges(1).cycles(1)
@@ -264,7 +270,7 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
                     }
                 }
             """,
-        """
+            """
                 import java.util.Locale;
                 class Test {
                     String source() {
@@ -834,4 +840,152 @@ interface FindLocalFlowPathsStringTest: RewriteTest {
         )
     )
 
+    @Test
+    fun `transitive assignment from literal with with a guard`() = rewriteRun(
+        java(
+            """
+                abstract class Test {
+                    abstract boolean guard();
+
+                    void test() {
+                        String n = "42";
+                        if (guard()) {
+                            String o = n;
+                            System.out.println(o);
+                            String p = o;
+                        } else {
+                            System.out.println(n);
+                        }
+                    }
+                }
+            """,
+            """
+                abstract class Test {
+                    abstract boolean guard();
+
+                    void test() {
+                        String n = /*~~>*/"42";
+                        if (guard()) {
+                            String o = n;
+                            System.out.println(o);
+                            String p = o;
+                        } else {
+                            System.out.println(/*~~>*/n);
+                        }
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `transitive assignment from literal with with a negated guard`() = rewriteRun(
+        java(
+            """
+                abstract class Test {
+                    abstract boolean guard();
+
+                    void test() {
+                        String n = "42";
+                        if (!guard()) {
+                            String o = n;
+                            System.out.println(o);
+                            String p = o;
+                        } else {
+                            System.out.println(n);
+                        }
+                    }
+                }
+            """,
+            """
+                abstract class Test {
+                    abstract boolean guard();
+
+                    void test() {
+                        String n = /*~~>*/"42";
+                        if (!guard()) {
+                            String o = /*~~>*/n;
+                            System.out.println(/*~~>*/o);
+                            String p = /*~~>*/o;
+                        } else {
+                            System.out.println(n);
+                        }
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `a thrown exception is a guard`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    if (guard()) {
+                        throw new RuntimeException();
+                    }
+                    String o = n;
+                    System.out.println(o);
+                    String p = o;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    if (guard()) {
+                        throw new RuntimeException();
+                    }
+                    String o = n;
+                    System.out.println(o);
+                    String p = o;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    @Disabled("Too complicated to support immediately")
+    fun `a thrown exception is a guard when included in an boolean expression`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    if (guard() || guard()) {
+                        throw new RuntimeException();
+                    }
+                    String o = n;
+                    System.out.println(o);
+                    String p = o;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    if (guard() || guard()) {
+                        throw new RuntimeException();
+                    }
+                    String o = n;
+                    System.out.println(o);
+                    String p = o;
+                }
+            }
+            """
+        )
+    )
 }
