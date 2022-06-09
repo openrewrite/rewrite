@@ -69,7 +69,7 @@ public interface CallMatcher {
             return getCallArguments(call).contains(expression) && matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
         }
 
-        public boolean isFirstParameter(Expression expression, Cursor cursor) {
+        public boolean isFirstParameter(Cursor cursor) {
             return isParameter(cursor, 0);
         }
 
