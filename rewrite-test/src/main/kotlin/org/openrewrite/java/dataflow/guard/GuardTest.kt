@@ -14,17 +14,17 @@ interface GuardTest : RewriteTest {
         spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitExpression(expression: Expression, p: ExecutionContext): Expression =
-                    Guard.from(cursor)
-                        .map { expression.withMarkers<Expression>(expression.markers.searchResult()) }
-                        .orElse(expression)
+                        Guard.from(cursor)
+                                .map { expression.withMarkers<Expression>(expression.markers.searchResult()) }
+                                .orElse(expression)
             }
         })
     }
 
     @Test
     fun `identifies guards`() = rewriteRun(
-        java(
-            """
+            java(
+                    """
             abstract class Test {
                 abstract boolean boolLiteral();
                 abstract Boolean boolObject();
@@ -39,10 +39,10 @@ interface GuardTest : RewriteTest {
                 }
             }
             """,
-            """
+                    """
             abstract class Test {
-                abstract boolean boolLiteral();
-                abstract Boolean boolObject();
+                abstract /*~~>*/boolean boolLiteral();
+                abstract /*~~>*/Boolean boolObject();
 
                 void test() {
                     if (/*~~>*/boolLiteral()) {
@@ -54,6 +54,112 @@ interface GuardTest : RewriteTest {
                 }
             }
             """
-        )
+            )
+    )
+
+    @Test
+    fun `identifies guards with binary expressions`() = rewriteRun(
+            java(
+                    """
+            abstract class Test {
+                abstract boolean boolPrim();
+                abstract Boolean boolObject();
+
+                void test() {
+                    if (boolPrim()) {
+                        // ...
+                    }
+                    if (boolObject() || boolPrim()) {
+                        // ...
+                    }
+                }
+            }
+            """,
+                    """
+            abstract class Test {
+                abstract /*~~>*/boolean boolPrim();
+                abstract /*~~>*/Boolean boolObject();
+
+                void test() {
+                    if (/*~~>*/boolPrim()) {
+                        // ...
+                    }
+                    if (/*~~>*//*~~>*/boolObject() || /*~~>*/boolPrim()) {
+                        // ...
+                    }
+                }
+            }
+            """
+            )
+    )
+
+
+    @Test
+    fun `identifies guards with methods with parameters`() = rewriteRun(
+            java(
+                    """
+            abstract class Test {
+
+                void test(boolean x, Boolean y) {
+                    if (x) {
+                        // ...
+                    }
+                    if (y) {
+                        // ...
+                    }
+                }
+            }
+            """,
+                    """
+            abstract class Test {
+                void test(/*~~>*/boolean /*~~>*/x, /*~~>*/Boolean /*~~>*/y) {
+                    if (/*~~>*/x) {
+                        // ...
+                    }
+                    if (/*~~>*/y) {
+                        // ...
+                    }
+                }
+            }
+            """
+            )
+    )
+
+
+    // field accesses
+    @Test
+    fun `identifies guards with field accesses`() = rewriteRun(
+            java(
+                    """
+            abstract class Test {
+                private boolean x;
+                private Boolean y;
+
+                void test() {
+                    if (x) {
+                        // ...
+                    }
+                    if (y) {
+                        // ...
+                    }
+                }
+            }
+            """,
+                    """
+            abstract class Test {
+                private /*~~>*/boolean /*~~>*/x;
+                private /*~~>*/Boolean /*~~>*/y;
+
+                void test() {
+                    if (/*~~>*/x) {
+                        // ...
+                    }
+                    if (/*~~>*/y) {
+                        // ...
+                    }
+                }
+            }
+            """
+            )
     )
 }
