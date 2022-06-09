@@ -100,7 +100,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         for (CompiledGroovySource compiled : compilerCus) {
             try {
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
-                        compiled.getInput().getPath(),
+                        compiled.getInput().getRelativePath(relativeTo),
                         compiled.getInput().getFileAttributes(),
                         compiled.getInput().getSource(),
                         typeCache,
