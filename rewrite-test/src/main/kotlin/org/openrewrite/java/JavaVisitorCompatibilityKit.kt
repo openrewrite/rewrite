@@ -198,6 +198,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindLocalFlowPathsStringTck : FindLocalFlowPathsStringTest
 
     @Nested
+    inner class FindLocalTaintFlowTck : FindLocalTaintFlowTest
+
+    @Nested
     inner class FindMethodsTck : FindMethodsTest
 
     @Nested

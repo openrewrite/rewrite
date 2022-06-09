@@ -24,7 +24,6 @@ import org.openrewrite.java.dataflow.analysis.SourceFlow;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
-import java.util.Iterator;
 import java.util.Optional;
 
 @Incubating(since = "7.24.0")

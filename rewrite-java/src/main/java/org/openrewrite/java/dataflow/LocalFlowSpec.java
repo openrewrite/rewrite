@@ -63,6 +63,25 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
      */
     public abstract boolean isSink(Sink sink, Cursor cursor);
 
+    public final boolean isFlowStep(
+            Expression startExpression,
+            Cursor startCursor,
+            Expression endExpression,
+            Cursor endCursor
+    ) {
+        return ExternalFlowModels.instance().isAdditionalFlowStep(
+                startExpression,
+                startCursor,
+                endExpression,
+                endCursor
+        ) || isAdditionalFlowStep(
+                startExpression,
+                startCursor,
+                endExpression,
+                endCursor
+        );
+    }
+
     /**
      * takes an existing flow-step in the graph and offers a potential next flow step.
      * The method can then decide if the offered potential next flow step should be considered a valid next flow step
