@@ -32,20 +32,23 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Matcher for finding {@link J.NewClass} and {@link J.MethodInvocation} {@link Expression}s.
+ */
 @Incubating(since = "7.25.0")
 @FunctionalInterface
-public interface CallMatcher {
+public interface InvocationMatcher {
     boolean matches(Expression expression);
 
-    default AdvancedCallMatcher advanced() {
-        return new AdvancedCallMatcher(this);
+    default AdvancedInvocationMatcher advanced() {
+        return new AdvancedInvocationMatcher(this);
     }
 
-    static CallMatcher fromMethodMatcher(MethodMatcher methodMatcher) {
+    static InvocationMatcher fromMethodMatcher(MethodMatcher methodMatcher) {
         return methodMatcher::matches;
     }
 
-    static CallMatcher fromCallMatchers(Collection<CallMatcher> matchers) {
+    static InvocationMatcher fromInvocationMatchers(Collection<InvocationMatcher> matchers) {
         if (matchers.size() > 750) {
             return expression -> matchers.parallelStream().anyMatch(matcher -> matcher.matches(expression));
         } else {
@@ -53,17 +56,17 @@ public interface CallMatcher {
         }
     }
 
-    static CallMatcher fromCallMatchers(MethodMatcher... methodMatchers) {
-        return fromCallMatchers(Stream.of(methodMatchers).map(CallMatcher::fromMethodMatcher).collect(Collectors.toList()));
+    static InvocationMatcher fromInvocationMatchers(MethodMatcher... methodMatchers) {
+        return fromInvocationMatchers(Stream.of(methodMatchers).map(InvocationMatcher::fromMethodMatcher).collect(Collectors.toList()));
     }
 
-    static CallMatcher fromMethodMatchers(Collection<MethodMatcher> matchers) {
-        return fromCallMatchers(matchers.stream().map(CallMatcher::fromMethodMatcher).collect(Collectors.toList()));
+    static InvocationMatcher fromMethodMatchers(Collection<MethodMatcher> matchers) {
+        return fromInvocationMatchers(matchers.stream().map(InvocationMatcher::fromMethodMatcher).collect(Collectors.toList()));
     }
 
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class AdvancedCallMatcher {
-        CallMatcher matcher;
+    class AdvancedInvocationMatcher {
+        InvocationMatcher matcher;
 
         public boolean isSelect(Cursor cursor) {
             Expression expression = ensureCursorIsExpression(cursor);

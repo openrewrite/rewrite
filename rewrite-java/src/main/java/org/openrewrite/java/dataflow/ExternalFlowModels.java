@@ -29,7 +29,7 @@ import lombok.NoArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.TypesInUse;
-import org.openrewrite.java.dataflow.internal.CallMatcher;
+import org.openrewrite.java.dataflow.internal.InvocationMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -118,7 +118,7 @@ class ExternalFlowModels {
 
     /**
      * Dedicated optimization step that attempts to optimize the {@link AdditionalFlowStepPredicate}s
-     * and reduce the number of them by merging similar method signatures into a single {@link CallMatcher}.
+     * and reduce the number of them by merging similar method signatures into a single {@link InvocationMatcher}.
      * <p>
      * <p>
      * As an example, take the following model method signatures:
@@ -128,9 +128,9 @@ class ExternalFlowModels {
      *     <li>{@code java.lang;String;false;trim;;;Argument[-1];ReturnValue;taint}</li>
      * </ul>
      * <p>
-     * These can be merged into a single {@link CallMatcher} that matches all these methods.
+     * These can be merged into a single {@link InvocationMatcher} that matches all these methods.
      * <p>
-     * From there, a single {@link CallMatcher.AdvancedCallMatcher} can be called by the
+     * From there, a single {@link InvocationMatcher.AdvancedInvocationMatcher} can be called by the
      * {@link AdditionalFlowStepPredicate}.
      */
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -160,7 +160,7 @@ class ExternalFlowModels {
                 int argumentIndex,
                 Set<MethodMatcher> methodMatchers
         ) {
-            CallMatcher callMatcher = CallMatcher.fromMethodMatchers(methodMatchers);
+            InvocationMatcher callMatcher = InvocationMatcher.fromMethodMatchers(methodMatchers);
             if (argumentIndex == -1) {
                 // Argument[-1] is the 'select' or 'qualifier' of a method call
                 return (startExpression, startCursor, endExpression, endCursor) ->
@@ -246,7 +246,7 @@ class ExternalFlowModels {
         /**
          * Loads the subset of {@link FlowModel}s that are relevant for the given {@link TypesInUse}.
          * <p>
-         * This optimization prevents the generation of {@link AdditionalFlowStepPredicate} and {@link CallMatcher}
+         * This optimization prevents the generation of {@link AdditionalFlowStepPredicate} and {@link InvocationMatcher}
          * for method signatures that aren't even present in {@link J.CompilationUnit}.
          */
         FlowModels forTypesInUse(TypesInUse typesInUse) {
@@ -304,7 +304,7 @@ class ExternalFlowModels {
         @Deprecated
         AdditionalFlowStepPredicate asAdditionalFlowStepPredicate() {
             MethodMatcherKey key = asMethodMatcherKey();
-            CallMatcher matcher = CallMatcher.fromMethodMatcher(
+            InvocationMatcher matcher = InvocationMatcher.fromMethodMatcher(
                     new MethodMatcher(
                             key.signature,
                             key.matchOverrides
