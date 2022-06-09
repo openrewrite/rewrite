@@ -15,11 +15,6 @@
  */
 package org.openrewrite.java.dataflow;
 
-import com.fasterxml.jackson.databind.MappingIterator;
-import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
-import com.fasterxml.jackson.dataformat.csv.CsvMapper;
-import com.fasterxml.jackson.dataformat.csv.CsvSchema;
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
 import lombok.AccessLevel;
@@ -34,25 +29,19 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.lang.ref.WeakReference;
-import java.net.URI;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
-
 /**
  * Loads and stores models from the `model.csv` file to be used for data flow and taint tracking analysis.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 class ExternalFlowModels {
     private static final String CURSOR_MESSAGE_KEY = "OPTIMIZED_FLOW_MODELS";
-    private static final Pattern ARGUMENT_MATCHER = Pattern.compile("Argument\\[(-?\\d+)\\.?\\.?(\\d+)?\\]");
+    private static final Pattern ARGUMENT_MATCHER = Pattern.compile("Argument\\[(-?\\d+)\\.?\\.?(\\d+)?]");
     private static final ExternalFlowModels instance = new ExternalFlowModels();
 
     public static ExternalFlowModels instance() {
@@ -347,20 +336,6 @@ class ExternalFlowModels {
             final String signature;
             final boolean matchOverrides;
         }
-
-        String toConstructorSource() {
-            return "ExternalFlowModels.FlowModel.from(" +
-                    "\"" + namespace + "\", " +
-                    "\"" + type + "\", " +
-                    subtypes + ", " +
-                    "\"" + name + "\", " +
-                    "\"" + signature + "\", " +
-                    "\"" + ext + "\", " +
-                    "\"" + input + "\", " +
-                    "\"" + output + "\", " +
-                    "\"" + kind + "\"" +
-                    ")";
-        }
     }
 
     private static class Loader {
@@ -376,29 +351,25 @@ class ExternalFlowModels {
         private FullyQualifiedNameToFlowModels loadModelFromFile() {
             final FullyQualifiedNameToFlowModels[] models = {FullyQualifiedNameToFlowModels.empty()};
             try (ScanResult scanResult = new ClassGraph().acceptPaths("data-flow").enableMemoryMapping().scan()) {
-                scanResult.getResourcesWithLeafName("model.csv").forEachInputStreamIgnoringIOException((res, input) -> {
-                    models[0] = models[0].merge(loadCvs(input, res.getURI()));
-                });
+                scanResult.getResourcesWithLeafName("model.csv")
+                        .forEachInputStreamIgnoringIOException((res, input) -> models[0] = models[0].merge(loadCvs(input)));
             }
             return models[0];
         }
 
-        private FullyQualifiedNameToFlowModels loadCvs(InputStream input, URI source) {
-            CsvMapper mapper = CsvMapper
-                    .builder()
-                    .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
-                    .build();
-            mapper.registerModule(new ParameterNamesModule());
-            maybeAddKotlinModule(mapper);
-            CsvSchema schema = mapper
-                    .schemaFor(FlowModel.class)
-                    .withHeader()
-                    .withColumnSeparator(';');
-            try (MappingIterator<FlowModel> iterator =
-                         mapper.readerFor(FlowModel.class).with(schema).readValues(input)) {
-                return createFullyQualifiedNameToFlowModels(() -> iterator);
+        private FullyQualifiedNameToFlowModels loadCvs(InputStream input) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+            List<FlowModel> flowModels = new ArrayList<>();
+            try {
+                //noinspection UnusedAssignment skip the header line
+                String line = reader.readLine();
+                while ((line = reader.readLine()) != null) {
+                    String[] tokens = line.split(";");
+                    flowModels.add(new FlowModel(tokens[0], tokens[1], Boolean.parseBoolean(tokens[2]), tokens[3], tokens[4], tokens[5], tokens[6], tokens[7], tokens[8]));
+                }
+                return createFullyQualifiedNameToFlowModels(flowModels);
             } catch (IOException e) {
-                throw new UncheckedIOException("Failed to read values from " + source, e);
+                throw new UncheckedIOException("Unable to load data-flow models", e);
             }
         }
     }
