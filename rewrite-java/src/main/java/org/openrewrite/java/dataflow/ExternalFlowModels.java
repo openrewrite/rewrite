@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.io.*;
 import java.lang.ref.WeakReference;
+import java.net.URI;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -352,12 +353,12 @@ class ExternalFlowModels {
             final FullyQualifiedNameToFlowModels[] models = {FullyQualifiedNameToFlowModels.empty()};
             try (ScanResult scanResult = new ClassGraph().acceptPaths("data-flow").enableMemoryMapping().scan()) {
                 scanResult.getResourcesWithLeafName("model.csv")
-                        .forEachInputStreamIgnoringIOException((res, input) -> models[0] = models[0].merge(loadCvs(input)));
+                        .forEachInputStreamIgnoringIOException((res, input) -> models[0] = models[0].merge(loadCvs(input, res.getURI())));
             }
             return models[0];
         }
 
-        private FullyQualifiedNameToFlowModels loadCvs(InputStream input) {
+        private FullyQualifiedNameToFlowModels loadCvs(InputStream input, URI source) {
             BufferedReader reader = new BufferedReader(new InputStreamReader(input));
             List<FlowModel> flowModels = new ArrayList<>();
             try {
@@ -369,7 +370,7 @@ class ExternalFlowModels {
                 }
                 return createFullyQualifiedNameToFlowModels(flowModels);
             } catch (IOException e) {
-                throw new UncheckedIOException("Unable to load data-flow models", e);
+                throw new UncheckedIOException("Failed to read data-flow values from " + source, e);
             }
         }
     }
