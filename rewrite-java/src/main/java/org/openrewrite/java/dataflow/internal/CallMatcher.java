@@ -1,4 +1,19 @@
-package org.openrewrite.java.internal.beta;
+/*
+ * Copyright 2022 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.java.dataflow.internal;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -13,6 +28,7 @@ import org.openrewrite.java.tree.JavaType;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -61,12 +77,10 @@ public interface CallMatcher {
 
         public boolean isAnyArgument(Cursor cursor) {
             Expression expression = ensureCursorIsExpression(cursor);
-            J stop = cursor.dropParentUntil(v -> v instanceof J.MethodInvocation || v instanceof J.NewClass || v instanceof J.Block).getValue();
-            if (stop instanceof J.Block) {
-                return false;
-            }
-            Expression call = (Expression) stop;
-            return getCallArguments(call).contains(expression) && matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
+            return extractCallExpression(cursor).map(call -> {
+                return getCallArguments(call).contains(expression)
+                        && matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
+            }).orElse(false);
         }
 
         public boolean isFirstParameter(Cursor cursor) {
@@ -75,27 +89,24 @@ public interface CallMatcher {
 
         public boolean isParameter(Cursor cursor, int parameterIndex) {
             Expression expression = ensureCursorIsExpression(cursor);
-            J stop = cursor.dropParentUntil(v -> v instanceof J.MethodInvocation || v instanceof J.NewClass || v instanceof J.Block).getValue();
-            if (stop instanceof J.Block) {
-                return false;
-            }
-            Expression call = (Expression) stop;
-            List<Expression> arguments = getCallArguments(call);
-            if (parameterIndex >= arguments.size()) {
-                return false;
-            }
-            if (doesMethodHaveVarargs(call)) {
-                // The varargs parameter is the last one, so we need to check if the expression is the last
-                // parameter or any further argument
-                final int finalParameterIndex = getType(call).getParameterTypes().size() - 1;
-                if (finalParameterIndex == parameterIndex) {
-                    List<Expression> varargs = arguments.subList(finalParameterIndex, arguments.size());
-                    return varargs.contains(expression) &&
-                            matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
+            return extractCallExpression(cursor).map(call -> {
+                List<Expression> arguments = getCallArguments(call);
+                if (parameterIndex >= arguments.size()) {
+                    return false;
                 }
-            }
-            return arguments.get(parameterIndex) == expression &&
-                    matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
+                if (doesMethodHaveVarargs(call)) {
+                    // The varargs parameter is the last one, so we need to check if the expression is the last
+                    // parameter or any further argument
+                    final int finalParameterIndex = getType(call).getParameterTypes().size() - 1;
+                    if (finalParameterIndex == parameterIndex) {
+                        List<Expression> varargs = arguments.subList(finalParameterIndex, arguments.size());
+                        return varargs.contains(expression) &&
+                                matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
+                    }
+                }
+                return arguments.get(parameterIndex) == expression &&
+                        matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
+            }).orElse(false);
         }
 
         private static boolean doesMethodHaveVarargs(Expression expression) {
@@ -128,11 +139,19 @@ public interface CallMatcher {
             }
         }
 
+        private static Optional<Expression> extractCallExpression(Cursor cursor) {
+            J stop = cursor.dropParentUntil(v -> v instanceof J.MethodInvocation || v instanceof J.NewClass || v instanceof J.Block).getValue();
+            if (stop instanceof J.Block) {
+                return Optional.empty();
+            }
+            return Optional.of((Expression) stop);
+        }
+
         private static Expression ensureCursorIsExpression(Cursor cursor) {
             if (cursor.getValue() instanceof Expression) {
                 return cursor.getValue();
             } else {
-                throw new IllegalArgumentException("Cursor is not an expression");
+                throw new IllegalArgumentException("Cursor is not an expression. Was " + cursor.getValue().getClass());
             }
         }
     }

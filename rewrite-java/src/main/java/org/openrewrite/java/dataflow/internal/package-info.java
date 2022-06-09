@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 @NonNullApi
-package org.openrewrite.java.internal.beta;
+package org.openrewrite.java.dataflow.internal;
 
 import org.openrewrite.internal.lang.NonNullApi;
