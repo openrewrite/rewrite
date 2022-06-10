@@ -300,4 +300,68 @@ interface ControlFlowTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `if statement with && in control`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                int test() {
+                    int x = start();
+                    x++;
+                    if (x >= 1 && x <= 2) {
+                        return 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                int test() /*~~(BB: 4 CN: 2 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    if (x >= 1 && /*~~(L)~~>*/x <= 2) /*~~(L)~~>*/{
+                        return 2;
+                    }
+                    /*~~(L)~~>*/return 5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `if statement with multiple && in control`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                int test() {
+                    int x = start();
+                    x++;
+                    if (x >= 1 && x <= 5 && x == 3) {
+                        return 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                int test() /*~~(BB: 5 CN: 3 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    if (x >= 1 && /*~~(L)~~>*/x <= 5 && /*~~(L)~~>*/x == 3) /*~~(L)~~>*/{
+                        return 2;
+                    }
+                    /*~~(L)~~>*/return 5;
+                }
+            }
+            """
+        )
+    )
 }

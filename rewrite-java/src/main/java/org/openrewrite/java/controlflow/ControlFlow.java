@@ -93,6 +93,9 @@ public final class ControlFlow {
                 if (!exitFlow.isEmpty()) {
                     return (ControlFlowNode.BasicBlock) (current = current.addBasicBlock());
                 }
+                if (current instanceof ControlFlowNode.ConditionNode) {
+                    return (ControlFlowNode.BasicBlock) (current = current.addBasicBlock());
+                }
                 throw new IllegalStateException("Not in a Basic Block. Is: " + current);
             }
         }
@@ -185,6 +188,9 @@ public final class ControlFlow {
         @Override
         public J.Binary visitBinary(J.Binary binary, P p) {
             visit(binary.getLeft(), p); // First the left is invoked
+            if (J.Binary.Type.And.equals(binary.getOperator())) {
+                current = current.addConditionNode(getCursor());
+            }
             visit(binary.getRight(), p); // Then the right is invoked
             addCursorToBasicBlock(); // Add the binary node last
             if (isBranchPoint()) {
