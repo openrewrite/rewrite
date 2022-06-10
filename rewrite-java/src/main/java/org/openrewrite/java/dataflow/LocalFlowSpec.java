@@ -17,6 +17,7 @@ package org.openrewrite.java.dataflow;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.java.controlflow.Guard;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -101,7 +102,7 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
         return false;
     }
 
-    public boolean isBarrierGuard(Expression expr, Cursor cursor) {
+    public boolean isBarrierGuard(Guard guard) {
         return false;
     }
 }

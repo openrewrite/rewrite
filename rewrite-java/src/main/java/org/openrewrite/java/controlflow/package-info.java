@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 @NonNullApi
-package org.openrewrite.java.dataflow.guard;
+package org.openrewrite.java.controlflow;
 
 import org.openrewrite.internal.lang.NonNullApi;

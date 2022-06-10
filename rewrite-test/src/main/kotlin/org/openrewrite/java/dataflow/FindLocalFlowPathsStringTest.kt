@@ -18,6 +18,7 @@ package org.openrewrite.java.dataflow
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
+import org.openrewrite.java.controlflow.Guard
 import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 import org.openrewrite.test.RecipeSpec
@@ -38,10 +39,12 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                 override fun isSink(expr: Expression, cursor: Cursor) =
                     true
 
-                override fun isBarrierGuard(expr: Expression, cursor: Cursor): Boolean =
-                    when (expr) {
-                        is J.MethodInvocation -> expr.name.simpleName == "guard"
-                        else -> false
+                override fun isBarrierGuard(guard: Guard): Boolean =
+                    guard.expression.run {
+                        when (this) {
+                            is J.MethodInvocation -> this.name.simpleName == "guard"
+                            else -> false
+                        }
                     }
             })
         })

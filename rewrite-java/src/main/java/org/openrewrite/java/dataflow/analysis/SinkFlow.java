@@ -20,6 +20,7 @@ import lombok.Getter;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
+import org.openrewrite.java.controlflow.Guard;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -89,7 +90,8 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     private void recurseGetFlows(FlowGraph flowGraph, Stack<Cursor> pathToHere,
                                  List<List<Cursor>> pathsToSinks) {
         Cursor cursor = flowGraph.getCursor();
-        if (cursor.getValue() instanceof Expression && spec.isBarrierGuard(cursor.getValue(), cursor)) {
+        if (cursor.getValue() instanceof Expression &&
+                Guard.from(cursor).map(spec::isBarrierGuard).orElse(false)) {
             return;
         }
 

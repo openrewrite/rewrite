@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.J;
 import java.util.Optional;
 
 @Incubating(since = "7.24.0")
-@RequiredArgsConstructor
+@RequiredArgsConstructor(staticName = "startingAt")
 public class Dataflow {
     final Cursor start;
 
