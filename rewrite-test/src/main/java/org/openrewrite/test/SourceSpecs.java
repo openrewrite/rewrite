@@ -138,6 +138,29 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
         return gradle;
     }
 
+    default SourceSpecs xml(@Language("xml") @Nullable String before) {
+        return xml(before, s -> {
+        });
+    }
+
+    default SourceSpecs xml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
+        SourceSpec<Xml.Document> xml = new SourceSpec<>(Xml.Document.class, null, before, null);
+        spec.accept(xml);
+        return xml;
+    }
+
+    default SourceSpecs xml(@Language("xml") @Nullable String before, @Language("yml") String after) {
+        return xml(before, after, s -> {
+        });
+    }
+
+    default SourceSpecs xml(@Language("xml") @Nullable String before, @Language("yml") String after,
+                             Consumer<SourceSpec<Xml.Document>> spec) {
+        SourceSpec<Xml.Document> xml = new SourceSpec<>(Xml.Document.class, null, before, after);
+        spec.accept(xml);
+        return xml;
+    }
+
     default SourceSpecs yaml(@Language("yml") @Nullable String before) {
         return yaml(before, s -> {
         });
