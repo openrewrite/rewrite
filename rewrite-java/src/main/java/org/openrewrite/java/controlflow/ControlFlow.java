@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
@@ -197,6 +198,14 @@ public final class ControlFlow {
                 current = current.addConditionNode(getCursor());
             }
             return binary;
+        }
+
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, P p) {
+            if (isBranchPoint()) {
+                current = current.addConditionNode(getCursor());
+            }
+            return identifier;
         }
 
         boolean isBranchPoint() {

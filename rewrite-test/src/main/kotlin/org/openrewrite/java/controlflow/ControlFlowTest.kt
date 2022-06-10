@@ -364,4 +364,39 @@ interface ControlFlowTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    @Disabled("TODO: fix this test")
+    fun `if statement with && for boolean variable in control`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                int test() {
+                    int x = start();
+                    x++;
+                    boolean b = x >= 1 && x <= 5 && x == 3;
+                    if (b) {
+                        return 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                int test() /*~~(BB: 6 CN: 4 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    boolean b = x >= 1 && /*~~(L)~~>*/x <= 5;
+                    if (b) /*~~(L)~~>*/{
+                        return 2;
+                    }
+                    /*~~(L)~~>*/return 5;
+                }
+            }
+            """
+        )
+    )
 }
