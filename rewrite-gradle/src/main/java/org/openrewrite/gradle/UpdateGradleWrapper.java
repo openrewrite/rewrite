@@ -70,7 +70,11 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Override
     public Validated validate(ExecutionContext ctx) {
-        if (gradleWrapper == null) {
+        String dist = distribution != null ? distribution : DistributionType.Bin.name().toLowerCase();
+        GradleWrapper wrapper = gradleWrapper != null ? gradleWrapper.getValue() : null;
+        if (wrapper == null ||
+                !wrapper.getVersion().equals(version) ||
+                !wrapper.getDistributionType().name().toLowerCase().equals(dist)) {
             org.openrewrite.ipc.http.HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
             gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution, httpSender));
         }
@@ -119,7 +123,7 @@ public class UpdateGradleWrapper extends Recipe {
         GradleWrapper gradleWrapper = validate(ctx).getValue();
         assert gradleWrapper != null;
 
-        return ListUtils.map(before, sourceFile -> {
+        List<SourceFile> sourceFileList = ListUtils.map(before, sourceFile -> {
             if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                 PlainText gradlew = (PlainText) setExecutable(sourceFile);
                 String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"));
@@ -153,6 +157,8 @@ public class UpdateGradleWrapper extends Recipe {
             }
             return sourceFile;
         });
+
+        return AddGradleWrapper.addGradleFiles(gradleWrapper, sourceFileList);
     }
 
     private static <T extends SourceFile> T setExecutable(T sourceFile) {

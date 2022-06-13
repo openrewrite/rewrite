@@ -72,7 +72,11 @@ public class AddGradleWrapper extends Recipe {
 
     @Override
     public Validated validate(ExecutionContext ctx) {
-        if (gradleWrapper == null) {
+        String dist = distribution != null ? distribution : DistributionType.Bin.name().toLowerCase();
+        GradleWrapper wrapper = gradleWrapper != null ? gradleWrapper.getValue() : null;
+        if (wrapper == null ||
+                !wrapper.getVersion().equals(version) ||
+                !wrapper.getDistributionType().name().toLowerCase().equals(dist)) {
             org.openrewrite.ipc.http.HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
             gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution, httpSender));
         }
@@ -97,7 +101,10 @@ public class AddGradleWrapper extends Recipe {
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         GradleWrapper gradleWrapper = validate(ctx).getValue();
         assert gradleWrapper != null;
+        return addGradleFiles(gradleWrapper, before);
+    }
 
+    public static List<SourceFile> addGradleFiles(GradleWrapper gradleWrapper, List<SourceFile> before) {
         boolean needsGradleWrapperProperties = true;
         boolean needsGradleWrapperJar = true;
         boolean needsGradleShellScript = true;
