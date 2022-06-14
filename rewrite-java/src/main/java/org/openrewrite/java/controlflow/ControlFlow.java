@@ -49,6 +49,9 @@ public final class ControlFlow {
             Object next = nextCursor.getValue();
             if (next instanceof J.Block) {
                 methodDeclarationBlockCursor = nextCursor;
+                if (((J.Block) next).isStatic()) {
+                    break;
+                }
             } else if (next instanceof J.MethodDeclaration) {
                 break;
             }
@@ -121,7 +124,6 @@ public final class ControlFlow {
 
         @Override
         public J.Block visitBlock(J.Block block, P p) {
-            addBasicBlockToCurrent();
             addCursorToBasicBlock();
             for (Statement statement : block.getStatements()) {
                 visit(statement, p);
@@ -378,7 +380,7 @@ public final class ControlFlow {
             addCursorToBasicBlock(); // Add the while node first
             ControlFlowNode.BasicBlock entryBlock = currentAsBasicBlock();
             ControlFlowAnalysis<P> conditionAnalysis =
-                    visitRecursive(current, whileLoop.getCondition().getTree(), p); // First the condition is invoked
+                    visitRecursive(Collections.singleton(entryBlock), whileLoop.getCondition().getTree(), p); // First the condition is invoked
             Set<ControlFlowNode.ConditionNode> conditionNodes =
                     allAsConditionNodesMissingTruthFirst(conditionAnalysis.current);
             ControlFlowAnalysis<P> bodyAnalysis =
@@ -395,6 +397,20 @@ public final class ControlFlow {
             );
             return whileLoop;
         }
+
+//        @Override
+//        public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
+//            addCursorToBasicBlock(); // Add the for node first
+//            // First the initialization is invoked
+//            ControlFlowAnalysis<P> initializationAnalysis =
+//                    visitRecursive(current, forLoop.getControl().getInit(), p);
+//            return forLoop;
+//        }
+//
+//        @Override
+//        public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
+//            return super.visitForControl(control, p);
+//        }
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, P p) {

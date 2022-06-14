@@ -103,17 +103,6 @@ public final class ControlFlowSummary {
         toVisit.forEach(n -> recurseComputeReachableBasicBlock(n, predicate, reachable));
     }
 
-    private Set<ControlFlowNode> walk(ControlFlowNode.ConditionNode node, BarrierGuardPredicate isBarrierGuard) {
-        Set<ControlFlowNode> nodes = new HashSet<>(2);
-        if (!isBarrierGuard.isBarrierGuard(node.asGuard(), true)) {
-            nodes.add(node.getTruthySuccessor());
-        }
-        if (!isBarrierGuard.isBarrierGuard(node.asGuard(), false)) {
-            nodes.add(node.getFalsySuccessor());
-        }
-        return nodes;
-    }
-
     int getBasicBlockCount() {
         return getBasicBlocks().size();
     }

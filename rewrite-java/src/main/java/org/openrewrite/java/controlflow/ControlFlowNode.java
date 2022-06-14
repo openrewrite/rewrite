@@ -38,6 +38,9 @@ public abstract class ControlFlowNode {
     }
 
     <C extends ControlFlowNode> C addSuccessor(C successor) {
+        if (this == successor) {
+            throw new IllegalArgumentException("Cannot add a node as a successor of itself");
+        }
         _addSuccessorInternal(successor);
         successor.predecessors.add(this);
         return successor;
@@ -145,6 +148,9 @@ public abstract class ControlFlowNode {
         private final List<Cursor> node = new ArrayList<>();
 
         public J getLeader() {
+            if (node.isEmpty()) {
+                throw new IllegalStateException("Basic block has no nodes!");
+            }
             return node.get(0).getValue();
         }
 

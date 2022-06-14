@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.controlflow
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.java.JavaIsoVisitor
@@ -630,8 +629,8 @@ interface ControlFlowTest : RewriteTest {
 
     @Test
     fun `while loop`() = rewriteRun(
-            java(
-                    """
+        java(
+            """
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
@@ -645,7 +644,7 @@ interface ControlFlowTest : RewriteTest {
                 }
             }
             """,
-                    """
+            """
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
@@ -659,13 +658,13 @@ interface ControlFlowTest : RewriteTest {
                 }
             }
             """
-            )
         )
+    )
 
     @Test
     fun `do-while loop`() = rewriteRun(
-            java(
-                    """
+        java(
+            """
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
@@ -679,20 +678,54 @@ interface ControlFlowTest : RewriteTest {
                 }
             }
             """,
-                    """
+            """
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
                     int x = start();
                     x++;
-                    do  /*~~(L)~~>*/{
+                    do /*~~(L)~~>*/{
                         x += 2;
                     } while (theTest());
                     return /*~~(L)~~>*/5;
                 }
             }
             """
-            )
+        )
+    )
+
+    @Test
+    fun `for i loop`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() {
+                    int x = start();
+                    x++;
+                    for (int i = 0; theTest(); i++) {
+                        x += 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    for (int i = 0; theTest(); /*~~(L)~~>*/i++) {
+                        x += 2;
+                    }
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+        )
     )
 }
