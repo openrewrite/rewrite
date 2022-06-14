@@ -57,6 +57,7 @@ public abstract class ControlFlowNode {
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     static class ConditionNode extends ControlFlowNode {
+        @Getter
         private final Cursor condition;
         private final boolean truthFirst;
         /**
@@ -93,6 +94,11 @@ public abstract class ControlFlowNode {
 
         @Override
         Set<ControlFlowNode> getSuccessors() {
+            verifyState();
+            return Stream.of(truthySuccessor, falsySuccessor).collect(Collectors.toSet());
+        }
+
+        private void verifyState() {
             if (truthySuccessor == null && falsySuccessor == null) {
                 throw new IllegalStateException("Condition node has no successors. Should have both!");
             }
@@ -102,7 +108,24 @@ public abstract class ControlFlowNode {
             if (falsySuccessor == null) {
                 throw new IllegalStateException("Condition node has no falsy successor");
             }
-            return Stream.of(truthySuccessor, falsySuccessor).collect(Collectors.toSet());
+        }
+
+        Set<ControlFlowNode> visit(BarrierGuardPredicate isBarrierGuard) {
+            verifyState();
+            Set<ControlFlowNode> nodes = new HashSet<>(2);
+            if (!isBarrierGuard.isBarrierGuard(asGuard(), true)) {
+                nodes.add(getTruthySuccessor());
+            }
+            if (!isBarrierGuard.isBarrierGuard(asGuard(), false)) {
+                nodes.add(getFalsySuccessor());
+            }
+            return nodes;
+        }
+
+        Guard asGuard() {
+            return Guard
+                    .from(condition)
+                    .orElseThrow(() -> new IllegalStateException("Condition node has no guard: " + condition));
         }
 
         @Override

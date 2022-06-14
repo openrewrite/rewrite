@@ -39,10 +39,10 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                 override fun isSink(expr: Expression, cursor: Cursor) =
                     true
 
-                override fun isBarrierGuard(guard: Guard): Boolean =
+                override fun isBarrierGuard(guard: Guard, branch: Boolean): Boolean =
                     guard.expression.run {
                         when (this) {
-                            is J.MethodInvocation -> this.name.simpleName == "guard"
+                            is J.MethodInvocation -> this.name.simpleName == "guard" && branch
                             else -> false
                         }
                     }
@@ -882,6 +882,44 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
     )
 
     @Test
+    fun `transitive assignment from literal with with a || guard`() = rewriteRun(
+        java(
+            """
+                abstract class Test {
+                    abstract boolean guard();
+
+                    void test() {
+                        String n = "42";
+                        if (guard() || guard()) {
+                            String o = n;
+                            System.out.println(o);
+                            String p = o;
+                        } else {
+                            System.out.println(n);
+                        }
+                    }
+                }
+            """,
+            """
+                abstract class Test {
+                    abstract boolean guard();
+
+                    void test() {
+                        String n = /*~~>*/"42";
+                        if (guard() || guard()) {
+                            String o = n;
+                            System.out.println(o);
+                            String p = o;
+                        } else {
+                            System.out.println(/*~~>*/n);
+                        }
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
     fun `transitive assignment from literal with with a negated guard`() = rewriteRun(
         java(
             """
@@ -928,7 +966,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
                 void test() {
                     String n = "42";
-                    if (guard()) {
+                    if (!guard()) {
                         throw new RuntimeException();
                     }
                     String o = n;
@@ -943,7 +981,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
                 void test() {
                     String n = /*~~>*/"42";
-                    if (guard()) {
+                    if (!guard()) {
                         throw new RuntimeException();
                     }
                     String o = n;

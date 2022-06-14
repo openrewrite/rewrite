@@ -17,7 +17,12 @@ package org.openrewrite.java.controlflow;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import org.openrewrite.Cursor;
+import org.openrewrite.java.tree.Expression;
 
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -59,6 +64,57 @@ public final class ControlFlowSummary {
                 return getConditionNodes(cfn);
             }
         });
+    }
+
+    public Set<Expression> computeReachableExpressions(BarrierGuardPredicate predicate) {
+        return computeExecutableCodePoints(predicate)
+                .stream()
+                .filter(cursor -> cursor.getValue() instanceof Expression)
+                .map(cursor -> (Expression) cursor.getValue())
+                .collect(Collectors.toSet());
+    }
+
+    public Set<Cursor> computeExecutableCodePoints(BarrierGuardPredicate predicate) {
+        return computeReachableBasicBlock(predicate)
+                .stream()
+                .flatMap(b -> b.getNodeCursors().stream())
+                .collect(Collectors.toSet());
+    }
+
+    public Set<ControlFlowNode.BasicBlock> computeReachableBasicBlock(BarrierGuardPredicate predicate) {
+        Set<ControlFlowNode> reachable = new HashSet<>();
+        recurseComputeReachableBasicBlock(start, predicate, reachable);
+        return reachable
+                .stream()
+                .filter(cfn -> cfn instanceof ControlFlowNode.BasicBlock)
+                .map(cfn -> (ControlFlowNode.BasicBlock) cfn)
+                .collect(Collectors.toSet());
+    }
+
+    private void recurseComputeReachableBasicBlock(ControlFlowNode visit, BarrierGuardPredicate predicate, Set<ControlFlowNode> reachable) {
+        reachable.add(visit);
+        final Queue<ControlFlowNode> toVisit = new LinkedList<>();
+        if (visit instanceof ControlFlowNode.ConditionNode) {
+            toVisit.addAll(((ControlFlowNode.ConditionNode) visit).visit(predicate));
+        } else if (!(visit instanceof ControlFlowNode.End)) {
+            toVisit.addAll(visit.getSuccessors());
+        } else {
+            // End node does not need to be visited
+            return;
+        }
+        toVisit.removeAll(reachable);
+        toVisit.forEach(n -> recurseComputeReachableBasicBlock(n, predicate, reachable));
+    }
+
+    private Set<ControlFlowNode> walk(ControlFlowNode.ConditionNode node, BarrierGuardPredicate isBarrierGuard) {
+        Set<ControlFlowNode> nodes = new HashSet<>(2);
+        if (!isBarrierGuard.isBarrierGuard(node.asGuard(), true)) {
+            nodes.add(node.getTruthySuccessor());
+        }
+        if (!isBarrierGuard.isBarrierGuard(node.asGuard(), false)) {
+            nodes.add(node.getFalsySuccessor());
+        }
+        return nodes;
     }
 
     int getBasicBlockCount() {

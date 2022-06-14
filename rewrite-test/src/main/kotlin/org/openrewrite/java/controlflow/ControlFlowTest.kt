@@ -303,7 +303,7 @@ interface ControlFlowTest : RewriteTest {
                     if (x == 1) /*~~(L)~~>*/{
                         throw new RuntimeException();
                     }
-                    /*~~(L)~~>*/return 5;
+                    return /*~~(L)~~>*/5;
                 }
             }
             """
@@ -389,7 +389,7 @@ interface ControlFlowTest : RewriteTest {
                     if (x >= 1 && /*~~(L)~~>*/x <= 2) /*~~(L)~~>*/{
                         return 2;
                     }
-                    /*~~(L)~~>*/return 5;
+                    return /*~~(L)~~>*/5;
                 }
             }
             """
@@ -415,13 +415,13 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 5 CN: 2 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 4 CN: 2 EX: 2 | L)~~>*/{
                     int x = start();
                     x++;
-                    if (/*~~(L (||))~~>*/x > 5 || /*~~(L)~~>*/x < 3) /*~~(L)~~>*/{
+                    if (x > 5 || /*~~(L)~~>*/x < 3) /*~~(L)~~>*/{
                         return 2;
                     }
-                    /*~~(L)~~>*/return 5;
+                    return /*~~(L)~~>*/5;
                 }
             }
             """
@@ -453,7 +453,7 @@ interface ControlFlowTest : RewriteTest {
                     if (x >= 1 && /*~~(L)~~>*/x <= 5 && /*~~(L)~~>*/x == 3) /*~~(L)~~>*/{
                         return 2;
                     }
-                    /*~~(L)~~>*/return 5;
+                    return /*~~(L)~~>*/5;
                 }
             }
             """
@@ -487,7 +487,7 @@ interface ControlFlowTest : RewriteTest {
                     if (b) /*~~(L)~~>*/{
                         return 2;
                     }
-                    /*~~(L)~~>*/return 5;
+                    return /*~~(L)~~>*/5;
                 }
             }
             """
@@ -521,7 +521,7 @@ interface ControlFlowTest : RewriteTest {
                     if (b) /*~~(L)~~>*/{
                         return 2;
                     }
-                    /*~~(L)~~>*/return 5;
+                    return /*~~(L)~~>*/5;
                 }
             }
             """
@@ -553,7 +553,7 @@ interface ControlFlowTest : RewriteTest {
                     if ((x >= 1 && /*~~(L)~~>*/x <= 5)) /*~~(L)~~>*/{
                         return 2;
                     }
-                    /*~~(L)~~>*/return 5;
+                    return /*~~(L)~~>*/5;
                 }
             }
             """
@@ -587,7 +587,7 @@ interface ControlFlowTest : RewriteTest {
                     if (theTest()) /*~~(L)~~>*/{
                         return 2;
                     }
-                    /*~~(L)~~>*/return 5;
+                    return /*~~(L)~~>*/5;
                 }
             }
             """
@@ -621,7 +621,7 @@ interface ControlFlowTest : RewriteTest {
                     if (!theTest()) /*~~(L)~~>*/{
                         return 2;
                     }
-                    /*~~(L)~~>*/return 5;
+                    return /*~~(L)~~>*/5;
                 }
             }
             """

@@ -20,7 +20,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.controlflow.Guard;
 import org.openrewrite.java.tree.Expression;
@@ -30,7 +29,6 @@ import org.openrewrite.java.tree.Statement;
 import java.util.*;
 
 public class ForwardFlow extends JavaVisitor<Integer> {
-    private static final MethodMatcher methodMatcherToString = new MethodMatcher("java.lang.String toString()");
 
     public static void findSinks(SinkFlow<?, ?> root) {
         Iterator<Cursor> cursorPath = root.getCursor().getPathAsCursors();
@@ -180,19 +178,6 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         @Override
         public J visitNewClass(J.NewClass newClass, Integer integer) {
             return super.visitNewClass(newClass, integer);
-        }
-
-        @Override
-        public J visitIf(J.If iff, Integer integer) {
-            if (Guard.from(new Cursor(getCursor(), iff.getIfCondition().getTree()))
-                    .map(localFlowSpec::isBarrierGuard)
-                    .orElse(false)) {
-                // then don't visit the 'then'
-                visit(iff.getElsePart(), integer, getCursor());
-            } else {
-                return super.visitIf(iff, integer);
-            }
-            return iff;
         }
     }
 

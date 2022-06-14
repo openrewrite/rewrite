@@ -102,7 +102,7 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
         return false;
     }
 
-    public boolean isBarrierGuard(Guard guard) {
+    public boolean isBarrierGuard(Guard guard, boolean branch) {
         return false;
     }
 }

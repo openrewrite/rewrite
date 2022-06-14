@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.J;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.Stack;
 import java.util.stream.Collectors;
 
@@ -38,10 +39,13 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     @Getter(AccessLevel.PACKAGE)
     private final LocalFlowSpec<Source, Sink> spec;
 
-    public SinkFlow(@Nullable Cursor source, LocalFlowSpec<Source, Sink> spec) {
+    private final Set<Expression> reachable;
+
+    public SinkFlow(@Nullable Cursor source, LocalFlowSpec<Source, Sink> spec, Set<Expression> reachable) {
         super(source);
         this.source = source;
         this.spec = spec;
+        this.reachable = reachable;
     }
 
     public Cursor getSourceCursor() {
@@ -90,8 +94,7 @@ public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGra
     private void recurseGetFlows(FlowGraph flowGraph, Stack<Cursor> pathToHere,
                                  List<List<Cursor>> pathsToSinks) {
         Cursor cursor = flowGraph.getCursor();
-        if (cursor.getValue() instanceof Expression &&
-                Guard.from(cursor).map(spec::isBarrierGuard).orElse(false)) {
+        if (cursor.getValue() instanceof Expression && !reachable.contains(cursor.<Expression>getValue())) {
             return;
         }
 
