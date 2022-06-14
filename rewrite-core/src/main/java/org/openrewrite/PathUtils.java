@@ -15,7 +15,10 @@
  */
 package org.openrewrite;
 
+import org.apache.commons.io.FilenameUtils;
+
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class PathUtils {
     private PathUtils() {}
@@ -26,8 +29,8 @@ public class PathUtils {
      * "foo/a.txt" is considered to be equal to "foo\a.txt"
      */
     public static boolean equalIgnoringSeparators(Path a, Path b) {
-        Path aNorm = a.normalize();
-        Path bNorm = b.normalize();
+        Path aNorm = Paths.get(FilenameUtils.separatorsToSystem(a.toString())).normalize();
+        Path bNorm = Paths.get(FilenameUtils.separatorsToSystem(b.toString())).normalize();
 
         if(aNorm.getNameCount() != bNorm.getNameCount()) {
             return false;

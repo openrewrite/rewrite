@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle
 
+import org.apache.commons.io.FilenameUtils
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.PathUtils
@@ -72,6 +73,59 @@ class UpdateGradleWrapperTest {
         assertThat(gradleBat.text).isNotBlank
 
         val gradleWrapperJar = result.filterIsInstance<Remote>().first { it.sourcePath.endsWith("gradle-wrapper.jar") }
+        assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.sourcePath, WRAPPER_JAR_LOCATION))
+        assertThat(gradleWrapperJar.uri).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"))
+    }
+
+    @Test
+    fun updateVersionAndDistributionWindows() {
+        val propertiesPath = Paths.get(
+            FilenameUtils.separatorsToWindows(
+                Paths.get(
+                    "gradle",
+                    "wrapper",
+                    "gradle-wrapper.properties"
+                ).toString()
+            )
+        )
+        val gradleWrapperProps = PropertiesParser().parse(
+            """
+                distributionBase=GRADLE_USER_HOME
+                distributionPath=wrapper/dists
+                distributionUrl=https\://services.gradle.org/distributions/gradle-7.4-all.zip
+                zipStoreBase=GRADLE_USER_HOME
+                zipStorePath=wrapper/dists
+            """.trimIndent()
+        )[0]!!
+            .withSourcePath(
+                propertiesPath
+            )
+
+        val result = UpdateGradleWrapper("7.4.2", null)
+            .run(listOf(gradleWrapperProps, gradlew, gradlewBat, gradleWrapperJarQuark))
+            .map { it.after }
+        assertThat(result.size).isEqualTo(4)
+
+        val props = result.filterIsInstance<Properties.File>()[0]
+        assertThat(props.printAll()).isEqualTo(
+            //language=properties
+            """
+                distributionBase=GRADLE_USER_HOME
+                distributionPath=wrapper/dists
+                distributionUrl=https\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+                zipStoreBase=GRADLE_USER_HOME
+                zipStorePath=wrapper/dists
+            """.trimIndent()
+        )
+
+        val gradleSh = result.filterIsInstance<PlainText>().first { it.sourcePath.endsWith("gradlew") }
+        assertThat(gradleSh.text).isNotBlank
+
+        val gradleBat = result.filterIsInstance<PlainText>().first { it.sourcePath.endsWith("gradlew.bat") }
+        assertThat(gradleBat.text).isNotBlank
+
+        val gradleWrapperJar = result.filterIsInstance<Remote>()
+            .first { FilenameUtils.separatorsToSystem(it.sourcePath.toString()).endsWith("gradle-wrapper.jar") }
         assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.sourcePath, WRAPPER_JAR_LOCATION))
         assertThat(gradleWrapperJar.uri).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"))
     }
