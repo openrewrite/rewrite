@@ -350,6 +350,30 @@ public final class ControlFlow {
         }
 
         @Override
+        public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
+            addCursorToBasicBlock(); // Add the while node first
+            ControlFlowNode.BasicBlock entryBlock = currentAsBasicBlock();
+            ControlFlowNode.BasicBlock basicBlock = entryBlock.addBasicBlock();
+            ControlFlowAnalysis<P> bodyAnalysis =
+                    visitRecursive(Collections.singleton(basicBlock), doWhileLoop.getBody(), p); // First  the body is visited
+            if (!bodyAnalysis.exitFlow.isEmpty()) {
+                exitFlow.addAll(bodyAnalysis.exitFlow);
+            }
+            ControlFlowAnalysis<P> conditionAnalysis =
+                    visitRecursive(bodyAnalysis.current, doWhileLoop.getWhileCondition().getTree(), p); // Then the condition is invoked
+            Set<ControlFlowNode.ConditionNode> conditionNodes =
+                    allAsConditionNodesMissingTruthFirst(conditionAnalysis.current);
+            // Add the 'loop' in
+            conditionNodes.forEach(
+                    controlFlowNode -> controlFlowNode.addSuccessor(basicBlock)
+            );
+            current = Collections.singleton(
+                    getControlFlowNodeMissingSuccessors(conditionNodes)
+            );
+            return doWhileLoop;
+        }
+
+        @Override
         public J.WhileLoop visitWhileLoop(J.WhileLoop whileLoop, P p) {
             addCursorToBasicBlock(); // Add the while node first
             ControlFlowNode.BasicBlock entryBlock = currentAsBasicBlock();

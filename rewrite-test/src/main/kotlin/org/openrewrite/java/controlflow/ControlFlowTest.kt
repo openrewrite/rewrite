@@ -627,4 +627,72 @@ interface ControlFlowTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `while loop`() = rewriteRun(
+            java(
+                    """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() {
+                    int x = start();
+                    x++;
+                    while (theTest()) {
+                        x += 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+                    """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    while (theTest()) /*~~(L)~~>*/{
+                        x += 2;
+                    }
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+            )
+        )
+
+    @Test
+    fun `do-while loop`() = rewriteRun(
+            java(
+                    """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() {
+                    int x = start();
+                    x++;
+                    do {
+                        x += 2;
+                    } while (theTest());
+                    return 5;
+                }
+            }
+            """,
+                    """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    do  /*~~(L)~~>*/{
+                        x += 2;
+                    } while (theTest());
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+            )
+    )
 }

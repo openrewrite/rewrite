@@ -17,6 +17,7 @@ package org.openrewrite.java.controlflow;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.tree.Expression;
 
@@ -31,39 +32,35 @@ import java.util.stream.Stream;
 public final class ControlFlowSummary {
     private final ControlFlowNode.Start start;
     private final ControlFlowNode.End end;
+    @Getter(lazy = true)
+    private final Set<ControlFlowNode> allNodes = getAllControlFlowNodes(start);
+
+    private static Set<ControlFlowNode> getAllControlFlowNodes(ControlFlowNode.Start start) {
+        Set<ControlFlowNode> all = new HashSet<>();
+        recurseGetAllControlFlowNodes(start, all);
+        return all;
+    }
+    private static void recurseGetAllControlFlowNodes(ControlFlowNode current, Set<ControlFlowNode> visited) {
+        visited.add(current);
+        Queue<ControlFlowNode> toVisit = new LinkedList<>(current.getSuccessors());
+        toVisit.removeAll(visited);
+        toVisit.forEach(node -> recurseGetAllControlFlowNodes(node, visited));
+    }
 
     public Set<ControlFlowNode.BasicBlock> getBasicBlocks() {
-        return getBasicBlocks(start).collect(Collectors.toSet());
+        return getAllNodes()
+                .stream()
+                .filter(node -> node instanceof ControlFlowNode.BasicBlock)
+                .map(node -> (ControlFlowNode.BasicBlock) node)
+                .collect(Collectors.toSet());
     }
 
     public Set<ControlFlowNode.ConditionNode> getConditionNodes() {
-        return getConditionNodes(start).collect(Collectors.toSet());
-    }
-
-    private Stream<ControlFlowNode.BasicBlock> getBasicBlocks(ControlFlowNode controlFlowNode) {
-        return controlFlowNode.getSuccessors().stream().flatMap(cfn -> {
-            if (cfn instanceof ControlFlowNode.BasicBlock) {
-                return Stream.concat(
-                        Stream.of((ControlFlowNode.BasicBlock) cfn),
-                        getBasicBlocks(cfn)
-                );
-            } else {
-                return getBasicBlocks(cfn);
-            }
-        });
-    }
-
-    private Stream<ControlFlowNode.ConditionNode> getConditionNodes(ControlFlowNode controlFlowNode) {
-        return controlFlowNode.getSuccessors().stream().flatMap(cfn -> {
-            if (cfn instanceof ControlFlowNode.ConditionNode) {
-                return Stream.concat(
-                        Stream.of((ControlFlowNode.ConditionNode) cfn),
-                        getConditionNodes(cfn)
-                );
-            } else {
-                return getConditionNodes(cfn);
-            }
-        });
+        return getAllNodes()
+                .stream()
+                .filter(node -> node instanceof ControlFlowNode.ConditionNode)
+                .map(node -> (ControlFlowNode.ConditionNode) node)
+                .collect(Collectors.toSet());
     }
 
     public Set<Expression> computeReachableExpressions(BarrierGuardPredicate predicate) {
