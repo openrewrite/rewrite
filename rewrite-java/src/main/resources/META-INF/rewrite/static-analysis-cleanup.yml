@@ -31,7 +31,6 @@ recipeList:
   - org.openrewrite.java.cleanup.EmptyBlock
   - org.openrewrite.java.cleanup.EqualsAvoidsNull
   - org.openrewrite.java.cleanup.ExplicitInitialization
-  - org.openrewrite.java.cleanup.ExplicitLambdaArgumentTypes
   - org.openrewrite.java.cleanup.ExternalizableHasNoArgsConstructor
   - org.openrewrite.java.cleanup.FallThrough
   - org.openrewrite.java.cleanup.FinalClass
