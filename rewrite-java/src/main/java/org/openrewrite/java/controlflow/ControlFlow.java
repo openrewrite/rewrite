@@ -105,16 +105,11 @@ public final class ControlFlow {
 
         ControlFlowNode.BasicBlock addBasicBlockToCurrent() {
             Set<ControlFlowNode> newCurrent = new HashSet<>(current);
-            ControlFlowNode.ConditionNode conditionNode = null;
             if (truthyCurrent != null) {
-                conditionNode = truthyCurrent.addConditionNode();
-                newCurrent.add(conditionNode);
+                newCurrent.add(truthyCurrent);
                 truthyCurrent = null;
             }
             ControlFlowNode.BasicBlock basicBlock = addBasicBlock(newCurrent);
-            if (conditionNode != null) {
-                conditionNode.addSuccessor(basicBlock);
-            }
             current = Collections.singleton(basicBlock);
             return basicBlock;
         }

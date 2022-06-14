@@ -386,7 +386,7 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 6 CN: 4 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 6 CN: 3 EX: 2 | L)~~>*/{
                     int x = start();
                     x++;
                     /*~~(L)~~>*/boolean b = x >= 1 && /*~~(L)~~>*/x <= 5 && /*~~(L)~~>*/x == 3;
