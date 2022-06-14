@@ -966,7 +966,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
                 void test() {
                     String n = "42";
-                    if (!guard()) {
+                    if (guard()) {
                         throw new RuntimeException();
                     }
                     String o = n;
@@ -981,7 +981,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
                 void test() {
                     String n = /*~~>*/"42";
-                    if (!guard()) {
+                    if (guard()) {
                         throw new RuntimeException();
                     }
                     String o = n;
