@@ -259,14 +259,6 @@ public final class ControlFlow {
             return identifier;
         }
 
-        boolean isBranchPoint() {
-            J.If maybeIf = getCursor().firstEnclosing(J.If.class);
-            if (maybeIf != null) {
-                return maybeIf.getIfCondition().getTree() == getCursor().getValue();
-            }
-            return false;
-        }
-
         @Override
         public J.Return visitReturn(J.Return _return, P p) {
             visit(_return.getExpression(), p); // First the expression is invoked
@@ -275,6 +267,16 @@ public final class ControlFlow {
             current = Collections.emptySet();
             jumps = true;
             return _return;
+        }
+
+        @Override
+        public J.Throw visitThrow(J.Throw thrown, P p) {
+            visit(thrown.getException(), p); // First the expression is invoked
+            addCursorToBasicBlock(); // Then the return
+            exitFlow.addAll(current);
+            current = Collections.emptySet();
+            jumps = true;
+            return thrown;
         }
 
         private static ControlFlowNode.BasicBlock addBasicBlock(Collection<ControlFlowNode> nodes) {

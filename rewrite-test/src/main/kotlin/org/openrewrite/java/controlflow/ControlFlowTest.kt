@@ -245,7 +245,7 @@ interface ControlFlowTest : RewriteTest {
     )
 
     @Test
-    fun `display control flow graph with branches with returns`() = rewriteRun(
+    fun `flow graph with branches with returns`() = rewriteRun(
         java(
             """
             abstract class Test {
@@ -272,6 +272,38 @@ interface ControlFlowTest : RewriteTest {
                     } else /*~~(L)~~>*/{
                         return 5;
                     }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `flow graph with branches with throws`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                int test() {
+                    int x = start();
+                    x++;
+                    if (x == 1) {
+                        throw new RuntimeException();
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    if (x == 1) /*~~(L)~~>*/{
+                        throw new RuntimeException();
+                    }
+                    /*~~(L)~~>*/return 5;
                 }
             }
             """
@@ -487,6 +519,106 @@ interface ControlFlowTest : RewriteTest {
                     x++;
                     /*~~(L)~~>*/boolean b = x >= 1 && /*~~(L)~~>*/x <= 5 && /*~~(L)~~>*/x == 3;
                     if (b) /*~~(L)~~>*/{
+                        return 2;
+                    }
+                    /*~~(L)~~>*/return 5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `if statement with wrapped parentheses in control`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                int test() {
+                    int x = start();
+                    x++;
+                    if ((x >= 1 && x <= 5)) {
+                        return 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                int test() /*~~(BB: 4 CN: 2 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    if ((x >= 1 && /*~~(L)~~>*/x <= 5)) /*~~(L)~~>*/{
+                        return 2;
+                    }
+                    /*~~(L)~~>*/return 5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `if method access in control`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() {
+                    int x = start();
+                    x++;
+                    if (theTest()) {
+                        return 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    if (theTest()) /*~~(L)~~>*/{
+                        return 2;
+                    }
+                    /*~~(L)~~>*/return 5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `if statement with negation in control`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() {
+                    int x = start();
+                    x++;
+                    if (!theTest()) {
+                        return 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    if (!theTest()) /*~~(L)~~>*/{
                         return 2;
                     }
                     /*~~(L)~~>*/return 5;
