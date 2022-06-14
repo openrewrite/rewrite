@@ -23,7 +23,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -75,7 +74,6 @@ public final class ControlFlow {
 
         private final boolean methodEntryPoint;
 
-        private final List<ControlFlowNode> danglingEnds = new ArrayList<>();
         /**
          * Flows that terminate in a {@link J.Return} or {@link J.Throw} statement.
          */
@@ -95,25 +93,13 @@ public final class ControlFlow {
         ControlFlowNode.BasicBlock currentAsBasicBlock() {
             jumps = false;
             assert !current.isEmpty() : "No current node!";
-            if (current.iterator().next() instanceof ControlFlowNode.BasicBlock) {
+            if (current.size() == 1 && current.iterator().next() instanceof ControlFlowNode.BasicBlock) {
                 return (ControlFlowNode.BasicBlock) current.iterator().next();
             } else {
-                if (!danglingEnds.isEmpty()) {
-                    Iterator<ControlFlowNode> cfnIterator = danglingEnds.iterator();
-                    ControlFlowNode.BasicBlock basicBlock = cfnIterator.next().addBasicBlock();
-                    while (cfnIterator.hasNext()) {
-                        cfnIterator.next().addSuccessor(basicBlock);
-                    }
-                    danglingEnds.clear();
-                    return basicBlock;
-                }
                 if (!exitFlow.isEmpty()) {
                     return addBasicBlockToCurrent();
                 }
-                if (current.iterator().next() instanceof ControlFlowNode.ConditionNode) {
-                    return addBasicBlockToCurrent();
-                }
-                throw new IllegalStateException("Not in a Basic Block. Is: " + current);
+                return addBasicBlockToCurrent();
             }
         }
 
@@ -158,9 +144,7 @@ public final class ControlFlow {
             }
             if (methodEntryPoint) {
                 ControlFlowNode end = ControlFlowNode.End.create();
-                if (!danglingEnds.isEmpty()) {
-                    danglingEnds.forEach(dangling -> dangling.addSuccessor(end));
-                } else if (!jumps) {
+                if (!jumps) {
                     addSuccessorToCurrent(end);
                 }
                 exitFlow.forEach(exit -> exit.addSuccessor(end));
@@ -183,14 +167,14 @@ public final class ControlFlow {
                 visit(variable.getInitializer(), p); // First the initializer is invoked
             }
             addCursorToBasicBlock(); // Then the variable declaration
-            return super.visitVariableDeclarations(multiVariable, p);
+            return multiVariable;
         }
 
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-            addCursorToBasicBlock(); // First add the variable declaration
-            visit(variable.getInitializer(), p); // Then add the initializer
+            visit(variable.getInitializer(), p); // First add the initializer
             visit(variable.getName(), p); // Then add the name
+            addCursorToBasicBlock(); // Then add the variable declaration
             return variable;
         }
 
@@ -211,26 +195,23 @@ public final class ControlFlow {
             ControlFlowNode.ConditionNode conditionNode = truthNode.addConditionNode();
             ControlFlowAnalysis<P> thenAnalysis =
                     visitRecursive(Collections.singleton(conditionNode), iff.getThenPart(), p); // Then the then block is visited
-            boolean exhaustiveJump = true;
             if (!thenAnalysis.exitFlow.isEmpty()) {
                 exitFlow.addAll(thenAnalysis.exitFlow);
             }
-            if (!thenAnalysis.exitFlow.containsAll(thenAnalysis.current)) {
-                danglingEnds.addAll(thenAnalysis.current);
-            }
-            exhaustiveJump &= thenAnalysis.jumps;
-            Set<ControlFlowNode> newCurrent = new HashSet<>();
-            newCurrent.add(conditionNode);
+            HashSet<ControlFlowNode> newCurrent = new HashSet<>();
             newCurrent.addAll(conditionAnalysis.current.stream().filter(c -> !conditionNode.getPredecessors().contains(c)).collect(Collectors.toSet()));
+            newCurrent.add(conditionNode);
+            boolean exhaustiveJump = thenAnalysis.jumps;
             if (iff.getElsePart() != null) {
                 ControlFlowAnalysis<P> elseAnalysis =
                         visitRecursive(newCurrent, iff.getElsePart(), p); // Then the else block is visited
                 if (!elseAnalysis.exitFlow.isEmpty()) {
                     exitFlow.addAll(elseAnalysis.exitFlow);
                 }
-                if (!elseAnalysis.exitFlow.containsAll(elseAnalysis.current)) {
-                    danglingEnds.addAll(elseAnalysis.current);
-                }
+                current = Stream.concat(
+                        thenAnalysis.current.stream(),
+                        elseAnalysis.current.stream()
+                ).collect(Collectors.toSet());
                 exhaustiveJump &= elseAnalysis.jumps;
             } else {
                 current = newCurrent;
@@ -284,6 +265,7 @@ public final class ControlFlow {
             visit(_return.getExpression(), p); // First the expression is invoked
             addCursorToBasicBlock(); // Then the return
             exitFlow.addAll(current);
+            current = Collections.emptySet();
             jumps = true;
             return _return;
         }

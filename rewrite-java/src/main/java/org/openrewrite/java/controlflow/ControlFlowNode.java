@@ -89,6 +89,15 @@ public abstract class ControlFlowNode {
             }
             return Stream.of(truthySuccessor, falsySuccessor).collect(Collectors.toSet());
         }
+
+        @Override
+        public String toString() {
+            return "ConditionNode{" +
+                    "condition=" + condition.getValue() +
+                    ", truthySuccessor=" + truthySuccessor +
+                    ", falsySuccessor=" + falsySuccessor +
+                    '}';
+        }
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -122,9 +131,6 @@ public abstract class ControlFlowNode {
 
         @Override
         protected void _addSuccessorInternal(ControlFlowNode successor) {
-            if (successor instanceof BasicBlock) {
-                throw new IllegalStateException("Can't add a basic block as a successor of a basic block");
-            }
             if (this.successor == successor) {
                 return;
             }
@@ -140,6 +146,15 @@ public abstract class ControlFlowNode {
                 throw new IllegalStateException("Basic block has no successor");
             }
             return Collections.singleton(successor);
+        }
+
+        @Override
+        public String toString() {
+            if (node.isEmpty()) {
+                return "BasicBlock { No leader yet! }";
+            } else {
+                return "BasicBlock { leader=" + getLeader() + " }";
+            }
         }
     }
 

@@ -389,7 +389,7 @@ interface ControlFlowTest : RewriteTest {
                 int test() /*~~(BB: 6 CN: 4 EX: 2 | L)~~>*/{
                     int x = start();
                     x++;
-                    boolean b = x >= 1 && /*~~(L)~~>*/x <= 5;
+                    /*~~(L)~~>*/boolean b = x >= 1 && /*~~(L)~~>*/x <= 5 && /*~~(L)~~>*/x == 3;
                     if (b) /*~~(L)~~>*/{
                         return 2;
                     }
