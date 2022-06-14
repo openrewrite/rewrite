@@ -18,7 +18,9 @@ package org.openrewrite.java.controlflow;
 import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
@@ -223,23 +225,70 @@ public final class ControlFlow {
             throw new IllegalArgumentException("No control flow node missing successors");
         }
 
-        @Override
-        public J.If visitIf(J.If iff, P p) {
+        private interface BranchingAdapter {
+            Expression getCondition();
+
+            J getTruePart();
+
+            @Nullable
+            J getFalsePart();
+
+            static BranchingAdapter of(J.If ifStatement) {
+                return new BranchingAdapter() {
+                    @Override
+                    public Expression getCondition() {
+                        return ifStatement.getIfCondition().getTree();
+                    }
+
+                    @Override
+                    public J getTruePart() {
+                        return ifStatement.getThenPart();
+                    }
+
+                    @Override
+                    public @Nullable J getFalsePart() {
+                        return ifStatement.getElsePart();
+                    }
+                };
+            }
+
+            static BranchingAdapter of(J.Ternary ternary) {
+                return new BranchingAdapter() {
+                    @Override
+                    public Expression getCondition() {
+                        return ternary.getCondition();
+                    }
+
+                    @Override
+                    public J getTruePart() {
+                        return ternary.getTruePart();
+                    }
+
+                    @Override
+                    public @Nullable J getFalsePart() {
+                        return ternary.getFalsePart();
+                    }
+                };
+            }
+        }
+
+        private void visitBranching(BranchingAdapter branching, P p) {
             addCursorToBasicBlock(); // Add the if node first
 
             ControlFlowAnalysis<P> conditionAnalysis =
-                    visitRecursive(current, iff.getIfCondition().getTree(), p); // First the condition is invoked
+                    visitRecursive(current, branching.getCondition(), p); // First the condition is invoked
+
             Set<ControlFlowNode.ConditionNode> conditionNodes = allAsConditionNodesMissingTruthFirst(conditionAnalysis.current);
             ControlFlowAnalysis<P> thenAnalysis =
-                    visitRecursive(conditionNodes, iff.getThenPart(), p); // Then the then block is visited
+                    visitRecursive(conditionNodes, branching.getTruePart(), p); // Then the then block is visited
             if (!thenAnalysis.exitFlow.isEmpty()) {
                 exitFlow.addAll(thenAnalysis.exitFlow);
             }
             Set<ControlFlowNode> newCurrent = Collections.singleton(getControlFlowNodeMissingSuccessors(conditionNodes));
             boolean exhaustiveJump = thenAnalysis.jumps;
-            if (iff.getElsePart() != null) {
+            if (branching.getFalsePart() != null) {
                 ControlFlowAnalysis<P> elseAnalysis =
-                        visitRecursive(newCurrent, iff.getElsePart(), p); // Then the else block is visited
+                        visitRecursive(newCurrent, branching.getFalsePart(), p); // Then the else block is visited
                 if (!elseAnalysis.exitFlow.isEmpty()) {
                     exitFlow.addAll(elseAnalysis.exitFlow);
                 }
@@ -252,6 +301,17 @@ public final class ControlFlow {
                 current = newCurrent;
             }
             jumps = exhaustiveJump;
+        }
+
+        @Override
+        public J.Ternary visitTernary(J.Ternary ternary, P p) {
+            visitBranching(BranchingAdapter.of(ternary), p);
+            return ternary;
+        }
+
+        @Override
+        public J.If visitIf(J.If iff, P p) {
+            visitBranching(BranchingAdapter.of(iff), p);
             return iff;
         }
 
