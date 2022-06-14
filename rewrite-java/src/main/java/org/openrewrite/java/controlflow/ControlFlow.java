@@ -236,7 +236,6 @@ public final class ControlFlow {
                 visit(binary.getLeft(), p); // First the left is invoked
                 visit(binary.getRight(), p); // Then the right is invoked
                 addCursorToBasicBlock(); // Add the binary node last
-                truthyCurrent = currentAsBasicBlock();
             }
             return binary;
         }

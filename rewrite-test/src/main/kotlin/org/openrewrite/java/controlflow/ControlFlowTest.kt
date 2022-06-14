@@ -366,7 +366,40 @@ interface ControlFlowTest : RewriteTest {
     )
 
     @Test
-    @Disabled("TODO: fix this test")
+    fun `a standalone boolean expression does not create a new basic block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                int test() {
+                    int x = start();
+                    x++;
+                    boolean b = x >= 1;
+                    if (b) {
+                        return 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    boolean b = x >= 1;
+                    if (b) /*~~(L)~~>*/{
+                        return 2;
+                    }
+                    /*~~(L)~~>*/return 5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
     fun `if statement with && for boolean variable in control`() = rewriteRun(
         java(
             """
