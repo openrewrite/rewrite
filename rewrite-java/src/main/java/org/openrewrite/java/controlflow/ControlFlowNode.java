@@ -140,6 +140,7 @@ public abstract class ControlFlowNode {
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     static class BasicBlock extends ControlFlowNode {
+        @Getter
         private ControlFlowNode successor;
         private final List<Cursor> node = new ArrayList<>();
 

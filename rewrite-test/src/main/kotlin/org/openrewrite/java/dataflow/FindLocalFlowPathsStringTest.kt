@@ -994,7 +994,6 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
     )
 
     @Test
-    @Disabled("Too complicated to support immediately")
     fun `a thrown exception is a guard when included in an boolean expression`() = rewriteRun(
         java(
             """
