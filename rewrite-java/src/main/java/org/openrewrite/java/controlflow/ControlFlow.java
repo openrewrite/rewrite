@@ -66,7 +66,10 @@ public final class ControlFlow {
 
     private static class ControlFlowAnalysis<P> extends JavaIsoVisitor<P> {
 
-        private Set<? extends ControlFlowNode> current;
+        /**
+         * @implNote This MUST be 'protected' or package-private. This is set by annonymous inner classes.
+         */
+        protected Set<? extends ControlFlowNode> current;
 
         private final boolean methodEntryPoint;
 
@@ -398,19 +401,61 @@ public final class ControlFlow {
             return whileLoop;
         }
 
-//        @Override
-//        public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
-//            addCursorToBasicBlock(); // Add the for node first
-//            // First the initialization is invoked
-//            ControlFlowAnalysis<P> initializationAnalysis =
-//                    visitRecursive(current, forLoop.getControl().getInit(), p);
-//            return forLoop;
-//        }
-//
-//        @Override
-//        public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
-//            return super.visitForControl(control, p);
-//        }
+        @Override
+        public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
+            // Basic Block has
+            //  - For Loop Statement
+            //  - Initialization
+            //  - Condition
+            //  Node has
+            //  - Condition
+            // Basic Block has
+            //  - Body
+            //  - Update
+            addCursorToBasicBlock(); // Add the for node first
+            // First the control is invoked
+            final ControlFlowNode.BasicBlock[] entryBlock = new ControlFlowNode.BasicBlock[1];
+            ControlFlowAnalysis<P> controlAnalysisFirstBit = new ControlFlowAnalysis<P>(current) {
+                @Override
+                public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
+                    // First the initialization is invoked
+                    visit(control.getInit(), p);
+                    entryBlock[0] = currentAsBasicBlock();
+                    // Then the condition is invoked
+                    ControlFlowAnalysis<P> conditionAnalysis =
+                            visitRecursive(current, control.getCondition(), p);
+                    current = allAsConditionNodesMissingTruthFirst(conditionAnalysis.current);
+                    return control;
+                }
+            };
+            controlAnalysisFirstBit.visit(forLoop.getControl(), p, getCursor());
+
+            // Then the body is invoked
+            ControlFlowAnalysis<P> bodyAnalysis =
+                    visitRecursive(controlAnalysisFirstBit.current, forLoop.getBody(), p);
+            if (!bodyAnalysis.exitFlow.isEmpty()) {
+                exitFlow.addAll(bodyAnalysis.exitFlow);
+            }
+            // Then the update is invoked
+            ControlFlowAnalysis<P> controlAnalysisSecondBit = new ControlFlowAnalysis<P>(bodyAnalysis.current) {
+                @Override
+                public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
+                    // Now the update is invoked
+                    visit(control.getUpdate(), p);
+                    return control;
+                }
+            };
+            controlAnalysisSecondBit.visit(forLoop.getControl(), p, getCursor());
+            controlAnalysisSecondBit.current.forEach(
+                    controlFlowNode -> controlFlowNode.addSuccessor(entryBlock[0].getSuccessor())
+            );
+            current = Collections.singleton(
+                    getControlFlowNodeMissingSuccessors(
+                            allAsConditionNodesMissingTruthFirst(controlAnalysisFirstBit.current)
+                    )
+            );
+            return forLoop;
+        }
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, P p) {

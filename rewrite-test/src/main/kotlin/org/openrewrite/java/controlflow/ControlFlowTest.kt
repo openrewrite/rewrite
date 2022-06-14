@@ -719,7 +719,41 @@ interface ControlFlowTest : RewriteTest {
                 int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
                     int x = start();
                     x++;
-                    for (int i = 0; theTest(); /*~~(L)~~>*/i++) {
+                    for (int i = 0; theTest(); i++) /*~~(L)~~>*/{
+                        x += 2;
+                    }
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `for i loop forever`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() {
+                    int x = start();
+                    x++;
+                    for (;;) {
+                        x += 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    for (;;) /*~~(L)~~>*/{
                         x += 2;
                     }
                     return /*~~(L)~~>*/5;
