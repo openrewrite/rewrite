@@ -47,13 +47,18 @@ public abstract class ControlFlowNode {
         return addSuccessor(new BasicBlock());
     }
 
-    ConditionNode addConditionNode() {
+    ConditionNode addConditionNodeTruthFirst() {
+        throw new IllegalStateException("Can only add a condition node to a basic block");
+    }
+
+    ConditionNode addConditionNodeFalseFirst() {
         throw new IllegalStateException("Can only add a condition node to a basic block");
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     static class ConditionNode extends ControlFlowNode {
         private final Cursor condition;
+        private final boolean truthFirst;
         /**
          * The successor that will be evaluated if the {@link #condition} is true.
          */
@@ -67,12 +72,22 @@ public abstract class ControlFlowNode {
 
         @Override
         protected void _addSuccessorInternal(ControlFlowNode successor) {
-            if (truthySuccessor == null) {
-                truthySuccessor = successor;
-            } else if (falsySuccessor == null) {
-                falsySuccessor = successor;
+            if (truthFirst) {
+                if (truthySuccessor == null) {
+                    truthySuccessor = successor;
+                } else if (falsySuccessor == null) {
+                    falsySuccessor = successor;
+                } else {
+                    throw new IllegalStateException("Condition node already has both successors");
+                }
             } else {
-                throw new IllegalStateException("Condition node already has both successors");
+                if (falsySuccessor == null) {
+                    falsySuccessor = successor;
+                } else if (truthySuccessor == null) {
+                    truthySuccessor = successor;
+                } else {
+                    throw new IllegalStateException("Condition node already has both successors");
+                }
             }
         }
 
@@ -122,11 +137,19 @@ public abstract class ControlFlowNode {
         }
 
         @Override
-        ConditionNode addConditionNode() {
+        ConditionNode addConditionNodeTruthFirst() {
             if (node.isEmpty()) {
                 throw new IllegalStateException("Cannot add condition node to empty basic block");
             }
-            return addSuccessor(new ControlFlowNode.ConditionNode(node.get(node.size() - 1)));
+            return addSuccessor(new ControlFlowNode.ConditionNode(node.get(node.size() - 1), true));
+        }
+
+        @Override
+        ConditionNode addConditionNodeFalseFirst() {
+            if (node.isEmpty()) {
+                throw new IllegalStateException("Cannot add condition node to empty basic block");
+            }
+            return addSuccessor(new ControlFlowNode.ConditionNode(node.get(node.size() - 1), false));
         }
 
         @Override

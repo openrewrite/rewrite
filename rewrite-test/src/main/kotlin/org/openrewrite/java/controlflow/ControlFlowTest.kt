@@ -58,8 +58,39 @@ interface ControlFlowTest : RewriteTest {
 
                             override fun visitExpression(expression: Expression, p: ExecutionContext): Expression {
                                 return if (leaders.contains(expression))
-                                    expression.withMarkers(expression.markers.searchResult("L"))
+                                    expression.withMarkers(expression.markers.searchResult(expression.leaderDescription()))
                                 else expression
+                            }
+
+                            fun Expression.leaderDescription(): String {
+                                return when (this) {
+                                    is J.Binary -> {
+                                        val tag = when (this.operator) {
+                                            J.Binary.Type.And -> "&&"
+                                            J.Binary.Type.Or -> "||"
+                                            J.Binary.Type.Addition -> "+"
+                                            J.Binary.Type.Subtraction -> "-"
+                                            J.Binary.Type.Multiplication -> "*"
+                                            J.Binary.Type.Division -> "/"
+                                            J.Binary.Type.Modulo -> "%"
+                                            J.Binary.Type.LessThan -> "<"
+                                            J.Binary.Type.LessThanOrEqual -> "<="
+                                            J.Binary.Type.GreaterThan -> ">"
+                                            J.Binary.Type.GreaterThanOrEqual -> ">="
+                                            J.Binary.Type.Equal -> "=="
+                                            J.Binary.Type.NotEqual -> "!="
+                                            J.Binary.Type.BitAnd -> "&"
+                                            J.Binary.Type.BitOr -> "|"
+                                            J.Binary.Type.BitXor -> "^"
+                                            J.Binary.Type.LeftShift -> "<<"
+                                            J.Binary.Type.RightShift -> ">>"
+                                            J.Binary.Type.UnsignedRightShift -> ">>>"
+                                            null -> "null"
+                                        }
+                                        "L ($tag)"
+                                    }
+                                    else -> "L"
+                                }
                             }
                         })
                         return block.withMarkers(
@@ -324,6 +355,38 @@ interface ControlFlowTest : RewriteTest {
                     int x = start();
                     x++;
                     if (x >= 1 && /*~~(L)~~>*/x <= 2) /*~~(L)~~>*/{
+                        return 2;
+                    }
+                    /*~~(L)~~>*/return 5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `if statement with || in control`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                int test() {
+                    int x = start();
+                    x++;
+                    if (x > 5 || x < 3) {
+                        return 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                int test() /*~~(BB: 5 CN: 2 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    if (/*~~(L (||))~~>*/x > 5 || /*~~(L)~~>*/x < 3) /*~~(L)~~>*/{
                         return 2;
                     }
                     /*~~(L)~~>*/return 5;

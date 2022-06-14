@@ -187,7 +187,7 @@ public final class ControlFlow {
             ControlFlowAnalysis<P> conditionAnalysis =
                     visitRecursive(current, iff.getIfCondition().getTree(), p); // First the condition is invoked
             ControlFlowNode truthNode = conditionAnalysis.getTruthyCurrent();
-            ControlFlowNode.ConditionNode conditionNode = truthNode.addConditionNode();
+            ControlFlowNode.ConditionNode conditionNode = truthNode.addConditionNodeTruthFirst();
             ControlFlowAnalysis<P> thenAnalysis =
                     visitRecursive(Collections.singleton(conditionNode), iff.getThenPart(), p); // Then the then block is visited
             if (!thenAnalysis.exitFlow.isEmpty()) {
@@ -219,7 +219,7 @@ public final class ControlFlow {
         public J.Binary visitBinary(J.Binary binary, P p) {
             if (J.Binary.Type.And.equals(binary.getOperator())) {
                 ControlFlowAnalysis<P> left = visitRecursive(current, binary.getLeft(), p);
-                ControlFlowNode.ConditionNode conditionLeft = left.getTruthyCurrent().addConditionNode();
+                ControlFlowNode.ConditionNode conditionLeft = left.getTruthyCurrent().addConditionNodeTruthFirst();
                 ControlFlowAnalysis<P> right = visitRecursive(
                         Collections.singleton(conditionLeft),
                         binary.getRight(),
@@ -232,6 +232,19 @@ public final class ControlFlow {
                         left.current.stream().filter(c -> !conditionLeft.getPredecessors().contains(c)),
                         Stream.of(conditionLeft)
                 ).collect(Collectors.toSet());
+            } else if (J.Binary.Type.Or.equals(binary.getOperator())) {
+                ControlFlowAnalysis<P> left = visitRecursive(current, binary.getLeft(), p);
+                ControlFlowNode.ConditionNode conditionLeft = left.getTruthyCurrent().addConditionNodeFalseFirst();
+                ControlFlowAnalysis<P> right = visitRecursive(
+                        Collections.singleton(conditionLeft),
+                        binary.getRight(),
+                        p
+                );
+                current = Stream.concat(
+                        Stream.of(conditionLeft),
+                        right.current.stream()
+                ).collect(Collectors.toSet());
+                addCursorToBasicBlock();
             } else {
                 visit(binary.getLeft(), p); // First the left is invoked
                 visit(binary.getRight(), p); // Then the right is invoked
