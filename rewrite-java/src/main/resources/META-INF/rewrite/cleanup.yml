@@ -22,7 +22,6 @@ recipeList:
   - org.openrewrite.java.cleanup.DefaultComesLast
   - org.openrewrite.java.cleanup.EmptyBlock
   - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
-  - org.openrewrite.java.cleanup.ExplicitLambdaArgumentTypes
   - org.openrewrite.java.cleanup.ForLoopControlVariablePostfixOperators
   - org.openrewrite.java.cleanup.MethodParamPad
   - org.openrewrite.java.cleanup.NoWhitespaceAfter
