@@ -211,7 +211,12 @@ public final class ControlFlow {
             if (unary.getOperator() == J.Unary.Type.Not) {
                 addCursorToBasicBlock();
                 visit(unary.getExpression(), p);
-                currentAsBasicBlock().invertNextConditional();
+                current.forEach(controlFlowNode -> {
+                    if (controlFlowNode instanceof ControlFlowNode.BasicBlock) {
+                        ControlFlowNode.BasicBlock basicBlock = (ControlFlowNode.BasicBlock) controlFlowNode;
+                        basicBlock.invertNextConditional();
+                    }
+                });
             } else {
                 visit(unary.getExpression(), p); // The expression is invoked
                 addCursorToBasicBlock(); // Then the unary
