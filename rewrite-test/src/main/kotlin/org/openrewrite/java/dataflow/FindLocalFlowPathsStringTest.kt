@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.dataflow
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.java.controlflow.Guard
@@ -1030,7 +1029,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
     )
 
     @Test
-    fun `a thrown exception is a guard when included in an boolean expression demorgans`() = rewriteRun(
+    fun `a thrown exception is a guard when included in an boolean expression De Morgan's`() = rewriteRun(
         java(
             """
             abstract class Test {
