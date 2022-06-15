@@ -113,6 +113,9 @@ public class Autodetect extends NamedStyles {
         private int linesWithSpaceIndents = 0;
         private int linesWithTabIndents = 0;
 
+        private int multilineAlignedToFirstArgument = 0;
+        private int multilineNotAlignedToFirstArgument = 0;
+
         public boolean isIndentedWithSpaces() {
             return linesWithSpaceIndents >= linesWithTabIndents;
         }
@@ -146,7 +149,8 @@ public class Autodetect extends NamedStyles {
                     useTabs ? 1 : indent,
                     continuationIndent,
                     false,
-                    new TabsAndIndentsStyle.MethodDeclarationParameters(true)
+                    new TabsAndIndentsStyle.MethodDeclarationParameters(
+                            multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
             );
         }
     }
@@ -174,6 +178,31 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class FindIndentJavaVisitor extends JavaIsoVisitor<IndentStatistics> {
+        @Override
+        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, IndentStatistics stats) {
+            if (method.getParameters().size() > 1) {
+                int alignTo;
+                if (method.getParameters().get(0).getPrefix().getLastWhitespace().contains("\n")) {
+                    // Compare to the prefix of the first arg.
+                    alignTo = method.getParameters().get(0).getPrefix().getLastWhitespace().length() - 1;
+                } else {
+                    String source = method.print(getCursor());
+                    alignTo = source.indexOf(method.getParameters().get(0).print(getCursor())) - 1;
+                }
+                List<Statement> parameters = method.getParameters();
+                for (int i = 1; i < parameters.size(); i++) {
+                    if (parameters.get(i).getPrefix().getLastWhitespace().contains("\n")) {
+                        if (alignTo == parameters.get(i).getPrefix().getLastWhitespace().length()) {
+                            stats.multilineAlignedToFirstArgument++;
+                        } else {
+                            stats.multilineNotAlignedToFirstArgument++;
+                        }
+                    }
+                }
+            }
+            return super.visitMethodDeclaration(method, stats);
+        }
+
         @Override
         public Space visitSpace(Space space, Space.Location loc, IndentStatistics stats) {
             Integer lastIndent = getCursor().getNearestMessage("lastIndent");

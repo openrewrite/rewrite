@@ -207,28 +207,25 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     case METHOD_DECLARATION_PARAMETER: {
                         JContainer<J> container = getCursor().getParentOrThrow().getValue();
                         J firstArg = container.getElements().iterator().next();
-                        if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
-                            // if the first argument is on its own line, align all arguments to be continuation indented
-                            elem = visitAndCast(elem, p);
-                            after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
-                        } else {
-                            // align to first argument when the first argument isn't on its own line
-                            if (style.getMethodDeclarationParameters().getAlignWhenMultiple()) {
-                                System.out.println();
-                                J.MethodDeclaration method = getCursor().firstEnclosing(J.MethodDeclaration.class);
-                                if (method != null) {
-                                    String source = method.print(getCursor());
-                                    int alignTo = source.indexOf(firstArg.print(getCursor())) - 1;
-                                    getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
-                                    elem = visitAndCast(elem, p);
-                                    after = indentTo(right.getAfter(), alignTo, loc.getAfterLocation());
+                        if (style.getMethodDeclarationParameters().getAlignWhenMultiple()) {
+                            J.MethodDeclaration method = getCursor().firstEnclosing(J.MethodDeclaration.class);
+                            if (method != null) {
+                                int alignTo;
+                                if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
+                                    alignTo = firstArg.getPrefix().getLastWhitespace().length() - 1;
                                 } else {
-                                    after = right.getAfter();
+                                    String source = method.print(getCursor());
+                                    alignTo = source.indexOf(firstArg.print(getCursor())) - 1;
                                 }
-                            } else {
+                                getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
                                 elem = visitAndCast(elem, p);
-                                after = indentTo(right.getAfter(), style.getContinuationIndent(), loc.getAfterLocation());
+                                after = indentTo(right.getAfter(), alignTo, loc.getAfterLocation());
+                            } else {
+                                after = right.getAfter();
                             }
+                        } else {
+                            elem = visitAndCast(elem, p);
+                            after = indentTo(right.getAfter(), style.getContinuationIndent(), loc.getAfterLocation());
                         }
                         break;
                     }

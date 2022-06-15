@@ -48,17 +48,27 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         jp,
         before = """
             class Test {
-                private void takeBoth(String first,
-                                      int times,
+                private void firstArgNoPrefix(String first,
+                                              int times,
+                     String third) {
+                }
+                private void firstArgOnNewLine(
+                        String first,
+                        int times,
                      String third) {
                 }
             }
         """,
         after = """
             class Test {
-                private void takeBoth(String first,
-                                      int times,
-                                      String third) {
+                private void firstArgNoPrefix(String first,
+                                              int times,
+                                              String third) {
+                }
+                private void firstArgOnNewLine(
+                        String first,
+                        int times,
+                        String third) {
                 }
             }
         """
@@ -71,15 +81,25 @@ interface TabsAndIndentsTest : JavaRecipeTest {
             TabsAndIndentsStyle.MethodDeclarationParameters(false)) }).build(),
         before = """
             class Test {
-                private void takeBoth(String first,
-                                      int times,
-                                      String third) {
+                private void firstArgNoPrefix(String first,
+                                              int times,
+                                              String third) {
+                }
+                private void firstArgOnNewLine(
+                                               String first,
+                                               int times,
+                                               String third) {
                 }
             }
         """,
         after = """
             class Test {
-                private void takeBoth(String first,
+                private void firstArgNoPrefix(String first,
+                        int times,
+                        String third) {
+                }
+                private void firstArgOnNewLine(
+                        String first,
                         int times,
                         String third) {
                 }
