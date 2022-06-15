@@ -87,7 +87,6 @@ interface FindLocalTaintFlowTest : RewriteTest {
                             File p = o.toFile();
                             System.out.println(p);
                         }
-
                     }
                 }
             """,
@@ -110,7 +109,6 @@ interface FindLocalTaintFlowTest : RewriteTest {
                             File p = /*~~>*//*~~>*/o.toFile();
                             System.out.println(/*~~>*/p);
                         }
-
                     }
                 }
             """

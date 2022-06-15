@@ -129,7 +129,10 @@ public final class ControlFlow {
         public J.Block visitBlock(J.Block block, P p) {
             addCursorToBasicBlock();
             for (Statement statement : block.getStatements()) {
-                visit(statement, p);
+                ControlFlowAnalysis<P> analysis = visitRecursive(current, statement, p);
+                current = analysis.current;
+                jumps = analysis.jumps;
+                exitFlow.addAll(analysis.exitFlow);
             }
             if (methodEntryPoint) {
                 ControlFlowNode end = ControlFlowNode.End.create();
@@ -148,6 +151,15 @@ public final class ControlFlow {
             visit(method.getArguments(), p); // Then the arguments are invoked
             addCursorToBasicBlock(); // Then the method invocation
             return method;
+        }
+
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, P p) {
+            visit(newClass.getEnclosing(), p); // First the enclosing is invoked
+            visit(newClass.getArguments(), p); // Then the arguments are invoked
+            addCursorToBasicBlock(); // Then the new class
+            // TODO: Maybe invoke a visitor on the body? (Anonymous inner classes)
+            return newClass;
         }
 
         @Override
