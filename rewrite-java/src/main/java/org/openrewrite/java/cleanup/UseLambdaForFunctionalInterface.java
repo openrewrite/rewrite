@@ -197,6 +197,21 @@ public class UseLambdaForFunctionalInterface extends Recipe {
         return hasThis.get();
     }
 
+    private static List<String> parameterNames(J.MethodDeclaration method) {
+        return method.getParameters().stream()
+                .filter(s -> s instanceof J.VariableDeclarations)
+                .map(v -> ((J.VariableDeclarations) v).getVariables().get(0).getSimpleName())
+                .collect(Collectors.toList());
+    }
+
+    // This does not recursive descend extended classes for inherited fields.
+    private static List<String> classFields(J.ClassDeclaration classDeclaration) {
+        return classDeclaration.getBody().getStatements().stream()
+                .filter(s -> s instanceof J.VariableDeclarations)
+                .map(v -> ((J.VariableDeclarations) v).getVariables().get(0).getSimpleName())
+                .collect(Collectors.toList());
+    }
+
     // if the contents of the cursor value shadow a local variable in its containing name scope
     private static boolean shadowsLocalVariable(Cursor cursor) {
         J.NewClass n = cursor.getValue();
@@ -205,6 +220,19 @@ public class UseLambdaForFunctionalInterface extends Recipe {
 
         List<String> localVariables = new ArrayList<>();
         J.Block nameScope = cursor.firstEnclosing(J.Block.class);
+
+        J nameScopeParent = cursor.dropParentUntil(is -> is instanceof J.MethodDeclaration || is instanceof J.ClassDeclaration).getValue();
+        if (nameScopeParent instanceof J.MethodDeclaration) {
+            J.MethodDeclaration m = (J.MethodDeclaration) nameScopeParent;
+            localVariables.addAll(parameterNames(m));
+            J.ClassDeclaration c = cursor.firstEnclosing(J.ClassDeclaration.class);
+            assert c != null;
+            localVariables.addAll(classFields(c));
+        } else {
+            J.ClassDeclaration c = (J.ClassDeclaration) nameScopeParent;
+            localVariables.addAll(classFields(c));
+        }
+
         new JavaVisitor<List<String>>() {
             @Override
             public J visitVariable(J.VariableDeclarations.NamedVariable variable, List<String> variables) {
