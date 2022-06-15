@@ -528,6 +528,40 @@ interface ControlFlowTest : RewriteTest {
     )
 
     @Test
+    fun `if statement with negation for boolean variable in control`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                int test() {
+                    int x = start();
+                    x++;
+                    boolean b = !(x >= 1);
+                    if (b) {
+                        return 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    boolean b = !(x >= 1);
+                    if (b) /*~~(L)~~>*/{
+                        return 2;
+                    }
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
     fun `if statement with wrapped parentheses in control`() = rewriteRun(
         java(
             """

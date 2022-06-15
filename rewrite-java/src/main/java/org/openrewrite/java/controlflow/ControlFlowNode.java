@@ -146,6 +146,7 @@ public abstract class ControlFlowNode {
         @Getter
         private ControlFlowNode successor;
         private final List<Cursor> node = new ArrayList<>();
+        private boolean nextConditionDefault = true;
 
         public J getLeader() {
             if (node.isEmpty()) {
@@ -166,12 +167,20 @@ public abstract class ControlFlowNode {
             return node.add(expression);
         }
 
+        /**
+         * When the next {@link #addConditionNodeTruthFirst()} or {@link #addConditionNodeFalseFirst()} is called,
+         * invert the default condition.
+         */
+        void invertNextConditional() {
+            nextConditionDefault = !nextConditionDefault;
+        }
+
         @Override
         ConditionNode addConditionNodeTruthFirst() {
             if (node.isEmpty()) {
                 throw new IllegalStateException("Cannot add condition node to empty basic block");
             }
-            return addSuccessor(new ControlFlowNode.ConditionNode(node.get(node.size() - 1), true));
+            return addSuccessor(new ControlFlowNode.ConditionNode(node.get(node.size() - 1), nextConditionDefault));
         }
 
         @Override
@@ -179,7 +188,7 @@ public abstract class ControlFlowNode {
             if (node.isEmpty()) {
                 throw new IllegalStateException("Cannot add condition node to empty basic block");
             }
-            return addSuccessor(new ControlFlowNode.ConditionNode(node.get(node.size() - 1), false));
+            return addSuccessor(new ControlFlowNode.ConditionNode(node.get(node.size() - 1), !nextConditionDefault));
         }
 
         @Override

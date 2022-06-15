@@ -199,7 +199,7 @@ public final class ControlFlow {
             if (unary.getOperator() == J.Unary.Type.Not) {
                 addCursorToBasicBlock();
                 visit(unary.getExpression(), p);
-                current = allAsConditionNodesMissingFalseFirst(current);
+                currentAsBasicBlock().invertNextConditional();
             } else {
                 visit(unary.getExpression(), p); // The expression is invoked
                 addCursorToBasicBlock(); // Then the unary
