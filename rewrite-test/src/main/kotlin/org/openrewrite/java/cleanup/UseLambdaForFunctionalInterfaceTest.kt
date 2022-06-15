@@ -210,6 +210,49 @@ interface UseLambdaForFunctionalInterfaceTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnnecessaryLocalVariable")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1915")
+    @Test
+    fun dontUseLambdaWhenShadowsClassField(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.function.Supplier;
+            class Test {
+                int n = 1;
+                void test() {
+                    Supplier<Integer> f = new Supplier<Integer>() {
+                        @Override
+                        public Integer get() {
+                            int n = 0;
+                            return n;
+                        }
+                    };
+                }
+            }
+        """
+    )
+
+    @Suppress("UnnecessaryLocalVariable")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1915")
+    @Test
+    fun dontUseLambdaWhenShadowsMethodDeclarationParam(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.function.Supplier;
+            class Test {
+                void test(int n) {
+                    Supplier<Integer> f = new Supplier<Integer>() {
+                        @Override
+                        public Integer get() {
+                            int n = 0;
+                            return n;
+                        }
+                    };
+                }
+            }
+        """
+    )
+
     @Test
     fun finalParameters(jp: JavaParser) = assertChanged(
         jp,
