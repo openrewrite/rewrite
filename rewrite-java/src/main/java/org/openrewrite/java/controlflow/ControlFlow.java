@@ -196,8 +196,14 @@ public final class ControlFlow {
 
         @Override
         public J.Unary visitUnary(J.Unary unary, P p) {
-            visit(unary.getExpression(), p); // The expression is invoked
-            addCursorToBasicBlock(); // Then the unary
+            if (unary.getOperator() == J.Unary.Type.Not) {
+                addCursorToBasicBlock();
+                visit(unary.getExpression(), p);
+                current = allAsConditionNodesMissingFalseFirst(current);
+            } else {
+                visit(unary.getExpression(), p); // The expression is invoked
+                addCursorToBasicBlock(); // Then the unary
+            }
             return unary;
         }
 
@@ -211,7 +217,7 @@ public final class ControlFlow {
             }).collect(Collectors.toSet());
         }
 
-        private static Set<ControlFlowNode.ConditionNode> allAsConditionNodesMissingFalsyFirst(Set<? extends ControlFlowNode> nodes) {
+        private static Set<ControlFlowNode.ConditionNode> allAsConditionNodesMissingFalseFirst(Set<? extends ControlFlowNode> nodes) {
             return nodes.stream().map(controlFlowNode -> {
                 if (controlFlowNode instanceof ControlFlowNode.ConditionNode) {
                     return ((ControlFlowNode.ConditionNode) controlFlowNode);
@@ -336,7 +342,7 @@ public final class ControlFlow {
                 ).collect(Collectors.toSet());
             } else if (J.Binary.Type.Or.equals(binary.getOperator())) {
                 ControlFlowAnalysis<P> left = visitRecursive(current, binary.getLeft(), p);
-                Set<ControlFlowNode.ConditionNode> conditionNodes = allAsConditionNodesMissingFalsyFirst(left.current);
+                Set<ControlFlowNode.ConditionNode> conditionNodes = allAsConditionNodesMissingFalseFirst(left.current);
                 ControlFlowAnalysis<P> right = visitRecursive(
                         conditionNodes,
                         binary.getRight(),

@@ -966,7 +966,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
                 void test() {
                     String n = "42";
-                    if (guard()) {
+                    if (!guard()) {
                         throw new RuntimeException();
                     }
                     String o = n;
@@ -981,7 +981,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
                 void test() {
                     String n = /*~~>*/"42";
-                    if (guard()) {
+                    if (!guard()) {
                         throw new RuntimeException();
                     }
                     String o = n;
@@ -1002,7 +1002,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
                 void test() {
                     String n = "42";
-                    if (guard() || guard()) {
+                    if (!guard() && !guard()) {
                         throw new RuntimeException();
                     }
                     String o = n;
@@ -1017,7 +1017,43 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
                 void test() {
                     String n = /*~~>*/"42";
-                    if (guard() || guard()) {
+                    if (!guard() && !guard()) {
+                        throw new RuntimeException();
+                    }
+                    String o = n;
+                    System.out.println(o);
+                    String p = o;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `a thrown exception is a guard when included in an boolean expression demorgans`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    if (!(guard() || guard())) {
+                        throw new RuntimeException();
+                    }
+                    String o = n;
+                    System.out.println(o);
+                    String p = o;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    if (!(guard() || guard())) {
                         throw new RuntimeException();
                     }
                     String o = n;

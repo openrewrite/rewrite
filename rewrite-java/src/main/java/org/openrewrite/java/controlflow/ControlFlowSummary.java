@@ -26,7 +26,6 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @AllArgsConstructor(staticName = "forGraph", access = AccessLevel.PACKAGE)
 public final class ControlFlowSummary {
