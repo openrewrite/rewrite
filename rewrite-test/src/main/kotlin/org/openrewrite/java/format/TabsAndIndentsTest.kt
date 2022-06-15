@@ -42,6 +42,51 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         )
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1913")
+    @Test
+    fun alignMethodDeclarationParamsWhenMultiple(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                private void takeBoth(String first,
+                                      int times,
+                     String third) {
+                }
+            }
+        """,
+        after = """
+            class Test {
+                private void takeBoth(String first,
+                                      int times,
+                                      String third) {
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1913")
+    @Test
+    fun alignMethodDeclarationParamsWhenContinuationIndent(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents { withMethodDeclarationParameters(
+            TabsAndIndentsStyle.MethodDeclarationParameters(false)) }).build(),
+        before = """
+            class Test {
+                private void takeBoth(String first,
+                                      int times,
+                                      String third) {
+                }
+            }
+        """,
+        after = """
+            class Test {
+                private void takeBoth(String first,
+                        int times,
+                        String third) {
+                }
+            }
+        """
+    )
+
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
     @Test
     fun rspec3973(jp: JavaParser) = assertChanged(

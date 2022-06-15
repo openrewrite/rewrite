@@ -145,7 +145,8 @@ public class Autodetect extends NamedStyles {
                     useTabs ? indent : 1,
                     useTabs ? 1 : indent,
                     continuationIndent,
-                    false
+                    false,
+                    new TabsAndIndentsStyle.MethodDeclarationParameters(true)
             );
         }
     }
