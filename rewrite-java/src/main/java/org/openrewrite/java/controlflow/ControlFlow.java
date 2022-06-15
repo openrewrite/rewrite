@@ -125,6 +125,14 @@ public final class ControlFlow {
             return analysis;
         }
 
+        ControlFlowAnalysis<P> visitRecursiveTransferringDefault(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
+            final ControlFlowAnalysis<P> analysis = visitRecursive(start, toVisit, param);
+            if (!analysis.exitFlow.isEmpty()) {
+                this.exitFlow.addAll(analysis.exitFlow);
+            }
+            return analysis;
+        }
+
         @Override
         public J.Block visitBlock(J.Block block, P p) {
             addCursorToBasicBlock();
@@ -303,23 +311,20 @@ public final class ControlFlow {
         private void visitBranching(BranchingAdapter branching, P p) {
             addCursorToBasicBlock(); // Add the if node first
 
+            // First the condition is invoked
             ControlFlowAnalysis<P> conditionAnalysis =
-                    visitRecursive(current, branching.getCondition(), p); // First the condition is invoked
+                    visitRecursiveTransferringDefault(current, branching.getCondition(), p);
 
             Set<ControlFlowNode.ConditionNode> conditionNodes = allAsConditionNodesMissingTruthFirst(conditionAnalysis.current);
+            // Then the then block is visited
             ControlFlowAnalysis<P> thenAnalysis =
-                    visitRecursive(conditionNodes, branching.getTruePart(), p); // Then the then block is visited
-            if (!thenAnalysis.exitFlow.isEmpty()) {
-                exitFlow.addAll(thenAnalysis.exitFlow);
-            }
+                    visitRecursiveTransferringDefault(conditionNodes, branching.getTruePart(), p);
             Set<ControlFlowNode> newCurrent = Collections.singleton(getControlFlowNodeMissingSuccessors(conditionNodes));
             boolean exhaustiveJump = thenAnalysis.jumps;
             if (branching.getFalsePart() != null) {
+                // Then the else block is visited
                 ControlFlowAnalysis<P> elseAnalysis =
-                        visitRecursive(newCurrent, branching.getFalsePart(), p); // Then the else block is visited
-                if (!elseAnalysis.exitFlow.isEmpty()) {
-                    exitFlow.addAll(elseAnalysis.exitFlow);
-                }
+                        visitRecursiveTransferringDefault(newCurrent, branching.getFalsePart(), p);
                 current = Stream.concat(
                         thenAnalysis.current.stream(),
                         elseAnalysis.current.stream()
@@ -383,10 +388,7 @@ public final class ControlFlow {
             ControlFlowNode.BasicBlock entryBlock = currentAsBasicBlock();
             ControlFlowNode.BasicBlock basicBlock = entryBlock.addBasicBlock();
             ControlFlowAnalysis<P> bodyAnalysis =
-                    visitRecursive(Collections.singleton(basicBlock), doWhileLoop.getBody(), p); // First  the body is visited
-            if (!bodyAnalysis.exitFlow.isEmpty()) {
-                exitFlow.addAll(bodyAnalysis.exitFlow);
-            }
+                    visitRecursiveTransferringDefault(Collections.singleton(basicBlock), doWhileLoop.getBody(), p); // First  the body is visited
             ControlFlowAnalysis<P> conditionAnalysis =
                     visitRecursive(bodyAnalysis.current, doWhileLoop.getWhileCondition().getTree(), p); // Then the condition is invoked
             Set<ControlFlowNode.ConditionNode> conditionNodes =
@@ -410,10 +412,7 @@ public final class ControlFlow {
             Set<ControlFlowNode.ConditionNode> conditionNodes =
                     allAsConditionNodesMissingTruthFirst(conditionAnalysis.current);
             ControlFlowAnalysis<P> bodyAnalysis =
-                    visitRecursive(conditionNodes, whileLoop.getBody(), p); // Then the body is visited
-            if (!bodyAnalysis.exitFlow.isEmpty()) {
-                exitFlow.addAll(bodyAnalysis.exitFlow);
-            }
+                    visitRecursiveTransferringDefault(conditionNodes, whileLoop.getBody(), p); // Then the body is visited
             // Add the 'loop' in
             bodyAnalysis.current.forEach(
                     controlFlowNode -> controlFlowNode.addSuccessor(entryBlock.getSuccessor())
@@ -455,10 +454,7 @@ public final class ControlFlow {
 
             // Then the body is invoked
             ControlFlowAnalysis<P> bodyAnalysis =
-                    visitRecursive(controlAnalysisFirstBit.current, forLoop.getBody(), p);
-            if (!bodyAnalysis.exitFlow.isEmpty()) {
-                exitFlow.addAll(bodyAnalysis.exitFlow);
-            }
+                    visitRecursiveTransferringDefault(controlAnalysisFirstBit.current, forLoop.getBody(), p);
             // Then the update is invoked
             ControlFlowAnalysis<P> controlAnalysisSecondBit = new ControlFlowAnalysis<P>(bodyAnalysis.current) {
                 @Override
