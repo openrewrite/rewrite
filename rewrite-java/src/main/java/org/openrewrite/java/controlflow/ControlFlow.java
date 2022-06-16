@@ -502,6 +502,30 @@ public final class ControlFlow {
             return thrown;
         }
 
+        @Override
+        public J.ArrayAccess visitArrayAccess(J.ArrayAccess arrayAccess, P p) {
+            addCursorToBasicBlock();
+            return arrayAccess;
+        }
+
+        @Override
+        public J.Try visitTry(J.Try _try, P p) {
+            addCursorToBasicBlock();
+            return _try;
+        }
+
+        @Override
+        public J.Switch visitSwitch(J.Switch _switch, P p) {
+            addCursorToBasicBlock();
+            return _switch;
+        }
+
+//        @Override
+//        public J.Case visitCase(J.Case _case, P p) {
+//            addCursorToBasicBlock();
+//            return _case;
+//        }
+
         private static ControlFlowNode.BasicBlock addBasicBlock(Collection<ControlFlowNode> nodes) {
             if (nodes.isEmpty()) {
                 throw new IllegalStateException("No nodes to add to a basic block!");

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.dataflow
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.java.controlflow.Guard
@@ -28,23 +29,20 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(RewriteTest.toRecipe {
             FindLocalFlowPaths(object : LocalFlowSpec<Expression, Expression>() {
-                override fun isSource(expr: Expression, cursor: Cursor) =
-                    when (expr) {
-                        is J.Literal -> expr.value == "42"
-                        is J.MethodInvocation -> expr.name.simpleName == "source"
+                override fun isSource(expr: Expression, cursor: Cursor) = when (expr) {
+                    is J.Literal -> expr.value == "42"
+                    is J.MethodInvocation -> expr.name.simpleName == "source"
+                    else -> false
+                }
+
+                override fun isSink(expr: Expression, cursor: Cursor) = true
+
+                override fun isBarrierGuard(guard: Guard, branch: Boolean): Boolean = guard.expression.run {
+                    when (this) {
+                        is J.MethodInvocation -> this.name.simpleName == "guard" && branch
                         else -> false
                     }
-
-                override fun isSink(expr: Expression, cursor: Cursor) =
-                    true
-
-                override fun isBarrierGuard(guard: Guard, branch: Boolean): Boolean =
-                    guard.expression.run {
-                        when (this) {
-                            is J.MethodInvocation -> this.name.simpleName == "guard" && branch
-                            else -> false
-                        }
-                    }
+                }
             })
         })
         spec.expectedCyclesThatMakeChanges(1).cycles(1)
@@ -62,8 +60,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         String p = o;
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     void test() {
                         String n = /*~~>*/"42";
@@ -78,8 +75,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `transitive assignment from source method`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     String source() {
@@ -93,8 +89,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         String p = o;
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     String source() {
                         return null;
@@ -113,8 +108,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `taint flow via append is not data flow`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     void test() {
@@ -124,8 +118,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         String p = o;
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     void test() {
                         String n = /*~~>*/"42";
@@ -140,8 +133,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `taint flow is not data flow but it is tracked to call site`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     void test() {
@@ -151,8 +143,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         String p = o;
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     void test() {
                         String n = /*~~>*/"42";
@@ -167,8 +158,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `taint flow via constructor call is not data flow`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     void test() {
@@ -177,8 +167,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(o);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     void test() {
                         String n = /*~~>*/"42";
@@ -192,8 +181,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `the source is also a sink simple`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     String source() {
@@ -206,8 +194,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         sink(source());
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     String source() {
                         return null;
@@ -225,8 +212,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `the source as a literal is also a sink`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     void sink(Object any) {
@@ -236,8 +222,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         sink("42");
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     void sink(Object any) {
                         // do nothing
@@ -252,8 +237,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `the source is also a sink`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 import java.util.Locale;
                 class Test {
@@ -271,8 +255,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                             .toLowerCase(Locale.ROOT);
                     }
                 }
-            """,
-            """
+            """, """
                 import java.util.Locale;
                 class Test {
                     String source() {
@@ -295,8 +278,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `the source is also a sink double call chain`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     String source() {
@@ -308,8 +290,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                             .toString();
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     String source() {
                         return null;
@@ -326,8 +307,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `the source can be tracked through wrapped parentheses`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 import java.util.Locale;
                 class Test {
@@ -348,8 +328,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         ).equals(null);
                     }
                 }
-            """,
-            """
+            """, """
                 import java.util.Locale;
                 class Test {
                     String source() {
@@ -375,8 +354,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `the source can be tracked through wrapped parentheses through casting`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 import java.util.Locale;
                 class Test {
@@ -391,8 +369,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         ).toString();
                     }
                 }
-            """,
-            """
+            """, """
                 import java.util.Locale;
                 class Test {
                     String source() {
@@ -412,8 +389,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `source is tracked when assigned in while loop control parentheses`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     String source() {
@@ -428,8 +404,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         }
                     }
                 }
-            """,
-            """
+            """, """
             class Test {
                 String source() {
                     return null;
@@ -449,8 +424,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `source is tracked when assigned in do while loop control parentheses`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     String source() {
@@ -465,8 +439,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         } while ((a = source()) != null);
                     }
                 }
-            """,
-            """
+            """, """
             class Test {
                 String source() {
                     return null;
@@ -486,8 +459,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `source is tracked when assigned in for loop`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     String source(int i) {
@@ -502,8 +474,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         }
                     }
                 }
-            """,
-            """
+            """, """
             class Test {
                 String source(int i) {
                     return null;
@@ -523,8 +494,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `reassignment of a variable breaks flow`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     void test() {
@@ -534,8 +504,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(n);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     void test() {
                         String n = /*~~>*/"42";
@@ -550,8 +519,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `reassignment of a variable with existing value preserves flow`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     void test() {
@@ -561,8 +529,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(n);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     void test() {
                         String n = /*~~>*/"42";
@@ -577,8 +544,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `reassignment of a variable with existing value wrapped in parentheses preserves flow`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     void test() {
@@ -588,8 +554,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(n);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     void test() {
                         String n = /*~~>*/"42";
@@ -604,8 +569,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `a class name in a constructor call is not considered as a part of dataflow`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     class n {}
@@ -617,8 +581,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(n);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     class n {}
 
@@ -635,8 +598,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `a class name in a constructor call on parent type is not considered as a part of dataflow`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     class n {}
@@ -648,8 +610,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(n);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     class n {}
 
@@ -666,8 +627,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `a method name is not considered as a part of dataflow`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     String n() {
@@ -681,8 +641,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(n);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     String n() {
                         return null;
@@ -701,8 +660,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `a class variable access is not considered as a part of dataflow`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
                     String n = "100";
@@ -713,8 +671,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(this.n);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
                     String n = "100";
 
@@ -730,8 +687,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `a ternary operator is considered a data flow step`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
 
@@ -740,8 +696,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(n);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
 
                     void test(boolean conditional) {
@@ -755,8 +710,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `a ternary operator is considered a data flow step 2`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
-        java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """
                 class Test {
 
@@ -766,8 +720,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(m);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
 
                     void test(boolean conditional) {
@@ -795,8 +748,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         System.out.println(n);
                     }
                 }
-            """,
-            """
+            """, """
                 class Test {
 
                     Boolean source() {
@@ -826,8 +778,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         String p = o;
                     }
                 }
-            """,
-            """
+            """, """
                 import java.util.Objects;
                 @SuppressWarnings({"ObviousNullCheck", "RedundantSuppression"})
                 class Test {
@@ -860,8 +811,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         }
                     }
                 }
-            """,
-            """
+            """, """
                 abstract class Test {
                     abstract boolean guard();
 
@@ -898,8 +848,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         }
                     }
                 }
-            """,
-            """
+            """, """
                 abstract class Test {
                     abstract boolean guard();
 
@@ -936,8 +885,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                         }
                     }
                 }
-            """,
-            """
+            """, """
                 abstract class Test {
                     abstract boolean guard();
 
@@ -973,8 +921,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                     String p = o;
                 }
             }
-            """,
-            """
+            """, """
             abstract class Test {
                 abstract boolean guard();
 
@@ -1009,8 +956,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                     String p = o;
                 }
             }
-            """,
-            """
+            """, """
             abstract class Test {
                 abstract boolean guard();
 
@@ -1045,8 +991,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                     String p = o;
                 }
             }
-            """,
-            """
+            """, """
             abstract class Test {
                 abstract boolean guard();
 
@@ -1063,4 +1008,292 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `try-catch block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    try {
+                        if (!(guard() || guard())) {
+                            throw new RuntimeException();
+                        }
+                    } catch (Exception e) {
+                        System.out.println(n);
+                    }
+                    String o = n;
+                    System.out.println(o);
+                    String p = o;
+                }
+            }
+            """, """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    try {
+                        if (!(guard() || guard())) {
+                            throw new RuntimeException();
+                        }
+                    } catch (Exception e) {
+                        System.out.println(n);
+                    }
+                    String o = n;
+                    System.out.println(o);
+                    String p = o;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `if-statement with boolean array index conditional`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    Boolean[] b = new Boolean[1];
+                    if (b[0] && (b.length == 1) && guard()) {
+                        String o = n;
+                        System.out.println(o);
+                        String p = o;
+                    } else {
+                        System.out.println(n);
+                    }
+                }
+            }
+            """, """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    Boolean[] b = new Boolean[1];
+                    if (b[0] && (b.length == 1) && guard()) {
+                        String o = n;
+                        System.out.println(o);
+                        String p = o;
+                    } else {
+                        System.out.println(n);
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `switch with multiple cases`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    int n = 42;
+                    switch (n) {
+                        case 1:
+                            System.out.println(n);
+                            break;
+                        case 42:
+                            System.out.println("Correct");
+                            break;
+                    }
+                    String o = n + "";
+                    System.out.println(o);
+                    String p = o;
+                }
+            }
+            """, """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    switch (n) {
+                        case 1:
+                            System.out.println(n);
+                            break;
+                        case 42:
+                            System.out.println("Correct");
+                            break;
+                    }
+                    String o = n + "";
+                    System.out.println(o);
+                    String p = o;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `typecast`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    int[] b = new int[1];
+                    char c = (char) b[0];
+                    if (1 == 1) {
+                        String o = n;
+                        System.out.println(o);
+                        String p = o;
+                    } else {
+                        System.out.println(n);
+                    }
+                }
+            }
+            """, """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    int[] b = new int[1];
+                    char c = (char) b[0];
+                    if (1 == 1) {
+                        String o = n;
+                        System.out.println(o);
+                        String p = o;
+                    } else {
+                        System.out.println(n);
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `for-each loop`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    for (char c : n.toCharArray()) {
+                        System.out.println(c);
+                    }
+                }
+            }
+            """, """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    for (char c : n.toCharArray()) {
+                        System.out.println(c);
+                    }
+                }
+            }
+            """
+        )
+    )
+
+
+    @Test
+    fun `generic object instantiation`() = rewriteRun(
+        java(
+            """
+            import java.util.LinkedList;abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    LinkedList<Integer> ll = new LinkedList<>();
+                    ll.add(1);
+                    for (int i : ll) {
+                        System.out.println(i);
+                    }
+                }
+            }
+            """, """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    LinkedList<Integer> ll = new LinkedList<>();
+                    ll.add(1);
+                    for (int i : ll) {
+                        System.out.println(i);
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `assert expression`() = rewriteRun(
+        java(
+            """
+            import java.util.LinkedList;abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    assert n.equals("42");
+                }
+            }
+            """, """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    assert n.equals("42");
+                }
+            }
+            """
+        )
+    )
+
+    @Disabled
+    @Test
+    fun `lambda expression`() = rewriteRun(
+        java(
+            """
+            import java.util.*;
+
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    int [] x = new int[5];
+                    Arrays.sort(x, (Integer a, Integer b) -> {return a.compareTo(b);});
+                }
+            }
+            """, """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = /*~~>*/"42";
+                    int [] x = new int[5];
+                    Arrays.sort(x, (Integer a, Integer b) -> {return a.compareTo(b);});
+                }
+            }
+            """
+        )
+    )
+
+
 }
