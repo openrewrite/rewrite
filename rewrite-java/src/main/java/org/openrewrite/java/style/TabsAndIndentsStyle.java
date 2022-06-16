@@ -33,6 +33,14 @@ public class TabsAndIndentsStyle implements JavaStyle {
     Integer continuationIndent;
     Boolean indentsRelativeToExpressionStart;
 
+    MethodDeclarationParameters methodDeclarationParameters;
+
+    @Value
+    @With
+    public static class MethodDeclarationParameters {
+        Boolean alignWhenMultiple;
+    }
+
     @Override
     public Style applyDefaults() {
         return StyleHelper.merge(IntelliJ.tabsAndIndents(), this);

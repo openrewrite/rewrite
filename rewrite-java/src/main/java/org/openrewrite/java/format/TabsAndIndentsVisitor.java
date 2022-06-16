@@ -21,15 +21,11 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
@@ -211,19 +207,25 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     case METHOD_DECLARATION_PARAMETER: {
                         JContainer<J> container = getCursor().getParentOrThrow().getValue();
                         J firstArg = container.getElements().iterator().next();
-                        if (firstArg.getPrefix().getWhitespace().isEmpty()) {
-                            after = right.getAfter();
-                        } else if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
-                            // if the first argument is on its own line, align all arguments to be continuation indented
-                            elem = visitAndCast(elem, p);
-                            after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
+                        if (style.getMethodDeclarationParameters().getAlignWhenMultiple()) {
+                            J.MethodDeclaration method = getCursor().firstEnclosing(J.MethodDeclaration.class);
+                            if (method != null) {
+                                int alignTo;
+                                if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
+                                    alignTo = firstArg.getPrefix().getLastWhitespace().length() - 1;
+                                } else {
+                                    String source = method.print(getCursor());
+                                    alignTo = source.indexOf(firstArg.print(getCursor())) - 1;
+                                }
+                                getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
+                                elem = visitAndCast(elem, p);
+                                after = indentTo(right.getAfter(), alignTo, loc.getAfterLocation());
+                            } else {
+                                after = right.getAfter();
+                            }
                         } else {
-                            // align to first argument when the first argument isn't on its own line
-                            int firstArgIndent = findIndent(firstArg.getPrefix());
-                            getCursor().getParentOrThrow().putMessage("lastIndent", firstArgIndent);
                             elem = visitAndCast(elem, p);
-                            getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                            after = indentTo(right.getAfter(), firstArgIndent, loc.getAfterLocation());
+                            after = indentTo(right.getAfter(), style.getContinuationIndent(), loc.getAfterLocation());
                         }
                         break;
                     }

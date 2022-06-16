@@ -66,7 +66,8 @@ public class IntelliJ extends NamedStyles {
     }
 
     public static TabsAndIndentsStyle tabsAndIndents() {
-        return new TabsAndIndentsStyle(false, 4, 4, 8, false);
+        return new TabsAndIndentsStyle(false, 4, 4, 8, false,
+                new TabsAndIndentsStyle.MethodDeclarationParameters(true));
     }
 
     public static BlankLinesStyle blankLines() {
