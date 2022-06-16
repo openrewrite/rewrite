@@ -139,10 +139,10 @@ public class GroovyParserVisitor {
                 }
             } catch (Throwable t) {
                 if (t instanceof StringIndexOutOfBoundsException) {
-                    throw new GroovyParsingException("Failed to parse, cursor position likely inaccurate.", t);
+                    throw new GroovyParsingException("Failed to parse " + sourcePath + ", cursor position likely inaccurate.", t);
                 }
                 throw new GroovyParsingException(
-                        "Failed to parse at cursor position " + cursor +
+                        "Failed to parse " + sourcePath + " at cursor position " + cursor +
                                 ". The next 10 characters in the original source are `" +
                                 source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
             }
