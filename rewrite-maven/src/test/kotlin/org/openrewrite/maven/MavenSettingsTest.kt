@@ -18,11 +18,13 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Condition
 import org.junit.jupiter.api.Disabled
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Parser
 import org.openrewrite.maven.tree.MavenRepositoryMirror
+import java.io.File
 import java.nio.file.Paths
 
 class MavenSettingsTest {
@@ -269,5 +271,49 @@ class MavenSettingsTest {
             .matches { it.id == "server001" }
             .matches { it.username == "my_login" }
             .matches { it.password == "my_password" }
+    }
+
+    @Nested
+    @Issue("https://github.com/openrewrite/rewrite/issues/1688")
+    inner class LocalRepository {
+        @Test
+        fun `parses value from settings xml`() {
+            val localRepoPath = System.getProperty("java.io.tmpdir")
+            val ctx = MavenExecutionContextView(InMemoryExecutionContext())
+            val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
+                """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                  <localRepository>$localRepoPath</localRepository>
+            </settings>
+            """.trimIndent().byteInputStream()
+            }, ctx)
+
+            assertThat(settings!!.localRepository).startsWith("file:/").containsSubsequence(localRepoPath.split(File.separator))
+        }
+
+        @Test
+        fun `defaults to the maven default`() {
+            val ctx = MavenExecutionContextView(InMemoryExecutionContext())
+            val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
+                """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+            </settings>
+            """.trimIndent().byteInputStream()
+            }, ctx)
+
+            assertThat(settings!!.localRepository).isEqualTo(MavenSettings.defaultLocalRepository())
+        }
+
+        @Test
+        fun `handles localRepository which is already a URI String`() {
+            val uriString = File(System.getProperty("java.io.tmpdir")).toURI().toString()
+            val mavenSettings = MavenSettings(uriString, null, null, null, null)
+
+            assertThat(mavenSettings.localRepository).isEqualTo(uriString)
+        }
     }
 }

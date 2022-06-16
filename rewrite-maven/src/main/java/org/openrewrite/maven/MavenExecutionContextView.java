@@ -36,6 +36,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     private static final String MAVEN_MIRRORS = "org.openrewrite.maven.mirrors";
     private static final String MAVEN_CREDENTIALS = "org.openrewrite.maven.auth";
+    private static final String MAVEN_LOCAL_REPOSITORY = "org.openrewrite.maven.localRepo";
     private static final String MAVEN_REPOSITORIES = "org.openrewrite.maven.repos";
     private static final String MAVEN_PINNED_SNAPSHOT_VERSIONS = "org.openrewrite.maven.pinnedSnapshotVersions";
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
@@ -82,6 +83,14 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public MavenPomCache getPomCache() {
         return getMessage(MAVEN_POM_CACHE, DEFAULT_POM_CACHE);
+    }
+
+    public void setLocalRepository(String localRepository) {
+        putMessage(MAVEN_LOCAL_REPOSITORY, localRepository);
+    }
+
+    public String getLocalRepository() {
+        return getMessage(MAVEN_LOCAL_REPOSITORY, MavenSettings.defaultLocalRepository());
     }
 
     public void setRepositories(List<MavenRepository> repositories) {
