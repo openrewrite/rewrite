@@ -141,7 +141,7 @@ public final class ControlFlow {
             if (!analysis.continueFlow.isEmpty()) {
                 this.continueFlow.addAll(analysis.continueFlow);
             }
-            if(!analysis.breakFlow.isEmpty()) {
+            if (!analysis.breakFlow.isEmpty()) {
                 this.breakFlow.addAll(analysis.breakFlow);
             }
             return analysis;
@@ -489,7 +489,7 @@ public final class ControlFlow {
                 @Override
                 public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
                     // Now the update is invoked
-                    if (control.getUpdate().isEmpty()) {
+                    if (control.getUpdate().isEmpty() || control.getUpdate().get(0) instanceof J.Empty) {
                         visit(control.getUpdate(), p);
                         return control;
                     }
@@ -550,8 +550,14 @@ public final class ControlFlow {
                     controlAnalysis.currentAsBasicBlock().addConditionNodeTruthFirst();
             ControlFlowAnalysis<P> bodyAnalysis =
                     visitRecursiveTransferringAll(Collections.singleton(conditionalEntry), forLoop.getBody(), p);
-            bodyAnalysis.current.forEach(controlFlowNode -> controlFlowNode.addSuccessor(conditionalEntry));
-            current = Collections.singleton(conditionalEntry);
+            bodyAnalysis.current.forEach(controlFlowNode -> {
+                controlFlowNode.addSuccessor(conditionalEntry);
+                bodyAnalysis.continueFlow.forEach(continueFlowNode -> continueFlowNode.addSuccessor(controlFlowNode));
+            });
+            current = Stream.concat(
+                    Stream.of(conditionalEntry),
+                    bodyAnalysis.breakFlow.stream()
+            ).collect(Collectors.toSet());
             return forLoop;
         }
 

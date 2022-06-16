@@ -846,10 +846,10 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 4 CN: 1 EX: 1 | L)~~>*/{
                     int x = start();
                     x++;
-                    for (int i = 0; theTest(); i++) /*~~(L)~~>*/{
+                    for (int i = 0; theTest(); /*~~(L)~~>*/i++) /*~~(L)~~>*/{
                         x += 2;
                     }
                     return /*~~(L)~~>*/5;
@@ -886,7 +886,9 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 7 CN: 3 EX: 1 | L)~~>*/{
+                abstract boolean theTest2();
+                abstract boolean theTest3();
+                int test() /*~~(BB: 8 CN: 3 EX: 1 | L)~~>*/{
                     int x = start();
                     x++;
                     for (int i = 0; theTest(); /*~~(L)~~>*/i++) /*~~(L)~~>*/{
@@ -1001,13 +1003,13 @@ interface ControlFlowTest : RewriteTest {
                 abstract boolean theTest2();
                 abstract boolean theTest3();
                 abstract Iterable<Integer> iterable();
-                int test() /*~~(BB: 5 CN: 3 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 6 CN: 3 EX: 1 | L)~~>*/{
                     int x = start();
                     x++;
                     for (Integer i : iterable()) /*~~(L)~~>*/{
                         if (theTest2())
                             /*~~(L)~~>*/continue;
-                        if (theTest3())
+                        /*~~(L)~~>*/if (theTest3())
                             /*~~(L)~~>*/break;
                     }
                     return /*~~(L)~~>*/5;
