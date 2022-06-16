@@ -35,7 +35,7 @@ public class ControlFlowBasicBlockVisitor<P> extends JavaIsoVisitor<P> {
                 methodDeclaration.getName().getSimpleName().equals(methodName)) {
             ControlFlowSummary summary = ControlFlow.startingAt(getCursor()).findControlFlow();
             Set<J> inBasicBlock = summary.getBasicBlocks().stream().flatMap(b ->
-                    b.getNodes().stream()).collect(Collectors.toSet());
+                    b.getNodeValues().stream()).collect(Collectors.toSet());
             doAfterVisit(new JavaIsoVisitor<P>() {
 
                 @Override

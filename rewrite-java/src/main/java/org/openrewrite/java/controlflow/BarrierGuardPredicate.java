@@ -15,6 +15,9 @@
  */
 package org.openrewrite.java.controlflow;
 
+import org.openrewrite.Incubating;
+
+@Incubating(since = "7.25.0")
 @FunctionalInterface
 public interface BarrierGuardPredicate {
     boolean isBarrierGuard(Guard guard, boolean branch);

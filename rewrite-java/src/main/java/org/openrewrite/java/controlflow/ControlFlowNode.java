@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Incubating(since = "7.25.0")
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public abstract class ControlFlowNode {
     final Set<ControlFlowNode> predecessors = new HashSet<>();
 
@@ -58,6 +58,9 @@ public abstract class ControlFlowNode {
         throw new IllegalStateException("Can only add a condition node to a basic block");
     }
 
+    /**
+     * A control flow node that represents a branching point in the code.
+     */
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     static class ConditionNode extends ControlFlowNode {
         @Getter
@@ -141,6 +144,12 @@ public abstract class ControlFlowNode {
         }
     }
 
+    /**
+     * A basic block is a straight-line code sequence with no branches in except to the entry and
+     * no branches out except at the exit.
+     *
+     * @see <a href="https://en.wikipedia.org/wiki/Basic_block">Wikipedia: Basic Block</a>
+     */
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     static class BasicBlock extends ControlFlowNode {
         @Getter
@@ -159,11 +168,11 @@ public abstract class ControlFlowNode {
             return Collections.unmodifiableList(node);
         }
 
-        public List<J> getNodes() {
+        public List<J> getNodeValues() {
             return node.stream().map(Cursor::<J>getValue).collect(Collectors.toList());
         }
 
-        boolean addNodeToBasicBlock(Cursor expression) {
+        boolean addCursorToBasicBlock(Cursor expression) {
             return node.add(expression);
         }
 

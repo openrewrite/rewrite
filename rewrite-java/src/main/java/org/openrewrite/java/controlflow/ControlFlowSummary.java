@@ -19,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.Expression;
 
 import java.util.HashSet;
@@ -27,6 +28,10 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * To create an instance call {@link ControlFlow#findControlFlow()}.
+ */
+@Incubating(since = "7.25.0")
 @AllArgsConstructor(staticName = "forGraph", access = AccessLevel.PACKAGE)
 public final class ControlFlowSummary {
     private final ControlFlowNode.Start start;

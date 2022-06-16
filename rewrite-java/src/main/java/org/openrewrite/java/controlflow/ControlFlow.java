@@ -59,7 +59,7 @@ public final class ControlFlow {
         }
         if (methodDeclarationBlockCursor == null) {
             throw new IllegalArgumentException(
-                    "Invalid start point: Could not find a Method Declaration to begin computing Control Flow"
+                    "Invalid start point: Could not find a method declaration or static block to begin computing Control Flow"
             );
         }
         return methodDeclarationBlockCursor;
@@ -78,7 +78,15 @@ public final class ControlFlow {
          * Flows that terminate in a {@link J.Return} or {@link J.Throw} statement.
          */
         private final Set<ControlFlowNode> exitFlow = new HashSet<>();
+
+        /**
+         * Flows that terminate in a {@link J.Continue} statement.
+         */
         private final Set<ControlFlowNode> continueFlow = new HashSet<>();
+
+        /**
+         * Flows that terminate in a {@link J.Break} statement.
+         */
         private final Set<ControlFlowNode> breakFlow = new HashSet<>();
         private boolean jumps;
 
@@ -119,7 +127,7 @@ public final class ControlFlow {
         }
 
         private void addCursorToBasicBlock() {
-            currentAsBasicBlock().addNodeToBasicBlock(getCursor());
+            currentAsBasicBlock().addCursorToBasicBlock(getCursor());
         }
 
         ControlFlowAnalysis<P> visitRecursive(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
@@ -606,6 +614,24 @@ public final class ControlFlow {
         }
 
         @Override
+        public J.ArrayAccess visitArrayAccess(J.ArrayAccess arrayAccess, P p) {
+            addCursorToBasicBlock();
+            return arrayAccess;
+        }
+
+        @Override
+        public J.Try visitTry(J.Try _try, P p) {
+            addCursorToBasicBlock();
+            return _try;
+        }
+
+        @Override
+        public J.Switch visitSwitch(J.Switch _switch, P p) {
+            addCursorToBasicBlock();
+            return _switch;
+        }
+
+        @Override
         public J.Return visitReturn(J.Return _return, P p) {
             visit(_return.getExpression(), p); // First the expression is invoked
             addCursorToBasicBlock(); // Then the return
@@ -639,24 +665,6 @@ public final class ControlFlow {
             breakFlow.add(currentAsBasicBlock());
             current = Collections.emptySet();
             return breakStatement;
-        }
-
-        @Override
-        public J.ArrayAccess visitArrayAccess(J.ArrayAccess arrayAccess, P p) {
-            addCursorToBasicBlock();
-            return arrayAccess;
-        }
-
-        @Override
-        public J.Try visitTry(J.Try _try, P p) {
-            addCursorToBasicBlock();
-            return _try;
-        }
-
-        @Override
-        public J.Switch visitSwitch(J.Switch _switch, P p) {
-            addCursorToBasicBlock();
-            return _switch;
         }
 
         private static ControlFlowNode.BasicBlock addBasicBlock(Collection<ControlFlowNode> nodes) {
