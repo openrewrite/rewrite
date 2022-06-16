@@ -446,10 +446,18 @@ public class MavenPomDownloader {
      * Returns a request builder with Authorization header set if the provided repository specifies credentials
      */
     private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
-        if (repository.getUsername() != null && repository.getPassword() != null) {
+        if (isViableCredential(repository.getUsername()) && isViableCredential(repository.getPassword())) {
             return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
         }
         return request;
+    }
+
+    private boolean isViableCredential(@Nullable String value) {
+        return value != null && !isUnresolvedProperty(value);
+    }
+
+    private boolean isUnresolvedProperty(String value) {
+        return value.startsWith("${") && value.endsWith("}");
     }
 
     private MavenRepository applyMirrors(MavenRepository repository) {
