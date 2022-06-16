@@ -1030,7 +1030,8 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                     String p = o;
                 }
             }
-            """, """
+            """,
+            """
             abstract class Test {
                 abstract boolean guard();
 
@@ -1043,9 +1044,9 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                     } catch (Exception e) {
                         System.out.println(n);
                     }
-                    String o = n;
-                    System.out.println(o);
-                    String p = o;
+                    String o = /*~~>*/n;
+                    System.out.println(/*~~>*/o);
+                    String p = /*~~>*/o;
                 }
             }
             """
@@ -1057,12 +1058,11 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
         java(
             """
             abstract class Test {
-                abstract boolean guard();
 
                 void test() {
                     String n = "42";
                     Boolean[] b = new Boolean[1];
-                    if (b[0] && (b.length == 1) && guard()) {
+                    if (b[0] && (b.length == 1)) {
                         String o = n;
                         System.out.println(o);
                         String p = o;
@@ -1073,17 +1073,16 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
             }
             """, """
             abstract class Test {
-                abstract boolean guard();
 
                 void test() {
                     String n = /*~~>*/"42";
                     Boolean[] b = new Boolean[1];
-                    if (b[0] && (b.length == 1) && guard()) {
-                        String o = n;
-                        System.out.println(o);
-                        String p = o;
+                    if (b[0] && (b.length == 1)) {
+                        String o = /*~~>*/n;
+                        System.out.println(/*~~>*/o);
+                        String p = /*~~>*/o;
                     } else {
-                        System.out.println(n);
+                        System.out.println(/*~~>*/n);
                     }
                 }
             }
@@ -1100,61 +1099,20 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                 abstract boolean guard();
 
                 void test() {
-                    int n = 42;
-                    switch (n) {
-                        case 1:
-                            System.out.println(n);
-                            break;
-                        case 42:
-                            System.out.println("Correct");
-                            break;
-                    }
-                    String o = n + "";
-                    System.out.println(o);
-                    String p = o;
-                }
-            }
-            """, """
-            abstract class Test {
-                abstract boolean guard();
-
-                void test() {
-                    String n = /*~~>*/"42";
-                    switch (n) {
-                        case 1:
-                            System.out.println(n);
-                            break;
-                        case 42:
-                            System.out.println("Correct");
-                            break;
-                    }
-                    String o = n + "";
-                    System.out.println(o);
-                    String p = o;
-                }
-            }
-            """
-        )
-    )
-
-    @Test
-    fun `typecast`() = rewriteRun(
-        java(
-            """
-            abstract class Test {
-                abstract boolean guard();
-
-                void test() {
                     String n = "42";
-                    int[] b = new int[1];
-                    char c = (char) b[0];
-                    if (1 == 1) {
-                        String o = n;
-                        System.out.println(o);
-                        String p = o;
-                    } else {
-                        System.out.println(n);
+                    switch (n) {
+                        case "1":
+                            System.out.println(n);
+                            break;
+                        case "42":
+                            System.out.println("Correct");
+                            break;
+                        default:
+                            break;
                     }
+                    String o = n + "";
+                    System.out.println(o);
+                    String p = o;
                 }
             }
             """, """
@@ -1163,20 +1121,26 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
                 void test() {
                     String n = /*~~>*/"42";
-                    int[] b = new int[1];
-                    char c = (char) b[0];
-                    if (1 == 1) {
-                        String o = n;
-                        System.out.println(o);
-                        String p = o;
-                    } else {
-                        System.out.println(n);
+                    switch (n) {
+                        case "1":
+                            System.out.println(n);
+                            break;
+                        case "42":
+                            System.out.println("Correct");
+                            break;
+                        default:
+                            break;
                     }
+                    String o = n + "";
+                    System.out.println(o);
+                    String p = o;
                 }
             }
             """
         )
     )
+
+
 
     @Test
     fun `for-each loop`() = rewriteRun(
@@ -1189,6 +1153,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                     String n = "42";
                     for (char c : n.toCharArray()) {
                         System.out.println(c);
+                        System.out.println(n);
                     }
                 }
             }
@@ -1198,8 +1163,9 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
                 void test() {
                     String n = /*~~>*/"42";
-                    for (char c : n.toCharArray()) {
+                    for (char c : /*~~>*/n.toCharArray()) {
                         System.out.println(c);
+                        System.out.println(/*~~>*/n);
                     }
                 }
             }
@@ -1212,7 +1178,8 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
     fun `generic object instantiation`() = rewriteRun(
         java(
             """
-            import java.util.LinkedList;abstract class Test {
+            import java.util.LinkedList;
+            abstract class Test {
                 abstract boolean guard();
 
                 void test() {
@@ -1221,10 +1188,13 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                     ll.add(1);
                     for (int i : ll) {
                         System.out.println(i);
+                        System.out.println(n);
                     }
                 }
             }
-            """, """
+            """,
+            """
+            import java.util.LinkedList;
             abstract class Test {
                 abstract boolean guard();
 
@@ -1234,6 +1204,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                     ll.add(1);
                     for (int i : ll) {
                         System.out.println(i);
+                        System.out.println(/*~~>*/n);
                     }
                 }
             }
@@ -1245,21 +1216,19 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
     fun `assert expression`() = rewriteRun(
         java(
             """
-            import java.util.LinkedList;abstract class Test {
+            abstract class Test {
                 abstract boolean guard();
-
                 void test() {
                     String n = "42";
-                    assert n.equals("42");
+                    assert n.contains("4");
                 }
             }
             """, """
             abstract class Test {
                 abstract boolean guard();
-
                 void test() {
                     String n = /*~~>*/"42";
-                    assert n.equals("42");
+                    assert /*~~>*/n.contains("4");
                 }
             }
             """

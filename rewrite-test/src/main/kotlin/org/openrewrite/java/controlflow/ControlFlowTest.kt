@@ -696,6 +696,56 @@ interface ControlFlowTest : RewriteTest {
     )
 
     @Test
+    fun `while loop with continue & break`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                abstract boolean theTest2();
+                abstract boolean theTest3();
+                int test() {
+                    int x = start();
+                    x++;
+                    while (theTest()) {
+                        if (theTest2()) {
+                            continue;
+                        }
+                        if (theTest3()) {
+                            break;
+                        }
+                        x += 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                abstract boolean theTest2();
+                abstract boolean theTest3();
+                int test() /*~~(BB: 7 CN: 3 EX: 1 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    while (theTest()) /*~~(L)~~>*/{
+                        if (theTest2()) /*~~(L)~~>*/{
+                            continue;
+                        }
+                        /*~~(L)~~>*/if (theTest3()) /*~~(L)~~>*/{
+                            break;
+                        }
+                        /*~~(L)~~>*/x += 2;
+                    }
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
     fun `do-while loop`() = rewriteRun(
         java(
             """
@@ -721,6 +771,52 @@ interface ControlFlowTest : RewriteTest {
                     x++;
                     do /*~~(L)~~>*/{
                         x += 2;
+                    } while (theTest());
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `do-while loop with continue & break`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                abstract boolean theTest2();
+                abstract boolean theTest3();
+                int test() {
+                    int x = start();
+                    x++;
+                    do {
+                        if (theTest2())
+                            continue;
+                        if (theTest3())
+                            break;
+                        x += 2;
+                    } while (theTest());
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                abstract boolean theTest2();
+                abstract boolean theTest3();
+                int test() /*~~(BB: 7 CN: 3 EX: 1 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    do /*~~(L)~~>*/{
+                        if (theTest2())
+                            /*~~(L)~~>*/continue;
+                        /*~~(L)~~>*/if (theTest3())
+                            /*~~(L)~~>*/break;
+                        /*~~(L)~~>*/x += 2;
                     } while (theTest());
                     return /*~~(L)~~>*/5;
                 }
@@ -764,6 +860,50 @@ interface ControlFlowTest : RewriteTest {
     )
 
     @Test
+    fun `for i loop with continue and break`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                abstract boolean theTest2();
+                abstract boolean theTest3();
+                int test() {
+                    int x = start();
+                    x++;
+                    for (int i = 0; theTest(); i++) {
+                        if (theTest2())
+                            continue;
+                        if (theTest3())
+                            break;
+                        x += 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                int test() /*~~(BB: 7 CN: 3 EX: 1 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    for (int i = 0; theTest(); /*~~(L)~~>*/i++) /*~~(L)~~>*/{
+                        if (theTest2())
+                            /*~~(L)~~>*/continue;
+                        /*~~(L)~~>*/if (theTest3())
+                            /*~~(L)~~>*/break;
+                        /*~~(L)~~>*/x += 2;
+                    }
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
     fun `for i loop forever`() = rewriteRun(
         java(
             """
@@ -791,6 +931,129 @@ interface ControlFlowTest : RewriteTest {
                         x += 2;
                     }
                     return /*~~(L)~~>*/5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `for each loop`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                abstract Iterable<Integer> iterable();
+                int test() {
+                    int x = start();
+                    x++;
+                    for (Integer i : iterable()) {
+                        x += 2;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                abstract Iterable<Integer> iterable();
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    for (Integer i : iterable()) /*~~(L)~~>*/{
+                        x += 2;
+                    }
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `for each loop with continue and break`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                abstract boolean theTest2();
+                abstract boolean theTest3();
+                abstract Iterable<Integer> iterable();
+                int test() {
+                    int x = start();
+                    x++;
+                    for (Integer i : iterable()) {
+                        if (theTest2())
+                            continue;
+                        if (theTest3())
+                            break;
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                abstract boolean theTest();
+                abstract boolean theTest2();
+                abstract boolean theTest3();
+                abstract Iterable<Integer> iterable();
+                int test() /*~~(BB: 5 CN: 3 EX: 1 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    for (Integer i : iterable()) /*~~(L)~~>*/{
+                        if (theTest2())
+                            /*~~(L)~~>*/continue;
+                        if (theTest3())
+                            /*~~(L)~~>*/break;
+                    }
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+        )
+    )
+
+
+
+    @Test
+    fun `typecast`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() {
+                    String n = "42";
+                    int[] b = new int[1];
+                    char c = (char) b[0];
+                    if (1 == 1) {
+                        String o = n;
+                        System.out.println(o);
+                        String p = o;
+                    } else {
+                        System.out.println(n);
+                    }
+                }
+            }
+            """, """
+            abstract class Test {
+                abstract boolean guard();
+
+                void test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                    String n = "42";
+                    int[] b = new int[1];
+                    char c = (char) b[0];
+                    if (1 == 1) /*~~(L)~~>*/{
+                        String o = n;
+                        System.out.println(o);
+                        String p = o;
+                    } else /*~~(L)~~>*/{
+                        System.out.println(n);
+                    }
                 }
             }
             """
