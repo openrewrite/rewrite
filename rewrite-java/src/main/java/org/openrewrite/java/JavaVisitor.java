@@ -52,12 +52,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
     @Incubating(since = "7.24.0")
     public Dataflow dataflow() {
-        return new Dataflow(getCursor());
+        return Dataflow.startingAt(getCursor());
     }
 
     @Incubating(since = "7.24.0")
     public Dataflow dataflow(Cursor cursor) {
-        return new Dataflow(cursor);
+        return Dataflow.startingAt(cursor);
     }
 
     /**

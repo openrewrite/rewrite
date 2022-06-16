@@ -20,8 +20,8 @@ import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
+import org.openrewrite.java.controlflow.Guard;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -29,7 +29,6 @@ import org.openrewrite.java.tree.Statement;
 import java.util.*;
 
 public class ForwardFlow extends JavaVisitor<Integer> {
-    private static final MethodMatcher methodMatcherToString = new MethodMatcher("java.lang.String toString()");
 
     public static void findSinks(SinkFlow<?, ?> root) {
         Iterator<Cursor> cursorPath = root.getCursor().getPathAsCursors();

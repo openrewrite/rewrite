@@ -18,6 +18,9 @@ package org.openrewrite.java.dataflow;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.java.controlflow.ControlFlow;
+import org.openrewrite.java.controlflow.ControlFlowNode;
+import org.openrewrite.java.controlflow.ControlFlowSummary;
 import org.openrewrite.java.dataflow.analysis.ForwardFlow;
 import org.openrewrite.java.dataflow.analysis.SinkFlow;
 import org.openrewrite.java.dataflow.analysis.SourceFlow;
@@ -25,9 +28,10 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 import java.util.Optional;
+import java.util.Set;
 
 @Incubating(since = "7.24.0")
-@RequiredArgsConstructor
+@RequiredArgsConstructor(staticName = "startingAt")
 public class Dataflow {
     final Cursor start;
 
@@ -40,7 +44,10 @@ public class Dataflow {
                 return Optional.empty();
             }
 
-            SinkFlow<Source, Sink> flow = new SinkFlow<>(start, spec);
+            ControlFlowSummary controlFlowSummary = ControlFlow.startingAt(start).findControlFlow();
+            Set<Expression> reachable = controlFlowSummary.computeReachableExpressions(spec::isBarrierGuard);
+
+            SinkFlow<Source, Sink> flow = new SinkFlow<>(start, spec, reachable);
 
             ForwardFlow.findSinks(flow);
 

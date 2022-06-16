@@ -49,6 +49,9 @@ public interface InvocationMatcher {
     }
 
     static InvocationMatcher fromInvocationMatchers(Collection<InvocationMatcher> matchers) {
+        if (matchers.size() == 1) {
+            return matchers.iterator().next();
+        }
         if (matchers.size() > 750) {
             return expression -> matchers.parallelStream().anyMatch(matcher -> matcher.matches(expression));
         } else {

@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
+import org.openrewrite.java.controlflow.Guard;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -57,8 +58,8 @@ public class UriCreatedWithHttpScheme extends Recipe {
         }
 
         @Override
-        public boolean isBarrierGuard(Expression expr) {
-            return STRING_REPLACE.matches(expr);
+        public boolean isBarrierGuard(Guard guard, boolean branch) {
+            return STRING_REPLACE.matches(guard.getExpression());
         }
     };
 

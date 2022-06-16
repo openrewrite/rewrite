@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.dataflow.*
+import org.openrewrite.java.controlflow.ControlFlowTest
+import org.openrewrite.java.controlflow.GuardTest
 import org.openrewrite.java.format.*
 import org.openrewrite.java.recipes.ExecutionContextParameterNameTest
 import org.openrewrite.java.recipes.SetDefaultEstimatedEffortPerOccurrenceTest
@@ -109,6 +111,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class ChangeTypeTck : ChangeTypeTest
+
+    @Nested
+    inner class ControlFlowTck : ControlFlowTest
 
     @Nested
     inner class CovariantEqualsTck : CovariantEqualsTest
@@ -217,6 +222,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class GenerateGetterAndSetterVisitorTck : GenerateGetterAndSetterVisitorTest
+
+    @Nested
+    inner class GuardTck: GuardTest
 
     @Nested
     inner class HiddenFieldTck : HiddenFieldTest
