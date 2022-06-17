@@ -130,6 +130,40 @@ interface ControlFlowTest : RewriteTest {
     )
 
     @Test
+    fun `control flow graph for synchronized block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                private final Object lock = new Object();
+                abstract int start();
+                void test() {
+                    int x;
+                    synchronized (lock) {
+                        x = start();
+                        x++;
+                    }
+                    x--;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                private final Object lock = new Object();
+                abstract int start();
+                void test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                    int x;
+                    synchronized (lock) {
+                        x = start();
+                        x++;
+                    }
+                    x--;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
     fun `display control flow graph with dual branch`() = rewriteRun(
         java(
             """
