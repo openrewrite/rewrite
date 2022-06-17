@@ -26,6 +26,25 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = ReplaceLambdaWithMethodReference()
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1926")
+    @Test
+    fun multipleMethodInvocations() = assertUnchanged(
+        before = """
+            import java.nio.file.Path;
+            import java.nio.file.Paths;
+            import java.util.List;import java.util.stream.Collectors;
+            
+            class Test {
+                Path path = Paths.get("");
+                List<String> method(List<String> l) {
+                    return l.stream()
+                        .filter(s -> path.getFileName().toString().equals(s))
+                        .collect(Collectors.toList());
+                }
+            }
+        """.trimIndent()
+    )
+
     @Test
     fun containsMultipleStatements() = assertUnchanged(
         before = """
