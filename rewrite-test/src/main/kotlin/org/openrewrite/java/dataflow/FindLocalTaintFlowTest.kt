@@ -18,6 +18,7 @@ package org.openrewrite.java.dataflow
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.java.tree.Expression
+import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.J.MethodInvocation
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
@@ -32,6 +33,13 @@ interface FindLocalTaintFlowTest : RewriteTest {
 
                 override fun isSink(expr: Expression, cursor: Cursor) =
                     true
+
+                override fun isSanitizer(expression: Expression, cursor: Cursor): Boolean =
+                    when(expression) {
+                        is J.Binary -> expression.operator == J.Binary.Type.Addition
+                            && (expression.right as? J.Literal)?.value == "sanitizer"
+                        else -> false
+                    }
             })
         })
         spec.expectedCyclesThatMakeChanges(1).cycles(1)
@@ -175,5 +183,73 @@ interface FindLocalTaintFlowTest : RewriteTest {
                 }
                 """
             )
+    )
+
+    @Test
+    fun `taint tracking through string appending`() = rewriteRun(
+        java(
+            """
+                import java.io.File;
+                class Test {
+                    String source() { return null; }
+                    void test() {
+                        String n = source();
+                        String o = "hello " + n ;
+                        String p = o + " world";
+                        String q = p + File.separatorChar;
+                        String r = q + true;
+                        System.out.println(r);
+                    }
+                }
+                """,
+            """
+                import java.io.File;
+                class Test {
+                    String source() { return null; }
+                    void test() {
+                        String n = /*~~>*/source();
+                        String o = /*~~>*/"hello " + /*~~>*/n ;
+                        String p = /*~~>*//*~~>*/o + " world";
+                        String q = /*~~>*//*~~>*/p + File.separatorChar;
+                        String r = /*~~>*//*~~>*/q + true;
+                        System.out.println(/*~~>*/r);
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `taint stops at a sanitizer`() = rewriteRun(
+        java(
+            """
+                import java.io.File;
+                class Test {
+                    String source() { return null; }
+                    void test() {
+                        String n = source();
+                        String o = "hello " + n ;
+                        String p = o + " world";
+                        String q = p + "sanitizer";
+                        String r = q + true;
+                        System.out.println(r);
+                    }
+                }
+                """,
+            """
+                import java.io.File;
+                class Test {
+                    String source() { return null; }
+                    void test() {
+                        String n = /*~~>*/source();
+                        String o = /*~~>*/"hello " + /*~~>*/n ;
+                        String p = /*~~>*//*~~>*/o + " world";
+                        String q = /*~~>*/p + "sanitizer";
+                        String r = q + true;
+                        System.out.println(r);
+                    }
+                }
+                """
+        )
     )
 }

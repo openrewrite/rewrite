@@ -65,21 +65,21 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
     public abstract boolean isSink(Sink sink, Cursor cursor);
 
     public final boolean isFlowStep(
-            Expression startExpression,
-            Cursor startCursor,
-            Expression endExpression,
-            Cursor endCursor
+            Expression srcExpression,
+            Cursor srcCursor,
+            Expression sinkExpression,
+            Cursor sinkCursor
     ) {
         return ExternalFlowModels.instance().isAdditionalFlowStep(
-                startExpression,
-                startCursor,
-                endExpression,
-                endCursor
+                srcExpression,
+                srcCursor,
+                sinkExpression,
+                sinkCursor
         ) || isAdditionalFlowStep(
-                startExpression,
-                startCursor,
-                endExpression,
-                endCursor
+                srcExpression,
+                srcCursor,
+                sinkExpression,
+                sinkCursor
         );
     }
 
@@ -91,18 +91,25 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
      * Allows for ad-hoc taint tracking by allowing for additional, non-default flow steps to be added to the flow graph.
      *
      * The following is always true:
-     * {@code  startExpression == startCursor.getValue() && endExpression == endCursor.getValue()}.
+     * {@code  srcExpression == srcCursor.getValue() && sinkExpression == sinkCursor.getValue()}.
      */
     public boolean isAdditionalFlowStep(
-            Expression startExpression,
-            Cursor startCursor,
-            Expression endExpression,
-            Cursor endCursor
+            Expression srcExpression,
+            Cursor srcCursor,
+            Expression sinkExpression,
+            Cursor sinkCursor
     ) {
         return false;
     }
 
     public boolean isBarrierGuard(Guard guard, boolean branch) {
+        return false;
+    }
+
+    /**
+     * Holds if flow through `expression` is prohibited.
+     */
+    public boolean isBarrier(Expression expression, Cursor cursor) {
         return false;
     }
 }

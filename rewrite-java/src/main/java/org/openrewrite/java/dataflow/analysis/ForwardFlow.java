@@ -204,6 +204,12 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                 // `isAdditionalFlowStep` to see if it should be added to the flow graph.
                 // This allows the API user to extend what the definition of 'flow' is.
                 Cursor previousCursor = nextFlowGraph.getCursor();
+                if (spec.isBarrier(
+                        (Expression) ancestor,
+                        ancestorCursor
+                )) {
+                    break;
+                }
                 if (spec.isFlowStep(
                         previousCursor.getValue(),
                         previousCursor,

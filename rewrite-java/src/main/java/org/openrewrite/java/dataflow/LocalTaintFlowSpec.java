@@ -17,6 +17,7 @@ package org.openrewrite.java.dataflow;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.java.controlflow.Guard;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -25,30 +26,53 @@ public abstract class LocalTaintFlowSpec<Source extends Expression, Sink extends
 
     @Override
     public final boolean isAdditionalFlowStep(
-            Expression startExpression,
-            Cursor startCursor,
-            Expression endExpression,
-            Cursor endCursor
+            Expression srcExpression,
+            Cursor srcCursor,
+            Expression sinkExpression,
+            Cursor sinkCursor
     ) {
         return ExternalFlowModels.instance().isAdditionalTaintStep(
-                startExpression,
-                startCursor,
-                endExpression,
-                endCursor
+                srcExpression,
+                srcCursor,
+                sinkExpression,
+                sinkCursor
+        ) || DefaultFlowModels.isDefaultAdditionalTaintStep(
+                srcExpression,
+                srcCursor,
+                sinkExpression,
+                sinkCursor
         ) || isAdditionalTaintStep(
-                startExpression,
-                startCursor,
-                endExpression,
-                endCursor
+                srcExpression,
+                srcCursor,
+                sinkExpression,
+                sinkCursor
         );
     }
 
     public final boolean isAdditionalTaintStep(
-            Expression startExpression,
-            Cursor startCursor,
-            Expression endExpression,
-            Cursor endCursor
+            Expression srcExpression,
+            Cursor srcCursor,
+            Expression sinkExpression,
+            Cursor sinkCursor
     ) {
+        return false;
+    }
+
+    @Override
+    public final boolean isBarrierGuard(Guard guard, boolean branch) {
+        return isSanitizerGuard(guard, branch);
+    }
+
+    public boolean isSanitizerGuard(Guard guard, boolean branch) {
+        return false;
+    }
+
+    @Override
+    public final boolean isBarrier(Expression expression, Cursor cursor) {
+        return isSanitizer(expression, cursor);
+    }
+
+    public boolean isSanitizer(Expression expression, Cursor cursor) {
         return false;
     }
 }

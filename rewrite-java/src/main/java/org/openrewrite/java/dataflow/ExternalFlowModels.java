@@ -36,6 +36,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
 /**
  * Loads and stores models from the `model.csv` file to be used for data flow and taint tracking analysis.
  */
@@ -79,24 +80,24 @@ class ExternalFlowModels {
     }
 
     boolean isAdditionalFlowStep(
-            Expression startExpression,
-            Cursor startCursor,
-            Expression endExpression,
-            Cursor endCursor
+            Expression srcExpression,
+            Cursor srcCursor,
+            Expression sinkExpression,
+            Cursor sinkCursor
     ) {
-        return getOrComputeOptimizedFlowModels(startCursor).value.stream().anyMatch(
-                value -> value.isAdditionalFlowStep(startExpression, startCursor, endExpression, endCursor)
+        return getOrComputeOptimizedFlowModels(srcCursor).value.stream().anyMatch(
+                value -> value.isAdditionalFlowStep(srcExpression, srcCursor, sinkExpression, sinkCursor)
         );
     }
 
     boolean isAdditionalTaintStep(
-            Expression startExpression,
-            Cursor startCursor,
-            Expression endExpression,
-            Cursor endCursor
+            Expression srcExpression,
+            Cursor srcCursor,
+            Expression sinkExpression,
+            Cursor sinkCursor
     ) {
-        return getOrComputeOptimizedFlowModels(startCursor).taint.stream().anyMatch(
-                taint -> taint.isAdditionalFlowStep(startExpression, startCursor, endExpression, endCursor)
+        return getOrComputeOptimizedFlowModels(srcCursor).taint.stream().anyMatch(
+                taint -> taint.isAdditionalFlowStep(srcExpression, srcCursor, sinkExpression, sinkCursor)
         );
     }
 
@@ -153,11 +154,11 @@ class ExternalFlowModels {
             InvocationMatcher callMatcher = InvocationMatcher.fromMethodMatchers(methodMatchers);
             if (argumentIndex == -1) {
                 // Argument[-1] is the 'select' or 'qualifier' of a method call
-                return (startExpression, startCursor, endExpression, endCursor) ->
-                        callMatcher.advanced().isSelect(startCursor);
+                return (srcExpression, srcCursor, sinkExpression, sinkCursor) ->
+                        callMatcher.advanced().isSelect(srcCursor);
             } else {
-                return (startExpression, startCursor, endExpression, endCursor) ->
-                        callMatcher.advanced().isParameter(startCursor, argumentIndex);
+                return (srcExpression, srcCursor, sinkExpression, sinkCursor) ->
+                        callMatcher.advanced().isParameter(srcCursor, argumentIndex);
             }
         }
 
@@ -302,15 +303,15 @@ class ExternalFlowModels {
             );
             Matcher argumentMatcher = ARGUMENT_MATCHER.matcher(input);
             if ("Argument[-1]".equals(input) && "ReturnValue".equals(output)) {
-                return (startExpression, startCursor, endExpression, endCursor) ->
-                        matcher.advanced().isSelect(startCursor);
+                return (srcExpression, srcCursor, sinkExpression, sinkCursor) ->
+                        matcher.advanced().isSelect(srcCursor);
             } else if (argumentMatcher.matches() && "ReturnValue".equals(output)) {
                 int argumentIndex = Integer.parseInt(argumentMatcher.group(1));
-                return (startExpression, startCursor, endExpression, endCursor) ->
-                        matcher.advanced().isParameter(startCursor, argumentIndex);
+                return (srcExpression, srcCursor, sinkExpression, sinkCursor) ->
+                        matcher.advanced().isParameter(srcCursor, argumentIndex);
             }
 
-            return (startExpression, startCursor, endExpression, endCursor) -> false;
+            return (srcExpression, srcCursor, sinkExpression, sinkCursor) -> false;
         }
 
         MethodMatcherKey asMethodMatcherKey() {

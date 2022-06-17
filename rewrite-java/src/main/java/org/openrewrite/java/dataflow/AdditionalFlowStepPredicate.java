@@ -23,9 +23,9 @@ import org.openrewrite.java.tree.Expression;
 @FunctionalInterface
 interface AdditionalFlowStepPredicate {
     boolean isAdditionalFlowStep(
-            Expression startExpression,
-            Cursor startCursor,
-            Expression endExpression,
-            Cursor endCursor
+            Expression srcExpression,
+            Cursor srcCursor,
+            Expression sinkExpression,
+            Cursor sinkCursor
     );
 }

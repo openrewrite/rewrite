@@ -48,11 +48,10 @@ public class UriCreatedWithHttpScheme extends Recipe {
         }
 
         @Override
-        public boolean isAdditionalFlowStep(Expression startE, Cursor startC, Expression endE, Cursor endC) {
-            boolean isAdditionalFlow = endE instanceof J.Binary;
-            if (isAdditionalFlow) {
-                J.Binary endBinary = (J.Binary) endE;
-                return startE == endBinary.getLeft();
+        public boolean isAdditionalFlowStep(Expression srcExpression, Cursor srcCursor, Expression sinkExpression, Cursor sinkCursor) {
+            if (sinkExpression instanceof J.Binary) {
+                J.Binary endBinary = (J.Binary) sinkExpression;
+                return srcExpression == endBinary.getLeft();
             }
             return false;
         }
