@@ -22,7 +22,7 @@ dependencies {
     // https://github.com/openrewrite/rewrite/issues/1479
     compileOnly("com.squareup.okhttp3:okhttp:4.9.3")
 
-    implementation("commons-io:commons-io:latest.release")
+    implementation("commons-io:commons-io:2.+")
     implementation("org.apache.commons:commons-compress:latest.release")
 
     implementation("io.micrometer:micrometer-core:1.+")

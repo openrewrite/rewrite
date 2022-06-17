@@ -26,6 +26,7 @@ import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.internal.RawRepositories;
 import org.openrewrite.maven.tree.ProfileActivation;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,17 +40,18 @@ import static java.util.Collections.emptyList;
 @Data
 public class MavenSettings {
     @Nullable
+    String localRepository;
+
+    @Nullable
     Profiles profiles;
 
     @Nullable
     ActiveProfiles activeProfiles;
 
     @Nullable
-    @Getter
     Mirrors mirrors;
 
     @Nullable
-    @Getter
     @With
     Servers servers;
 
@@ -78,6 +80,18 @@ public class MavenSettings {
         }
 
         return activeRepositories;
+    }
+
+    public static String defaultLocalRepository() {
+        return asUriString(System.getProperty("user.home") + "/.m2/repository");
+    }
+
+    public String getLocalRepository() {
+        return localRepository != null ? asUriString(localRepository) : defaultLocalRepository();
+    }
+
+    private static String asUriString(final String pathname) {
+        return pathname.startsWith("file:/") ? pathname : new File(pathname).toURI().toString();
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
