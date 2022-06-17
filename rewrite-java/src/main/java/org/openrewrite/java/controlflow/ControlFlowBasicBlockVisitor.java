@@ -16,6 +16,7 @@
 package org.openrewrite.java.controlflow;
 
 import lombok.AllArgsConstructor;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -24,6 +25,7 @@ import org.openrewrite.java.tree.Statement;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Incubating(since = "7.25.0")
 @AllArgsConstructor
 public class ControlFlowBasicBlockVisitor<P> extends JavaIsoVisitor<P> {
     private final String methodName;
