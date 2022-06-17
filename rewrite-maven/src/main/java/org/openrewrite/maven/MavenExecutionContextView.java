@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
+@SuppressWarnings("unused")
 public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final MavenPomCache DEFAULT_POM_CACHE = new InMemoryMavenPomCache();
 
@@ -132,6 +133,8 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                     .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots()))
                     .collect(Collectors.toList()));
         }
+
+        setLocalRepository(settings.getMavenLocal());
 
         setRepositories(settings.getActiveRepositories(Arrays.asList(activeProfiles)).stream()
                 .map(repo -> {

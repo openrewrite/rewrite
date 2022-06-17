@@ -282,7 +282,6 @@ class MavenSettingsTest {
         @Test
         fun `parses localRepository path from settings xml`() {
             val localRepoPath = System.getProperty("java.io.tmpdir")
-            val ctx = MavenExecutionContextView(InMemoryExecutionContext())
             val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
                 """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -291,16 +290,14 @@ class MavenSettingsTest {
                   <localRepository>$localRepoPath</localRepository>
             </settings>
             """.trimIndent().byteInputStream()
-            }, ctx)!!
+            }, InMemoryExecutionContext())!!
 
             assertThat(settings.mavenLocal.uri).startsWith("file://").containsSubsequence(localRepoPath.split(File.separator))
-            assertThat(ctx.localRepository).isSameAs(settings.mavenLocal)
         }
 
         @Test
         fun `parses localRepository uri from settings xml`() {
             val localRepoPath = Paths.get(System.getProperty("java.io.tmpdir")).toUri().toString()
-            val ctx = MavenExecutionContextView(InMemoryExecutionContext())
             val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
                 """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -309,15 +306,13 @@ class MavenSettingsTest {
                   <localRepository>$localRepoPath</localRepository>
             </settings>
             """.trimIndent().byteInputStream()
-            }, ctx)
+            }, InMemoryExecutionContext())
 
             assertThat(settings!!.mavenLocal.uri).startsWith("file://").containsSubsequence(localRepoPath.split("/"))
-            assertThat(ctx.localRepository).isSameAs(settings.mavenLocal)
         }
 
         @Test
         fun `defaults to the maven default`() {
-            val ctx = MavenExecutionContextView(InMemoryExecutionContext())
             val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
                 """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -325,10 +320,9 @@ class MavenSettingsTest {
                 xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
             </settings>
             """.trimIndent().byteInputStream()
-            }, ctx)
+            }, InMemoryExecutionContext())
 
             assertThat(settings!!.mavenLocal.uri).isEqualTo(MavenRepository.MAVEN_LOCAL_DEFAULT.uri)
-            assertThat(ctx.localRepository).isSameAs(settings.mavenLocal)
         }
     }
 }

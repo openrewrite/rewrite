@@ -76,11 +76,7 @@ public class MavenSettings {
     @Nullable
     public static MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
-            MavenSettings settings = MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
-            if(settings.localRepository != null) {
-                new MavenExecutionContextView(ctx).setLocalRepository(settings.getMavenLocal());
-            }
-            return settings;
+            return MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
         } catch (IOException e) {
             ctx.getOnError().accept(new IOException("Failed to parse " + source.getPath(), e));
             return null;
