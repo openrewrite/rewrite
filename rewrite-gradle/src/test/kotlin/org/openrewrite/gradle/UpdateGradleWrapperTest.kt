@@ -15,7 +15,6 @@
  */
 package org.openrewrite.gradle
 
-import org.apache.commons.io.FilenameUtils
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.PathUtils
@@ -79,15 +78,6 @@ class UpdateGradleWrapperTest {
 
     @Test
     fun updateVersionAndDistributionWindows() {
-        val propertiesPath = Paths.get(
-            FilenameUtils.separatorsToWindows(
-                Paths.get(
-                    "gradle",
-                    "wrapper",
-                    "gradle-wrapper.properties"
-                ).toString()
-            )
-        )
         val gradleWrapperProps = PropertiesParser().parse(
             """
                 distributionBase=GRADLE_USER_HOME
@@ -98,7 +88,7 @@ class UpdateGradleWrapperTest {
             """.trimIndent()
         )[0]!!
             .withSourcePath(
-                propertiesPath
+                Paths.get("gradle\\wrapper\\gradle-wrapper.properties")
             )
 
         val result = UpdateGradleWrapper("7.4.2", null)
@@ -125,7 +115,7 @@ class UpdateGradleWrapperTest {
         assertThat(gradleBat.text).isNotBlank
 
         val gradleWrapperJar = result.filterIsInstance<Remote>()
-            .first { FilenameUtils.separatorsToSystem(it.sourcePath.toString()).endsWith("gradle-wrapper.jar") }
+            .first { it.sourcePath.toString().endsWith("gradle-wrapper.jar") }
         assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.sourcePath, WRAPPER_JAR_LOCATION))
         assertThat(gradleWrapperJar.uri).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"))
     }

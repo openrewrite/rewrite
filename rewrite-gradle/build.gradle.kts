@@ -20,7 +20,6 @@ dependencies {
     runtimeOnly("org.codehaus.groovy:groovy-ant:latest.release")
     runtimeOnly("org.codehaus.groovy:groovy-xml:latest.release")
 
-    testImplementation("commons-io:commons-io:2.+")
     compileOnly("org.gradle:gradle-base-services:latest.release")
     compileOnly("org.gradle:gradle-core-api:latest.release")
     compileOnly("org.gradle:gradle-language-groovy:latest.release")
