@@ -34,6 +34,7 @@ import java.net.URI;
 @RequiredArgsConstructor
 public class MavenRepository {
     public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), true, true, true, null, null);
+    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", new File(System.getProperty("user.home") + "/.m2/repository").toURI().toString(), true, true, true, null, null);
     public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", true, false, true, null, null);
 
     @EqualsAndHashCode.Include

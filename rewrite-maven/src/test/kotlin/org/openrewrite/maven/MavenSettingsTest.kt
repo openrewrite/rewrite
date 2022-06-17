@@ -23,10 +23,13 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Parser
+import org.openrewrite.maven.tree.MavenRepository
 import org.openrewrite.maven.tree.MavenRepositoryMirror
 import java.io.File
+import java.net.URI
 import java.nio.file.Paths
 
+@Suppress("HttpUrlsUsage")
 class MavenSettingsTest {
     @Test
     fun parse() {
@@ -277,8 +280,26 @@ class MavenSettingsTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1688")
     inner class LocalRepository {
         @Test
-        fun `parses value from settings xml`() {
+        fun `parses localRepository path from settings xml`() {
             val localRepoPath = System.getProperty("java.io.tmpdir")
+            val ctx = MavenExecutionContextView(InMemoryExecutionContext())
+            val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
+                """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                  <localRepository>$localRepoPath</localRepository>
+            </settings>
+            """.trimIndent().byteInputStream()
+            }, ctx)!!
+
+            assertThat(settings.mavenLocal.uri).startsWith("file://").containsSubsequence(localRepoPath.split(File.separator))
+            assertThat(ctx.localRepository).isSameAs(settings.mavenLocal)
+        }
+
+        @Test
+        fun `parses localRepository uri from settings xml`() {
+            val localRepoPath = Paths.get(System.getProperty("java.io.tmpdir")).toUri().toString()
             val ctx = MavenExecutionContextView(InMemoryExecutionContext())
             val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
                 """
@@ -290,7 +311,8 @@ class MavenSettingsTest {
             """.trimIndent().byteInputStream()
             }, ctx)
 
-            assertThat(settings!!.localRepository).startsWith("file:/").containsSubsequence(localRepoPath.split(File.separator))
+            assertThat(settings!!.mavenLocal.uri).startsWith("file://").containsSubsequence(localRepoPath.split("/"))
+            assertThat(ctx.localRepository).isSameAs(settings.mavenLocal)
         }
 
         @Test
@@ -305,15 +327,8 @@ class MavenSettingsTest {
             """.trimIndent().byteInputStream()
             }, ctx)
 
-            assertThat(settings!!.localRepository).isEqualTo(MavenSettings.defaultLocalRepository())
-        }
-
-        @Test
-        fun `handles localRepository which is already a URI String`() {
-            val uriString = File(System.getProperty("java.io.tmpdir")).toURI().toString()
-            val mavenSettings = MavenSettings(uriString, null, null, null, null)
-
-            assertThat(mavenSettings.localRepository).isEqualTo(uriString)
+            assertThat(settings!!.mavenLocal.uri).isEqualTo(MavenRepository.MAVEN_LOCAL_DEFAULT.uri)
+            assertThat(ctx.localRepository).isSameAs(settings.mavenLocal)
         }
     }
 }

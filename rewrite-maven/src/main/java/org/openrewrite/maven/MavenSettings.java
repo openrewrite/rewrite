@@ -15,32 +15,41 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.internal.RawRepositories;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ProfileActivation;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
+@AllArgsConstructor
 public class MavenSettings {
     @Nullable
     String localRepository;
+
+    @Nullable
+    @NonFinal
+    MavenRepository mavenLocal;
 
     @Nullable
     Profiles profiles;
@@ -55,10 +64,23 @@ public class MavenSettings {
     @With
     Servers servers;
 
+    @JsonCreator
+    public MavenSettings(String localRepository, Profiles profiles, ActiveProfiles activeProfiles, Mirrors mirrors, Servers servers) {
+        this.localRepository = localRepository;
+        this.profiles = profiles;
+        this.activeProfiles = activeProfiles;
+        this.mirrors = mirrors;
+        this.servers = servers;
+    }
+
     @Nullable
     public static MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
-            return MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
+            MavenSettings settings = MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
+            if(settings.localRepository != null) {
+                new MavenExecutionContextView(ctx).setLocalRepository(settings.getMavenLocal());
+            }
+            return settings;
         } catch (IOException e) {
             ctx.getOnError().accept(new IOException("Failed to parse " + source.getPath(), e));
             return null;
@@ -82,16 +104,18 @@ public class MavenSettings {
         return activeRepositories;
     }
 
-    public static String defaultLocalRepository() {
-        return asUriString(System.getProperty("user.home") + "/.m2/repository");
-    }
-
-    public String getLocalRepository() {
-        return localRepository != null ? asUriString(localRepository) : defaultLocalRepository();
+    public MavenRepository getMavenLocal() {
+        if(localRepository == null) {
+            return MAVEN_LOCAL_DEFAULT;
+        }
+        if(mavenLocal == null) {
+            mavenLocal = new MavenRepository("local", asUriString(localRepository), true, true, true, null, null);
+        }
+        return mavenLocal;
     }
 
     private static String asUriString(final String pathname) {
-        return pathname.startsWith("file:/") ? pathname : new File(pathname).toURI().toString();
+        return pathname.startsWith("file://") ? pathname : Paths.get(pathname).toUri().toString();
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -128,6 +152,7 @@ public class MavenSettings {
             return ProfileActivation.isActive(id, activeProfiles, activation);
         }
 
+        @SuppressWarnings("unused")
         public boolean isActive(String... activeProfiles) {
             return isActive(Arrays.asList(activeProfiles));
         }

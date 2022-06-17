@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final MavenPomCache DEFAULT_POM_CACHE = new InMemoryMavenPomCache();
@@ -85,12 +86,12 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_POM_CACHE, DEFAULT_POM_CACHE);
     }
 
-    public void setLocalRepository(String localRepository) {
+    public void setLocalRepository(MavenRepository localRepository) {
         putMessage(MAVEN_LOCAL_REPOSITORY, localRepository);
     }
 
-    public String getLocalRepository() {
-        return getMessage(MAVEN_LOCAL_REPOSITORY, MavenSettings.defaultLocalRepository());
+    public MavenRepository getLocalRepository() {
+        return getMessage(MAVEN_LOCAL_REPOSITORY, MAVEN_LOCAL_DEFAULT);
     }
 
     public void setRepositories(List<MavenRepository> repositories) {
