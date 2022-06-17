@@ -178,6 +178,14 @@ public final class ControlFlow {
         }
 
         @Override
+        public J.Synchronized visitSynchronized(J.Synchronized _sync, P p) {
+            addCursorToBasicBlock();
+            visit(_sync.getLock(), p);
+            visit(_sync.getBody(), p);
+            return _sync;
+        }
+
+        @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
             visit(method.getSelect(), p); // First the select is invoked
             visit(method.getArguments(), p); // Then the arguments are invoked
