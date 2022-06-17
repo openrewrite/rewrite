@@ -31,6 +31,7 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Expression;
@@ -49,6 +50,7 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
 
@@ -1531,8 +1533,10 @@ public class GroovyParserVisitor {
 
         int delimIndex = cursor;
         for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
-            if (inSingleLineComment && source.charAt(delimIndex) == '\n') {
-                inSingleLineComment = false;
+            if (inSingleLineComment) {
+                if (source.charAt(delimIndex) == '\n') {
+                    inSingleLineComment = false;
+                }
             } else {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     switch (source.substring(delimIndex, delimIndex + 2)) {
@@ -1563,40 +1567,7 @@ public class GroovyParserVisitor {
     }
 
     private Space whitespace() {
-        boolean inMultiLineComment = false;
-        boolean inSingleLineComment = false;
-
-        int delimIndex = cursor;
-        for (; delimIndex < source.length(); delimIndex++) {
-            if (inSingleLineComment && (source.charAt(delimIndex) == '\n' || source.charAt(delimIndex) == '\r')) {
-                inSingleLineComment = false;
-            } else {
-                if (source.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = true;
-                            delimIndex++;
-                            continue;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            continue;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex++;
-                            continue;
-                    }
-                }
-
-                if (!inMultiLineComment && !inSingleLineComment) {
-                    if (!Character.isWhitespace(source.substring(delimIndex, delimIndex + 1).charAt(0))) {
-                        break; // found it!
-                    }
-                }
-            }
-        }
-
-        String prefix = source.substring(cursor, delimIndex);
+        String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
         cursor += prefix.length();
         return format(prefix);
     }

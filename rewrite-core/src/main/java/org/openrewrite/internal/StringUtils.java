@@ -23,10 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -599,5 +596,47 @@ public class StringUtils {
         }
 
         return maxLen;
+    }
+
+    /**
+     * Considering C-style comments to be whitespace, return the index of the next non-whitespace character
+     *
+     * @return
+     */
+    public static int indexOfNextNonWhitespace(int cursor, String source) {
+        boolean inMultiLineComment = false;
+        boolean inSingleLineComment = false;
+
+        int delimIndex = cursor;
+        for (; delimIndex < source.length(); delimIndex++) {
+            if (inSingleLineComment) {
+                if(source.charAt(delimIndex) == '\n') {
+                    inSingleLineComment = false;
+                }
+            } else {
+                if (source.length() > delimIndex + 1) {
+                    switch (source.substring(delimIndex, delimIndex + 2)) {
+                        case "//":
+                            inSingleLineComment = true;
+                            delimIndex++;
+                            continue;
+                        case "/*":
+                            inMultiLineComment = true;
+                            delimIndex++;
+                            continue;
+                        case "*/":
+                            inMultiLineComment = false;
+                            delimIndex++;
+                            continue;
+                    }
+                }
+            }
+            if (!inMultiLineComment && !inSingleLineComment) {
+                if (!Character.isWhitespace(source.substring(delimIndex, delimIndex + 1).charAt(0))) {
+                    break; // found it!
+                }
+            }
+        }
+        return delimIndex;
     }
 }

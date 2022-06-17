@@ -57,6 +57,7 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
 
@@ -1712,44 +1713,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     private final Function<Tree, Space> noDelim = ignored -> EMPTY;
 
     private Space whitespace() {
-        boolean inMultiLineComment = false;
-        boolean inSingleLineComment = false;
-
-        int delimIndex = cursor;
-        for (; delimIndex < source.length(); delimIndex++) {
-            if (inSingleLineComment && (source.charAt(delimIndex) == '\n' || source.charAt(delimIndex) == '\r')) {
-                inSingleLineComment = false;
-            } else {
-                if (source.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = true;
-                            delimIndex++;
-                            continue;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            continue;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex++;
-                            continue;
-                    }
-                }
-
-                if (!inMultiLineComment && !inSingleLineComment) {
-                    if (!Character.isWhitespace(source.substring(delimIndex, delimIndex + 1).charAt(0))) {
-                        break; // found it!
-                    }
-                }
-            }
-        }
-
-        String prefix = source.substring(cursor, delimIndex);
+        String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
         cursor += prefix.length();
         return format(prefix);
     }
-
     private String skip(@Nullable String token) {
         if (token == null) {
             //noinspection ConstantConditions

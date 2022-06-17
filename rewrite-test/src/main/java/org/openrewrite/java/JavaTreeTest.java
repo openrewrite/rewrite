@@ -40,7 +40,7 @@ public interface JavaTreeTest {
         J.clearCaches();
     }
 
-    default void assertParsePrintAndProcess(JavaParser parser, NestingLevel nestingLevel, String code,
+    default void assertParsePrintAndProcess(JavaParser parser, NestingLevel nestingLevel, @Language("java") String code,
                                             String... imports) {
         @Language("java") String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
 

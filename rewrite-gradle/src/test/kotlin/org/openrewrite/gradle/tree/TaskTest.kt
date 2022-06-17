@@ -15,7 +15,6 @@
  */
 package org.openrewrite.gradle.tree
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 
@@ -28,5 +27,17 @@ class TaskTest: GradleTreeTest {
             useTestNG()
             options.excludeGroups = [] as Set
           }
+    """, false)
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1929")
+    @Test
+    fun testDsl() = assertParsePrintAndProcess("""
+        test {
+            // Ex: -PexcludeTests=com/google/cloud/healthcare/etl/runner/hl7v2tofhir/integ/*
+            if (project.hasProperty('excludeTests')) {
+                exclude project.property('excludeTests')
+            }
+            dependsOn('buildDeps')
+        }
     """, false)
 }
