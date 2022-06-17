@@ -109,7 +109,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     }
                 } else if (body instanceof J.MethodInvocation) {
                     J.MethodInvocation method = (J.MethodInvocation) body;
-                    if (!methodArgumentsMatchLambdaParameters(method, lambda)) {
+                    if (!methodArgumentsMatchLambdaParameters(method, lambda) || multipleMethodInvocations(method)) {
                         return l;
                     }
 
@@ -134,6 +134,10 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                 }
 
                 return l;
+            }
+
+            private boolean multipleMethodInvocations(J.MethodInvocation method) {
+                return method.getSelect() instanceof J.MethodInvocation;
             }
 
             private boolean methodArgumentsMatchLambdaParameters(J.MethodInvocation method, J.Lambda lambda) {
