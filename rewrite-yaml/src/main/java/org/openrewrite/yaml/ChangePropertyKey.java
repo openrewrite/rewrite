@@ -121,7 +121,6 @@ public class ChangePropertyKey extends Recipe {
                                 propertyToTest,
                                 entry
                         ));
-                        doAfterVisit(new DeleteProperty.DeletePropertyVisitor<>(entry));
                         break;
                     }
                     propertyToTest = propertyToTest.substring(value.length() + 1);
@@ -148,9 +147,6 @@ public class ChangePropertyKey extends Recipe {
             Yaml.Mapping m = super.visitMapping(mapping, p);
             if (m.getEntries().contains(scope)) {
                 String newEntryPrefix = scope.getPrefix();
-                if (newEntryPrefix.isEmpty()) {
-                    newEntryPrefix = "\n";
-                }
                 Yaml.Mapping.Entry newEntry = new Yaml.Mapping.Entry(randomId(),
                         newEntryPrefix,
                         Markers.EMPTY,
@@ -167,12 +163,52 @@ public class ChangePropertyKey extends Recipe {
                         return e;
                     }));
                 } else {
-                    m = m.withEntries(ListUtils.concat(m.getEntries(), newEntry));
-                    doAfterVisit(new DeleteProperty.DeletePropertyVisitor<>(entryToReplace));
+                    m = (Yaml.Mapping) new DeletePropertyVisitor<>(entryToReplace).visitNonNull(m, p);
+                    m = maybeAutoFormat(m, m.withEntries(ListUtils.concat(m.getEntries(), newEntry)), p, getCursor().getParentOrThrow());
                 }
             }
 
             return m;
         }
     }
+    private static class DeletePropertyVisitor<P> extends YamlIsoVisitor<P> {
+        private final Yaml.Mapping.Entry scope;
+
+        private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
+            this.scope = scope;
+        }
+
+        @Override
+        public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
+            Yaml.Mapping m = super.visitMapping(mapping, p);
+
+            boolean changed = false;
+            List<Yaml.Mapping.Entry> entries = new ArrayList<>();
+            for (Yaml.Mapping.Entry entry : m.getEntries()) {
+                if (entry == scope || (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
+                    changed = true;
+                } else {
+                    entries.add(entry);
+                }
+            }
+
+            if (entries.size() == 1) {
+                entries = ListUtils.map(entries, e -> e.withPrefix(""));
+            }
+
+            if (changed) {
+                m = m.withEntries(entries);
+
+                if (getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) {
+                    Yaml.Document document = getCursor().getParentOrThrow().getValue();
+                    if (!document.isExplicit()) {
+                        m = m.withEntries(m.getEntries());
+                    }
+                }
+            }
+            return m;
+        }
+    }
+
+
 }

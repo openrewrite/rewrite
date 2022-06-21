@@ -111,10 +111,10 @@ public class DeleteProperty extends Recipe {
         };
     }
 
-    public static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
+    private static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
         private final Yaml.Mapping.Entry scope;
 
-        public DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
+        private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
             this.scope = scope;
         }
 
