@@ -64,7 +64,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
             g = (G.GString) temp;
         }
         g = g.withStrings(ListUtils.map(g.getStrings(), s -> visit(s, p)));
-        g = g.withType(gString.getType());
+        g = g.withType(visitType(gString.getType(), p));
         return g;
     }
 
