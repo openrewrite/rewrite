@@ -1480,7 +1480,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
         Space moduleEnd = sourceBefore("}");
-        return new J.Module(UUID.randomUUID(), prefix, Markers.EMPTY, annotations, kind, name, directives, moduleEnd);
+        return new J.Module(randomId(), prefix, Markers.EMPTY, annotations, kind, name, directives, moduleEnd);
     }
 
     @Override
