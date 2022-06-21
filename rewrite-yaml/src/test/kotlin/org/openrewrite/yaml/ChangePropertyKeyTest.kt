@@ -51,7 +51,8 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         after = """
             unrelated.property: true
             management.metrics:
-                binders.jvm.enabled: true
+                binders:
+                    jvm.enabled: true
                 enable.process.files: true
         """
     )
@@ -66,7 +67,8 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         """,
         after = """
             unrelated.property: true
-            management.metrics.enable.process.files: true
+            management.metrics:
+                enable.process.files: true
         """
     )
 
@@ -306,4 +308,42 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         assertThat(valid.isValid).isTrue
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1841")
+    fun doesNotReformatUnrelatedProperties() = assertChanged(
+        before = """
+            unrelated:
+              property: true
+            management.metrics:
+              binders.files.enabled: true
+            other:
+              property: true
+        """,
+        after = """
+            unrelated:
+              property: true
+            management.metrics:
+              enable.process.files: true
+            other:
+              property: true
+        """
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1841")
+    fun relocatesPropertyIfNothingElseInFamily() = assertChanged(
+        recipe = ChangePropertyKey("a.b.c", "x.y.z", true, null),
+        before = """
+            a:
+              b:
+                c: abc
+            something:
+              else: qwe
+        """,
+        after = """
+            something:
+              else: qwe
+            x.y.z: abc
+        """
+    )
 }
