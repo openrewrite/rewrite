@@ -16,6 +16,7 @@
 package org.openrewrite.yaml
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
@@ -32,6 +33,49 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             null,
             null
         )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1873")
+    @Test
+    fun `shorter new key with indented config`() = assertChanged(
+        recipe = ChangePropertyKey("a.b.c.d.e", "x.y", null, null),
+        before = """
+    a:
+      b:
+        c:
+          d:
+            e:
+              child: true
+    """,
+        after = """
+    x.y:
+      child: true
+    """
+        /* actual:
+        x.y:
+                  child: true
+        */
+    )
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1873")
+    @Test
+    fun `longer new key with indented config`() = assertChanged(
+        recipe = ChangePropertyKey("x.y", "a.b.c.d.e",  null, null),
+        before = """
+    x:
+      y:
+        child: true
+    """,
+        after = """
+    a.b.c.d.e:
+      child: true
+    """
+        /* actual:
+        a.b.c.d.e:
+            child: true
+        */
+    )
 
     @Test
     fun singleEntry() = assertChanged(
