@@ -31,7 +31,6 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.Expression;
@@ -786,6 +785,45 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitCatchStatement(CatchStatement node) {
+            Space prefix = sourceBefore("catch");
+            Space parenPrefix = sourceBefore("(");
+
+            // This does not handle multi-catch statements like catch(ExceptionTypeA | ExceptionTypeB e)
+            // The Groovy AST seems to only record the first type in the list, so some extra hacking is required to get the others
+            Parameter param = node.getVariable();
+            TypeTree paramType;
+            Space paramPrefix = whitespace();
+            // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
+            // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
+            if("java.lang.Exception".equals(param.getType().getName())
+                    && !source.startsWith("Exception", cursor)
+                    && !source.startsWith("java.lang.Exception", cursor)) {
+                paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, "",
+                        JavaType.ShallowClass.build("java.lang.Exception"), null);
+            } else {
+                paramType = visitTypeTree(param.getOriginType()).withPrefix(paramPrefix);
+            }
+
+            JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
+                    new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
+                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, param.getName(), null, null),
+                            emptyList(), null, null)
+            );
+            cursor += param.getName().length();
+            Space rightPad = whitespace();
+            cursor += 1; // skip )
+            JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramType.getPrefix(),
+                    Markers.EMPTY, emptyList(), emptyList(), paramType.withPrefix(EMPTY),
+                    null, emptyList(),
+                    singletonList(paramName))
+            ).withAfter(rightPad);
+
+            J.ControlParentheses<J.VariableDeclarations> catchControl = new J.ControlParentheses<>(randomId(), parenPrefix, Markers.EMPTY,variable);
+            queue.add(new J.Try.Catch(randomId(), prefix, Markers.EMPTY, catchControl, visit(node.getCode())));
+        }
+
+        @Override
         public void visitCastExpression(CastExpression cast) {
             // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
             // If the CastExpression starts at the same place as the expression it contains, then it must be a groovy-style cast
@@ -1351,6 +1389,32 @@ public class GroovyParserVisitor {
             }
 
             queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));
+        }
+
+        @Override
+        public void visitTryCatchFinally(TryCatchStatement node) {
+            Space prefix = sourceBefore("try");
+            // Recent versions of groovy support try-with-resources, usage of this pattern in groovy is uncommon
+            JContainer<J.Try.Resource> resources = null;
+            J.Block body = visit(node.getTryStatement());
+            List<J.Try.Catch> catches;
+            if(node.getCatchStatements().isEmpty()) {
+                catches = null;
+            } else {
+                catches = new ArrayList<>(node.getCatchStatements().size());
+                for(CatchStatement catchStatement : node.getCatchStatements()) {
+                    visitCatchStatement(catchStatement);
+                    catches.add((J.Try.Catch) queue.poll());
+                }
+            }
+
+            // Strangely, groovy parses the finally's block as a BlockStatement which contains another BlockStatement
+            // The true contents of the block are within the first statement of this apparently pointless enclosing BlockStatement
+            JLeftPadded<J.Block> finallyy = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
+                    padLeft(sourceBefore("finally"), visit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0)));
+
+            queue.add(new J.Try(randomId(),prefix, Markers.EMPTY, resources, body, catches, finallyy));
+
         }
 
         @Override
