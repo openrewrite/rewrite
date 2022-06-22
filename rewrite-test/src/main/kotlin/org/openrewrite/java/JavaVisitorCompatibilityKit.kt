@@ -401,6 +401,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveUnusedImportsTck : RemoveUnusedImportsTest
 
     @Nested
+    inner class RenameClassTck : RenameClassTest
+
+    @Nested
     inner class RenameVariableTck : RenameVariableTest
 
     @Nested
