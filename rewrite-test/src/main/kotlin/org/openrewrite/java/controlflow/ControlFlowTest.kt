@@ -1056,7 +1056,7 @@ interface ControlFlowTest : RewriteTest {
 
 
     @Test
-    fun `typecast`() = rewriteRun(
+    fun typecast() = rewriteRun(
         java(
             """
             abstract class Test {
@@ -1089,6 +1089,32 @@ interface ControlFlowTest : RewriteTest {
                         String p = o;
                     } else /*~~(L)~~>*/{
                         System.out.println(n);
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `throw an exception as an exit condition`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+                void test() {
+                    if (guard()) {
+                        throw new RuntimeException();
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean guard();
+                void test() /*~~(BB: 2 CN: 1 EX: 2 | L)~~>*/{
+                    if (guard()) /*~~(L)~~>*/{
+                        throw new RuntimeException();
                     }
                 }
             }
