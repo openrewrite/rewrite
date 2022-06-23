@@ -108,7 +108,7 @@ public class ChangePackage extends Recipe {
                 String path = ((SourceFile) c).getSourcePath().toString().replace('\\', '/');
                 String changingFrom = getCursor().getMessage(RENAME_FROM_KEY);
                 assert changingFrom != null;
-                c = (JavaSourceFile) ((SourceFile) c).withSourcePath(Paths.get(path.replaceFirst(
+                c = ((SourceFile) c).withSourcePath(Paths.get(path.replaceFirst(
                         changingFrom.replace('.', '/'),
                         changingTo.replace('.', '/')
                 )));
@@ -141,8 +141,22 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
+        public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
+            Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
+            if (updatePrefix != null && updatePrefix) {
+                _import = _import.withPrefix(Space.EMPTY);
+            }
+            return super.visitImport(_import, executionContext);
+        }
+
+        @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+
+            Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
+            if (updatePrefix != null && updatePrefix) {
+                c = c.withPrefix(Space.EMPTY);
+            }
 
             String changingTo = getCursor().getNearestMessage(RENAME_TO_KEY);
             if (changingTo != null && classDecl.getType() != null) {
@@ -179,13 +193,19 @@ public class ChangePackage extends Recipe {
 
             if (original.equals(oldPackageName)) {
                 getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, newPackageName);
-                pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, newPackageName).build(), pkg.getCoordinates().replace());
+                if (newPackageName.contains(".")) {
+                    pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, newPackageName).build(), pkg.getCoordinates().replace());
+                } else {
+                    getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
+                    pkg = null;
+                }
             } else if ((recursive == null || recursive)
                     && original.startsWith(oldPackageName) && !original.startsWith(newPackageName)) {
                 String changingTo = newPackageName + original.substring(oldPackageName.length());
                 getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, changingTo);
                 pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, changingTo).build(), pkg.getCoordinates().replace());
             }
+            //noinspection ConstantConditions
             return pkg;
         }
 

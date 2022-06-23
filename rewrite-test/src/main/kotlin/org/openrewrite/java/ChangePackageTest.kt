@@ -18,12 +18,18 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 import java.nio.file.Paths
 
-interface ChangePackageTest: JavaRecipeTest {
+interface ChangePackageTest: JavaRecipeTest, RewriteTest {
 
     override val recipe: Recipe
         get() = ChangePackage("org.openrewrite", "org.openrewrite.test", null)
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(recipe)
+    }
 
     companion object {
         private val testClass = """
@@ -604,6 +610,51 @@ interface ChangePackageTest: JavaRecipeTest {
                 }
             }
         """
+    )
+
+    @Test
+    fun updateImportPrefixWithEmptyPackage(jp: JavaParser) = rewriteRun(
+        { spec ->
+            spec.parser(jp)
+            spec.recipe(
+                ChangePackage("a.b", "", false)
+            )},
+        java("""
+            package a.b;
+            
+            import java.util.List;
+            
+            class Test {
+            }
+            """,
+            """
+            import java.util.List;
+            
+            class Test {
+            }
+            """
+        )
+    )
+
+    @Test
+    fun updateClassPrefixWithEmptyPackage(jp: JavaParser) = rewriteRun(
+        { spec ->
+            spec.parser(jp)
+            spec.recipe(
+                ChangePackage("a.b", "", false)
+            )
+        },
+        java("""
+            package a.b;
+            
+            class Test {
+            }
+            """,
+            """
+            class Test {
+            }
+            """
+        )
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
