@@ -20,6 +20,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.EmptyBlockStyle;
@@ -28,6 +29,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Collections;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SimplifyConstantIfBranchExecution extends Recipe {
 
@@ -53,21 +55,21 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
             J.Block bl = (J.Block) super.visitBlock(block, executionContext);
             if (bl != block) {
                 bl = (J.Block) new RemoveUnneededBlock.RemoveUnneededBlockStatementVisitor()
-                    .visitNonNull(bl, executionContext, getCursor().getParentOrThrow());
+                        .visitNonNull(bl, executionContext, getCursor().getParentOrThrow());
                 EmptyBlockStyle style = ((SourceFile) getCursor().firstEnclosingOrThrow(JavaSourceFile.class))
-                    .getStyle(EmptyBlockStyle.class);
+                        .getStyle(EmptyBlockStyle.class);
                 if (style == null) {
                     style = Checkstyle.emptyBlock();
                 }
                 bl = (J.Block) new EmptyBlockVisitor<>(style)
-                    .visitNonNull(bl, executionContext, getCursor().getParentOrThrow());
+                        .visitNonNull(bl, executionContext, getCursor().getParentOrThrow());
             }
             return bl;
         }
 
         @SuppressWarnings("unchecked")
         private <E extends Expression> E cleanupBooleanExpression(
-            E expression, ExecutionContext context
+                E expression, ExecutionContext context
         ) {
             final E ex1 =
                     (E) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
@@ -83,6 +85,40 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
             J.If if__ = (J.If) super.visitIf(if_, context);
             J.ControlParentheses<Expression> cp =
                     cleanupBooleanExpression(if__.getIfCondition(), context);
+            Statement _then = if_.getThenPart();
+            visit(_then, context);
+            AtomicBoolean visitedCFKeyword = new AtomicBoolean(false);
+            // if there is a return, break, continue, throws in _then, then set visitedKeyword to true
+            new JavaIsoVisitor<AtomicBoolean>(){
+                @Override
+                public J.Return visitReturn(J.Return _return, AtomicBoolean atomicBoolean) {
+                    atomicBoolean.set(true);
+                    return _return;
+                }
+
+                @Override
+                public J.Continue visitContinue(J.Continue continueStatement, AtomicBoolean atomicBoolean) {
+                    atomicBoolean.set(true);
+                    return continueStatement;
+                }
+
+                @Override
+                public J.Break visitBreak(J.Break breakStatement, AtomicBoolean atomicBoolean) {
+                    atomicBoolean.set(true);
+                    return breakStatement;
+                }
+
+                @Override
+                public J.Throw visitThrow(J.Throw thrown, AtomicBoolean atomicBoolean) {
+                    atomicBoolean.set(true);
+                    return thrown;
+                }
+            }.visit(if__.getThenPart(), visitedCFKeyword, getCursor());
+
+            if (visitedCFKeyword.get()) {
+                return if__;
+            }
+
             // The compile-time constant value of the if condition control parentheses.
             final Optional<Boolean> compileTimeConstantBoolean;
             if (isLiteralTrue(cp.getTree())) {
@@ -102,10 +138,10 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                 // Only keep the `then` branch, and remove the `else` branch.
                 Statement s = if__.getThenPart();
                 return maybeAutoFormat(
-                    if__,
-                    s,
-                    context,
-                    getCursor().getParentOrThrow()
+                        if__,
+                        s,
+                        context,
+                        getCursor().getParentOrThrow()
                 );
             } else {
                 // False branch
@@ -114,10 +150,10 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                     // The `else` part needs to be kept
                     Statement s = if__.getElsePart().getBody();
                     return maybeAutoFormat(
-                        if__,
-                        s,
-                        context,
-                        getCursor().getParentOrThrow()
+                            if__,
+                            s,
+                            context,
+                            getCursor().getParentOrThrow()
                     );
                 }
                 /*
@@ -144,12 +180,12 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
          */
         private static J.Block emptyJBlock() {
             return new J.Block(
-                Tree.randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                JRightPadded.build(false),
-                Collections.emptyList(),
-                Space.EMPTY
+                    Tree.randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    JRightPadded.build(false),
+                    Collections.emptyList(),
+                    Space.EMPTY
             );
         }
 

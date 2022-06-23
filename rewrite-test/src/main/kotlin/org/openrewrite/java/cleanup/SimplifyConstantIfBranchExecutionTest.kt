@@ -22,7 +22,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 
-@Suppress("ConstantConditions")
+@Suppress("ConstantConditions", "FunctionName")
 interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
     override val recipe: Recipe
         get() = SimplifyConstantIfBranchExecution()
@@ -582,4 +582,75 @@ interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun `does not remove when return in if block` (jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (true) {
+                        System.out.println("hello");
+                        return;
+                    }
+                    System.out.println("goodbye");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun `does not remove when throws in if block` (jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    if (true) {
+                        System.out.println("hello");
+                        throw new RuntimeException();
+                    }
+                    System.out.println("goodbye");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun `does not remove when break in if block (within while)` (jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    while (true){
+                        if (true) {
+                            System.out.println("hello");
+                            break;
+                        }
+                        System.out.println("goodbye");
+                    }
+                    System.out.println("goodbye");
+                }
+            }
+        """
+    )
+
+    @Test
+    fun `does not remove when continue in if block (within while)` (jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            public class A {
+                public void test() {
+                    while (true){
+                        if (true) {
+                            System.out.println("hello");
+                            continue;
+                        }
+                        System.out.println("goodbye");
+                    }
+                    System.out.println("goodbye");
+                }
+            }
+        """
+    )
+
 }
