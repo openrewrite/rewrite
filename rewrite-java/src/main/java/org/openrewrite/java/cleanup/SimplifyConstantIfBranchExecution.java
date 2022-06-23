@@ -85,8 +85,6 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
             J.If if__ = (J.If) super.visitIf(if_, context);
             J.ControlParentheses<Expression> cp =
                     cleanupBooleanExpression(if__.getIfCondition(), context);
-            Statement _then = if_.getThenPart();
-            visit(_then, context);
             AtomicBoolean visitedCFKeyword = new AtomicBoolean(false);
             // if there is a return, break, continue, throws in _then, then set visitedKeyword to true
             new JavaIsoVisitor<AtomicBoolean>(){
@@ -113,7 +111,7 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                     atomicBoolean.set(true);
                     return thrown;
                 }
-            }.visit(if__.getThenPart(), visitedCFKeyword, getCursor());
+            }.visit(if__.getThenPart(), visitedCFKeyword);
 
             if (visitedCFKeyword.get()) {
                 return if__;

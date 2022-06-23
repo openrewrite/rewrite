@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("StatementWithEmptyBody", "PointlessBooleanExpression")
+@file:Suppress("StatementWithEmptyBody", "PointlessBooleanExpression", "LoopStatementThatDoesntLoop",
+    "InfiniteLoopStatement"
+)
 
 package org.openrewrite.java.cleanup
 
@@ -532,28 +534,6 @@ interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
             }
         """
     )
-
-    @Test
-    fun simplifyConstantIfTrueBlockInWhile(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
-            public class A {
-                public void test() {
-                    while (true)
-                        if (true) break;
-                }
-            }
-        """,
-        after = """
-            public class A {
-                public void test() {
-                    while (true) break;
-                }
-            }
-        """
-    )
-
-
     @Test
     fun doNotFormatCodeOutsideRemovedBlock(jp: JavaParser) = assertChanged(
         jp,
