@@ -23,8 +23,10 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/*
+/**
  * Recursively checks the equality of each element of two ASTs to determine if two trees are semantically equal.
+ *
+ * Bug fixes related to semantic equality should be applied to `CombineSemanticallyEqualCatchBlocks$CommentVisitor` too.
  */
 @Incubating(since = "7.24.0")
 public class SemanticallyEqual {
@@ -96,7 +98,6 @@ public class SemanticallyEqual {
                 }
             }
             return annotation;
-
         }
 
         @Override

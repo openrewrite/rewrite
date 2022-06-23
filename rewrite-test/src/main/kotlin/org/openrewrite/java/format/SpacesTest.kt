@@ -1758,7 +1758,7 @@ interface SpacesTest : JavaRecipeTest {
             """
     )
 
-        @Suppress("CatchMayIgnoreException", "EmptyTryBlock")
+    @Suppress("CatchMayIgnoreException", "EmptyTryBlock")
     @Issue("https://github.com/openrewrite/rewrite/issues/1896")
     @Test
     fun aroundExceptionDelimiterFalse(jp: JavaParser.Builder<*, *>) = assertChanged(
