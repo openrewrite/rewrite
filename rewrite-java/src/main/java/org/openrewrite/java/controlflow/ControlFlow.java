@@ -88,7 +88,6 @@ public final class ControlFlow {
          * Flows that terminate in a {@link J.Break} statement.
          */
         private final Set<ControlFlowNode> breakFlow = new HashSet<>();
-        private boolean jumps;
 
         ControlFlowAnalysis(ControlFlowNode start, boolean methodEntryPoint) {
             this.current = Collections.singleton(Objects.requireNonNull(start, "start cannot be null"));
@@ -101,7 +100,6 @@ public final class ControlFlow {
         }
 
         ControlFlowNode.BasicBlock currentAsBasicBlock() {
-            jumps = false;
             assert !current.isEmpty() : "No current node!";
             if (current.size() == 1 && current.iterator().next() instanceof ControlFlowNode.BasicBlock) {
                 return (ControlFlowNode.BasicBlock) current.iterator().next();
@@ -161,16 +159,13 @@ public final class ControlFlow {
             for (Statement statement : block.getStatements()) {
                 ControlFlowAnalysis<P> analysis = visitRecursive(current, statement, p);
                 current = analysis.current;
-                jumps = analysis.jumps;
                 continueFlow.addAll(analysis.continueFlow);
                 breakFlow.addAll(analysis.breakFlow);
                 exitFlow.addAll(analysis.exitFlow);
             }
             if (methodEntryPoint) {
                 ControlFlowNode end = ControlFlowNode.End.create();
-                if (!jumps) {
-                    addSuccessorToCurrent(end);
-                }
+                addSuccessorToCurrent(end);
                 exitFlow.forEach(exit -> exit.addSuccessor(end));
                 current = Collections.singleton(end);
             }
@@ -352,7 +347,6 @@ public final class ControlFlow {
             ControlFlowAnalysis<P> thenAnalysis =
                     visitRecursiveTransferringAll(conditionNodes, branching.getTruePart(), p);
             Set<ControlFlowNode> newCurrent = Collections.singleton(getControlFlowNodeMissingSuccessors(conditionNodes));
-            boolean exhaustiveJump = thenAnalysis.jumps;
             if (branching.getFalsePart() != null) {
                 // Then the else block is visited
                 ControlFlowAnalysis<P> elseAnalysis =
@@ -361,11 +355,9 @@ public final class ControlFlow {
                         thenAnalysis.current.stream(),
                         elseAnalysis.current.stream()
                 ).collect(Collectors.toSet());
-                exhaustiveJump &= elseAnalysis.jumps;
             } else {
                 current = newCurrent;
             }
-            jumps = exhaustiveJump;
         }
 
         @Override
@@ -645,7 +637,6 @@ public final class ControlFlow {
             addCursorToBasicBlock(); // Then the return
             exitFlow.addAll(current);
             current = Collections.emptySet();
-            jumps = true;
             return _return;
         }
 
@@ -655,7 +646,6 @@ public final class ControlFlow {
             addCursorToBasicBlock(); // Then the return
             exitFlow.addAll(current);
             current = Collections.emptySet();
-            jumps = true;
             return thrown;
         }
 
