@@ -55,6 +55,13 @@ class MethodInvocationTest : GroovyTreeTest {
     )
 
     @Test
+    fun mapLiteralFirstArgument() = assertParsePrintAndProcess(
+        """
+            foo(["foo" : "bar"])
+        """
+    )
+
+    @Test
     fun namedArgumentsInDeclaredOrder() = assertParsePrintAndProcess("""
         def acceptsNamedArguments (Map a, int i) { }
         acceptsNamedArguments(foo: "bar", 1)

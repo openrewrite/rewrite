@@ -530,7 +530,6 @@ public class GroovyParserVisitor {
             }
 
             List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = expression.getExpressions();
-
             // If the first parameter to a function is a Map, then groovy allows "named parameters" style invocations, see:
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
@@ -549,13 +548,21 @@ public class GroovyParserVisitor {
                                         .thenComparing(ASTNode::getLastColumnNumber))
                                 .collect(Collectors.toList());
             } else if (unparsedArgs.size() > 0 && unparsedArgs.get(0) instanceof MapExpression) {
-                // Bring named parameters out of their containing MapExpression so that they can be parsed correctly
-                MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
-                unparsedArgs =
-                        Stream.concat(
-                                        namedArgExpressions.getMapEntryExpressions().stream(),
-                                        unparsedArgs.subList(1, unparsedArgs.size()).stream())
-                                .collect(Collectors.toList());
+                // The map literal may or may not be wrapped in "[]"
+                // If it is wrapped in "[]" then this isn't a named arguments situation and we should not lift the parameters out of the enclosing MapExpression
+                saveCursor = cursor;
+                whitespace();
+                boolean isOpeningBracketPresent = '[' == source.charAt(cursor);
+                cursor = saveCursor;
+                if(!isOpeningBracketPresent) {
+                    // Bring named parameters out of their containing MapExpression so that they can be parsed correctly
+                    MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
+                    unparsedArgs =
+                            Stream.concat(
+                                            namedArgExpressions.getMapEntryExpressions().stream(),
+                                            unparsedArgs.subList(1, unparsedArgs.size()).stream())
+                                    .collect(Collectors.toList());
+                }
             }
 
             for (int i = 0; i < unparsedArgs.size(); i++) {
