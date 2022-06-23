@@ -143,6 +143,11 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         return delegate.visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
     }
 
+    @Override
+    public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
+        return delegate.visitSpace(space, loc, p);
+    }
+
     protected void visitContainer(String before, @Nullable JContainer<? extends J> container, GContainer.Location location,
                                   String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
         if (container == null) {

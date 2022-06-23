@@ -45,4 +45,10 @@ class CompilationUnitTest : GroovyTreeTest {
         """.trimIndent()
     )
 
+    @Test
+    fun trailingComment() = assertParsePrintAndProcess(
+        """
+            // foo
+        """
+    )
 }
