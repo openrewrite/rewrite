@@ -53,6 +53,10 @@ public class Cursor {
         return new CursorPathIterator(this);
     }
 
+    public Iterator<Cursor> getPathAsCursors(Predicate<Object> filter) {
+        return new CursorPathIterator(this, filter);
+    }
+
     public Iterator<Object> getPath() {
         return new CursorIterator(this);
     }
@@ -72,24 +76,37 @@ public class Cursor {
 
     private static class CursorPathIterator implements Iterator<Cursor> {
         private Cursor cursor;
+        private Predicate<Object> filter = v -> true;
 
         private CursorPathIterator(Cursor cursor) {
             this.cursor = cursor;
         }
 
+        private CursorPathIterator(Cursor cursor, Predicate<Object> filter) {
+            this(cursor);
+            this.filter = filter;
+        }
+
         @Override
         public boolean hasNext() {
-            return cursor != null;
+            for (Cursor c = cursor; c != null; c = c.parent) {
+                if (filter.test(c.value)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override
         public Cursor next() {
-            Cursor next = cursor;
-            cursor = cursor.parent;
-            if(next == null) {
-                throw new NoSuchElementException();
+            for (; cursor != null; cursor = cursor.parent) {
+                Cursor c = cursor;
+                if (filter.test(c.value)) {
+                    cursor = c.parent;
+                    return c;
+                }
             }
-            return next;
+            throw new NoSuchElementException();
         }
     }
 
