@@ -13,6 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("StatementWithEmptyBody", "PointlessBooleanExpression", "ConstantConditions",
+    "ClassInitializerMayBeStatic", "ConditionCoveredByFurtherCondition", "DuplicateCondition", "DoubleNegation",
+    "UnnecessaryLocalVariable", "StringOperationCanBeSimplified"
+)
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
@@ -283,6 +288,27 @@ interface SimplifyBooleanExpressionTest : JavaRecipeTest {
             }
         """,
 
+    )
+    @Test
+    fun binaryOrBothFalse(jp: JavaParser) = assertChanged(
+        before = """
+            public class A {
+                {
+                    if (!true || !true) {
+                        System.out.println("");
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                {
+                    if (false) {
+                        System.out.println("");
+                    }
+                }
+            }
+        """
     )
 
 }

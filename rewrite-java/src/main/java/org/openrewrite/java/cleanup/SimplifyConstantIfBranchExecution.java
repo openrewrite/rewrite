@@ -74,46 +74,18 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
             final E ex1 =
                     (E) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
                             .visitNonNull(expression, context, getCursor().getParentOrThrow());
-            final E ex2 =
-                    (E) new SimplifyBooleanExpressionVisitor<>()
+            return (E) new SimplifyBooleanExpressionVisitor<>()
                             .visitNonNull(ex1, context, getCursor().getParentOrThrow());
-            return ex2;
         }
 
         @Override
         public J visitIf(J.If if_, ExecutionContext context) {
             J.If if__ = (J.If) super.visitIf(if_, context);
-            J.ControlParentheses<Expression> cp =
-                    cleanupBooleanExpression(if__.getIfCondition(), context);
-            AtomicBoolean visitedCFKeyword = new AtomicBoolean(false);
-            // if there is a return, break, continue, throws in _then, then set visitedKeyword to true
-            new JavaIsoVisitor<AtomicBoolean>(){
-                @Override
-                public J.Return visitReturn(J.Return _return, AtomicBoolean atomicBoolean) {
-                    atomicBoolean.set(true);
-                    return _return;
-                }
 
-                @Override
-                public J.Continue visitContinue(J.Continue continueStatement, AtomicBoolean atomicBoolean) {
-                    atomicBoolean.set(true);
-                    return continueStatement;
-                }
+            J.ControlParentheses<Expression> cp = cleanupBooleanExpression(if__.getIfCondition(), context);
+            if__ = if__.withIfCondition(cp);
 
-                @Override
-                public J.Break visitBreak(J.Break breakStatement, AtomicBoolean atomicBoolean) {
-                    atomicBoolean.set(true);
-                    return breakStatement;
-                }
-
-                @Override
-                public J.Throw visitThrow(J.Throw thrown, AtomicBoolean atomicBoolean) {
-                    atomicBoolean.set(true);
-                    return thrown;
-                }
-            }.visit(if__.getThenPart(), visitedCFKeyword);
-
-            if (visitedCFKeyword.get()) {
+            if (visitsKeyWord(if__)) {
                 return if__;
             }
 
@@ -171,6 +143,41 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                  */
                 return emptyJBlock();
             }
+        }
+
+        private boolean visitsKeyWord(J.If iff) {
+            if (iff.getIfCondition().getTree() instanceof J.Literal && ((J.Literal) iff.getIfCondition().getTree()).getValue() == Boolean.valueOf(false)) {
+                return false;
+            }
+
+            AtomicBoolean visitedCFKeyword = new AtomicBoolean(false);
+            // if there is a return, break, continue, throws in _then, then set visitedKeyword to true
+            new JavaIsoVisitor<AtomicBoolean>(){
+                @Override
+                public J.Return visitReturn(J.Return _return, AtomicBoolean atomicBoolean) {
+                    atomicBoolean.set(true);
+                    return _return;
+                }
+
+                @Override
+                public J.Continue visitContinue(J.Continue continueStatement, AtomicBoolean atomicBoolean) {
+                    atomicBoolean.set(true);
+                    return continueStatement;
+                }
+
+                @Override
+                public J.Break visitBreak(J.Break breakStatement, AtomicBoolean atomicBoolean) {
+                    atomicBoolean.set(true);
+                    return breakStatement;
+                }
+
+                @Override
+                public J.Throw visitThrow(J.Throw thrown, AtomicBoolean atomicBoolean) {
+                    atomicBoolean.set(true);
+                    return thrown;
+                }
+            }.visit(iff.getThenPart(), visitedCFKeyword);
+            return visitedCFKeyword.get();
         }
 
         /**

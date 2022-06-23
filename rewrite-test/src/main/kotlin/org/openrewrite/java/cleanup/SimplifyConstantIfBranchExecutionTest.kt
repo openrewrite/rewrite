@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 @file:Suppress("StatementWithEmptyBody", "PointlessBooleanExpression", "LoopStatementThatDoesntLoop",
-    "InfiniteLoopStatement"
+    "InfiniteLoopStatement", "DuplicateCondition", "ClassInitializerMayBeStatic"
 )
 
 package org.openrewrite.java.cleanup
@@ -633,4 +633,20 @@ interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun binaryOrIsAlwaysFalse(jp: JavaParser) = assertChanged(
+        before = """
+            public class A {
+                {
+                    if (!true || !true) {
+                        throw new RuntimeException();
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+            }
+        """
+    )
 }
