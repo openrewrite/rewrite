@@ -35,24 +35,25 @@ public class ControlFlowBasicBlockVisitor<P> extends JavaIsoVisitor<P> {
         J.MethodDeclaration methodDeclaration = getCursor().firstEnclosing(J.MethodDeclaration.class);
         if (block == methodDeclaration.getBody() &&
                 methodDeclaration.getName().getSimpleName().equals(methodName)) {
-            ControlFlowSummary summary = ControlFlow.startingAt(getCursor()).findControlFlow();
-            Set<J> inBasicBlock = summary.getBasicBlocks().stream().flatMap(b ->
-                    b.getNodeValues().stream()).collect(Collectors.toSet());
-            doAfterVisit(new JavaIsoVisitor<P>() {
+            ControlFlow.startingAt(getCursor()).findControlFlow().ifPresent(summary -> {
+                Set<J> inBasicBlock = summary.getBasicBlocks().stream().flatMap(b ->
+                        b.getNodeValues().stream()).collect(Collectors.toSet());
+                doAfterVisit(new JavaIsoVisitor<P>() {
 
-                @Override
-                public Statement visitStatement(Statement statement, P p) {
-                    return inBasicBlock.contains(statement) ?
-                            statement.withMarkers(statement.getMarkers().searchResult()) :
-                            statement;
-                }
+                    @Override
+                    public Statement visitStatement(Statement statement, P p) {
+                        return inBasicBlock.contains(statement) ?
+                                statement.withMarkers(statement.getMarkers().searchResult()) :
+                                statement;
+                    }
 
-                @Override
-                public Expression visitExpression(Expression expression, P p) {
-                    return inBasicBlock.contains(expression) ?
-                            expression.withMarkers(expression.getMarkers().searchResult()) :
-                            expression;
-                }
+                    @Override
+                    public Expression visitExpression(Expression expression, P p) {
+                        return inBasicBlock.contains(expression) ?
+                                expression.withMarkers(expression.getMarkers().searchResult()) :
+                                expression;
+                    }
+                });
             });
         }
         return super.visitBlock(block, p);
