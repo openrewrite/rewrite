@@ -71,4 +71,12 @@ class MethodDeclarationTest : GroovyTreeTest {
             }
         """
     )
+
+    @Test
+    fun dynamicTypedArguments() = assertParsePrintAndProcess(
+        """
+           def foo(bar, baz) {
+           }
+        """
+    )
 }

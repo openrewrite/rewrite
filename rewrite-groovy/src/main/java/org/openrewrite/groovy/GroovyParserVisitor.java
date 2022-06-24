@@ -431,7 +431,12 @@ public class GroovyParserVisitor {
                         })
                         .collect(Collectors.toList());
 
-                TypeTree paramType = visitTypeTree(param.getOriginType());
+                TypeTree paramType;
+                if(param.isDynamicTyped()) {
+                    paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "", JavaType.ShallowClass.build("java.lang.Object"), null);
+                } else {
+                    paramType = visitTypeTree(param.getOriginType());
+                }
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                         new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
                                 new J.Identifier(randomId(), EMPTY, Markers.EMPTY, param.getName(), null, null),
