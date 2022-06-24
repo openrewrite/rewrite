@@ -1121,4 +1121,32 @@ interface ControlFlowTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `simple two branch exit condition`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean guard();
+                void test() {
+                    System.out.println("Hello!");
+                    if (guard()) {
+                        System.out.println("Goodbye!");
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean guard();
+                void test() /*~~(BB: 2 CN: 1 EX: 2 | L)~~>*/{
+                    System.out.println("Hello!");
+                    if (guard()) /*~~(L)~~>*/{
+                        System.out.println("Goodbye!");
+                    }
+                }
+            }
+            """
+        )
+    )
 }
