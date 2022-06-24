@@ -34,69 +34,70 @@ interface ControlFlowTest : RewriteTest {
                 override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                     val methodDeclaration = cursor.firstEnclosing(J.MethodDeclaration::class.java)
                     if (methodDeclaration?.body == block && methodDeclaration.name.simpleName == "test") {
-                        val controlFlow = ControlFlow.startingAt(cursor).findControlFlow()
-                        val basicBlocks = controlFlow.basicBlocks
-                        val leaders = basicBlocks.map { it.leader }.toSet()
-                        doAfterVisit(object : JavaIsoVisitor<ExecutionContext>() {
+                        return ControlFlow.startingAt(cursor).findControlFlow().map { controlFlow ->
+                            val basicBlocks = controlFlow.basicBlocks
+                            val leaders = basicBlocks.map { it.leader }.toSet()
+                            doAfterVisit(object : JavaIsoVisitor<ExecutionContext>() {
 
-                            override fun visitStatement(statement: Statement, p: ExecutionContext): Statement {
-                                return if (leaders.contains(statement)) {
-                                    val searchResult =
-                                        statement.markers.markers.filterIsInstance<SearchResult>().getOrNull(0)
-                                    if (searchResult != null) {
-                                        statement.withMarkers(
-                                            statement.markers.removeByType(SearchResult::class.java).add(
-                                                searchResult.withDescription(searchResult.description?.plus(" | L"))
+                                override fun visitStatement(statement: Statement, p: ExecutionContext): Statement {
+                                    return if (leaders.contains(statement)) {
+                                        val searchResult =
+                                            statement.markers.markers.filterIsInstance<SearchResult>().getOrNull(0)
+                                        if (searchResult != null) {
+                                            statement.withMarkers(
+                                                statement.markers.removeByType(SearchResult::class.java).add(
+                                                    searchResult.withDescription(searchResult.description?.plus(" | L"))
+                                                )
                                             )
-                                        )
-                                    } else {
-                                        statement.withMarkers(statement.markers.searchResult("L"))
-                                    }
-                                } else statement
-                            }
-
-                            override fun visitExpression(expression: Expression, p: ExecutionContext): Expression {
-                                return if (leaders.contains(expression))
-                                    expression.withMarkers(expression.markers.searchResult(expression.leaderDescription()))
-                                else expression
-                            }
-
-                            fun Expression.leaderDescription(): String {
-                                return when (this) {
-                                    is J.Binary -> {
-                                        val tag = when (this.operator) {
-                                            J.Binary.Type.And -> "&&"
-                                            J.Binary.Type.Or -> "||"
-                                            J.Binary.Type.Addition -> "+"
-                                            J.Binary.Type.Subtraction -> "-"
-                                            J.Binary.Type.Multiplication -> "*"
-                                            J.Binary.Type.Division -> "/"
-                                            J.Binary.Type.Modulo -> "%"
-                                            J.Binary.Type.LessThan -> "<"
-                                            J.Binary.Type.LessThanOrEqual -> "<="
-                                            J.Binary.Type.GreaterThan -> ">"
-                                            J.Binary.Type.GreaterThanOrEqual -> ">="
-                                            J.Binary.Type.Equal -> "=="
-                                            J.Binary.Type.NotEqual -> "!="
-                                            J.Binary.Type.BitAnd -> "&"
-                                            J.Binary.Type.BitOr -> "|"
-                                            J.Binary.Type.BitXor -> "^"
-                                            J.Binary.Type.LeftShift -> "<<"
-                                            J.Binary.Type.RightShift -> ">>"
-                                            J.Binary.Type.UnsignedRightShift -> ">>>"
-                                            null -> "null"
+                                        } else {
+                                            statement.withMarkers(statement.markers.searchResult("L"))
                                         }
-                                        "L ($tag)"
-                                    }
-                                    else -> "L"
+                                    } else statement
                                 }
-                            }
-                        })
-                        return block.withMarkers(
-                            block.markers.searchResult(
-                                "BB: ${basicBlocks.size} CN: ${controlFlow.conditionNodeCount} EX: ${controlFlow.exitCount}"
+
+                                override fun visitExpression(expression: Expression, p: ExecutionContext): Expression {
+                                    return if (leaders.contains(expression))
+                                        expression.withMarkers(expression.markers.searchResult(expression.leaderDescription()))
+                                    else expression
+                                }
+
+                                fun Expression.leaderDescription(): String {
+                                    return when (this) {
+                                        is J.Binary -> {
+                                            val tag = when (this.operator) {
+                                                J.Binary.Type.And -> "&&"
+                                                J.Binary.Type.Or -> "||"
+                                                J.Binary.Type.Addition -> "+"
+                                                J.Binary.Type.Subtraction -> "-"
+                                                J.Binary.Type.Multiplication -> "*"
+                                                J.Binary.Type.Division -> "/"
+                                                J.Binary.Type.Modulo -> "%"
+                                                J.Binary.Type.LessThan -> "<"
+                                                J.Binary.Type.LessThanOrEqual -> "<="
+                                                J.Binary.Type.GreaterThan -> ">"
+                                                J.Binary.Type.GreaterThanOrEqual -> ">="
+                                                J.Binary.Type.Equal -> "=="
+                                                J.Binary.Type.NotEqual -> "!="
+                                                J.Binary.Type.BitAnd -> "&"
+                                                J.Binary.Type.BitOr -> "|"
+                                                J.Binary.Type.BitXor -> "^"
+                                                J.Binary.Type.LeftShift -> "<<"
+                                                J.Binary.Type.RightShift -> ">>"
+                                                J.Binary.Type.UnsignedRightShift -> ">>>"
+                                                null -> "null"
+                                            }
+                                            "L ($tag)"
+                                        }
+                                        else -> "L"
+                                    }
+                                }
+                            })
+                            block.withMarkers(
+                                block.markers.searchResult(
+                                    "BB: ${basicBlocks.size} CN: ${controlFlow.conditionNodeCount} EX: ${controlFlow.exitCount}"
+                                )
                             )
-                        )
+                        }.orElseGet { super.visitBlock(block, p) }
                     }
                     return super.visitBlock(block, p)
                 }

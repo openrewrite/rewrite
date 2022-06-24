@@ -43,19 +43,20 @@ public class Dataflow {
             if (!spec.isSource(source, start)) {
                 return Optional.empty();
             }
+            return ControlFlow.startingAt(start).findControlFlow().flatMap(summary -> {
+                Set<Expression> reachable = summary.computeReachableExpressions(spec::isBarrierGuard);
 
-            ControlFlowSummary controlFlowSummary = ControlFlow.startingAt(start).findControlFlow();
-            Set<Expression> reachable = controlFlowSummary.computeReachableExpressions(spec::isBarrierGuard);
+                SinkFlow<Source, Sink> flow = new SinkFlow<>(start, spec, reachable);
 
-            SinkFlow<Source, Sink> flow = new SinkFlow<>(start, spec, reachable);
+                ForwardFlow.findSinks(flow);
 
-            ForwardFlow.findSinks(flow);
-
-            if (flow.isNotEmpty()) {
-                return Optional.of(flow);
-            }
+                if (flow.isNotEmpty()) {
+                    return Optional.of(flow);
+                } else {
+                    return Optional.empty();
+                }
+            });
         }
-
         return Optional.empty();
     }
 

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.controlflow;
 
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
@@ -29,20 +30,30 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Incubating(since = "7.25.0")
-@AllArgsConstructor(staticName = "startingAt")
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ControlFlow {
+    private static final String CONTROL_FLOW_MESSAGE_KEY = "__CONTROL_FLOW_SUMMARY";
+    @Nullable
     private final Cursor start;
 
-    public ControlFlowSummary findControlFlow() {
-        Cursor methodDeclarationBlockCursor = getMethodDeclarationBlockCursor();
-        ControlFlowNode.Start start = ControlFlowNode.Start.create();
-        ControlFlowAnalysis<Integer> analysis = new ControlFlowAnalysis<>(start, true);
-        analysis.visit(methodDeclarationBlockCursor.getValue(), 1, methodDeclarationBlockCursor);
-        ControlFlowNode.End end = (ControlFlowNode.End) analysis.current.iterator().next();
-        return ControlFlowSummary.forGraph(start, end);
+    /**
+     * A return value of {@link Optional#empty()} indicates that control flow can not be computed for the given
+     * start point.
+     */
+    public Optional<ControlFlowSummary> findControlFlow() {
+        if (start == null) {
+            return Optional.empty();
+        }
+        return start.computeMessageIfAbsent(CONTROL_FLOW_MESSAGE_KEY, __ -> {
+            ControlFlowNode.Start startNode = ControlFlowNode.Start.create();
+            ControlFlowAnalysis<Integer> analysis = new ControlFlowAnalysis<>(startNode, true);
+            analysis.visit(start.getValue(), 1, start);
+            ControlFlowNode.End end = (ControlFlowNode.End) analysis.current.iterator().next();
+            return Optional.of(ControlFlowSummary.forGraph(startNode, end));
+        });
     }
 
-    private Cursor getMethodDeclarationBlockCursor() {
+    public static ControlFlow startingAt(Cursor start) {
         Iterator<Cursor> cursorPath = start.getPathAsCursors();
         Cursor methodDeclarationBlockCursor = null;
         while (cursorPath.hasNext()) {
@@ -57,12 +68,7 @@ public final class ControlFlow {
                 break;
             }
         }
-        if (methodDeclarationBlockCursor == null) {
-            throw new IllegalArgumentException(
-                    "Invalid start point: Could not find a method declaration or static block to begin computing Control Flow"
-            );
-        }
-        return methodDeclarationBlockCursor;
+        return new ControlFlow(methodDeclarationBlockCursor);
     }
 
     private static class ControlFlowAnalysis<P> extends JavaIsoVisitor<P> {
