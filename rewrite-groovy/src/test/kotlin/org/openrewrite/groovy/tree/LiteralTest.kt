@@ -130,5 +130,4 @@ class LiteralTest : GroovyTreeTest {
         def a = "${'$'}{foo.bar}"
         def b = "${'$'}{foo.bar}baz"
     """)
-
 }
