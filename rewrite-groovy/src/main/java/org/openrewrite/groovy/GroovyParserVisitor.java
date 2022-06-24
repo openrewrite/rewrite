@@ -505,7 +505,16 @@ public class GroovyParserVisitor {
                 @SuppressWarnings("unchecked") JRightPadded<T> converted = JRightPadded.build(
                         node instanceof ClassNode ? (T) visitTypeTree((ClassNode) node) : visit(node));
                 if (i == nodes.length - 1) {
-                    ts.add(converted.withAfter(afterLast == null ? EMPTY : sourceBefore(afterLast)));
+                    converted = converted.withAfter(whitespace());
+                    if(',' == source.charAt(cursor)) {
+                        // In Groovy trailing "," are allowed
+                        cursor += 1;
+                        converted = converted.withMarkers(Markers.EMPTY.add(new TrailingComma(randomId(), whitespace())));
+                    }
+                    ts.add(converted);
+                    if(afterLast != null && source.startsWith(afterLast, cursor)) {
+                        cursor += afterLast.length();
+                    }
                 } else {
                     ts.add(converted.withAfter(sourceBefore(",")));
                 }

@@ -113,4 +113,15 @@ class LiteralTest : GroovyTreeTest {
             '''
         """.trimIndent()
     )
+
+    @Test
+    fun mapLiteralTrailingComma() = assertParsePrintAndProcess("""
+        def a = [ foo : "bar" , ]
+    """)
+
+    @Test
+    fun listLiteralTrailingComma() = assertParsePrintAndProcess("""
+        def a = [ "foo" /* "foo" suffix */ , /* "]" prefix */ ]
+    """)
+
 }

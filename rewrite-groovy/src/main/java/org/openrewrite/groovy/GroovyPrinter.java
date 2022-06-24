@@ -29,6 +29,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
+import java.util.Optional;
 
 public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private final GroovyJavaPrinter delegate = new GroovyJavaPrinter();
@@ -166,6 +167,11 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             visitSpace(node.getAfter(), location.getAfterLocation(), p);
             if (i < nodes.size() - 1) {
                 p.out.append(suffixBetween);
+            } else {
+                node.getMarkers().findFirst(TrailingComma.class).ifPresent(trailingComma -> {
+                    p.out.append(suffixBetween);
+                    visitSpace(trailingComma.getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
+                });
             }
         }
     }
