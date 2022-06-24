@@ -23,7 +23,7 @@ public class IsBuildGradle<P> extends JavaIsoVisitor<P> {
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         SourceFile sourceFile = (SourceFile) cu;
-        if ("build.gradle".equals(sourceFile.getSourcePath().toFile().getName())) {
+        if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
             return sourceFile.withMarkers(sourceFile.getMarkers().searchResult());
         }
         return super.visitJavaSourceFile(cu, p);
