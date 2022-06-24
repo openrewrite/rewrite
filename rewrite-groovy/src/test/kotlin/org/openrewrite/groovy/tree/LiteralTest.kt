@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.search.FindAnnotationsTest.Companion.foo
 
 class LiteralTest : GroovyTreeTest {
 
@@ -122,6 +123,12 @@ class LiteralTest : GroovyTreeTest {
     @Test
     fun listLiteralTrailingComma() = assertParsePrintAndProcess("""
         def a = [ "foo" /* "foo" suffix */ , /* "]" prefix */ ]
+    """)
+
+    @Test
+    fun gStringThatHasEmptyValueExpressionForUnknownReason() = assertParsePrintAndProcess("""
+        def a = "${'$'}{foo.bar}"
+        def b = "${'$'}{foo.bar}baz"
     """)
 
 }

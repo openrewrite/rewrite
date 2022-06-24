@@ -1139,6 +1139,10 @@ public class GroovyParserVisitor {
             int valueIndex = 0;
             for (ConstantExpression string : gstring.getStrings()) {
                 if (string.getValue().equals("")) {
+                    if(source.charAt(cursor) != '$') {
+                        // Sometimes there are empty constant expressions which do not, apparently, correspond to anything
+                        continue;
+                    }
                     boolean inCurlies = source.charAt(cursor + 1) == '{';
                     if (inCurlies) {
                         cursor += 2; // skip ${
