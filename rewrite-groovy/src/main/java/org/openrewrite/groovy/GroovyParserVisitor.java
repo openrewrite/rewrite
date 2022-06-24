@@ -1141,7 +1141,12 @@ public class GroovyParserVisitor {
                         cursor++; // skip }
                     }
                 } else {
-                    strings.add(visit(string));
+                    // If this string begins with any character that can open a string, such as "/"
+                    // then visitConstantExpression will misinterpret it.
+                    // There's no easy way for visitConstantExpression to know otherwise, so it has to be handled here
+                    String value = (String) string.getValue();
+                    strings.add(new J.Literal(randomId(), EMPTY, Markers.EMPTY, value, value, null, JavaType.Primitive.String));
+                    cursor += value.length();
                 }
             }
 

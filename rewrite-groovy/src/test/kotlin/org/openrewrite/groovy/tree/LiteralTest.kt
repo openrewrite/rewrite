@@ -74,6 +74,11 @@ class LiteralTest : GroovyTreeTest {
     )
 
     @Test
+    fun gStringInterpolationFollowedByForwardSlash() = assertParsePrintAndProcess("""
+        String s = "${"$"}{ARTIFACTORY_URL}/plugins-release"
+    """)
+
+    @Test
     fun mapLiteral() = assertParsePrintAndProcess(
         """
             def person = [ name: 'sam' , age: 9000 ]
