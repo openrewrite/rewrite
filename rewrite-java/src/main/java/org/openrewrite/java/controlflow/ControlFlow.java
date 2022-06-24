@@ -356,7 +356,10 @@ public final class ControlFlow {
                         elseAnalysis.current.stream()
                 ).collect(Collectors.toSet());
             } else {
-                current = newCurrent;
+                current = Stream.concat(
+                        newCurrent.stream(),
+                        thenAnalysis.current.stream()
+                ).collect(Collectors.toSet());
             }
         }
 
