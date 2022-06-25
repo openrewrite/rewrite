@@ -1348,7 +1348,11 @@ public class GroovyParserVisitor {
         @Override
         public void visitReturnStatement(ReturnStatement retn) {
             Space fmt = sourceBefore("return");
-            queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(retn.getExpression())));
+            if(retn.getExpression() instanceof ConstantExpression && (((ConstantExpression) retn.getExpression()).getValue() == null)) {
+                queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
+            } else {
+                queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(retn.getExpression())));
+            }
         }
 
         @Override

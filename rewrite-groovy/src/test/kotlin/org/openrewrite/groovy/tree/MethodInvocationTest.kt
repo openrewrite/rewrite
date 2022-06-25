@@ -122,4 +122,11 @@ class MethodInvocationTest : GroovyTreeTest {
             println(foo)
         }
     """)
+
+    @Test
+    fun closureReturn() = assertParsePrintAndProcess("""
+        foo {
+            return
+        }
+    """)
 }
