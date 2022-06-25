@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.marker
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.util.*
 
@@ -24,18 +24,18 @@ class JavaVersionTest {
     @Test
     fun doesNotMatch() {
         val javaVersion = JavaVersion(UUID.randomUUID(), "", "", "-1", "").majorVersion
-        Assertions.assertThat(javaVersion).isEqualTo(-1)
+        assertThat(javaVersion).isEqualTo(-1)
     }
 
     @Test
     fun javaVersion8WithPrefixOneAndPattern() {
         val javaVersion = JavaVersion(UUID.randomUUID(), "", "", "1.8.0+x", "").majorVersion
-        Assertions.assertThat(javaVersion).isEqualTo(8)
+        assertThat(javaVersion).isEqualTo(8)
     }
 
     @Test
     fun javaVersion11Pattern() {
         val javaVersion = JavaVersion(UUID.randomUUID(), "", "", "11.0.11+x", "").majorVersion
-        Assertions.assertThat(javaVersion).isEqualTo(11)
+        assertThat(javaVersion).isEqualTo(11)
     }
 }
