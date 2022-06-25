@@ -1001,7 +1001,7 @@ public class GroovyParserVisitor {
             }
             cursor += text.length();
 
-            if (jType == JavaType.Primitive.Double || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Long) {
+            if (cursor < source.length() && (jType == JavaType.Primitive.Double || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Long)) {
                 char c = Character.toLowerCase(source.charAt(cursor));
                 if (c == 'f' || c == 'd' || c == 'l') {
                     text = text + source.charAt(cursor);

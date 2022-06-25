@@ -96,6 +96,13 @@ class LiteralTest : GroovyTreeTest {
     )
 
     @Test
+    fun doubleNotBigDecimal() = assertParsePrintAndProcess(
+        """
+            def a = 1.8
+        """
+    )
+
+    @Test
     fun emptyListLiteral() = assertParsePrintAndProcess(
         """
             def a = []
