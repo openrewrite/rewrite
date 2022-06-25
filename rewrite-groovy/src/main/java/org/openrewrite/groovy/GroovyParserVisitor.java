@@ -38,6 +38,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
@@ -947,10 +948,12 @@ public class GroovyParserVisitor {
             JavaType.Primitive jType;
             // The unaryPlus is not included in the expression and must be handled through the source.
             String text = expression.getText();
-
+            Object value = expression.getValue();
             ClassNode type = expression.getType();
             if (type == ClassHelper.BigDecimal_TYPE) {
+                // TODO: Proper support for BigDecimal literals
                 jType = JavaType.Primitive.Double;
+                value = ((BigDecimal) value).doubleValue();
             } else if (type == ClassHelper.boolean_TYPE) {
                 jType = JavaType.Primitive.Boolean;
             } else if (type == ClassHelper.byte_TYPE) {
@@ -1008,7 +1011,7 @@ public class GroovyParserVisitor {
                     cursor++;
                 }
             }
-            queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, expression.getValue(), text,
+            queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, value, text,
                     null, jType));
         }
 

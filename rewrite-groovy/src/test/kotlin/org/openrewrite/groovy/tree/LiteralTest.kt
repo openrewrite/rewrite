@@ -15,7 +15,11 @@
  */
 package org.openrewrite.groovy.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
+import org.openrewrite.java.tree.TypeUtils
 
 class LiteralTest : GroovyTreeTest {
 
@@ -96,11 +100,21 @@ class LiteralTest : GroovyTreeTest {
     )
 
     @Test
-    fun doubleNotBigDecimal() = assertParsePrintAndProcess(
+    fun literalValueAndTypeAgree() = assertParsePrintAndProcess(
         """
             def a = 1.8
         """
-    )
+    ) { cu ->
+        // Groovy AST represents 1.8 as a BigDecimal
+        // Java AST would represent it as Double
+        // Our AST could reasonably make either choice
+        val initializer = (cu.statements[0] as J.VariableDeclarations).variables[0].initializer!! as J.Literal
+        if(initializer.type == JavaType.Primitive.Double) {
+            assertThat(initializer.value).isEqualTo(1.8)
+        } else if(TypeUtils.isOfClassType(initializer.type, "java.math.BigDecimal")) {
+            assertThat(initializer.value).isInstanceOf(java.math.BigDecimal::class.java)
+        }
+    }
 
     @Test
     fun emptyListLiteral() = assertParsePrintAndProcess(
