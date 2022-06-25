@@ -19,6 +19,7 @@ public class GSpace {
     public enum Location {
         BINARY_PREFIX,
         BINARY_OPERATOR,
+        BINARY_SUFFIX,
         GSTRING,
         LIST_LITERAL,
         LIST_LITERAL_ELEMENT_SUFFIX,

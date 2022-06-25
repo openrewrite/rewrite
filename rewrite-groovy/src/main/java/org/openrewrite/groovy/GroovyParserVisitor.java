@@ -446,10 +446,11 @@ public class GroovyParserVisitor {
 
                 org.codehaus.groovy.ast.expr.Expression defaultValue = param.getDefaultValue();
                 if(defaultValue != null) {
-                    Space equalsPrefix = sourceBefore("=");
-                    JLeftPadded<Expression> initializer = JLeftPadded.build(new RewriteGroovyVisitor(defaultValue, this).visit(defaultValue));
-                    initializer = initializer.withBefore(equalsPrefix);
-                    paramName = paramName.withElement(paramName.getElement().getPadding().withInitializer(initializer));
+                    paramName = paramName.withElement(paramName.getElement().getPadding()
+                            .withInitializer(new JLeftPadded<>(
+                                    sourceBefore("="),
+                                    new RewriteGroovyVisitor(defaultValue, this).visit(defaultValue),
+                                    Markers.EMPTY)));
                 }
                 Space rightPad = sourceBefore(i == unparsedParams.length - 1 ? ")" : ",");
 
@@ -745,6 +746,9 @@ public class GroovyParserVisitor {
                 case "==~":
                     gBinaryOp = G.Binary.Type.Match;
                     break;
+                case "[":
+                    gBinaryOp = G.Binary.Type.Access;
+                    break;
             }
 
             cursor += binary.getOperation().getText().length();
@@ -763,9 +767,13 @@ public class GroovyParserVisitor {
                         left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
                         right, typeMapping.type(binary.getType())));
             } else if (gBinaryOp != null) {
+                Space after = EMPTY;
+                if(gBinaryOp == G.Binary.Type.Access) {
+                    after = sourceBefore("]");
+                }
                 queue.add(new G.Binary(randomId(), fmt, Markers.EMPTY,
                         left, JLeftPadded.build(gBinaryOp).withBefore(opPrefix),
-                        right, typeMapping.type(binary.getType())));
+                        right, after, typeMapping.type(binary.getType())));
             }
         }
 

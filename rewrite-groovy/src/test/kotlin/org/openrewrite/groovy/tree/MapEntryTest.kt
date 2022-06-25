@@ -26,4 +26,9 @@ class MapEntryTest : GroovyTreeTest {
     fun multipleEntries() = assertParsePrintAndProcess("""
         exclude(group: 'g', module: 'm')
     """.trimIndent())
+
+    @Test
+    fun mapAccess() = assertParsePrintAndProcess("""
+        def a = someMap /*[*/ [ /*'*/ 'someKey' /*]*/ ]
+    """)
 }

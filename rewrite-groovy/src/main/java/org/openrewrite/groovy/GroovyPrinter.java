@@ -129,6 +129,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             case Match:
                 keyword = "==~";
                 break;
+            case Access:
+                keyword = "[";
+                break;
         }
         visitSpace(binary.getPrefix(), GSpace.Location.BINARY_PREFIX, p);
         visitMarkers(binary.getMarkers(), p);
@@ -136,6 +139,10 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         visitSpace(binary.getPadding().getOperator().getBefore(), GSpace.Location.BINARY_OPERATOR, p);
         p.append(keyword);
         visit(binary.getRight(), p);
+        if(binary.getOperator() == G.Binary.Type.Access) {
+            visitSpace(binary.getAfter(), GSpace.Location.BINARY_SUFFIX, p);
+            p.append("]");
+        }
         return binary;
     }
 

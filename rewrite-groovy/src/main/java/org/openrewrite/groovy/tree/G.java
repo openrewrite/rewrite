@@ -649,6 +649,9 @@ public interface G extends J {
         Expression right;
 
         @With
+        Space after;
+
+        @With
         @Nullable
         JavaType type;
 
@@ -675,6 +678,8 @@ public interface G extends J {
         public enum Type {
             Find,
             Match,
+
+            Access
         }
 
         public G.Binary.Padding getPadding() {
@@ -701,7 +706,7 @@ public interface G extends J {
             }
 
             public G.Binary withOperator(JLeftPadded<G.Binary.Type> operator) {
-                return t.operator == operator ? t : new G.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.type);
+                return t.operator == operator ? t : new G.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.after, t.type);
             }
         }
     }
