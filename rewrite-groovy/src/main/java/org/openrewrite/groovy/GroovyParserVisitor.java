@@ -444,6 +444,13 @@ public class GroovyParserVisitor {
                 );
                 cursor += param.getName().length();
 
+                org.codehaus.groovy.ast.expr.Expression defaultValue = param.getDefaultValue();
+                if(defaultValue != null) {
+                    Space equalsPrefix = sourceBefore("=");
+                    JLeftPadded<Expression> initializer = JLeftPadded.build(new RewriteGroovyVisitor(defaultValue, this).visit(defaultValue));
+                    initializer = initializer.withBefore(equalsPrefix);
+                    paramName = paramName.withElement(paramName.getElement().getPadding().withInitializer(initializer));
+                }
                 Space rightPad = sourceBefore(i == unparsedParams.length - 1 ? ")" : ",");
 
                 params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), paramType.getPrefix(),

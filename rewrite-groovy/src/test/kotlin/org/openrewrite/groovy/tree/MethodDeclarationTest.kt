@@ -79,4 +79,12 @@ class MethodDeclarationTest : GroovyTreeTest {
            }
         """
     )
+
+    @Test
+    fun defaultArgumentValues() = assertParsePrintAndProcess(
+        """
+            def confirmNextStepWithCredentials(String message /* = prefix */ = /* hello prefix */ "Hello" ) {
+            }
+        """
+    )
 }
