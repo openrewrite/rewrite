@@ -22,7 +22,7 @@ import org.openrewrite.Issue
 
 interface ChangeTypeTest : JavaRecipeTest {
     override val recipe: ChangeType
-        get() = ChangeType("a.A1","a.A2", null)
+        get() = ChangeType("a.A1","a.A2")
 
     companion object {
         private val a1 = """
@@ -45,7 +45,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun doNotAddJavaLangWrapperImports(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("java.lang.Integer","java.lang.Long", null),
+        recipe = ChangeType("java.lang.Integer","java.lang.Long"),
         before = "public class ThinkPositive { private Integer fred = 1;}",
         after = "public class ThinkPositive { private Long fred = 1;}"
     )
@@ -54,7 +54,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Suppress("deprecation")
     fun allowJavaLangSubpackages(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("java.util.logging.LoggingMXBean","java.lang.management.PlatformLoggingMXBean", null),
+        recipe = ChangeType("java.util.logging.LoggingMXBean","java.lang.management.PlatformLoggingMXBean"),
         before = """
             import java.util.logging.LoggingMXBean;
 
@@ -80,7 +80,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun unnecessaryImport(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = ChangeType("test.Outer.Inner", "java.util.ArrayList", null),
+        recipe = ChangeType("test.Outer.Inner", "java.util.ArrayList"),
         before = """
             import test.Outer;
             
@@ -108,7 +108,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun changeInnerClassToOuterClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("java.util.Map${'$'}Entry", "java.util.List", null),
+        recipe = ChangeType("java.util.Map${'$'}Entry", "java.util.List"),
         before = """
             import java.util.Map;
             import java.util.Map.Entry;
@@ -132,7 +132,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun changeStaticFieldAccess(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("java.io.File", "my.pkg.List", null),
+        recipe = ChangeType("java.io.File", "my.pkg.List"),
         before = """
             import java.io.File;
             
@@ -160,7 +160,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun replaceWithNestedType(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("java.io.File", "java.util.Map${'$'}Entry", null),
+        recipe = ChangeType("java.io.File", "java.util.Map${'$'}Entry"),
         before = """
             import java.io.File;
             
@@ -204,7 +204,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun annotation(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("a.b.c.A1","a.b.d.A2", null),
+        recipe = ChangeType("a.b.c.A1","a.b.d.A2"),
         dependsOn = arrayOf(
             "package a.b.c;\npublic @interface A1 {}",
             "package a.b.d;\npublic @interface A2 {}"
@@ -216,7 +216,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun array2(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("com.acme.product.Pojo","com.acme.product.v2.Pojo", null),
+        recipe = ChangeType("com.acme.product.Pojo","com.acme.product.v2.Pojo"),
         dependsOn = arrayOf("""
             package com.acme.product;
             
@@ -281,7 +281,7 @@ interface ChangeTypeTest : JavaRecipeTest {
             "public interface I2 {}"
         ),
         recipe = recipe.doNext(
-            ChangeType("I1", "I2", null)
+            ChangeType("I1", "I2")
         ),
         before = """
             import a.A1;
@@ -547,7 +547,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun staticImports2(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("com.acme.product.RunnableFactory","com.acme.product.v2.RunnableFactory", null),
+        recipe = ChangeType("com.acme.product.RunnableFactory","com.acme.product.v2.RunnableFactory"),
         dependsOn = arrayOf("""
             package com.acme.product;
             
@@ -584,7 +584,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun staticConstant(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("com.acme.product.RunnableFactory","com.acme.product.v2.RunnableFactory", null),
+        recipe = ChangeType("com.acme.product.RunnableFactory","com.acme.product.v2.RunnableFactory"),
         dependsOn = arrayOf("""
             package com.acme.product;
             
@@ -620,7 +620,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun primitiveToClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("int", "java.lang.Integer", null),
+        recipe = ChangeType("int", "java.lang.Integer"),
         before = """
             class A {
                 int foo = 5;
@@ -642,7 +642,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun classToPrimitive(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("java.lang.Integer","int", null),
+        recipe = ChangeType("java.lang.Integer","int"),
         before = """
             class A {
                 Integer foo = 5;
@@ -665,7 +665,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun importOrdering(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("com.yourorg.a.A", "com.myorg.b.B", null),
+        recipe = ChangeType("com.yourorg.a.A", "com.myorg.b.B"),
         dependsOn = arrayOf("""
             package com.yourorg.a;
             public class A {}
@@ -713,7 +713,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeType("com.acme.product.OuterClass", "com.acme.product.v2.OuterClass", null),
+        recipe = ChangeType("com.acme.product.OuterClass", "com.acme.product.v2.OuterClass"),
         before = """
             package de;
             
@@ -761,7 +761,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", null),
+        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote"),
         before = """
             package de;
             
@@ -798,7 +798,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeType("com.acme.product.Procedure", "com.acme.product.Procedure2", null),
+        recipe = ChangeType("com.acme.product.Procedure", "com.acme.product.Procedure2"),
         before = """
             import com.acme.product.Procedure;
             
@@ -837,7 +837,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", null),
+        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote"),
         before = """
             package de;
             
@@ -880,7 +880,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", null),
+        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote"),
         before = """
             package de;
             
@@ -905,26 +905,11 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/775")
-    @Test
-    fun changeTypeInTypeDeclaration(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("de.Class2", "de.Class1", null),
-        before = """
-            package de;
-            public class Class2 {}
-        """,
-            after = """
-            package de;
-            public class Class1 {}
-        """
-    )
-
     @Issue("https://github.com/openrewrite/rewrite/issues/1291")
     @Test
     fun doNotChangeTypeInTypeDeclaration(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = ChangeType("de.Class2", "de.Class1", true),
+        recipe = ChangeType("de.Class2", "de.Class1"),
         before = """
             package de;
             public class Class2 {}
@@ -933,7 +918,7 @@ interface ChangeTypeTest : JavaRecipeTest {
 
     @Test
     fun javadocs() = assertChanged(
-        recipe = ChangeType("java.util.List", "java.util.Collection", null),
+        recipe = ChangeType("java.util.List", "java.util.Collection"),
         before = """
             import java.util.List;
             
@@ -978,7 +963,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """),
-        recipe = ChangeType("com.acme.product.factory.V1Factory","com.acme.product.factory.V1FactoryA", null),
+        recipe = ChangeType("com.acme.product.factory.V1Factory","com.acme.product.factory.V1FactoryA"),
         before = """
             import com.acme.product.factory.V1Factory;
 
@@ -1018,20 +1003,20 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ChangeType(null, null, null)
+        var recipe = ChangeType(null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("newFullyQualifiedTypeName")
         assertThat(valid.failures()[1].property).isEqualTo("oldFullyQualifiedTypeName")
 
-        recipe = ChangeType(null, "java.lang.String", null)
+        recipe = ChangeType(null, "java.lang.String")
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("oldFullyQualifiedTypeName")
 
-        recipe = ChangeType("java.lang.String", null, null)
+        recipe = ChangeType("java.lang.String", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)

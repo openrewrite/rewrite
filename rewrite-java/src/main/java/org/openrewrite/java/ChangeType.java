@@ -42,14 +42,6 @@ public class ChangeType extends Recipe {
             example = "org.junit.jupiter.api.Assumptions")
     String newFullyQualifiedTypeName;
 
-    @Option(displayName = "Ignore type definition",
-            description = "When set to `true` the definition of the old type will be left untouched. " +
-                    "This is useful when you're replacing usage of a class but don't want to rename it.",
-            example = "true",
-            required = false)
-    @Nullable
-    Boolean ignoreDefinition;
-
     @Override
     public String getDisplayName() {
         return "Change type";
@@ -75,16 +67,6 @@ public class ChangeType extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                for (J.ClassDeclaration it : cu.getClasses()) {
-                    if (!TypeUtils.isOfClassType(it.getType(), oldFullyQualifiedTypeName)) {
-                        continue;
-                    }
-                    if(Boolean.TRUE.equals(ignoreDefinition)) {
-                        return cu;
-                    } else {
-                        return cu.withMarkers(cu.getMarkers().searchResult());
-                    }
-                }
                 doAfterVisit(new UsesType<>(oldFullyQualifiedTypeName));
                 return cu;
             }

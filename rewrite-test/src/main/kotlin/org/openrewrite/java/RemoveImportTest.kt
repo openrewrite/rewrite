@@ -380,7 +380,7 @@ interface RemoveImportTest : JavaRecipeTest {
     fun generateNewUUIDPerUnfoldedImport(jp: JavaParser) = assertChanged(
         jp,
         recipe = removeImport("java.util.Collection")
-            .doNext(ChangeType("java.util.List", "java.util.Collection", null)),
+            .doNext(ChangeType("java.util.List", "java.util.Collection")),
         before = """
             package a;
 
