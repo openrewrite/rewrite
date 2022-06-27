@@ -635,6 +635,12 @@ public final class ControlFlow {
         }
 
         @Override
+        public J.Try.Resource visitTryResource(J.Try.Resource tryResource, P p) {
+            addCursorToBasicBlock();
+            return tryResource;
+        }
+
+        @Override
         public J.Switch visitSwitch(J.Switch _switch, P p) {
             addCursorToBasicBlock();
             return _switch;

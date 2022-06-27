@@ -252,4 +252,66 @@ interface FindLocalTaintFlowTest : RewriteTest {
                 """
         )
     )
+
+    @Test
+    fun `taint tracking through try with resources`() = rewriteRun(
+        java(
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    void test() {
+                        try (InputStream source = source()) {
+                            System.out.println(source.read());
+                        }
+                    }
+                }
+                """,
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    void test() {
+                        try (InputStream source = /*~~>*/source()) {
+                            System.out.println(/*~~>*/source.read());
+                        }
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `taint tracking through try`() = rewriteRun(
+        java(
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    void test() {
+                        InputStream source = source();
+                        try {
+                            System.out.println(source.read());
+                        } finally {
+                            source.close();
+                        }
+                    }
+                }
+                """,
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    void test() {
+                        InputStream source = /*~~>*/source();
+                        try {
+                            System.out.println(/*~~>*/source.read());
+                        } finally {
+                            /*~~>*/source.close();
+                        }
+                    }
+                }
+                """
+        )
+    )
 }

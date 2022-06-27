@@ -1150,4 +1150,66 @@ interface ControlFlowTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `control flow for try with resources`() = rewriteRun(
+        java(
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    void test() {
+                        try (InputStream source = source()) {
+                            System.out.println(source.read());
+                        }
+                    }
+                }
+                """,
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    void test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                        try (InputStream source = source()) {
+                            System.out.println(source.read());
+                        }
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `control flow for try`() = rewriteRun(
+        java(
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    void test() {
+                        InputStream source = source();
+                        try {
+                            System.out.println(source.read());
+                        } finally {
+                            source.close();
+                        }
+                    }
+                }
+                """,
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    void test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                        InputStream source = source();
+                        try {
+                            System.out.println(source.read());
+                        } finally {
+                            source.close();
+                        }
+                    }
+                }
+                """
+        )
+    )
 }
