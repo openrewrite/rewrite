@@ -6,7 +6,7 @@ import org.openrewrite.java.tree.JavaType;
 
 public class ReadSided extends Dispatch1<Boolean, VariableSide> {
 
-    public static final Read read = new Read();
+    public static final Reads READS = new Reads();
 
     // Expression
 
@@ -44,12 +44,12 @@ public class ReadSided extends Dispatch1<Boolean, VariableSide> {
     @Override
     public Boolean visitAssignment(J.Assignment assignment, VariableSide vs) {
         return reads(assignment.getVariable(), vs.variable, Side.LVALUE)
-                || read.reads(assignment.getAssignment(), vs.variable);
+                || READS.reads(assignment.getAssignment(), vs.variable);
     }
 
     @Override
     public Boolean visitBinary(J.Binary binary, VariableSide vs) {
-        return read.reads(binary.getLeft(), vs.variable) || read.reads(binary.getRight(), vs.variable);
+        return READS.reads(binary.getLeft(), vs.variable) || READS.reads(binary.getRight(), vs.variable);
     }
 
     // Block
@@ -57,7 +57,7 @@ public class ReadSided extends Dispatch1<Boolean, VariableSide> {
 
     @Override
     public Boolean visitBlock(J.Block block, VariableSide vs) {
-        return block.getStatements().stream().map(s -> read.reads(s, vs.variable)).reduce(false, (a, b) -> a | b);
+        return block.getStatements().stream().map(s -> READS.reads(s, vs.variable)).reduce(false, (a, b) -> a | b);
     }
 
     // Break

@@ -5,31 +5,26 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.Arrays;
+public class Reads extends Dispatch1<Boolean, JavaType.Variable> {
 
-public class Read extends Dispatch1<Boolean, JavaType.Variable> {
-
-    public static final ReadSided readSided = new ReadSided();
+    public static final ReadSided READ_SIDED = new ReadSided();
 
     public boolean reads(J e, JavaType.Variable v) {
         return dispatch(e, v);
     }
 
-    // public T visitArrayAccess(J pp, P1 p1) {
     @Override
     public Boolean visitArrayAccess(J.ArrayAccess arrayAccess, JavaType.Variable v) {
-        return readSided.visitArrayAccess(arrayAccess, new VariableSide(v, Side.RVALUE));
+        return READ_SIDED.visitArrayAccess(arrayAccess, new VariableSide(v, Side.RVALUE));
     }
-
     @Override
     public Boolean visitAssignment(J.Assignment assignment, JavaType.Variable v) {
-        return readSided.reads(assignment.getVariable(), v, Side.LVALUE)
-                || readSided.reads(assignment.getAssignment(), v, Side.RVALUE);
+        return READ_SIDED.reads(assignment.getVariable(), v, Side.LVALUE)
+                || READ_SIDED.reads(assignment.getAssignment(), v, Side.RVALUE);
     }
-
     @Override
     public Boolean visitFieldAccess(J.FieldAccess fieldAccess, JavaType.Variable variable) {
-        return readSided.reads(fieldAccess, variable, Side.RVALUE);
+        return READ_SIDED.reads(fieldAccess, variable, Side.RVALUE);
     }
 
     @Override
@@ -56,7 +51,7 @@ public class Read extends Dispatch1<Boolean, JavaType.Variable> {
 
     @Override
     public Boolean visitIdentifier(J.Identifier ident, JavaType.Variable v) {
-        return readSided.reads(ident, v, Side.RVALUE);
+        return READ_SIDED.reads(ident, v, Side.RVALUE);
     }
 
     @Override

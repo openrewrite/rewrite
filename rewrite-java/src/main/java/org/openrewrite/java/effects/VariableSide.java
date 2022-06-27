@@ -10,6 +10,4 @@ public class VariableSide {
         this.variable = variable;
         this.side = side;
     }
-
-
 }
