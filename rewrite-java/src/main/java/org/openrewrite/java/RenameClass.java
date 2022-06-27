@@ -156,7 +156,7 @@ public class RenameClass extends Recipe {
                 String newClassName = getNewClassName(fq);
                 cd = cd.withName(cd.getName().withSimpleName(newClassName));
                 cd = cd.withType(updateType(cd.getType()));
-                doNext(new ChangeType(oldType.getFullyQualifiedName(), newFullyQualifiedTypeName, true));
+                doNext(new ChangeType(oldType.getFullyQualifiedName(), newFullyQualifiedTypeName));
             }
             return cd;
         }
