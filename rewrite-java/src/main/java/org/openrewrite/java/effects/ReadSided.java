@@ -1,17 +1,12 @@
 package org.openrewrite.java.effects;
 
-import org.openrewrite.java.JavaVisitableAdapter;
+import org.openrewrite.java.tree.Dispatch1;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-public class ReadSided extends JavaVisitableAdapter<Boolean, VariableSide> {
+public class ReadSided extends Dispatch1<Boolean, VariableSide> {
 
     public static final Read read = new Read();
-
-    @Override
-    public Boolean defaultValue(J tree, VariableSide vs) {
-        throw new UnsupportedOperationException();
-    }
 
     // Expression
 
@@ -24,7 +19,7 @@ public class ReadSided extends JavaVisitableAdapter<Boolean, VariableSide> {
      */
     public boolean reads(J e, VariableSide vs) {
         if (vs.side == Side.LVALUE) throw new NodeCannotBeAnLValueException();
-        return e.acceptJava(this, vs);
+        return dispatch(e, vs);
     }
 
     public boolean reads(J e, JavaType.Variable v, Side s) {

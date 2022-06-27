@@ -1,38 +1,23 @@
 //package org.openrewrite.java;
 //
+//import org.openrewrite.java.effects.NodeCannotBeAnLValueException;
+//import org.openrewrite.java.effects.Side;
+//import org.openrewrite.java.effects.VariableSide;
+//import org.openrewrite.java.tree.Dispatch1;
 //import org.openrewrite.java.tree.Expression;
 //import org.openrewrite.java.tree.J;
 //import org.openrewrite.java.tree.JavaType;
 //
 //import java.util.Arrays;
 //
-//public class Writes {
-//
-//    // Expression
+//public class Writes extends Dispatch1<Boolean, VariableSide> {
 //
 //
-//    /** @return True if this expression, when evaluated, may read variable v. */
-//    boolean reads(JavaType.Variable v);
 //    /** @return True if this expression, when evaluated, may write variable v. */
-//    boolean writes(JavaType.Variable v);
-//
-//    /** @return True if this expression, when in `side` position, may read variable v. */
-//    default boolean reads(JavaType.Variable v, Side s) {
-//        if(s == Side.LVALUE) throw new NodeCannotBeAnLValueException();
-//        return reads(v);
-//    }
-//    /** @return True if this expression, when in `side` position, may write variable v. */
-//    default boolean writes(JavaType.Variable v, Side s) {
-//        if(s == Side.LVALUE) throw new NodeCannotBeAnLValueException();
-//        return writes(v);
+//    public boolean writes(J e, VariableSide vs) {
+//        return dispatch(e, v);
 //    }
 //
-//    // Statement
-//
-//    /** @return True if this statement, when executed, may read variable v. */
-//    boolean reads(JavaType.Variable v);
-//    /** @return True if this statement, when executed, may write variable v. */
-//    boolean writes(JavaType.Variable v);
 //
 //    // AnnotatedType
 //

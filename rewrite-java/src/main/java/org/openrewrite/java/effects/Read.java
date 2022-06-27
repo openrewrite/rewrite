@@ -1,20 +1,21 @@
 package org.openrewrite.java.effects;
 
-import org.openrewrite.java.*;
+import org.openrewrite.java.tree.Dispatch1;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.Arrays;
 
-public class Read extends JavaVisitableAdapter<Boolean, JavaType.Variable> {
+public class Read extends Dispatch1<Boolean, JavaType.Variable> {
 
     public static final ReadSided readSided = new ReadSided();
 
     public boolean reads(J e, JavaType.Variable v) {
-        return e.acceptJava(this, v);
+        return dispatch(e, v);
     }
 
+    // public T visitArrayAccess(J pp, P1 p1) {
     @Override
     public Boolean visitArrayAccess(J.ArrayAccess arrayAccess, JavaType.Variable v) {
         return readSided.visitArrayAccess(arrayAccess, new VariableSide(v, Side.RVALUE));
@@ -32,12 +33,12 @@ public class Read extends JavaVisitableAdapter<Boolean, JavaType.Variable> {
     }
 
     @Override
-    public Boolean visitForEachLoop(J.ForEachLoop forLoop, JavaType.Variable v) {
+    public Boolean visitForeachLoop(J.ForEachLoop forLoop, JavaType.Variable v) {
         return reads(forLoop.getControl(), v) || reads(forLoop.getBody(), v);
     }
 
     @Override
-    public Boolean visitForEachControl(J.ForEachLoop.Control control, JavaType.Variable v) {
+    public Boolean visitForeachLoopControl(J.ForEachLoop.Control control, JavaType.Variable v) {
         return reads(control.getVariable(), v) || reads(control.getIterable(), v);
     }
 
@@ -47,7 +48,7 @@ public class Read extends JavaVisitableAdapter<Boolean, JavaType.Variable> {
     }
 
     @Override
-    public Boolean visitForControl(J.ForLoop.Control control, JavaType.Variable v) {
+    public Boolean visitForLoopControl(J.ForLoop.Control control, JavaType.Variable v) {
         return control.getInit().stream().map(s -> reads(s, v)).reduce(false, (a,b) -> a|b)
                 || control.getUpdate().stream().map(s -> reads(s, v)).reduce(false, (a,b) -> a|b)
                 || reads(control.getCondition(), v);

@@ -5,94 +5,103 @@ public abstract class Dispatch3<T,P1,P2,P3> {
     private String className(J pp) {
         return pp.getClass().getName().replaceAll("^org.openrewrite.java.tree.", "");
     }
+
     public final T dispatch(J pp, P1 p1, P2 p2, P3 p3) {
         switch (className(pp)) {
             case "J$ArrayAccess":
-                return visitArrayAccess(pp, p1, p2, p3);
+                return visitArrayAccess((J.ArrayAccess)pp, p1, p2, p3);
             case "J$Assert":
-                return visitAssert(pp, p1, p2, p3);
+                return visitAssert((J.Assert)pp, p1, p2, p3);
             case "J$Assignment":
-                return visitAssignment(pp, p1, p2, p3);
+                return visitAssignment((J.Assignment)pp, p1, p2, p3);
             case "J$AssignmentOperation":
-                return visitAssignmentOperation(pp, p1, p2, p3);
+                return visitAssignmentOperation((J.AssignmentOperation)pp, p1, p2, p3);
             case "J$Binary":
-                return visitBinary(pp, p1, p2, p3);
+                return visitBinary((J.Binary)pp, p1, p2, p3);
             case "J$Block":
-                return visitBlock(pp, p1, p2, p3);
+                return visitBlock((J.Block)pp, p1, p2, p3);
             case "J$Break":
-                return visitBreak(pp, p1, p2, p3);
+                return visitBreak((J.Break)pp, p1, p2, p3);
             case "J$Case":
-                return visitCase(pp, p1, p2, p3);
+                return visitCase((J.Case)pp, p1, p2, p3);
             case "J$ClassDeclaration":
-                return visitClassDeclaration(pp, p1, p2, p3);
+                return visitClassDeclaration((J.ClassDeclaration)pp, p1, p2, p3);
             case "J$CompilationUnit":
-                return visitCompilationUnit(pp, p1, p2, p3);
+                return visitCompilationUnit((J.CompilationUnit)pp, p1, p2, p3);
             case "J$Continue":
-                return visitContinue(pp, p1, p2, p3);
+                return visitContinue((J.Continue)pp, p1, p2, p3);
             case "J$ControlParentheses":
-                return visitControlParentheses(pp, p1, p2, p3);
+                return visitControlParentheses((J.ControlParentheses)pp, p1, p2, p3);
             case "J$DoWhileLoop":
-                return visitDoWhileLoop(pp, p1, p2, p3);
+                return visitDoWhileLoop((J.DoWhileLoop)pp, p1, p2, p3);
             case "J$Empty":
-                return visitEmpty(pp, p1, p2, p3);
+                return visitEmpty((J.Empty)pp, p1, p2, p3);
             case "J$EnumValue":
-                return visitEnumValue(pp, p1, p2, p3);
+                return visitEnumValue((J.EnumValue)pp, p1, p2, p3);
             case "J$EnumValueSet":
-                return visitEnumValueSet(pp, p1, p2, p3);
+                return visitEnumValueSet((J.EnumValueSet)pp, p1, p2, p3);
             case "J$FieldAccess":
-                return visitFieldAccess(pp, p1, p2, p3);
+                return visitFieldAccess((J.FieldAccess)pp, p1, p2, p3);
             case "J$ForeachLoop":
-                return visitForeachLoop(pp, p1, p2, p3);
+                return visitForeachLoop((J.ForEachLoop)pp, p1, p2, p3);
+            case "J$ForeachLoop$Control":
+                return visitForeachLoopControl((J.ForEachLoop.Control)pp, p1, p2, p3);
             case "J$ForLoop":
-                return visitForLoop(pp, p1, p2, p3);
+                return visitForLoop((J.ForLoop)pp, p1, p2, p3);
             case "J$ForLoop$Control":
-                return visitForLoopControl(pp, p1, p2, p3);
+                return visitForLoopControl((J.ForLoop.Control)pp, p1, p2, p3);
             case "J$Identifier":
-                return visitIdentifier(pp, p1, p2, p3);
+                return visitIdentifier((J.Identifier)pp, p1, p2, p3);
             case "J$InstanceOf":
-                return visitInstanceOf(pp, p1, p2, p3);
+                return visitInstanceOf((J.InstanceOf)pp, p1, p2, p3);
             case "J$If":
-                return visitIf(pp, p1, p2, p3);
+                return visitIf((J.If)pp, p1, p2, p3);
             case "J$If$Else":
-                return visitIfElse(pp, p1, p2, p3);
+                return visitIfElse((J.If.Else)pp, p1, p2, p3);
             case "J$Label":
-                return visitLabel(pp, p1, p2, p3);
+                return visitLabel((J.Label)pp, p1, p2, p3);
             case "J$Lambda":
-                return visitLambda(pp, p1, p2, p3);
+                return visitLambda((J.Lambda)pp, p1, p2, p3);
             case "J$Literal":
-                return visitLiteral(pp, p1, p2, p3);
+                return visitLiteral((J.Literal)pp, p1, p2, p3);
             case "J$MethodDeclaration":
-                return visitMethodDeclaration(pp, p1, p2, p3);
+                return visitMethodDeclaration((J.MethodDeclaration)pp, p1, p2, p3);
+            case "J$MemberReference":
+                return visitMemberReference((J.MemberReference)pp, p1, p2, p3);
             case "J$MethodInvocation":
-                return visitMethodInvocation(pp, p1, p2, p3);
+                return visitMethodInvocation((J.MethodInvocation)pp, p1, p2, p3);
             case "J$MultiCatch":
-                return visitMultiCatch(pp, p1, p2, p3);
+                return visitMultiCatch((J.MultiCatch)pp, p1, p2, p3);
             case "J$NewArray":
-                return visitNewArray(pp, p1, p2, p3);
+                return visitNewArray((J.NewArray)pp, p1, p2, p3);
             case "J$NewClass":
-                return visitNewClass(pp, p1, p2, p3);
+                return visitNewClass((J.NewClass)pp, p1, p2, p3);
             case "J$Parentheses":
-                return visitParentheses(pp, p1, p2, p3);
+                return visitParentheses((J.Parentheses)pp, p1, p2, p3);
             case "J$Return":
-                return visitReturn(pp, p1, p2, p3);
+                return visitReturn((J.Return)pp, p1, p2, p3);
             case "J$Switch":
-                return visitSwitch(pp, p1, p2, p3);
+                return visitSwitch((J.Switch)pp, p1, p2, p3);
+            case "J$Synchronized":
+                return visitSynchronized((J.Synchronized)pp, p1, p2, p3);
             case "J$Ternary":
-                return visitTernary(pp, p1, p2, p3);
+                return visitTernary((J.Ternary)pp, p1, p2, p3);
             case "J$Throw":
-                return visitThrow(pp, p1, p2, p3);
+                return visitThrow((J.Throw)pp, p1, p2, p3);
             case "J$Try":
-                return visitTry(pp, p1, p2, p3);
+                return visitTry((J.Try)pp, p1, p2, p3);
+            case "J$Try$Resource":
+                return visitTryResource((J.Try.Resource)pp, p1, p2, p3);
             case "J$TypeCast":
-                return visitTypeCast(pp, p1, p2, p3);
+                return visitTypeCast((J.TypeCast)pp, p1, p2, p3);
             case "J$Unary":
-                return visitUnary(pp, p1, p2, p3);
+                return visitUnary((J.Unary)pp, p1, p2, p3);
             case "J$VariableDeclarations":
-                return visitVariableDeclarations(pp, p1, p2, p3);
+                return visitVariableDeclarations((J.VariableDeclarations)pp, p1, p2, p3);
             case "J$VariableDeclarations$NamedVariable":
-                return visitVariableDeclarationsNamedVariable(pp, p1, p2, p3);
+                return visitVariableDeclarationsNamedVariable((J.VariableDeclarations.NamedVariable)pp, p1, p2, p3);
             case "J$WhileLoop":
-                return visitWhileLoop(pp, p1, p2, p3);
+                return visitWhileLoop((J.WhileLoop)pp, p1, p2, p3);
 
             default:
                 throw new Error("Unexpected node type: " + pp.getClass().getName());
@@ -104,175 +113,191 @@ public abstract class Dispatch3<T,P1,P2,P3> {
         throw new UnsupportedOperationException();
     }
 
-    public T visitArrayAccess(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitArrayAccess(J.ArrayAccess pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitAssert(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitAssert(J.Assert pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitAssignment(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitAssignment(J.Assignment pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitAssignmentOperation(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitAssignmentOperation(J.AssignmentOperation pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitBinary(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitBinary(J.Binary pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitBlock(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitBlock(J.Block pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitBreak(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitBreak(J.Break pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitCase(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitCase(J.Case pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitClassDeclaration(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitClassDeclaration(J.ClassDeclaration pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitCompilationUnit(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitCompilationUnit(J.CompilationUnit pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitContinue(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitContinue(J.Continue pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitControlParentheses(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitControlParentheses(J.ControlParentheses pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitDoWhileLoop(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitDoWhileLoop(J.DoWhileLoop pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitEmpty(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitEmpty(J.Empty pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitEnumValue(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitEnumValue(J.EnumValue pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitEnumValueSet(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitEnumValueSet(J.EnumValueSet pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitFieldAccess(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitFieldAccess(J.FieldAccess pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitForeachLoop(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitForeachLoop(J.ForEachLoop pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitForLoop(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitForeachLoopControl(J.ForEachLoop.Control pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitForLoopControl(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitForLoop(J.ForLoop pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitIdentifier(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitForLoopControl(J.ForLoop.Control pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitInstanceOf(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitIdentifier(J.Identifier pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitIf(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitInstanceOf(J.InstanceOf pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitIfElse(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitIf(J.If pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitLabel(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitIfElse(J.If.Else pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitLambda(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitLabel(J.Label pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitLiteral(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitLambda(J.Lambda pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitMethodDeclaration(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitLiteral(J.Literal pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitMethodInvocation(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitMemberReference(J.MemberReference pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitMultiCatch(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitMethodDeclaration(J.MethodDeclaration pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitNewArray(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitMethodInvocation(J.MethodInvocation pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitNewClass(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitMultiCatch(J.MultiCatch pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitParentheses(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitNewArray(J.NewArray pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitReturn(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitNewClass(J.NewClass pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitSwitch(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitParentheses(J.Parentheses pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitTernary(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitReturn(J.Return pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitThrow(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitSwitch(J.Switch pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitTry(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitSynchronized(J.Synchronized pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitTypeCast(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitTernary(J.Ternary pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitUnary(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitThrow(J.Throw pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitVariableDeclarations(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitTry(J.Try pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitVariableDeclarationsNamedVariable(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitTryResource(J.Try.Resource pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 
-    public T visitWhileLoop(J pp, P1 p1, P2 p2, P3 p3) {
+    public T visitTypeCast(J.TypeCast pp, P1 p1, P2 p2, P3 p3) {
+        return defaultDispatch(pp, p1, p2, p3);
+    }
+
+    public T visitUnary(J.Unary pp, P1 p1, P2 p2, P3 p3) {
+        return defaultDispatch(pp, p1, p2, p3);
+    }
+
+    public T visitVariableDeclarations(J.VariableDeclarations pp, P1 p1, P2 p2, P3 p3) {
+        return defaultDispatch(pp, p1, p2, p3);
+    }
+
+    public T visitVariableDeclarationsNamedVariable(J.VariableDeclarations.NamedVariable pp, P1 p1, P2 p2, P3 p3) {
+        return defaultDispatch(pp, p1, p2, p3);
+    }
+
+    public T visitWhileLoop(J.WhileLoop pp, P1 p1, P2 p2, P3 p3) {
         return defaultDispatch(pp, p1, p2, p3);
     }
 }
