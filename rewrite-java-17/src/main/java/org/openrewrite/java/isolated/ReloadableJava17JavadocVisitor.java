@@ -348,7 +348,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         }
 
         if (!lineBreaks.isEmpty()) {
-            body.addAll(lineBreaks.values());
+            lineBreaks.keySet().stream().sorted().forEach(o -> body.add(lineBreaks.get(o)));
         }
 
         return new Javadoc.DocComment(randomId(), Markers.EMPTY, body, "");
