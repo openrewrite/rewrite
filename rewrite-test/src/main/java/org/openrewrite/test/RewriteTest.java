@@ -322,80 +322,62 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        for (Result result : results) {
-            SourceFile before = result.getBefore();
-            if (before == null) {
-                continue;
-            }
-
-            SourceSpec<?> resultSpec = specBySourceFile.get(before);
-
-            if (resultSpec.after == null) {
-                if (result.diff().isEmpty()) {
-                    fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
-                }
-                SourceFile after = result.getAfter();
-                if (after == null) {
-                    fail("The recipe deleted a source file that was not expected to change");
-                } else {
-                    assertThat(after.printAll())
-                            .as("The recipe must not make changes")
-                            .isEqualTo(before.printAll());
-                }
-            } else {
-                assertThat(result.getAfter()).isNotNull();
-                String actual = result.getAfter().printAll();
-                String expected = trimIndentPreserveCRLF(resultSpec.after);
-                assertThat(actual).isEqualTo(expected);
-
-                //noinspection unchecked
-                ((Consumer<SourceFile>) resultSpec.afterRecipe).accept(result.getAfter());
-                if (result.getAfter() instanceof JavaSourceFile) {
-                    TypeValidation typeValidation = testMethodSpec.typeValidation != null ? testMethodSpec.typeValidation : testClassSpec.typeValidation;
-                    if (typeValidation == null) {
-                        typeValidation = new TypeValidation();
-                    }
-                    typeValidation.assertValidTypes((JavaSourceFile) result.getAfter());
-                }
-            }
-        }
-
         nextSourceFile:
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
-            String after = specForSourceFile.getValue().after;
+            String expectedAfter = specForSourceFile.getValue().after;
             for (Result result : results) {
-                if (result.getBefore() instanceof Quark) {
-                    continue nextSourceFile;
-                }
 
                 if (result.getBefore() == specForSourceFile.getKey()) {
-                    if (after == null) {
-                        assertThat(result.getAfter() == null ? "<deleted>" : result.getAfter().printAll())
-                                .as("The recipe must not make changes to the contents of the source file.")
-                                .isEqualTo(result.getBefore() == null ? "" : result.getBefore().printAll());
+
+                    if (expectedAfter != null && result.getAfter() != null) {
+                        String actual = result.getAfter().printAll();
+                        String expected = trimIndentPreserveCRLF(expectedAfter);
+                        assertThat(actual).isEqualTo(expected);
+                        if (result.getAfter() instanceof JavaSourceFile) {
+                            TypeValidation typeValidation = testMethodSpec.typeValidation != null ? testMethodSpec.typeValidation : testClassSpec.typeValidation;
+                            if (typeValidation == null) {
+                                typeValidation = new TypeValidation();
+                            }
+                            typeValidation.assertValidTypes((JavaSourceFile) result.getAfter());
+                        }
+                    } else if (expectedAfter == null && result.getAfter() != null) {
+                        if (result.diff().isEmpty()) {
+                            fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
+                        }
+
+                        assert result.getBefore() != null;
+                        assertThat(result.getAfter().printAll())
+                                .as("The recipe must not make changes")
+                                .isEqualTo(result.getBefore().printAll());
+                    } else if (expectedAfter != null && result.getAfter() == null) {
+                        assert result.getBefore() != null;
+                        fail("The recipe deleted a source file [" + result.getBefore().getSourcePath() + "] that was not expected to change");
                     }
+
+
                     //noinspection unchecked
                     ((Consumer<SourceFile>) specForSourceFile.getValue().afterRecipe).accept(result.getAfter());
-                    break nextSourceFile;
+                    continue nextSourceFile;
                 }
             }
 
-            SoftAssertions newFilesGenerated = new SoftAssertions();
-            for (SourceSpec<?> expectedNewSource : expectedNewSources) {
-                newFilesGenerated.assertThat(expectedNewSource.after).as("No new source file was generated that matched.").isEmpty();
-            }
-            newFilesGenerated.assertAll();
+            //If we get here, there was no result.
+            if (expectedAfter != null) {
+                String before = trimIndentPreserveCRLF(specForSourceFile.getKey().printAll());
+                String expected = trimIndentPreserveCRLF(expectedAfter);
 
-            assertThat(expectedNewSources).as("Did not find a source spec for a file that should be created whose " +
-                    "contents match this result's after.").isEmpty();
-
-            if (after != null && results.isEmpty()) {
-                fail("The recipe must make changes");
-            } else if (after == null) {
-                //noinspection unchecked
-                ((Consumer<SourceFile>) specForSourceFile.getValue().afterRecipe).accept(specForSourceFile.getKey());
+                assertThat(before)
+                        .as("The recipe should have made the following change.")
+                        .isEqualTo(expected);
             }
+            //noinspection unchecked
+            ((Consumer<SourceFile>) specForSourceFile.getValue().afterRecipe).accept(specForSourceFile.getKey());
         }
+        SoftAssertions newFilesGenerated = new SoftAssertions();
+        for (SourceSpec<?> expectedNewSource : expectedNewSources) {
+            newFilesGenerated.assertThat(expectedNewSource.after).as("No new source file was generated that matched.").isEmpty();
+        }
+        newFilesGenerated.assertAll();
 
         recipeSchedulerCheckingExpectedCycles.verify();
     }
