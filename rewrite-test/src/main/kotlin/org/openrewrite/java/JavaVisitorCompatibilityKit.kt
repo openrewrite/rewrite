@@ -167,6 +167,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindAnnotationsTck : FindAnnotationsTest
 
     @Nested
+    inner class FindVariableNamesInScopeTck : FindVariableNamesInScopeTest
+
+    @Nested
     inner class FixSerializableFieldsTck : FixSerializableFieldsTest
 
     @Nested
