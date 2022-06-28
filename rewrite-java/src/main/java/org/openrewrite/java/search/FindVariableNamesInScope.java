@@ -91,23 +91,17 @@ public class FindVariableNamesInScope {
             }
 
             if (scope.getValue().equals(tree)) {
-                if (scope.getValue() instanceof J.Identifier) {
-                    Cursor aggregatedScope = aggregateNameScope();
-                    Set<String> names = nameScopes.get(aggregatedScope);
+                 Cursor aggregatedScope = aggregateNameScope();
+                 // Add names from parent scope.
+                 Set<String> names = nameScopes.get(aggregatedScope);
 
-                    // Add the names created in the target scope.
-                    Set<String> namesInCursorScope = nameScopes.get(scope);
-                    if (namesInCursorScope != null) {
-                        names.addAll(nameScopes.get(scope));
+                 // Add the names created in the target scope.
+                namesInScope.addAll(names);
+                nameScopes.forEach((key, value) -> {
+                    if (key.isScopeInPath(scope.getValue())) {
+                        namesInScope.addAll(value);
                     }
-                    namesInScope.addAll(names);
-                } else {
-                    nameScopes.forEach((key, value) -> {
-                        if (key.isScopeInPath(scope.getValue())) {
-                            namesInScope.addAll(value);
-                        }
-                    });
-                }
+                });
                 return tree;
             }
 
@@ -124,12 +118,6 @@ public class FindVariableNamesInScope {
         public J.Package visitPackage(J.Package pkg, Set<String> namesInScope) {
             // Skip identifiers from `package`.
             return pkg;
-        }
-
-        @Override
-        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Set<String> strings) {
-            // Placeholder: variable declarations in a scope may be tracked to distinguish when a namespace conflict is a valid shadow vs. compilation error.
-            return super.visitVariableDeclarations(multiVariable, strings);
         }
 
         @Override
@@ -181,28 +169,12 @@ public class FindVariableNamesInScope {
         }
 
         @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> namesInScope) {
-            if (isValidIdentifier()) {
-                Set<String> names = nameScopes.get(currentScope.peek());
-                if (names != null) {
-                    names.add(identifier.getSimpleName());
-                }
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Set<String> strings) {
+            Set<String> names = nameScopes.get(currentScope.peek());
+            if (names != null) {
+                names.add(variable.getSimpleName());
             }
-            return super.visitIdentifier(identifier, namesInScope);
-        }
-
-        // Filter out identifiers that won't create namespace conflicts.
-        private boolean isValidIdentifier() {
-            J parent = getCursor().dropParentUntil(is -> is instanceof J).getValue();
-            return !(parent instanceof J.ClassDeclaration) &&
-                    !(parent instanceof J.MethodDeclaration) &&
-                    !(parent instanceof J.MethodInvocation) &&
-                    !(parent instanceof J.VariableDeclarations) &&
-                    !(parent instanceof J.NewClass) &&
-                    !(parent instanceof J.Annotation) &&
-                    !(parent instanceof J.MultiCatch) &&
-                    !(parent instanceof J.ParameterizedType) &&
-                    !(parent instanceof J.Case && getCursor().getValue() instanceof J.Identifier && "default".equals(((J.Identifier) getCursor().getValue()).getSimpleName()));
+            return super.visitVariable(variable, strings);
         }
     }
 }
