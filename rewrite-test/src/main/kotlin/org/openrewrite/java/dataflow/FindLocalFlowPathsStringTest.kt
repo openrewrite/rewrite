@@ -1019,9 +1019,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                 void test() {
                     String n = "42";
                     try {
-                        if (!(guard() || guard())) {
-                            throw new RuntimeException();
-                        }
+                        System.out.println(n);
                     } catch (Exception e) {
                         System.out.println(n);
                     }
@@ -1038,9 +1036,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                 void test() {
                     String n = /*~~>*/"42";
                     try {
-                        if (!(guard() || guard())) {
-                            throw new RuntimeException();
-                        }
+                        System.out.println(/*~~>*/n);
                     } catch (Exception e) {
                         System.out.println(n);
                     }
