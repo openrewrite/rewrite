@@ -1,24 +1,29 @@
-//package org.openrewrite.java;
-//
-//import org.openrewrite.java.effects.NodeCannotBeAnLValueException;
-//import org.openrewrite.java.effects.Side;
-//import org.openrewrite.java.effects.VariableSide;
-//import org.openrewrite.java.tree.Dispatch1;
-//import org.openrewrite.java.tree.Expression;
-//import org.openrewrite.java.tree.J;
-//import org.openrewrite.java.tree.JavaType;
-//
-//import java.util.Arrays;
-//
-//public class Writes extends Dispatch1<Boolean, VariableSide> {
-//
-//
-//    /** @return True if this expression, when evaluated, may write variable v. */
-//    public boolean writes(J e, VariableSide vs) {
-//        return dispatch(e, v);
-//    }
-//
-//
+package org.openrewrite.java.effects;
+
+import org.openrewrite.java.tree.Dispatch1;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+
+public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
+
+
+    /** @return True if this expression, when evaluated, may write variable v. */
+    public boolean writes(J e, JavaType.Variable v) {
+        // return dispatch(e, v);
+        throw new Error();
+    }
+
+    public boolean writes(J e, JavaType.Variable v, Side s) {
+        // return dispatch(e, v);
+        throw new Error();
+    }
+
+    @Override
+    public Boolean defaultDispatch(J ignoredC, JavaType.Variable ignoredP1) {
+        throw new Error();
+    }
+
+
 //    // AnnotatedType
 //
 //    public boolean reads(JavaType.Variable v) {
@@ -742,5 +747,5 @@
 //    public boolean writes(JavaType.Variable v) {
 //        throw new UnsupportedOperationException();
 //    }
-//
-//}
+
+}

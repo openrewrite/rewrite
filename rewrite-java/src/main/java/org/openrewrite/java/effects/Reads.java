@@ -5,23 +5,33 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-public class Reads extends Dispatch1<Boolean, JavaType.Variable> {
+public class Reads implements Dispatch1<Boolean, JavaType.Variable> {
 
     public static final ReadSided READ_SIDED = new ReadSided();
 
+    /**
+     * @return Whether this expression may read variable v.
+     */
     public boolean reads(J e, JavaType.Variable v) {
         return dispatch(e, v);
     }
 
     @Override
-    public Boolean visitArrayAccess(J.ArrayAccess arrayAccess, JavaType.Variable v) {
-        return READ_SIDED.visitArrayAccess(arrayAccess, new VariableSide(v, Side.RVALUE));
+    public Boolean defaultDispatch(J ignoredC, JavaType.Variable ignoredP1) {
+        throw new UnsupportedOperationException();
     }
+
+    @Override
+    public Boolean visitArrayAccess(J.ArrayAccess arrayAccess, JavaType.Variable v) {
+        return READ_SIDED.visitArrayAccess(arrayAccess, v, Side.RVALUE);
+    }
+
     @Override
     public Boolean visitAssignment(J.Assignment assignment, JavaType.Variable v) {
         return READ_SIDED.reads(assignment.getVariable(), v, Side.LVALUE)
                 || READ_SIDED.reads(assignment.getAssignment(), v, Side.RVALUE);
     }
+
     @Override
     public Boolean visitFieldAccess(J.FieldAccess fieldAccess, JavaType.Variable variable) {
         return READ_SIDED.reads(fieldAccess, variable, Side.RVALUE);
@@ -44,8 +54,9 @@ public class Reads extends Dispatch1<Boolean, JavaType.Variable> {
 
     @Override
     public Boolean visitForLoopControl(J.ForLoop.Control control, JavaType.Variable v) {
-        return control.getInit().stream().map(s -> reads(s, v)).reduce(false, (a,b) -> a|b)
-                || control.getUpdate().stream().map(s -> reads(s, v)).reduce(false, (a,b) -> a|b)
+        // TODO avoid streams, shortcut evaluation
+        return control.getInit().stream().map(s -> reads(s, v)).reduce(false, (a, b) -> a | b)
+                || control.getUpdate().stream().map(s -> reads(s, v)).reduce(false, (a, b) -> a | b)
                 || reads(control.getCondition(), v);
     }
 
@@ -84,7 +95,7 @@ public class Reads extends Dispatch1<Boolean, JavaType.Variable> {
     @Override
     public Boolean visitMemberReference(J.MemberReference memberRef, JavaType.Variable v) {
         // Here we assume that v is a local variable, so it cannot be referenced by a member reference.
-        // However there might be references to v in the expression.
+        // However, there might be references to v in the expression.
         return reads(memberRef.getContaining(), v);
     }
 
@@ -92,31 +103,31 @@ public class Reads extends Dispatch1<Boolean, JavaType.Variable> {
     public Boolean visitMethodInvocation(J.MethodInvocation method, JavaType.Variable v) {
         // This does not take into account the effects inside the method body.
         // As long as v is a local variable, we are guaranteed that it cannot be affected
-        // as a side-effect of the method invocation.
+        // as a side effect of the method invocation.
         return (method.getSelect() != null && reads(method.getSelect(), v))
-                || method.getArguments().stream().map(e -> reads(e, v)).reduce(false, (a,b) -> a|b);
+                || method.getArguments().stream().map(e -> reads(e, v)).reduce(false, (a, b) -> a | b);
     }
 
     @Override
     public Boolean visitNewArray(J.NewArray newArray, JavaType.Variable v) {
-        return (newArray.getInitializer() != null && newArray.getInitializer().stream().map(e -> reads(e, v)).reduce(false, (a,b) -> a|b))
-                || newArray.getDimensions().stream().map(e -> reads(e.getIndex(), v)).reduce(false, (a,b) -> a|b);
+        return (newArray.getInitializer() != null && newArray.getInitializer().stream().map(e -> reads(e, v)).reduce(false, (a, b) -> a | b))
+                || newArray.getDimensions().stream().map(e -> reads(e.getIndex(), v)).reduce(false, (a, b) -> a | b);
     }
 
     @Override
     public Boolean visitNewClass(J.NewClass newClass, JavaType.Variable v) {
         return (newClass.getEnclosing() != null && reads(newClass.getEnclosing(), v))
-                || (newClass.getArguments() != null && newClass.getArguments().stream().map(e -> reads(e, v)).reduce(false, (a,b) -> a|b))
+                || (newClass.getArguments() != null && newClass.getArguments().stream().map(e -> reads(e, v)).reduce(false, (a, b) -> a | b))
                 || (newClass.getBody() != null && reads(newClass.getBody(), v));
     }
 
     @Override
-    public Boolean visitParentheses(J.Parentheses parens, JavaType.Variable v) {
+    public Boolean visitParentheses(J.Parentheses<?> parens, JavaType.Variable v) {
         return reads(parens.getTree(), v);
     }
 
     @Override
-    public Boolean visitControlParentheses(J.ControlParentheses controlParens, JavaType.Variable v) {
+    public Boolean visitControlParentheses(J.ControlParentheses<?> controlParens, JavaType.Variable v) {
         return controlParens.getTree() instanceof Expression && reads(controlParens.getTree(), v);
     }
 
@@ -147,9 +158,9 @@ public class Reads extends Dispatch1<Boolean, JavaType.Variable> {
 
     @Override
     public Boolean visitTry(J.Try tryable, JavaType.Variable v) {
-        return (tryable.getResources() != null && tryable.getResources().stream().map(c -> reads(c, v)).reduce(false, (a,b) -> a|b))
+        return (tryable.getResources() != null && tryable.getResources().stream().map(c -> reads(c, v)).reduce(false, (a, b) -> a | b))
                 || reads(tryable.getBody(), v)
-                || tryable.getCatches().stream().map(c -> reads(c.getBody(), v)).reduce(false, (a,b) -> a|b)
+                || tryable.getCatches().stream().map(c -> reads(c.getBody(), v)).reduce(false, (a, b) -> a | b)
                 || (tryable.getFinally() != null && reads(tryable.getFinally(), v));
     }
 

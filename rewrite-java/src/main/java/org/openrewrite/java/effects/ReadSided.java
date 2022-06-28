@@ -1,70 +1,65 @@
 package org.openrewrite.java.effects;
 
 import org.openrewrite.java.tree.Dispatch1;
+import org.openrewrite.java.tree.Dispatch2;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-public class ReadSided extends Dispatch1<Boolean, VariableSide> {
+// TODO Use Dispatch2
+public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
 
     public static final Reads READS = new Reads();
 
-    // Expression
-
-    /** @return True if this expression, when evaluated, may read variable v. */
-    //boolean reads(JavaType.Variable v);
-
+    /**
+     * @return Whether given expression, when in given position, may read variable v.
+     */
+    public boolean reads(J e, JavaType.Variable variable, Side side) {
+        return dispatch(e, variable, side);
+    }
 
     /**
-     * @return True if this expression, when in `side` position, may read variable v.
+     * @return Whether given expression, when in `RVALUE` position, may read variable v.
      */
-    public boolean reads(J e, VariableSide vs) {
-        if (vs.side == Side.LVALUE) throw new NodeCannotBeAnLValueException();
-        return dispatch(e, vs);
-    }
-
-    public boolean reads(J e, JavaType.Variable v, Side s) {
-        return reads(e, new VariableSide(v, s));
-    }
-
     public boolean reads(J e, JavaType.Variable v) {
-        return reads(e, new VariableSide(v, Side.RVALUE));
+        return reads(e, v, Side.RVALUE);
     }
 
-    // Statement
-
+    @Override
+    public Boolean defaultDispatch(J ignoredC, JavaType.Variable variable, Side side) {
+        throw new UnsupportedOperationException();
+    }
 
     // AnnotatedType
     // Annotation
     // ArrayAccess
     @Override
-    public Boolean visitArrayAccess(J.ArrayAccess arrayAccess, VariableSide vs) {
-        return reads(arrayAccess.getIndexed(), vs) || reads(arrayAccess.getDimension().getIndex(), new VariableSide(vs.variable, Side.RVALUE));
+    public Boolean visitArrayAccess(J.ArrayAccess arrayAccess, JavaType.Variable variable, Side side) {
+        return reads(arrayAccess.getIndexed(), variable, side) || reads(arrayAccess.getDimension().getIndex(), variable, Side.RVALUE);
     }
 
     @Override
-    public Boolean visitAssignment(J.Assignment assignment, VariableSide vs) {
-        return reads(assignment.getVariable(), vs.variable, Side.LVALUE)
-                || READS.reads(assignment.getAssignment(), vs.variable);
+    public Boolean visitAssignment(J.Assignment assignment, JavaType.Variable variable, Side side) {
+        return reads(assignment.getVariable(), variable, Side.LVALUE) || READS.reads(assignment.getAssignment(), variable);
     }
 
     @Override
-    public Boolean visitBinary(J.Binary binary, VariableSide vs) {
-        return READS.reads(binary.getLeft(), vs.variable) || READS.reads(binary.getRight(), vs.variable);
+    public Boolean visitBinary(J.Binary binary, JavaType.Variable variable, Side side) {
+        return READS.reads(binary.getLeft(), variable) || READS.reads(binary.getRight(), variable);
     }
 
     // Block
 
 
     @Override
-    public Boolean visitBlock(J.Block block, VariableSide vs) {
-        return block.getStatements().stream().map(s -> READS.reads(s, vs.variable)).reduce(false, (a, b) -> a | b);
+    public Boolean visitBlock(J.Block block, JavaType.Variable variable, Side side) {
+        return block.getStatements().stream().map(s -> READS.reads(s, variable)).reduce(false, (a, b) -> a | b);
     }
 
     // Break
 
 
     @Override
-    public Boolean visitBreak(J.Break breakStatement, VariableSide variableSide) {
+    public Boolean visitBreak(J.Break breakStatement, JavaType.Variable variable, Side side) {
         return false;
     }
 
@@ -73,8 +68,8 @@ public class ReadSided extends Dispatch1<Boolean, VariableSide> {
 
 
     @Override
-    public Boolean visitCase(J.Case caze, VariableSide vs) {
-        return caze.getStatements().stream().map(s -> reads(s, vs.variable)).reduce(false, (a, b) -> a | b);
+    public Boolean visitCase(J.Case caze, JavaType.Variable variable, Side side) {
+        return caze.getStatements().stream().map(s -> reads(s, variable)).reduce(false, (a, b) -> a | b);
     }
 
     // ClassDeclaration
@@ -84,7 +79,7 @@ public class ReadSided extends Dispatch1<Boolean, VariableSide> {
 
 
     @Override
-    public Boolean visitContinue(J.Continue continueStatement, VariableSide variableSide) {
+    public Boolean visitContinue(J.Continue continueStatement, JavaType.Variable variable, Side side) {
         return false;
     }
 
@@ -93,9 +88,9 @@ public class ReadSided extends Dispatch1<Boolean, VariableSide> {
 
 
     @Override
-    public Boolean visitDoWhileLoop(J.DoWhileLoop doWhileLoop, VariableSide vs) {
-        return reads(doWhileLoop.getWhileCondition(), vs.variable)
-                || reads(doWhileLoop.getBody(), vs.variable);
+    public Boolean visitDoWhileLoop(J.DoWhileLoop doWhileLoop, JavaType.Variable variable, Side side) {
+        return reads(doWhileLoop.getWhileCondition(), variable)
+                || reads(doWhileLoop.getBody(), variable);
     }
 
     // Empty
@@ -105,9 +100,9 @@ public class ReadSided extends Dispatch1<Boolean, VariableSide> {
 
 
     @Override
-    public Boolean visitEnumValueSet(J.EnumValueSet enums, VariableSide vs) {
+    public Boolean visitEnumValueSet(J.EnumValueSet enums, JavaType.Variable variable, Side side) {
         return enums.getEnums().stream().map(n ->
-                n.getInitializer() != null && reads(n.getInitializer(), vs.variable)).reduce(false, (a, b) -> a | b);
+                n.getInitializer() != null && reads(n.getInitializer(), variable)).reduce(false, (a, b) -> a | b);
     }
 
 
@@ -115,19 +110,24 @@ public class ReadSided extends Dispatch1<Boolean, VariableSide> {
 
 
     @Override
-    public Boolean visitFieldAccess(J.FieldAccess fieldAccess, VariableSide vs) {
-        return (vs.side == Side.RVALUE && fieldAccess.getType() != null && fieldAccess.getType().equals(vs.variable))
-                || reads(fieldAccess.getTarget(), vs);
+    public Boolean visitFieldAccess(J.FieldAccess fieldAccess, JavaType.Variable variable, Side side) {
+        return (side == Side.RVALUE && fieldAccess.getType() != null && fieldAccess.getType().equals(variable))
+                || reads(fieldAccess.getTarget(), variable, side);
     }
 
     @Override
-    public Boolean visitIdentifier(J.Identifier ident, VariableSide vs) {
-        return (vs.side == Side.RVALUE) && ident.getFieldType() != null && ident.getFieldType().equals(vs.variable);
+    public Boolean visitIdentifier(J.Identifier ident, JavaType.Variable variable, Side side) {
+        return (side == Side.RVALUE) && ident.getFieldType() != null && ident.getFieldType().equals(variable);
     }
 
     @Override
-    public Boolean visitTypeCast(J.TypeCast typeCast, VariableSide vs) {
-        if (vs.side == Side.LVALUE) throw new NodeCannotBeAnLValueException();
-        return reads(typeCast.getExpression(), vs.variable);
+    public Boolean visitLiteral(J.Literal pp, JavaType.Variable variable, Side side) {
+        return false;
+    }
+
+    @Override
+    public Boolean visitTypeCast(J.TypeCast typeCast, JavaType.Variable variable, Side side) {
+        assert side == Side.RVALUE;
+        return reads(typeCast.getExpression(), variable);
     }
 }
