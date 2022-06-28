@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest
 interface DoesNotUseRewriteSkipTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(
-            ChangeType("java.util.List", "java.util.Collection")
+            ChangeType("java.util.List", "java.util.Collection", false)
                 .addSingleSourceApplicableTest(DoesNotUseRewriteSkip().visitor)
         )
     }
