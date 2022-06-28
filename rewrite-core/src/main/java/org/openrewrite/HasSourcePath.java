@@ -18,6 +18,7 @@ package org.openrewrite;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 
+import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
@@ -50,7 +51,12 @@ public class HasSourcePath<P> extends TreeVisitor<Tree, P> {
 
         if (tree instanceof SourceFile) {
             SourceFile sourceFile = (SourceFile) tree;
-            Path sourcePath = sourceFile.getSourcePath().normalize();
+            Path sourcePath;
+            if ("glob".equals(syntax) && filePattern.startsWith("**")) {
+                sourcePath = Paths.get(".").resolve(sourceFile.getSourcePath().normalize());
+            } else {
+                sourcePath = sourceFile.getSourcePath().normalize();
+            }
 
             PathMatcher pathMatcher = sourcePath.getFileSystem().getPathMatcher(syntax + ":" + filePattern);
             if (pathMatcher.matches(sourcePath)) {
