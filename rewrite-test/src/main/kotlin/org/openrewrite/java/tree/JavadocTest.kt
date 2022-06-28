@@ -139,6 +139,21 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Test
+    fun authorPostFixedNumber(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * @author FirstName LastName 42
+             *
+             */
+            public class A {
+                void method() {}
+            }
+        """.trimIndent()
+    )
+
     // code
     @Test
     fun code(jp: JavaParser) = assertParsePrintAndProcess(
