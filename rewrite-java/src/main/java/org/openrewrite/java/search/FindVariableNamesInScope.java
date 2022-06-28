@@ -91,15 +91,23 @@ public class FindVariableNamesInScope {
             }
 
             if (scope.getValue().equals(tree)) {
-                Cursor aggregatedScope = aggregateNameScope();
-                Set<String> names = nameScopes.get(aggregatedScope);
+                if (scope.getValue() instanceof J.Identifier) {
+                    Cursor aggregatedScope = aggregateNameScope();
+                    Set<String> names = nameScopes.get(aggregatedScope);
 
-                // Add the names created in the target scope.
-                Set<String> namesInCursorScope = nameScopes.get(scope);
-                if (namesInCursorScope != null) {
-                    names.addAll(nameScopes.get(scope));
+                    // Add the names created in the target scope.
+                    Set<String> namesInCursorScope = nameScopes.get(scope);
+                    if (namesInCursorScope != null) {
+                        names.addAll(nameScopes.get(scope));
+                    }
+                    namesInScope.addAll(names);
+                } else {
+                    nameScopes.forEach((key, value) -> {
+                        if (key.isScopeInPath(scope.getValue())) {
+                            namesInScope.addAll(value);
+                        }
+                    });
                 }
-                namesInScope.addAll(names);
                 return tree;
             }
 

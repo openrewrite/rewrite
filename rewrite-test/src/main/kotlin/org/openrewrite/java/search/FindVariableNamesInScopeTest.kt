@@ -84,7 +84,7 @@ interface FindVariableNamesInScopeTest {
     }
 
     @Test
-    fun findAllNamesAvailableFromBlock() {
+    fun findNamesAvailableFromBlock() {
         val sources = parser.parse(
             InMemoryExecutionContext(),
             """
@@ -105,7 +105,7 @@ interface FindVariableNamesInScopeTest {
             """.trimIndent()
         )
         val scope = "methodBlockA"
-        val expected = setOf("classFieldA", "classFieldB", "methodBlockA", "methodBlockB", "methodParam")
+        val expected = setOf("classFieldA", "classFieldB", "methodBlockA", "methodBlockB", "methodParam", "control", "forBlock", "ifBlock")
 
         val names = mutableSetOf<String>()
         val recipe = toRecipe {
