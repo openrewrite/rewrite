@@ -23,7 +23,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
 
     implementation("org.antlr:antlr4:4.9.+")
-    compileOnly("com.puppycrawl.tools:checkstyle:10.+") {
+    compileOnly("com.puppycrawl.tools:checkstyle:9.+") { // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
         isTransitive = false
     }
     implementation("commons-lang:commons-lang:latest.release")
@@ -37,7 +37,7 @@ dependencies {
     implementation("org.ow2.asm:asm-util:latest.release")
 
     testImplementation("org.yaml:snakeyaml:latest.release")
-    testImplementation("com.puppycrawl.tools:checkstyle:10.+") {
+    testImplementation("com.puppycrawl.tools:checkstyle:9.+") { // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
         isTransitive = false
     }
     testImplementation(project(":rewrite-test"))
