@@ -49,7 +49,7 @@ public class JavaVersion implements Marker {
 
         if (version.startsWith("1.")) {
             String removePrefix = version.substring(version.indexOf(".") + 1);
-            return removePrefix.substring(0, version.indexOf("."));
+            return removePrefix.substring(0, removePrefix.indexOf("."));
         } else {
             return version.substring(0, version.indexOf("."));
         }

@@ -306,6 +306,15 @@ abstract class RewriteGradleProject implements Project {
     abstract void allprojects(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteGradleProject) Closure cl)
     abstract void test(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteTestSpec) Closure cl)
 
+    // @Deprecated(since="7.1.0", replacedBy="org.gradle.api.plugins.JavaPluginExtension")
+    // @see org.gradle.api.plugins.JavaPluginConvention
+    abstract JavaVersion getSourceCompatibility();
+    abstract void setSourceCompatibility(Object value);
+    abstract void setSourceCompatibility(JavaVersion value);
+    abstract JavaVersion getTargetCompatibility();
+    abstract void setTargetCompatibility(Object value);
+    abstract void setTargetCompatibility(JavaVersion value);
+
     // These functions don't actually exist in the Gradle API, but are syntactic sugar which forward to TaskContainer.create()
     abstract Task task(Map<String, ?> options)
     abstract Task task(Map<String, ?> options, Closure configureClosure)
