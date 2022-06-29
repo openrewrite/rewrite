@@ -63,7 +63,7 @@ recipeList:
   - org.openrewrite.java.cleanup.RemoveExtraSemicolons
 #  - org.openrewrite.java.cleanup.RemoveRedundantTypeCast
 #  - org.openrewrite.java.RemoveUnusedImports
-  - org.openrewrite.java.cleanup.RemoveUnusedLocalVariables
+#  - org.openrewrite.java.cleanup.RemoveUnusedLocalVariables
 #  - org.openrewrite.java.cleanup.RemoveUnusedPrivateMethods
   - org.openrewrite.java.cleanup.RenameLocalVariablesToCamelCase
   - org.openrewrite.java.cleanup.RenameMethodsNamedHashcodeEqualOrTostring
