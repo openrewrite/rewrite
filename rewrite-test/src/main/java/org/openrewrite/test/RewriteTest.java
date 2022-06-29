@@ -18,6 +18,8 @@ package org.openrewrite.test;
 import org.assertj.core.api.SoftAssertions;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
+import org.openrewrite.cobol.CobolParser;
+import org.openrewrite.cobol.tree.Cobol;
 import org.openrewrite.config.Environment;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.groovy.GroovyParser;
@@ -223,6 +225,10 @@ public interface RewriteTest extends SourceSpecs {
             } else if (Properties.File.class.equals(sourceSpec.sourceFileType)) {
                 sourceSpecsByParser.computeIfAbsent(
                         new ParserSupplier(Properties.File.class, sourceSpec.dsl, PropertiesParser::new),
+                        p -> new ArrayList<>()).add(sourceSpec);
+            } else if(Cobol.CompilationUnit.class.equals(sourceSpec.sourceFileType)) {
+                sourceSpecsByParser.computeIfAbsent(
+                        new ParserSupplier(Cobol.CompilationUnit.class, sourceSpec.dsl, CobolParser::new),
                         p -> new ArrayList<>()).add(sourceSpec);
             }
         }
