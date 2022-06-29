@@ -10,6 +10,7 @@ includeBuild(
 )
 
 include(
+    "rewrite-cobol",
     "rewrite-core",
     "rewrite-gradle",
     "rewrite-groovy",

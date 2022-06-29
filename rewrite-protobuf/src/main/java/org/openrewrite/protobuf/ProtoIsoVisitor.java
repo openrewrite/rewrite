@@ -35,8 +35,8 @@ public class ProtoIsoVisitor<P> extends ProtoVisitor<P> {
     }
 
     @Override
-    public Proto.Enum visitEmpty(Proto.Empty empty, P p) {
-        return (Proto.Enum) super.visitEmpty(empty, p);
+    public Proto.Empty visitEmpty(Proto.Empty empty, P p) {
+        return (Proto.Empty) super.visitEmpty(empty, p);
     }
 
     @Override
