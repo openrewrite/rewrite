@@ -23,10 +23,17 @@ import org.openrewrite.java.JavaRecipeTest
 @Suppress("RedundantOperationOnEmptyContainer")
 interface FindMethodsTest : JavaRecipeTest {
 
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    fun findMethods(methodPattern: String?, matchOverrides: Boolean?): FindMethods = FindMethods(
+        methodPattern,
+        matchOverrides,
+        null
+    )
+
     @Test
     fun findConstructors(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("A <constructor>(String)", false),
+        recipe = findMethods("A <constructor>(String)", false),
         before = """
             class Test {
                 A a = new A("test");
@@ -37,17 +44,19 @@ interface FindMethodsTest : JavaRecipeTest {
                 A a = /*~~>*/new A("test");
             }
         """,
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             class A {
                 public A(String s) {}
             }
-        """)
+        """
+        )
     )
 
     @Test
     fun findMethodReferences(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("A singleArg(String)", false),
+        recipe = findMethods("A singleArg(String)", false),
         before = """
             class Test {
                 void test() {
@@ -62,17 +71,19 @@ interface FindMethodsTest : JavaRecipeTest {
                 }
             }
         """,
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             class A {
                 public void singleArg(String s) {}
             }
-        """)
+        """
+        )
     )
 
     @Test
     fun findOverriddenMethodReferences(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("java.util.Collection isEmpty()", true),
+        recipe = findMethods("java.util.Collection isEmpty()", true),
         before = """
             class Test {
                 void test() {
@@ -92,7 +103,7 @@ interface FindMethodsTest : JavaRecipeTest {
     @Test
     fun findStaticMethodCalls(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("java.util.Collections emptyList()", false),
+        recipe = findMethods("java.util.Collections emptyList()", false),
         before = """
             import java.util.Collections;
             public class A {
@@ -110,7 +121,7 @@ interface FindMethodsTest : JavaRecipeTest {
     @Test
     fun findStaticallyImportedMethodCalls(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("java.util.Collections emptyList()", false),
+        recipe = findMethods("java.util.Collections emptyList()", false),
         before = """
             import static java.util.Collections.emptyList;
             public class A {
@@ -128,7 +139,7 @@ interface FindMethodsTest : JavaRecipeTest {
     @Test
     fun matchVarargs(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("A foo(String, Object...)", false),
+        recipe = findMethods("A foo(String, Object...)", false),
         before = """
             public class B {
                public void test() {
@@ -143,17 +154,19 @@ interface FindMethodsTest : JavaRecipeTest {
                }
             }
         """,
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             public class A {
                 public void foo(String s, Object... o) {}
             }
-        """)
+        """
+        )
     )
 
     @Test
     fun matchOnInnerClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethods("B.C foo()", false),
+        recipe = findMethods("B.C foo()", false),
         before = """
             public class A {
                void test() {
@@ -168,25 +181,50 @@ interface FindMethodsTest : JavaRecipeTest {
                }
             }
         """,
-        dependsOn = arrayOf("""
+        dependsOn = arrayOf(
+            """
             public class B {
                public static class C {
                    public void foo() {}
                }
             }
-        """)
+        """
+        )
     )
 
-    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun findDataFlowFromSource(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = FindMethods("java.util.Collections emptyList()", false, "data"),
+        before = """
+            import static java.util.Collections.emptyList;
+            public class A {
+               void test() {
+                   Object o = emptyList();
+                   System.out.println(o);
+               }
+            }
+        """,
+        after = """
+            import static java.util.Collections.emptyList;
+            public class A {
+               void test() {
+                   Object o = /*~~>*/emptyList();
+                   System.out.println(/*~~>*/o);
+               }
+            }
+        """
+    )
+
     @Test
     fun checkValidation() {
-        var recipe = FindMethods(null, false)
+        var recipe = findMethods(null, false)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
-        recipe = FindMethods("com.foo.Foo bar()", false)
+        recipe = findMethods("com.foo.Foo bar()", false)
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue
     }
