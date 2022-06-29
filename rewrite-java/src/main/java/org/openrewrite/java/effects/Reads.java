@@ -33,6 +33,21 @@ public class Reads implements Dispatch1<Boolean, JavaType.Variable> {
     }
 
     @Override
+    public Boolean visitBinary(J.Binary pp, JavaType.Variable v) {
+        return reads(pp.getLeft(), v) || reads(pp.getRight(), v);
+    }
+
+    @Override
+    public Boolean visitBlock(J.Block pp, JavaType.Variable v) {
+        return pp.getStatements().stream().map(s -> reads(s, v)).reduce(false, (a, b) -> a | b);
+    }
+
+    @Override
+    public Boolean visitControlParentheses(J.ControlParentheses<?> controlParens, JavaType.Variable v) {
+        return controlParens.getTree() instanceof Expression && reads(controlParens.getTree(), v);
+    }
+
+    @Override
     public Boolean visitFieldAccess(J.FieldAccess fieldAccess, JavaType.Variable variable) {
         return READ_SIDED.reads(fieldAccess, variable, Side.RVALUE);
     }
@@ -70,6 +85,11 @@ public class Reads implements Dispatch1<Boolean, JavaType.Variable> {
         return reads(iff.getIfCondition(), v)
                 || reads(iff.getThenPart(), v)
                 || (iff.getElsePart() != null && reads(iff.getElsePart().getBody(), v));
+    }
+
+    @Override
+    public Boolean visitIfElse(J.If.Else pp, JavaType.Variable v) {
+        return reads(pp.getBody(), v);
     }
 
     @Override
@@ -127,11 +147,6 @@ public class Reads implements Dispatch1<Boolean, JavaType.Variable> {
     }
 
     @Override
-    public Boolean visitControlParentheses(J.ControlParentheses<?> controlParens, JavaType.Variable v) {
-        return controlParens.getTree() instanceof Expression && reads(controlParens.getTree(), v);
-    }
-
-    @Override
     public Boolean visitReturn(J.Return retrn, JavaType.Variable v) {
         return retrn.getExpression() != null && reads(retrn.getExpression(), v);
     }
@@ -168,6 +183,16 @@ public class Reads implements Dispatch1<Boolean, JavaType.Variable> {
     public Boolean visitTryResource(J.Try.Resource tryResource, JavaType.Variable v) {
         return tryResource.getVariableDeclarations() instanceof J.VariableDeclarations
                 && reads(tryResource.getVariableDeclarations(), v);
+    }
+
+    @Override
+    public Boolean visitUnary(J.Unary pp, JavaType.Variable v) {
+        return reads(pp.getExpression(), v);
+    }
+
+    @Override
+    public Boolean visitVariableDeclarations(J.VariableDeclarations pp, JavaType.Variable v) {
+        return pp.getVariables().stream().map(n -> n.getInitializer() != null && reads(n.getInitializer(), v)).reduce(false, (a, b) -> a | b);
     }
 }
 

@@ -5,7 +5,9 @@ import org.openrewrite.java.tree.Dispatch2;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-// TODO Use Dispatch2
+/**
+ *  Provides the reads() methods for nodes that can be on either side of an assignment.
+ */
 public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
 
     public static final Reads READS = new Reads();
@@ -29,9 +31,6 @@ public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
         throw new UnsupportedOperationException();
     }
 
-    // AnnotatedType
-    // Annotation
-    // ArrayAccess
     @Override
     public Boolean visitArrayAccess(J.ArrayAccess arrayAccess, JavaType.Variable variable, Side side) {
         return reads(arrayAccess.getIndexed(), variable, side) || reads(arrayAccess.getDimension().getIndex(), variable, Side.RVALUE);
@@ -47,25 +46,15 @@ public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
         return READS.reads(binary.getLeft(), variable) || READS.reads(binary.getRight(), variable);
     }
 
-    // Block
-
-
     @Override
     public Boolean visitBlock(J.Block block, JavaType.Variable variable, Side side) {
         return block.getStatements().stream().map(s -> READS.reads(s, variable)).reduce(false, (a, b) -> a | b);
     }
 
-    // Break
-
-
     @Override
     public Boolean visitBreak(J.Break breakStatement, JavaType.Variable variable, Side side) {
         return false;
     }
-
-
-    // Case
-
 
     @Override
     public Boolean visitCase(J.Case caze, JavaType.Variable variable, Side side) {
@@ -74,18 +63,10 @@ public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
 
     // ClassDeclaration
 
-
-    // Continue
-
-
     @Override
     public Boolean visitContinue(J.Continue continueStatement, JavaType.Variable variable, Side side) {
         return false;
     }
-
-
-    // DoWhileLoop
-
 
     @Override
     public Boolean visitDoWhileLoop(J.DoWhileLoop doWhileLoop, JavaType.Variable variable, Side side) {
@@ -95,19 +76,11 @@ public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
 
     // Empty
 
-
-    // EnumValueSet
-
-
     @Override
     public Boolean visitEnumValueSet(J.EnumValueSet enums, JavaType.Variable variable, Side side) {
         return enums.getEnums().stream().map(n ->
                 n.getInitializer() != null && reads(n.getInitializer(), variable)).reduce(false, (a, b) -> a | b);
     }
-
-
-    // FieldAccess
-
 
     @Override
     public Boolean visitFieldAccess(J.FieldAccess fieldAccess, JavaType.Variable variable, Side side) {
@@ -123,6 +96,12 @@ public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
     @Override
     public Boolean visitLiteral(J.Literal pp, JavaType.Variable variable, Side side) {
         return false;
+    }
+
+    @Override
+    public Boolean visitMethodInvocation(J.MethodInvocation pp, JavaType.Variable variable, Side side) {
+        assert side == Side.RVALUE;
+        return READS.reads(pp, variable);
     }
 
     @Override
