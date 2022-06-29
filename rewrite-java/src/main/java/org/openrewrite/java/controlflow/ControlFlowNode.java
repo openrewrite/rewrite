@@ -19,6 +19,8 @@ import lombok.*;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -98,9 +100,33 @@ public abstract class ControlFlowNode {
             }
         }
 
+        private Optional<J.Literal> asBooleanLiteral() {
+            if (condition.getValue() instanceof J.Literal) {
+                J.Literal literal = condition.getValue();
+                if (TypeUtils.isAssignableTo(JavaType.Primitive.Boolean, literal.getType())) {
+                    return Optional.of(literal);
+                }
+            }
+            return Optional.empty();
+        }
+
+        private boolean isAlwaysTrue() {
+            return asBooleanLiteral().map(l -> (Boolean) l.getValue()).orElse(false);
+        }
+
+        private boolean isAlwaysFalse() {
+            return asBooleanLiteral().map(l -> !((Boolean) l.getValue())).orElse(false);
+        }
+
         @Override
         Set<ControlFlowNode> getSuccessors() {
             verifyState();
+            if (isAlwaysTrue()) {
+                return Collections.singleton(truthySuccessor);
+            }
+            if (isAlwaysFalse()) {
+                return Collections.singleton(falsySuccessor);
+            }
             return Stream.of(truthySuccessor, falsySuccessor).collect(Collectors.toSet());
         }
 
@@ -119,28 +145,28 @@ public abstract class ControlFlowNode {
         Set<ControlFlowNode> visit(BarrierGuardPredicate isBarrierGuard) {
             verifyState();
             Set<ControlFlowNode> nodes = new HashSet<>(2);
-            if (!isBarrierGuard.isBarrierGuard(asGuard(), true)) {
-                nodes.add(getTruthySuccessor());
-            }
-            if (!isBarrierGuard.isBarrierGuard(asGuard(), false)) {
-                nodes.add(getFalsySuccessor());
+            if (isAlwaysTrue()) {
+                nodes.add(truthySuccessor);
+            } else if (isAlwaysFalse()) {
+                nodes.add(falsySuccessor);
+            } else {
+                if (!isBarrierGuard.isBarrierGuard(asGuard(), true)) {
+                    nodes.add(getTruthySuccessor());
+                }
+                if (!isBarrierGuard.isBarrierGuard(asGuard(), false)) {
+                    nodes.add(getFalsySuccessor());
+                }
             }
             return nodes;
         }
 
         Guard asGuard() {
-            return Guard
-                    .from(condition)
-                    .orElseThrow(() -> new IllegalStateException("Condition node has no guard: " + condition));
+            return Guard.from(condition).orElseThrow(() -> new IllegalStateException("Condition node has no guard: " + condition));
         }
 
         @Override
         public String toString() {
-            return "ConditionNode{" +
-                    "condition=" + condition.getValue() +
-                    ", truthySuccessor=" + truthySuccessor +
-                    ", falsySuccessor=" + falsySuccessor +
-                    '}';
+            return "ConditionNode{" + "condition=" + condition.getValue() + ", truthySuccessor=" + truthySuccessor + ", falsySuccessor=" + falsySuccessor + '}';
         }
     }
 
