@@ -1,21 +1,19 @@
 package org.openrewrite.java.effects;
 
 import org.openrewrite.java.tree.Dispatch1;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
+import java.util.Arrays;
+
 public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
 
+    public static final WriteSided WRITE_SIDED = new WriteSided();
 
     /** @return True if this expression, when evaluated, may write variable v. */
     public boolean writes(J e, JavaType.Variable v) {
-        // return dispatch(e, v);
-        throw new Error();
-    }
-
-    public boolean writes(J e, JavaType.Variable v, Side s) {
-        // return dispatch(e, v);
-        throw new Error();
+        return dispatch(e, v);
     }
 
     @Override
@@ -23,729 +21,229 @@ public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
         throw new Error();
     }
 
+    @Override
+    public Boolean visitArrayAccess(J.ArrayAccess pp, JavaType.Variable v) {
+        return WRITE_SIDED.writes(pp, v, Side.RVALUE);
+    }
 
-//    // AnnotatedType
-//
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // Annotation
-//
-//
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperatzionException();
-//    }
-//
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // ArrayAccess
-//
-//
-//    @Override
-//    public  boolean reads(JavaType.Variable v) {
-//        return reads(v, Side.RVALUE);
-//    }
-//
-//    @Override
-//    public  boolean writes(JavaType.Variable v) {
-//        return writes(v, Side.RVALUE);
-//    }
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v, Side s) {
-//        return getIndexed().reads(v, s) || getDimension().getIndex().reads(v, Side.RVALUE);
-//    }
-//
-//    public boolean writes(JavaType.Variable v, Side s) {
-//        return getIndexed().writes(v, s) || getDimension().getIndex().writes(v, Side.RVALUE);
-//    }
-//
-//    // ArrayType
-//
-//
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // Assert
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // Assignment
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return variable.reads(v, Side.LVALUE) || getAssignment().reads(v, Side.RVALUE);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return variable.writes(v, Side.LVALUE) || getAssignment().writes(v, Side.RVALUE);
-//    }
-//
-//    // AssignmentOperation
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return variable.reads(v, Side.LVALUE) || assignment.reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return variable.writes(v, Side.LVALUE) || assignment.writes(v);
-//    }
-//
-//    // Binary
-//
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getLeft().reads(v) || getRight().reads(v);
-//    }
-//
-//    public boolean writes(JavaType.Variable v) {
-//        return getLeft().writes(v) || getRight().writes(v);
-//    }
-//
-//    // Block
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getStatements().stream().map(s -> s.reads(v)).reduce(false, (a,b) -> a|b);
-//    }
-//
-//    public boolean writes(JavaType.Variable v) {
-//        return getStatements().stream().map(s -> s.writes(v)).reduce(false, (a,b) -> a|b);
-//    }
-//
-//    // Break
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return false;
-//    }
-//
-//    public boolean writes(JavaType.Variable v) {
-//        return false;
-//    }
-//
-//    // Case
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getStatements().stream().map(s -> s.reads(v)).reduce(false, (a,b) -> a|b);
-//    }
-//
-//    public boolean writes(JavaType.Variable v) {
-//        return getStatements().stream().map(s -> s.writes(v)).reduce(false, (a,b) -> a|b);
-//    }
-//
-//    // ClassDeclaration
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // Continue
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return false;
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return false;
-//    }
-//
-//    // DoWhileLoop
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getWhileCondition().reads(v) || getBody().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getWhileCondition().writes(v) || getBody().writes(v);
-//    }
-//
-//    // Empty
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // EnumValueSet
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getEnums().stream().map(n -> n.getInitializer() != null && n.getInitializer().reads(v)).reduce(false, (a, b) -> a|b);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getEnums().stream().map(n -> n.getInitializer() != null && n.getInitializer().writes(v)).reduce(false, (a, b) -> a|b);
-//    }
-//
-//    // FieldAccess
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return reads(v, Side.RVALUE);
-//    }
-//
-//    public boolean writes(JavaType.Variable v) {
-//        return writes(v, Side.RVALUE);
-//    }
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v, Side s) {
-//        return (s == Side.RVALUE && type != null && type.equals(v)) || getTarget().reads(v, s);
-//    }
-//
-//    public boolean writes(JavaType.Variable v, Side s) {
-//        return (s == Side.LVALUE && type != null && type.equals(v)) || getTarget().reads(v, s);
-//    }
-//
-//    // ForeachLoop
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getControl().reads(v) || getBody().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getControl().writes(v) || getBody().writes(v);
-//    }
-//
-//    // Foreachlopp.Control
-//
-//
-//    public boolean reads(JavaType.Variable v) {
-//        return getVariable().reads(v) || getIterable().reads(v);
-//    }
-//    public boolean writes(JavaType.Variable v) {
-//        return getVariable().writes(v) || getIterable().writes(v);
-//    }
-//
-//    // ForLoop
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getControl().reads(v) || getBody().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getControl().writes(v) || getBody().writes(v);
-//    }
-//
-//    // ForLoop.Control
-//
-//
-//    public boolean reads(JavaType.Variable v) {
-//        return getInit().stream().map(s -> s.reads(v)).reduce(false, (a,b) -> a|b)
-//                || getUpdate().stream().map(s -> s.reads(v)).reduce(false, (a,b) -> a|b)
-//                || getCondition().reads(v);
-//    }
-//    public boolean writes(JavaType.Variable v) {
-//        return getInit().stream().map(s -> s.writes(v)).reduce(false, (a,b) -> a|b)
-//                || getUpdate().stream().map(s -> s.writes(v)).reduce(false, (a,b) -> a|b)
-//                || getCondition().writes(v);
-//    }
-//
-//    // Identifier
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return reads(v, Side.RVALUE);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return writes(v, Side.RVALUE);
-//    }
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v, Side s) {
-//        return (s == Side.RVALUE) && fieldType != null && fieldType.equals(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v, Side s) {
-//        return (s == Side.LVALUE) && fieldType != null && fieldType.equals(v);
-//    }
-//
-//    // If
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getIfCondition().reads(v) || getThenPart().reads(v) || (getElsePart() != null && getElsePart().getBody().reads(v));
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getIfCondition().writes(v) || getThenPart().writes(v) || (getElsePart() != null && getElsePart().getBody().writes(v));
-//    }
-//
-//    // Import
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // Instanceof
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getExpression().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getExpression().writes(v);
-//    }
-//
-//    // Label
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return false;
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return false;
-//    }
-//
-//    // Lambda
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getBody() instanceof Expression && ((Expression) getBody()).reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getBody() instanceof Expression && ((Expression) getBody()).writes(v);
-//    }
-//
-//    // Literal
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return false;
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return false;
-//    }
-//
-//    // MemberReference
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        // Here we assume that v is a local variable, so it cannot be referenced by a member reference.
-//        // However there might be references to v in the expression.
-//        return getContaining().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        // Here we assume that v is a local variable, so it cannot be referenced by a member reference.
-//        // However there might be references to v in the expression.
-//        return getContaining().writes(v);
-//    }
-//
-//    // MethodDeclaration
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // MethodInvocation
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        // This does not take into account the effects inside the method body.
-//        // As long as v is a local variable, we are guaranteed that it cannot be affected
-//        // as a side-effect of the method invocation.
-//        return (getSelect() != null && getSelect().reads(v))
-//                || getArguments().stream().map(e -> e.reads(v)).reduce(false, (a,b) -> a|b);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        // This does not take into account the effects inside the method body.
-//        // As long as v is a local variable, we are guaranteed that it cannot be affected
-//        // as a side-effect of the method invocation.
-//        return (getSelect() != null && getSelect().writes(v))
-//                || getArguments().stream().map(e -> e.writes(v)).reduce(false, (a,b) -> a|b);
-//    }
-//
-//    // NewArray
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return (getInitializer() != null && getInitializer().stream().map(e -> e.reads(v)).reduce(false, (a,b) -> a|b))
-//                || getDimensions().stream().map(e -> e.getIndex().reads(v)).reduce(false, (a,b) -> a|b);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return (getInitializer() != null && getInitializer().stream().map(e -> e.writes(v)).reduce(false, (a,b) -> a|b))
-//                || getDimensions().stream().map(e -> e.getIndex().writes(v)).reduce(false, (a,b) -> a|b);
-//    }
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v, Side s) {
-//        throw new UnsupportedOperationException("TODO");
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v, Side s) {
-//        throw new UnsupportedOperationException("TODO");
-//    }
-//
-//    // NewClass
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return (getEnclosing() != null && getEnclosing().reads(v))
-//                || (getArguments() != null && getArguments().stream().map(e -> e.reads(v)).reduce(false, (a,b) -> a|b))
-//                || (getBody() != null && getBody().reads(v));
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return (getEnclosing() != null && getEnclosing().writes(v))
-//                || (getArguments() != null && getArguments().stream().map(e -> e.writes(v)).reduce(false, (a,b) -> a|b))
-//                || (getBody() != null && getBody().writes(v));
-//    }
-//
-//    // Package
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // ParameterizedType
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // ParamerizedType.Padding
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v, Side s) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v, Side s) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // Parentheses
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return ((Expression)getTree()).reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return ((Expression)getTree()).reads(v);
-//    }
-//
-//    // ControlParentheses
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getTree() instanceof Expression && ((Expression) getTree()).reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getTree() instanceof Expression && ((Expression) getTree()).writes(v);
-//    }
-//
-//    // Primitive
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    // Return
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getExpression() != null && getExpression().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getExpression() != null && getExpression().writes(v);
-//    }
-//
-//    // Switch
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getSelector().reads(v) || getCases().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getSelector().writes(v) || getCases().writes(v);
-//    }
-//
-//    // Synchronized
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getLock().reads(v) || getBody().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getLock().writes(v) || getBody().writes(v);
-//    }
-//
-//    // Ternary
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getCondition().reads(v) || getTruePart().reads(v) || getFalsePart().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getCondition().writes(v) || getTruePart().writes(v) || getFalsePart().writes(v);
-//    }
-//
-//    // Throw
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getException().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getException().writes(v);
-//    }
-//
-//    // Try
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return (getResources() != null && getResources().stream().map(c -> c.reads(v)).reduce(false, (a,b) -> a|b))
-//                || getBody().reads(v)
-//                || getCatches().stream().map(c -> c.getBody().reads(v)).reduce(false, (a,b) -> a|b)
-//                || (getFinally() != null && getFinally().reads(v));
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return (getResources() != null && getResources().stream().map(c -> c.writes(v)).reduce(false, (a,b) -> a|b))
-//                || getBody().reads(v)
-//                || getCatches().stream().map(c -> c.getBody().writes(v)).reduce(false, (a,b) -> a|b)
-//                || (getFinally() != null && getFinally().writes(v));
-//    }
-//
-//    // Try.Ressource
-//
-//
-//    public boolean reads(JavaType.Variable v) {
-//        return variableDeclarations instanceof J.VariableDeclarations && ((J.VariableDeclarations) variableDeclarations).reads(v);
-//    }
-//
-//    public boolean writes(JavaType.Variable v) {
-//        return variableDeclarations instanceof J.VariableDeclarations && ((J.VariableDeclarations) variableDeclarations).writes(v);
-//    }
-//
-//    // TypeCast
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getExpression().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getExpression().writes(v);
-//    }
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v, Side s) {
-//        if(s == Side.LVALUE) throw new NodeCannotBeAnLValueException();
-//        return expression.reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v, Side s) {
-//        if(s == Side.LVALUE) throw new NodeCannotBeAnLValueException();
-//        return expression.writes(v);
-//    }
-//
-//    // Unary
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return expression.reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        if(Arrays.asList(new J.Unary.Type[]{ J.Unary.Type.PreIncrement, J.Unary.Type.PreDecrement, J.Unary.Type. PostIncrement, J.Unary.Type.PostDecrement })
-//                .contains(getOperator())) {
-//            // expr = expr + 1, expr = 1 + expr, ...: expr appears on both sides
-//            return expression.writes(v, Side.LVALUE) || expression.writes(v, Side.RVALUE);
-//        }
-//        return expression.writes(v);
-//    }
-//
-//    // VariableDeclarations
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getVariables().stream().map(n -> n.getInitializer() != null && n.getInitializer().reads(v)).reduce(false, (a,b) -> a|b);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getVariables().stream().map(n -> n.getInitializer() != null && n.getInitializer().writes(v)).reduce(false, (a,b) -> a|b);
-//    }
-//
-//    // WhileLoop
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        return getCondition().reads(v) || getBody().reads(v);
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        return getCondition().writes(v) || getBody().writes(v);
-//    }
-//
-//    // Wildcard
-//
-//
-//    @Override
-//    public boolean reads(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
-//
-//    @Override
-//    public boolean writes(JavaType.Variable v) {
-//        throw new UnsupportedOperationException();
-//    }
+    @Override
+    public Boolean visitAssert(J.Assert pp, JavaType.Variable v) {
+        return writes(pp.getCondition(), v);
+    }
 
+    @Override
+    public Boolean visitAssignment(J.Assignment pp, JavaType.Variable v) {
+        return WRITE_SIDED.writes(pp.getVariable(), v, Side.LVALUE) || WRITE_SIDED.writes(pp.getAssignment(), v, Side.RVALUE);
+    }
+
+    @Override
+    public Boolean visitAssignmentOperation(J.AssignmentOperation pp, JavaType.Variable v) {
+        return WRITE_SIDED.writes(pp.getVariable(), v, Side.LVALUE) || writes(pp.getAssignment(), v);
+    }
+
+    @Override
+    public Boolean visitBinary(J.Binary pp, JavaType.Variable v) {
+        return writes(pp.getLeft(), v) || writes(pp.getRight(), v);
+    }
+
+    @Override
+    public Boolean visitBlock(J.Block pp, JavaType.Variable v) {
+        return pp.getStatements().stream().map(s -> writes(s, v)).reduce(false, (a,b) -> a|b);
+    }
+
+    @Override
+    public Boolean visitBreak(J.Break pp, JavaType.Variable variable) {
+        return false;
+    }
+
+    @Override
+    public Boolean visitCase(J.Case pp, JavaType.Variable v) {
+        return pp.getStatements().stream().map(s -> writes(s, v)).reduce(false, (a,b) -> a|b);
+    }
+
+    @Override
+    public Boolean visitContinue(J.Continue pp, JavaType.Variable variable) {
+        return false;
+    }
+
+    @Override
+    public Boolean visitDoWhileLoop(J.DoWhileLoop pp, JavaType.Variable v) {
+        return writes(pp.getWhileCondition(), v) || writes(pp.getBody(), v);
+    }
+
+    @Override
+    public Boolean visitEmpty(J.Empty pp, JavaType.Variable variable) {
+        return false;
+    }
+
+    @Override
+    public Boolean visitEnumValueSet(J.EnumValueSet pp, JavaType.Variable v) {
+        return pp.getEnums().stream().map(n -> n.getInitializer() != null && writes(n.getInitializer(), v)).reduce(false, (a, b) -> a|b);
+    }
+
+    @Override
+    public Boolean visitFieldAccess(J.FieldAccess pp, JavaType.Variable v) {
+        return WRITE_SIDED.writes(pp, v, Side.RVALUE);
+    }
+
+    @Override
+    public Boolean visitForeachLoop(J.ForEachLoop pp, JavaType.Variable v) {
+        return writes(pp.getControl(), v) || writes(pp.getBody(), v);
+    }
+
+    @Override
+    public Boolean visitForeachLoopControl(J.ForEachLoop.Control pp, JavaType.Variable v) {
+        return writes(pp.getVariable(), v) || writes(pp.getIterable(), v);
+    }
+
+    @Override
+    public Boolean visitForLoop(J.ForLoop pp, JavaType.Variable v) {
+        return writes(pp.getControl(), v) || writes(pp.getBody(), v);
+    }
+
+    @Override
+    public Boolean visitForLoopControl(J.ForLoop.Control pp, JavaType.Variable v) {
+        return pp.getInit().stream().map(s -> writes(s, v)).reduce(false, (a,b) -> a|b) ||
+                pp.getUpdate().stream().map(s -> writes(s, v)).reduce(false, (a,b) -> a|b) ||
+                writes(pp.getCondition(), v);
+    }
+
+    @Override
+    public Boolean visitIdentifier(J.Identifier pp, JavaType.Variable v) {
+        return WRITE_SIDED.writes(pp, v, Side.RVALUE);
+    }
+
+    @Override
+    public Boolean visitIf(J.If pp, JavaType.Variable v) {
+        return writes(pp.getIfCondition(), v) || writes(pp.getThenPart(), v) ||
+                (pp.getElsePart() != null && writes(pp.getElsePart().getBody(), v));
+    }
+
+    @Override
+    public Boolean visitIfElse(J.If.Else pp, JavaType.Variable v) {
+        return writes(pp.getBody(), v);
+    }
+
+    @Override
+    public Boolean visitInstanceOf(J.InstanceOf pp, JavaType.Variable v) {
+        return writes(pp.getExpression(), v);
+    }
+
+    @Override
+    public Boolean visitLabel(J.Label pp, JavaType.Variable variable) {
+        return false;
+    }
+
+    @Override
+    public Boolean visitLambda(J.Lambda pp, JavaType.Variable v) {
+        return pp.getBody() instanceof Expression && writes((Expression)pp.getBody(), v);
+    }
+
+    @Override
+    public Boolean visitLiteral(J.Literal pp, JavaType.Variable variable) {
+        return false;
+    }
+
+    @Override
+    public Boolean visitMemberReference(J.MemberReference pp, JavaType.Variable v) {
+        // Here we assume that v is a local variable, so it cannot be referenced by a member reference.
+        // However there might be references to v in the expression.
+        return writes(pp.getContaining(), v);
+    }
+
+    @Override
+    public Boolean visitMethodInvocation(J.MethodInvocation pp, JavaType.Variable v) {
+        // This does not take into account the effects inside the method body.
+        // As long as v is a local variable, we are guaranteed that it cannot be affected
+        // as a side-effect of the method invocation.
+        return (pp.getSelect() != null && writes(pp.getSelect(), v))
+                || pp.getArguments().stream().map(e -> writes(e, v)).reduce(false, (a,b) -> a|b);
+    }
+
+    @Override
+    public Boolean visitNewArray(J.NewArray pp, JavaType.Variable v) {
+        return (pp.getInitializer() != null && pp.getInitializer().stream().map(e -> writes(e, v)).reduce(false, (a,b) -> a|b))
+                || pp.getDimensions().stream().map(e -> writes(e.getIndex(), v)).reduce(false, (a,b) -> a|b);
+    }
+
+    @Override
+    public Boolean visitNewClass(J.NewClass pp, JavaType.Variable v) {
+        return (pp.getEnclosing() != null && writes(pp.getEnclosing(), v))
+                || (pp.getArguments() != null && pp.getArguments().stream().map(e -> writes(e, v)).reduce(false, (a,b) -> a|b))
+                || (pp.getBody() != null && writes(pp.getBody(), v));
+    }
+
+    @Override
+    public Boolean visitParentheses(J.Parentheses<?> pp, JavaType.Variable v) {
+        return writes((Expression)pp.getTree(), v);
+    }
+
+    @Override
+    public Boolean visitControlParentheses(J.ControlParentheses<?> pp, JavaType.Variable v) {
+        return writes((Expression)pp.getTree(), v);
+    }
+
+    @Override
+    public Boolean visitReturn(J.Return pp, JavaType.Variable v) {
+        return pp.getExpression() != null && writes(pp.getExpression(), v);
+    }
+
+    @Override
+    public Boolean visitSwitch(J.Switch pp, JavaType.Variable v) {
+        return writes(pp.getSelector(), v) || writes(pp.getCases(), v);
+    }
+
+    @Override
+    public Boolean visitSynchronized(J.Synchronized pp, JavaType.Variable v) {
+        return writes(pp.getLock(), v) || writes(pp.getBody(), v);
+    }
+
+    @Override
+    public Boolean visitTernary(J.Ternary pp, JavaType.Variable v) {
+        return writes(pp.getCondition(), v) || writes(pp.getTruePart(), v) || writes(pp.getFalsePart(), v);
+    }
+
+    @Override
+    public Boolean visitThrow(J.Throw pp, JavaType.Variable v) {
+        return writes(pp.getException(), v);
+    }
+
+    @Override
+    public Boolean visitTry(J.Try pp, JavaType.Variable v) {
+        return (pp.getResources() != null && pp.getResources().stream().map(c -> writes(c, v)).reduce(false, (a,b) -> a|b))
+                || writes(pp.getBody(), v)
+                || pp.getCatches().stream().map(c -> writes(c.getBody(), v)).reduce(false, (a,b) -> a|b)
+                || (pp.getFinally() != null && writes(pp.getFinally(), v));
+    }
+
+    @Override
+    public Boolean visitTryResource(J.Try.Resource pp, JavaType.Variable v) {
+        return pp.getVariableDeclarations() instanceof J.VariableDeclarations
+                && writes((J.VariableDeclarations)pp.getVariableDeclarations(), v);
+    }
+
+    @Override
+    public Boolean visitTypeCast(J.TypeCast pp, JavaType.Variable v) {
+        return writes(pp.getExpression(), v);
+    }
+
+    @Override
+    public Boolean visitUnary(J.Unary pp, JavaType.Variable v) {
+        if(Arrays.asList(new J.Unary.Type[]{ J.Unary.Type.PreIncrement, J.Unary.Type.PreDecrement, J.Unary.Type. PostIncrement, J.Unary.Type.PostDecrement })
+                .contains(pp.getOperator())) {
+            // expr = expr + 1, expr = 1 + expr, ...: expr appears on both sides
+            return WRITE_SIDED.writes(pp.getExpression(), v, Side.LVALUE) || WRITE_SIDED.writes(pp.getExpression(), v, Side.RVALUE);
+        }
+        return writes(pp.getExpression(), v);
+    }
+
+    @Override
+    public Boolean visitVariableDeclarations(J.VariableDeclarations pp, JavaType.Variable v) {
+        return pp.getVariables().stream().map(n -> n.getInitializer() != null && writes(n.getInitializer(), v)).reduce(false, (a,b) -> a|b);
+    }
+
+    @Override
+    public Boolean visitWhileLoop(J.WhileLoop pp, JavaType.Variable v) {
+        return writes(pp.getCondition(), v) || writes(pp.getBody(), v);
+    }
 }
