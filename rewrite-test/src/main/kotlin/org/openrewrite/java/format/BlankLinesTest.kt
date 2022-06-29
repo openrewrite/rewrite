@@ -45,7 +45,7 @@ interface BlankLinesTest : JavaRecipeTest {
         before = """
             public class A {
                 private Long id; // this comment will move to wrong place
-
+            
                 public Long id() {
                     return id;
                 }
@@ -91,6 +91,9 @@ interface BlankLinesTest : JavaRecipeTest {
     fun keepMaximumInDeclarations(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(blankLines { withKeepMaximum(keepMaximum.withInDeclarations(0)) }).build(),
         before = """
+            import java.util.List;
+            
+            
             public class Test {
             
             
@@ -119,6 +122,8 @@ interface BlankLinesTest : JavaRecipeTest {
             }
         """,
         after = """
+            import java.util.List;
+            
             public class Test {
                 private int field1;
                 private int field2;
