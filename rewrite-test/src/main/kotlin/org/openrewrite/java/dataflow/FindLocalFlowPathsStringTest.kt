@@ -1242,11 +1242,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                 void test() {
                     String n = "42";
                     ArrayList<Integer> numbers = new ArrayList<Integer>();
-                    numbers.add(5);
-                    numbers.add(9);
-                    numbers.add(8);
-                    numbers.add(1);
-                    numbers.forEach( (i) -> { System.out.println(i); } );
+                    numbers.forEach( (i) -> { System.out.println(n); } );
                 }
             }
             """, """
@@ -1256,16 +1252,64 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                 void test() {
                     String n = /*~~>*/"42";
                     ArrayList<Integer> numbers = new ArrayList<Integer>();
-                    numbers.add(5);
-                    numbers.add(9);
-                    numbers.add(8);
-                    numbers.add(1);
-                    numbers.forEach( (i) -> { System.out.println(i); } );
+                    numbers.forEach( (i) -> { System.out.println(/*~~>*/n); } );
                 }
             }
             """
         )
     )
 
+    @Test
+    fun `true literal guard`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test() {
+                    String n = "42";
+                    if (true) {
+                        System.out.println(n);
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test() {
+                    String n = /*~~>*/"42";
+                    if (true) {
+                        System.out.println(/*~~>*/n);
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
 
+    @Test
+    fun `false literal guard`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test() {
+                    String n = "42";
+                    if (false) {
+                        System.out.println(n);
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test() {
+                    String n = /*~~>*/"42";
+                    if (false) {
+                        System.out.println(n);
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
 }

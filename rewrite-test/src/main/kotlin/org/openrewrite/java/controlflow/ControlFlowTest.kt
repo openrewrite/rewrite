@@ -1151,6 +1151,35 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    /**
+     * TODO: It may be beneficial in the future to represent this as a single basic block with no conditional nodes
+     */
+    @Test
+    fun `literal true`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test() {
+                    System.out.println("Hello!");
+                    if (true) {
+                        System.out.println("Goodbye!");
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                void test() /*~~(BB: 2 CN: 1 EX: 2 | L)~~>*/{
+                    System.out.println("Hello!");
+                    if (true) /*~~(L)~~>*/{
+                        System.out.println("Goodbye!");
+                    }
+                }
+            }
+            """
+        )
+    )
+
     @Test
     fun `control flow for try with resources`() = rewriteRun(
         java(
