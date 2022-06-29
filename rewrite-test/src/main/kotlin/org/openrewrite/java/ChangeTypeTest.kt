@@ -18,7 +18,12 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.java.tree.TypeUtils
+import org.openrewrite.test.RewriteTest
+import java.nio.file.Path
 
 interface ChangeTypeTest : JavaRecipeTest {
     override val recipe: ChangeType
@@ -909,7 +914,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Test
     fun changeTypeInTypeDeclaration(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType("de.Class2", "de.Class1", null),
+        recipe = ChangeType("de.Class2", "de.Class1", false),
         before = """
             package de;
             public class Class2 {}
@@ -917,7 +922,8 @@ interface ChangeTypeTest : JavaRecipeTest {
             after = """
             package de;
             public class Class1 {}
-        """
+        """,
+        expectedCyclesThatMakeChanges = 2
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1291")
@@ -1013,6 +1019,324 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun filePathMatchWithNoMatchedClassFqn(@TempDir tempDir: Path) = assertUnchangedBase(
+        recipe = ChangeType("a.b.Original", "x.y.Target", false),
+        before = tempDir.resolve("a/b/Original.java").apply {
+            toFile().parentFile.mkdirs()
+            // language=java
+            toFile().writeText("""
+                package a;
+                public class NoMatch {
+                }
+            """.trimIndent())
+        }.toFile()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun onlyChangeTypeMissingPublicModifier(@TempDir tempDir: Path) = assertChanged(
+        recipe = ChangeType("a.b.Original", "x.y.Target", false),
+        before = tempDir.resolve("a/b/Original.java").apply {
+            toFile().parentFile.mkdirs()
+            // language=java
+            toFile().writeText("""
+                package a.b;
+                class Original {
+                }
+            """.trimIndent())
+        }.toFile(),
+        after = """
+                package x.y;
+                class Target {
+                }
+        """.trimIndent(),
+        afterConditions = {
+                cu -> assertThat(TypeUtils.isOfClassType(cu.classes[0].type, "x.y.Target")).isTrue
+        }
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun onlyChangeTypeWithoutMatchedFilePath(@TempDir tempDir: Path) = assertChanged(
+        recipe = ChangeType("a.b.Original", "x.y.Target", false),
+        before = tempDir.resolve("a/b/NoMatch.java").apply {
+            toFile().parentFile.mkdirs()
+            // language=java
+            toFile().writeText("""
+                package a.b;
+                public class Original {
+                }
+            """.trimIndent())
+        }.toFile(),
+        after = """
+                package x.y;
+                public class Target {
+                }
+        """.trimIndent(),
+        afterConditions = {
+                cu -> assertThat(TypeUtils.isOfClassType(cu.classes[0].type, "x.y.Target")).isTrue
+        }
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun renameClassAndFilePath(@TempDir tempDir: Path) {
+        val sources = parser.parse(
+            listOf(tempDir.resolve("a/b/Original.java").apply {
+                toFile().parentFile.mkdirs()
+                // language=java
+                toFile().writeText("""
+                    package a.b;
+                    public class Original {
+                    }
+                """.trimIndent())
+            }),
+            tempDir,
+            InMemoryExecutionContext()
+        )
+
+        val results = ChangeType("a.b.Original", "x.y.Target", false).run(sources)
+
+        // similarity index doesn't matter
+        // language=diff
+        assertThat(results.joinToString("") { it.diff() }).isEqualTo("""
+            diff --git a/a/b/Original.java b/x/y/Target.java
+            similarity index 0%
+            rename from a/b/Original.java
+            rename to x/y/Target.java
+            index 49dd697..65e689d 100644
+            --- a/a/b/Original.java
+            +++ b/x/y/Target.java
+            @@ -1,3 +1,3 @@ org.openrewrite.java.ChangeType
+            -package a.b;
+            -public class Original {
+            +package x.y;
+            +public class Target {
+             }
+            \ No newline at end of file
+        """.trimIndent() + "\n")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun renamePackageAndFilePath(@TempDir tempDir: Path) {
+        val sources = parser.parse(
+            listOf(tempDir.resolve("a/b/Original.java").apply {
+                toFile().parentFile.mkdirs()
+                // language=java
+                toFile().writeText("""
+                    package a.b;
+                    public class Original {
+                    }
+                """.trimIndent())
+            }),
+            tempDir,
+            InMemoryExecutionContext()
+        )
+
+        val results = ChangeType("a.b.Original", "x.y.Original", false).run(sources)
+
+        // similarity index doesn't matter
+        // language=diff
+        assertThat(results.joinToString("") { it.diff() }).isEqualTo("""
+            diff --git a/a/b/Original.java b/x/y/Original.java
+            similarity index 0%
+            rename from a/b/Original.java
+            rename to x/y/Original.java
+            index 49dd697..02e6a06 100644
+            --- a/a/b/Original.java
+            +++ b/x/y/Original.java
+            @@ -1,3 +1,3 @@ org.openrewrite.java.ChangeType
+            -package a.b;
+            +package x.y;
+             public class Original {
+             }
+            \ No newline at end of file
+        """.trimIndent() + "\n")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun renamePackageAndInnerClassName(@TempDir tempDir: Path) {
+        val sources = parser.parse(
+            listOf(tempDir.resolve("a/b/C.java").apply {
+                toFile().parentFile.mkdirs()
+                // language=java
+                toFile().writeText("""
+                    package a.b;
+                    public class C {
+                        public static class Original {
+                        }
+                    }
+                """.trimIndent())
+            }),
+            tempDir,
+            InMemoryExecutionContext()
+        )
+
+        val results = ChangeType("a.b.C${'$'}Original", "x.y.C${'$'}Target", false).run(sources)
+
+        // similarity index doesn't matter
+        // language=diff
+        assertThat(results.joinToString("") { it.diff() }).isEqualTo("""
+            diff --git a/a/b/C.java b/x/y/C.java
+            similarity index 0%
+            rename from a/b/C.java
+            rename to x/y/C.java
+            index 7b428dc..56a5c53 100644
+            --- a/a/b/C.java
+            +++ b/x/y/C.java
+            @@ -1,5 +1,5 @@ org.openrewrite.java.ChangeType
+            -package a.b;
+            +package x.y;
+             public class C {
+            -    public static class Original {
+            +    public static class Target {
+                 }
+             }
+            \ No newline at end of file
+        """.trimIndent() + "\n")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun updateImportPrefixWithEmptyPackage(jp: JavaParser) = assertChanged(
+        recipe = ChangeType("a.b.Original", "Target", false),
+        before = """
+            package a.b;
+            
+            import java.util.List;
+            
+            class Original {
+            }
+        """,
+        after = """
+            import java.util.List;
+            
+            class Target {
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun updateClassPrefixWithEmptyPackage(jp: JavaParser) = assertChanged(
+        recipe = ChangeType("a.b.Original", "Target", false),
+        before = """
+            package a.b;
+            
+            class Original {
+            }
+        """,
+        after = """
+            class Target {
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun renameInnerClass(jp: JavaParser) = assertChanged(
+        recipe = ChangeType("a.b.C${'$'}Original", "a.b.C${'$'}Target", false),
+        before = """
+            package a.b;
+            public class C {
+                public static class Original {
+                }
+            }
+        """,
+        after = """
+            package a.b;
+            public class C {
+                public static class Target {
+                }
+            }
+        """,
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun multipleLevelsOfInnerClasses(@TempDir tempDir: Path) {
+        val sources = parser.parse(
+            listOf(tempDir.resolve("a/b/C.java").apply {
+                toFile().parentFile.mkdirs()
+                // language=java
+                toFile().writeText("""
+                    package a.b;
+                    public class C {
+                        public static class D {
+                            public static class Original {
+                            }
+                        }
+                    }
+                """.trimIndent())
+            }),
+            tempDir,
+            InMemoryExecutionContext()
+        )
+
+        val results = ChangeType("a.b.C${'$'}D${'$'}Original", "x.y.C${'$'}D${'$'}Target", false).run(sources)
+
+        // similarity index doesn't matter
+        // language=diff
+        assertThat(results.joinToString("") { it.diff() }).isEqualTo("""
+            diff --git a/a/b/C.java b/x/y/C.java
+            similarity index 0%
+            rename from a/b/C.java
+            rename to x/y/C.java
+            index 22bd92f..816d6b1 100644
+            --- a/a/b/C.java
+            +++ b/x/y/C.java
+            @@ -1,7 +1,7 @@ org.openrewrite.java.ChangeType
+            -package a.b;
+            +package x.y;
+             public class C {
+                 public static class D {
+            -        public static class Original {
+            +        public static class Target {
+                     }
+                 }
+             }
+            \ No newline at end of file
+        """.trimIndent() + "\n")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun renamePackage(jp: JavaParser) = assertChanged(
+        recipe = ChangeType("a.b.Original", "x.y.Original", false),
+        before = """
+            package a.b;
+            class Original {
+            }
+        """,
+        after = """
+            package x.y;
+            class Original {
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
+    @Test
+    fun renameClass(jp: JavaParser) = assertChanged(
+        recipe = ChangeType("a.b.Original", "a.b.Target", false),
+        before = """
+            package a.b;
+            class Original {
+            }
+        """,
+        after = """
+            package a.b;
+            class Target {
+            }
+        """,
+        expectedCyclesThatMakeChanges = 2
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
