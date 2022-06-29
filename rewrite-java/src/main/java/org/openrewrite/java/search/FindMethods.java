@@ -15,16 +15,16 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import lombok.*;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.dataflow.FindLocalFlowPaths;
+import org.openrewrite.java.dataflow.LocalFlowSpec;
+import org.openrewrite.java.dataflow.LocalTaintFlowSpec;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 import java.util.HashSet;
@@ -52,6 +52,14 @@ public class FindMethods extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
+    @Option(displayName = "Show flow",
+            description = "When enabled, show the data or taint flow of the method invocation.",
+            valid = {"none", "data", "taint"},
+            required = false
+    )
+    @Nullable
+    String flow;
+
     @Override
     public String getDisplayName() {
         return "Find method usages";
@@ -68,14 +76,20 @@ public class FindMethods extends Recipe {
     }
 
     @Override
+    @SuppressWarnings("ConstantConditions")
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
+        final boolean flowEnabled = flow != null && !"none".equals(flow);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
-                    m = m.withMarkers(m.getMarkers().searchResult());
+                    if (!flowEnabled) {
+                        m = m.withMarkers(m.getMarkers().searchResult());
+                    } else {
+                        doAfterVisit(new FindLocalFlowPaths(getFlowSpec(method)));
+                    }
                 }
                 return m;
             }
@@ -84,7 +98,11 @@ public class FindMethods extends Recipe {
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getMethodType())) {
-                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().searchResult()));
+                    if (!flowEnabled) {
+                        m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().searchResult()));
+                    } else {
+                        doAfterVisit(new FindLocalFlowPaths(getFlowSpec(memberRef)));
+                    }
                 }
                 return m;
             }
@@ -93,9 +111,45 @@ public class FindMethods extends Recipe {
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
                 J.NewClass n = super.visitNewClass(newClass, ctx);
                 if (methodMatcher.matches(newClass)) {
-                    n = n.withMarkers(n.getMarkers().searchResult());
+                    if (!flowEnabled) {
+                        n = n.withMarkers(n.getMarkers().searchResult());
+                    } else {
+                        doAfterVisit(new FindLocalFlowPaths(getFlowSpec(newClass)));
+                    }
                 }
                 return n;
+            }
+
+            private LocalFlowSpec<Expression, Expression> getFlowSpec(Expression source) {
+                switch (flow) {
+                    case "data":
+                        return new LocalFlowSpec<Expression, Expression>() {
+
+                            @Override
+                            public boolean isSource(Expression expression, Cursor cursor) {
+                                return expression == source;
+                            }
+
+                            @Override
+                            public boolean isSink(Expression expression, Cursor cursor) {
+                                return true;
+                            }
+                        };
+                    case "taint":
+                        return new LocalTaintFlowSpec<Expression, Expression>() {
+                            @Override
+                            public boolean isSource(Expression expression, Cursor cursor) {
+                                return expression == source;
+                            }
+
+                            @Override
+                            public boolean isSink(Expression expression, Cursor cursor) {
+                                return true;
+                            }
+                        };
+                    default:
+                        throw new IllegalStateException("Unknown flow: " + flow);
+                }
             }
         };
     }
