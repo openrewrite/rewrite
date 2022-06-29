@@ -68,6 +68,10 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                     body = ((J.ForLoop) taintStmt).getBody();
                 }
                 analysis.visit(body, 0, taintStmtCursorParent);
+            } else if (taintStmt instanceof J.Try) {
+                J.Try _try = (J.Try) taintStmt;
+                analysis.visit(_try.getBody(), 0, taintStmtCursorParent);
+                analysis.visit(_try.getFinally(), 0, taintStmtCursorParent);
             } else {
                 // This is when assignment occurs within the body of a block
                 boolean seenRoot = false;
