@@ -646,4 +646,50 @@ class ChangeDependencyGroupIdAndArtifactIdTest : RewriteTest {
             </project>
         """)
     )
+
+    @Test
+    fun changeGroupIdOnWildcardArtifacts() = rewriteRun(
+        { spec ->
+            spec.recipe(
+                ChangeDependencyGroupIdAndArtifactId(
+                    "org.apache.commons",
+                    "*",
+                    "commons-io",
+                    null,
+                    "2.11.0",
+                    null
+                )
+            )
+        },
+        pomXml("""
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.apache.commons</groupId>
+                        <artifactId>commons-io</artifactId>
+                        <version>1.3.2</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+            """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>commons-io</groupId>
+                        <artifactId>commons-io</artifactId>
+                        <version>2.11.0</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+        ))
 }

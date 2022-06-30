@@ -37,28 +37,33 @@ import java.util.*;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     @Option(displayName = "Old groupId",
-            description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
             example = "org.openrewrite.recipe")
     String oldGroupId;
 
     @Option(displayName = "Old artifactId",
-            description = "The old artifactId to replace. The artifactId is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The old artifactId to replace. The artifactId is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
             example = "rewrite-testing-frameworks")
     String oldArtifactId;
 
     @Option(displayName = "New groupId",
-            description = "The new groupId to use.",
-            example = "corp.internal.openrewrite.recipe")
+            description = "The new groupId to use. Defaults to the existing group id.",
+            example = "corp.internal.openrewrite.recipe",
+            required = false)
+    @Nullable
     String newGroupId;
 
     @Option(displayName = "New artifactId",
-            description = "The new artifactId to use.",
-            example = "rewrite-testing-frameworks")
+            description = "The new artifactId to use. Defaults to the existing artifact id.",
+            example = "rewrite-testing-frameworks",
+            required = false)
+    @Nullable
     String newArtifactId;
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "29.X")
+            example = "29.X",
+            required = false)
     @Nullable
     String newVersion;
 
@@ -77,7 +82,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     @Nullable
     Boolean overrideManagedVersion;
 
-    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
+    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
@@ -88,7 +93,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     }
 
     @JsonCreator
-    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion) {
+    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion) {
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
@@ -109,12 +114,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change Maven dependency groupId, artifactId and optionally the version";
+        return "Change Maven dependency groupId, artifactId and/or the version";
     }
 
     @Override
     public String getDescription() {
-        return "Change the groupId, artifactId and optionally the version of a specified Maven dependency.";
+        return "Change the groupId, artifactId and/or the version of a specified Maven dependency.";
     }
 
     @Override
@@ -131,21 +136,31 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
 
                 if (isDependencyTag(oldGroupId, oldArtifactId)) {
-
-                    t = changeChildTagValue(t, "groupId", newGroupId, ctx);
-                    t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
+                    String groupId = newGroupId;
+                    if (groupId != null) {
+                        t = changeChildTagValue(t, "groupId", groupId, ctx);
+                    } else {
+                        groupId = t.getChildValue("groupId").orElseThrow(NoSuchElementException::new);
+                    }
+                    String artifactId = newArtifactId;
+                    if (artifactId != null) {
+                        t = changeChildTagValue(t, "artifactId", artifactId, ctx);
+                    } else {
+                        artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
+                    }
                     if (newVersion != null) {
-                        String resolvedNewVersion = resolveSemverVersion(ctx);
+                        String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId);
                         Optional<Xml.Tag> scopeTag = t.getChild("scope");
                         Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
                         Optional<Xml.Tag> versionTag = t.getChild("version");
-                        if (!versionTag.isPresent() && (Boolean.TRUE.equals(overrideManagedVersion) || !isNewDependencyManaged(scope))) {
+                        if (!versionTag.isPresent() &&
+                                (Boolean.TRUE.equals(overrideManagedVersion) || !isDependencyManaged(scope, groupId, artifactId))) {
                             //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
                             Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
                             //noinspection ConstantConditions
                             t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
                         } else if (versionTag.isPresent()) {
-                            if (isNewDependencyManaged(scope)) {
+                            if (isDependencyManaged(scope, groupId, artifactId)) {
                                 //If the previous dependency had a version but the new artifact is managed, removed the
                                 //version tag.
                                 t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false).visit(t, ctx);
@@ -172,11 +187,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 return tag;
             }
 
-            private boolean isNewDependencyManaged(Scope scope) {
+            private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
 
                 MavenResolutionResult result = getResolutionResult();
                 for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
-                    if (newGroupId.equals(managedDependency.getGroupId()) && newArtifactId.equals(managedDependency.getArtifactId())) {
+                    if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
                         return scope.isInClasspathOf(managedDependency.getScope());
                     }
                 }
@@ -184,13 +199,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(ExecutionContext ctx) {
+            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId) {
                 if (versionComparator == null) {
                     return newVersion;
                 }
                 if (availableVersions == null) {
                     availableVersions = new ArrayList<>();
-                    MavenMetadata mavenMetadata = downloadMetadata(newGroupId, newArtifactId, ctx);
+                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
                     for (String v : mavenMetadata.getVersioning().getVersions()) {
                         if (versionComparator.isValid(newVersion, v)) {
                             availableVersions.add(v);
