@@ -13,19 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.effects;
+package org.openrewrite.java.dataflow2;
 
 import org.openrewrite.Incubating;
 
 @Incubating(since = "7.25.0")
-public enum Side {
-    /**
-     * Refers to an expression being assigned to (e.g. left side of an assignment).
-     */
-    LVALUE,
+public class TraversalControl<S extends ProgramState<?>> {
 
-    /**
-     * Refers to an expression being evaluated (e.g. right side of an assignment).
-     */
-    RVALUE
+    @SuppressWarnings("InstantiationOfUtilityClass")
+    public static <S extends ProgramState<?>> TraversalControl<S> noop() {
+        return new TraversalControl<>();
+    }
 }

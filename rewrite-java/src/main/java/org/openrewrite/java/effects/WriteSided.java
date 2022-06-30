@@ -15,13 +15,15 @@
  */
 package org.openrewrite.java.effects;
 
-import org.openrewrite.java.tree.Dispatch2;
+import org.openrewrite.Incubating;
+import org.openrewrite.java.tree.JavaDispatcher2;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-public class WriteSided  implements Dispatch2<Boolean, JavaType.Variable, Side> {
+@Incubating(since =  "7.25.0")
+public class WriteSided  implements JavaDispatcher2<Boolean, JavaType.Variable, Side> {
 
-    public static final Writes WRITES = new Writes();
+    private static final Writes WRITES = new Writes();
 
     /**
      * @return Whether given expression, when in given position, may read variable v.
@@ -50,5 +52,4 @@ public class WriteSided  implements Dispatch2<Boolean, JavaType.Variable, Side> 
         assert side == Side.RVALUE;
         return WRITES.writes(pp, variable);
     }
-
 }

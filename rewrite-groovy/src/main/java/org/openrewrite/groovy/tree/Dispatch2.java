@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.groovy.tree;
+
+import org.openrewrite.java.tree.J;
 
 public interface Dispatch2<T, P1, P2> {
 

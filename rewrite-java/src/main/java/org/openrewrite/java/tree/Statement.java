@@ -16,8 +16,9 @@
 package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.dataflow2.ProgramPoint;
 
-public interface Statement extends J {
+public interface Statement extends J, ProgramPoint {
     default boolean hasClassType(@Nullable JavaType.Class classType) {
         if (classType == null) {
             return false;
