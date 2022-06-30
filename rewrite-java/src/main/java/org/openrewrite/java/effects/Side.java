@@ -15,7 +15,17 @@
  */
 package org.openrewrite.java.effects;
 
+import org.openrewrite.Incubating;
+
+@Incubating(since = "7.25.0")
 public enum Side {
-    LVALUE, // refers to an expression being assigned to (e.g. left side of an assignment)
-    RVALUE; // refers to an expression being evaluated (e.g. right side of an assignment)
+    /**
+     * Refers to an expression being assigned to (e.g. left side of an assignment).
+     */
+    LVALUE,
+
+    /**
+     * Refers to an expression being evaluated (e.g. right side of an assignment).
+     */
+    RVALUE
 }

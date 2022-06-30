@@ -15,10 +15,13 @@
  */
 package org.openrewrite.java.tree;
 
-public interface Dispatch1<T, P1> {
+import org.openrewrite.Incubating;
+
+@Incubating(since = "7.25.0")
+public interface JavaDispatcher1<T, P1> {
 
     default T dispatch(J pp, P1 p1) {
-        switch (pp.getClass().getName().replaceAll("^org.openrewrite.java.tree.", "")) {
+        switch (pp.getClass().getSimpleName()) {
             case "J$ArrayAccess":
                 return visitArrayAccess((J.ArrayAccess) pp, p1);
             case "J$Assert":
@@ -113,12 +116,10 @@ public interface Dispatch1<T, P1> {
                 return visitVariableDeclarationsNamedVariable((J.VariableDeclarations.NamedVariable) pp, p1);
             case "J$WhileLoop":
                 return visitWhileLoop((J.WhileLoop) pp, p1);
-
             default:
-                throw new Error("Unexpected node type: " + pp.getClass().getName());
+                throw new IllegalArgumentException("Unexpected node type: " + pp.getClass().getName());
         }
     }
-
 
     T defaultDispatch(J ignoredC, P1 ignoredP1);
 

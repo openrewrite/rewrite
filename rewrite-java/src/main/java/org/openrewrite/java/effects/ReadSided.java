@@ -15,17 +15,19 @@
  */
 package org.openrewrite.java.effects;
 
-import org.openrewrite.java.tree.Dispatch1;
-import org.openrewrite.java.tree.Dispatch2;
+import org.openrewrite.Incubating;
+import org.openrewrite.java.tree.JavaDispatcher2;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 
 /**
- *  Provides the reads() methods for nodes that can be on either side of an assignment.
+ * Provides the reads() methods for nodes that can be on either side of an assignment.
  */
-public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
+@Incubating(since = "7.25.0")
+public class ReadSided implements JavaDispatcher2<Boolean, JavaType.Variable, Side> {
 
-    public static final Reads READS = new Reads();
+    private static final Reads READS = new Reads();
 
     /**
      * @return Whether given expression, when in given position, may read variable v.
@@ -63,7 +65,12 @@ public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
 
     @Override
     public Boolean visitBlock(J.Block block, JavaType.Variable variable, Side side) {
-        return block.getStatements().stream().map(s -> READS.reads(s, variable)).reduce(false, (a, b) -> a | b);
+        for (Statement s : block.getStatements()) {
+            if (READS.reads(s, variable)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -73,7 +80,12 @@ public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
 
     @Override
     public Boolean visitCase(J.Case caze, JavaType.Variable variable, Side side) {
-        return caze.getStatements().stream().map(s -> reads(s, variable)).reduce(false, (a, b) -> a | b);
+        for (Statement s : caze.getStatements()) {
+            if (reads(s, variable)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ClassDeclaration
@@ -85,22 +97,25 @@ public class ReadSided implements Dispatch2<Boolean, JavaType.Variable, Side> {
 
     @Override
     public Boolean visitDoWhileLoop(J.DoWhileLoop doWhileLoop, JavaType.Variable variable, Side side) {
-        return reads(doWhileLoop.getWhileCondition(), variable)
-                || reads(doWhileLoop.getBody(), variable);
+        return reads(doWhileLoop.getWhileCondition(), variable) || reads(doWhileLoop.getBody(), variable);
     }
 
     // Empty
 
     @Override
     public Boolean visitEnumValueSet(J.EnumValueSet enums, JavaType.Variable variable, Side side) {
-        return enums.getEnums().stream().map(n ->
-                n.getInitializer() != null && reads(n.getInitializer(), variable)).reduce(false, (a, b) -> a | b);
+        for (J.EnumValue n : enums.getEnums()) {
+            if (n.getInitializer() != null && reads(n.getInitializer(), variable)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public Boolean visitFieldAccess(J.FieldAccess fieldAccess, JavaType.Variable variable, Side side) {
-        return (side == Side.RVALUE && fieldAccess.getType() != null && fieldAccess.getType().equals(variable))
-                || reads(fieldAccess.getTarget(), variable, side);
+        return (side == Side.RVALUE && fieldAccess.getType() != null && fieldAccess.getType().equals(variable)) ||
+                reads(fieldAccess.getTarget(), variable, side);
     }
 
     @Override

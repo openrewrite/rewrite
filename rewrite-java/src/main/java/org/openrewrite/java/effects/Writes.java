@@ -15,18 +15,17 @@
  */
 package org.openrewrite.java.effects;
 
-import org.openrewrite.java.tree.Dispatch1;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.Incubating;
+import org.openrewrite.java.tree.*;
 
-import java.util.Arrays;
+@Incubating(since = "7.25.0")
+public class Writes implements JavaDispatcher1<Boolean, JavaType.Variable> {
 
-public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
+    private static final WriteSided WRITE_SIDED = new WriteSided();
 
-    public static final WriteSided WRITE_SIDED = new WriteSided();
-
-    /** @return True if this expression, when evaluated, may write variable v. */
+    /**
+     * @return True if this expression, when evaluated, may write variable v.
+     */
     public boolean writes(J e, JavaType.Variable v) {
         return dispatch(e, v);
     }
@@ -63,7 +62,12 @@ public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
 
     @Override
     public Boolean visitBlock(J.Block pp, JavaType.Variable v) {
-        return pp.getStatements().stream().map(s -> writes(s, v)).reduce(false, (a,b) -> a|b);
+        for (Statement s : pp.getStatements()) {
+            if (writes(s, v)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -73,7 +77,12 @@ public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
 
     @Override
     public Boolean visitCase(J.Case pp, JavaType.Variable v) {
-        return pp.getStatements().stream().map(s -> writes(s, v)).reduce(false, (a,b) -> a|b);
+        for (Statement s : pp.getStatements()) {
+            if (writes(s, v)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -93,7 +102,12 @@ public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
 
     @Override
     public Boolean visitEnumValueSet(J.EnumValueSet pp, JavaType.Variable v) {
-        return pp.getEnums().stream().map(n -> n.getInitializer() != null && writes(n.getInitializer(), v)).reduce(false, (a, b) -> a|b);
+        for (J.EnumValue n : pp.getEnums()) {
+            if (n.getInitializer() != null && writes(n.getInitializer(), v)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -118,9 +132,17 @@ public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
 
     @Override
     public Boolean visitForLoopControl(J.ForLoop.Control pp, JavaType.Variable v) {
-        return pp.getInit().stream().map(s -> writes(s, v)).reduce(false, (a,b) -> a|b) ||
-                pp.getUpdate().stream().map(s -> writes(s, v)).reduce(false, (a,b) -> a|b) ||
-                writes(pp.getCondition(), v);
+        for (Statement statement : pp.getInit()) {
+            if (writes(statement, v)) {
+                return true;
+            }
+        }
+        for (Statement s : pp.getUpdate()) {
+            if (writes(s, v)) {
+                return true;
+            }
+        }
+        return writes(pp.getCondition(), v);
     }
 
     @Override
@@ -131,7 +153,7 @@ public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
     @Override
     public Boolean visitIf(J.If pp, JavaType.Variable v) {
         return writes(pp.getIfCondition(), v) || writes(pp.getThenPart(), v) ||
-                (pp.getElsePart() != null && writes(pp.getElsePart().getBody(), v));
+                pp.getElsePart() != null && writes(pp.getElsePart().getBody(), v);
     }
 
     @Override
@@ -151,7 +173,7 @@ public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
 
     @Override
     public Boolean visitLambda(J.Lambda pp, JavaType.Variable v) {
-        return pp.getBody() instanceof Expression && writes((Expression)pp.getBody(), v);
+        return pp.getBody() instanceof Expression && writes(pp.getBody(), v);
     }
 
     @Override
@@ -171,31 +193,58 @@ public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
         // This does not take into account the effects inside the method body.
         // As long as v is a local variable, we are guaranteed that it cannot be affected
         // as a side-effect of the method invocation.
-        return (pp.getSelect() != null && writes(pp.getSelect(), v))
-                || pp.getArguments().stream().map(e -> writes(e, v)).reduce(false, (a,b) -> a|b);
+        if (pp.getSelect() != null && writes(pp.getSelect(), v)) {
+            return true;
+        }
+        for (Expression e : pp.getArguments()) {
+            if (writes(e, v)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public Boolean visitNewArray(J.NewArray pp, JavaType.Variable v) {
-        return (pp.getInitializer() != null && pp.getInitializer().stream().map(e -> writes(e, v)).reduce(false, (a,b) -> a|b))
-                || pp.getDimensions().stream().map(e -> writes(e.getIndex(), v)).reduce(false, (a,b) -> a|b);
+        if (pp.getInitializer() != null) {
+            for (Expression e : pp.getInitializer()) {
+                if (writes(e, v)) {
+                    return true;
+                }
+            }
+        }
+        for (J.ArrayDimension e : pp.getDimensions()) {
+            if (writes(e.getIndex(), v)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public Boolean visitNewClass(J.NewClass pp, JavaType.Variable v) {
-        return (pp.getEnclosing() != null && writes(pp.getEnclosing(), v))
-                || (pp.getArguments() != null && pp.getArguments().stream().map(e -> writes(e, v)).reduce(false, (a,b) -> a|b))
-                || (pp.getBody() != null && writes(pp.getBody(), v));
+        if (pp.getEnclosing() != null && writes(pp.getEnclosing(), v)) {
+            return true;
+        }
+        if (pp.getArguments() == null) {
+            return false;
+        }
+        for (Expression e : pp.getArguments()) {
+            if (writes(e, v)) {
+                return true;
+            }
+        }
+        return pp.getBody() != null && writes(pp.getBody(), v);
     }
 
     @Override
     public Boolean visitParentheses(J.Parentheses<?> pp, JavaType.Variable v) {
-        return writes((Expression)pp.getTree(), v);
+        return writes(pp.getTree(), v);
     }
 
     @Override
     public Boolean visitControlParentheses(J.ControlParentheses<?> pp, JavaType.Variable v) {
-        return writes((Expression)pp.getTree(), v);
+        return writes(pp.getTree(), v);
     }
 
     @Override
@@ -225,16 +274,22 @@ public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
 
     @Override
     public Boolean visitTry(J.Try pp, JavaType.Variable v) {
-        return (pp.getResources() != null && pp.getResources().stream().map(c -> writes(c, v)).reduce(false, (a,b) -> a|b))
-                || writes(pp.getBody(), v)
-                || pp.getCatches().stream().map(c -> writes(c.getBody(), v)).reduce(false, (a,b) -> a|b)
-                || (pp.getFinally() != null && writes(pp.getFinally(), v));
+        if (pp.getResources() != null && pp.getResources().stream().map(c -> writes(c, v)).reduce(false, (a, b) -> a | b)
+                || writes(pp.getBody(), v)) {
+            return true;
+        }
+        for (J.Try.Catch c : pp.getCatches()) {
+            if (writes(c.getBody(), v)) {
+                return true;
+            }
+        }
+        return pp.getFinally() != null && writes(pp.getFinally(), v);
     }
 
     @Override
     public Boolean visitTryResource(J.Try.Resource pp, JavaType.Variable v) {
-        return pp.getVariableDeclarations() instanceof J.VariableDeclarations
-                && writes((J.VariableDeclarations)pp.getVariableDeclarations(), v);
+        return pp.getVariableDeclarations() instanceof J.VariableDeclarations &&
+                writes(pp.getVariableDeclarations(), v);
     }
 
     @Override
@@ -244,17 +299,26 @@ public class Writes implements Dispatch1<Boolean, JavaType.Variable> {
 
     @Override
     public Boolean visitUnary(J.Unary pp, JavaType.Variable v) {
-        if(Arrays.asList(new J.Unary.Type[]{ J.Unary.Type.PreIncrement, J.Unary.Type.PreDecrement, J.Unary.Type. PostIncrement, J.Unary.Type.PostDecrement })
-                .contains(pp.getOperator())) {
-            // expr = expr + 1, expr = 1 + expr, ...: expr appears on both sides
-            return WRITE_SIDED.writes(pp.getExpression(), v, Side.LVALUE) || WRITE_SIDED.writes(pp.getExpression(), v, Side.RVALUE);
+        switch (pp.getOperator()) {
+            case PreIncrement:
+            case PreDecrement:
+            case PostDecrement:
+            case PostIncrement:
+                // expr = expr + 1, expr = 1 + expr, ...: expr appears on both sides
+                return WRITE_SIDED.writes(pp.getExpression(), v, Side.LVALUE) || WRITE_SIDED.writes(pp.getExpression(), v, Side.RVALUE);
+            default:
+                return writes(pp.getExpression(), v);
         }
-        return writes(pp.getExpression(), v);
     }
 
     @Override
     public Boolean visitVariableDeclarations(J.VariableDeclarations pp, JavaType.Variable v) {
-        return pp.getVariables().stream().map(n -> n.getInitializer() != null && writes(n.getInitializer(), v)).reduce(false, (a,b) -> a|b);
+        for (J.VariableDeclarations.NamedVariable n : pp.getVariables()) {
+            if (n.getInitializer() != null && writes(n.getInitializer(), v)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
