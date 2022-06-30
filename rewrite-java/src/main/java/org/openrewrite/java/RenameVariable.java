@@ -21,6 +21,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.Arrays;
@@ -34,7 +35,6 @@ import java.util.Stack;
  *
  * Notes:
  *  - The current version will rename variables even if a variable with `toName` is already declared in the same scope.
- *  - FieldAccess to the new variable need to be covered separately. Refer to ChangeFieldAccess.
  */
 @Incubating(since = "7.5.0")
 public class RenameVariable<P> extends JavaIsoVisitor<P> {
@@ -96,7 +96,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                     J.FieldAccess fieldAccess =  ((J.FieldAccess) parent);
                     J.Identifier fieldAccessTarget = (J.Identifier) fieldAccess.getTarget();
                     if (fieldAccessTarget.getFieldType() != null && (fieldAccessTarget.getFieldType().equals(variable.getName().getFieldType())
-                            || fieldAccessTarget.getFieldType().getType() != null && fieldAccessTarget.getFieldType().getType().equals(variable.getName().getFieldType().getOwner()))) {
+                            || fieldAccessTarget.getFieldType().getType() != null && variable.getName().getFieldType() != null && fieldAccessTarget.getFieldType().getType().equals(variable.getName().getFieldType().getOwner()))) {
                         return ident.withSimpleName(toName);
                     }
                 }
@@ -131,14 +131,6 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             return super.visitCatch(_catch, p);
         }
 
-        @Override
-        public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch, P p) {
-            // Check if the try added a new scope to the stack,
-            // postVisit doesn't happen until after both the try and catch are processed.
-            maybeChangeNameScope(getCursorToParentScope(getCursor()).getValue());
-            return super.visitMultiCatch(multiCatch, p);
-        }
-
         @Nullable
         @Override
         public J postVisit(J tree, P p) {
@@ -151,7 +143,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
          * Pops the stack if the tree element is at the top of the stack.
          */
         private void maybeChangeNameScope(Tree tree) {
-            if (currentNameScope.size() > 0 && currentNameScope.peek().equals(tree)) {
+            if (!currentNameScope.isEmpty() && currentNameScope.peek().equals(tree)) {
                 currentNameScope.pop();
             }
         }
@@ -165,16 +157,16 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
          */
         private Cursor getCursorToParentScope(Cursor cursor) {
             return cursor.dropParentUntil(is ->
-                    is instanceof J.Block ||
+                    is instanceof JavaSourceFile ||
+                            is instanceof J.ClassDeclaration ||
                             is instanceof J.MethodDeclaration ||
+                            is instanceof J.Block ||
                             is instanceof J.ForLoop ||
                             is instanceof J.ForEachLoop ||
                             is instanceof J.Case ||
                             is instanceof J.Try ||
                             is instanceof J.Try.Catch ||
-                            is instanceof J.MultiCatch ||
-                            is instanceof J.Lambda
-            );
+                            is instanceof J.Lambda);
         }
     }
 

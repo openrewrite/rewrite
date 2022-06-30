@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.tree.J
 import java.util.stream.Collectors.toList
@@ -537,6 +538,7 @@ interface RenameVariableTest : JavaRecipeTest {
     )
 
     @Suppress("UnnecessaryLocalVariable")
+    @Issue("https://github.com/openrewrite/rewrite/pull/1603")
     @Test
     fun renameFieldAccessVariables(jp: JavaParser) = assertChanged(
         jp,
@@ -569,6 +571,7 @@ interface RenameVariableTest : JavaRecipeTest {
     )
 
     @Suppress("UnnecessaryLocalVariable")
+    @Issue("https://github.com/openrewrite/rewrite/pull/1603")
     @Test
     fun renameLocalFieldAccessInStaticMethod(jp: JavaParser) = assertChanged(
         jp,
