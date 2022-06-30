@@ -143,7 +143,7 @@ public class HiddenFieldVisitor<P> extends JavaIsoVisitor<P> {
                 ) {
                     nextName = nextName(nextName);
                 }
-                doAfterVisit(new RenameVariable<>(v, nextName));
+                renameVariable(v, nextName);
             }
             return v;
         }

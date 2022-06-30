@@ -20,7 +20,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -85,7 +84,7 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
 
             renameVariablesMap.forEach((key, value) -> {
                 if (!hasNameSet.contains(value) && !hasNameSet.contains(key.getSimpleName())) {
-                    doAfterVisit(new RenameVariable<>(key, value));
+                    renameVariable(key, value);
                     hasNameSet.add(value);
                 }
             });

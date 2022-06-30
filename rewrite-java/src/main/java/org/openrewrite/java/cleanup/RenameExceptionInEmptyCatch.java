@@ -20,7 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.RenameVariable;
+import org.openrewrite.java.VariableNameUtils;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
@@ -112,20 +112,13 @@ public class RenameExceptionInEmptyCatch extends Recipe {
                         aggregateNameScopes(variableScopes);
 
                         String baseName = "ignored";
-                        int count = 0;
                         for (J.VariableDeclarations.NamedVariable variable : multiVariable.getVariables()) {
                             if (variable.getSimpleName().contains(baseName)) {
                                 continue;
                             }
 
-                            String newName = baseName;
-                            // Generate a new name to prevent namespace shadowing.
-                            while (variableScopes.containsKey(parentScope) && variableScopes.get(parentScope).contains(newName)) {
-                                newName = baseName + (count += 1);
-                            }
                             // Rename the variable.
-                            doAfterVisit(new RenameVariable<>(variable, newName));
-                            namesInScope.add(newName);
+                            renameVariableWithUniqueName(variable, baseName, getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER);
                         }
                     }
                 }

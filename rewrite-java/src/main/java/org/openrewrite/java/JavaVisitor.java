@@ -144,6 +144,37 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
     }
 
+    /**
+     * This method will generate a unique name based on the generation strategy, and rename the target variable and all the associated identifiers to the new name.
+     *
+     * A JavaSourceFile must be available in the Cursor path to account for all names
+     * available in the cursor scope.
+     *
+     * @param target target variable.
+     * @param toName new name.
+     */
+    @Incubating(since = "7.25.0")
+    public void renameVariableWithUniqueName(J.VariableDeclarations.NamedVariable target, String toName, Cursor cursor, VariableNameUtils.GenerationStrategy strategy) {
+        String uniqueName = VariableNameUtils.generateVariableName(toName, cursor, strategy);
+        RenameVariable<P> op = new RenameVariable<>(target, uniqueName);
+        if (!getAfterVisit().contains(op)) {
+            doAfterVisit(op);
+        }
+    }
+
+    /**
+     * This method will rename the target variable and all the associated identifiers to the new name.
+     * @param target target variable.
+     * @param toName new name.
+     */
+    @Incubating(since = "7.25.0")
+    public void renameVariable(J.VariableDeclarations.NamedVariable target, String toName) {
+        RenameVariable<P> op = new RenameVariable<>(target, toName);
+        if (!getAfterVisit().contains(op)) {
+            doAfterVisit(op);
+        }
+    }
+
     public J visitExpression(Expression expression, P p) {
         return expression;
     }
