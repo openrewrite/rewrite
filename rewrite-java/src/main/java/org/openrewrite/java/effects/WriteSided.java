@@ -21,7 +21,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
 @Incubating(since =  "7.25.0")
-public class WriteSided  implements JavaDispatcher2<Boolean, JavaType.Variable, Side> {
+class WriteSided  implements JavaDispatcher2<Boolean, JavaType.Variable, Side> {
 
     private static final Writes WRITES = new Writes();
 

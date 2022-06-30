@@ -25,7 +25,7 @@ import org.openrewrite.java.tree.Statement;
  * Provides the reads() methods for nodes that can be on either side of an assignment.
  */
 @Incubating(since = "7.25.0")
-public class ReadSided implements JavaDispatcher2<Boolean, JavaType.Variable, Side> {
+class ReadSided implements JavaDispatcher2<Boolean, JavaType.Variable, Side> {
 
     private static final Reads READS = new Reads();
 
