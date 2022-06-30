@@ -311,6 +311,85 @@ public interface G extends J {
         }
     }
 
+    /**
+     * Unlike Java, Groovy allows expressions to appear anywhere Statements do.
+     * Rather than re-define versions of the many J types that implement Expression to also implement Statement,
+     * just wrap such expressions.
+     *
+     * Has no state or behavior of its own aside from the Expression it wraps.
+     */
+    @SuppressWarnings("unchecked")
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
+    final class ExpressionStatement implements G, Expression, Statement {
+        @With
+        @Getter
+        Expression expression;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return acceptJava(v, p);
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            J j = v.visit(getExpression(), p);
+            if(j instanceof ExpressionStatement) {
+                return j;
+            } else if (j instanceof Expression) {
+                return withExpression((Expression) j);
+            }
+            return j;
+        }
+
+        @Override
+        public UUID getId() {
+            return expression.getId();
+        }
+
+        @Override
+        public <T extends Tree> T withId(UUID id) {
+            return (T) withExpression(expression.withId(id));
+        }
+
+        @Override
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withExpression(expression.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return expression.getPrefix();
+        }
+
+        @Override
+        public <J2 extends J> J2 withMarkers(Markers markers) {
+            return (J2) withExpression(expression.withMarkers(markers));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return expression.getMarkers();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return expression.getType();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) withExpression(expression.withType(type));
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            throw new UnsupportedOperationException("ExpressionStatement has no concept of coordinates");
+        }
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor

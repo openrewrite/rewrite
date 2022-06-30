@@ -1084,6 +1084,14 @@ public class GroovyParserVisitor {
             queue.add(new J.Empty(randomId(), EMPTY, Markers.EMPTY));
         }
 
+        @Override
+        public void visitExpressionStatement(ExpressionStatement statement) {
+            super.visitExpressionStatement(statement);
+            if(queue.peek() instanceof Expression && !(queue.peek() instanceof Statement)) {
+                queue.add(new G.ExpressionStatement((Expression) queue.poll()));
+            }
+        }
+
         @SuppressWarnings("unchecked")
         @Override
         public void visitForLoop(ForStatement forLoop) {

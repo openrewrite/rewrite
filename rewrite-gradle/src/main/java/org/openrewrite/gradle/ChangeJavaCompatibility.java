@@ -40,8 +40,8 @@ import static org.openrewrite.Tree.randomId;
 public class ChangeJavaCompatibility extends Recipe {
     @Option(displayName = "New version",
             description = "The Java version to update source compatibility to. All allowed variations of Gradle's `org.gradle.api.JavaVersion` are allowed. " +
-                          "This means that we accept versions in the form of doubles (ex. 1.8, 1.11), whole numbers (8, 11), and `org.gradle.api.JavaVersion` " +
-                          "enum values (ex: VERSION_1_8, VERSION_11).",
+                          "This means that we accept versions in the form of doubles (ex. 1.8, 1.11), whole numbers (ex. 8, 11), strings (ex. \"1.8\", \"8\", '1.11', '11'), " +
+                          "and `org.gradle.api.JavaVersion` enum values (ex. VERSION_1_8, VERSION_11, JavaVersion.VERSION_1_8, JavaVersion.VERSION_11).",
             example = "11")
     String newVersion;
 
@@ -144,11 +144,11 @@ public class ChangeJavaCompatibility extends Recipe {
             }
 
             private String normalize(String version) {
-                if (version.contains("\"")) {
-                    version = version.replace("\"", "");
+                if (version.contains("\"") || version.contains("'")) {
+                    version = version.replace("\"", "").replace("'", "");
                 }
 
-                if (!version.contains("\"") && !version.contains(".") && !version.contains("_")) {
+                if (!version.contains(".") && !version.contains("_")) {
                     return version;
                 }
 
@@ -165,7 +165,7 @@ public class ChangeJavaCompatibility extends Recipe {
             }
 
             private Class<?> determineRequestedType(String value) {
-                if (value.contains("\"")) {
+                if (value.contains("\"") || value.contains("'")) {
                     return String.class;
                 }
 
@@ -205,7 +205,7 @@ public class ChangeJavaCompatibility extends Recipe {
                 } else if (expression instanceof J.FieldAccess) {
                     J.FieldAccess fieldAccess = (J.FieldAccess) expression;
                     if (String.class.equals(requestedType)) {
-                        expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), requestedValue, "\"" + requestedValue + "\"", Collections.emptyList(), JavaType.Primitive.String);
+                        expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), requestedValue, requestedValue, Collections.emptyList(), JavaType.Primitive.String);
                     } else if (Enum.class.equals(requestedType)) {
                         String name = requestedValue.substring(requestedValue.indexOf(".") + 1);
                         expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(name));

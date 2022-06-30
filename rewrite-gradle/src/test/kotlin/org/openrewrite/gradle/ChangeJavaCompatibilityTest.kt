@@ -29,8 +29,12 @@ class ChangeJavaCompatibilityTest : GradleRecipeTest {
     class NewDouble : BaseTest("1.8")
 
     @Nested
-    @DisplayName("When requested version is a string")
-    class NewString : BaseTest("\"1.8\"")
+    @DisplayName("When requested version is a string (double quotes)")
+    class NewStringDoubleQuoted : BaseTest("\"1.8\"")
+
+    @Nested
+    @DisplayName("When requested version is a string (single quotes -tmp)")
+    class NewStringSingleQuoted : BaseTest("'1.8'")
 
     @Nested
     @DisplayName("When requested version is an enum (shorthand)")
@@ -68,7 +72,7 @@ class ChangeJavaCompatibilityTest : GradleRecipeTest {
                     java
                 }
                 
-                targetCompatibility = 7
+                targetCompatibility = '7'
             """,
             after = """
                 plugins {
@@ -87,7 +91,7 @@ class ChangeJavaCompatibilityTest : GradleRecipeTest {
                     java
                 }
                 
-                setSourceCompatibility 7
+                setSourceCompatibility "7"
             """,
             after = """
                 plugins {
@@ -106,7 +110,7 @@ class ChangeJavaCompatibilityTest : GradleRecipeTest {
                     java
                 }
                 
-                setTargetCompatibility 7
+                setTargetCompatibility 1.7
             """,
             after = """
                 plugins {
@@ -149,7 +153,7 @@ class ChangeJavaCompatibilityTest : GradleRecipeTest {
                 }
                 
                 java {
-                    targetCompatibility = "1.7"
+                    targetCompatibility = '1.7'
                 }
             """,
             after = """
@@ -172,7 +176,7 @@ class ChangeJavaCompatibilityTest : GradleRecipeTest {
                 }
                 
                 compileJava {
-                    sourceCompatibility = "1.7"
+                    sourceCompatibility = JavaVersion.VERSION_1_7
                 }
             """,
             after = """
@@ -302,11 +306,7 @@ class ChangeJavaCompatibilityTest : GradleRecipeTest {
         )
 
         private fun coerce(version: String): String {
-            return when {
-                version.startsWith("JavaVersion.") -> version
-                version.startsWith("VERSION_") -> "JavaVersion.$version"
-                else -> version
-            }
+            return if (version.startsWith("VERSION_")) "JavaVersion.$version" else version
         }
     }
 }
