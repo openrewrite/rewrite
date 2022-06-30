@@ -19,8 +19,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.J;
 
-import java.util.Collection;
-
 /**
  * A program point is anything that may change the state of a program.
  * It represents a node in the data-flow graph, embedded in the AST. Namely, program points are represented
@@ -35,11 +33,6 @@ import java.util.Collection;
  */
 @Incubating(since = "7.25.0")
 public interface ProgramPoint {
-
-//    default Collection<Cursor> previous(DataFlowGraph dfg, Cursor c) {
-//        return dfg.previous(c);
-//    }
-
     default String printPP(Cursor cursor) {
         if (this instanceof J) {
             return ((J) this).print(cursor);

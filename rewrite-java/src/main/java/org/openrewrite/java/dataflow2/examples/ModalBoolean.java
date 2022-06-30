@@ -59,9 +59,9 @@ public enum ModalBoolean {
             if (out == NoIdea) {
                 continue;
             }
-            if ((result == True && out != True)
-                    || (result == False && out != False)
-                    || (result == Null && out != Null)) {
+            if ((result == True && out != True) ||
+                    (result == False && out != False) ||
+                    (result == Null && out != Null)) {
                 return Conflict;
             } else if (result == Conflict) {
                 return result;

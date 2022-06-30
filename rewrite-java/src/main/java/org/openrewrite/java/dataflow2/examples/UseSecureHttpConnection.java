@@ -18,18 +18,32 @@ package org.openrewrite.java.dataflow2.examples;
 import lombok.AllArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow2.DataFlowGraph;
 import org.openrewrite.java.dataflow2.ProgramPoint;
 import org.openrewrite.java.dataflow2.ProgramState;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
-import static org.openrewrite.java.dataflow2.examples.HttpAnalysis.URI_CREATE_MATCHER;
-
 public class UseSecureHttpConnection extends Recipe {
+    private static final MethodMatcher URI_CREATE_MATCHER = new MethodMatcher("java.net.URI create(String)");
+
     @Override
     public String getDisplayName() {
-        return "Use Secure Http Connection";
+        return "Use secure HTTP connection";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Use HTTPS instead of HTTP wherever possible.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        return new UsesMethod<>(URI_CREATE_MATCHER);
     }
 
     @Override
@@ -42,8 +56,7 @@ public class UseSecureHttpConnection extends Recipe {
                 if (URI_CREATE_MATCHER.matches(mi)) {
                     J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
                     HttpAnalysis httpAnalysis = new HttpAnalysis(new DataFlowGraph(cu));
-                    ProgramPoint arg0 = mi.getArguments().get(0);
-                    ProgramState<HttpAnalysisValue> state = httpAnalysis.getStateAfter(arg0);
+                    ProgramState<HttpAnalysisValue> state = httpAnalysis.getStateAfter(mi.getArguments().get(0));
                     HttpAnalysisValue stateValue = state.expr();
                     if (stateValue.getName() == HttpAnalysisValue.Understanding.NOT_SECURE) {
                         doAfterVisit(new HttpToHttpsVisitor((J.Literal) stateValue.getLiteral()));

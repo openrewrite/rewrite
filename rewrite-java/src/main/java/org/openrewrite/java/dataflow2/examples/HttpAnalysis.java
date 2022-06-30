@@ -22,8 +22,8 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 public class HttpAnalysis extends DataFlowAnalysis<HttpAnalysisValue> {
-    public static MethodMatcher URI_CREATE_MATCHER = new MethodMatcher("java.net.URI create(String)");
-    public static MethodMatcher STRING_REPLACE = new MethodMatcher("java.lang.String replace(..)");
+    private static final MethodMatcher URI_CREATE_MATCHER = new MethodMatcher("java.net.URI create(String)");
+    private static final MethodMatcher STRING_REPLACE = new MethodMatcher("java.lang.String replace(..)");
 
     public HttpAnalysis(DataFlowGraph dfg) {
         super(dfg, HttpAnalysisValue.JOINER);

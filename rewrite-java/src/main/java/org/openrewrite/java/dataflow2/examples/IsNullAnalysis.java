@@ -36,8 +36,6 @@ public class IsNullAnalysis extends DataFlowAnalysis<ModalBoolean> {
         super(dfg, ModalBoolean.JOINER);
     }
 
-    //private static final Joiner<ModalBoolean> JOINER = ModalBoolean.JOINER;
-
     /**
      * @return Whether the variable v is known to be null before given program point.
      */

@@ -17,14 +17,10 @@ package org.openrewrite.java.dataflow2;
 
 import org.openrewrite.Incubating;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 @Incubating(since = "7.25.0")
 public class TraversalControl<S extends ProgramState<?>> {
 
+    @SuppressWarnings("InstantiationOfUtilityClass")
     public static <S extends ProgramState<?>> TraversalControl<S> noop() {
         return new TraversalControl<>();
     }

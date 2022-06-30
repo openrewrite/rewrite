@@ -93,9 +93,8 @@ public class Transfer<T> implements JavaDispatcher3<ProgramState<T>, Cursor, Pro
     @Override
     public ProgramState<T> visitIdentifier(J.Identifier pp, Cursor c, ProgramState<T> inputState, TraversalControl<ProgramState<T>> t) {
         J.Identifier i = c.getValue();
-        ProgramState<T> s = inputState;
-        T v = s.get(i.getFieldType());
-        return s.push(v);
+        T v = inputState.get(i.getFieldType());
+        return inputState.push(v);
     }
 
     @Override

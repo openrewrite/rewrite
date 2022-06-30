@@ -37,9 +37,7 @@ public class ConstantPropagationValue {
         public ConstantPropagationValue join(Collection<ConstantPropagationValue> values) {
             ConstantPropagationValue result = UNKNOWN;
             for (ConstantPropagationValue value : values) {
-                if (result == UNKNOWN) {
-                    result = value;
-                } else if (value == UNKNOWN) {
+                if (result == UNKNOWN || value == UNKNOWN) {
                     result = value;
                 } else if (value == CONFLICT) {
                     return CONFLICT;

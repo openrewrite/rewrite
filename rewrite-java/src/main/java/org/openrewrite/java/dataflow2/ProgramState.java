@@ -15,16 +15,18 @@
  */
 package org.openrewrite.java.dataflow2;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-
 import lombok.*;
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Incubating(since = "7.25.0")
 @Data
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode
 public class ProgramState<T> {
 
@@ -32,7 +34,7 @@ public class ProgramState<T> {
     LinkedListElement<T> expressionStack;
 
     @With
-    HashMap<JavaType.Variable, T> map;
+    Map<JavaType.Variable, T> map;
 
     public ProgramState(T lowerBound) {
         expressionStack = null;
@@ -40,16 +42,6 @@ public class ProgramState<T> {
 //            expressionStack = new LinkedListElement<>(expressionStack, lowerBound);
 //        }
         map = new HashMap<>();
-    }
-
-    private ProgramState(HashMap<JavaType.Variable, T> map) {
-        this.expressionStack = null;
-        this.map = map;
-    }
-
-    private ProgramState(LinkedListElement<T> expressionStack, HashMap<JavaType.Variable, T> map) {
-        this.expressionStack = expressionStack;
-        this.map = map;
     }
 
     public T expr() {
@@ -68,7 +60,10 @@ public class ProgramState<T> {
         return s.value;
     }
 
-    public ProgramState<T> push(T value) {
+    public ProgramState<T> push(@Nullable T value) {
+        if (value == null) {
+            return this;
+        }
         return this.withExpressionStack(new LinkedListElement<>(expressionStack, value));
     }
 
@@ -84,13 +79,18 @@ public class ProgramState<T> {
         return withExpressionStack(e);
     }
 
-    public T get(JavaType.Variable ident) {
+    @Nullable
+    public T get(@Nullable JavaType.Variable ident) {
         return map.get(ident);
     }
 
-    public ProgramState<T> set(JavaType.Variable ident, T expr) {
-        // TODO : Horrible
-        HashMap<JavaType.Variable, T> m = (HashMap<JavaType.Variable, T>) map.clone();
+    public ProgramState<T> set(@Nullable JavaType.Variable ident, T expr) {
+        if (ident == null) {
+            return this;
+        }
+
+        // FIXME why do we need to copy this?
+        Map<JavaType.Variable, T> m = new HashMap<>(map);
         m.put(ident, expr);
         return this.withMap(m);
     }
@@ -158,7 +158,9 @@ public class ProgramState<T> {
         T value;
 
         public static <T> boolean isEqual(LinkedListElement<T> a, LinkedListElement<T> b) {
-            if (a == b) return true;
+            if (a == b) {
+                return true;
+            }
             if (a == null ^ b == null) {
                 return false;
             }
