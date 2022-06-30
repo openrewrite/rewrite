@@ -26,6 +26,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         spec.recipe(UseSecureHttpConnection())
     }
 
+    @Disabled
     @Test
     fun `find insecure uri`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -60,6 +61,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `replace is a barrier guard`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -81,6 +83,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `reassignment breaks data flow path`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -126,6 +129,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `reassignment within block does not break path`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -161,6 +165,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `dataflow through ternary operator`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -196,6 +201,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `example of taint tracking`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -231,6 +237,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `example of taint tracking through an alternate flow path`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -266,6 +273,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `example of negative taint tracking`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -287,6 +295,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `arbitrary method calls are not dataflow`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -313,6 +322,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `arbitrary method call chains are not dataflow`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -336,6 +346,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `special case toString on String type is DataFlow`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },
@@ -379,6 +390,7 @@ interface UseSecureHttpConnectionTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun `zero step flow is still considered and fixed`(javaParser: JavaParser) = rewriteRun(
         { spec -> spec.parser(javaParser) },

@@ -16,6 +16,7 @@
 package org.openrewrite.java.dataflow2
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.dataflow2.ProgramPoint.ENTRY
@@ -58,6 +59,7 @@ interface DataFlowGraphTest : DataFlowTest {
         assertPrevious(cu, "b()", EXIT, "b()")
     }
 
+    @Disabled
     @Test
     fun assertWithDetailTest(jp: JavaParser) {
         val ac = "assert w == 1 : \"invalid\""
@@ -126,6 +128,7 @@ interface DataFlowGraphTest : DataFlowTest {
         assertPrevious(cu, "str", EXIT,"str")
     }
 
+    @Disabled
     @Test
     fun methodInvocationTest(jp: JavaParser) {
         val ac = "abc = myMethod(a1, b1)"
