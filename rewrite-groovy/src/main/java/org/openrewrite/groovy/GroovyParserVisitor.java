@@ -1087,7 +1087,9 @@ public class GroovyParserVisitor {
         @Override
         public void visitExpressionStatement(ExpressionStatement statement) {
             super.visitExpressionStatement(statement);
-            queue.add(new G.ExpressionStatement((Expression) queue.poll()));
+            if(queue.peek() instanceof Expression && !(queue.peek() instanceof Statement)) {
+                queue.add(new G.ExpressionStatement((Expression) queue.poll()));
+            }
         }
 
         @SuppressWarnings("unchecked")
