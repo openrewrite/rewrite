@@ -116,6 +116,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private void scanClasses(ClassGraph classGraph, ClassLoader classLoader) {
         try (ScanResult result = classGraph
                 .ignoreClassVisibility()
+                .overrideClassLoaders(classLoader)
                 .scan()) {
 
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
