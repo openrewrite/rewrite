@@ -112,9 +112,8 @@ interface FindVariableNamesInScopeTest {
             object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitIdentifier(identifier: J.Identifier, p: ExecutionContext): J.Identifier {
                     return if (identifier.simpleName == scope) {
-                        val cu: J.CompilationUnit = this.cursor.dropParentUntil { it is J.CompilationUnit }.getValue()
                         val blockCursor: Cursor = this.cursor.dropParentUntil { it is J.Block }
-                        names.addAll(FindVariableNamesInScope.find(cu, blockCursor))
+                        names.addAll(FindVariableNamesInScope.findNamesInScope(blockCursor))
                         identifier.withSimpleName("changed")
                     } else {
                         identifier
@@ -401,8 +400,7 @@ interface FindVariableNamesInScopeTest {
             object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitIdentifier(identifier: J.Identifier, p: ExecutionContext): J.Identifier {
                     return if (identifier.simpleName == scope) {
-                        val cu: J.CompilationUnit = this.cursor.dropParentUntil { it is J.CompilationUnit }.getValue()
-                        names.addAll(FindVariableNamesInScope.find(cu, this.cursor))
+                        names.addAll(FindVariableNamesInScope.findNamesInScope(this.cursor))
                         identifier.withSimpleName("changed")
                     } else {
                         identifier

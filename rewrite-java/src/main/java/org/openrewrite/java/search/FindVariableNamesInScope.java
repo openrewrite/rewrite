@@ -19,10 +19,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 
 import java.util.*;
 
@@ -30,8 +27,22 @@ import java.util.*;
 @Value
 public class FindVariableNamesInScope {
 
-    // The SourceFile is required to ensure all J.ClassDeclaration fields may be found.
-    public static Set<String> find(SourceFile compilationUnit, Cursor scope) {
+    /**
+     * Find the names of variables that already exist in the scope of a cursor.
+     * A JavaSourceFile must be available in the Cursor path to account for all names
+     * available in the cursor scope.
+     *
+     * Known issue: all names of static imports are imported.
+     *
+     * @param scope The cursor position of a JavaVisitor, {@link org.openrewrite.java.JavaVisitor#getCursor()}.
+     * @return Variable names available in the name scope of the cursor.
+     */
+    public static Set<String> findNamesInScope(Cursor scope) {
+        JavaSourceFile compilationUnit = scope.firstEnclosing(JavaSourceFile.class);
+        if (compilationUnit == null) {
+            throw new IllegalStateException("A JavaSourceFile is required in the cursor path.");
+        }
+
         Set<String> names = new HashSet<>();
         VariableNameScopeVisitor variableNameScopeVisitor = new VariableNameScopeVisitor(scope);
         variableNameScopeVisitor.visit(compilationUnit, names);
@@ -55,16 +66,15 @@ public class FindVariableNamesInScope {
          */
         private Cursor aggregateNameScope() {
             return getCursor().dropParentUntil(is ->
-                    is instanceof J.CompilationUnit ||
+                    is instanceof JavaSourceFile ||
                             is instanceof J.ClassDeclaration ||
                             is instanceof J.MethodDeclaration ||
                             is instanceof J.Block ||
                             is instanceof J.ForLoop ||
+                            is instanceof J.ForEachLoop ||
                             is instanceof J.Case ||
                             is instanceof J.Try ||
                             is instanceof J.Try.Catch ||
-                            is instanceof J.If ||
-                            is instanceof J.If.Else ||
                             is instanceof J.Lambda);
         }
 
@@ -91,11 +101,11 @@ public class FindVariableNamesInScope {
             }
 
             if (scope.getValue().equals(tree)) {
-                 Cursor aggregatedScope = aggregateNameScope();
-                 // Add names from parent scope.
-                 Set<String> names = nameScopes.get(aggregatedScope);
+                Cursor aggregatedScope = aggregateNameScope();
+                // Add names from parent scope.
+                Set<String> names = nameScopes.get(aggregatedScope);
 
-                 // Add the names created in the target scope.
+                // Add the names created in the target scope.
                 namesInScope.addAll(names);
                 nameScopes.forEach((key, value) -> {
                     if (key.isScopeInPath(scope.getValue())) {
@@ -138,6 +148,15 @@ public class FindVariableNamesInScope {
             return super.visitClassDeclaration(classDecl, namesInScope);
         }
 
+        @Override
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Set<String> strings) {
+            Set<String> names = nameScopes.get(currentScope.peek());
+            if (names != null) {
+                names.add(variable.getSimpleName());
+            }
+            return super.visitVariable(variable, strings);
+        }
+
         private void addImportedStaticFieldNames(@Nullable J.CompilationUnit cu, Cursor classCursor) {
             if (cu != null) {
                 List<J.Import> imports = cu.getImports();
@@ -166,15 +185,6 @@ public class FindVariableNamesInScope {
                 });
                 addInheritedClassFields(fq.getSupertype(), classCursor);
             }
-        }
-
-        @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Set<String> strings) {
-            Set<String> names = nameScopes.get(currentScope.peek());
-            if (names != null) {
-                names.add(variable.getSimpleName());
-            }
-            return super.visitVariable(variable, strings);
         }
     }
 }
