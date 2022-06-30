@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.groovy.tree.G
 import org.openrewrite.java.JavaVisitor
 import org.openrewrite.java.asFullyQualified
+import org.openrewrite.java.search.FindAnnotationsTest.Companion.foo
 import org.openrewrite.java.tree.J
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.SourceSpec
@@ -124,7 +125,7 @@ class GroovyTypeAttributionTest : RewriteTest {
                 val m = cu.statements[1] as J.MethodInvocation
                 assertThat(m.arguments).hasSize(3)
                 assertThat(m.arguments[2]).isInstanceOf(J.Lambda::class.java)
-                val foo = (((m.arguments[2] as J.Lambda).body as J.Block).statements[0] as J.Return).expression as J.Identifier
+                val foo = ((((m.arguments[2] as J.Lambda).body as J.Block).statements[0] as J.Return).expression as G.ExpressionStatement).expression as J.Identifier
                 assertThat(foo.type.asFullyQualified()!!.fullyQualifiedName).isEqualTo("java.lang.String")
             }
         }
