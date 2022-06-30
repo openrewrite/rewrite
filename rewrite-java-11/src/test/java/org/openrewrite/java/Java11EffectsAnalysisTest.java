@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Set;
 
 public class Java11EffectsAnalysisTest implements RewriteTest {
-
     private final Reads r = new Reads();
     private final Writes w = new Writes();
 
@@ -44,19 +43,19 @@ public class Java11EffectsAnalysisTest implements RewriteTest {
                                 .getTypesInUse().getVariables();
                         List<JavaType.Variable> vsList = new ArrayList<>(vs);
                         vsList.sort(Comparator.comparing(JavaType.Variable::getName));
-                        String marker = "";
+                        StringBuilder marker = new StringBuilder();
                         for (JavaType.Variable variable : vsList) {
                             if (r.reads(a, variable)) {
-                                if (marker != "") marker += ", ";
-                                marker += "reads " + variable.getName();
+                                if (!marker.toString().isEmpty()) marker.append(", ");
+                                marker.append("reads ").append(variable.getName());
                             }
                             if (w.writes(a, variable)) {
-                                if (marker != "") marker += ", ";
-                                marker += "writes " + variable.getName();
+                                if (!marker.toString().equals("")) marker.append(", ");
+                                marker.append("writes ").append(variable.getName());
                             }
                         }
-                        if (marker != "") {
-                            a = a.withMarkers(a.getMarkers().searchResult(marker));
+                        if (!marker.toString().isEmpty()) {
+                            a = a.withMarkers(a.getMarkers().searchResult(marker.toString()));
                         }
                         return a;
                     }

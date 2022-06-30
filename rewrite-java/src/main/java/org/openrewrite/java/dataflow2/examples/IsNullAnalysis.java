@@ -41,11 +41,9 @@ public class IsNullAnalysis extends DataFlowAnalysis<ModalBoolean> {
     /**
      * @return Whether the variable v is known to be null before given program point.
      */
-    public ModalBoolean isNullBefore(Cursor programPoint, JavaType.Variable v)
-    {
-        ProgramState<ModalBoolean> state = inputState(programPoint, new TraversalControl<>());
-        ModalBoolean result = state.get(v);
-        return result;
+    public ModalBoolean isNullBefore(Cursor programPoint, JavaType.Variable v) {
+        ProgramState<ModalBoolean> state = inputState(programPoint, TraversalControl.noop());
+        return state.get(v);
     }
 
     @Override
@@ -78,15 +76,14 @@ public class IsNullAnalysis extends DataFlowAnalysis<ModalBoolean> {
         J.Assignment a = c.getValue();
         if (a.getVariable() instanceof J.Identifier) {
             J.Identifier ident = (J.Identifier) a.getVariable();
-            ProgramState<ModalBoolean> s = inputState; //analysis(a.getAssignment());
-            return s.set(ident.getFieldType(), s.expr()); // .pop().push(s.expr());
+            return inputState.set(ident.getFieldType(), inputState.expr()); // .pop().push(s.expr());
         } else {
             throw new UnsupportedOperationException();
         }
     }
 
-    private static final String[] definitelyNonNullReturningMethodSignatures = new String[] {
-        "java.lang.String toUpperCase()"
+    private static final String[] definitelyNonNullReturningMethodSignatures = new String[]{
+            "java.lang.String toUpperCase()"
     };
 
     private static final List<MethodMatcher> definitelyNonNullReturningMethodMatchers =
@@ -109,7 +106,7 @@ public class IsNullAnalysis extends DataFlowAnalysis<ModalBoolean> {
 //            result = result.pop();
 //        }
 
-        for(MethodMatcher matcher : definitelyNonNullReturningMethodMatchers) {
+        for (MethodMatcher matcher : definitelyNonNullReturningMethodMatchers) {
             if (matcher.matches(method)) {
                 return result.push(False);
             }
@@ -168,15 +165,15 @@ public class IsNullAnalysis extends DataFlowAnalysis<ModalBoolean> {
     @Override
     public ProgramState transferToIfThenElseBranches(J.If ifThenElse, ProgramState s, String ifThenElseBranch) {
         Expression cond = ifThenElse.getIfCondition().getTree();
-        if(cond instanceof J.Binary) {
-            J.Binary binary = (J.Binary)cond;
-            if(binary.getOperator() == J.Binary.Type.Equal) {
-                if(binary.getLeft() instanceof J.Identifier) {
+        if (cond instanceof J.Binary) {
+            J.Binary binary = (J.Binary) cond;
+            if (binary.getOperator() == J.Binary.Type.Equal) {
+                if (binary.getLeft() instanceof J.Identifier) {
                     J.Identifier left = (J.Identifier) binary.getLeft();
                     if (binary.getRight() instanceof J.Literal) {
                         // condition has the form 's == literal'
                         boolean isNull = ((J.Literal) binary.getRight()).getValue() == null;
-                        if(ifThenElseBranch.equals("then")) {
+                        if (ifThenElseBranch.equals("then")) {
                             // in the 'then' branch
                             s = s.set(left.getFieldType(), isNull ? True : False);
                         } else {
@@ -189,6 +186,5 @@ public class IsNullAnalysis extends DataFlowAnalysis<ModalBoolean> {
         }
         return s;
     }
-
 }
 

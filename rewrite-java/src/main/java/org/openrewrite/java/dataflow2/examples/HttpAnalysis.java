@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.J;
 public class HttpAnalysis extends DataFlowAnalysis<HttpAnalysisValue> {
     public static MethodMatcher URI_CREATE_MATCHER = new MethodMatcher("java.net.URI create(String)");
     public static MethodMatcher STRING_REPLACE = new MethodMatcher("java.lang.String replace(..)");
+
     public HttpAnalysis(DataFlowGraph dfg) {
         super(dfg, HttpAnalysisValue.JOINER);
     }
@@ -39,11 +40,11 @@ public class HttpAnalysis extends DataFlowAnalysis<HttpAnalysisValue> {
             HttpAnalysisValue arg0Value = inputState.expr(1); // analysis(arg0);
             HttpAnalysisValue arg1Value = inputState.expr(0); // analysis(arg1);
             if (arg0Value.getName() == HttpAnalysisValue.Understanding.NOT_SECURE
-                && arg1Value.getName() == HttpAnalysisValue.Understanding.SECURE) {
+                    && arg1Value.getName() == HttpAnalysisValue.Understanding.SECURE) {
                 return inputState.push(HttpAnalysisValue.SECURE);
             } else if (arg1Value.getName() == HttpAnalysisValue.Understanding.NOT_SECURE
                     && arg0Value.getName() == HttpAnalysisValue.Understanding.SECURE)
-            return inputState.push(new HttpAnalysisValue(HttpAnalysisValue.Understanding.NOT_SECURE, mi.getArguments().get(1)));
+                return inputState.push(new HttpAnalysisValue(HttpAnalysisValue.Understanding.NOT_SECURE, mi.getArguments().get(1)));
         }
         return super.transferMethodInvocation(c, inputState, t);
     }
@@ -52,7 +53,7 @@ public class HttpAnalysis extends DataFlowAnalysis<HttpAnalysisValue> {
     public ProgramState<HttpAnalysisValue> transferLiteral(Cursor c, ProgramState<HttpAnalysisValue> inputState, TraversalControl<ProgramState<HttpAnalysisValue>> t) {
         J.Literal literal = c.getValue();
         String value = literal.getValueSource();
-        if(value != null) {
+        if (value != null) {
             if (value.startsWith("https")) {
                 return inputState.push(HttpAnalysisValue.SECURE);
             } else if (value.startsWith("http")) {

@@ -37,11 +37,9 @@ public class ConstantPropagation extends DataFlowAnalysis<ConstantPropagationVal
         super(dfg, ConstantPropagationValue.JOINER);
     }
 
-    public ConstantPropagationValue value(Cursor programPoint, JavaType.Variable v)
-    {
+    public ConstantPropagationValue value(Cursor programPoint, JavaType.Variable v) {
         ProgramState<ConstantPropagationValue> state = inputState(programPoint, new TraversalControl<>());
-        ConstantPropagationValue result = state.get(v);
-        return result;
+        return state.get(v);
     }
 
     @Override
@@ -82,17 +80,17 @@ public class ConstantPropagation extends DataFlowAnalysis<ConstantPropagationVal
 
         inputState = inputState.pop().pop();
 
-        if(cp0 == null || cp1 == null) {
+        if (cp0 == null || cp1 == null) {
             return inputState.push(CONFLICT);
         }
 
-        if(cp0.getUnderstanding() == Known && cp1.getUnderstanding() == Known) {
-            if(binary.getOperator() == J.Binary.Type.Addition) {
-                if(cp0.getValue() instanceof Integer && cp1.getValue() instanceof Integer) {
-                    Integer result = ((Integer)cp0.getValue()) + ((Integer)cp1.getValue());
+        if (cp0.getUnderstanding() == Known && cp1.getUnderstanding() == Known) {
+            if (binary.getOperator() == J.Binary.Type.Addition) {
+                if (cp0.getValue() instanceof Integer && cp1.getValue() instanceof Integer) {
+                    Integer result = ((Integer) cp0.getValue()) + ((Integer) cp1.getValue());
                     return inputState.push(new ConstantPropagationValue(Known, result));
-                } else if(cp0.getValue() instanceof String && cp1.getValue() instanceof String) {
-                    String result = ((String)cp0.getValue()) + ((String)cp1.getValue());
+                } else if (cp0.getValue() instanceof String && cp1.getValue() instanceof String) {
+                    String result = ((String) cp0.getValue()) + ((String) cp1.getValue());
                     return inputState.push(new ConstantPropagationValue(Known, result));
                 } else {
                     return inputState.push(CONFLICT);
@@ -100,7 +98,7 @@ public class ConstantPropagation extends DataFlowAnalysis<ConstantPropagationVal
             } else {
                 return inputState.push(CONFLICT);
             }
-        } else if(cp0.getUnderstanding() == Unknown || cp1.getUnderstanding() == Unknown) {
+        } else if (cp0.getUnderstanding() == Unknown || cp1.getUnderstanding() == Unknown) {
             return inputState.push(UNKNOWN);
         } else {
             return inputState.push(CONFLICT);
@@ -111,7 +109,7 @@ public class ConstantPropagation extends DataFlowAnalysis<ConstantPropagationVal
     public ProgramState<ConstantPropagationValue> transferNamedVariable(Cursor c, ProgramState<ConstantPropagationValue> inputState, TraversalControl<ProgramState<ConstantPropagationValue>> tc) {
         J.VariableDeclarations.NamedVariable v = c.getValue();
         JavaType.Variable t = v.getVariableType();
-        if(v.getInitializer() != null) {
+        if (v.getInitializer() != null) {
             //ProgramState<ConstantPropagationValue> s = analysis(v.getInitializer());
             //ConstantPropagationValue e = inputState.expr();
             return inputState.set(t, inputState.expr());
@@ -134,12 +132,9 @@ public class ConstantPropagation extends DataFlowAnalysis<ConstantPropagationVal
         }
     }
 
-    private static final String[] definitelyNonNullReturningMethodSignatures = new String[] {
-        "java.lang.String toUpperCase()"
-    };
+    private static final String[] definitelyNonNullReturningMethodSignatures = new String[]{"java.lang.String toUpperCase()"};
 
-    private static final List<MethodMatcher> definitelyNonNullReturningMethodMatchers =
-            Arrays.stream(definitelyNonNullReturningMethodSignatures).map(MethodMatcher::new).collect(Collectors.toList());
+    private static final List<MethodMatcher> definitelyNonNullReturningMethodMatchers = Arrays.stream(definitelyNonNullReturningMethodSignatures).map(MethodMatcher::new).collect(Collectors.toList());
 
     @Override
     public ProgramState<ConstantPropagationValue> transferMethodInvocation(Cursor c, ProgramState<ConstantPropagationValue> inputState, TraversalControl<ProgramState<ConstantPropagationValue>> t) {
@@ -155,16 +150,22 @@ public class ConstantPropagation extends DataFlowAnalysis<ConstantPropagationVal
     @Override
     public ProgramState<ConstantPropagationValue> transferLiteral(Cursor c, ProgramState<ConstantPropagationValue> inputState, TraversalControl<ProgramState<ConstantPropagationValue>> t) {
         J.Literal pp = c.getValue();
-        //ProgramState<ConstantPropagationValue> s = inputState(c, t);
-        if (pp.getType() == JavaType.Primitive.String) {
-            String value = pp.getValueSource();
-            value = value.substring(1, value.length() - 1).replaceAll("\\\'", "'");
-            return inputState.push(new ConstantPropagationValue(Known, value));
-        } else if (pp.getType() == JavaType.Primitive.Int) {
-            Integer value = Integer.parseInt(pp.getValueSource());
-            return inputState.push(new ConstantPropagationValue(Known, value));
-        } else {
+        if (pp.getType() == null) {
             return inputState.push(UNKNOWN);
+        }
+        switch (pp.getType()) {
+            case String:
+            case Double:
+            case Float:
+            case Int:
+            case Long:
+            case Short:
+            case Byte:
+            case Char:
+            case Boolean:
+                return inputState.push(new ConstantPropagationValue(Known, pp.getValue()));
+            default:
+                return inputState.push(UNKNOWN);
         }
     }
 

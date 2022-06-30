@@ -56,7 +56,9 @@ public enum ModalBoolean {
     public static ModalBoolean join(Collection<ModalBoolean> outs) {
         ModalBoolean result = NoIdea;
         for (ModalBoolean out : outs) {
-            if (out == NoIdea) continue;
+            if (out == NoIdea) {
+                continue;
+            }
             if ((result == True && out != True)
                     || (result == False && out != False)
                     || (result == Null && out != Null)) {

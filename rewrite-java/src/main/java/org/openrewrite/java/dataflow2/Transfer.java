@@ -41,7 +41,8 @@ public class Transfer<T> implements JavaDispatcher3<ProgramState<T>, Cursor, Pro
         return inputState.push(dfa.joiner.lowerBound());
     }
 
-    @Override public ProgramState<T> visitAssignment(J.Assignment pp, Cursor c, ProgramState<T> inputState, TraversalControl<ProgramState<T>> t) {
+    @Override
+    public ProgramState<T> visitAssignment(J.Assignment pp, Cursor c, ProgramState<T> inputState, TraversalControl<ProgramState<T>> t) {
         J.Assignment a = c.getValue();
         if (a.getVariable() instanceof J.Identifier) {
             J.Identifier ident = (J.Identifier) a.getVariable();
@@ -135,7 +136,7 @@ public class Transfer<T> implements JavaDispatcher3<ProgramState<T>, Cursor, Pro
     }
 
     @Override
-    public  ProgramState<T> visitNewClass(J.NewClass pp, Cursor c, ProgramState<T> inputState, TraversalControl<ProgramState<T>> t) {
+    public ProgramState<T> visitNewClass(J.NewClass pp, Cursor c, ProgramState<T> inputState, TraversalControl<ProgramState<T>> t) {
         J.NewClass newClass = c.getValue();
         int d = dfa.stackSizeBefore(newClass);
         ProgramState<T> result = inputState.pop(d);

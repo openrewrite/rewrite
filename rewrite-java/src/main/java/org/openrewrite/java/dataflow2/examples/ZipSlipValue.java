@@ -67,8 +67,8 @@ public abstract class ZipSlipValue {
                 // do nothing
             } else if (value == ZIP_ENTRY_NAME && result == ZIP_ENTRY_NAME) {
                 // do nothing
-            } else if(value instanceof NewFileFromZipEntry && result instanceof NewFileFromZipEntry) {
-                if(!((NewFileFromZipEntry)value).dir.equals(((NewFileFromZipEntry)result).dir)) {
+            } else if (value instanceof NewFileFromZipEntry && result instanceof NewFileFromZipEntry) {
+                if (!((NewFileFromZipEntry) value).dir.equals(((NewFileFromZipEntry) result).dir)) {
                     return UNSAFE;
                 }
             } else {
@@ -84,8 +84,8 @@ public abstract class ZipSlipValue {
     }
 
     public static boolean equal(Expression a, Expression b) {
-        if(a instanceof J.Identifier && b instanceof J.Identifier) {
-            return ((J.Identifier)a).getFieldType() == ((J.Identifier)b).getFieldType();
+        if (a instanceof J.Identifier && b instanceof J.Identifier) {
+            return ((J.Identifier) a).getFieldType() == ((J.Identifier) b).getFieldType();
         }
         return false;
     }
@@ -116,6 +116,7 @@ public abstract class ZipSlipValue {
 
     public static class NewFileFromZipEntry extends ZipSlipValue {
         public final Expression dir;
+
         protected NewFileFromZipEntry(Expression dir) {
             super("NewFileFromZipEntry");
             this.dir = dir;

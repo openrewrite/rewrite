@@ -25,5 +25,7 @@ import java.util.Set;
 @Incubating(since = "7.25.0")
 public class TraversalControl<S extends ProgramState<?>> {
 
-    public static TraversalControl<?> DEFAULT = new TraversalControl<>();
+    public static <S extends ProgramState<?>> TraversalControl<S> noop() {
+        return new TraversalControl<>();
+    }
 }

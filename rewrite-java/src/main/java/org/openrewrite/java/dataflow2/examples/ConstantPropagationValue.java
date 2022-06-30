@@ -37,14 +37,14 @@ public class ConstantPropagationValue {
         public ConstantPropagationValue join(Collection<ConstantPropagationValue> values) {
             ConstantPropagationValue result = UNKNOWN;
             for (ConstantPropagationValue value : values) {
-                if(result == UNKNOWN) {
+                if (result == UNKNOWN) {
                     result = value;
                 } else if (value == UNKNOWN) {
                     result = value;
-                } else if(value == CONFLICT) {
+                } else if (value == CONFLICT) {
                     return CONFLICT;
-                } else if(value.getUnderstanding() == Understanding.Known) {
-                    if(result.getUnderstanding() != Understanding.Known || !result.value.equals(value.value)) {
+                } else if (value.getUnderstanding() == Understanding.Known) {
+                    if (result.getUnderstanding() != Understanding.Known || !result.value.equals(value.value)) {
                         return CONFLICT;
                     }
                     result = value;

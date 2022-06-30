@@ -40,7 +40,7 @@ public class UseSecureHttpConnection extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
                 if (URI_CREATE_MATCHER.matches(mi)) {
-                    J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
+                    J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
                     HttpAnalysis httpAnalysis = new HttpAnalysis(new DataFlowGraph(cu));
                     ProgramPoint arg0 = mi.getArguments().get(0);
                     ProgramState<HttpAnalysisValue> state = httpAnalysis.getStateAfter(arg0);
@@ -60,8 +60,8 @@ public class UseSecureHttpConnection extends Recipe {
 
         @Override
         public J.Literal visitLiteral(J.Literal literal, ExecutionContext executionContext) {
-
             if (literal == insecureHttps) {
+                assert literal.getValueSource() != null;
                 return literal.withValueSource(literal.getValueSource().replace("http", "https"));
             }
             return literal;

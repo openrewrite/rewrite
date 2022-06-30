@@ -110,10 +110,10 @@ public class Utils {
     }
 
     public static String print(Cursor c) {
-        if(c.getValue() instanceof ProgramPoint) {
+        if (c.getValue() instanceof ProgramPoint) {
             ProgramPoint p = c.getValue();
-            return print(p,c);
-        } else if(c.getValue() instanceof List) {
+            return print(p, c);
+        } else if (c.getValue() instanceof List) {
             List<ProgramPoint> l = c.getValue();
             return "[" + l.stream().map(e -> print(e, c)).collect(Collectors.joining(", ")) + "]";
         } else {

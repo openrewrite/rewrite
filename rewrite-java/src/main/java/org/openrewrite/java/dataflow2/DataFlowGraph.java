@@ -30,17 +30,16 @@ import static org.openrewrite.java.dataflow2.ProgramPoint.EXIT;
 
 @Incubating(since = "7.25.0")
 public class DataFlowGraph {
-
-    final J.CompilationUnit cu;
+    private final J.CompilationUnit cu;
 
     // This is a temporary hack to compute next from previous
     // until the next() methods are implemented.
     private Map<Cursor, List<Cursor>> previousMap;
 
     // NLE statement -> target
-    Map<ProgramPoint, Cursor> nonLocalExitsForward;
+    private Map<ProgramPoint, Cursor> nonLocalExitsForward;
     // target -> list(NLE statements targeting target)
-    Map<ProgramPoint, ArrayList<Cursor>> nonLocalExitsBackward;
+    private Map<ProgramPoint, ArrayList<Cursor>> nonLocalExitsBackward;
 
     public DataFlowGraph(J.CompilationUnit cu) {
         this.cu = cu;
@@ -70,92 +69,60 @@ public class DataFlowGraph {
         }
 
         J parent = parentCursor.getValue();
-        switch (parent.getClass().getName().replaceAll("^org.openrewrite.java.tree.", "")) {
-            case "J$Assignment":
-                return previousInAssignment(parentCursor, current);
-            case "J$Block":
-                return previousInBlock(parentCursor, current);
-            case "J$MethodInvocation":
-                return previousInMethodInvocation(parentCursor, current);
-            case "J$NewClass":
-                return previousInNewClass(parentCursor, current);
-            case "J$If":
-                return previousInIf(parentCursor, current);
-            case "J$If$Else":
-                return previousInIfElse(parentCursor, current);
-            case "J$WhileLoop":
-                return previousInWhileLoop(parentCursor, current);
-            case "J$ForLoop":
-                return previousInForLoop(parentCursor, current);
-            case "J$ForLoop$Control":
-                return previousInForLoopControl(parentCursor, current);
-            case "J$VariableDeclarations":
-                return previousInVariableDeclarations(parentCursor, current);
-            case "J$Unary":
-                return previousInUnary(parentCursor, current);
-            case "J$Binary":
-                return previousInBinary(parentCursor, current);
-            case "J$Parentheses":
-                return previousInParentheses(parentCursor, current);
-            case "J$ControlParentheses":
-                return previousInControlParentheses(parentCursor, current);
-            case "J$VariableDeclarations$NamedVariable":
-                return previousInNamedVariable(parentCursor, current);
-            case "J$Return":
-                return previousInReturn(parentCursor, current);
-            case "J$Throw":
-                return previousInThrow(parentCursor, current);
-            case "J$Try":
-                return previousInTry(parentCursor, current);
-            case "J$Try$Catch":
-                return previousInTryCatch(parentCursor, current);
-            case "J$MethodDeclaration":
-                return previousInMethodDeclaration(parentCursor, current);
-            case "J$ArrayAccess":
-                return previousInArrayAccess(parentCursor, current);
-            case "J$ArrayDimension":
-                return previousInArrayDimension(parentCursor, current);
-            case "J$Assert":
-                return previousInAssert(parentCursor, current);
-            case "J$CompilationUnit":
-            case "J$ClassDeclaration":
-                return Collections.emptyList();
-            case "J$Literal":
-            case "J$Identifier":
-            case "J$Empty":
-                // all these are terminal nodes
-                return previousInTerminalNode(parentCursor, current);
-            case "J$Primitive":
-                // not actually a program point, but implements Expression or Statement
-                return previousInTerminalNode(parentCursor, current);
-            default:
-                // Assert
-                // ArrayAccess
-                // AssignmentOperation
-                // Break
-                // Case
-                // Continue
-                // DoWhileLoop
-                // EnumValue
-                // EnumValueSet
-                // FieldAccess
-                // ForeachLoop
-                // InstanceOf
-                // Label
-                // Lambda
-                // MemberReference
-                // MultiCatch
-                // NewArray
-                // ArrayDimension
-                // Return
-                // Switch
-                // Ternary
-                // Throw
-                // Try
-                // TypeCast
-                // WhileLoop
-                throw new Error("Not implemented : " + parent.getClass().getName());
+        if (parent instanceof J.Assignment) {
+            return previousInAssignment(parentCursor, current);
+        } else if (parent instanceof J.Block) {
+            return previousInBlock(parentCursor, current);
+        } else if (parent instanceof J.MethodInvocation) {
+            return previousInMethodInvocation(parentCursor, current);
+        } else if (parent instanceof J.NewClass) {
+            return previousInNewClass(parentCursor, current);
+        } else if (parent instanceof J.If) {
+            return previousInIf(parentCursor, current);
+        } else if (parent instanceof J.If.Else) {
+            return previousInIfElse(parentCursor, current);
+        } else if (parent instanceof J.WhileLoop) {
+            return previousInWhileLoop(parentCursor, current);
+        } else if (parent instanceof J.ForLoop) {
+            return previousInForLoop(parentCursor, current);
+        } else if (parent instanceof J.ForLoop.Control) {
+            return previousInForLoopControl(parentCursor, current);
+        } else if (parent instanceof J.VariableDeclarations) {
+            return previousInVariableDeclarations(parentCursor, current);
+        } else if (parent instanceof J.Unary) {
+            return previousInUnary(parentCursor, current);
+        } else if (parent instanceof J.Binary) {
+            return previousInBinary(parentCursor, current);
+        } else if (parent instanceof J.Parentheses) {
+            return previousInParentheses(parentCursor, current);
+        } else if (parent instanceof J.ControlParentheses) {
+            return previousInControlParentheses(parentCursor, current);
+        } else if (parent instanceof J.VariableDeclarations.NamedVariable) {
+            return previousInNamedVariable(parentCursor, current);
+        } else if (parent instanceof J.Return) {
+            return previousInReturn(parentCursor, current);
+        } else if (parent instanceof J.Throw) {
+            return previousInThrow(parentCursor, current);
+        } else if (parent instanceof J.Try) {
+            return previousInTry(parentCursor, current);
+        } else if (parent instanceof J.Try.Catch) {
+            return previousInTryCatch(parentCursor, current);
+        } else if (parent instanceof J.MethodDeclaration) {
+            return previousInMethodDeclaration(parentCursor, current);
+        } else if (parent instanceof J.ArrayAccess) {
+            return previousInArrayAccess(parentCursor, current);
+        } else if (parent instanceof J.ArrayDimension) {
+            return previousInArrayDimension(parentCursor, current);
+        } else if (parent instanceof J.Assert) {
+            return previousInAssert(parentCursor, current);
+        } else if (parent instanceof J.CompilationUnit || parent instanceof J.ClassDeclaration) {
+            return Collections.emptyList();
+        } else if (parent instanceof J.Literal || parent instanceof J.Identifier || parent instanceof J.Empty) {// all these are terminal nodes
+            return previousInTerminalNode(parentCursor, current);
+        } else if (parent instanceof J.Primitive) {// not actually a program point, but implements Expression or Statement
+            return previousInTerminalNode(parentCursor, current);
         }
+        throw new IllegalArgumentException("Not implemented : " + parent.getClass().getName());
     }
 
     List<Cursor> previousInBlock(Cursor parentCursor, ProgramPoint p) {
@@ -213,7 +180,7 @@ public class DataFlowGraph {
 
     public List<Cursor> previous(Cursor c) {
         List<Cursor> prev = previousIn(c, EXIT);
-        if(prev.size() == 1 && prev.contains(c)) {
+        if (prev.size() == 1 && prev.contains(c)) {
             return previousIn(c, ENTRY);
         } else {
             return prev;
@@ -686,8 +653,7 @@ public class DataFlowGraph {
             if (_finally != null) {
                 return previousIn(new Cursor(parentCursor, _finally), EXIT);
             } else {
-                List<Cursor> result = new ArrayList<>();
-                result.addAll(previousIn(new Cursor(parentCursor, body), EXIT));
+                List<Cursor> result = new ArrayList<>(previousIn(new Cursor(parentCursor, body), EXIT));
                 for (J.Try.Catch _catch : catches) {
                     result.addAll(previousIn(new Cursor(parentCursor, _catch), EXIT));
                 }
@@ -696,8 +662,7 @@ public class DataFlowGraph {
         } else if (p == ENTRY) {
             return previousIn(parentCursor.getParentOrThrow(), parentCursor.getValue());
         } else if (p == _finally) {
-            List<Cursor> result = new ArrayList<>();
-            result.addAll(previousIn(new Cursor(parentCursor, body), EXIT));
+            List<Cursor> result = new ArrayList<>(previousIn(new Cursor(parentCursor, body), EXIT));
             for (J.Try.Catch _catch : catches) {
                 result.addAll(previousIn(new Cursor(parentCursor, _catch), EXIT));
             }

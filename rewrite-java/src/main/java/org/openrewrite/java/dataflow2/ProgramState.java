@@ -43,17 +43,17 @@ public class ProgramState<T> {
     }
 
     private ProgramState(HashMap<JavaType.Variable, T> map) {
-        this.expressionStack  = null;
+        this.expressionStack = null;
         this.map = map;
     }
 
     private ProgramState(LinkedListElement<T> expressionStack, HashMap<JavaType.Variable, T> map) {
-        this.expressionStack  = expressionStack;
+        this.expressionStack = expressionStack;
         this.map = map;
     }
 
     public T expr() {
-        if(expressionStack == null) {
+        if (expressionStack == null) {
             // If this happens, it means that some expression didn't push its value
             throw new NullPointerException("Empty expression stack");
         }
@@ -62,7 +62,7 @@ public class ProgramState<T> {
 
     public T expr(int depth) {
         LinkedListElement<T> s = expressionStack;
-        for(int i=0; i<depth; i++) {
+        for (int i = 0; i < depth; i++) {
             s = s.previous;
         }
         return s.value;
@@ -78,7 +78,7 @@ public class ProgramState<T> {
 
     public ProgramState<T> pop(int n) {
         LinkedListElement<T> e = expressionStack;
-        for(int i=0; i<n; i++) {
+        for (int i = 0; i < n; i++) {
             e = e.previous;
         }
         return withExpressionStack(e);
@@ -96,14 +96,14 @@ public class ProgramState<T> {
     }
 
     public static <T> ProgramState<T> join(Joiner<T> joiner, List<ProgramState<T>> outs) {
-        if(outs.size() == 1) {
+        if (outs.size() == 1) {
             return outs.get(0);
         }
         HashMap<JavaType.Variable, T> m = new HashMap<>();
-        for(ProgramState<T> out : outs) {
-            for(JavaType.Variable key : out.getMap().keySet()) {
+        for (ProgramState<T> out : outs) {
+            for (JavaType.Variable key : out.getMap().keySet()) {
                 T v1 = out.getMap().get(key);
-                if(!m.containsKey(key)) {
+                if (!m.containsKey(key)) {
                     m.put(key, v1);
                 } else {
                     T v2 = m.get(key);
@@ -112,7 +112,7 @@ public class ProgramState<T> {
             }
         }
         // ... combine stacks : must have the same length ...
-        if(outs.size() > 0) {
+        if (outs.size() > 0) {
             int len = LinkedListElement.length(outs.get(0).expressionStack);
             for (int i = 1; i < outs.size(); i++) {
                 assert len == LinkedListElement.length(outs.get(i).expressionStack);
@@ -126,12 +126,12 @@ public class ProgramState<T> {
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder("{");
-        for(LinkedListElement<T> e = expressionStack; e != null; e = e.previous) {
+        for (LinkedListElement<T> e = expressionStack; e != null; e = e.previous) {
             s.append(" ");
             s.append(e.value == null ? "null" : e.value.toString());
         }
         s.append(" |");
-        for(JavaType.Variable v : map.keySet()) {
+        for (JavaType.Variable v : map.keySet()) {
             T t = map.get(v);
             s.append(" ").append(v.getName()).append(" -> ").append(t);
         }
@@ -158,7 +158,7 @@ public class ProgramState<T> {
         T value;
 
         public static <T> boolean isEqual(LinkedListElement<T> a, LinkedListElement<T> b) {
-            if(a == b) return true;
+            if (a == b) return true;
             if (a == null ^ b == null) {
                 return false;
             }
@@ -166,7 +166,7 @@ public class ProgramState<T> {
         }
 
         public static <T> int length(LinkedListElement<T> expressionStack) {
-            if(expressionStack == null) {
+            if (expressionStack == null) {
                 return 0;
             } else {
                 return 1 + length(expressionStack.previous);
