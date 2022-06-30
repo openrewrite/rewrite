@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 class CompilationUnitTest : GroovyTreeTest {
 
@@ -49,6 +50,14 @@ class CompilationUnitTest : GroovyTreeTest {
     fun trailingComment() = assertParsePrintAndProcess(
         """
             // foo
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1974")
+    @Test
+    fun topLevelExpression() = assertParsePrintAndProcess(
+        """
+            5
         """
     )
 }
