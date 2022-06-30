@@ -22,12 +22,15 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.internal.VariableNameUtils
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.RewriteTest.toRecipe
 
-interface FindVariableNamesInScopeTest {
+interface VariableNameUtilsTest : RewriteTest {
     val parser: JavaParser
         get() = JavaParser.fromJavaVersion().build()
 
@@ -113,7 +116,7 @@ interface FindVariableNamesInScopeTest {
                 override fun visitIdentifier(identifier: J.Identifier, p: ExecutionContext): J.Identifier {
                     return if (identifier.simpleName == scope) {
                         val blockCursor: Cursor = this.cursor.dropParentUntil { it is J.Block }
-                        names.addAll(FindVariableNamesInScope.findNamesInScope(blockCursor))
+                        names.addAll(VariableNameUtils.findNamesInScope(blockCursor))
                         identifier.withSimpleName("changed")
                     } else {
                         identifier
@@ -388,6 +391,61 @@ interface FindVariableNamesInScopeTest {
         baseTest(source, scope, result)
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1937")
+    @Test
+    fun generateUniqueNameWithIncrementedNumber() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaIsoVisitor<ExecutionContext>() {
+                    override fun visitIdentifier(identifier: J.Identifier, p: ExecutionContext): J.Identifier {
+                        return if (identifier.simpleName == "ex") {
+                            identifier.withSimpleName(VariableNameUtils.generateVariableName("ignored", this.cursor, VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER))
+                        } else {
+                            identifier
+                        }
+                    }
+                }
+            })
+        },
+        java("""
+            @SuppressWarnings("all")
+            class Test {
+                int ignored = 0;
+                void method(int ignored1) {
+                    int ignored2 = 0;
+                    for (int ignored3 = 0; ignored3 < 10; ignored3++) { // scope does not apply.
+                        int ignored4 = 0; // scope does not apply.
+                    }
+                    if (ignored1 > 0) {
+                        int ignored5 = 0; // scope does not apply.
+                    }
+                    try {
+                        int ignored6 = 0; // scope does not apply.
+                    } catch (Exception ex) {
+                    }
+                }
+            }
+        """, """
+            @SuppressWarnings("all")
+            class Test {
+                int ignored = 0;
+                void method(int ignored1) {
+                    int ignored2 = 0;
+                    for (int ignored3 = 0; ignored3 < 10; ignored3++) { // scope does not apply.
+                        int ignored4 = 0; // scope does not apply.
+                    }
+                    if (ignored1 > 0) {
+                        int ignored5 = 0; // scope does not apply.
+                    }
+                    try {
+                        int ignored6 = 0; // scope does not apply.
+                    } catch (Exception ignored3) {
+                    }
+                }
+            }
+        """)
+    )
+
     fun baseTest(source: Array<String>, scope: String, expected: String) {
         val sources = parser.parse(
             InMemoryExecutionContext(),
@@ -400,7 +458,7 @@ interface FindVariableNamesInScopeTest {
             object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitIdentifier(identifier: J.Identifier, p: ExecutionContext): J.Identifier {
                     return if (identifier.simpleName == scope) {
-                        names.addAll(FindVariableNamesInScope.findNamesInScope(this.cursor))
+                        names.addAll(VariableNameUtils.findNamesInScope(this.cursor))
                         identifier.withSimpleName("changed")
                     } else {
                         identifier

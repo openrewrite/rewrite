@@ -136,6 +136,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class DeleteStatementTck : DeleteStatementTest
 
     @Nested
+    inner class DoesNotUseRewriteSkipTck : DoesNotUseRewriteSkipTest
+
+    @Nested
     inner class EmptyBlockTck : EmptyBlockTest
 
     @Nested
@@ -170,9 +173,6 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class FindAnnotationsTck : FindAnnotationsTest
-
-    @Nested
-    inner class FindVariableNamesInScopeTck : FindVariableNamesInScopeTest
 
     @Nested
     inner class FixSerializableFieldsTck : FixSerializableFieldsTest
@@ -454,6 +454,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class SimplifyBooleanReturnTck : SimplifyBooleanReturnTest
 
     @Nested
+    inner class SimplifyCompoundStatementTck : SimplifyCompoundStatementTest
+
+    @Nested
     inner class SimplifyConsecutiveAssignmentsTck : SimplifyConsecutiveAssignmentsTest
 
     @Nested
@@ -532,9 +535,6 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UseStringReplaceTestTck : UseStringReplaceTest
 
     @Nested
-    inner class DoesNotUseRewriteSkipTck : DoesNotUseRewriteSkipTest
-
-    @Nested
     inner class UseStaticImportTck : UseStaticImportTest
 
     @Nested
@@ -544,7 +544,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UsesTypeTck : UsesTypeTest
 
     @Nested
-    inner class SimplifyCompoundStatementTck : SimplifyCompoundStatementTest
+    inner class VariableNameUtilsTck : VariableNameUtilsTest
 
     @Nested
     inner class WhileInsteadOfForTck : WhileInsteadOfForTest

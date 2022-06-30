@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.search;
+package org.openrewrite.java.internal;
 
 import lombok.Value;
 import org.openrewrite.*;
@@ -25,7 +25,35 @@ import java.util.*;
 
 @Incubating(since = "7.25.0")
 @Value
-public class FindVariableNamesInScope {
+public class VariableNameUtils {
+
+    private VariableNameUtils() {
+    }
+
+    /**
+     * Generates a variable name without namespace conflicts in the scope of a cursor.
+     *
+     * A JavaSourceFile must be available in the Cursor path to account for all names
+     * available in the cursor scope.
+     *
+     * @param baseName baseName for the variable.
+     * @param scope The cursor position of a JavaVisitor, {@link org.openrewrite.java.JavaVisitor#getCursor()}.
+     * @param strategy {@link GenerationStrategy} to use if a name already exists with the baseName.
+     * @return either the baseName if a namespace conflict does not exist or a name generated with the provided strategy.
+     */
+    public static String generateVariableName(String baseName, Cursor scope, GenerationStrategy strategy) {
+        Set<String> namesInScope = findNamesInScope(scope);
+        String newName = baseName;
+        // Generate a new name to prevent namespace shadowing.
+        if (GenerationStrategy.INCREMENT_NUMBER.equals(strategy)) {
+            int count = 0;
+            while (namesInScope.contains(newName)) {
+                newName = baseName + (count += 1);
+            }
+        }
+
+        return newName;
+    }
 
     /**
      * Find the names of variables that already exist in the scope of a cursor.
@@ -47,6 +75,10 @@ public class FindVariableNamesInScope {
         VariableNameScopeVisitor variableNameScopeVisitor = new VariableNameScopeVisitor(scope);
         variableNameScopeVisitor.visit(compilationUnit, names);
         return names;
+    }
+
+    public enum GenerationStrategy {
+        INCREMENT_NUMBER
     }
 
     private static final class VariableNameScopeVisitor extends JavaIsoVisitor<Set<String>> {
