@@ -43,10 +43,8 @@ public class Utils {
     }
 
     static class Visitor extends JavaIsoVisitor<Integer> {
-
         final String ppToFind;
         Cursor result;
-
 
         public Visitor(String ppToFind) {
             this.ppToFind = ppToFind;
@@ -90,10 +88,8 @@ public class Utils {
     }
 
     static class FindVariableVisitor extends JavaIsoVisitor<Integer> {
-
         final String variableToFind;
         JavaType.Variable result;
-
 
         public FindVariableVisitor(String variableToFind) {
             this.variableToFind = variableToFind;
@@ -115,17 +111,17 @@ public class Utils {
             return print(p, c);
         } else if (c.getValue() instanceof List) {
             List<ProgramPoint> l = c.getValue();
-            return "[" + l.stream().map(e -> print(e, c)).collect(Collectors.joining(", ")) + "]";
+            return l.stream().map(e -> print(e, c)).collect(Collectors.joining(", ", "[", "]"));
         } else {
             throw new UnsupportedOperationException();
         }
     }
 
     public static String print(ProgramPoint p, Cursor c) {
-        return ((J) p).print(c).replace("\n", " ").replaceAll("[ ]+", " ").trim();
+        return ((J) p).print(c).replace("\n", " ").replaceAll("\\s\\s+", " ").trim();
     }
 
     public static String print(ProgramPoint p) {
-        return ((J) p).print().replace("\n", " ").replaceAll("[ ]+", " ").trim();
+        return ((J) p).print().replace("\n", " ").replaceAll("\\s\\s+", " ").trim();
     }
 }

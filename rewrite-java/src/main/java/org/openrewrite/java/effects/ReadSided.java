@@ -85,8 +85,6 @@ public class ReadSided implements JavaDispatcher2<Boolean, JavaType.Variable, Si
         return false;
     }
 
-    // ClassDeclaration
-
     @Override
     public Boolean visitContinue(J.Continue continueStatement, JavaType.Variable variable, Side side) {
         return false;
@@ -96,8 +94,6 @@ public class ReadSided implements JavaDispatcher2<Boolean, JavaType.Variable, Si
     public Boolean visitDoWhileLoop(J.DoWhileLoop doWhileLoop, JavaType.Variable variable, Side side) {
         return reads(doWhileLoop.getWhileCondition(), variable) || reads(doWhileLoop.getBody(), variable);
     }
-
-    // Empty
 
     @Override
     public Boolean visitEnumValueSet(J.EnumValueSet enums, JavaType.Variable variable, Side side) {
