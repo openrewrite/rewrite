@@ -16,12 +16,13 @@
 package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.dataflow2.ProgramPoint;
 
 import java.util.List;
 
 import static java.util.Collections.emptyList;
 
-public interface Expression extends J {
+public interface Expression extends J, ProgramPoint {
     @Nullable
     JavaType getType();
 

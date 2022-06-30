@@ -16,16 +16,13 @@
 package org.openrewrite.java.effects;
 
 import org.openrewrite.Incubating;
-import org.openrewrite.java.tree.JavaDispatcher2;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 
 /**
  * Provides the reads() methods for nodes that can be on either side of an assignment.
  */
 @Incubating(since = "7.25.0")
-class ReadSided implements JavaDispatcher2<Boolean, JavaType.Variable, Side> {
+public class ReadSided implements JavaDispatcher2<Boolean, JavaType.Variable, Side> {
 
     private static final Reads READS = new Reads();
 

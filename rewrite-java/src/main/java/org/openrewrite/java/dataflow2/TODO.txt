@@ -1,0 +1,18 @@
+* Verify stack size
+  - Useful for correctness
+  - Necessary to allocate the required number of stack slots when creating a new ProgramState (at present, stack slots are created by need)
+  - Clear stack when an expression is not used (e.g. "x = 1;", where "x = 1" is both an Expression and a Statement)
+* Sort out previous() vs. previousIn()
+  - The wording and possible the API design make it difficult to understand the "previous" relationship in the case of compound program points
+    (namely, enclosing other program points, such as an if-then-else statement). Finding a more intuitive way to present this would help
+    a lot in writing analysis code and making sure it is correct.
+* Compose analyses
+  - ProgramState is monolithic. It should instead be composable and allow to record the result of multiple analyses. For instance, we might want to
+    ask simultaneously whether x is possibly null, whether x is possibly even, and whether x is possibly equql to y.
+* Compute states by need
+  - There is no need to compute program states for program points or variables that are unrelated to the question at hand.
+* Complete missing features:
+  - Complete previousInXXX() methods to cover all types of program points.
+  - Complete transferXXX() methods to cover all types of program points.
+* Add more analysis examples.
+

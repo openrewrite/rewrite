@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.groovy.tree;
 
-import org.openrewrite.Incubating;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaDispatcher1;
 
-@Incubating(since = "7.25.0")
-public interface JavaDispatcher1<T, P1> {
+public interface GroovyDispatcher1<T, P1> extends JavaDispatcher1<T, P1> {
 
     default T dispatch(J pp, P1 p1) {
         if (pp instanceof J.ArrayAccess) {
@@ -115,197 +115,37 @@ public interface JavaDispatcher1<T, P1> {
             return visitVariableDeclarationsNamedVariable((J.VariableDeclarations.NamedVariable) pp, p1);
         } else if (pp instanceof J.WhileLoop) {
             return visitWhileLoop((J.WhileLoop) pp, p1);
+        } else if (pp instanceof G.MapEntry) {
+            return visitMapEntry((G.MapEntry) pp, p1);
+        } else if (pp instanceof G.MapLiteral) {
+            return visitMapLiteral((G.MapLiteral) pp, p1);
+        } else if (pp instanceof G.ListLiteral) {
+            return visitListLiteral((G.ListLiteral) pp, p1);
+        } else if (pp instanceof G.GString) {
+            return visitGString((G.GString) pp, p1);
+        } else if (pp instanceof G.Binary) {
+            return visitGBinary((G.Binary) pp, p1);
         }
-        throw new IllegalArgumentException("Unexpected node type: " + pp.getClass().getName());
+        throw new Error("Unexpected node type: " + pp.getClass().getName());
     }
 
-    T defaultDispatch(J ignoredC, P1 ignoredP1);
-
-    default T visitArrayAccess(J.ArrayAccess pp, P1 p1) {
+    default T visitMapEntry(G.MapEntry pp, P1 p1) {
         return defaultDispatch(pp, p1);
     }
 
-    default T visitAssert(J.Assert pp, P1 p1) {
+    default T visitMapLiteral(G.MapLiteral pp, P1 p1) {
         return defaultDispatch(pp, p1);
     }
 
-    default T visitAssignment(J.Assignment pp, P1 p1) {
+    default T visitListLiteral(G.ListLiteral pp, P1 p1) {
         return defaultDispatch(pp, p1);
     }
 
-    default T visitAssignmentOperation(J.AssignmentOperation pp, P1 p1) {
+    default T visitGString(G.GString pp, P1 p1) {
         return defaultDispatch(pp, p1);
     }
 
-    default T visitBinary(J.Binary pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitBlock(J.Block pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitBreak(J.Break pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitCase(J.Case pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitClassDeclaration(J.ClassDeclaration pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitCompilationUnit(J.CompilationUnit pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitContinue(J.Continue pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitControlParentheses(J.ControlParentheses<?> pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitDoWhileLoop(J.DoWhileLoop pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitEmpty(J.Empty pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitEnumValue(J.EnumValue pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitEnumValueSet(J.EnumValueSet pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitFieldAccess(J.FieldAccess pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitForeachLoop(J.ForEachLoop pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitForeachLoopControl(J.ForEachLoop.Control pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitForLoop(J.ForLoop pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitForLoopControl(J.ForLoop.Control pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitIdentifier(J.Identifier pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitInstanceOf(J.InstanceOf pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitIf(J.If pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitIfElse(J.If.Else pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitLabel(J.Label pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitLambda(J.Lambda pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitLiteral(J.Literal pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitMemberReference(J.MemberReference pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitMethodDeclaration(J.MethodDeclaration pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitMethodInvocation(J.MethodInvocation pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitMultiCatch(J.MultiCatch pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitNewArray(J.NewArray pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitNewClass(J.NewClass pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitParentheses(J.Parentheses<?> pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitReturn(J.Return pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitSwitch(J.Switch pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitSynchronized(J.Synchronized pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitTernary(J.Ternary pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitThrow(J.Throw pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitTry(J.Try pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitTryResource(J.Try.Resource pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitTypeCast(J.TypeCast pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitUnary(J.Unary pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitVariableDeclarations(J.VariableDeclarations pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitVariableDeclarationsNamedVariable(J.VariableDeclarations.NamedVariable pp, P1 p1) {
-        return defaultDispatch(pp, p1);
-    }
-
-    default T visitWhileLoop(J.WhileLoop pp, P1 p1) {
+    default T visitGBinary(G.Binary pp, P1 p1) {
         return defaultDispatch(pp, p1);
     }
 }
