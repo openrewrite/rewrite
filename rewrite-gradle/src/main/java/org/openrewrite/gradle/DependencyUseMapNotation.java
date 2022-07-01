@@ -84,7 +84,13 @@ public class DependencyUseMapNotation extends Recipe {
                         .withMarkers(arg.getMarkers());
                 G.MapEntry versionEntry = mapEntry("version", gav[2])
                         .withMarkers(arg.getMarkers());
-                m = m.withArguments(Arrays.asList(groupEntry, artifactEntry, versionEntry));
+
+                Expression lastArg = m.getArguments().get(m.getArguments().size() - 1);
+                if (lastArg instanceof J.Lambda) {
+                    m = m.withArguments(Arrays.asList(groupEntry, artifactEntry, versionEntry, lastArg));
+                } else {
+                    m = m.withArguments(Arrays.asList(groupEntry, artifactEntry, versionEntry));
+                }
 
                 return updateTypeForMapArgument(m);
             }
@@ -121,7 +127,13 @@ public class DependencyUseMapNotation extends Recipe {
                         .withMarkers(e.getMarkers());
                 G.MapEntry versionEntry = mapEntry("version", (Expression) arg2.getTree().withPrefix(Space.format(" ")))
                         .withMarkers(e.getMarkers());
-                m = m.withArguments(Arrays.asList(groupEntry, artifactEntry, versionEntry));
+
+                Expression lastArg = m.getArguments().get(m.getArguments().size() - 1);
+                if (lastArg instanceof J.Lambda) {
+                    m = m.withArguments(Arrays.asList(groupEntry, artifactEntry, versionEntry, lastArg));
+                } else {
+                    m = m.withArguments(Arrays.asList(groupEntry, artifactEntry, versionEntry));
+                }
 
                 return updateTypeForMapArgument(m);
             }
