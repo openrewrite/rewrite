@@ -388,6 +388,40 @@ interface VariableNameUtilsTest : RewriteTest {
         baseTest(source, scope, result)
     }
 
+    @Test
+    fun incrementExistingNumberPostFix() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaIsoVisitor<ExecutionContext>() {
+                    override fun visitIdentifier(identifier: J.Identifier, p: ExecutionContext): J.Identifier {
+                        return if (identifier.simpleName == "name2") {
+                            identifier.withSimpleName(VariableNameUtils.generateVariableName("name1", this.cursor, VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER))
+                        } else {
+                            identifier
+                        }
+                    }
+                }
+            })
+        },
+        java("""
+            @SuppressWarnings("all")
+            class Test {
+                int name = 0;
+                void method(int name1) {
+                    int name2 = 0;
+                }
+            }
+        """, """
+            @SuppressWarnings("all")
+            class Test {
+                int name = 0;
+                void method(int name1) {
+                    int name3 = 0;
+                }
+            }
+        """)
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1937")
     @Test
     fun generateUniqueNameWithIncrementedNumber() = rewriteRun(

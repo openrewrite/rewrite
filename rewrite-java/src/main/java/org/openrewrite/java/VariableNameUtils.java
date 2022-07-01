@@ -42,10 +42,22 @@ public class VariableNameUtils {
      */
     public static String generateVariableName(String baseName, Cursor scope, GenerationStrategy strategy) {
         Set<String> namesInScope = findNamesInScope(scope);
-        String newName = baseName;
         // Generate a new name to prevent namespace shadowing.
+        String newName = baseName;
         if (GenerationStrategy.INCREMENT_NUMBER.equals(strategy)) {
-            int count = 0;
+            StringBuilder postFix = new StringBuilder();
+            char[] charArray = baseName.toCharArray();
+            for (int i = charArray.length - 1; i >= 0; i--) {
+                char c = charArray[i];
+                if (Character.isDigit(c)) {
+                    postFix.append(c);
+                } else {
+                    break;
+                }
+            }
+
+            baseName = baseName.substring(0, baseName.length() - postFix.length());
+            int count = postFix.length() == 0 ? 0 : Integer.parseInt(postFix.reverse().toString());
             while (namesInScope.contains(newName)) {
                 newName = baseName + (count += 1);
             }
