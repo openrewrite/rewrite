@@ -255,7 +255,7 @@ public abstract class DataFlowAnalysis<T> {
     }
 
     private String className(Cursor c) {
-        return c.getValue();
+        return c.getValue().getClass().getName().replaceAll("^org.openrewrite.java.tree.", "");
     }
 
     private ProgramState<T> transfer2(Cursor pp, ProgramState inputState, TraversalControl<ProgramState<T>> t) {
@@ -334,48 +334,163 @@ public abstract class DataFlowAnalysis<T> {
     }
 
     protected final int stackSizeBefore(ProgramPoint pp) {
-        if (pp instanceof J.MethodInvocation) {
-            J.MethodInvocation invoke = (J.MethodInvocation) pp;
-            List<Expression> args = invoke.getArguments();
-            return (args.size() == 1 && args.get(0) instanceof J.Empty ? 0 : args.size())
-                    + (invoke.getSelect() == null ? 0 : 1);
-        } else if (pp instanceof J.Assert) {
-            J.Assert assertStmt = (J.Assert) pp;
-            return 1 + (assertStmt.getDetail() == null ? 0 : 1);
-        } else if (pp instanceof J.NewClass) {
-            J.NewClass newClass = (J.NewClass) pp;
-            // FIXME what if there is one argument and it is `J.Empty`?
-            return newClass.getArguments() == null ? 0 :
-                    newClass.getArguments().size();
-        } else if (pp instanceof J.If || pp instanceof J.If.Else || pp instanceof J.WhileLoop ||
-                pp instanceof J.ForLoop || pp instanceof J.ForLoop.Control || pp instanceof J.Block ||
-                pp instanceof J.VariableDeclarations || pp instanceof J.Literal || pp instanceof J.Identifier ||
-                pp instanceof J.Empty || pp instanceof J.ClassDeclaration ||
-                pp instanceof J.MethodDeclaration) {
-            return 0;
-        } else if (pp instanceof J.VariableDeclarations.NamedVariable || pp instanceof J.Unary ||
-                pp instanceof J.Assignment || pp instanceof J.Parentheses || pp instanceof J.ControlParentheses ||
-                pp instanceof J.FieldAccess) {
-            return 1;
-        } else if (pp instanceof J.Binary || pp instanceof J.ArrayAccess) {
-            return 2;
+        switch (pp.getClass().getName().replaceAll("^org.openrewrite.java.tree.", "")) {
+            case "J$MethodInvocation": {
+                J.MethodInvocation invoke = (J.MethodInvocation)pp;
+                List<Expression> args = invoke.getArguments();
+                return (args.size() == 1 && args.get(0) instanceof J.Empty ? 0 : args.size())
+                        + (invoke.getSelect() == null ? 0 : 1);
+            }
+            case "J$ArrayAccess":
+                return 2;
+            case "J$Assert": {
+                J.Assert assertStmt = (J.Assert)pp;
+                return 1 + (assertStmt.getDetail() == null ? 0 : 1);
+            }
+            case "J$NewClass": {
+                J.NewClass newClass = (J.NewClass)pp;
+                return newClass.getArguments().size();
+            }
+            case "J$If":
+                return 0;
+            case "J$If$Else":
+                return 0;
+            case "J$WhileLoop":
+                return 0;
+            case "J$ForLoop":
+                return 0;
+            case "J$ForLoop$Control":
+                return 0;
+            case "J$Block":
+                return 0;
+            case "J$VariableDeclarations":
+                return 0;
+            case "J$VariableDeclarations$NamedVariable":
+                return 1;
+            case "J$Unary":
+                return 1;
+            case "J$Binary":
+                return 2;
+            case "J$Assignment":
+                return 1;
+            case "J$Parentheses":
+                return 1;
+            case "J$ControlParentheses":
+                return 1;
+            case "J$Literal":
+                return 0;
+            case "J$Identifier":
+                return 0;
+            case "J$Empty":
+                return 0;
+            case "J$FieldAccess":
+                return 1;
+            case "J$CompilationUnit":
+            case "J$ClassDeclaration":
+            case "J$MethodDeclaration":
+                return 0;
+
+            // AssignmentOperation x+=1
+            // EnumValue
+            // EnumValueSet
+            // ForeachLoop
+            // DoWhileLoop
+            // InstanceOf like binary
+            // NewArray like new class with dimension
+            // Ternary (? :)
+            // TypeCast like parenthesis evaluate expression not type
+            // MemberReference
+
+            // Switch
+            // Case
+            // Lambda
+            // Break
+            // Continue
+            // Label
+            // Return
+            // Throw
+            // Try
+            // MultiCatch
+
+            default:
+                throw new IllegalArgumentException("Not implemented: " + pp.getClass().getName());
         }
-        throw new IllegalArgumentException("Not implemented: " + pp.getClass().getName());
     }
 
     protected final int stackSizeAfter(ProgramPoint pp) {
-        if (pp instanceof J.ClassDeclaration || pp instanceof J.MethodDeclaration || pp instanceof J.Assert ||
-                pp instanceof J.If || pp instanceof J.If.Else || pp instanceof J.WhileLoop || pp instanceof J.ForLoop ||
-                pp instanceof J.ForLoop.Control || pp instanceof J.Block || pp instanceof J.VariableDeclarations ||
-                pp instanceof J.VariableDeclarations.NamedVariable || pp instanceof J.Empty) {
-            return 0;
-        } else if (pp instanceof J.MethodInvocation || pp instanceof J.ArrayAccess || pp instanceof J.NewClass ||
-                pp instanceof J.Unary || pp instanceof J.Binary || pp instanceof J.Assignment ||
-                pp instanceof J.Parentheses || pp instanceof J.ControlParentheses || pp instanceof J.Literal ||
-                pp instanceof J.Identifier || pp instanceof J.FieldAccess) {
-            return 1;
+        switch (pp.getClass().getName().replaceAll("^org.openrewrite.java.tree.", "")) {
+            case "J$MethodInvocation":
+                return 1;
+            case "J$ArrayAccess":
+                return 1;
+            case "J$Assert":
+                return 0;
+            case "J$NewClass":
+                return 1;
+            case "J$If":
+                return 0;
+            case "J$If$Else":
+                return 0;
+            case "J$WhileLoop":
+                return 0;
+            case "J$ForLoop":
+                return 0;
+            case "J$ForLoop$Control":
+                return 0;
+            case "J$Block":
+                return 0;
+            case "J$VariableDeclarations":
+                return 0;
+            case "J$VariableDeclarations$NamedVariable":
+                return 0;
+            case "J$Unary":
+                return 1;
+            case "J$Binary":
+                return 1;
+            case "J$Assignment":
+                return 1;
+            case "J$Parentheses":
+                return 1;
+            case "J$ControlParentheses":
+                return 1;
+            case "J$Literal":
+                return 1;
+            case "J$Identifier":
+                return 1;
+            case "J$Empty":
+                return 0;
+            case "J$FieldAccess":
+                return 1;
+            case "J$CompilationUnit":
+            case "J$ClassDeclaration":
+            case "J$MethodDeclaration":
+                return 0;
+
+            // AssignmentOperation x+=1
+            // EnumValue
+            // EnumValueSet
+            // ForeachLoop
+            // DoWhileLoop
+            // InstanceOf like binary
+            // NewArray like new class with dimension
+            // Ternary (? :)
+            // TypeCast like parenthesis evaluate expression not type
+            // MemberReference
+
+            // Switch
+            // Case
+            // Lambda
+            // Break
+            // Continue
+            // Label
+            // Return
+            // Throw
+            // Try
+            // MultiCatch
+
+            default:
+                throw new IllegalArgumentException("Not implemented: " + pp.getClass().getName());
         }
-        throw new IllegalArgumentException("Not implemented: " + pp.getClass().getName());
     }
 
     public ProgramState<T> defaultTransfer(Cursor c, ProgramState<T> inputState, TraversalControl<ProgramState<T>> t) {
