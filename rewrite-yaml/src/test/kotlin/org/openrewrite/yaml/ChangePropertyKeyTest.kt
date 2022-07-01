@@ -27,7 +27,7 @@ import java.nio.file.Path
 class ChangePropertyKeyTest : YamlRecipeTest {
     override val recipe: Recipe
         get() = ChangePropertyKey(
-            "management.metrics.binders.files.enabled",
+            "management.metrics.binders.*.enabled",
             "management.metrics.enable.process.files",
             null,
             null
@@ -75,7 +75,19 @@ class ChangePropertyKeyTest : YamlRecipeTest {
     )
 
     @Test
+    fun singleGlobEntry() = assertChanged(
+        before = "management.metrics.binders.files.enabled: true",
+        after = "management.metrics.enable.process.files: true"
+    )
+
+    @Test
     fun nestedEntry() = assertChanged(
+        recipe = ChangePropertyKey(
+            "management.metrics.binders.files.enabled",
+            "management.metrics.enable.process.files",
+            null,
+            null
+        ),
         before = """
             unrelated.property: true
             management.metrics:

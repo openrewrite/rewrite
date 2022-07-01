@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -42,8 +43,8 @@ import static org.openrewrite.Tree.randomId;
 public class ChangePropertyKey extends Recipe {
 
     @Option(displayName = "Old property key",
-            description = "The property key to rename.",
-            example = "management.metrics.binders.files.enabled")
+            description = "The property key to rename. Supports glob",
+            example = "management.metrics.binders.*.enabled")
     String oldPropertyKey;
 
     @Option(displayName = "New property key",
@@ -109,7 +110,9 @@ public class ChangePropertyKey extends Recipe {
                     .collect(Collectors.joining("."));
 
             String propertyToTest = newPropertyKey;
-            if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, oldPropertyKey) : prop.equals(oldPropertyKey)) {
+            if (!Boolean.FALSE.equals(relaxedBinding) ?
+                    NameCaseConvention.matchesRelaxedBinding(prop, oldPropertyKey) :
+                    StringUtils.matchesGlob(prop, oldPropertyKey)) {
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
@@ -209,6 +212,4 @@ public class ChangePropertyKey extends Recipe {
             return m;
         }
     }
-
-
 }
