@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.YamlVisitor;
@@ -65,7 +66,9 @@ public class FindProperty extends Recipe {
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
+                if (!Boolean.FALSE.equals(relaxedBinding) ?
+                        NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) :
+                        StringUtils.matchesGlob(prop, propertyKey)) {
                     e = e.withValue(e.getValue().withMarkers(e.getValue().getMarkers().searchResult()));
                 }
                 return e;
@@ -79,7 +82,9 @@ public class FindProperty extends Recipe {
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml.Block> values) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, values);
                 String prop = getProperty(getCursor());
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
+                if (!Boolean.FALSE.equals(relaxedBinding) ?
+                        NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) :
+                        StringUtils.matchesGlob(prop, propertyKey)) {
                     values.add(entry.getValue());
                 }
                 return e;
@@ -89,6 +94,13 @@ public class FindProperty extends Recipe {
         Set<Yaml.Block> values = new HashSet<>();
         findVisitor.visit(y, values);
         return values;
+    }
+
+    public static boolean matches(Cursor cursor, String propertyKey, @Nullable Boolean relaxedBinding) {
+        String prop = getProperty(cursor);
+        return !Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) :
+                StringUtils.matchesGlob(prop, propertyKey);
     }
 
     private static String getProperty(Cursor cursor) {

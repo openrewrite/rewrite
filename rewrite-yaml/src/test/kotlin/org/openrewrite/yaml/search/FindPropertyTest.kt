@@ -75,5 +75,4 @@ class FindPropertyTest : YamlRecipeTest {
             acme.my_project.person.first_name: example
         """
     )
-
 }
