@@ -21,12 +21,13 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
-import org.openrewrite.java.controlflow.Guard;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class ForwardFlow extends JavaVisitor<Integer> {
 
@@ -74,17 +75,88 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                 analysis.visit(_try.getFinally(), 0, taintStmtCursorParent);
             } else {
                 // This is when assignment occurs within the body of a block
-                boolean seenRoot = false;
-                Cursor blockCursor = root.getCursor().dropParentUntil(J.Block.class::isInstance);
-                for (Statement statement : ((J.Block) blockCursor.getValue()).getStatements()) {
-                    if (seenRoot) {
-                        analysis.visit(statement, 0, blockCursor);
-                    }
-                    if (statement == taintStmt) {
-                        seenRoot = true;
-                    }
+                visitBlocksRecursive(root.getCursor().dropParentUntil(J.Block.class::isInstance), taintStmt, analysis);
+            }
+        }
+    }
+
+    /**
+     * @param blockCursor    The cursor for the current {@link J.Block} being explored.
+     * @param startStatement The statement to start looking for flow from. Should not start before this point.
+     * @param analysis       The analysis visitor to use.
+     */
+    private static void visitBlocksRecursive(Cursor blockCursor, Object startStatement, Analysis analysis) {
+        boolean seenRoot = false;
+        J.Block block = blockCursor.getValue();
+        final List<String> declaredVariables = new ArrayList<>();
+        for (Statement statement : block.getStatements()) {
+            if (statement instanceof J.VariableDeclarations) {
+                J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) statement;
+                for (J.VariableDeclarations.NamedVariable variableDeclaration : variableDeclarations.getVariables()) {
+                    declaredVariables.add(variableDeclaration.getSimpleName());
                 }
             }
+            if (seenRoot) {
+                analysis.visit(statement, 0, blockCursor);
+            }
+            if (statement == startStatement) {
+                seenRoot = true;
+            }
+        }
+        J.MethodDeclaration parentMethodDeclaration = blockCursor.firstEnclosing(J.MethodDeclaration.class);
+        if (parentMethodDeclaration != null && parentMethodDeclaration.getBody() == block) {
+            // This block is the body of a method, so we don't need to visit any higher
+            return;
+        }
+        J.Block parentBlock = blockCursor.getParentOrThrow().firstEnclosing(J.Block.class);
+        if (parentBlock != null && parentBlock.getStatements().contains(block) &&
+                J.Block.isStaticOrInitBlock(blockCursor)) {
+            // This block is the body of a static block or an init block, so we don't need to visit any higher
+            return;
+        }
+
+        // Remove any variables that were declared in this block
+        declaredVariables.forEach(analysis.flowsByIdentifier.peek()::remove);
+
+        // Get the parent J
+        J nextStartStatement = blockCursor.getParentOrThrow().firstEnclosing(J.class);
+        if (nextStartStatement instanceof J.Block && ((J.Block) nextStartStatement).getStatements().contains(block)) {
+            // If the parent J is a block, and the current block is a statement in the of the parent J,
+            // then use it as the starting point.
+            nextStartStatement = block;
+        } else if (nextStartStatement == null || !getPossibleSubBlock(nextStartStatement).contains(block)) {
+            // We found *a* parent J, but it wasn't a parent J that we should use as a starting point.
+            return;
+        }
+        visitBlocksRecursive(blockCursor.dropParentUntil(J.Block.class::isInstance), nextStartStatement, analysis);
+    }
+
+    private static Set<Statement> getPossibleSubBlock(J j) {
+        if (j instanceof J.If) {
+            J.If _if = (J.If) j;
+            if (_if.getElsePart() != null) {
+                return Stream.of(_if.getThenPart(), _if.getElsePart().getBody()).collect(Collectors.toSet());
+            } else {
+                return Collections.singleton(_if.getThenPart());
+            }
+        }
+        if (j instanceof J.WhileLoop) {
+            return Collections.singleton(((J.WhileLoop) j).getBody());
+        } else if (j instanceof J.DoWhileLoop) {
+            return Collections.singleton(((J.DoWhileLoop) j).getBody());
+        } else if (j instanceof J.ForLoop) {
+            return Collections.singleton(((J.ForLoop) j).getBody());
+        } else if (j instanceof J.ForEachLoop) {
+            return Collections.singleton(((J.ForEachLoop) j).getBody());
+        } else if (j instanceof J.Try) {
+            J.Try _try = (J.Try) j;
+            return Stream.concat(
+                            Stream.of(_try.getBody(), _try.getFinally()),
+                            _try.getCatches().stream().map(J.Try.Catch::getBody)
+                    )
+                    .collect(Collectors.toSet());
+        } else {
+            return Collections.emptySet();
         }
     }
 

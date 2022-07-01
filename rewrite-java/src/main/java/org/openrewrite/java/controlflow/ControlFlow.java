@@ -61,7 +61,7 @@ public final class ControlFlow {
             Object next = nextCursor.getValue();
             if (next instanceof J.Block) {
                 methodDeclarationBlockCursor = nextCursor;
-                if (((J.Block) next).isStatic()) {
+                if (J.Block.isStaticOrInitBlock(nextCursor)) {
                     break;
                 }
             } else if (next instanceof J.MethodDeclaration) {
