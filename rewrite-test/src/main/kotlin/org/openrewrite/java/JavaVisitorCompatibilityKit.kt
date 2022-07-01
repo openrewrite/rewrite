@@ -529,6 +529,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UseStandardCharsetTck : UseStandardCharsetTest
 
     @Nested
+    inner class UsesAllMethodsTck : UsesAllMethodsTest
+
+    @Nested
     inner class UsesMethodTck : UsesMethodTest
 
     @Nested
