@@ -16,6 +16,7 @@
 package org.openrewrite.internal
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 
@@ -133,4 +134,19 @@ class NameCaseConventionTest {
         assertThat(NameCaseConvention.equalsRelaxedBinding(input, expected)).isTrue
     }
 
+    @Test
+    fun matchesRelaxedBinding() {
+        assertThat(
+            NameCaseConvention.matchesRelaxedBinding(
+                "spring.registration.test.identityprovider",
+                "spring.registration.*.identityprovider"
+            )
+        ).isTrue
+        assertThat(
+            NameCaseConvention.matchesRelaxedBinding(
+                "spring.registration.test.assertingparty",
+                "spring.registration.*.identityprovider"
+            )
+        ).isFalse
+    }
 }

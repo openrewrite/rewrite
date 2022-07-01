@@ -30,6 +30,13 @@ class FindPropertyTest : YamlRecipeTest {
         after = "management.metrics.binders.files.enabled: ~~>true"
     )
 
+    @Test
+    fun findGlobProperty() = assertChanged(
+        recipe = FindProperty("management.metrics.binders.*.enabled", null),
+        before = "management.metrics.binders.files.enabled: true",
+        after = "management.metrics.binders.files.enabled: ~~>true"
+    )
+
     @ParameterizedTest
     @ValueSource(
         strings = [

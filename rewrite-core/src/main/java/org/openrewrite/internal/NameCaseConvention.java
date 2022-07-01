@@ -112,6 +112,20 @@ public enum NameCaseConvention {
         return LOWER_CAMEL.format(str0).equals(LOWER_CAMEL.format(str1));
     }
 
+    /**
+     * Check equality between two inputs using "relaxed binding" rules.
+     * The inputs will be converted to {@link NameCaseConvention#LOWER_CAMEL} before being checked using {@link String#equals}.
+     *
+     * @param test The property to test.
+     * @param pattern A glob pattern.
+     * @return Whether the inputs are equal.
+     * @see <a href="https://docs.micronaut.io/3.1.0/guide/index.html#_property_value_binding">Micronaut Property Value Binding Normalization</a>
+     * @see <a href="https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding">Spring Boot Relaxed Binding</a>
+     */
+    public static boolean matchesRelaxedBinding(String test, String pattern) {
+        return StringUtils.matchesGlob(LOWER_CAMEL.format(test), LOWER_CAMEL.format(pattern));
+    }
+
     private static String lowerHyphen(String str) {
         return nameCaseJoiner(str.replace('_', '-').replace(' ', '-'), true, '-');
     }

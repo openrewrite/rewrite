@@ -17,20 +17,14 @@ package org.openrewrite.yaml.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Incubating;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Spliterators.spliteratorUnknownSize;
@@ -41,8 +35,8 @@ import static java.util.stream.StreamSupport.stream;
 public class FindProperty extends Recipe {
 
     @Option(displayName = "Property key",
-            description = "The key to look for.",
-            example = "management.metrics.binders.files.enabled")
+            description = "The key to look for. Glob is supported.",
+            example = "management.metrics.binders.*.enabled")
     String propertyKey;
 
     @Incubating(since = "7.17.0")
@@ -61,7 +55,7 @@ public class FindProperty extends Recipe {
     @Override
     public String getDescription() {
         return "Find a YAML property. Nested YAML mappings are interpreted as dot separated property names, i.e. " +
-                " as Spring Boot interprets application.yml files.";
+                " as Spring Boot interprets `application.yml` files.";
     }
 
     @Override
@@ -70,20 +64,10 @@ public class FindProperty extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
-
-                Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
-                        .filter(Yaml.Mapping.Entry.class::isInstance)
-                        .map(Yaml.Mapping.Entry.class::cast)
-                        .collect(Collectors.toCollection(ArrayDeque::new));
-
-                String prop = stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
-                        .map(e2 -> e2.getKey().getValue())
-                        .collect(Collectors.joining("."));
-
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
+                String prop = getProperty(getCursor());
+                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
                     e = e.withValue(e.getValue().withMarkers(e.getValue().getMarkers().searchResult()));
                 }
-
                 return e;
             }
         };
@@ -94,20 +78,10 @@ public class FindProperty extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Set<Yaml.Block> values) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, values);
-
-                Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
-                        .filter(Yaml.Mapping.Entry.class::isInstance)
-                        .map(Yaml.Mapping.Entry.class::cast)
-                        .collect(Collectors.toCollection(ArrayDeque::new));
-
-                String prop = stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
-                        .map(e2 -> e2.getKey().getValue())
-                        .collect(Collectors.joining("."));
-
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
+                String prop = getProperty(getCursor());
+                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
                     values.add(entry.getValue());
                 }
-
                 return e;
             }
         };
@@ -117,4 +91,20 @@ public class FindProperty extends Recipe {
         return values;
     }
 
+    private static String getProperty(Cursor cursor) {
+        StringBuilder asProperty = new StringBuilder();
+        Iterator<Object> path = cursor.getPath();
+        int i = 0;
+        while (path.hasNext()) {
+            Object next = path.next();
+            if (next instanceof Yaml.Mapping.Entry) {
+                Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) next;
+                if (i++ > 0) {
+                    asProperty.insert(0, '.');
+                }
+                asProperty.insert(0, entry.getKey().getValue());
+            }
+        }
+        return asProperty.toString();
+    }
 }
