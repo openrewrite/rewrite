@@ -72,15 +72,16 @@ public class MavenPomDownloader {
         this.sendRequest = Retry.decorateCheckedFunction(
                 mavenDownloaderRetry,
                 request -> {
-                    HttpSender.Response response = httpSender.send(request);
-                    if (response.isSuccessful()) {
-                        return response.getBodyAsBytes();
-                    } else if (response.getCode() >= 400 && response.getCode() <= 404) {
-                        //Throw a different exception for client-side failures to allow downstream callers to handle those
-                        //differently.
-                        throw new MavenClientSideException("Failed to download " + request.getUrl() + ": " + response.getCode());
+                    try (HttpSender.Response response = httpSender.send(request)) {
+                        if (response.isSuccessful()) {
+                            return response.getBodyAsBytes();
+                        } else if (response.getCode() >= 400 && response.getCode() <= 404) {
+                            //Throw a different exception for client-side failures to allow downstream callers to handle those
+                            //differently.
+                            throw new MavenClientSideException("Failed to download " + request.getUrl() + ": " + response.getCode());
+                        }
+                        throw new MavenDownloadingException("Failed to download " + request.getUrl() + ": " + response.getCode());
                     }
-                    throw new MavenDownloadingException("Failed to download " + request.getUrl() + ": " + response.getCode());
                 });
         this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenCache = this.ctx.getPomCache();
