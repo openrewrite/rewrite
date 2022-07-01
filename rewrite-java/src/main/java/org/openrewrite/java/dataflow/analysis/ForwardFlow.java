@@ -21,7 +21,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
-import org.openrewrite.java.internal.BlockUtil;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -111,7 +110,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         }
         J.Block parentBlock = blockCursor.getParentOrThrow().firstEnclosing(J.Block.class);
         if (parentBlock != null && parentBlock.getStatements().contains(block) &&
-                BlockUtil.isStaticOrInitBlock(blockCursor)) {
+                J.Block.isStaticOrInitBlock(blockCursor)) {
             // This block is the body of a static block or an init block, so we don't need to visit any higher
             return;
         }

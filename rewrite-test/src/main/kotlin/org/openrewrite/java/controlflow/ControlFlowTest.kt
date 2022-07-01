@@ -18,7 +18,6 @@ package org.openrewrite.java.controlflow
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.java.JavaIsoVisitor
-import org.openrewrite.java.internal.BlockUtil
 import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.Statement
@@ -35,7 +34,7 @@ interface ControlFlowTest : RewriteTest {
                 override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                     val methodDeclaration = cursor.firstEnclosing(J.MethodDeclaration::class.java)
                     val isTestMethod = methodDeclaration?.body == block && methodDeclaration.name.simpleName == "test"
-                    val isStaticOrInitBlock = BlockUtil.isStaticOrInitBlock(cursor)
+                    val isStaticOrInitBlock = J.Block.isStaticOrInitBlock(cursor)
                     if (isTestMethod || isStaticOrInitBlock) {
                         return ControlFlow.startingAt(cursor).findControlFlow().map { controlFlow ->
                             val basicBlocks = controlFlow.basicBlocks
