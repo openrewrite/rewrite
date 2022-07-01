@@ -195,10 +195,17 @@ public class VariableNameUtils {
                     if (i.isStatic()) {
                         // Note: Currently, adds all statically imported identifiers including method and classes rather than restricting the names to static fields.
                         Set<String> namesAtCursor = nameScopes.computeIfAbsent(classCursor, k -> new HashSet<>());
-                        namesAtCursor.add(i.getQualid().getSimpleName());
+                        if (isValidImportName(i.getQualid().getTarget().getType(), i.getQualid().getSimpleName())) {
+                            namesAtCursor.add(i.getQualid().getSimpleName());
+                        }
                     }
                 });
             }
+        }
+
+        private boolean isValidImportName(@Nullable JavaType targetType, String name) {
+            // Consider the id a valid field if the type is null since it is indistinguishable from a method name or class name.
+            return targetType == null || (targetType instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) targetType).getMembers().stream().anyMatch(o -> o.getName().equals(name)));
         }
 
         private void addInheritedClassFields(@Nullable JavaType.FullyQualified fq, Cursor classCursor) {

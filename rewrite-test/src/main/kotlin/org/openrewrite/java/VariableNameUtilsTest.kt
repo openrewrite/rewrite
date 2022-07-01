@@ -64,7 +64,7 @@ interface VariableNameUtilsTest : RewriteTest {
             }
         """.trimIndent())
 
-        baseTest(source, "classBlock", "classBlock, UTF_8, emptyList")
+        baseTest(source, "classBlock", "classBlock, UTF_8")
     }
 
     @Test
