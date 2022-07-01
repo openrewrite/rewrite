@@ -132,9 +132,8 @@ public class MavenPomDownloader {
                             result = Optional.of(MavenMetadata.parse(Files.readAllBytes(path)));
                         }
                     } else {
-                        HttpSender.Request.Builder request = applyAuthenticationToRequest(repo, httpSender.get(uri));
                         try {
-                            byte[] responseBody = sendRequest.apply(request.build());
+                            byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri);
                             result = Optional.of(MavenMetadata.parse(responseBody));
                             mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, result.get());
                         } catch (MavenClientSideException exception) {
@@ -273,9 +272,8 @@ public class MavenPomDownloader {
                     }
                 }
 
-                HttpSender.Request.Builder request = applyAuthenticationToRequest(repo, httpSender.get(uri.toString()));
                 try {
-                    byte[] responseBody = sendRequest.apply(request.build());
+                    byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
 
                     Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
                     RawPom rawPom = RawPom.parse(
@@ -433,6 +431,17 @@ public class MavenPomDownloader {
         }
 
         return result == null || !result.isPresent() ? null : applyAuthenticationToRepository(result.get());
+    }
+
+    /**
+     * Replicates Apache Maven's behavior to attempt anonymous download if repository credentials prove invalid
+     */
+    private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws Throwable {
+        try {
+            return sendRequest.apply(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
+        } catch (MavenClientSideException e) {
+            return sendRequest.apply(httpSender.get(uriString).build());
+        }
     }
 
     /**
