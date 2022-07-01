@@ -116,7 +116,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         }
 
         // Remove any variables that were declared in this block
-        declaredVariables.forEach(declared -> analysis.flowsByIdentifier.peek().remove(declared));
+        declaredVariables.forEach(analysis.flowsByIdentifier.peek()::remove);
 
         // Get the parent J
         J nextStartStatement = blockCursor.getParentOrThrow().firstEnclosing(J.class);
