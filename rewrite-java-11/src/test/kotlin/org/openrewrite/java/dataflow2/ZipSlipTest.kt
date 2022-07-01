@@ -16,6 +16,7 @@
 package org.openrewrite.java.dataflow2
 
 import org.assertj.core.api.AssertionsForClassTypes
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
@@ -36,6 +37,7 @@ class ZipSlipTest : RewriteTest {
         spec.recipe(ZipSlip())
     }
 
+    @Disabled
     @Test
     fun fixesZipSlipUsingFile() = rewriteRun(
         java(
@@ -78,6 +80,7 @@ class ZipSlipTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun fixesZipSlipUsingPath() = rewriteRun(
         java(
@@ -117,6 +120,7 @@ class ZipSlipTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun fixesZipSlipUsingString() = rewriteRun(
         java(
@@ -155,6 +159,7 @@ class ZipSlipTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun safeZipSlipPathStartsWith() = rewriteRun(
         java(
@@ -177,6 +182,7 @@ class ZipSlipTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun safeZipSlipPathNormalizedStartsWith() = rewriteRun(
         java(
@@ -194,6 +200,7 @@ class ZipSlipTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun safeZipSlipValidateMethod() = rewriteRun(
         java(
@@ -215,6 +222,7 @@ class ZipSlipTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun safeZipSlipPathAbsoluteNormalizeStartsWith() = rewriteRun(
         java(
@@ -234,6 +242,7 @@ class ZipSlipTest : RewriteTest {
         )
     )
 
+    @Disabled
     @Test
     fun safeZipSlipSlipCanonicalPath() = rewriteRun(
         java(
