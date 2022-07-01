@@ -61,9 +61,6 @@ public class ProgramState<T> {
     }
 
     public ProgramState<T> push(@Nullable T value) {
-        if (value == null) {
-            return this;
-        }
         return this.withExpressionStack(new LinkedListElement<>(expressionStack, value));
     }
 
