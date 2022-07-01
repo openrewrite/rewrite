@@ -16,6 +16,13 @@ tasks.register<JavaExec>("generateAntlrSources") {
     classpath = sourceSets["main"].runtimeClasspath
 }
 
+sourceSets {
+    create("model") {
+        compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
+        runtimeClasspath += sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath
+    }
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api("org.jetbrains:annotations:latest.release")
