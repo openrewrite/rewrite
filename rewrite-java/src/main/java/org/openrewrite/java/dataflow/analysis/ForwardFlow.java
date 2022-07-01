@@ -82,9 +82,9 @@ public class ForwardFlow extends JavaVisitor<Integer> {
     }
 
     /**
-     * @param blockCursor The cursor for the current {@link J.Block} being explored.
+     * @param blockCursor    The cursor for the current {@link J.Block} being explored.
      * @param startStatement The statement to start looking for flow from. Should not start before this point.
-     * @param analysis The analysis visitor to use.
+     * @param analysis       The analysis visitor to use.
      */
     private static void visitBlocksRecursive(Cursor blockCursor, Object startStatement, Analysis analysis) {
         boolean seenRoot = false;
@@ -140,15 +140,22 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             } else {
                 return Collections.singleton(_if.getThenPart());
             }
-        } if (j instanceof J.WhileLoop) {
+        }
+        if (j instanceof J.WhileLoop) {
             return Collections.singleton(((J.WhileLoop) j).getBody());
         } else if (j instanceof J.DoWhileLoop) {
             return Collections.singleton(((J.DoWhileLoop) j).getBody());
         } else if (j instanceof J.ForLoop) {
             return Collections.singleton(((J.ForLoop) j).getBody());
+        } else if (j instanceof J.ForEachLoop) {
+            return Collections.singleton(((J.ForEachLoop) j).getBody());
         } else if (j instanceof J.Try) {
             J.Try _try = (J.Try) j;
-            return Stream.of(_try.getBody(), _try.getFinally()).collect(Collectors.toSet());
+            return Stream.concat(
+                            Stream.of(_try.getBody(), _try.getFinally()),
+                            _try.getCatches().stream().map(J.Try.Catch::getBody)
+                    )
+                    .collect(Collectors.toSet());
         } else {
             return Collections.emptySet();
         }

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.dataflow
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.java.controlflow.Guard
@@ -1480,6 +1479,63 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
                     do {
                         n = /*~~>*/"42";
                     } while (condition);
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in a for i block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    for(int i = 0; i < 42; i++) {
+                        n = "42";
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    for(int i = 0; i < 42; i++) {
+                        n = /*~~>*/"42";
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in a for each block`() = rewriteRun(
+        java(
+            """
+            import java.util.List;
+            abstract class Test {
+                void test(boolean condition, List<Integer> integerList) {
+                    String n;
+                    for(Integer i : integerList) {
+                        n = "42";
+                    }
+                    System.out.println(n);
+                }
+            }
+            """,
+            """
+            import java.util.List;
+            abstract class Test {
+                void test(boolean condition, List<Integer> integerList) {
+                    String n;
+                    for(Integer i : integerList) {
+                        n = /*~~>*/"42";
+                    }
                     System.out.println(/*~~>*/n);
                 }
             }
