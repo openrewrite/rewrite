@@ -111,11 +111,11 @@ public class ProgramState<T> {
         // ... combine stacks : must have the same length ...
         if (outs.size() > 0) {
             int len = LinkedListElement.length(outs.get(0).expressionStack);
-            for (int i = 1; i < outs.size(); i++) {
-                assert len == LinkedListElement.length(outs.get(i).expressionStack);
-            }
-
-            assert len == 0; // TODO        }
+//            for (int i = 1; i < outs.size(); i++) {
+//                assert len == LinkedListElement.length(outs.get(i).expressionStack);
+//            }
+//
+//            assert len == 0; // TODO : combine stacks when non empty
         }
         return new ProgramState<>(new LinkedListElement<>(null, joiner.lowerBound()), m);
     }
