@@ -18,22 +18,36 @@ package org.openrewrite.gradle
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 
-class DependencyUseMapNotationTest: GradleRecipeTest {
+class DependencyUseStringNotationTest: GradleRecipeTest {
     override val recipe: Recipe
-        get() = DependencyUseMapNotation()
+        get() = DependencyUseStringNotation()
 
     @Test
-    fun basicString() = assertChanged(
+    fun basicMap() = assertChanged(
         before = """
             dependencies {
-                api('org.openrewrite:rewrite-core:latest.release')
-                implementation "group:artifact:version"
+                api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
+                implementation group: 'group', name: 'artifact', version: 'version'
             }
         """,
         after = """
             dependencies {
-                api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
-                implementation group: 'group', name: 'artifact', version: 'version'
+                api("org.openrewrite:rewrite-core:latest.release")
+                implementation "group:artifact:version"
+            }
+        """
+    )
+
+    @Test
+    fun basicMapLiteral() = assertChanged(
+        before = """
+            dependencies {
+                api([group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'])
+            }
+        """,
+        after = """
+            dependencies {
+                api("org.openrewrite:rewrite-core:latest.release")
             }
         """
     )
@@ -43,15 +57,31 @@ class DependencyUseMapNotationTest: GradleRecipeTest {
         before = """
             def version = "latest.release"
             dependencies {
-                api("org.openrewrite:rewrite-core:${"$"}version")
-                implementation "group:artifact:${"$"}version"
+                api(group: 'org.openrewrite', name: 'rewrite-core', version: version)
+                implementation group: 'group', name: 'artifact', version: version
             }
         """,
         after = """
             def version = "latest.release"
             dependencies {
-                api(group: 'org.openrewrite', name: 'rewrite-core', version: version)
-                implementation group: 'group', name: 'artifact', version: version
+                api("org.openrewrite:rewrite-core:${"$"}version")
+                implementation "group:artifact:${"$"}version"
+            }
+        """
+    )
+
+    @Test
+    fun withoutVersion() = assertChanged(
+        before = """
+            dependencies {
+                api(group: "org.openrewrite", name: "rewrite-core")
+                implementation group: "group", name: "artifact"
+            }
+        """,
+        after = """
+            dependencies {
+                api("org.openrewrite:rewrite-core")
+                implementation "group:artifact"
             }
         """
     )
@@ -60,45 +90,35 @@ class DependencyUseMapNotationTest: GradleRecipeTest {
     fun withExclusion() = assertChanged(
         before = """
             dependencies {
-                api("org.openrewrite:rewrite-core:latest.release") {
+                api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release") {
                     exclude group: "group", module: "artifact"
-                }
-                implementation "group:artifact:version", {
-                    exclude group: "group2", module: "artifact2"
                 }
             }
         """,
         after = """
             dependencies {
-                api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release') {
+                api("org.openrewrite:rewrite-core:latest.release") {
                     exclude group: "group", module: "artifact"
-                }
-                implementation group: 'group', name: 'artifact', version: 'version', {
-                    exclude group: "group2", module: "artifact2"
                 }
             }
         """
     )
 
     @Test
-    fun withGStringAndExclusion() = assertChanged(
+    fun withGStringExclusion() = assertChanged(
         before = """
+            def version = "latest.release"
             dependencies {
-                api("org.openrewrite:rewrite-core:${"$"}version") {
+                api(group: "org.openrewrite", name: "rewrite-core", version: version) {
                     exclude group: "group", module: "artifact"
-                }
-                implementation "group:artifact:${"$"}version", {
-                    exclude group: "group2", module: "artifact2"
                 }
             }
         """,
         after = """
+            def version = "latest.release"
             dependencies {
-                api(group: 'org.openrewrite', name: 'rewrite-core', version: version) {
+                api("org.openrewrite:rewrite-core:${"$"}version") {
                     exclude group: "group", module: "artifact"
-                }
-                implementation group: 'group', name: 'artifact', version: version, {
-                    exclude group: "group2", module: "artifact2"
                 }
             }
         """
