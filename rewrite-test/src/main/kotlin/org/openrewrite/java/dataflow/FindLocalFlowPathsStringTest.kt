@@ -1312,4 +1312,403 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `data flow for a source in a higher block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test() {
+                    String n;
+                    {
+                        n = "42";
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test() {
+                    String n;
+                    {
+                        n = /*~~>*/"42";
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in a doubly higher block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test() {
+                    String n;
+                    {
+                        {
+                            n = "42";
+                        }
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test() {
+                    String n;
+                    {
+                        {
+                            n = /*~~>*/"42";
+                        }
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in a triply higher block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test() {
+                    String n;
+                    {
+                        {
+                            {
+                                n = "42";
+                            }
+                        }
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test() {
+                    String n;
+                    {
+                        {
+                            {
+                                n = /*~~>*/"42";
+                            }
+                        }
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in an if block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    if (condition) {
+                        n = "42";
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    if (condition) {
+                        n = /*~~>*/"42";
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in a while block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    while (condition) {
+                        n = "42";
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    while (condition) {
+                        n = /*~~>*/"42";
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in a do-while block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    do {
+                        n = "42";
+                    } while (condition);
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    do {
+                        n = /*~~>*/"42";
+                    } while (condition);
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in a try catch block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    try {
+                        n = "42";
+                    } catch (Exception e) {
+                        // No-op
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    try {
+                        n = /*~~>*/"42";
+                    } catch (Exception e) {
+                        // No-op
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in a try catch finally block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    String o;
+                    try {
+                        n = "42";
+                    } catch (Exception e) {
+                        // No-op
+                    } finally {
+                        o = "42";
+                    }
+                    System.out.println(n);
+                    System.out.println(o);
+                }
+            }
+            """, """
+            abstract class Test {
+                void test(boolean condition) {
+                    String n;
+                    String o;
+                    try {
+                        n = /*~~>*/"42";
+                    } catch (Exception e) {
+                        // No-op
+                    } finally {
+                        o = /*~~>*/"42";
+                    }
+                    System.out.println(/*~~>*/n);
+                    System.out.println(/*~~>*/o);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow should not cross scope boundaries`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                void test() {
+                    {
+                        String n;
+                        {
+                            n = "42";
+                        }
+                        System.out.println(n);
+                    }
+                    {
+                        String n = "hello";
+                        System.out.println(n);
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                void test() {
+                    {
+                        String n;
+                        {
+                            n = /*~~>*/"42";
+                        }
+                        System.out.println(/*~~>*/n);
+                    }
+                    {
+                        String n = "hello";
+                        System.out.println(n);
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow should not cross scope boundaries with class scope variable conflicts`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                String n;
+                void test() {
+                    {
+                        String n;
+                        {
+                            n = "42";
+                        }
+                        System.out.println(n);
+                    }
+                    {
+                        System.out.println(n);
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                String n;
+                void test() {
+                    {
+                        String n;
+                        {
+                            n = /*~~>*/"42";
+                        }
+                        System.out.println(/*~~>*/n);
+                    }
+                    {
+                        System.out.println(n);
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in a higher block in static block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                static {
+                    String n;
+                    {
+                        n = "42";
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                static {
+                    String n;
+                    {
+                        n = /*~~>*/"42";
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in an init`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                {
+                    String n = "42";
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                {
+                    String n = /*~~>*/"42";
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `data flow for a source in a higher block in init block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                {
+                    String n;
+                    {
+                        n = "42";
+                    }
+                    System.out.println(n);
+                }
+            }
+            """, """
+            abstract class Test {
+                {
+                    String n;
+                    {
+                        n = /*~~>*/"42";
+                    }
+                    System.out.println(/*~~>*/n);
+                }
+            }
+            """
+        )
+    )
 }

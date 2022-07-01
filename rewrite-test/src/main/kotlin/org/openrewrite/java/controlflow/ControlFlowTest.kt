@@ -18,6 +18,7 @@ package org.openrewrite.java.controlflow
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.java.JavaIsoVisitor
+import org.openrewrite.java.internal.BlockUtil
 import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.Statement
@@ -33,7 +34,9 @@ interface ControlFlowTest : RewriteTest {
 
                 override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                     val methodDeclaration = cursor.firstEnclosing(J.MethodDeclaration::class.java)
-                    if (methodDeclaration?.body == block && methodDeclaration.name.simpleName == "test") {
+                    val isTestMethod = methodDeclaration?.body == block && methodDeclaration.name.simpleName == "test"
+                    val isStaticOrInitBlock = BlockUtil.isStaticOrInitBlock(cursor)
+                    if (isTestMethod || isStaticOrInitBlock) {
                         return ControlFlow.startingAt(cursor).findControlFlow().map { controlFlow ->
                             val basicBlocks = controlFlow.basicBlocks
                             val leaders = basicBlocks.map { it.leader }.toSet()
@@ -1236,6 +1239,36 @@ interface ControlFlowTest : RewriteTest {
                         } finally {
                             source.close();
                         }
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `control flow for init block`() = rewriteRun(
+        java(
+            """
+                class Test {
+                    {
+                        if (compute()) {
+                            System.out.println("Hello!");
+                        }
+                    }
+                    static Boolean compute() {
+                        return null;
+                    }
+                }
+                """,
+            """
+                class Test {
+                    /*~~(BB: 2 CN: 1 EX: 2 | L)~~>*/{
+                        if (compute()) /*~~(L)~~>*/{
+                            System.out.println("Hello!");
+                        }
+                    }
+                    static Boolean compute() {
+                        return null;
                     }
                 }
                 """

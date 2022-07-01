@@ -23,6 +23,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.internal.BlockUtil;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -61,7 +62,7 @@ public final class ControlFlow {
             Object next = nextCursor.getValue();
             if (next instanceof J.Block) {
                 methodDeclarationBlockCursor = nextCursor;
-                if (((J.Block) next).isStatic()) {
+                if (BlockUtil.isStaticOrInitBlock(nextCursor)) {
                     break;
                 }
             } else if (next instanceof J.MethodDeclaration) {
