@@ -246,7 +246,9 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             Expression left = unwrap(a.getVariable());
             if (left instanceof J.Identifier) {
                 String variableName = ((J.Identifier) left).getSimpleName();
-                if (a.getAssignment() != flowsByIdentifier.peek().get(variableName).getCursor().getValue()) {
+                FlowGraph variableNameFlowGraph = flowsByIdentifier.peek().get(variableName);
+                if (variableNameFlowGraph != null &&
+                        a.getAssignment() != variableNameFlowGraph.getCursor().getValue()) {
                     flowsByIdentifier.peek().remove(variableName);
                 }
             }

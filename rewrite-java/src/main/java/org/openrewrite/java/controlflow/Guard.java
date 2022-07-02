@@ -105,6 +105,22 @@ public class Guard {
     }
 
     private static Optional<JavaType> getTypeSafe(Expression e) {
-        return Optional.ofNullable(e.getType());
+        JavaType type = e.getType();
+        if (type != null && !JavaType.Unknown.getInstance().equals(type)) {
+            return Optional.of(type);
+        }
+        if (e instanceof J.Binary) {
+            J.Binary binary = (J.Binary) e;
+            switch (binary.getOperator()) {
+                case And:
+                case Or:
+                case Equal:
+                case NotEqual:
+                    return Optional.of(JavaType.Primitive.Boolean);
+                default:
+                    return Optional.empty();
+            }
+        }
+        return Optional.empty();
     }
 }

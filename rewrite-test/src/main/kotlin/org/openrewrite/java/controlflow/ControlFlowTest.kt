@@ -1245,6 +1245,40 @@ interface ControlFlowTest : RewriteTest {
     )
 
     @Test
+    fun `control flow for try with return`() = rewriteRun(
+        java(
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    int test() {
+                        InputStream source = source();
+                        try {
+                            return source.read();
+                        } finally {
+                            source.close();
+                        }
+                    }
+                }
+                """,
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    int test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                        InputStream source = source();
+                        try {
+                            return source.read();
+                        } finally {
+                            source.close();
+                        }
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
     fun `control flow for init block`() = rewriteRun(
         java(
             """
@@ -1271,6 +1305,155 @@ interface ControlFlowTest : RewriteTest {
                     }
                 }
                 """
+        )
+    )
+
+    @Test
+    fun `control flow for != null`() = rewriteRun(
+        java(
+            """
+                class Test {
+                    void test() {
+                        if (compute() != null) {
+                            System.out.println("Hello!");
+                        }
+                    }
+                    static Object compute() {
+                        return null;
+                    }
+                }
+                """,
+            """
+                class Test {
+                    void test() /*~~(BB: 2 CN: 1 EX: 2 | L)~~>*/{
+                        if (compute() != null) /*~~(L)~~>*/{
+                            System.out.println("Hello!");
+                        }
+                    }
+                    static Object compute() {
+                        return null;
+                    }
+                }
+                """
+        )
+    )
+
+    @Test
+    fun `decode url`() = rewriteRun(
+        java(
+            """
+                import java.lang.StringBuffer;
+                import java.nio.ByteBuffer;
+
+                class Test {
+                    /**
+                     * Decodes the specified URL as per RFC 3986, i.e. transforms
+                     * percent-encoded octets to characters by decoding with the UTF-8 character
+                     * set. This function is primarily intended for usage with
+                     * {@link java.net.URL} which unfortunately does not enforce proper URLs. As
+                     * such, this method will leniently accept invalid characters or malformed
+                     * percent-encoded octets and simply pass them literally through to the
+                     * result string. Except for rare edge cases, this will make unencoded URLs
+                     * pass through unaltered.
+                     *
+                     * @param url  The URL to decode, may be <code>null</code>.
+                     * @return The decoded URL or <code>null</code> if the input was
+                     *         <code>null</code>.
+                     */
+                    static String test(String url) {
+                        String decoded = url;
+                        if (url != null && url.indexOf('%') >= 0) {
+                            int n = url.length();
+                            StringBuffer buffer = new StringBuffer();
+                            ByteBuffer bytes = ByteBuffer.allocate(n);
+                            for (int i = 0; i < n;) {
+                                if (url.charAt(i) == '%') {
+                                    try {
+                                        do {
+                                            byte octet = (byte) Integer.parseInt(url.substring(i + 1, i + 3), 16);
+                                            bytes.put(octet);
+                                            i += 3;
+                                        } while (i < n && url.charAt(i) == '%');
+                                        continue;
+                                    } catch (RuntimeException e) {
+                                        // malformed percent-encoded octet, fall through and
+                                        // append characters literally
+                                    } finally {
+                                        if (bytes.position() > 0) {
+                                            bytes.flip();
+                                            buffer.append(utf8Decode(bytes));
+                                            bytes.clear();
+                                        }
+                                    }
+                                }
+                                buffer.append(url.charAt(i++));
+                            }
+                            decoded = buffer.toString();
+                        }
+                        return decoded;
+                    }
+
+                    private static String utf8Decode(ByteBuffer buff) {
+                        return null;
+                    }
+                }
+            """,
+            """
+            import java.lang.StringBuffer;
+            import java.nio.ByteBuffer;
+
+            class Test {
+                /**
+                 * Decodes the specified URL as per RFC 3986, i.e. transforms
+                 * percent-encoded octets to characters by decoding with the UTF-8 character
+                 * set. This function is primarily intended for usage with
+                 * {@link java.net.URL} which unfortunately does not enforce proper URLs. As
+                 * such, this method will leniently accept invalid characters or malformed
+                 * percent-encoded octets and simply pass them literally through to the
+                 * result string. Except for rare edge cases, this will make unencoded URLs
+                 * pass through unaltered.
+                 *
+                 * @param url  The URL to decode, may be <code>null</code>.
+                 * @return The decoded URL or <code>null</code> if the input was
+                 *         <code>null</code>.
+                 */
+                static String test(String url) /*~~(BB: 12 CN: 7 EX: 1 | L)~~>*/{
+                    String decoded = url;
+                    if (url != null && /*~~(L)~~>*/url.indexOf('%') >= 0) /*~~(L)~~>*/{
+                        int n = url.length();
+                        StringBuffer buffer = new StringBuffer();
+                        ByteBuffer bytes = ByteBuffer.allocate(n);
+                        for (int i = 0; i < n;) /*~~(L)~~>*/{
+                            if (url.charAt(i) == '%') /*~~(L)~~>*/{
+                                try {
+                                    do /*~~(L)~~>*/{
+                                        byte octet = (byte) Integer.parseInt(url.substring(i + 1, i + 3), 16);
+                                        bytes.put(octet);
+                                        i += 3;
+                                    } while (i < n && /*~~(L)~~>*/url.charAt(i) == '%');
+                                    /*~~(L)~~>*/continue;
+                                } catch (RuntimeException e) {
+                                    // malformed percent-encoded octet, fall through and
+                                    // append characters literally
+                                } finally {
+                                    if (bytes.position() > 0) /*~~(L)~~>*/{
+                                        bytes.flip();
+                                        buffer.append(utf8Decode(bytes));
+                                        bytes.clear();
+                                    }
+                                }
+                            }
+                            /*~~(L)~~>*/buffer.append(url.charAt(i++));
+                        }
+                        /*~~(L)~~>*/decoded = buffer.toString();
+                    }
+                    return /*~~(L)~~>*/decoded;
+                }
+                private static String utf8Decode(ByteBuffer buff) {
+                    return null;
+                }
+            }
+            """
         )
     )
 }

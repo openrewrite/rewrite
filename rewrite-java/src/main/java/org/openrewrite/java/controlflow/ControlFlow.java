@@ -110,9 +110,6 @@ public final class ControlFlow {
             if (current.size() == 1 && current.iterator().next() instanceof ControlFlowNode.BasicBlock) {
                 return (ControlFlowNode.BasicBlock) current.iterator().next();
             } else {
-                if (!exitFlow.isEmpty()) {
-                    return addBasicBlockToCurrent();
-                }
                 return addBasicBlockToCurrent();
             }
         }
@@ -568,8 +565,34 @@ public final class ControlFlow {
         public J.Try visitTry(J.Try _try, P p) {
             addCursorToBasicBlock();
             visit(_try.getResources(), p);
-            visit(_try.getBody(), p);
-            visit(_try.getFinally(), p);
+            if (_try.getFinally() == null) {
+                visit(_try.getBody(), p);
+            } else {
+                ControlFlowAnalysis<P> tryBodyAnalysis = new ControlFlowAnalysis<>(current);
+                tryBodyAnalysis.visit(_try.getBody(), p, getCursor());
+                if (!tryBodyAnalysis.current.isEmpty()) {
+                    ControlFlowAnalysis<P> finallyAnalysisFromCurrent =
+                            visitRecursiveTransferringAll(tryBodyAnalysis.current, _try.getFinally(), p);
+                    current = finallyAnalysisFromCurrent.current;
+                } else {
+                    current = Collections.emptySet();
+                }
+                if (!tryBodyAnalysis.exitFlow.isEmpty()) {
+                    ControlFlowAnalysis<P> finallyAnalysisFromExitFlow =
+                            visitRecursiveTransferringAll(tryBodyAnalysis.exitFlow, _try.getFinally(), p);
+                    exitFlow.addAll(finallyAnalysisFromExitFlow.current);
+                }
+                if (!tryBodyAnalysis.breakFlow.isEmpty()) {
+                    ControlFlowAnalysis<P> finallyAnalysisFromBreakFlow =
+                            visitRecursiveTransferringAll(tryBodyAnalysis.breakFlow, _try.getFinally(), p);
+                    breakFlow.addAll(finallyAnalysisFromBreakFlow.current);
+                }
+                if (!tryBodyAnalysis.continueFlow.isEmpty()) {
+                    ControlFlowAnalysis<P> finallyAnalysisFromContinueFlow =
+                            visitRecursiveTransferringAll(tryBodyAnalysis.continueFlow, _try.getFinally(), p);
+                    continueFlow.addAll(finallyAnalysisFromContinueFlow.current);
+                }
+            }
             return _try;
         }
 
