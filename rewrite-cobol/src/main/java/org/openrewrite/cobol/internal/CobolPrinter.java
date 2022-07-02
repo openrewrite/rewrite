@@ -20,10 +20,6 @@ import org.openrewrite.cobol.CobolVisitor;
 import org.openrewrite.cobol.tree.Cobol;
 
 public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
-    @Override
-    public Cobol visitDisplay(Cobol.Display display, PrintOutputCapture<P> pPrintOutputCapture) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
 
     @Override
     public Cobol visitDocument(Cobol.CompilationUnit compilationUnit, PrintOutputCapture<P> p) {
@@ -32,37 +28,5 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
 //        visitStatements(document.getPadding().getBody(), p);
         visitSpace(compilationUnit.getEof(), p);
         return compilationUnit;
-    }
-
-    @Override
-    public Cobol visitEmpty(Cobol.Empty empty, PrintOutputCapture<P> p) {
-        visitSpace(empty.getPrefix(), p);
-        visitMarkers(empty.getMarkers(), p);
-        return empty;
-    }
-
-    @Override
-    public Cobol visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, PrintOutputCapture<P> pPrintOutputCapture) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
-
-    @Override
-    public Cobol visitLiteral(Cobol.Literal literal, PrintOutputCapture<P> pPrintOutputCapture) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
-
-    @Override
-    public Cobol visitProcedureDivision(Cobol.ProcedureDivision procedureDivision, PrintOutputCapture<P> pPrintOutputCapture) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
-
-    @Override
-    public Cobol visitProgramUnit(Cobol.ProgramUnit programUnit, PrintOutputCapture<P> pPrintOutputCapture) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
-
-    @Override
-    public Cobol visitStop(Cobol.Stop stop, PrintOutputCapture<P> pPrintOutputCapture) {
-        return super.visitStop(stop, pPrintOutputCapture);
     }
 }
