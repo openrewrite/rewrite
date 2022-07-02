@@ -15,41 +15,34 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.List;
 
 /**
  * Marks a {@link JavaSourceFile} as matching if all the passed methods are found.
  */
+@RequiredArgsConstructor
 public class UsesAllMethods<P> extends JavaIsoVisitor<P> {
-    private final Set<MethodMatcher> methodMatchers;
-
-    public UsesAllMethods(Set<MethodMatcher> methodMatchers) {
-        this.methodMatchers = Objects.requireNonNull(methodMatchers, "methodMatchers cannot be null");
-    }
+    private final List<MethodMatcher> methodMatchers;
 
     public UsesAllMethods(MethodMatcher... methodMatchers) {
-        this(new HashSet<>(Arrays.asList(methodMatchers)));
+        this(Arrays.asList(methodMatchers));
     }
 
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        Set<MethodMatcher> unmatched = new HashSet<>(methodMatchers);
+        List<MethodMatcher> unmatched = new ArrayList<>(methodMatchers);
         for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
-            unmatched.removeIf(matcher -> matcher.matches(type));
-            if (unmatched.isEmpty()) {
-                break;
+            if (unmatched.removeIf(matcher -> matcher.matches(type)) && unmatched.isEmpty()) {
+                return cu.withMarkers(cu.getMarkers().searchResult());
             }
-        }
-        if (unmatched.isEmpty()) {
-            return cu.withMarkers(cu.getMarkers().searchResult());
         }
         return cu;
     }
