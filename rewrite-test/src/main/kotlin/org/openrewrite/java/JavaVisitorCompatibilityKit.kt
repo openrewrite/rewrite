@@ -124,6 +124,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class CovariantEqualsTck : CovariantEqualsTest
 
     @Nested
+    inner class DataFlowInsanityTck : DataFlowInsanityTest
+
+    @Nested
     inner class DataFlowGraphTck : DataFlowGraphTest
 
     @Nested

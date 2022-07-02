@@ -74,7 +74,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
 
     @Test
     fun `transitive assignment from source method`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
+        java(
             """
                 class Test {
                     String source() {

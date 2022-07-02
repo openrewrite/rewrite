@@ -243,10 +243,12 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         @Override
         public J visitAssignment(J.Assignment assignment, Integer integer) {
             J.Assignment a = (J.Assignment) super.visitAssignment(assignment, integer);
-            String variableName = ((J.Identifier) unwrap(a.getVariable())).getSimpleName();
-            // Remove the variable name from the flowsByIdentifier map when assignment occurs
-            if (a.getAssignment() != flowsByIdentifier.peek().get(variableName).getCursor().getValue()) {
-                flowsByIdentifier.peek().remove(variableName);
+            Expression left = unwrap(a.getVariable());
+            if (left instanceof J.Identifier) {
+                String variableName = ((J.Identifier) left).getSimpleName();
+                if (a.getAssignment() != flowsByIdentifier.peek().get(variableName).getCursor().getValue()) {
+                    flowsByIdentifier.peek().remove(variableName);
+                }
             }
             return a;
         }
