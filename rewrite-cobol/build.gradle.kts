@@ -23,6 +23,12 @@ sourceSets {
     }
 }
 
+val modelImplementation by configurations.getting {
+    extendsFrom(configurations.implementation.get())
+}
+
+configurations["modelRuntimeOnly"].extendsFrom(configurations.runtimeOnly.get())
+
 dependencies {
     api(project(":rewrite-core"))
     api("org.jetbrains:annotations:latest.release")
@@ -30,6 +36,8 @@ dependencies {
 
     implementation("org.antlr:antlr4:4.9.+")
     implementation("io.micrometer:micrometer-core:1.+")
+
+    modelImplementation(project(":rewrite-java-11"))
 
     testImplementation(project(":rewrite-test"))
 }

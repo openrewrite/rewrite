@@ -13,14 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.cobol;
+@NonNullApi
+package generate;
 
-import org.openrewrite.cobol.tree.Cobol;
-
-public class CobolIsoVisitor<P> extends CobolVisitor<P> {
-
-    @Override
-    public Cobol.CompilationUnit visitDocument(Cobol.CompilationUnit compilationUnit, P p) {
-        return (Cobol.CompilationUnit) super.visitDocument(compilationUnit, p);
-    }
-}
+import org.openrewrite.internal.lang.NonNullApi;
