@@ -25,43 +25,12 @@ import java.util.List;
 
 public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
 
-    public Cobol visitDisplay(Cobol.Display display, P p) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
-
     public Cobol visitDocument(Cobol.CompilationUnit compilationUnit, P p) {
         Cobol.CompilationUnit d = compilationUnit;
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.getPadding().withProgramUnits(ListUtils.map(d.getPadding().getProgramUnits(), it -> visitRightPadded(it, p)));
         return d;
-    }
-
-    public Cobol visitEmpty(Cobol.Empty empty, P p) {
-        Cobol.Empty e = empty;
-        e = e.withPrefix(visitSpace(e.getPrefix(), p));
-        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
-        return e;
-    }
-
-    public Cobol visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, P p) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
-
-    public Cobol visitLiteral(Cobol.Literal literal, P p) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
-
-    public Cobol visitProcedureDivision(Cobol.ProcedureDivision procedureDivision, P p) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
-
-    public Cobol visitProgramUnit(Cobol.ProgramUnit programUnit, P p) {
-        throw new UnsupportedOperationException("Implement me!");
-    }
-
-    public Cobol visitStop(Cobol.Stop stop, P p) {
-        throw new UnsupportedOperationException("Implement me!");
     }
 
     public Space visitSpace(Space space, P p) {

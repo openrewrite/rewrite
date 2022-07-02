@@ -10,8 +10,6 @@ import java.util.List;
 
 public interface Cobol {
     class Display implements Statement {
-        Space display;
-
         /**
          * Either an {@link Identifier} or {@link Literal}.
          */
