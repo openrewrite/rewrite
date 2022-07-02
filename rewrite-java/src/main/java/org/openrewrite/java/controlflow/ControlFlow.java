@@ -62,13 +62,13 @@ public final class ControlFlow {
             if (next instanceof J.Block) {
                 methodDeclarationBlockCursor = nextCursor;
                 if (J.Block.isStaticOrInitBlock(nextCursor)) {
-                    break;
+                    return new ControlFlow(nextCursor);
                 }
             } else if (next instanceof J.MethodDeclaration) {
-                break;
+                return new ControlFlow(methodDeclarationBlockCursor);
             }
         }
-        return new ControlFlow(methodDeclarationBlockCursor);
+        return new ControlFlow(null);
     }
 
     private static class ControlFlowAnalysis<P> extends JavaIsoVisitor<P> {
