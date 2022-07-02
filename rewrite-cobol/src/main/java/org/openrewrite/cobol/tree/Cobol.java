@@ -101,6 +101,7 @@ public interface Cobol extends Tree {
         @Getter
         @Nullable
         Checksum checksum;
+
         @Override
         public Charset getCharset() {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
