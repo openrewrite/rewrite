@@ -1210,6 +1210,44 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    /**
+     * TODO: This is wrong, but we don't have control flow through try-catch modeled currently.
+     * This test is just to make sure that we don't blow up when we hit this case.
+     */
+    @Test
+    fun `control flow for try with resources with catch and additional return`() = rewriteRun(
+        java(
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    int test() {
+                        try (InputStream source = source()) {
+                            return source.read();
+                        } catch (RuntimeException ignored) {
+
+                        }
+                        return 0;
+                    }
+                }
+                """,
+            """
+                import java.io.InputStream;
+                class Test {
+                    InputStream source() { return null; }
+                    int test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                        try (InputStream source = source()) {
+                            return source.read();
+                        } catch (RuntimeException ignored) {
+
+                        }
+                        return 0;
+                    }
+                }
+                """
+        )
+    )
+
     @Test
     fun `control flow for try`() = rewriteRun(
         java(

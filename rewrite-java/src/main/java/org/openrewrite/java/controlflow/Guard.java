@@ -120,6 +120,8 @@ public class Guard {
                 default:
                     return Optional.empty();
             }
+        } else if (e instanceof J.InstanceOf) {
+            return Optional.of(JavaType.Primitive.Boolean);
         }
         return Optional.empty();
     }
