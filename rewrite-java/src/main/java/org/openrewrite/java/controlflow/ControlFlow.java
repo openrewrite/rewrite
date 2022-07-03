@@ -165,6 +165,12 @@ public final class ControlFlow {
                 continueFlow.addAll(analysis.continueFlow);
                 breakFlow.addAll(analysis.breakFlow);
                 exitFlow.addAll(analysis.exitFlow);
+                if (current.isEmpty() && statement instanceof J.Try) {
+                    // TODO: Support try-catch blocks properly.
+                    // This case occurs when a try block has exhaustive exits,
+                    // and catch blocks handle errors gracefully
+                    break;
+                }
             }
             if (methodEntryPoint) {
                 ControlFlowNode end = ControlFlowNode.End.create();
@@ -386,6 +392,13 @@ public final class ControlFlow {
                 addCursorToBasicBlock(); // Add the binary node last
             }
             return binary;
+        }
+
+        @Override
+        public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, P p) {
+            visit(instanceOf.getExpression(), p); // First the expression is invoked
+            addCursorToBasicBlock(); // Then the instanceof node
+            return instanceOf;
         }
 
         @Override
