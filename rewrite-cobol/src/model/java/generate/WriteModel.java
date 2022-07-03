@@ -81,15 +81,19 @@ public class WriteModel extends Recipe {
                 "  return v.visit#{}(this, p);" +
                 "}").javaParser(parser).build();
 
-        final JavaTemplate paddedGetterWither = JavaTemplate.builder(this::getCursor, "" +
+        /**
+         * The accessors in the model class that skips the padding and return the contained element.
+         */
+        final JavaTemplate unwrappedPaddedGetterWither = JavaTemplate.builder(this::getCursor, "" +
                 "public #{} get#{}() {" +
                 "    return #{}.getElement();" +
                 "}" +
-                "public #{} with#{}(#{} #{}) {" +
+                "public #{} with#{}(#{} #{}) {\n" +
+                "    //noinspection ConstantConditions\n" +
                 "    return getPadding().with#{}(Cobol#{}Padded.withElement(this.#{}, #{}));" +
                 "}").javaParser(parser).build();
 
-        final JavaTemplate nullablePaddedGetterWither = JavaTemplate.builder(this::getCursor, "" +
+        final JavaTemplate nullableUnwrappedPaddedGetterWither = JavaTemplate.builder(this::getCursor, "" +
                 "@Nullable " +
                 "public #{} get#{}() {" +
                 "    return #{} == null ? null : #{}.getElement();" +
@@ -116,7 +120,6 @@ public class WriteModel extends Recipe {
             if (padded) {
                 c = c.withTemplate(paddingField, c.getBody().getCoordinates().firstStatement());
                 c = c.withTemplate(getPadding, c.getBody().getCoordinates().lastStatement());
-                c = c.withTemplate(paddingClass, c.getBody().getCoordinates().lastStatement(), c.getSimpleName());
                 c = c.withTemplate(paddedModel, c.getCoordinates().replaceAnnotations());
             } else {
                 c = c.withTemplate(valueModel, c.getCoordinates().replaceAnnotations());
@@ -128,9 +131,9 @@ public class WriteModel extends Recipe {
                     JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(varDec.getType());
 
                     JavaType.FullyQualified elementType = null;
-                    if(varDec.getTypeExpression() instanceof J.ParameterizedType) {
+                    if (varDec.getTypeExpression() instanceof J.ParameterizedType) {
                         J.ParameterizedType typeExpression = (J.ParameterizedType) varDec.getTypeExpression();
-                        if(typeExpression.getTypeParameters() != null) {
+                        if (typeExpression.getTypeParameters() != null) {
                             elementType = TypeUtils.asFullyQualified(typeExpression.getTypeParameters().get(0).getType());
                         }
                     }
@@ -151,6 +154,10 @@ public class WriteModel extends Recipe {
                 }
             }
 
+            if(padded) {
+                c = c.withTemplate(paddingClass, c.getBody().getCoordinates().lastStatement(), c.getSimpleName());
+            }
+
             return c;
         }
 
@@ -166,20 +173,20 @@ public class WriteModel extends Recipe {
             String elementTypeName = elementType.getClassName();
             String modelTypeName = c.getSimpleName();
 
-            if(nullable) {
+            if (nullable) {
                 StringJoiner newModelArguments = new StringJoiner(", ");
                 for (Statement statement : c.getBody().getStatements()) {
-                    if(statement instanceof J.VariableDeclarations) {
+                    if (statement instanceof J.VariableDeclarations) {
                         newModelArguments.add(statement == varDec ? "null" : ((J.VariableDeclarations) statement).getVariables()
                                 .get(0).getSimpleName());
                     }
                 }
-                c = c.withTemplate(nullablePaddedGetterWither, c.getBody().getCoordinates().lastStatement(),
+                c = c.withTemplate(nullableUnwrappedPaddedGetterWither, c.getBody().getCoordinates().lastStatement(),
                         elementTypeName, capitalizedName, name, name, modelTypeName, capitalizedName,
                         elementTypeName, name, name, name, modelTypeName, newModelArguments.toString(),
                         capitalizedName, leftOrRight, name, name);
             } else {
-                c = c.withTemplate(paddedGetterWither, c.getBody().getCoordinates().lastStatement(),
+                c = c.withTemplate(unwrappedPaddedGetterWither, c.getBody().getCoordinates().lastStatement(),
                         elementTypeName, capitalizedName, name,
                         modelTypeName, capitalizedName, elementTypeName, name,
                         capitalizedName, leftOrRight, name, name);
