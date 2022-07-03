@@ -36,8 +36,7 @@ public interface Cobol extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return v instanceof CobolVisitor ?
-                (R) acceptCobol((CobolVisitor<P>) v, p) : v.defaultValue(this, p);
+        return v instanceof CobolVisitor ? (R) acceptCobol((CobolVisitor<P>) v, p) : v.defaultValue(this, p);
     }
 
     @Nullable
@@ -78,8 +77,7 @@ public interface Cobol extends Tree {
 
         @With
         @Getter
-        @Nullable
-        FileAttributes fileAttributes;
+        @Nullable FileAttributes fileAttributes;
 
         @With
         @Getter
@@ -99,8 +97,7 @@ public interface Cobol extends Tree {
 
         @With
         @Getter
-        @Nullable
-        Checksum checksum;
+        @Nullable Checksum checksum;
 
         @Override
         public Charset getCharset() {
