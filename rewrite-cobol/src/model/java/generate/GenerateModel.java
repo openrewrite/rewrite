@@ -58,7 +58,7 @@ public class GenerateModel {
                 ctx
         ), ctx));
 
-        results.addAll(new WriteModel(modelClasses).run(jp.parse(
+        results.addAll(new WritePrinter(modelClasses).run(jp.parse(
                 Collections.singletonList(
                         Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/internal/CobolPrinter.java")
                 ),
