@@ -30,7 +30,6 @@ public class WritePrinter extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-
                 return super.visitClassDeclaration(classDecl, ctx);
             }
         };
