@@ -57,6 +57,14 @@ public class GenerateModel {
         Path cobolTreePath = Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/tree/Cobol.java");
 
         results.addAll(new WriteModel(modelClasses).run(jp().parse(Collections.singletonList(cobolTreePath), null, ctx), ctx));
+        results.addAll(new WriteVisitorMethods(modelClasses).run(jp().parse(
+                Arrays.asList(
+                        Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/CobolVisitor.java"),
+                        Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/CobolIsoVisitor.java")
+                ),
+                null,
+                ctx
+        ), ctx));
         results.addAll(new WritePrinter(modelClasses).run(jp().parse(
                 Collections.singletonList(
                         Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/internal/CobolPrinter.java")
