@@ -14,6 +14,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.function.Supplier;
@@ -47,9 +48,9 @@ public class WriteModel extends Recipe {
                 "@RequiredArgsConstructor " +
                 "@AllArgsConstructor(access = AccessLevel.PRIVATE)").javaParser(parser).build();
 
-        final JavaTemplate idField = JavaTemplate.builder(this::getCursor, "#{}@EqualsAndHashCode.Include UUID id;").javaParser(parser).build();
-        final JavaTemplate prefixField = JavaTemplate.builder(this::getCursor, "#{}Space prefix;").javaParser(parser).build();
-        final JavaTemplate markersField = JavaTemplate.builder(this::getCursor, "#{}Markers markers;").javaParser(parser).build();
+        final JavaTemplate idField = JavaTemplate.builder(this::getCursor, "@EqualsAndHashCode.Include UUID id;").javaParser(parser).build();
+        final JavaTemplate prefixField = JavaTemplate.builder(this::getCursor, "Space prefix;").javaParser(parser).build();
+        final JavaTemplate markersField = JavaTemplate.builder(this::getCursor, "Markers markers;").javaParser(parser).build();
         final JavaTemplate paddingField = JavaTemplate.builder(this::getCursor, "@Nullable @NonFinal transient WeakReference<Padding> padding;").javaParser(parser).build();
 
         final JavaTemplate getPadding = JavaTemplate.builder(this::getCursor, "" +
@@ -105,16 +106,18 @@ public class WriteModel extends Recipe {
                 "    return getPadding().with#{}(Cobol#{}Padded.withElement(this.#{}, #{}));" +
                 "}").javaParser(parser).build();
 
+        final JavaTemplate withGetterAnnotations = JavaTemplate.builder(this::getCursor, "@With @Getter")
+                .javaParser(parser).build();
+
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration c = classDecl;
 
             boolean padded = c.getBody().getStatements().stream().anyMatch(this::isPadded);
-            String fieldAnnotations = padded ? " @With @Getter " : "";
 
-            c = c.withTemplate(markersField, c.getBody().getCoordinates().firstStatement(), fieldAnnotations);
-            c = c.withTemplate(prefixField, c.getBody().getCoordinates().firstStatement(), fieldAnnotations);
-            c = c.withTemplate(idField, c.getBody().getCoordinates().firstStatement(), fieldAnnotations);
+            c = c.withTemplate(markersField, c.getBody().getCoordinates().firstStatement());
+            c = c.withTemplate(prefixField, c.getBody().getCoordinates().firstStatement());
+            c = c.withTemplate(idField, c.getBody().getCoordinates().firstStatement());
             c = c.withTemplate(acceptMethod, c.getBody().getCoordinates().lastStatement(), classDecl.getSimpleName());
 
             if (padded) {
@@ -138,23 +141,28 @@ public class WriteModel extends Recipe {
                         }
                     }
 
-                    if (fqn != null && elementType != null) {
-                        switch (fqn.getClassName()) {
-                            case "CobolContainer":
-                                c = writeContainerGetterWithers(c, varDec, elementType);
-                                break;
-                            case "CobolLeftPadded":
-                                c = writePaddedGetterWithers(c, varDec, elementType, "Left");
-                                break;
-                            case "CobolRightPadded":
-                                c = writePaddedGetterWithers(c, varDec, elementType, "Right");
-                                break;
+                    if (fqn != null) {
+                        if (elementType != null) {
+                            switch (fqn.getClassName()) {
+                                case "CobolContainer":
+                                    c = writeContainerGetterWithers(c, varDec, elementType);
+                                    break;
+                                case "CobolLeftPadded":
+                                    c = writePaddedGetterWithers(c, varDec, elementType, "Left");
+                                    break;
+                                case "CobolRightPadded":
+                                    c = writePaddedGetterWithers(c, varDec, elementType, "Right");
+                                    break;
+                            }
+                        } else if (padded) {
+                            c = c.withTemplate(withGetterAnnotations, varDec.getCoordinates()
+                                    .addAnnotation(Comparator.comparing(J.Annotation::getSimpleName)));
                         }
                     }
                 }
             }
 
-            if(padded) {
+            if (padded) {
                 c = c.withTemplate(paddingClass, c.getBody().getCoordinates().lastStatement(), c.getSimpleName());
             }
 
@@ -162,7 +170,7 @@ public class WriteModel extends Recipe {
         }
 
         private J.ClassDeclaration writeContainerGetterWithers(J.ClassDeclaration c, J.VariableDeclarations statement, JavaType.FullyQualified elementType) {
-            return c;
+            throw new UnsupportedOperationException("Implement me!");
         }
 
         private J.ClassDeclaration writePaddedGetterWithers(J.ClassDeclaration c, J.VariableDeclarations varDec, JavaType.FullyQualified elementType,

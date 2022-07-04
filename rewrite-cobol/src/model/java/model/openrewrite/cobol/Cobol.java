@@ -2,7 +2,6 @@ package model.openrewrite.cobol;
 
 import org.openrewrite.cobol.tree.CobolLeftPadded;
 import org.openrewrite.cobol.tree.CobolRightPadded;
-import org.openrewrite.cobol.tree.DottedKeyword;
 import org.openrewrite.cobol.tree.Space;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -30,7 +29,7 @@ public interface Cobol {
 
     class IdentificationDivision implements Cobol {
         CobolRightPadded<IdKeyword> identification;
-        DottedKeyword division;
+        CobolRightPadded<Space> division;
 
         public enum IdKeyword {
             Identification,
@@ -42,7 +41,7 @@ public interface Cobol {
     }
 
     class ProgramIdParagraph implements Cobol {
-        DottedKeyword programId;
+        CobolRightPadded<Space> programId;
         Identifier programName;
     }
 
