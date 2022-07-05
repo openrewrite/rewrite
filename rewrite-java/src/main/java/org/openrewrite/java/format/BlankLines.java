@@ -15,13 +15,11 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 public class BlankLines extends Recipe {
@@ -50,5 +48,13 @@ public class BlankLines extends Recipe {
             doAfterVisit(new BlankLinesVisitor<>(style));
             return cu;
         }
+    }
+
+    public static <J2 extends J> J2 formatBlankLines(J j, Cursor cursor) {
+        BlankLinesStyle style = cursor.firstEnclosingOrThrow(SourceFile.class)
+                .getStyle(BlankLinesStyle.class);
+        //noinspection unchecked
+        return (J2) new BlankLinesVisitor<>(style == null ? IntelliJ.blankLines() : style)
+                .visitNonNull(j, 0, cursor);
     }
 }

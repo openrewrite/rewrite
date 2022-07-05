@@ -511,6 +511,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UseDiamondOperatorTck : UseDiamondOperatorTest
 
     @Nested
+    inner class UseAsBuilderTck : UseAsBuilderTest
+
+    @Nested
     inner class UseCollectionInterfacesTck : UseCollectionInterfacesTest
 
     @Nested

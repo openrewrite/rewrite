@@ -169,12 +169,16 @@ public class MethodMatcher {
                         .collect(joining(","))).matches();
     }
 
-    public boolean matches(Expression maybeMethod) {
+    public boolean matches(@Nullable Expression maybeMethod) {
         return (maybeMethod instanceof J.MethodInvocation && matches((J.MethodInvocation) maybeMethod)) ||
                 (maybeMethod instanceof J.NewClass && matches((J.NewClass) maybeMethod));
     }
 
-    public boolean matches(J.MethodInvocation method) {
+    public boolean matches(@Nullable J.MethodInvocation method) {
+        if(method == null) {
+            return false;
+        }
+
         if (method.getMethodType() == null) {
             return false;
         }
