@@ -99,7 +99,7 @@ interface FindFlowBetweenMethodsTest : JavaRecipeTest {
                 void test() {
                     Integer x = /*~~>*/Integer.parseInt("10");
                     LinkedList<Integer> l = new LinkedList<>();
-                    l.add(x);
+                    l.add(/*~~>*/x);
                     System.out.println(l);
                     /*~~>*/x.equals(10);
                 }
