@@ -113,7 +113,7 @@ public class FindFlowBetweenMethods extends Recipe {
                 return n;
             }
 
-            private boolean conditional (InvocationMatcher sinkMatcher, Cursor cursor) {
+            private boolean conditional(InvocationMatcher sinkMatcher, Cursor cursor) {
                 switch (target) {
                     case "Select":
                         return sinkMatcher.advanced().isSelect(cursor);
