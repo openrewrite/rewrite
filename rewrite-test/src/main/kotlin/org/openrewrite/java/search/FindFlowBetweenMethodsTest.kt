@@ -25,9 +25,13 @@ interface FindFlowBetweenMethodsTest : JavaRecipeTest {
     @Test
     fun `taint flow between subject only`(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindFlowBetweenMethods("java.util.LinkedList <constructor>()",
-            true, "java.util.LinkedList remove()",
-            true, "Select","Taint"),
+        recipe = FindFlowBetweenMethods(
+            "java.util.LinkedList <constructor>()",
+            true,
+            "java.util.LinkedList remove()",
+            true,
+            "Select",
+            "Taint"),
         before = """
             import java.util.LinkedList;
             class Test {
@@ -56,9 +60,13 @@ interface FindFlowBetweenMethodsTest : JavaRecipeTest {
     @Test
     fun `taint flow between arguments only`(jp: JavaParser) = assertChanged(
             jp,
-            recipe = FindFlowBetweenMethods("java.lang.Integer parseInt(String)",
-                true, "java.util.LinkedList remove(..)",
-                true, "Arguments", "Taint"),
+            recipe = FindFlowBetweenMethods(
+                "java.lang.Integer parseInt(String)",
+                true,
+                "java.util.LinkedList remove(..)",
+                true,
+                "Arguments",
+                "Taint"),
             before = """
             import java.util.LinkedList;
             class Test {
@@ -86,9 +94,13 @@ interface FindFlowBetweenMethodsTest : JavaRecipeTest {
     @Test
     fun `taint flow through multiple subjects, Integer source and sink methods specified` (jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindFlowBetweenMethods("java.lang.Integer parseInt(String)",
-            true, "java.lang.Integer equals(..)",
-            true, "Both", "Taint"),
+        recipe = FindFlowBetweenMethods(
+            "java.lang.Integer parseInt(String)",
+            true,
+            "java.lang.Integer equals(..)",
+            true,
+            "Both",
+            "Taint"),
         before = """
             import java.util.LinkedList;
             class Test {
@@ -118,9 +130,13 @@ interface FindFlowBetweenMethodsTest : JavaRecipeTest {
     @Test
     fun `no taint flow through arguments` (jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = FindFlowBetweenMethods("java.lang.Integer parseInt(String)",
-            true, "java.lang.Integer equals(..)",
-            true, "Arguments", "Taint"),
+        recipe = FindFlowBetweenMethods(
+            "java.lang.Integer parseInt(String)",
+            true,
+            "java.lang.Integer equals(..)",
+            true,
+            "Arguments",
+            "Taint"),
         before = """
             import java.util.LinkedList;
             class Test {
@@ -138,9 +154,13 @@ interface FindFlowBetweenMethodsTest : JavaRecipeTest {
     @Test
     fun `taint flow between arguments and subject`(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindFlowBetweenMethods("java.util.LinkedList <constructor>()",
-            true, "java.util.LinkedList remove()",
-            true, "Both","Taint"),
+        recipe = FindFlowBetweenMethods(
+            "java.util.LinkedList <constructor>()",
+            true,
+            "java.util.LinkedList remove()",
+            true,
+            "Both",
+            "Taint"),
         before = """
             import java.util.LinkedList;
             class Test {
