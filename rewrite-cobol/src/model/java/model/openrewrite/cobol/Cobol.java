@@ -28,6 +28,11 @@ public interface Cobol {
     }
 
     class IdentificationDivision implements Cobol {
+
+        // identificationDivision
+        //   : (IDENTIFICATION | ID) DIVISION DOT_FS programIdParagraph identificationDivisionBody*
+        //   ;
+
         CobolRightPadded<IdKeyword> identification;
         CobolRightPadded<Space> division;
 
@@ -35,6 +40,8 @@ public interface Cobol {
             Identification,
             Id
         }
+
+        ProgramIdParagraph programIdParagraph;
     }
 
     class ProcedureDivision implements Cobol {
@@ -46,6 +53,7 @@ public interface Cobol {
     }
 
     class ProgramUnit implements Cobol {
+        IdentificationDivision identificationDivision;
     }
 
     class Stop implements Statement {

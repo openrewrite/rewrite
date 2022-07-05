@@ -15,6 +15,8 @@
  */
 package org.openrewrite.cobol.internal;
 
+import lombok.Getter;
+import lombok.With;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -22,15 +24,17 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.cobol.internal.grammar.CobolBaseVisitor;
 import org.openrewrite.cobol.internal.grammar.CobolParser;
 import org.openrewrite.cobol.tree.Cobol;
+import org.openrewrite.cobol.tree.CobolRightPadded;
 import org.openrewrite.cobol.tree.Space;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.BiFunction;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
@@ -54,7 +58,21 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     }
 
     @Override
+    public Cobol.CompilationUnit visitStartRule(CobolParser.StartRuleContext ctx) {
+        return visitCompilationUnit(ctx.compilationUnit()).withEof(sourceBefore(source.substring(cursor)));
+    }
+
+    @Override
     public Cobol.CompilationUnit visitCompilationUnit(CobolParser.CompilationUnitContext ctx) {
+
+        List<CobolParser.ProgramUnitContext> puCtxs = ctx.programUnit();
+        List<CobolRightPadded<Cobol.ProgramUnit>> programUnits = new ArrayList<>();
+        for(int i=0; i<puCtxs.size(); i++) {
+            Cobol.ProgramUnit pu = (Cobol.ProgramUnit) visitProgramUnit(puCtxs.get(i));
+            CobolRightPadded<Cobol.ProgramUnit> ppu = CobolRightPadded.build(pu);
+            programUnits.add(ppu);
+        }
+
         return new Cobol.CompilationUnit(
                 randomId(),
                 path,
@@ -64,14 +82,49 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
                 charset.name(),
                 charsetBomMarked,
                 null,
-                emptyList(),
+                // List<CobolRightPadded<Cobol>> programUnits;
+                programUnits,
                 Space.EMPTY
         );
     }
 
     @Override
-    public Cobol.CompilationUnit visitStartRule(CobolParser.StartRuleContext ctx) {
-        return visitCompilationUnit(ctx.compilationUnit()).withEof(sourceBefore(source.substring(cursor)));
+    public Cobol visitProgramUnit(CobolParser.ProgramUnitContext ctx) {
+        Cobol.IdentificationDivision identificationDivision = (Cobol.IdentificationDivision) visitIdentificationDivision(ctx.identificationDivision());
+        return new Cobol.ProgramUnit(
+                randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                identificationDivision);
+    }
+
+    @Override
+    public Cobol visitIdentificationDivision(CobolParser.IdentificationDivisionContext ctx) {
+        // identificationDivision :  (IDENTIFICATION | ID) DIVISION DOT_FS programIdParagraph identificationDivisionBody*
+        Cobol.ProgramIdParagraph programIdParagraph = (Cobol.ProgramIdParagraph) visitProgramIdParagraph(ctx.programIdParagraph());
+        Cobol.IdentificationDivision id = new Cobol.IdentificationDivision(
+                randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                CobolRightPadded.build(ctx.IDENTIFICATION() == null ?
+                                Cobol.IdentificationDivision.IdKeyword.Id : Cobol.IdentificationDivision.IdKeyword.Identification),
+                CobolRightPadded.build(Space.build(ctx.DIVISION().getText())),
+                programIdParagraph
+        );
+        return id;
+    }
+
+    @Override
+    public Cobol visitProgramIdParagraph(CobolParser.ProgramIdParagraphContext ctx) {
+        CobolRightPadded<Space> programId = CobolRightPadded.build(Space.build("PROGRAM ID"));
+        String programName = ctx.programName().getText();
+        return new Cobol.ProgramIdParagraph(
+                randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                programId,
+                programName
+        );
     }
 
     private Space prefix(ParserRuleContext ctx) {
