@@ -35,9 +35,7 @@ import static java.util.Collections.emptyList;
 @EqualsAndHashCode
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public class Space {
-    public static final Space EMPTY = new Space("", emptyList());
-
-    private final List<Comment> comments;
+    public static final Space EMPTY = new Space("");
 
     @Nullable
     private final String whitespace;
@@ -49,33 +47,23 @@ public class Space {
      */
     private static final Map<String, Space> flyweights = new WeakHashMap<>();
 
-    private Space(@Nullable String whitespace, List<Comment> comments) {
-        this.comments = comments;
+    private Space(@Nullable String whitespace) {
         this.whitespace = whitespace == null || whitespace.isEmpty() ? null : whitespace;
     }
 
     @JsonCreator
-    public static Space build(@Nullable String whitespace, List<Comment> comments) {
-        if (comments.isEmpty()) {
-            if (whitespace == null || whitespace.isEmpty()) {
-                return Space.EMPTY;
-            }
-            return flyweights.computeIfAbsent(whitespace, k -> new Space(whitespace, comments));
+    public static Space build(@Nullable String whitespace) {
+        if (whitespace == null || whitespace.isEmpty()) {
+            return Space.EMPTY;
         }
-        return new Space(whitespace, comments);
+        return flyweights.computeIfAbsent(whitespace, k -> new Space(whitespace));
     }
 
     public String getIndent() {
-        if (!comments.isEmpty()) {
-            return getWhitespaceIndent(comments.get(comments.size() - 1).getSuffix());
-        }
         return getWhitespaceIndent(whitespace);
     }
 
     public String getLastWhitespace() {
-        if (!comments.isEmpty()) {
-            return comments.get(comments.size() - 1).getSuffix();
-        }
         return whitespace == null ? "" : whitespace;
     }
 
@@ -92,41 +80,8 @@ public class Space {
         return whitespace;
     }
 
-    public List<Comment> getComments() {
-        return comments;
-    }
-
     public String getWhitespace() {
         return whitespace == null ? "" : whitespace;
-    }
-
-    public boolean hasComment(String comment) {
-        for (Comment c : comments) {
-            if (c.getText().equals(comment)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public Space withComments(List<Comment> comments) {
-        if (comments == this.comments) {
-            return this;
-        }
-        if (comments.isEmpty() && (whitespace == null || whitespace.isEmpty())) {
-            return Space.EMPTY;
-        }
-        return build(whitespace, comments);
-    }
-
-    public Space withWhitespace(String whitespace) {
-        if (comments.isEmpty() && whitespace.isEmpty()) {
-            return Space.EMPTY;
-        }
-        if ((whitespace.isEmpty() && this.whitespace == null) || whitespace.equals(this.whitespace)) {
-            return this;
-        }
-        return build(whitespace, comments);
     }
 
     public boolean isEmpty() {
@@ -138,7 +93,7 @@ public class Space {
     }
 
     public static Space format(String formatting) {
-        throw new UnsupportedOperationException("Implement me!");
+        return build(formatting);
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -170,38 +125,8 @@ public class Space {
         return trees;
     }
 
-    private static final String[] spaces = {
-            "·₁", "·₂", "·₃", "·₄", "·₅", "·₆", "·₇", "·₈", "·₉", "·₊"
-    };
-
-    private static final String[] tabs = {
-            "-₁", "-₂", "-₃", "-₄", "-₅", "-₆", "-₇", "-₈", "-₉", "-₊"
-    };
-
     @Override
     public String toString() {
-        StringBuilder printedWs = new StringBuilder();
-        int lastNewline = 0;
-        if (whitespace != null) {
-            char[] charArray = whitespace.toCharArray();
-            for (int i = 0; i < charArray.length; i++) {
-                char c = charArray[i];
-                if (c == '\n') {
-                    printedWs.append("\\n");
-                    lastNewline = i + 1;
-                } else if (c == '\r') {
-                    printedWs.append("\\r");
-                    lastNewline = i + 1;
-                } else if (c == ' ') {
-                    printedWs.append(spaces[(i - lastNewline) % 10]);
-                } else if (c == '\t') {
-                    printedWs.append(tabs[(i - lastNewline) % 10]);
-                }
-            }
-        }
-
-        return "Space(" +
-                "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") +
-                ">, whitespace='" + printedWs + "')";
+        return whitespace;
     }
 }
