@@ -208,6 +208,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindDeprecatedMethodsTck : FindDeprecatedMethodsTest
 
     @Nested
+    inner class FindFlowBetweenMethodsTck : FindFlowBetweenMethodsTest
+
+    @Nested
     inner class FindLiteralsTck : FindLiteralsTest
 
     @Nested
