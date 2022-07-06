@@ -17,11 +17,15 @@ package org.openrewrite.cobol.internal;
 
 import lombok.Getter;
 import lombok.With;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenSource;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.cobol.internal.grammar.CobolBaseVisitor;
+import org.openrewrite.cobol.internal.grammar.CobolLexer;
 import org.openrewrite.cobol.internal.grammar.CobolParser;
 import org.openrewrite.cobol.tree.Cobol;
 import org.openrewrite.cobol.tree.CobolRightPadded;
@@ -84,6 +88,47 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         return source.substring(ctx1.getStop().getStopIndex() + 1, ctx2.getStart().getStartIndex());
     }
 
+    private Space prefix(TerminalNode terminal) {
+        TerminalNode previousNode = previousTerminalNode(terminal);
+        if(previousNode == null) {
+            return Space.build(source.substring(0, terminal.getSymbol().getStartIndex()));
+        } else {
+            return Space.build(source.substring(previousNode.getSymbol().getStopIndex()+1, terminal.getSymbol().getStartIndex()));
+        }
+    }
+
+    private Space prefix(ParserRuleContext tree) {
+        TerminalNode previousNode = previousTerminalNode(tree);
+        if(previousNode == null) {
+            return Space.build(source.substring(0, tree.getStart().getStartIndex()));
+        } else {
+            return Space.build(source.substring(previousNode.getSymbol().getStopIndex()+1, tree.getStart().getStartIndex()));
+        }
+    }
+
+    private TerminalNode previousTerminalNode(ParseTree n) {
+        ParseTree parent = n.getParent();
+        if(parent == null) return null;
+        int pos;
+        for(pos = 0; pos < parent.getChildCount(); pos++) {
+            if(parent.getChild(pos) == n) break;
+        }
+        assert pos < parent.getChildCount();
+        if(pos == 0) {
+            return previousTerminalNode(parent);
+        } else {
+            return lastTerminalNode(parent.getChild(pos-1));
+        }
+    }
+
+    private TerminalNode lastTerminalNode(ParseTree n) {
+        if(n instanceof TerminalNode) {
+            return (TerminalNode) n;
+        } else {
+            return lastTerminalNode(n.getChild(n.getChildCount()-1));
+        }
+    }
+
 
 
     @Override
@@ -106,7 +151,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
                 randomId(),
                 path,
                 fileAttributes,
-                Space.EMPTY,
+                prefix(ctx),
                 Markers.EMPTY,
                 charset.name(),
                 charsetBomMarked,
@@ -131,7 +176,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         }
         return new Cobol.ProgramUnit(
                 randomId(),
-                Space.EMPTY,
+                prefix(ctx),
                 Markers.EMPTY,
                 identificationDivision,
                 procedureDivision);
@@ -139,11 +184,25 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitProcedureDivision(CobolParser.ProcedureDivisionContext ctx) {
+        // procedureDivision
+        //   : PROCEDURE DIVISION procedureDivisionUsingClause? procedureDivisionGivingClause? DOT_FS procedureDeclaratives? procedureDivisionBody
+        //   ;
+        if(ctx.procedureDivisionUsingClause() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+        if(ctx.procedureDivisionGivingClause() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+        if(ctx.procedureDeclaratives() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+
+        Cobol.ProcedureDivisionBody procedureDivisionBody = (Cobol.ProcedureDivisionBody) visitProcedureDivisionBody(ctx.procedureDivisionBody());
         return new Cobol.ProcedureDivision(
                 randomId(),
-                Space.EMPTY,
+                prefix(ctx),
                 Markers.EMPTY,
-                null // TODO
+                procedureDivisionBody
         );
     }
 
@@ -163,7 +222,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
         Cobol.IdentificationDivision id = new Cobol.IdentificationDivision(
                 randomId(),
-                Space.EMPTY,
+                prefix(ctx),
                 Markers.EMPTY,
                 CobolRightPadded.build(idKeyword).withAfter(Space.build(space1)),
                 CobolRightPadded.build(Space.build(ctx.DIVISION().getText())).withAfter(Space.build(space2)),
@@ -183,29 +242,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         String programName = ctx.programName().getText();
         return new Cobol.ProgramIdParagraph(
                 randomId(),
-                Space.EMPTY,
+                prefix(ctx),
                 Markers.EMPTY,
                 programId,
                 programName
         );
-    }
-
-    private Space prefix(ParserRuleContext ctx) {
-        return prefix(ctx.getStart());
-    }
-
-    private Space prefix(@Nullable TerminalNode terminalNode) {
-        return terminalNode == null ? Space.EMPTY : prefix(terminalNode.getSymbol());
-    }
-
-    private Space prefix(Token token) {
-        int start = token.getStartIndex();
-        if (start < cursor) {
-            return Space.EMPTY;
-        }
-        String prefix = source.substring(cursor, start);
-        cursor = start;
-        return Space.format(prefix);
     }
 
     @Nullable
