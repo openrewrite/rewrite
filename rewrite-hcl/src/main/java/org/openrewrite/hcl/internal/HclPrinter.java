@@ -105,7 +105,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         visitMarkers(binary.getMarkers(), p);
         visit(binary.getLeft(), p);
         visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
-        switch(binary.getOperator()) {
+        switch (binary.getOperator()) {
             case Addition:
                 p.out.append('+');
                 break;
@@ -159,7 +159,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         visitSpace(block.getOpen(), Space.Location.BLOCK_OPEN, p);
         p.out.append('{');
         visit(block.getBody(), p);
-        visitSpace(block.getClose(), Space.Location.BLOCK_CLOSE, p);
+        visitSpace(block.getEnd(), Space.Location.BLOCK_CLOSE, p);
         p.out.append('}');
         return block;
     }
@@ -179,6 +179,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         visitSpace(configFile.getPrefix(), Space.Location.CONFIG_FILE, p);
         visitMarkers(configFile.getMarkers(), p);
         visit(configFile.getBody(), p);
+        visitSpace(configFile.getEof(), Space.Location.CONFIG_FILE_EOF, p);
         return configFile;
     }
 
@@ -200,7 +201,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         visit(forObject.getIntro(), p);
         visitLeftPadded(":", forObject.getPadding().getUpdateName(), HclLeftPadded.Location.FOR_UPDATE, p);
         visitLeftPadded("=>", forObject.getPadding().getUpdateValue(), HclLeftPadded.Location.FOR_UPDATE_VALUE, p);
-        if(forObject.getEllipsis() != null) {
+        if (forObject.getEllipsis() != null) {
             visitSpace(forObject.getEllipsis().getPrefix(), Space.Location.FOR_UPDATE_VALUE_ELLIPSIS, p);
             p.out.append("...");
         }
@@ -364,7 +365,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     public Hcl visitUnary(Hcl.Unary unary, PrintOutputCapture<P> p) {
         visitSpace(unary.getPrefix(), Space.Location.UNARY, p);
         visitMarkers(unary.getMarkers(), p);
-        switch(unary.getOperator()) {
+        switch (unary.getOperator()) {
             case Negative:
                 p.out.append('-');
                 break;
@@ -386,7 +387,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
 
     @Override
     public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-        if(marker instanceof SearchResult) {
+        if (marker instanceof SearchResult) {
             String description = ((SearchResult) marker).getDescription();
             p.out.append("/*~~")
                     .append(description == null ? "" : "(" + description + ")~~")

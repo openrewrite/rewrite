@@ -84,11 +84,72 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
         //noinspection unchecked
         H h = (H) new HclVisitor<Integer>() {
             @Override
+            public Hcl visitConfigFile(Hcl.ConfigFile configFile, Integer p) {
+                Hcl.ConfigFile c = (Hcl.ConfigFile) super.visitConfigFile(configFile, p);
+                if (loc.equals(Location.CONFIG_FILE_EOF)) {
+                    List<BodyContent> gen = substitutions.unsubstitute(templateParser.parseBodyContent(substitutedTemplate));
+
+                    if (coordinates.getComparator() != null) {
+                        for (int i = 0; i < gen.size(); i++) {
+                            BodyContent g = gen.get(i);
+                            BodyContent formatted;
+                            if (i == 0) {
+                                formatted = c.getBody().isEmpty() ?
+                                        g :
+                                        g.withPrefix(Space.format("\n"));
+                            } else {
+                                formatted = g;
+                            }
+
+                            c = c.withBody(
+                                    ListUtils.insertInOrder(
+                                            c.getBody(),
+                                            autoFormat(formatted, p, getCursor()),
+                                            coordinates.getComparator()
+                                    )
+                            );
+                        }
+                    } else {
+                        c = c.withBody(
+                                ListUtils.concatAll(
+                                        c.getBody(),
+                                        ListUtils.map(gen, (i, s) -> autoFormat(i == 0 ? s.withPrefix(Space.format("\n")) : s, p, getCursor()))
+                                )
+                        );
+                    }
+                } else if (loc.equals(Location.CONFIG_FILE)) {
+                    List<BodyContent> gen = substitutions.unsubstitute(templateParser.parseBodyContent(substitutedTemplate));
+                    c = c.withBody(
+                            ListUtils.concatAll(
+                                    ListUtils.map(gen, (i, s) -> autoFormat(s, p, getCursor())),
+                                    Space.formatFirstPrefix(c.getBody(), c.getBody().isEmpty() ?
+                                            Space.EMPTY :
+                                            c.getBody().get(0).getPrefix().withWhitespace("\n")))
+                    );
+                }
+                return c;
+            }
+
+            @Override
             public Hcl visitBlock(Hcl.Block block, Integer p) {
                 Hcl.Block b = (Hcl.Block) super.visitBlock(block, p);
                 if (loc.equals(Location.BLOCK_CLOSE)) {
                     if (b.isScope(insertionPoint)) {
                         List<BodyContent> gen = substitutions.unsubstitute(templateParser.parseBodyContent(substitutedTemplate));
+
+                        if (coordinates.getComparator() != null) {
+                            for (BodyContent g : gen) {
+                                b = b.withBody(
+                                        ListUtils.insertInOrder(
+                                                b.getBody(),
+                                                autoFormat(gen.get(0), p, getCursor()),
+                                                coordinates.getComparator()
+                                        )
+                                );
+                            }
+                            return b;
+                        }
+
                         b = b.withBody(
                                 ListUtils.concatAll(
                                         block.getBody(),
@@ -101,7 +162,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
                                 .orElse(SpacesStyle.DEFAULT)).visit(b, p, getCursor().getParentOrThrow());
                         assert b != null;
                     }
-                } else if(loc.equals(Location.BLOCK)) {
+                } else if (loc.equals(Location.BLOCK)) {
                     if (b.isScope(insertionPoint)) {
                         b = (Hcl.Block) autoFormat(templateParser.parseBodyContent(substitutedTemplate).get(0), p,
                                 getCursor().getParentOrThrow());

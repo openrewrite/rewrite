@@ -289,6 +289,7 @@ public class Space {
         CONDITIONAL_TRUE_PREFIX,
         CONDITIONAL_FALSE_PREFIX,
         CONFIG_FILE,
+        CONFIG_FILE_EOF,
         EMPTY,
         EXPRESSION_PREFIX,
         FOR_CONDITION,

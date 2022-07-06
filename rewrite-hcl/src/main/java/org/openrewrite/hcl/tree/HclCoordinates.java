@@ -37,23 +37,15 @@ public class HclCoordinates implements Coordinates {
         return Mode.REPLACEMENT.equals(mode);
     }
 
-    /**
-     * Determines whether we are replacing a whole tree element, and not either
-     * (1) replacing just a piece of a method, class, or variable declaration signature or
-     * (2) inserting a new element
-     */
-    public boolean isReplaceWholeCursorValue() {
-        return isReplacement() && spaceLocation == null;
-    }
-
     public enum Mode {
         AFTER,
         BEFORE,
         REPLACEMENT
     }
 
-    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    @Nullable
     public <H extends Hcl> Comparator<H> getComparator() {
+        //noinspection unchecked
         return (Comparator<H>) comparator;
     }
 }

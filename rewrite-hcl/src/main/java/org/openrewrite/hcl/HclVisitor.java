@@ -107,7 +107,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         b = b.withLabels(ListUtils.map(b.getLabels(), l -> (Label) visit(l, p)));
         b = b.withOpen(visitSpace(b.getOpen(), Space.Location.BLOCK_OPEN, p));
         b = b.withBody(ListUtils.map(b.getBody(), bc -> (BodyContent) visit(bc, p)));
-        b = b.withClose(visitSpace(b.getClose(), Space.Location.BLOCK_CLOSE, p));
+        b = b.withEnd(visitSpace(b.getEnd(), Space.Location.BLOCK_CLOSE, p));
         return b;
     }
 
@@ -136,6 +136,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CONFIG_FILE, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         c = c.withBody(ListUtils.map(c.getBody(), bc -> (BodyContent) visit(bc, p)));
+        c = c.withEof(visitSpace(c.getEof(), Space.Location.CONFIG_FILE_EOF, p));
         return c;
     }
 

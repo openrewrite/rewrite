@@ -19,19 +19,46 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.hcl.HclRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-class AutoFormatTest : HclRecipeTest {
-    override val recipe: Recipe
-        get() = AutoFormat()
+class AutoFormatTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(AutoFormat())
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/974")
     @Test
-    fun lineComments() = assertUnchanged(
-        before = """
-            # a hash comment with # or // is still 1 line.
-            // a slash comment with # or // is still 1 line.
-            resource {
-            }
-        """
+    fun lineComments() = rewriteRun(
+        hcl(
+            """
+                # a hash comment with # or // is still 1 line.
+                // a slash comment with # or // is still 1 line.
+                resource {
+                }
+            """
+        )
+    )
+
+    @Test
+    fun blankLines() = rewriteRun(
+        hcl(
+            """
+                r1 {
+                }
+                
+                
+                
+                r2 {
+                }
+            """,
+            """
+                r1 {
+                }
+                
+                r2 {
+                }
+            """
+        )
     )
 }

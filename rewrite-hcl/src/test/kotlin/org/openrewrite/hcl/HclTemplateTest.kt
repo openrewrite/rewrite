@@ -23,6 +23,90 @@ import org.openrewrite.hcl.tree.Hcl
 class HclTemplateTest : HclRecipeTest {
 
     @Test
+    fun lastInConfigFile() = assertChanged(
+        recipe = toRecipe {
+            object : HclVisitor<ExecutionContext>() {
+                val t = HclTemplate.builder({ cursor }, "after {\n}").build()
+
+                override fun visitConfigFile(configFile: Hcl.ConfigFile, p: ExecutionContext): Hcl {
+                    if (configFile.body.size == 1) {
+                        return configFile.withTemplate(t, configFile.coordinates.last())
+                    }
+                    return super.visitConfigFile(configFile, p)
+                }
+            }
+        },
+        before = """
+            before {
+            }
+        """,
+        after = """
+            before {
+            }
+            after {
+            }
+        """
+    )
+
+    @Test
+    fun firstInConfigFile() = assertChanged(
+        recipe = toRecipe {
+            object : HclVisitor<ExecutionContext>() {
+                val t = HclTemplate.builder({ cursor }, "after {\n}").build()
+
+                override fun visitConfigFile(configFile: Hcl.ConfigFile, p: ExecutionContext): Hcl {
+                    if (configFile.body.size == 1) {
+                        return configFile.withTemplate(t, configFile.coordinates.first())
+                    }
+                    return super.visitConfigFile(configFile, p)
+                }
+            }
+        },
+        before = """
+            before {
+            }
+        """,
+        after = """
+            after {
+            }
+            before {
+            }
+        """
+    )
+
+    @Test
+    fun middleOfConfigFile() = assertChanged(
+        recipe = toRecipe {
+            object : HclVisitor<ExecutionContext>() {
+                val t = HclTemplate.builder({ cursor }, "second {\n}").build()
+
+                override fun visitConfigFile(configFile: Hcl.ConfigFile, p: ExecutionContext): Hcl {
+                    if (configFile.body.size == 2) {
+                        return configFile.withTemplate(t, configFile.coordinates.add(
+                            Comparator.comparing { bc -> (bc as Hcl.Block).type!!.name }
+                        ))
+                    }
+                    return super.visitConfigFile(configFile, p)
+                }
+            }
+        },
+        before = """
+            first {
+            }
+            third {
+            }
+        """,
+        after = """
+            first {
+            }
+            second {
+            }
+            third {
+            }
+        """
+    )
+
+    @Test
     fun lastBodyContentInBlock() = assertChanged(
         recipe = toRecipe {
             object : HclVisitor<ExecutionContext>() {

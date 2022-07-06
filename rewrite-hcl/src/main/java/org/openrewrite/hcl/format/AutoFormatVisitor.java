@@ -47,6 +47,10 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
                 .orElse(SpacesStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
+        t = new BlankLinesVisitor<>(Optional.ofNullable(cf.getStyle(BlankLinesStyle.class))
+                .orElse(BlankLinesStyle.DEFAULT), stopAfter)
+                .visit(t, p, cursor.fork());
+
         t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cf.getStyle(TabsAndIndentsStyle.class))
                 .orElse(TabsAndIndentsStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
@@ -64,6 +68,10 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
 
         t = (Hcl.ConfigFile) new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
                 .orElse(SpacesStyle.DEFAULT), stopAfter)
+                .visit(t, p);
+
+        t = (Hcl.ConfigFile) new BlankLinesVisitor<>(Optional.ofNullable(cf.getStyle(BlankLinesStyle.class))
+                .orElse(BlankLinesStyle.DEFAULT), stopAfter)
                 .visit(t, p);
 
         t = (Hcl.ConfigFile) new TabsAndIndentsVisitor<>(Optional.ofNullable(cf.getStyle(TabsAndIndentsStyle.class))

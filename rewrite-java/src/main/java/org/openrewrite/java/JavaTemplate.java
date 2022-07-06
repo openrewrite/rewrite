@@ -127,19 +127,17 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     substitutedTemplate, loc));
 
                             if (coordinates.getComparator() != null) {
-                                if (gen.size() != 1) {
-                                    throw new IllegalArgumentException("Expected a template that would generate exactly one " +
-                                            "statement to replace one statement, but generated " + gen.size() +
-                                            ". Template:\n" + substitutedTemplate);
+                                J.Block b = block;
+                                for (Statement g : gen) {
+                                    block.withStatements(
+                                            ListUtils.insertInOrder(
+                                                    block.getStatements(),
+                                                    autoFormat(g, p, getCursor()),
+                                                    coordinates.getComparator()
+                                            )
+                                    );
                                 }
-
-                                return block.withStatements(
-                                        ListUtils.insertInOrder(
-                                                block.getStatements(),
-                                                autoFormat(gen.get(0), p, getCursor()),
-                                                coordinates.getComparator()
-                                        )
-                                );
+                                return b;
                             }
 
                             return block.withStatements(
@@ -161,7 +159,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                 Cursor parent = getCursor();
                                 for (int i = 0; i < gen.size(); i++) {
                                     Statement s = gen.get(i);
-                                    Statement formattedS = autoFormat(i == 0 ? s.withPrefix(statement.getPrefix().withComments(Collections.emptyList())) : s, p, parent);
+                                    Statement formattedS = autoFormat(i == 0 ? s.withPrefix(statement.getPrefix().withComments(emptyList())) : s, p, parent);
                                     gen.set(i, formattedS);
                                 }
 
@@ -218,7 +216,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     .map(TypedTree::getType)
                                     .map(TypeUtils::asFullyQualified)
                                     .filter(Objects::nonNull)
-                                    .collect(Collectors.toList());
+                                    .collect(toList());
                             J.ClassDeclaration c = classDecl;
 
                             if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {

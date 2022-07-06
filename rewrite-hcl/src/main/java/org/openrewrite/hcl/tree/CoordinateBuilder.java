@@ -15,6 +15,8 @@
  */
 package org.openrewrite.hcl.tree;
 
+import java.util.Comparator;
+
 public abstract class CoordinateBuilder {
     Hcl tree;
 
@@ -53,8 +55,30 @@ public abstract class CoordinateBuilder {
             return before(Space.Location.BLOCK_CLOSE);
         }
 
+        public HclCoordinates add(Comparator<BodyContent> idealOrdering) {
+            return new HclCoordinates(tree, Space.Location.BLOCK_CLOSE, HclCoordinates.Mode.BEFORE, idealOrdering);
+        }
+
         public HclCoordinates replace() {
             return replace(Space.Location.BLOCK);
+        }
+    }
+
+    public static class ConfigFile extends CoordinateBuilder {
+        ConfigFile(Hcl.ConfigFile tree) {
+            super(tree);
+        }
+
+        public HclCoordinates last() {
+            return before(Space.Location.CONFIG_FILE_EOF);
+        }
+
+        public HclCoordinates add(Comparator<BodyContent> idealOrdering) {
+            return new HclCoordinates(tree, Space.Location.CONFIG_FILE_EOF, HclCoordinates.Mode.BEFORE, idealOrdering);
+        }
+
+        public HclCoordinates first() {
+            return before(Space.Location.CONFIG_FILE);
         }
     }
 }

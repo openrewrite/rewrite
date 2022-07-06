@@ -364,7 +364,7 @@ public interface Hcl extends Tree {
         List<BodyContent> body;
 
         @With
-        Space close;
+        Space end;
 
         public CoordinateBuilder.Block getCoordinates() {
             return new CoordinateBuilder.Block(this);
@@ -523,6 +523,10 @@ public interface Hcl extends Tree {
 
         @With
         Space eof;
+
+        public CoordinateBuilder.ConfigFile getCoordinates() {
+            return new CoordinateBuilder.ConfigFile(this);
+        }
 
         @Override
         public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
