@@ -66,7 +66,8 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
 
     public Cobol visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, PrintOutputCapture<P> p) {
         visitSpace(programIdParagraph.getPrefix(), p);
-        //visitRightPadded(programIdParagraph.getPadding().getProgramId(), p);
+        p.append(programIdParagraph.getPadding().getProgramId().getElement().toString());
+        p.append(programIdParagraph.getPadding().getProgramId().getAfter().toString());
         p.append(programIdParagraph.getProgramName());
         return programIdParagraph;
     }
