@@ -66,7 +66,7 @@ public class AddCommentToMavenDependency extends Recipe {
     }
 
     @Override
-    protected MavenVisitor<ExecutionContext> getVisitor() {
+    public MavenVisitor<ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             final XPathMatcher matcher = new XPathMatcher(xPath);
 

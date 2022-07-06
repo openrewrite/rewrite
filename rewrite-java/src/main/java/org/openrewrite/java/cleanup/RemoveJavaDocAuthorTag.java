@@ -43,7 +43,7 @@ public class RemoveJavaDocAuthorTag extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             protected JavadocVisitor<ExecutionContext> getJavadocVisitor() {

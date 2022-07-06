@@ -31,7 +31,7 @@ public class LineBreaks extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public LineBreaksVisitor<ExecutionContext> getVisitor() {
         return new LineBreaksVisitor<>();
     }
 }

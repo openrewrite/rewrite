@@ -51,7 +51,7 @@ public class RemoveExtraSemicolons extends Recipe {
 
     @SuppressWarnings("ConstantConditions")
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Empty visitEmpty(J.Empty empty, ExecutionContext ctx) {

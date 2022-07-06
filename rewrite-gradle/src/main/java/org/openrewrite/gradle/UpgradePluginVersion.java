@@ -109,7 +109,7 @@ public class UpgradePluginVersion extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         assert versionComparator != null;
 

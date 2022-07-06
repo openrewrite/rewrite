@@ -57,7 +57,7 @@ public class StringLiteralEquality extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public StringLiteralEqualityVisitor getVisitor() {
         return new StringLiteralEqualityVisitor();
     }
 

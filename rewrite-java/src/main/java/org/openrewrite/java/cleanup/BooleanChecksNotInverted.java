@@ -47,7 +47,7 @@ public class BooleanChecksNotInverted extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
 
             @SuppressWarnings("ConstantConditions")

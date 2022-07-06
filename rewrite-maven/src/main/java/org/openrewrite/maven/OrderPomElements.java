@@ -76,7 +76,7 @@ public class OrderPomElements extends Recipe {
     }
 
     @Override
-    protected MavenVisitor<ExecutionContext> getVisitor() {
+    public MavenVisitor<ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {

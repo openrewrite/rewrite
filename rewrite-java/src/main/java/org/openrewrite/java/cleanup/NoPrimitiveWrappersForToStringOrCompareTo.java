@@ -56,7 +56,7 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
     }
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext> getVisitor() {
+    public JavaIsoVisitor<ExecutionContext> getVisitor() {
         return new NoPrimitiveWrapperVisitor();
     }
 

@@ -79,7 +79,7 @@ public class DependencyInsight extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         Scope aScope = Scope.fromName(scope);
 
         return new MavenIsoVisitor<ExecutionContext>() {

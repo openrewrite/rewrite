@@ -37,7 +37,7 @@ public class NormalizeTabsOrSpaces extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TabsAndIndentsFromCompilationUnitStyle();
     }
 

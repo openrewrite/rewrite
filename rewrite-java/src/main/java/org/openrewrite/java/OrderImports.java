@@ -64,7 +64,7 @@ public class OrderImports extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new OrderImportsVisitor<>(removeUnused);
     }
 

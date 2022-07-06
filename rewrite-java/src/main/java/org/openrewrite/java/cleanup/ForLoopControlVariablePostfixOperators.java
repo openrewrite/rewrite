@@ -35,7 +35,7 @@ public class ForLoopControlVariablePostfixOperators extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {

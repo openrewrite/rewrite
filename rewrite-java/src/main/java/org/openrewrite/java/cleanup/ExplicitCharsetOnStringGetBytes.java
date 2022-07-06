@@ -58,7 +58,7 @@ public class ExplicitCharsetOnStringGetBytes extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             final JavaTemplate WITH_ENCODING = JavaTemplate
                     .builder(this::getCursor, "getBytes(StandardCharsets.#{})")

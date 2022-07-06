@@ -126,7 +126,7 @@ public class ChangeParentPom extends Recipe {
     }
 
     @Override
-    protected MavenVisitor<ExecutionContext> getVisitor() {
+    public MavenVisitor<ExecutionContext> getVisitor() {
         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         assert versionComparator != null;
 

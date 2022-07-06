@@ -35,7 +35,7 @@ public class Spaces extends Recipe {
     }
 
     @Override
-    protected HclVisitor<ExecutionContext> getVisitor() {
+    public HclVisitor<ExecutionContext> getVisitor() {
         return new SpacesFromCompilationUnitStyle();
     }
 

@@ -91,7 +91,7 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     @Override
-    protected MavenVisitor<ExecutionContext> getVisitor() {
+    public MavenVisitor<ExecutionContext> getVisitor() {
         return changeParentPom.getVisitor();
     }
 }

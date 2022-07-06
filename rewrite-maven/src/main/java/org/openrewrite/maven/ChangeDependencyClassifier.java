@@ -54,7 +54,7 @@ public class ChangeDependencyClassifier extends Recipe {
     @Nullable
     String newClassifier;
 
-	@Override
+    @Override
     public String getDisplayName() {
         return "Change Maven dependency classifier";
     }
@@ -65,7 +65,7 @@ public class ChangeDependencyClassifier extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public MavenVisitor<ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {

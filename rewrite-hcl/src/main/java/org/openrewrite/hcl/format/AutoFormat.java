@@ -31,7 +31,7 @@ public class AutoFormat extends Recipe {
     }
 
     @Override
-    protected HclVisitor<ExecutionContext> getVisitor() {
+    public HclVisitor<ExecutionContext> getVisitor() {
         return new AutoFormatVisitor<>();
     }
 }

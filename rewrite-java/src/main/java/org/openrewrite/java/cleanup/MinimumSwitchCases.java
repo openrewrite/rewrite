@@ -51,7 +51,7 @@ public class MinimumSwitchCases extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             final JavaTemplate ifElseIfPrimitive = JavaTemplate.builder(this::getCursor, "" +
                     "if(#{any()} == #{any()}) {\n" +

@@ -46,7 +46,7 @@ public class WriteOctalValuesAsDecimal extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {

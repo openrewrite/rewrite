@@ -67,7 +67,7 @@ public class IndexOfChecksShouldUseAStartPosition extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             private boolean isValueNotCompliant(J.Literal literal) {

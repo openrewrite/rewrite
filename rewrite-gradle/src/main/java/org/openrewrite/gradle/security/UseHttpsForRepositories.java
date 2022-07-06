@@ -59,7 +59,7 @@ public class UseHttpsForRepositories extends Recipe {
     }
 
     @Override
-    protected GroovyVisitor<ExecutionContext> getVisitor() {
+    public GroovyVisitor<ExecutionContext> getVisitor() {
         return new GroovyVisitor<ExecutionContext>() {
 
             private J.Literal fixupLiteralIfNeeded(J.Literal arg) {

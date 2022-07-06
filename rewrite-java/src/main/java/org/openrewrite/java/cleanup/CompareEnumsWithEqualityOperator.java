@@ -52,7 +52,7 @@ public class CompareEnumsWithEqualityOperator extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         final MethodMatcher ENUM_EQUALS = new MethodMatcher("java.lang.Enum equals(java.lang.Object)");
         return new JavaVisitor<ExecutionContext>() {
             @Override

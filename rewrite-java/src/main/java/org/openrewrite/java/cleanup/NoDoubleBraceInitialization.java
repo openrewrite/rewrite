@@ -69,7 +69,7 @@ public class NoDoubleBraceInitialization extends Recipe {
     }
 
     @Override
-    protected NoDoubleBraceInitializationVisitor getVisitor() {
+    public NoDoubleBraceInitializationVisitor getVisitor() {
         return new NoDoubleBraceInitializationVisitor();
     }
 

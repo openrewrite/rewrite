@@ -84,7 +84,7 @@ public abstract class Recipe {
         }
 
         @Override
-        protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
             return NOOP;
         }
     }
@@ -216,6 +216,7 @@ public abstract class Recipe {
      *
      * @return A tree visitor that performs an applicability test.
      */
+    @SuppressWarnings("unused")
     public Recipe addApplicableTest(TreeVisitor<?, ExecutionContext> test) {
         this.applicableTests.add(test);
         return this;
@@ -320,6 +321,7 @@ public abstract class Recipe {
         return validated;
     }
 
+    @SuppressWarnings("unused")
     @Incubating(since = "7.0.0")
     public final Collection<Validated> validateAll(ExecutionContext ctx) {
         return validateAll(ctx, new ArrayList<>());

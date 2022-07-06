@@ -45,7 +45,7 @@ public class RemoveImportBenchmark {
             }
 
             @Override
-            protected TreeVisitor<?, ExecutionContext> getVisitor() {
+            public TreeVisitor<?, ExecutionContext> getVisitor() {
                 return new RemoveImport("java.util.function.Function");
             }
         }.run(state.getSourceFiles());

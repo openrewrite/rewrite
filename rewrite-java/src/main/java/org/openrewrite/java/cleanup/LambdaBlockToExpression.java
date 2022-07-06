@@ -36,7 +36,7 @@ public class LambdaBlockToExpression extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext executionContext) {

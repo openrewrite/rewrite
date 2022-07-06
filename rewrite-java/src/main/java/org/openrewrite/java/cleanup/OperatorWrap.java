@@ -39,7 +39,7 @@ public class OperatorWrap extends Recipe {
     }
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext> getVisitor() {
+    public JavaIsoVisitor<ExecutionContext> getVisitor() {
         return new OperatorWrapVisitor();
     }
 

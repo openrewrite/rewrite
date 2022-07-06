@@ -63,7 +63,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             private final JavaTemplate twoArgDivide = JavaTemplate.builder(this::getCursor, "#{any(java.math.BigDecimal)}, #{}")
                     .imports("java.math.RoundingMode")

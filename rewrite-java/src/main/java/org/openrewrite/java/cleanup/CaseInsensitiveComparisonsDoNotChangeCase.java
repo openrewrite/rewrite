@@ -55,7 +55,7 @@ public class CaseInsensitiveComparisonsDoNotChangeCase extends Recipe {
     }
 
     @Override
-    protected CaseInsensitiveComparisonVisitor<ExecutionContext> getVisitor() {
+    public CaseInsensitiveComparisonVisitor<ExecutionContext> getVisitor() {
         return new CaseInsensitiveComparisonVisitor<>();
     }
 

@@ -72,7 +72,7 @@ public class ChangeTagAttribute extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangeTagAttributeVisitor<>(new XPathMatcher(elementName), attributeName, oldValue, newValue);
     }
 }

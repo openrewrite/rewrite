@@ -47,7 +47,7 @@ public class FindTags extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         XPathMatcher matcher = new XPathMatcher(xPath);
         return new XmlVisitor<ExecutionContext>() {
 

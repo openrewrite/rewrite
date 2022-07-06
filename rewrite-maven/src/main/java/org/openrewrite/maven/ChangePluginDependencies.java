@@ -67,7 +67,7 @@ public class ChangePluginDependencies extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         Xml.Tag dependenciesTag;
         if(dependencies == null) {
             dependenciesTag = null;

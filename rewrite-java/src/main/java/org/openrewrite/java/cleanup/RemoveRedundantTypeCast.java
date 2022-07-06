@@ -49,7 +49,7 @@ public class RemoveRedundantTypeCast extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitTypeCast(J.TypeCast typeCast, ExecutionContext executionContext) {

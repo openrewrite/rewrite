@@ -41,7 +41,7 @@ public class NoWhitespaceAfter extends Recipe {
     }
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext> getVisitor() {
+    public JavaIsoVisitor<ExecutionContext> getVisitor() {
         return new NoWhitespaceAfterVisitor();
     }
 

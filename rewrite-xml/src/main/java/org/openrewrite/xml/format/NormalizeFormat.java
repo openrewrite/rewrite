@@ -34,7 +34,7 @@ public class NormalizeFormat extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public NormalizeFormatVisitor<ExecutionContext> getVisitor() {
         return new NormalizeFormatVisitor<>();
     }
 }

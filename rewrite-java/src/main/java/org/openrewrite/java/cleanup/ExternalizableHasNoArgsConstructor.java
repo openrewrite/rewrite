@@ -58,7 +58,7 @@ public class ExternalizableHasNoArgsConstructor extends Recipe {
     }
 
     @Override
-    protected ExternalizableHasNoArgsConstructorVisitor getVisitor() {
+    public ExternalizableHasNoArgsConstructorVisitor getVisitor() {
         return new ExternalizableHasNoArgsConstructorVisitor();
     }
 

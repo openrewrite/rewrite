@@ -52,7 +52,7 @@ public class AddCommentToXmlTag extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new XmlVisitor<ExecutionContext>() {
             final XPathMatcher matcher = new XPathMatcher(xPath);
 

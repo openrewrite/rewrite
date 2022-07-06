@@ -68,7 +68,7 @@ public class FindDependency extends Recipe {
     }
 
     @Override
-    protected GroovyVisitor<ExecutionContext> getVisitor() {
+    public GroovyVisitor<ExecutionContext> getVisitor() {
         MethodMatcher dependency = new MethodMatcher("DependencyHandlerSpec *(..)");
         return new GroovyVisitor<ExecutionContext>() {
             @Override

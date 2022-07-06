@@ -47,7 +47,7 @@ public class FindKey extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(key);
         return new YamlVisitor<ExecutionContext>() {
             @Override

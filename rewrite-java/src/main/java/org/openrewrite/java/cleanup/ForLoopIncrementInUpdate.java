@@ -54,7 +54,7 @@ public class ForLoopIncrementInUpdate extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {

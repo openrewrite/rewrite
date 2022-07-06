@@ -48,7 +48,7 @@ public class WhileInsteadOfFor extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             final JavaTemplate whileLoop = JavaTemplate.builder(this::getCursor,
                     "while(#{any(boolean)}) {}")

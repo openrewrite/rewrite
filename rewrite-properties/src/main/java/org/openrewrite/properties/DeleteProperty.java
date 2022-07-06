@@ -70,7 +70,7 @@ public class DeleteProperty extends Recipe {
     }
 
     @Override
-    protected PropertiesVisitor<ExecutionContext> getVisitor() {
+    public PropertiesVisitor<ExecutionContext> getVisitor() {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext executionContext) {

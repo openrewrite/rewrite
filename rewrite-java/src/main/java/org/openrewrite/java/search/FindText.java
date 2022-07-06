@@ -68,7 +68,7 @@ public class FindText extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<Pattern> compiledPatterns = patterns.stream()
                 .map(Pattern::compile)
                 .collect(Collectors.toList());

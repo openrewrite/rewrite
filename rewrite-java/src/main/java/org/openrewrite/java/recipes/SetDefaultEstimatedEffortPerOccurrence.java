@@ -53,7 +53,7 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             final JavaTemplate addMethod = JavaTemplate.builder(this::getCursor,
                             "@Override public Duration getEstimatedEffortPerOccurrence() {\n" +

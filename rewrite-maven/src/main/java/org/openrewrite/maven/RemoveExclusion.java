@@ -59,7 +59,7 @@ public class RemoveExclusion extends Recipe {
     }
 
     @Override
-    protected MavenVisitor getVisitor() {
+    public MavenVisitor<ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {

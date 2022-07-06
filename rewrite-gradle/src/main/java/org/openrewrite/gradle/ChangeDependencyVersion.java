@@ -71,7 +71,7 @@ public class ChangeDependencyVersion extends Recipe {
     }
 
     @Override
-    protected GroovyVisitor<ExecutionContext> getVisitor() {
+    public GroovyVisitor<ExecutionContext> getVisitor() {
         return new GroovyVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = DependencyMatcher.build(dependencyPattern).getValue();
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");

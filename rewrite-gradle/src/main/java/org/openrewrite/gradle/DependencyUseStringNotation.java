@@ -54,7 +54,7 @@ public class DependencyUseStringNotation extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         return new GroovyVisitor<ExecutionContext>() {
             @Override

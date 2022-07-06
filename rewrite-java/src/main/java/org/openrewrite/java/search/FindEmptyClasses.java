@@ -48,7 +48,7 @@ public class FindEmptyClasses extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {

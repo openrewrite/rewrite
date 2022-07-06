@@ -48,7 +48,7 @@ public class RemoveRepository extends Recipe {
     }
 
     @Override
-    protected GroovyVisitor<ExecutionContext> getVisitor() {
+    public GroovyVisitor<ExecutionContext> getVisitor() {
         MethodMatcher repositories = new MethodMatcher("org.gradle.api.artifacts.dsl.RepositoryHandler " + repository + "()");
         return new GroovyVisitor<ExecutionContext>() {
             @Override

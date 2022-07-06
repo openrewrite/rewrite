@@ -62,7 +62,7 @@ public class NoEmptyCollectionWithRawType extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         Map<String, String> updateFields = new HashMap<>();
         updateFields.put("EMPTY_LIST", "emptyList");
         updateFields.put("EMPTY_MAP", "emptyMap");

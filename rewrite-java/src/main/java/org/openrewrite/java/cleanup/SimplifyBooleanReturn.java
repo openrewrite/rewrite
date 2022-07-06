@@ -47,7 +47,7 @@ public class SimplifyBooleanReturn extends Recipe {
     }
 
     @Override
-    protected SimplifyBooleanReturnVisitor<ExecutionContext> getVisitor() {
+    public SimplifyBooleanReturnVisitor<ExecutionContext> getVisitor() {
         return new SimplifyBooleanReturnVisitor<>();
     }
 

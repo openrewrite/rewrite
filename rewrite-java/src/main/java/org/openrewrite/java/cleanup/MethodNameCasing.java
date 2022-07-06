@@ -68,7 +68,7 @@ public class MethodNameCasing extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern standardMethodName = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
         return new JavaIsoVisitor<ExecutionContext>() {
 

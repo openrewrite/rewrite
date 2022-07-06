@@ -53,7 +53,7 @@ public class FindProperties extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern propertyMatcher = Pattern.compile(propertyPattern.replace(".", "\\.")
                 .replace("*", ".*"));
         return new MavenVisitor<ExecutionContext>() {

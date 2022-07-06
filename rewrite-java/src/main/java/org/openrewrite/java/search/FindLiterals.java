@@ -63,7 +63,7 @@ public class FindLiterals extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         Pattern compiledPattern = Pattern.compile(pattern);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override

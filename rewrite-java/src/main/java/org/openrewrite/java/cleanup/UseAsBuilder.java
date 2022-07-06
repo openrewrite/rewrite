@@ -70,7 +70,7 @@ public class UseAsBuilder extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             final MethodMatcher builderCall = new MethodMatcher(builderType + " *(..)");
 

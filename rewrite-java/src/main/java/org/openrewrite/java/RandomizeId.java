@@ -32,7 +32,7 @@ public class RandomizeId extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new RandomizeIdVisitor<>();
     }
 }
