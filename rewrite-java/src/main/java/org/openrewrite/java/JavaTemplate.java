@@ -129,7 +129,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                             if (coordinates.getComparator() != null) {
                                 J.Block b = block;
                                 for (Statement g : gen) {
-                                    block.withStatements(
+                                    b = b.withStatements(
                                             ListUtils.insertInOrder(
                                                     block.getStatements(),
                                                     autoFormat(g, p, getCursor()),
