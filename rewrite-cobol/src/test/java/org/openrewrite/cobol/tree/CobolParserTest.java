@@ -24,7 +24,7 @@ public class CobolParserTest implements RewriteTest {
     void helloWorld() {
         rewriteRun(
                 cobol("" +
-                        "IDENTIFICATION DIVISION.\n" +
+                        "IDENTIFICATION  DIVISION .\n" +
                         "PROGRAM-ID    . HELLO     .\n" +
                         "PROCEDURE DIVISION.\n" +
                         "   DISPLAY 'Hello world!'.\n" +

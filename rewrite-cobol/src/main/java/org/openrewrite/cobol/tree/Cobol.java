@@ -302,6 +302,7 @@ class IdentificationDivision implements Cobol {
 
         CobolRightPadded<IdKeyword> identification;
         CobolRightPadded<Space> division;
+        CobolRightPadded<Space> dot;
 
         public enum IdKeyword {
             Identification,
@@ -350,6 +351,15 @@ class IdentificationDivision implements Cobol {
         return getPadding().withDivision(CobolRightPadded.withElement(this.division, division));
     }
 
+    public Space getDot() {
+        return dot.getElement();
+    }
+
+    public IdentificationDivision withDot(Space dot) {
+        //noinspection ConstantConditions
+        return getPadding().withDot(CobolRightPadded.withElement(this.dot, dot));
+    }
+
     @RequiredArgsConstructor
     public static class Padding {
         private final IdentificationDivision t;
@@ -359,7 +369,7 @@ class IdentificationDivision implements Cobol {
         }
 
         public IdentificationDivision withIdentification(CobolRightPadded<Cobol.IdentificationDivision.IdKeyword> identification) {
-            return t.identification == identification ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, identification, t.division, t.programIdParagraph);
+            return t.identification == identification ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, identification, t.division, t.dot, t.programIdParagraph);
         }
 
         public CobolRightPadded<Space> getDivision() {
@@ -367,7 +377,15 @@ class IdentificationDivision implements Cobol {
         }
 
         public IdentificationDivision withDivision(CobolRightPadded<Space> division) {
-            return t.division == division ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, division, t.programIdParagraph);
+            return t.division == division ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, division, t.dot, t.programIdParagraph);
+        }
+
+        public CobolRightPadded<Space> getDot() {
+            return t.dot;
+        }
+
+        public IdentificationDivision withDot(CobolRightPadded<Space> dot) {
+            return t.dot == dot ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, t.division, dot, t.programIdParagraph);
         }
     }
     }

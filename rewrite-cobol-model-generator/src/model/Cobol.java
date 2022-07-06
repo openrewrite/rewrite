@@ -35,6 +35,7 @@ public interface Cobol {
 
         CobolRightPadded<IdKeyword> identification;
         CobolRightPadded<Space> division;
+        CobolRightPadded<Space> dot;
 
         public enum IdKeyword {
             Identification,

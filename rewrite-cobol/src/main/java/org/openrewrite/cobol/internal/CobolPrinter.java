@@ -50,8 +50,11 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(identificationDivision.getPrefix(), p);
         Cobol.IdentificationDivision.IdKeyword id = identificationDivision.getIdentification();
         p.append(id == Cobol.IdentificationDivision.IdKeyword.Id ? "ID" : "IDENTIFICATION");
+        p.append(identificationDivision.getPadding().getIdentification().getAfter().toString());
         p.append("DIVISION");
+        p.append(identificationDivision.getPadding().getDivision().getAfter().toString());
         p.append(".");
+        p.append(identificationDivision.getPadding().getDot().getAfter().toString());
         visitProgramIdParagraph(identificationDivision.getProgramIdParagraph(), p);
         return identificationDivision;
     }
