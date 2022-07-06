@@ -37,8 +37,8 @@ public class GenerateModel {
         new GenerateModel(jp()
                 .parse(
                         Arrays.asList(
-                                Paths.get("./rewrite-cobol/src/model/java/model/openrewrite/cobol/Cobol.java"),
-                                Paths.get("./rewrite-cobol/src/model/java/model/openrewrite/cobol/Statement.java")
+                                Paths.get("./rewrite-cobol-model-generator/src/model/Cobol.java"),
+                                Paths.get("./rewrite-cobol-model-generator/src/model/Statement.java")
                         ),
                         null,
                         ctx

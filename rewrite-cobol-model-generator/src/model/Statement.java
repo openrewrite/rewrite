@@ -1,4 +1,4 @@
-package cobol;
+package model;
 
 public interface Statement {
 }
