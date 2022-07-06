@@ -11,6 +11,7 @@ includeBuild(
 
 include(
     "rewrite-cobol",
+    "rewrite-cobol-model-generator",
     "rewrite-core",
     "rewrite-gradle",
     "rewrite-groovy",

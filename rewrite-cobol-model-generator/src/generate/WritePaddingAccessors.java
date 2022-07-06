@@ -14,7 +14,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.List;
 import java.util.StringJoiner;
 import java.util.function.Supplier;
 
