@@ -15,15 +15,10 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.EmptyForInitializerPadStyle;
-import org.openrewrite.java.style.EmptyForIteratorPadStyle;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.SpacesStyle;
+import org.openrewrite.java.style.*;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 public class Spaces extends Recipe {
@@ -54,5 +49,14 @@ public class Spaces extends Recipe {
                     ((SourceFile) cu).getStyle(EmptyForIteratorPadStyle.class)));
             return super.visitJavaSourceFile(cu, executionContext);
         }
+    }
+
+    public static <J2 extends J> J2 formatSpaces(J j, Cursor cursor) {
+        SourceFile cu = cursor.firstEnclosingOrThrow(SourceFile.class);
+        SpacesStyle style = cu.getStyle(SpacesStyle.class);
+        //noinspection unchecked
+        return (J2) new SpacesVisitor<>(style == null ? IntelliJ.spaces() : style,
+                cu.getStyle(EmptyForInitializerPadStyle.class),
+                cu.getStyle(EmptyForIteratorPadStyle.class)).visitNonNull(j, 0, cursor);
     }
 }

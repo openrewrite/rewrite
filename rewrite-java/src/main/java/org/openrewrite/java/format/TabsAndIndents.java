@@ -15,13 +15,11 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 public class TabsAndIndents extends Recipe {
@@ -50,5 +48,13 @@ public class TabsAndIndents extends Recipe {
             doAfterVisit(new TabsAndIndentsVisitor<>(style));
             return cu;
         }
+    }
+
+    public static <J2 extends J> J2 formatTabsAndIndents(J j, Cursor cursor) {
+        TabsAndIndentsStyle style = cursor.firstEnclosingOrThrow(SourceFile.class)
+                .getStyle(TabsAndIndentsStyle.class);
+        //noinspection unchecked
+        return (J2) new TabsAndIndentsVisitor<>(style == null ? IntelliJ.tabsAndIndents() : style)
+                .visitNonNull(j, 0, cursor);
     }
 }

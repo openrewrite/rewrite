@@ -15,13 +15,11 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
@@ -65,5 +63,13 @@ public class WrappingAndBraces extends Recipe {
             doAfterVisit(new WrappingAndBracesVisitor<>(style));
             return cu;
         }
+    }
+
+    public static <J2 extends J> J2 formatWrappingAndBraces(J j, Cursor cursor) {
+        WrappingAndBracesStyle style = cursor.firstEnclosingOrThrow(SourceFile.class)
+                .getStyle(WrappingAndBracesStyle.class);
+        //noinspection unchecked
+        return (J2) new WrappingAndBracesVisitor<>(style == null ? IntelliJ.wrappingAndBraces() : style)
+                .visitNonNull(j, 0, cursor);
     }
 }
