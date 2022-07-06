@@ -423,7 +423,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
-    fun moveToSubPackageRemoveImportRecursive() = assertChanged(
+    fun moveToSubPackageDoNotRemoveImport() = assertChanged(
         recipe = ChangePackage("com.acme.project", "com.acme.product", true),
         dependsOn = arrayOf("""
             package com.acme.product;
