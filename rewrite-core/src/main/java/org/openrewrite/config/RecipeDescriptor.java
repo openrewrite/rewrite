@@ -43,6 +43,7 @@ public class RecipeDescriptor {
     @EqualsAndHashCode.Include
     List<OptionDescriptor> options;
 
+    @Deprecated
     List<String> languages;
 
     @With

@@ -119,9 +119,8 @@ public abstract class Recipe {
 
     /**
      * A set of strings used for categorizing related recipes. For example
-     * "testing", "junit", "spring". Tags should not include information about
-     * the language(s) this recipe is applicable to. See {@link #getLanguages()} instead.
-     * Any individual tag should consist of a single word, all lowercase.
+     * "testing", "junit", "spring". Any individual tag should consist of a
+     * single word, all lowercase.
      *
      * @return The tags.
      */
@@ -143,12 +142,11 @@ public abstract class Recipe {
 
     /**
      * @return Describes the language type(s) that this recipe applies to, e.g. java, xml, properties.
+     * @deprecated
      */
+    @Deprecated
     public List<String> getLanguages() {
         return emptyList();
-//        return Stream.concat(Stream.of(getVisitor().getLanguage()), getRecipeList().stream().flatMap(r -> r.getLanguages().stream()))
-//                .filter(Objects::nonNull)
-//                .collect(toList());
     }
 
     /**

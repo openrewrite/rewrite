@@ -34,6 +34,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -80,6 +81,7 @@ public class RecipeIntrospectionUtils {
         for (Recipe childRecipe : recipe.getRecipeList()) {
             recipeList.add(recipeDescriptorFromRecipe(childRecipe));
         }
+        //noinspection deprecation
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
                 recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
                 emptyList(), recipe.getLanguages(), recipeList, source);
@@ -125,6 +127,7 @@ public class RecipeIntrospectionUtils {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
+        //noinspection deprecation
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(),
                 recipe.getDescription(), recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
                 options, recipe.getLanguages(), recipeList, recipeSource);
@@ -140,6 +143,17 @@ public class RecipeIntrospectionUtils {
             java.lang.reflect.Parameter param = primaryConstructor.getParameters()[i];
             if (param.getType().isPrimitive()) {
                 constructorArgs[i] = getPrimitiveDefault(param.getType());
+            } else if (param.getType().equals(String.class)) {
+                constructorArgs[i] = "";
+            } else if (Enum.class.isAssignableFrom(param.getType())) {
+                try {
+                    Object[] values = (Object[]) param.getType().getMethod("values").invoke(null);
+                    constructorArgs[i] = values[0];
+                } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
+                    throw new RuntimeException(e);
+                }
+            } else if (List.class.isAssignableFrom(param.getType())) {
+                constructorArgs[i] = emptyList();
             } else {
                 constructorArgs[i] = null;
             }
