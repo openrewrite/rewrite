@@ -23,4 +23,44 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.CompilationUnit visitDocument(Cobol.CompilationUnit compilationUnit, P p) {
         return (Cobol.CompilationUnit) super.visitDocument(compilationUnit, p);
     }
+
+    @Override
+    public Cobol.Display visitDisplay(Cobol.Display display, P p) {
+        return (Cobol.Display) super.visitDisplay(display, p);
+    }
+
+    @Override
+    public Cobol.Identifier visitIdentifier(Cobol.Identifier identifier, P p) {
+        return (Cobol.Identifier) super.visitIdentifier(identifier, p);
+    }
+
+    @Override
+    public Cobol.Literal visitLiteral(Cobol.Literal literal, P p) {
+        return (Cobol.Literal) super.visitLiteral(literal, p);
+    }
+
+    @Override
+    public Cobol.IdentificationDivision visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, P p) {
+        return (Cobol.IdentificationDivision) super.visitIdentificationDivision(identificationDivision, p);
+    }
+
+    @Override
+    public Cobol.ProcedureDivision visitProcedureDivision(Cobol.ProcedureDivision procedureDivision, P p) {
+        return (Cobol.ProcedureDivision) super.visitProcedureDivision(procedureDivision, p);
+    }
+
+    @Override
+    public Cobol.ProgramIdParagraph visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, P p) {
+        return (Cobol.ProgramIdParagraph) super.visitProgramIdParagraph(programIdParagraph, p);
+    }
+
+    @Override
+    public Cobol.ProgramUnit visitProgramUnit(Cobol.ProgramUnit programUnit, P p) {
+        return (Cobol.ProgramUnit) super.visitProgramUnit(programUnit, p);
+    }
+
+    @Override
+    public Cobol.Stop visitStop(Cobol.Stop stop, P p) {
+        return (Cobol.Stop) super.visitStop(stop, p);
+    }
 }

@@ -104,7 +104,6 @@ public class WritePrinter extends Recipe {
                     c = c.withTemplate(visitMethod, c.getBody().getCoordinates().lastStatement(),
                             modelTypeName, modelTypeName, paramName,
                             paramName,
-                            paramName,
                             fields,
                             paramName);
                 }

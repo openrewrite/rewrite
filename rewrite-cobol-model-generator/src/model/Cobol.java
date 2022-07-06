@@ -49,7 +49,7 @@ public interface Cobol {
 
     class ProgramIdParagraph implements Cobol {
         CobolRightPadded<Space> programId;
-        Identifier programName;
+        String programName;
     }
 
     class ProgramUnit implements Cobol {

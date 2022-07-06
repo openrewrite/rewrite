@@ -98,4 +98,68 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Space after = visitSpace(right.getAfter(), p);
         return (after == right.getAfter() && t == right.getElement()) ? right : new CobolRightPadded<>(t, after, right.getMarkers());
     }
+
+    public Cobol visitDisplay(Cobol.Display display, P p) {
+        Cobol.Display d = display;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        //d = d.getPadding().withOperands(ListUtils.map(d.getPadding().getOperands(), t -> (Cobol) visit(t, p)));
+        d = d.getPadding().withUpon(visitLeftPadded(d.getPadding().getUpon(), p));
+        return d;
+    }
+
+    public Cobol visitIdentifier(Cobol.Identifier identifier, P p) {
+        Cobol.Identifier i = identifier;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        return i;
+    }
+
+    public Cobol visitLiteral(Cobol.Literal literal, P p) {
+        Cobol.Literal l = literal;
+        l = l.withPrefix(visitSpace(l.getPrefix(), p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        return l;
+    }
+
+    public Cobol visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, P p) {
+        Cobol.IdentificationDivision i = identificationDivision;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withIdentification(visitRightPadded(i.getPadding().getIdentification(), p));
+        i = i.getPadding().withDivision(visitRightPadded(i.getPadding().getDivision(), p));
+        i = i.withProgramIdParagraph((Cobol.ProgramIdParagraph) visit(i.getProgramIdParagraph(), p));
+        return i;
+    }
+
+    public Cobol visitProcedureDivision(Cobol.ProcedureDivision procedureDivision, P p) {
+        Cobol.ProcedureDivision pp = procedureDivision;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        return pp;
+    }
+
+    public Cobol visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, P p) {
+        Cobol.ProgramIdParagraph pp = programIdParagraph;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.getPadding().withProgramId(visitRightPadded(pp.getPadding().getProgramId(), p));
+        return pp;
+    }
+
+    public Cobol visitProgramUnit(Cobol.ProgramUnit programUnit, P p) {
+        Cobol.ProgramUnit pp = programUnit;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withIdentificationDivision((Cobol.IdentificationDivision) visit(pp.getIdentificationDivision(), p));
+        return pp;
+    }
+
+    public Cobol visitStop(Cobol.Stop stop, P p) {
+        Cobol.Stop s = stop;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withStatement((Cobol) visit(s.getStatement(), p));
+        return s;
+    }
 }

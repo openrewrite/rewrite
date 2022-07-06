@@ -59,7 +59,7 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                             return null;
                         }
 
-                        Cobol.CompilationUnit compilationUnit = new CobolParserVisitor(
+                        Cobol.CompilationUnit compilationUnit = (Cobol.CompilationUnit) new CobolParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
                                 sourceFile.getFileAttributes(),
                                 sourceStr,
