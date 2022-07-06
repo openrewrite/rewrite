@@ -74,10 +74,7 @@ public class FindFlowBetweenMethods extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesAllMethods<>(
-                new MethodMatcher(startMethodPattern, startMatchOverrides),
-                new MethodMatcher(endMethodPattern, endMatchOverrides)
-        );
+        return new UsesAllMethods<>(new MethodMatcher(startMethodPattern, startMatchOverrides), new MethodMatcher(endMethodPattern, endMatchOverrides));
     }
 
     @Override
@@ -120,8 +117,7 @@ public class FindFlowBetweenMethods extends Recipe {
                     case "Arguments":
                         return sinkMatcher.advanced().isAnyArgument(cursor);
                     case "Both":
-                        return sinkMatcher.advanced().isAnyArgument(cursor) ||
-                                sinkMatcher.advanced().isSelect(cursor);
+                        return sinkMatcher.advanced().isAnyArgument(cursor) || sinkMatcher.advanced().isSelect(cursor);
                     default:
                         throw new IllegalStateException("Unknown target: " + target);
 
