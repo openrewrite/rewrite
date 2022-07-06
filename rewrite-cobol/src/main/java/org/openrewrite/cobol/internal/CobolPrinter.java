@@ -84,4 +84,22 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return stop;
     }
 
+    public Cobol visitProcedureDivisionBody(Cobol.ProcedureDivisionBody procedureDivisionBody, PrintOutputCapture<P> p) {
+        visitSpace(procedureDivisionBody.getPrefix(), p);
+        visit(procedureDivisionBody.getParagraphs(), p);
+        return procedureDivisionBody;
+    }
+
+    public Cobol visitParagraphs(Cobol.Paragraphs paragraphs, PrintOutputCapture<P> p) {
+        visitSpace(paragraphs.getPrefix(), p);
+        // List
+        return paragraphs;
+    }
+
+    public Cobol visitSentence(Cobol.Sentence sentence, PrintOutputCapture<P> p) {
+        visitSpace(sentence.getPrefix(), p);
+        // List
+        return sentence;
+    }
+
 }

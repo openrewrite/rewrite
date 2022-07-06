@@ -63,4 +63,20 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.Stop visitStop(Cobol.Stop stop, P p) {
         return (Cobol.Stop) super.visitStop(stop, p);
     }
+
+    @Override
+    public Cobol.ProcedureDivisionBody visitProcedureDivisionBody(Cobol.ProcedureDivisionBody procedureDivisionBody, P p) {
+        return (Cobol.ProcedureDivisionBody) super.visitProcedureDivisionBody(procedureDivisionBody, p);
+    }
+
+    @Override
+    public Cobol.Paragraphs visitParagraphs(Cobol.Paragraphs paragraphs, P p) {
+        return (Cobol.Paragraphs) super.visitParagraphs(paragraphs, p);
+    }
+
+    @Override
+    public Cobol.Sentence visitSentence(Cobol.Sentence sentence, P p) {
+        return (Cobol.Sentence) super.visitSentence(sentence, p);
+    }
+
 }

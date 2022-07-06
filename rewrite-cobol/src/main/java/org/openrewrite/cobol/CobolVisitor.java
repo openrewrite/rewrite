@@ -162,4 +162,28 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         s = s.withStatement((Cobol) visit(s.getStatement(), p));
         return s;
     }
+
+    public Cobol visitProcedureDivisionBody(Cobol.ProcedureDivisionBody procedureDivisionBody, P p) {
+        Cobol.ProcedureDivisionBody pp = procedureDivisionBody;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withParagraphs((Cobol.Paragraphs) visit(pp.getParagraphs(), p));
+        return pp;
+    }
+
+    public Cobol visitParagraphs(Cobol.Paragraphs paragraphs, P p) {
+        Cobol.Paragraphs pp = paragraphs;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        //pp = pp.getPadding().withSentences(ListUtils.map(pp.getPadding().getSentences(), t -> (Cobol.Sentence) visit(t, p)));
+        return pp;
+    }
+
+    public Cobol visitSentence(Cobol.Sentence sentence, P p) {
+        Cobol.Sentence s = sentence;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        //s = s.getPadding().withStatements(ListUtils.map(s.getPadding().getStatements(), t -> (Statement) visit(t, p)));
+        return s;
+    }
 }

@@ -29,6 +29,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface Cobol extends Tree {
@@ -398,10 +399,68 @@ class ProcedureDivision implements Cobol {
         UUID id;
         Space prefix;
         Markers markers;
+        // procedureDivision
+        //   : PROCEDURE DIVISION procedureDivisionUsingClause? procedureDivisionGivingClause? DOT_FS procedureDeclaratives? procedureDivisionBody
+        //   ;
+        ProcedureDivisionBody body;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitProcedureDivision(this, p);
+        }
+    }
+
+@Value
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@With
+class ProcedureDivisionBody implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+        Space prefix;
+        Markers markers;
+        Paragraphs paragraphs;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureDivisionBody(this, p);
+        }
+    }
+
+@Value
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@With
+class Paragraphs implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+        Space prefix;
+        Markers markers;
+        // paragraphs
+        //   : sentence* paragraph*
+        //   ;
+        List<Sentence> sentences;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitParagraphs(this, p);
+        }
+    }
+
+@Value
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@With
+class Sentence implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+        Space prefix;
+        Markers markers;
+        // sentence
+        //   : statement* DOT_FS
+        //   ;
+        List<Statement> statements;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSentence(this, p);
         }
     }
 
@@ -482,7 +541,11 @@ class ProgramUnit implements Cobol {
         UUID id;
         Space prefix;
         Markers markers;
+        // programUnit
+        //   : identificationDivision environmentDivision? dataDivision? procedureDivision? programUnit* endProgramStatement?
+        //   ;
         IdentificationDivision identificationDivision;
+        Optional<ProcedureDivision> procedureDivision;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
