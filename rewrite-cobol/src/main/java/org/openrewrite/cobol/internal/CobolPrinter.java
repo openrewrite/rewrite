@@ -18,8 +18,15 @@ package org.openrewrite.cobol.internal;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.cobol.CobolVisitor;
 import org.openrewrite.cobol.tree.Cobol;
+import org.openrewrite.cobol.tree.Space;
 
 public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
+
+    @Override
+    public Space visitSpace(Space space, PrintOutputCapture<P> p) {
+        p.append(space.toString());
+        return space;
+    }
 
     public Cobol visitDisplay(Cobol.Display display, PrintOutputCapture<P> p) {
         visitSpace(display.getPrefix(), p);    // List
