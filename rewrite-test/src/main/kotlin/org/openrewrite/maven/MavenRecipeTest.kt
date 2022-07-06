@@ -29,6 +29,13 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
     override val parser: MavenParser
         get() = MavenParser.builder().build()
 
+    override val executionContext: ExecutionContext get() {
+        return MavenExecutionContextView.view(super.executionContext)
+            .also { if (MavenSettings.readFromDiskEnabled()) {
+                it.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(it))
+            }}
+    }
+
     fun assertChanged(
         parser: MavenParser = this.parser,
         recipe: Recipe = this.recipe!!,

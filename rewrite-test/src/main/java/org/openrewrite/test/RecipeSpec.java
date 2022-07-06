@@ -19,7 +19,6 @@ import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.TypeValidation;
 
 import java.io.InputStream;
@@ -30,8 +29,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.function.Consumer;
-
-import static org.assertj.core.api.AssertionsForClassTypes.fail;
 
 public class RecipeSpec {
     public static RecipeSpec defaults() {
@@ -143,11 +140,8 @@ public class RecipeSpec {
         return this;
     }
 
+    @Nullable
     ExecutionContext getExecutionContext() {
-        if (executionContext == null) {
-            executionContext = new InMemoryExecutionContext(t -> fail("Failed to run parse sources or recipe", t));
-            executionContext.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
-        }
         return executionContext;
     }
 }
