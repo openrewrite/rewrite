@@ -148,7 +148,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitProgramIdParagraph(CobolParser.ProgramIdParagraphContext ctx) {
-        CobolRightPadded<Space> programId = CobolRightPadded.build(Space.build("PROGRAM ID"));
+        // programIdParagraph
+        //   : PROGRAM_ID DOT_FS programName (IS? (COMMON | INITIAL | LIBRARY | DEFINITION | RECURSIVE) PROGRAM?)? DOT_FS? commentEntry?
+        //   ;
+        CobolRightPadded<Space> programId = CobolRightPadded.build(Space.build("PROGRAM-ID"))
+                .withAfter(Space.build(space(ctx.PROGRAM_ID(), ctx.programName())));
         String programName = ctx.programName().getText();
         return new Cobol.ProgramIdParagraph(
                 randomId(),
