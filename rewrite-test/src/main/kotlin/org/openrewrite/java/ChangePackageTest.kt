@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
@@ -65,6 +66,60 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
     )
 
     @Test
+    fun renameImport(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf("""
+            package org.openrewrite;
+            public class Test {
+            }
+        """),
+        before = """
+            import org.openrewrite.Test;
+            
+            class A {
+            }
+        """,
+        after = """ 
+            import org.openrewrite.test.Test;
+            
+            class A {
+            }
+        """,
+        afterConditions = { cu ->
+            val imported = cu.imports[0]
+            assertThat(imported.packageName).isEqualTo("org.openrewrite.test")
+        }
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1997")
+    @Test
+    fun typesInUseContainsOneTypeReference() = assertChanged(
+        dependsOn = arrayOf(testClass),
+        before = """
+            import org.openrewrite.Test;
+            
+            public class A {
+                Test a;
+                Test b;
+                Test c;
+            }
+        """,
+        after = """
+            import org.openrewrite.test.Test;
+            
+            public class A {
+                Test a;
+                Test b;
+                Test c;
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
+        }
+    )
+
+    @Test
     fun renamePackage(jp: JavaParser) = assertChanged(
         jp,
         before = """
@@ -78,9 +133,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
-            assertThat(cu.sourcePath)
-                .isEqualTo(Paths.get("org", "openrewrite", "test", "Test.java"))
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -98,14 +152,42 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.sourcePath)
-                .isEqualTo(Paths.get("org/openrewrite/test/internal/Test.java"))
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.sourcePath).isEqualTo(Paths.get("org/openrewrite/test/internal/Test.java"))
+
+            assertThat(cu.findType("org.openrewrite.internal.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.internal.Test")).isNotEmpty()
         }
     )
 
     @Test
-    fun renamePackageReferences(jp: JavaParser) = assertChanged(
+    fun renamePackageRecursiveImported(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = ChangePackage("org.openrewrite", "org.openrewrite.test", true),
+        dependsOn = arrayOf("""
+            package org.openrewrite.other;
+            public class Test {}
+        """),
+        before = """
+            import org.openrewrite.other.Test;
+            class A {
+                Test test = null;
+            }
+        """,
+        after = """ 
+            import org.openrewrite.test.other.Test;
+            class A {
+                Test test = null;
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.other.Test")).isNotEmpty()
+        }
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1997")
+    @Test
+    fun typeParameter(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf("""
             package org.openrewrite;
@@ -113,55 +195,77 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """),
         before = """
-            import org.openrewrite.*;
+            import org.openrewrite.Test;
+            import java.util.List;
             
-            class A<T extends org.openrewrite.Test> {
-                Test test;
+            class A {
+                List<Test> list;
             }
         """,
         after = """ 
-            import org.openrewrite.test.*;
+            import org.openrewrite.test.Test;
+            import java.util.List;
             
-            class A<T extends org.openrewrite.test.Test> {
-                Test test;
+            class A {
+                List<Test> list;
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
     @Test
-    fun simpleName(jp: JavaParser) = assertChanged(
+    fun classTypeParameter(jp: JavaParser) = assertChanged(
         jp,
+        dependsOn = arrayOf("""
+            package org.openrewrite;
+            public class Test {
+            }
+        """),
+        before = """
+            import org.openrewrite.Test;
+            
+            class A<T extends Test> {
+            }
+        """,
+        after = """ 
+            import org.openrewrite.test.Test;
+            
+            class A<T extends Test> {
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
+        }
+    )
+
+    @Test
+    fun boundedGenericType() = assertChanged(
         dependsOn = arrayOf(testClass),
         before = """
             import org.openrewrite.Test;
-
-            public class B extends Test {}
+            
+            public class A {
+                <T extends Test> T method(T t) {
+                    return t;
+                }
+            }
         """,
         after = """
             import org.openrewrite.test.Test;
-
-            public class B extends Test {}
+            
+            public class A {
+                <T extends Test> T method(T t) {
+                    return t;
+                }
+            }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
-        }
-    )
-
-    @Test
-    fun fullyQualifiedName(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
-            public class B extends org.openrewrite.Test {}
-        """,
-        after = """
-            public class B extends org.openrewrite.test.Test {}
-        """,
-        afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -170,21 +274,37 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
         jp,
         dependsOn = arrayOf("""
                 package org.openrewrite;
-                public @interface A {}
+                
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+                
+                @Target({ElementType.TYPE, ElementType.METHOD})
+                @Retention(RetentionPolicy.RUNTIME)
+                public @interface Test {}
         """),
         before = """
-            @org.openrewrite.A public class B {}
+            import org.openrewrite.Test;
+            public class A {
+                @Test
+                void method() {}
+            }
         """,
 
         after = """
-            @org.openrewrite.test.A public class B {}
+            import org.openrewrite.test.Test;
+            public class A {
+                @Test
+                void method() {}
+            }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
-    // array types and new arrays
     @Test
     fun array(jp: JavaParser) = assertChanged(
         jp,
@@ -200,7 +320,32 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
+        }
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1997")
+    @Test
+    fun multiDimensionalArray() = assertChanged(
+        dependsOn = arrayOf(testClass),
+        before = """
+            import org.openrewrite.Test;
+            
+            public class A {
+                Test[][] multiDimensionalArray;
+            }
+        """,
+        after = """
+            import org.openrewrite.test.Test;
+            
+            public class A {
+                Test[][] multiDimensionalArray;
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -215,7 +360,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             public class B extends org.openrewrite.test.Test implements I1 {}
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -275,6 +421,42 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1997")
+    @Test
+    fun moveToSubPackageRemoveImportRecursive() = assertChanged(
+        recipe = ChangePackage("com.acme.project", "com.acme.product", true),
+        dependsOn = arrayOf("""
+            package com.acme.product;
+
+            public class RunnableFactory {
+                public static Runnable getRunnable() {
+                    return null;
+                }
+            }
+        """),
+        before = """
+            package com.acme.project.other;
+
+            import com.acme.product.RunnableFactory;
+            
+            public class StaticImportWorker {
+                public void work() {
+                    RunnableFactory.getRunnable().run();
+                }
+            }
+        """,
+        after = """
+            package com.acme.product.other;
+            
+            import com.acme.product.RunnableFactory;
+            
+            public class StaticImportWorker {
+                public void work() {
+                    RunnableFactory.getRunnable().run();
+                }
+            }
+        """
+    )
 
     @Test
     fun lambda(jp: JavaParser) = assertChanged(
@@ -312,17 +494,18 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
         jp,
         dependsOn = arrayOf(testClass),
         before = """
-            public class B {
+            public class A {
                public org.openrewrite.Test foo() { return null; }
             }
         """,
         after = """
-            public class B {
+            public class A {
                public org.openrewrite.test.Test foo() { return null; }
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue()
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -368,7 +551,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -393,7 +577,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -412,7 +597,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -436,7 +622,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -455,7 +642,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -474,45 +662,60 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
     fun typeCast(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(testClass),
         before = """
-            public class B {
-               org.openrewrite.Test a = null;
+            import org.openrewrite.Test;
+            
+            public class A {
+                Test method(Object obj) {
+                    return (Test) obj;
+                }
             }
         """,
         after = """
-            public class B {
-               org.openrewrite.test.Test a = null;
+            import org.openrewrite.test.Test;
+            
+            public class A {
+                Test method(Object obj) {
+                    return (Test) obj;
+                }
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
     fun classReference(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(testClass),
         before = """
+            import org.openrewrite.Test;
             public class Test {
-                Class<?> clazz = org.openrewrite.Test.class;
+                Class<?> clazz = Test.class;
             }
         """,
         after = """
+            import org.openrewrite.test.Test;
             public class Test {
-                Class<?> clazz = org.openrewrite.test.Test.class;
+                Class<?> clazz = Test.class;
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -533,7 +736,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
@@ -560,7 +764,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
-            assertThat(cu.typesInUse.typesInUse.none { "org.openrewrite" == it.asFullyQualified()?.packageName }).isTrue
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }
     )
 
