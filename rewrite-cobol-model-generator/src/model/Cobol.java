@@ -1,4 +1,4 @@
-package cobol;
+package model;
 
 import org.openrewrite.cobol.tree.CobolLeftPadded;
 import org.openrewrite.cobol.tree.CobolRightPadded;

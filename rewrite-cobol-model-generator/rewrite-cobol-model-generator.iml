@@ -11,5 +11,6 @@
     <orderEntry type="module" module-name="rewrite.rewrite-java.main" />
     <orderEntry type="library" name="Gradle: org.projectlombok:lombok:1.18.24" level="project" />
     <orderEntry type="module" module-name="rewrite.rewrite-cobol.main" />
+    <orderEntry type="module" module-name="rewrite.rewrite-java-11.main" />
   </component>
 </module>
