@@ -23,17 +23,29 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.internal.RawRepositories;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ProfileActivation;
 
+import javax.annotation.ParametersAreNullableByDefault;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
@@ -65,6 +77,7 @@ public class MavenSettings {
     Servers servers;
 
     @JsonCreator
+    @ParametersAreNullableByDefault
     public MavenSettings(String localRepository, Profiles profiles, ActiveProfiles activeProfiles, Mirrors mirrors, Servers servers) {
         this.localRepository = localRepository;
         this.profiles = profiles;
@@ -76,11 +89,73 @@ public class MavenSettings {
     @Nullable
     public static MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
-            return MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
+            return new Interpolator().interpolate(
+                    MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class));
         } catch (IOException e) {
             ctx.getOnError().accept(new IOException("Failed to parse " + source.getPath(), e));
             return null;
         }
+    }
+
+    @Nullable
+    public static MavenSettings parse(Path settingsPath, ExecutionContext ctx) {
+        return parse(new Parser.Input(settingsPath, () -> {
+            try {
+                return Files.newInputStream(settingsPath);
+            } catch (IOException e) {
+                ctx.getOnError().accept(new IOException("Failed to read settings.xml at " + settingsPath, e));
+                return null;
+            }
+        }), ctx);
+    }
+
+    @Nullable
+    public static MavenSettings readMavenSettingsFromDisk(ExecutionContext ctx) {
+        final Optional<MavenSettings> userSettings = Optional.of(userSettingsPath())
+                .filter(MavenSettings::exists)
+                .map(path -> parse(path, ctx));
+        final MavenSettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
+        return userSettings.map(mavenSettings -> mavenSettings.merge(installSettings))
+                .orElse(installSettings);
+    }
+
+    public static boolean readFromDiskEnabled() {
+        final String propertyValue = System.getProperty("org.openrewrite.test.readMavenSettingsFromDisk");
+        return propertyValue != null && !propertyValue.equalsIgnoreCase("false");
+    }
+
+    private static Path userSettingsPath() {
+        return Paths.get(System.getProperty("user.home")).resolve(".m2/settings.xml");
+    }
+
+    private static Optional<Path> findMavenHomeSettings() {
+        for (String envVariable : Arrays.asList("MVN_HOME", "M2_HOME", "MAVEN_HOME")) {
+            for (String s : Optional.ofNullable(System.getenv(envVariable)).map(Arrays::asList).orElse(emptyList())) {
+                Path resolve = Paths.get(s).resolve("conf/settings.xml");
+                if (exists(resolve)) {
+                    return Optional.of(resolve);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static boolean exists(Path path) {
+        try {
+            return path.toFile().exists();
+        } catch (SecurityException e) {
+            return false;
+        }
+    }
+
+    public MavenSettings merge(@Nullable MavenSettings installSettings) {
+        return installSettings == null ? this : new MavenSettings(
+                localRepository == null ? installSettings.localRepository : localRepository,
+                profiles == null ? installSettings.profiles : profiles.merge(installSettings.profiles),
+                activeProfiles == null ? installSettings.activeProfiles : activeProfiles.merge(installSettings.activeProfiles),
+                mirrors == null ? installSettings.mirrors : mirrors.merge(installSettings.mirrors),
+                servers == null ? installSettings.servers : servers.merge(installSettings.servers)
+        );
     }
 
     public List<RawRepositories.Repository> getActiveRepositories(Iterable<String> activeProfiles) {
@@ -114,22 +189,133 @@ public class MavenSettings {
         return pathname.startsWith("file://") ? pathname : Paths.get(pathname).toUri().toString();
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
-    public static class Profiles {
-        @JacksonXmlProperty(localName = "profile")
-        @JacksonXmlElementWrapper(useWrapping = false)
-        List<Profile> profiles = emptyList();
+    private static class Interpolator {
+        private final Map<String, String> placeholderResolutions = new HashMap<>();
+
+        public MavenSettings interpolate(final MavenSettings mavenSettings) {
+            return new MavenSettings(
+                    interpolate(mavenSettings.localRepository),
+                    mavenSettings.profiles,
+                    interpolate(mavenSettings.activeProfiles),
+                    interpolate(mavenSettings.mirrors),
+                    interpolate(mavenSettings.servers));
+        }
+
+        @Nullable
+        private ActiveProfiles interpolate(@Nullable final ActiveProfiles activeProfiles) {
+            if (activeProfiles == null) return null;
+            return new ActiveProfiles(ListUtils.map(activeProfiles.getActiveProfiles(), this::interpolate));
+        }
+
+        @Nullable
+        private Mirrors interpolate(@Nullable final Mirrors mirrors) {
+            if (mirrors == null) return null;
+            return new Mirrors(ListUtils.map(mirrors.getMirrors(), this::interpolate));
+        }
+
+        private Mirror interpolate(final Mirror mirror) {
+            return new Mirror(interpolate(mirror.id), interpolate(mirror.url), interpolate(mirror.getMirrorOf()), mirror.releases, mirror.snapshots);
+        }
+
+        @Nullable
+        private Servers interpolate(@Nullable final Servers servers) {
+            if (servers == null) return null;
+            return new Servers(ListUtils.map(servers.getServers(), this::interpolate));
+        }
+
+        private Server interpolate(final Server server) {
+            return new Server(interpolate(server.id), interpolate(server.username), interpolate(server.password));
+        }
+
+        @Nullable
+        private String interpolate(@Nullable final String s) {
+            if (s == null) return null;
+            resolve(findPlaceholders(s));
+            String result = s;
+            for (Map.Entry<String, String> entry : placeholderResolutions.entrySet()) {
+                result = result.replace(entry.getKey(), entry.getValue());
+            }
+            return result;
+        }
+
+        private List<String> findPlaceholders(final String s) {
+            Matcher matcher = Pattern.compile("\\$\\{[^}]+}").matcher(s);
+            List<String> resultList = new ArrayList<>();
+            while (matcher.find()) {
+                resultList.add(s.substring(matcher.start(), matcher.end()));
+            }
+            return resultList;
+        }
+
+        public void resolve(List<String> placeholderList) {
+            placeholderList.forEach(placeholder -> placeholderResolutions.computeIfAbsent(placeholder, this::resolve));
+        }
+
+        private String resolve(final String placeholder) {
+            String key = trimPlaceholderSyntax(placeholder);
+            String property = System.getProperty(key);
+            if (property != null) {
+                return property;
+            }
+            if (key.startsWith("env.")) {
+                String envVar = System.getenv().get(key.substring(4));
+                if (envVar != null) {
+                    return envVar;
+                }
+            }
+            return placeholder;
+        }
+
+        private String trimPlaceholderSyntax(final String placeholder) {
+            return placeholder.substring(2, placeholder.length() - 1);
+        }
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
     @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class Profiles {
+        @JacksonXmlProperty(localName = "profile")
+        @JacksonXmlElementWrapper(useWrapping = false)
+        List<Profile> profiles = emptyList();
+
+        public Profiles merge(@Nullable Profiles profiles) {
+            final Map<String, Profile> merged = new LinkedHashMap<>();
+            for (Profile profile : this.profiles) {
+                merged.put(profile.id, profile);
+            }
+            if (profiles != null) {
+                profiles.getProfiles().forEach(profile -> merged.putIfAbsent(profile.getId(), profile));
+            }
+            return new Profiles(new ArrayList<>(merged.values()));
+        }
+    }
+
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
     public static class ActiveProfiles {
         @JacksonXmlProperty(localName = "activeProfile")
         @JacksonXmlElementWrapper(useWrapping = false)
         List<String> activeProfiles = emptyList();
+
+        public ActiveProfiles merge(@Nullable ActiveProfiles activeProfiles) {
+            if (activeProfiles == null) {
+                return new ActiveProfiles(new ArrayList<>(this.activeProfiles));
+            }
+            List<String> result = new ArrayList<>();
+            Set<String> uniqueValues = new HashSet<>();
+            for (String s : ListUtils.concatAll(this.activeProfiles, activeProfiles.activeProfiles)) {
+                if (uniqueValues.add(s)) {
+                    result.add(s);
+                }
+            }
+            return new ActiveProfiles(result);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -157,10 +343,23 @@ public class MavenSettings {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
     @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
     public static class Mirrors {
         @JacksonXmlProperty(localName = "mirror")
         @JacksonXmlElementWrapper(useWrapping = false)
         List<Mirror> mirrors = emptyList();
+
+        public Mirrors merge(@Nullable Mirrors mirrors) {
+            final Map<String, Mirror> merged = new LinkedHashMap<>();
+            for (Mirror mirror : this.mirrors) {
+                merged.put(mirror.id, mirror);
+            }
+            if (mirrors != null) {
+                mirrors.getMirrors().forEach(mirror -> merged.putIfAbsent(mirror.getId(), mirror));
+            }
+            return new Mirrors(new ArrayList<>(merged.values()));
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -185,10 +384,23 @@ public class MavenSettings {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
     @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
     public static class Servers {
         @JacksonXmlProperty(localName = "server")
         @JacksonXmlElementWrapper(useWrapping = false)
         List<Server> servers = emptyList();
+
+        public Servers merge(@Nullable Servers servers) {
+            final Map<String, Server> merged = new LinkedHashMap<>();
+            for (Server server : this.servers) {
+                merged.put(server.id, server);
+            }
+            if (servers != null) {
+                servers.getServers().forEach(server -> merged.putIfAbsent(server.getId(), server));
+            }
+            return new Servers(new ArrayList<>(merged.values()));
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

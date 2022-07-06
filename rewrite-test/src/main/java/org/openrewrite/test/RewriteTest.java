@@ -15,6 +15,7 @@
  */
 package org.openrewrite.test;
 
+import org.assertj.core.api.AssertionsForClassTypes;
 import org.assertj.core.api.SoftAssertions;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
@@ -31,7 +32,9 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.protobuf.ProtoParser;
@@ -134,8 +137,14 @@ public interface RewriteTest extends SourceSpecs {
         RecipeSchedulerCheckingExpectedCycles recipeSchedulerCheckingExpectedCycles =
                 new RecipeSchedulerCheckingExpectedCycles(DirectScheduler.common(), expectedCyclesThatMakeChanges);
 
-        ExecutionContext executionContext = testMethodSpec.executionContext == null ? testClassSpec.getExecutionContext() :
-                testMethodSpec.getExecutionContext();
+        ExecutionContext executionContext;
+        if (testMethodSpec.getExecutionContext() != null) {
+            executionContext = testMethodSpec.getExecutionContext();
+        } else if (testClassSpec.getExecutionContext() != null) {
+            executionContext = testClassSpec.getExecutionContext();
+        } else {
+            executionContext = defaultExecutionContext(sourceSpecs);
+        }
 
         Map<ParserSupplier, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
 
@@ -385,6 +394,21 @@ public interface RewriteTest extends SourceSpecs {
     default void rewriteRun(SourceSpec<?>... sources) {
         rewriteRun(spec -> {
         }, sources);
+    }
+
+    default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
+        ExecutionContext executionContext = new InMemoryExecutionContext(
+                t -> AssertionsForClassTypes.fail("Failed to run parse sources or recipe", t));
+        if (Arrays.stream(sourceSpecs)
+                .anyMatch(sourceSpec -> J.CompilationUnit.class.equals(sourceSpec.sourceFileType))) {
+            executionContext.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        }
+        if (MavenSettings.readFromDiskEnabled()
+                && Arrays.stream(sourceSpecs).anyMatch(sourceSpec -> "maven".equals(sourceSpec.dsl))) {
+            MavenExecutionContextView.view(executionContext)
+                    .setMavenSettings(MavenSettings.readMavenSettingsFromDisk(executionContext));
+        }
+        return executionContext;
     }
 
     @NotNull
