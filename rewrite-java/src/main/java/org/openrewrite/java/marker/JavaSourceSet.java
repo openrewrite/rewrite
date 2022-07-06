@@ -216,6 +216,10 @@ public class JavaSourceSet implements Marker {
                     sb.append(outerClass.getName().substring(sb.length())).append(".");
                 }
             }
+            if (sb.length() >= classInfo.getName().length()) {
+                // Code obfuscaters can generate inner classes which don't share a common package prefix with their outer class
+                return classInfo.getName();
+            }
             String nameFragment = classInfo.getName().substring(sb.length());
 
             if (isUndeclarable(nameFragment)) {
