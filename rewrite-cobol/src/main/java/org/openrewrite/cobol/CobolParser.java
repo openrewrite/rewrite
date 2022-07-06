@@ -67,6 +67,7 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                                 is.isCharsetBomMarked()
                         ).visitStartRule(parser.startRule());
 
+                        String test = compilationUnit.print(new org.openrewrite.Cursor(null, compilationUnit));
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, compilationUnit);
                         return compilationUnit;

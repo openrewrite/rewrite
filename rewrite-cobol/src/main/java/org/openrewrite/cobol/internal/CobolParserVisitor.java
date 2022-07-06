@@ -57,6 +57,32 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         this.charsetBomMarked = charsetBomMarked;
     }
 
+    private int startIndex(ParserRuleContext ctx) {
+        return ctx.start.getStartIndex();
+    }
+
+    private int stopIndex(ParserRuleContext ctx) {
+        return ctx.stop.getStopIndex();
+    }
+
+    private String space(TerminalNode n1, TerminalNode n2) {
+        return source.substring(n1.getSymbol().getStopIndex() + 1, n2.getSymbol().getStartIndex());
+    }
+
+    private String space(TerminalNode n1, ParserRuleContext ctx2) {
+        return source.substring(n1.getSymbol().getStopIndex() + 1, ctx2.getStart().getStartIndex());
+    }
+
+    private String space(ParserRuleContext ctx1, TerminalNode n2) {
+        return source.substring(ctx1.getStop().getStopIndex() + 1, n2.getSymbol().getStartIndex());
+    }
+
+    private String space(ParserRuleContext ctx1, ParserRuleContext ctx2) {
+        return source.substring(ctx1.getStop().getStopIndex() + 1, ctx2.getStart().getStartIndex());
+    }
+
+
+
     @Override
     public Cobol.CompilationUnit visitStartRule(CobolParser.StartRuleContext ctx) {
         return visitCompilationUnit(ctx.compilationUnit()).withEof(sourceBefore(source.substring(cursor)));
@@ -100,15 +126,21 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitIdentificationDivision(CobolParser.IdentificationDivisionContext ctx) {
-        // identificationDivision :  (IDENTIFICATION | ID) DIVISION DOT_FS programIdParagraph identificationDivisionBody*
+        // identificationDivision :  (IDENTIFICATION | ID) 1 DIVISION 2 DOT_FS 3 programIdParagraph identificationDivisionBody*
         Cobol.ProgramIdParagraph programIdParagraph = (Cobol.ProgramIdParagraph) visitProgramIdParagraph(ctx.programIdParagraph());
+        TerminalNode idTerminal = ctx.IDENTIFICATION() == null ? ctx.ID() : ctx.IDENTIFICATION();
+        String space1 = space(idTerminal, ctx.DIVISION());
+        Cobol.IdentificationDivision.IdKeyword idKeyword = ctx.IDENTIFICATION() == null ? Cobol.IdentificationDivision.IdKeyword.Id : Cobol.IdentificationDivision.IdKeyword.Identification;
+        String space2 = space(ctx.DIVISION(), ctx.DOT_FS());
+        String space3 = space(ctx.DOT_FS(), ctx.programIdParagraph());
+
         Cobol.IdentificationDivision id = new Cobol.IdentificationDivision(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                CobolRightPadded.build(ctx.IDENTIFICATION() == null ?
-                                Cobol.IdentificationDivision.IdKeyword.Id : Cobol.IdentificationDivision.IdKeyword.Identification),
-                CobolRightPadded.build(Space.build(ctx.DIVISION().getText())),
+                CobolRightPadded.build(idKeyword).withAfter(Space.build(space1)),
+                CobolRightPadded.build(Space.build(ctx.DIVISION().getText())).withAfter(Space.build(space2)),
+                CobolRightPadded.build(Space.build(ctx.DOT_FS().getText())).withAfter(Space.build(space3)),
                 programIdParagraph
         );
         return id;
