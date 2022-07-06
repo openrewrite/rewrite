@@ -124,6 +124,18 @@ class MethodInvocationTest : GroovyTreeTest {
     """)
 
     @Test
+    fun closureArgumentInParens() = assertParsePrintAndProcess("""
+        def acceptsClosure(Closure cl) {}
+        acceptsClosure({})
+    """)
+
+    @Test
+    fun closureArgumentAfterEmptyParens() = assertParsePrintAndProcess("""
+        def acceptsClosure(Closure cl) {}
+        acceptsClosure ( /* () */ ) { /* {} */ }
+    """)
+
+    @Test
     fun closureReturn() = assertParsePrintAndProcess("""
         foo {
             return

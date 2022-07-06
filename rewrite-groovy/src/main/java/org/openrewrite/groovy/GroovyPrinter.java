@@ -277,7 +277,15 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
             visit(method.getName(), p);
-
+            Optional<EmptyArgumentListPrecedesArgument> maybeEal = method.getMarkers().findFirst(EmptyArgumentListPrecedesArgument.class);
+            // If a recipe changed the number or kind of arguments then this marker is nonsense, even if the recipe forgets to remove it
+            if(maybeEal.isPresent() && method.getArguments().size() == 1 && method.getArguments().get(0) instanceof J.Lambda) {
+                EmptyArgumentListPrecedesArgument eal = maybeEal.get();
+                visitSpace(eal.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
+                p.append("(");
+                visitSpace(eal.getInfix(), Space.Location.LANGUAGE_EXTENSION, p);
+                p.append(")");
+            }
             JContainer<Expression> argContainer = method.getPadding().getArguments();
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);

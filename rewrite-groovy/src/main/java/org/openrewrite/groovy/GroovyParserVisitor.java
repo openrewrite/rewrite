@@ -1262,26 +1262,46 @@ public class GroovyParserVisitor {
                 name = name.withMarkers(name.getMarkers().add(implicitDot));
             }
             // Method invocations may have type information that can enrich the type information of its parameters
-            if (call.getArguments() instanceof ArgumentListExpression && call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
+            Markers markers = Markers.EMPTY;
+            if(call.getArguments() instanceof ArgumentListExpression) {
                 ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
-                for (org.codehaus.groovy.ast.expr.Expression arg : args.getExpressions()) {
-                    if (!(arg instanceof ClosureExpression)) {
-                        continue;
-                    }
-                    ClosureExpression cl = (ClosureExpression) arg;
-                    ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
-                    for (Parameter p : cl.getParameters()) {
-                        if (p.isDynamicTyped()) {
-                            p.setType(actualParamTypeRaw);
-                            p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                if (call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
+                    for (org.codehaus.groovy.ast.expr.Expression arg : args.getExpressions()) {
+                        if (!(arg instanceof ClosureExpression)) {
+                            continue;
+                        }
+                        ClosureExpression cl = (ClosureExpression) arg;
+                        ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                        for (Parameter p : cl.getParameters()) {
+                            if (p.isDynamicTyped()) {
+                                p.setType(actualParamTypeRaw);
+                                p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                            }
+                        }
+                        for (Map.Entry<String, Variable> declaredVariable : cl.getVariableScope().getDeclaredVariables().entrySet()) {
+                            if (declaredVariable.getValue() instanceof Parameter && declaredVariable.getValue().isDynamicTyped()) {
+                                Parameter p = (Parameter) declaredVariable.getValue();
+                                p.setType(actualParamTypeRaw);
+                                p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                            }
                         }
                     }
-                    for (Map.Entry<String, Variable> declaredVariable : cl.getVariableScope().getDeclaredVariables().entrySet()) {
-                        if (declaredVariable.getValue() instanceof Parameter && declaredVariable.getValue().isDynamicTyped()) {
-                            Parameter p = (Parameter) declaredVariable.getValue();
-                            p.setType(actualParamTypeRaw);
-                            p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                }
+                // handle the obscure case where there are empty parens ahead of a closure
+                if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
+                    int saveCursor = cursor;
+                    Space prefix = whitespace();
+                    if (source.charAt(cursor) == '(') {
+                        cursor += 1;
+                        Space infix = whitespace();
+                        if(source.charAt(cursor) == ')') {
+                            cursor += 1;
+                            markers = markers.add(new EmptyArgumentListPrecedesArgument(randomId(), prefix, infix));
+                        } else {
+                            cursor = saveCursor;
                         }
+                    } else {
+                        cursor = saveCursor;
                     }
                 }
             }
@@ -1331,7 +1351,7 @@ public class GroovyParserVisitor {
             } else {
                 methodType = typeMapping.methodType(methodNode);
             }
-            queue.add(new J.MethodInvocation(randomId(), fmt, Markers.EMPTY,
+            queue.add(new J.MethodInvocation(randomId(), fmt, markers,
                     select, null, name, args, methodType));
         }
 
