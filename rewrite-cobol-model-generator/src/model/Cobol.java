@@ -6,6 +6,7 @@ import org.openrewrite.cobol.tree.Space;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface Cobol {
     class Display implements Statement {
@@ -46,6 +47,28 @@ public interface Cobol {
     }
 
     class ProcedureDivision implements Cobol {
+        // procedureDivision
+        //   : PROCEDURE DIVISION procedureDivisionUsingClause? procedureDivisionGivingClause? DOT_FS procedureDeclaratives? procedureDivisionBody
+        //   ;
+        ProcedureDivisionBody body;
+    }
+
+    class ProcedureDivisionBody implements Cobol {
+        Paragraphs paragraphs;
+    }
+
+    class Paragraphs implements Cobol {
+        // paragraphs
+        //   : sentence* paragraph*
+        //   ;
+        List<Sentence> sentences;
+    }
+
+    class Sentence implements Cobol {
+        // sentence
+        //   : statement* DOT_FS
+        //   ;
+        List<Statement> statements;
     }
 
     class ProgramIdParagraph implements Cobol {
@@ -54,7 +77,11 @@ public interface Cobol {
     }
 
     class ProgramUnit implements Cobol {
+        // programUnit
+        //   : identificationDivision environmentDivision? dataDivision? procedureDivision? programUnit* endProgramStatement?
+        //   ;
         IdentificationDivision identificationDivision;
+        Optional<ProcedureDivision> procedureDivision;
     }
 
     class Stop implements Statement {

@@ -26,6 +26,7 @@ import org.openrewrite.cobol.internal.grammar.CobolParser;
 import org.openrewrite.cobol.tree.Cobol;
 import org.openrewrite.cobol.tree.CobolRightPadded;
 import org.openrewrite.cobol.tree.Space;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -33,7 +34,9 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -116,12 +119,32 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitProgramUnit(CobolParser.ProgramUnitContext ctx) {
+        // programUnit
+        //   : identificationDivision environmentDivision? dataDivision? procedureDivision? programUnit* endProgramStatement?
+        //   ;
         Cobol.IdentificationDivision identificationDivision = (Cobol.IdentificationDivision) visitIdentificationDivision(ctx.identificationDivision());
+        Optional<Cobol.ProcedureDivision> procedureDivision;
+        if(ctx.procedureDivision() == null) {
+            procedureDivision = Optional.empty();
+        } else {
+            procedureDivision = Optional.of((Cobol.ProcedureDivision) visitProcedureDivision(ctx.procedureDivision()));
+        }
         return new Cobol.ProgramUnit(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                identificationDivision);
+                identificationDivision,
+                procedureDivision);
+    }
+
+    @Override
+    public Cobol visitProcedureDivision(CobolParser.ProcedureDivisionContext ctx) {
+        return new Cobol.ProcedureDivision(
+                randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                null // TODO
+        );
     }
 
     @Override
@@ -133,6 +156,10 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         Cobol.IdentificationDivision.IdKeyword idKeyword = ctx.IDENTIFICATION() == null ? Cobol.IdentificationDivision.IdKeyword.Id : Cobol.IdentificationDivision.IdKeyword.Identification;
         String space2 = space(ctx.DIVISION(), ctx.DOT_FS());
         String space3 = space(ctx.DOT_FS(), ctx.programIdParagraph());
+
+        if(ctx.identificationDivisionBody() != null && ctx.identificationDivisionBody().size() != 0) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
 
         Cobol.IdentificationDivision id = new Cobol.IdentificationDivision(
                 randomId(),
