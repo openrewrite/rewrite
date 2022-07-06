@@ -87,7 +87,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     private String space(ParserRuleContext ctx1, ParserRuleContext ctx2) {
         return source.substring(ctx1.getStop().getStopIndex() + 1, ctx2.getStart().getStartIndex());
     }
-
+    
     private Space prefix(TerminalNode terminal) {
         TerminalNode previousNode = previousTerminalNode(terminal);
         if(previousNode == null) {
@@ -102,23 +102,29 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         if(previousNode == null) {
             return Space.build(source.substring(0, tree.getStart().getStartIndex()));
         } else {
-            return Space.build(source.substring(previousNode.getSymbol().getStopIndex()+1, tree.getStart().getStartIndex()));
+            return Space.build(source.substring(previousNode.getSymbol().getStopIndex(), tree.getStart().getStartIndex()));
         }
     }
 
     private TerminalNode previousTerminalNode(ParseTree n) {
         ParseTree parent = n.getParent();
-        if(parent == null) return null;
-        int pos;
-        for(pos = 0; pos < parent.getChildCount(); pos++) {
-            if(parent.getChild(pos) == n) break;
-        }
-        assert pos < parent.getChildCount();
+        if(n.getParent() == null) return null;
+        int pos = positionInParent(n);
         if(pos == 0) {
             return previousTerminalNode(parent);
         } else {
             return lastTerminalNode(parent.getChild(pos-1));
         }
+    }
+
+    private int positionInParent(ParseTree n) {
+        ParseTree parent = n.getParent();
+        int pos;
+        for(pos = 0; pos < parent.getChildCount(); pos++) {
+            if(parent.getChild(pos) == n) break;
+        }
+        assert pos < parent.getChildCount();
+        return pos;
     }
 
     private TerminalNode lastTerminalNode(ParseTree n) {
