@@ -31,6 +31,7 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -55,10 +56,6 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                         parser.removeErrorListeners();
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
-                        if (sourceStr.contains("proto3")) {
-                            return null;
-                        }
-
                         Cobol.CompilationUnit compilationUnit = (Cobol.CompilationUnit) new CobolParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
                                 sourceFile.getFileAttributes(),
@@ -67,7 +64,6 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                                 is.isCharsetBomMarked()
                         ).visitStartRule(parser.startRule());
 
-                        String test = compilationUnit.print(new org.openrewrite.Cursor(null, compilationUnit));
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, compilationUnit);
                         return compilationUnit;
@@ -86,9 +82,14 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
+    private static String[] COBOL_FILE_EXTENSIONS = new String[] {
+            ".cbl", ".cpy"
+    };
+
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".CBL");
+        String s = path.toString().toLowerCase();
+        return Arrays.stream(COBOL_FILE_EXTENSIONS).anyMatch(ext -> s.endsWith(ext));
     }
 
     @Override
