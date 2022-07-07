@@ -26,7 +26,6 @@ import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.dataflow2.ProgramPoint;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.search.FindTypes;
@@ -1966,7 +1965,7 @@ public interface J extends Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
         @AllArgsConstructor(access = AccessLevel.PRIVATE)
-        public static final class Control implements J, ProgramPoint {
+        public static final class Control implements J {
             @Nullable
             @NonFinal
             transient WeakReference<Padding> padding;
@@ -2192,7 +2191,7 @@ public interface J extends Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
         @AllArgsConstructor(access = AccessLevel.PRIVATE)
-        public static final class Else implements J, ProgramPoint {
+        public static final class Else implements J {
             @Nullable
             @NonFinal
             transient WeakReference<Padding> padding;
@@ -4550,7 +4549,7 @@ public interface J extends Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static final class Catch implements J, ProgramPoint {
+        public static final class Catch implements J {
             @With
             @EqualsAndHashCode.Include
             UUID id;
@@ -5015,7 +5014,7 @@ public interface J extends Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @RequiredArgsConstructor
         @AllArgsConstructor(access = AccessLevel.PRIVATE)
-        public static final class NamedVariable implements J, NameTree, ProgramPoint {
+        public static final class NamedVariable implements J, NameTree {
             @Nullable
             @NonFinal
             transient WeakReference<Padding> padding;
