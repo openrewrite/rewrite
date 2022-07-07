@@ -172,7 +172,7 @@ public class ChangeParentPom extends Recipe {
                             if (!oldVersion.equals(targetVersion.get())) {
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()).visitNonNull(t, ctx);
                             }
-                            doAfterVisit(new RemoveRedundantDependencyVersions());
+                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
                         }
                     }
                 }

@@ -115,7 +115,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
                 if (d != document) {
                     maybeUpdateModel();
-                    doAfterVisit(new RemoveRedundantDependencyVersions());
+                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
                 }
                 return d;
             }

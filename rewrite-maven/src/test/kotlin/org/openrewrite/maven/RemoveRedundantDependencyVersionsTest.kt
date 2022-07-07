@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test
 
 class RemoveRedundantDependencyVersionsTest : MavenRecipeTest {
 
-    override val recipe = RemoveRedundantDependencyVersions()
+    override val recipe = RemoveRedundantDependencyVersions(null, null, true)
 
     @Test
     fun givenScopeIsDefinedWhenVersionMatchesParentDmForDifferentScopeThenKeepIt() {
