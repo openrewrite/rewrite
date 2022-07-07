@@ -23,3 +23,23 @@ Try it yourself at https://app.moderne.io, now in open beta.
 
 This project is maintained by [Moderne](https://moderne.io/).
 Visit us at https://moderne.io to learn how to remove the tedium, technical debt, and inefficiency from your organization's software development.
+
+## Building in Secure Environments
+
+Security conscious organizations sometimes impose restrictions on the repositories developers can access.
+Building OpenRewrite and running its tests involves accessing the [Maven Central](https://search.maven.org/) artifact repository.
+If you are unable to access Maven Central you can still build OpenRewrite if you have access to another repository which serves all of OpenRewrite's dependencies.
+Set the JVM system property `org.openrewrite.maven.remoteRepo` to the URI of your repository.
+Similarly, you can relocate the maven local directory (which Maven locates by default) 
+
+On the command line that looks like:
+```
+./gradlew build -Dorg.openrewrite.maven.remoteRepo=https://artifactory.your.org/ -Dorg.openrewrite.maven.localRepo=file:///home/your/repository
+```
+
+To permanently set this configuration for all your builds, place a gradle.properties file in your user directory with the contents:
+```properties
+systemProp.org.openrewrite.maven.remoteRepo=https://artifactory.your.org/
+systemProp.org.openrewrite.maven.localRepo=file:///home/your/repository
+```
+

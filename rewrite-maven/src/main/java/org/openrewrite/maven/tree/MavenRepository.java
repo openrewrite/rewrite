@@ -34,8 +34,14 @@ import java.net.URI;
 @RequiredArgsConstructor
 public class MavenRepository {
     public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), true, true, true, null, null);
-    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", new File(System.getProperty("user.home") + "/.m2/repository").toURI().toString(), true, true, true, null, null);
-    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", true, false, true, null, null);
+
+    public static final MavenRepository MAVEN_LOCAL_DEFAULT = (System.getProperty("org.openrewrite.maven.localRepo") == null) ?
+            new MavenRepository("local", new File(System.getProperty("user.home") + "/.m2/repository").toURI().toString(), true, true, true, null, null) :
+            new MavenRepository("local", System.getProperty("org.openrewrite.maven.localRepo"), true, true, true, null, null);
+
+    public static final MavenRepository MAVEN_CENTRAL = (System.getProperty("org.openrewrite.maven.remoteRepo") == null) ?
+            new MavenRepository("central", "https://repo.maven.apache.org/maven2", true, false, true, null, null) :
+            new MavenRepository("central", System.getProperty("org.openrewrite.maven.remoteRepo"), true, false, true, null, null);
 
     @EqualsAndHashCode.Include
     @With
