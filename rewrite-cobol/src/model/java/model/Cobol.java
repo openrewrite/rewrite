@@ -1,5 +1,7 @@
 package model;
 
+import lombok.Getter;
+import lombok.With;
 import org.openrewrite.cobol.tree.CobolLeftPadded;
 import org.openrewrite.cobol.tree.CobolRightPadded;
 import org.openrewrite.cobol.tree.Space;
@@ -12,10 +14,7 @@ public interface Cobol {
         /**
          * Either an {@link Identifier} or {@link Literal}.
          */
-        List<Cobol> operands;
-
-        @Nullable
-        CobolLeftPadded<Identifier> upon;
+        List<String> operands;
     }
 
     class Identifier implements Cobol {
@@ -40,6 +39,8 @@ public interface Cobol {
     }
 
     class ProcedureDivision implements Cobol {
+        Space procedure;
+        Space division;
         ProcedureDivisionBody body;
     }
 
@@ -53,11 +54,14 @@ public interface Cobol {
 
     class Sentence implements Cobol {
         List<Statement> statements;
+        Space dot;
     }
 
     class ProgramIdParagraph implements Cobol {
         CobolRightPadded<Space> programId;
+        CobolRightPadded<Space> dot1;
         String programName;
+        CobolLeftPadded<Space> dot2;
     }
 
     class ProgramUnit implements Cobol {
@@ -69,6 +73,7 @@ public interface Cobol {
 
     class Stop implements Statement {
         Space stop;
+        Space run;
         Cobol statement;
     }
 }
