@@ -237,7 +237,7 @@ public class MavenSettings {
 
         @Nullable
         private String interpolate(@Nullable String s) {
-            return propertyPlaceholders.replacePlaceholders(s, propertyResolver);
+            return s == null ? null : propertyPlaceholders.replacePlaceholders(s, propertyResolver);
         }
     }
 
