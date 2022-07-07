@@ -244,8 +244,6 @@ interface RewriteTestSpec {
     void setEnableAssertions(boolean enabled)
     boolean getDebug()
     void setDebug(boolean enabled)
-    JavaDebugOptions getDebugOptions()
-    void debugOptions(Action<JavaDebugOptions> action)
     void setFailFast(boolean failFast)
     boolean getFailFast()
     List<String> getAllJvmArgs()
