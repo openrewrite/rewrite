@@ -85,19 +85,19 @@ public interface RewriteTest extends SourceSpecs {
         }, sourceSpecs);
     }
 
-    default void rewriteRun(Consumer<RecipeSpec> specChange, SourceSpecs... sourceSpecs) {
-        rewriteRun(specChange, Arrays.stream(sourceSpecs)
+    default void rewriteRun(Consumer<RecipeSpec> spec, SourceSpecs... sourceSpecs) {
+        rewriteRun(spec, Arrays.stream(sourceSpecs)
                 .flatMap(specGroup -> StreamSupport.stream(specGroup.spliterator(), false))
                 .toArray(SourceSpec[]::new)
         );
     }
 
-    default void rewriteRun(Consumer<RecipeSpec> specChange, SourceSpec<?>... sourceSpecs) {
+    default void rewriteRun(Consumer<RecipeSpec> spec, SourceSpec<?>... sourceSpecs) {
         RecipeSpec testClassSpec = RecipeSpec.defaults();
         defaults(testClassSpec);
 
         RecipeSpec testMethodSpec = RecipeSpec.defaults();
-        specChange.accept(testMethodSpec);
+        spec.accept(testMethodSpec);
 
         Recipe recipe = testMethodSpec.recipe == null ? testClassSpec.recipe : testMethodSpec.recipe;
         assertThat(recipe)
@@ -108,7 +108,9 @@ public interface RewriteTest extends SourceSpecs {
                 .as("Recipe validation must succeed")
                 .isTrue();
 
-        if (!(recipe instanceof AdHocRecipe)) {
+        if (!(recipe instanceof AdHocRecipe) &&
+                testClassSpec.serializationValidation &&
+                testMethodSpec.serializationValidation) {
             RecipeSerializer recipeSerializer = new RecipeSerializer();
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
@@ -253,14 +255,14 @@ public interface RewriteTest extends SourceSpecs {
                 sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
                         sourceFile.getMarkers().getMarkers(), testMethodSpec.allSources.markers)));
 
-                SourceSpec<?> spec = sourceSpecIter.next();
+                SourceSpec<?> nextSpec = sourceSpecIter.next();
                 sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
-                        sourceFile.getMarkers().getMarkers(), spec.markers)));
+                        sourceFile.getMarkers().getMarkers(), nextSpec.markers)));
 
                 //noinspection unchecked
-                ((Consumer<SourceFile>) spec.beforeRecipe).accept(sourceFile);
+                ((Consumer<SourceFile>) nextSpec.beforeRecipe).accept(sourceFile);
 
-                specBySourceFile.put(sourceFile, spec);
+                specBySourceFile.put(sourceFile, nextSpec);
             }
         }
 

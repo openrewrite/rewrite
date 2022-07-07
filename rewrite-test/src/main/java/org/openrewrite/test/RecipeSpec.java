@@ -59,6 +59,8 @@ public class RecipeSpec {
     @Nullable
     TypeValidation typeValidation;
 
+    boolean serializationValidation = true;
+
     Consumer<List<SourceFile>> beforeRecipe = s -> {
     };
 
@@ -118,6 +120,11 @@ public class RecipeSpec {
 
     public RecipeSpec afterRecipe(Consumer<List<Result>> afterRecipe) {
         this.afterRecipe = afterRecipe;
+        return this;
+    }
+
+    public RecipeSpec validateRecipeSerialization(boolean validate) {
+        this.serializationValidation = validate;
         return this;
     }
 
