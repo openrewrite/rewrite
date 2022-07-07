@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.Getter;
+import lombok.With;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;

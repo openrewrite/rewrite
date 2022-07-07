@@ -335,38 +335,39 @@ class MavenSettingsTest {
         @Test
         fun properties() {
             System.setProperty("rewrite.test.custom.location", "/tmp")
-            val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
+            val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+                //language=xml
                 """
-            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                <servers>
-                     <server>
-                         <id>private-repo</id>
-                         <username>my_username</username>
-                         <password>my_pass</password>
-                    </server>
-                </servers>
-                <localRepository>${'$'}{rewrite.test.custom.location}/maven/local/repository/</localRepository>
-                <activeProfiles>
-                    <activeProfile>
-                        my-profile
-                    </activeProfile>
-                </activeProfiles>
-                <profiles>
-                    <profile>
-                        <id>my-profile</id>
-                        <repositories>
-                            <repository>
-                                <id>private-repo</id>
-                                <name>Private Repo</name>
-                                <url>https://repo.company.net/maven</url>
-                            </repository>
-                        </repositories>
-                    </profile>
-                </profiles>
-            </settings>
-            """.trimIndent().byteInputStream()
+                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                        <servers>
+                             <server>
+                                 <id>private-repo</id>
+                                 <username>my_username</username>
+                                 <password>my_pass</password>
+                            </server>
+                        </servers>
+                        <localRepository>${'$'}{rewrite.test.custom.location}/maven/local/repository/</localRepository>
+                        <activeProfiles>
+                            <activeProfile>
+                                my-profile
+                            </activeProfile>
+                        </activeProfiles>
+                        <profiles>
+                            <profile>
+                                <id>my-profile</id>
+                                <repositories>
+                                    <repository>
+                                        <id>private-repo</id>
+                                        <name>Private Repo</name>
+                                        <url>https://repo.company.net/maven</url>
+                                    </repository>
+                                </repositories>
+                            </profile>
+                        </profiles>
+                    </settings>
+                """.trimIndent().byteInputStream()
             }, InMemoryExecutionContext())
 
             assertThat(settings!!.localRepository).isEqualTo("/tmp/maven/local/repository/")
@@ -376,36 +377,36 @@ class MavenSettingsTest {
         fun `unresolved placeholders remain unchanged`() {
             val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
                 """
-            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                <servers>
-                     <server>
-                         <id>private-repo</id>
-                         <username>${'$'}{env.PRIVATE_REPO_USERNAME_ZZ}</username>
-                         <password>${'$'}{env.PRIVATE_REPO_PASSWORD_ZZ}</password>
-                    </server>
-                </servers>
-                <localRepository>${'$'}{custom.location.zz}/maven/local/repository/</localRepository>
-                <activeProfiles>
-                    <activeProfile>
-                        my-profile
-                    </activeProfile>
-                </activeProfiles>
-                <profiles>
-                    <profile>
-                        <id>my-profile</id>
-                        <repositories>
-                            <repository>
-                                <id>private-repo</id>
-                                <name>Private Repo</name>
-                                <url>https://repo.company.net/maven</url>
-                            </repository>
-                        </repositories>
-                    </profile>
-                </profiles>
-            </settings>
-            """.trimIndent().byteInputStream()
+                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                        <servers>
+                             <server>
+                                 <id>private-repo</id>
+                                 <username>${'$'}{env.PRIVATE_REPO_USERNAME_ZZ}</username>
+                                 <password>${'$'}{env.PRIVATE_REPO_PASSWORD_ZZ}</password>
+                            </server>
+                        </servers>
+                        <localRepository>${'$'}{custom.location.zz}/maven/local/repository/</localRepository>
+                        <activeProfiles>
+                            <activeProfile>
+                                my-profile
+                            </activeProfile>
+                        </activeProfiles>
+                        <profiles>
+                            <profile>
+                                <id>my-profile</id>
+                                <repositories>
+                                    <repository>
+                                        <id>private-repo</id>
+                                        <name>Private Repo</name>
+                                        <url>https://repo.company.net/maven</url>
+                                    </repository>
+                                </repositories>
+                            </profile>
+                        </profiles>
+                    </settings>
+                """.trimIndent().byteInputStream()
             }, InMemoryExecutionContext())
 
             assertThat(settings!!.localRepository).isEqualTo("\${custom.location.zz}/maven/local/repository/")
@@ -420,36 +421,36 @@ class MavenSettingsTest {
             updateEnvMap("REWRITE_TEST_PRIVATE_REPO_PASSWORD", "pass")
             val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {//language=xml
                 """
-            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                <servers>
-                     <server>
-                         <id>private-repo</id>
-                         <username>${'$'}{env.REWRITE_TEST_PRIVATE_REPO_USERNAME}</username>
-                         <password>${'$'}{env.REWRITE_TEST_PRIVATE_REPO_PASSWORD}</password>
-                    </server>
-                </servers>
-                <localRepository>/tmp/maven/local/repository/</localRepository>
-                <activeProfiles>
-                    <activeProfile>
-                        my-profile
-                    </activeProfile>
-                </activeProfiles>
-                <profiles>
-                    <profile>
-                        <id>my-profile</id>
-                        <repositories>
-                            <repository>
-                                <id>private-repo</id>
-                                <name>Private Repo</name>
-                                <url>https://repo.company.net/maven</url>
-                            </repository>
-                        </repositories>
-                    </profile>
-                </profiles>
-            </settings>
-            """.trimIndent().byteInputStream()
+                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                        <servers>
+                             <server>
+                                 <id>private-repo</id>
+                                 <username>${'$'}{env.REWRITE_TEST_PRIVATE_REPO_USERNAME}</username>
+                                 <password>${'$'}{env.REWRITE_TEST_PRIVATE_REPO_PASSWORD}</password>
+                            </server>
+                        </servers>
+                        <localRepository>/tmp/maven/local/repository/</localRepository>
+                        <activeProfiles>
+                            <activeProfile>
+                                my-profile
+                            </activeProfile>
+                        </activeProfiles>
+                        <profiles>
+                            <profile>
+                                <id>my-profile</id>
+                                <repositories>
+                                    <repository>
+                                        <id>private-repo</id>
+                                        <name>Private Repo</name>
+                                        <url>https://repo.company.net/maven</url>
+                                    </repository>
+                                </repositories>
+                            </profile>
+                        </profiles>
+                    </settings>
+                """.trimIndent().byteInputStream()
             }, InMemoryExecutionContext())
 
             assertThat(settings?.servers!!.servers).hasSize(1)

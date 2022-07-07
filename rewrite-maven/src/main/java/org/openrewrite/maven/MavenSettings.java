@@ -24,28 +24,19 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.internal.RawRepositories;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ProfileActivation;
 
-import javax.annotation.ParametersAreNullableByDefault;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.*;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
@@ -77,8 +68,9 @@ public class MavenSettings {
     Servers servers;
 
     @JsonCreator
-    @ParametersAreNullableByDefault
-    public MavenSettings(String localRepository, Profiles profiles, ActiveProfiles activeProfiles, Mirrors mirrors, Servers servers) {
+    public MavenSettings(@Nullable String localRepository, @Nullable Profiles profiles,
+                         @Nullable ActiveProfiles activeProfiles, @Nullable Mirrors mirrors,
+                         @Nullable Servers servers) {
         this.localRepository = localRepository;
         this.profiles = profiles;
         this.activeProfiles = activeProfiles;
@@ -176,10 +168,10 @@ public class MavenSettings {
     }
 
     public MavenRepository getMavenLocal() {
-        if(localRepository == null) {
+        if (localRepository == null) {
             return MAVEN_LOCAL_DEFAULT;
         }
-        if(mavenLocal == null) {
+        if (mavenLocal == null) {
             mavenLocal = new MavenRepository("local", asUriString(localRepository), true, true, true, null, null);
         }
         return mavenLocal;
@@ -189,10 +181,26 @@ public class MavenSettings {
         return pathname.startsWith("file://") ? pathname : Paths.get(pathname).toUri().toString();
     }
 
+    /**
+     * Resolve all properties EXCEPT in the profiles section, which can be affected by
+     * the POM using the settings.
+     */
     private static class Interpolator {
-        private final Map<String, String> placeholderResolutions = new HashMap<>();
+        private static final PropertyPlaceholderHelper propertyPlaceholders = new PropertyPlaceholderHelper(
+                "${", "}", null);
 
-        public MavenSettings interpolate(final MavenSettings mavenSettings) {
+        private static final UnaryOperator<String> propertyResolver = key -> {
+            String property = System.getProperty(key);
+            if (property != null) {
+                return property;
+            }
+            if (key.startsWith("env.")) {
+                return System.getenv().get(key.substring(4));
+            }
+            return null;
+        };
+
+        public MavenSettings interpolate(MavenSettings mavenSettings) {
             return new MavenSettings(
                     interpolate(mavenSettings.localRepository),
                     mavenSettings.profiles,
@@ -202,72 +210,34 @@ public class MavenSettings {
         }
 
         @Nullable
-        private ActiveProfiles interpolate(@Nullable final ActiveProfiles activeProfiles) {
+        private ActiveProfiles interpolate(@Nullable ActiveProfiles activeProfiles) {
             if (activeProfiles == null) return null;
             return new ActiveProfiles(ListUtils.map(activeProfiles.getActiveProfiles(), this::interpolate));
         }
 
         @Nullable
-        private Mirrors interpolate(@Nullable final Mirrors mirrors) {
+        private Mirrors interpolate(@Nullable Mirrors mirrors) {
             if (mirrors == null) return null;
             return new Mirrors(ListUtils.map(mirrors.getMirrors(), this::interpolate));
         }
 
-        private Mirror interpolate(final Mirror mirror) {
+        private Mirror interpolate(Mirror mirror) {
             return new Mirror(interpolate(mirror.id), interpolate(mirror.url), interpolate(mirror.getMirrorOf()), mirror.releases, mirror.snapshots);
         }
 
         @Nullable
-        private Servers interpolate(@Nullable final Servers servers) {
+        private Servers interpolate(@Nullable Servers servers) {
             if (servers == null) return null;
             return new Servers(ListUtils.map(servers.getServers(), this::interpolate));
         }
 
-        private Server interpolate(final Server server) {
+        private Server interpolate(Server server) {
             return new Server(interpolate(server.id), interpolate(server.username), interpolate(server.password));
         }
 
         @Nullable
-        private String interpolate(@Nullable final String s) {
-            if (s == null) return null;
-            resolve(findPlaceholders(s));
-            String result = s;
-            for (Map.Entry<String, String> entry : placeholderResolutions.entrySet()) {
-                result = result.replace(entry.getKey(), entry.getValue());
-            }
-            return result;
-        }
-
-        private List<String> findPlaceholders(final String s) {
-            Matcher matcher = Pattern.compile("\\$\\{[^}]+}").matcher(s);
-            List<String> resultList = new ArrayList<>();
-            while (matcher.find()) {
-                resultList.add(s.substring(matcher.start(), matcher.end()));
-            }
-            return resultList;
-        }
-
-        public void resolve(List<String> placeholderList) {
-            placeholderList.forEach(placeholder -> placeholderResolutions.computeIfAbsent(placeholder, this::resolve));
-        }
-
-        private String resolve(final String placeholder) {
-            String key = trimPlaceholderSyntax(placeholder);
-            String property = System.getProperty(key);
-            if (property != null) {
-                return property;
-            }
-            if (key.startsWith("env.")) {
-                String envVar = System.getenv().get(key.substring(4));
-                if (envVar != null) {
-                    return envVar;
-                }
-            }
-            return placeholder;
-        }
-
-        private String trimPlaceholderSyntax(final String placeholder) {
-            return placeholder.substring(2, placeholder.length() - 1);
+        private String interpolate(@Nullable String s) {
+            return propertyPlaceholders.replacePlaceholders(s, propertyResolver);
         }
     }
 

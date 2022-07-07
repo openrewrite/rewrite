@@ -15,7 +15,6 @@
  */
 package org.openrewrite.test;
 
-import org.assertj.core.api.AssertionsForClassTypes;
 import org.assertj.core.api.SoftAssertions;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
@@ -398,16 +397,25 @@ public interface RewriteTest extends SourceSpecs {
 
     default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
         ExecutionContext executionContext = new InMemoryExecutionContext(
-                t -> AssertionsForClassTypes.fail("Failed to run parse sources or recipe", t));
-        if (Arrays.stream(sourceSpecs)
-                .anyMatch(sourceSpec -> J.CompilationUnit.class.equals(sourceSpec.sourceFileType))) {
-            executionContext.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+                t -> fail("Failed to run parse sources or recipe", t));
+
+        for (SourceSpec<?> spec : sourceSpecs) {
+            if (J.CompilationUnit.class.equals(spec.sourceFileType)) {
+                executionContext.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+                break;
+            }
         }
-        if (MavenSettings.readFromDiskEnabled()
-                && Arrays.stream(sourceSpecs).anyMatch(sourceSpec -> "maven".equals(sourceSpec.dsl))) {
-            MavenExecutionContextView.view(executionContext)
-                    .setMavenSettings(MavenSettings.readMavenSettingsFromDisk(executionContext));
+
+        if (MavenSettings.readFromDiskEnabled()) {
+            for (SourceSpec<?> sourceSpec : sourceSpecs) {
+                if ("maven".equals(sourceSpec.dsl)) {
+                    MavenExecutionContextView.view(executionContext)
+                            .setMavenSettings(MavenSettings.readMavenSettingsFromDisk(executionContext));
+                    break;
+                }
+            }
         }
+
         return executionContext;
     }
 
