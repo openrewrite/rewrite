@@ -58,16 +58,6 @@ tasks.named<Test>("test").configure {
         showStackTraces = true
     }
 
-    if(System.getProperty("org.openrewrite.maven.localRepo") != null) {
-        systemProperty("org.openrewrite.maven.localRepo", System.getProperty("org.openrewrite.maven.localRepo"))
-    }
-    if( System.getProperty("org.openrewrite.maven.snapshotRepo") != null) {
-        systemProperty("org.openrewrite.maven.snapshotRepo", System.getProperty("org.openrewrite.maven.snapshotRepo"))
-    }
-    if(System.getProperty("org.openrewrite.maven.remoteRepo") != null) {
-        systemProperty("org.openrewrite.maven.remoteRepo", System.getProperty("org.openrewrite.maven.remoteRepo"))
-    }
-
     val releasing = project.hasProperty("releasing")
     logger.info("This ${if(releasing) "is" else "is not"} a release build")
 

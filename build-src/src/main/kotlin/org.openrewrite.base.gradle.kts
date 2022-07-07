@@ -14,30 +14,12 @@ description = "Eliminate tech-debt. Automatically."
 
 repositories {
     if (!project.hasProperty("releasing")) {
-        if(System.getProperty("org.openrewrite.maven.localRepo") == null) {
-            mavenLocal()
-        } else {
-            maven {
-                url = uri(System.getProperty("org.openrewrite.maven.localRepo"))
-            }
-        }
-        if(System.getProperty("org.openrewrite.maven.snapshotRepo") == null) {
-            maven {
-                url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
-            }
-        } else {
-            maven {
-                url = uri(System.getProperty("org.openrewrite.maven.snapshotRepo"))
-            }
-        }
-    }
-    if(System.getProperty("org.openrewrite.maven.remoteRepo") == null) {
-        mavenCentral()
-    } else {
+        mavenLocal()
         maven {
-            url = uri(System.getProperty("org.openrewrite.maven.remoteRepo"))
+            url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
         }
     }
+    mavenCentral()
 }
 
 configure<ContactsExtension> {
