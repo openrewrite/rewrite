@@ -17,10 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
@@ -74,7 +71,7 @@ public class ChangeType extends Recipe {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 JavaSourceFile sf = super.visitJavaSourceFile(cu, executionContext);
-                if (Boolean.FALSE.equals(ignoreDefinition)) {
+                if (!Boolean.TRUE.equals(ignoreDefinition)) {
                     Boolean visit = executionContext.getMessage("TARGET_CLASS");
                     if (visit != null && visit) {
                         return sf.withMarkers(sf.getMarkers().searchResult());
@@ -87,7 +84,7 @@ public class ChangeType extends Recipe {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
                 J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, executionContext);
-                if (Boolean.FALSE.equals(ignoreDefinition) &&
+                if (!Boolean.TRUE.equals(ignoreDefinition) &&
                         TypeUtils.isOfClassType(cd.getType(), oldFullyQualifiedTypeName)) {
                     executionContext.putMessage("TARGET_CLASS", true);
                 }
@@ -98,152 +95,33 @@ public class ChangeType extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                if (Boolean.FALSE.equals(ignoreDefinition)) {
-                    ChangeClassDefinition changeClassDefinition = new ChangeClassDefinition(oldFullyQualifiedTypeName, newFullyQualifiedTypeName);
-                    cu = (JavaSourceFile) changeClassDefinition.visit(cu, executionContext);
-                    assert cu != null;
-                }
-                return super.visitJavaSourceFile(cu, executionContext);
-            }
-
-            @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                ChangeTypeVisitor changeTypeVisitor = new ChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName);
-                J.CompilationUnit c = (J.CompilationUnit) changeTypeVisitor.visit(cu, executionContext);
-                assert c != null;
-                return c;
-            }
-        };
-    }
-
-    private class ChangeClassDefinition extends JavaIsoVisitor<ExecutionContext> {
-        private final JavaType.Class originalType;
-        private final JavaType targetType;
-
-        private ChangeClassDefinition(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName) {
-            this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
-            this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
-        }
-
-        @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile sf, ExecutionContext ctx) {
-            String oldPath = ((SourceFile) sf).getSourcePath().toString().replace('\\', '/');
-            // The old FQN must exist in the path.
-            String oldFqn = fqnToPath(originalType.getFullyQualifiedName());
-            String newFqn = fqnToPath(newFullyQualifiedTypeName);
-
-            Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
-            if (updatePath(sf, oldPath, newPath.toString())) {
-                sf = ((SourceFile) sf).withSourcePath(newPath);
-            }
-            return super.visitJavaSourceFile(sf, ctx);
-        }
-
-        private String fqnToPath(String fullyQualifiedName) {
-            int index = fullyQualifiedName.indexOf("$");
-            String topLevelClassName = index == -1 ? fullyQualifiedName : fullyQualifiedName.substring(0, index);
-            return topLevelClassName.replace('.', '/');
-        }
-
-        private boolean updatePath(JavaSourceFile sf, String oldPath, String newPath) {
-            return !oldPath.equals(newPath) && sf.getClasses().stream()
-                    .anyMatch(o -> J.Modifier.hasModifier(o.getModifiers(), J.Modifier.Type.Public) &&
-                            o.getType() != null && !o.getType().getFullyQualifiedName().contains("$") &&
-                            TypeUtils.isOfClassType(o.getType(), getTopLevelClassName(originalType)));
-        }
-
-        private String getTopLevelClassName(JavaType.FullyQualified classType) {
-            if (classType.getOwningClass() == null) {
-                return classType.getFullyQualifiedName();
-            }
-            return getTopLevelClassName(classType.getOwningClass());
-        }
-
-        @Override
-        public J.Package visitPackage(J.Package pkg, ExecutionContext executionContext) {
-            J.Package p = super.visitPackage(pkg, executionContext);
-            String original = p.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
-            if (original.equals(originalType.getPackageName())) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
-                if (fq != null) {
-                    if (fq.getPackageName().isEmpty()) {
-                        getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
-                        p = null;
-                    } else {
-                        String newPkg = newFullyQualifiedTypeName.substring(0, newFullyQualifiedTypeName.lastIndexOf('.'));
-                        p = p.withTemplate(JavaTemplate.builder(this::getCursor, newPkg).build(), p.getCoordinates().replace());
-                    }
-                }
-            }
-            //noinspection ConstantConditions
-            return p;
-        }
-
-        @Override
-        public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
-            Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
-            if (updatePrefix != null && updatePrefix) {
-                _import = _import.withPrefix(Space.EMPTY);
-            }
-            return super.visitImport(_import, executionContext);
-        }
-
-        @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
-            J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, executionContext);
-            Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
-            if (updatePrefix != null && updatePrefix) {
-                cd = cd.withPrefix(Space.EMPTY);
-            }
-
-            if (TypeUtils.isOfClassType(classDecl.getType(), originalType.getFullyQualifiedName())) {
-                JavaType.FullyQualified fq = JavaType.FullyQualified.ShallowClass.build(newFullyQualifiedTypeName);
-                String newClassName = getNewClassName(fq);
-                cd = cd.withName(cd.getName().withSimpleName(newClassName));
-                cd = cd.withType(updateType(cd.getType()));
-            }
-            return cd;
-        }
-
-        private String getNewClassName(JavaType.FullyQualified fq) {
-            return fq.getOwningClass() == null ? fq.getClassName() :
-                    fq.getFullyQualifiedName().substring(fq.getOwningClass().getFullyQualifiedName().length() + 1);
-        }
-
-        private JavaType updateType(@Nullable JavaType type) {
-            JavaType.GenericTypeVariable gtv = TypeUtils.asGeneric(type);
-            if (gtv != null) {
-                return gtv.withBounds(ListUtils.map(gtv.getBounds(), bound -> {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(bound);
-                    if (fq != null) {
-                        if (fq.getFullyQualifiedName().equals(originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified) {
-                            return targetType;
-                        }
-                    }
-                    return bound;
-                }));
-            }
-
-            JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(type);
-            if (fqt != null && fqt.getFullyQualifiedName().equals(originalType.getFullyQualifiedName())) {
-                return targetType;
-            }
-
-            //noinspection ConstantConditions
-            return type;
-        }
+        return new ChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition);
     }
 
     private static class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
 
-        private ChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName) {
+        @Nullable
+        private final Boolean ignoreDefinition;
+
+        private ChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
+            this.ignoreDefinition = ignoreDefinition;
+        }
+
+        @Override
+        public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+            if (!Boolean.TRUE.equals(ignoreDefinition)) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
+                if (fq != null) {
+                    ChangeClassDefinition changeClassDefinition = new ChangeClassDefinition(originalType.getFullyQualifiedName(), fq.getFullyQualifiedName());
+                    cu = (JavaSourceFile) changeClassDefinition.visit(cu, executionContext);
+                    assert cu != null;
+                }
+            }
+            return super.visitJavaSourceFile(cu, executionContext);
         }
 
         @SuppressWarnings({"unchecked", "rawtypes", "ConstantConditions"})
@@ -492,6 +370,123 @@ public class ChangeType extends Recipe {
                         .withParameterTypes(ListUtils.map(mt.getParameterTypes(), this::updateType));
             }
             return null;
+        }
+    }
+
+    private static class ChangeClassDefinition extends JavaIsoVisitor<ExecutionContext> {
+        private final JavaType.Class originalType;
+        private final JavaType.Class targetType;
+
+        private ChangeClassDefinition(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName) {
+            this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
+            this.targetType = JavaType.ShallowClass.build(newFullyQualifiedTypeName);
+        }
+
+        @Override
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile sf, ExecutionContext ctx) {
+            String oldPath = ((SourceFile) sf).getSourcePath().toString().replace('\\', '/');
+            // The old FQN must exist in the path.
+            String oldFqn = fqnToPath(originalType.getFullyQualifiedName());
+            String newFqn = fqnToPath(targetType.getFullyQualifiedName());
+
+            Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
+            if (updatePath(sf, oldPath, newPath.toString())) {
+                sf = ((SourceFile) sf).withSourcePath(newPath);
+            }
+            return super.visitJavaSourceFile(sf, ctx);
+        }
+
+        private String fqnToPath(String fullyQualifiedName) {
+            int index = fullyQualifiedName.indexOf("$");
+            String topLevelClassName = index == -1 ? fullyQualifiedName : fullyQualifiedName.substring(0, index);
+            return topLevelClassName.replace('.', '/');
+        }
+
+        private boolean updatePath(JavaSourceFile sf, String oldPath, String newPath) {
+            return !oldPath.equals(newPath) && sf.getClasses().stream()
+                    .anyMatch(o -> J.Modifier.hasModifier(o.getModifiers(), J.Modifier.Type.Public) &&
+                            o.getType() != null && !o.getType().getFullyQualifiedName().contains("$") &&
+                            TypeUtils.isOfClassType(o.getType(), getTopLevelClassName(originalType)));
+        }
+
+        private String getTopLevelClassName(JavaType.FullyQualified classType) {
+            if (classType.getOwningClass() == null) {
+                return classType.getFullyQualifiedName();
+            }
+            return getTopLevelClassName(classType.getOwningClass());
+        }
+
+        @Override
+        public J.Package visitPackage(J.Package pkg, ExecutionContext executionContext) {
+            J.Package p = super.visitPackage(pkg, executionContext);
+            String original = p.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+            if (original.equals(originalType.getPackageName())) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
+                if (fq != null) {
+                    if (fq.getPackageName().isEmpty()) {
+                        getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
+                        p = null;
+                    } else {
+                        String newPkg = targetType.getPackageName();
+                        p = p.withTemplate(JavaTemplate.builder(this::getCursor, newPkg).build(), p.getCoordinates().replace());
+                    }
+                }
+            }
+            //noinspection ConstantConditions
+            return p;
+        }
+
+        @Override
+        public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
+            Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
+            if (updatePrefix != null && updatePrefix) {
+                _import = _import.withPrefix(Space.EMPTY);
+            }
+            return super.visitImport(_import, executionContext);
+        }
+
+        @Override
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+            J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, executionContext);
+            Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
+            if (updatePrefix != null && updatePrefix) {
+                cd = cd.withPrefix(Space.EMPTY);
+            }
+
+            if (TypeUtils.isOfClassType(classDecl.getType(), originalType.getFullyQualifiedName())) {
+                String newClassName = getNewClassName(targetType);
+                cd = cd.withName(cd.getName().withSimpleName(newClassName));
+                cd = cd.withType(updateType(cd.getType()));
+            }
+            return cd;
+        }
+
+        private String getNewClassName(JavaType.FullyQualified fq) {
+            return fq.getOwningClass() == null ? fq.getClassName() :
+                    fq.getFullyQualifiedName().substring(fq.getOwningClass().getFullyQualifiedName().length() + 1);
+        }
+
+        private JavaType updateType(@Nullable JavaType type) {
+            JavaType.GenericTypeVariable gtv = TypeUtils.asGeneric(type);
+            if (gtv != null) {
+                return gtv.withBounds(ListUtils.map(gtv.getBounds(), bound -> {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(bound);
+                    if (fq != null) {
+                        if (fq.getFullyQualifiedName().equals(originalType.getFullyQualifiedName())) {
+                            return targetType;
+                        }
+                    }
+                    return bound;
+                }));
+            }
+
+            JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(type);
+            if (fqt != null && fqt.getFullyQualifiedName().equals(originalType.getFullyQualifiedName())) {
+                return targetType;
+            }
+
+            //noinspection ConstantConditions
+            return type;
         }
     }
 }
