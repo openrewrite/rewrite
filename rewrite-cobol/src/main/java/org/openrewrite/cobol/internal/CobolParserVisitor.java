@@ -21,9 +21,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.cobol.internal.grammar.CobolBaseVisitor;
 import org.openrewrite.cobol.internal.grammar.CobolParser;
-import org.openrewrite.cobol.tree.Cobol;
-import org.openrewrite.cobol.tree.CobolRightPadded;
-import org.openrewrite.cobol.tree.Space;
+import org.openrewrite.cobol.tree.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -64,32 +62,58 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         return ctx.stop.getStopIndex();
     }
 
-    private String space(TerminalNode n1, TerminalNode n2) {
-        return source.substring(n1.getSymbol().getStopIndex() + 1, n2.getSymbol().getStartIndex());
-    }
+//    private String space(TerminalNode n1, TerminalNode n2) {
+//        return source.substring(n1.getSymbol().getStopIndex() + 1, n2.getSymbol().getStartIndex());
+//    }
+//
+//    private String space(TerminalNode n1, ParserRuleContext ctx2) {
+//        return source.substring(n1.getSymbol().getStopIndex() + 1, ctx2.getStart().getStartIndex());
+//    }
+//
+//    private String space(ParserRuleContext ctx1, TerminalNode n2) {
+//        return source.substring(ctx1.getStop().getStopIndex() + 1, n2.getSymbol().getStartIndex());
+//    }
+//
+//    private String space(ParserRuleContext ctx1, ParserRuleContext ctx2) {
+//        return source.substring(ctx1.getStop().getStopIndex() + 1, ctx2.getStart().getStartIndex());
+//    }
 
-    private String space(TerminalNode n1, ParserRuleContext ctx2) {
-        return source.substring(n1.getSymbol().getStopIndex() + 1, ctx2.getStart().getStartIndex());
-    }
-
-    private String space(ParserRuleContext ctx1, TerminalNode n2) {
-        return source.substring(ctx1.getStop().getStopIndex() + 1, n2.getSymbol().getStartIndex());
-    }
-
-    private String space(ParserRuleContext ctx1, ParserRuleContext ctx2) {
-        return source.substring(ctx1.getStop().getStopIndex() + 1, ctx2.getStart().getStartIndex());
+    private String space(ParseTree ctx1, ParseTree ctx2) {
+        int stop;
+        if(ctx1 instanceof ParserRuleContext) {
+            stop = ((ParserRuleContext)ctx1).getStop().getStopIndex();
+        } else if(ctx1 instanceof TerminalNode) {
+            stop = ((TerminalNode)ctx1).getSymbol().getStopIndex();
+        } else {
+            throw new IllegalArgumentException();
+        }
+        int start;
+        if(ctx2 instanceof ParserRuleContext) {
+            start = ((ParserRuleContext)ctx2).getStart().getStartIndex();
+        } else if(ctx2 instanceof TerminalNode) {
+            start = ((TerminalNode)ctx2).getSymbol().getStartIndex();
+        } else {
+            throw new IllegalArgumentException();
+        }
+        return source.substring(stop + 1, start);
     }
 
     private Space prefix(TerminalNode terminal) {
-        TerminalNode previousNode = previousTerminalNode(terminal);
-        if (previousNode == null) {
-            return Space.build(source.substring(0, terminal.getSymbol().getStartIndex()));
-        } else {
-            return Space.build(source.substring(previousNode.getSymbol().getStopIndex() + 1, terminal.getSymbol().getStartIndex()));
-        }
+        // prefix is attached to the outermost node, namely never to a terminal
+        return Space.EMPTY;
+//        TerminalNode previousNode = previousTerminalNode(terminal);
+//        if(previousNode == null) {
+//            return Space.build(source.substring(0, terminal.getSymbol().getStartIndex()));
+//        } else {
+//            return Space.build(source.substring(previousNode.getSymbol().getStopIndex()+1, terminal.getSymbol().getStartIndex()));
+//        }
     }
 
     private Space prefix(ParserRuleContext tree) {
+        if(positionInParent(tree) == 0) {
+            // prefix will be attached to an ancestor node
+            return Space.EMPTY;
+        }
         TerminalNode previousNode = previousTerminalNode(tree);
         if (previousNode == null) {
             return Space.build(source.substring(0, tree.getStart().getStartIndex()));
@@ -192,35 +216,170 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
             throw new UnsupportedOperationException("Not implemented");
         }
 
+        Space s = prefix(ctx);
+
+        Space procedure = Space.build(ctx.PROCEDURE().getText());
+        Space division = Space.build(space(ctx.PROCEDURE(), ctx.DIVISION()) + ctx.DIVISION().getText());
         Cobol.ProcedureDivisionBody procedureDivisionBody = (Cobol.ProcedureDivisionBody) visitProcedureDivisionBody(ctx.procedureDivisionBody());
         return new Cobol.ProcedureDivision(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
+                procedure,
+                division,
                 procedureDivisionBody
         );
     }
 
     @Override
+    public Cobol visitProcedureDivisionBody(CobolParser.ProcedureDivisionBodyContext ctx) {
+        // procedureDivisionBody
+        //   : paragraphs procedureSection*
+        //   ;
+        if(ctx.procedureSection() != null && ctx.procedureSection().size() > 0) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+        Cobol.Paragraphs paragraphs = (Cobol.Paragraphs) visitParagraphs(ctx.paragraphs());
+        return new Cobol.ProcedureDivisionBody(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                paragraphs
+        );
+    }
+
+    @Override
+    public Cobol visitParagraphs(CobolParser.ParagraphsContext ctx) {
+        // paragraphs
+        //   : sentence* paragraph*
+        //   ;
+        if(ctx.paragraph() != null && ctx.paragraph().size() > 0) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+        List<Cobol.Sentence> sentences = new ArrayList<>();
+        for(int i=0; i<ctx.sentence().size(); i++) {
+            sentences.add( (Cobol.Sentence) visitSentence(ctx.sentence(i)));
+        }
+        return new Cobol.Paragraphs(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                sentences);
+    }
+
+    @Override
+    public Cobol visitSentence(CobolParser.SentenceContext ctx) {
+        // sentence
+        //   : statement* DOT_FS
+        //   ;
+        List<Statement> statements = new ArrayList<>();
+        for(int i=0; i<ctx.statement().size(); i++) {
+            statements.add( (Statement) visit(ctx.statement(i)));
+        }
+        Space dot = ctx.statement().size() == 0
+                        ? Space.build("")
+                        : Space.build(space(ctx.statement(ctx.statement().size()-1), ctx.DOT_FS()));
+        return new Cobol.Sentence(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                statements,
+                dot);
+    }
+
+    @Override
+    public Cobol visitStopStatement(CobolParser.StopStatementContext ctx) {
+        // stopStatement
+        //   : STOP (RUN | literal | stopStatementGiving)
+        //   ;
+        if(ctx.literal() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+        if(ctx.stopStatementGiving() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+
+        Space stop = Space.build(ctx.STOP().getText());
+        Space run = null;
+        if(ctx.RUN() != null) {
+            run = Space.build(space(ctx.STOP(), ctx.RUN()) + ctx.RUN().getText());
+        }
+        return new Cobol.Stop(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                stop,
+                run,
+                null);
+    }
+
+    @Override
+    public Cobol visitDisplayStatement(CobolParser.DisplayStatementContext ctx) {
+        // displayStatement
+        //   : DISPLAY displayOperand+ displayAt? displayUpon? displayWith? onExceptionClause? notOnExceptionClause? END_DISPLAY?
+        //
+        //   ;
+        if(ctx.displayAt() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+        if(ctx.displayUpon() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+        if(ctx.displayWith() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+        if(ctx.onExceptionClause() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+        if(ctx.notOnExceptionClause() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+        if(ctx.END_DISPLAY() != null) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+
+        List<CobolLeftPadded<String>> operands = new ArrayList<>();
+        ParseTree previousCtx = ctx.DISPLAY();
+        for(int i=0; i<ctx.displayOperand().size(); i++) {
+            ParserRuleContext operandCtx = ctx.displayOperand(i);
+            Space before = Space.build(space(previousCtx, operandCtx));
+            previousCtx = operandCtx;
+            String element = operandCtx.getText();
+            operands.add(new CobolLeftPadded<>(before, element, Markers.EMPTY));
+        }
+        return new Cobol.Display(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                operands,
+                null);
+    }
+
+    @Override
     public Cobol visitIdentificationDivision(CobolParser.IdentificationDivisionContext ctx) {
+
+        if(ctx.identificationDivisionBody() != null && ctx.identificationDivisionBody().size() != 0) {
+            throw new UnsupportedOperationException("Not implemented");
+        }
+
         Cobol.ProgramIdParagraph programIdParagraph = (Cobol.ProgramIdParagraph) visitProgramIdParagraph(ctx.programIdParagraph());
         TerminalNode idTerminal = ctx.IDENTIFICATION() == null ? ctx.ID() : ctx.IDENTIFICATION();
         String space1 = space(idTerminal, ctx.DIVISION());
         Cobol.IdentificationDivision.IdKeyword idKeyword = ctx.IDENTIFICATION() == null ? Cobol.IdentificationDivision.IdKeyword.Id : Cobol.IdentificationDivision.IdKeyword.Identification;
         String space2 = space(ctx.DIVISION(), ctx.DOT_FS());
-        String space3 = space(ctx.DOT_FS(), ctx.programIdParagraph());
 
         if (ctx.identificationDivisionBody() != null && ctx.identificationDivisionBody().size() != 0) {
-            throw new UnsupportedOperationException("Not implemented");
-        }
+        CobolRightPadded<Cobol.IdentificationDivision.IdKeyword> identification = CobolRightPadded.build(idKeyword).withAfter(Space.build(space1));
+        CobolRightPadded<Space> division = CobolRightPadded.build(Space.build(ctx.DIVISION().getText())).withAfter(Space.build(space2));
+        Space dot = Space.build(ctx.DOT_FS().getText());
 
         return new Cobol.IdentificationDivision(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                CobolRightPadded.build(idKeyword).withAfter(Space.build(space1)),
-                CobolRightPadded.build(Space.build(ctx.DIVISION().getText())).withAfter(Space.build(space2)),
-                CobolRightPadded.build(Space.build(ctx.DOT_FS().getText())).withAfter(Space.build(space3)),
+                identification,
+                division,
+                dot,
                 programIdParagraph
         );
     }
@@ -228,14 +387,24 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     @Override
     public Cobol visitProgramIdParagraph(CobolParser.ProgramIdParagraphContext ctx) {
         CobolRightPadded<Space> programId = CobolRightPadded.build(Space.build("PROGRAM-ID"))
-                .withAfter(Space.build(space(ctx.PROGRAM_ID(), ctx.programName())));
+                .withAfter(Space.build(space(ctx.PROGRAM_ID(), ctx.DOT_FS(0))));
+        CobolRightPadded<Space> dot1 = CobolRightPadded.build(Space.build("."))
+                .withAfter(Space.build(space(ctx.DOT_FS(0), ctx.programName())));
         String programName = ctx.programName().getText();
+        CobolLeftPadded<Space> dot2 = null;
+        if(ctx.DOT_FS().size() > 1) {
+            dot2 = CobolLeftPadded.build(Space.build("."))
+                    .withBefore(Space.build(space(ctx.programName(), ctx.DOT_FS(1))));
+        }
+        Space s = prefix(ctx);
         return new Cobol.ProgramIdParagraph(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
                 programId,
-                programName
+                dot1,
+                programName,
+                dot2
         );
     }
 

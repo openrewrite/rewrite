@@ -187,7 +187,9 @@ public interface Cobol extends Tree {
         /**
          * Either an {@link Identifier} or {@link Literal}.
          */
-        List<Cobol> operands;
+        @Getter
+        @With
+        List<CobolLeftPadded<String>> operands;
 
         @Nullable
         CobolLeftPadded<Identifier> upon;
@@ -296,7 +298,7 @@ public interface Cobol extends Tree {
         Markers markers;
         CobolRightPadded<IdKeyword> identification;
         CobolRightPadded<Space> division;
-        CobolRightPadded<Space> dot;
+        @Getter
         @Getter
         @With
         ProgramIdParagraph programIdParagraph;
@@ -305,6 +307,10 @@ public interface Cobol extends Tree {
             Identification,
             Id
         }
+
+    @Getter
+    @With
+    ProgramIdParagraph programIdParagraph;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -352,7 +358,6 @@ public interface Cobol extends Tree {
             //noinspection ConstantConditions
             return getPadding().withDot(CobolRightPadded.withElement(this.dot, dot));
         }
-
         @RequiredArgsConstructor
         public static class Padding {
             private final IdentificationDivision t;
@@ -391,6 +396,8 @@ public interface Cobol extends Tree {
         UUID id;
         Space prefix;
         Markers markers;
+        Space procedure;
+        Space division;
         ProcedureDivisionBody body;
 
         @Override
@@ -440,6 +447,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         List<Statement> statements;
+        Space dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -468,10 +476,27 @@ public interface Cobol extends Tree {
         @Getter
         @With
         Markers markers;
-        CobolRightPadded<Space> programId;
+
+
+    // programIdParagraph
+    //   : PROGRAM_ID DOT_FS programName (IS? (COMMON | INITIAL | LIBRARY | DEFINITION | RECURSIVE) PROGRAM?)? DOT_FS? commentEntry?
+    //   ;
+    @Getter
+    @With
+    CobolRightPadded<Space> programId;
+
+    @Getter
+    @With
+    CobolRightPadded<Space> dot1;
+
         @Getter
         @With
         String programName;
+
+    @Getter
+    @With
+    @Nullable
+    CobolLeftPadded<Space> dot2;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -510,6 +535,15 @@ public interface Cobol extends Tree {
                 return t.programId;
             }
 
+        public CobolRightPadded<Space> getDot1() {
+            return t.dot1;
+        }
+
+        public CobolLeftPadded<Space> getDot2() {
+            return t.dot2;
+        }
+
+
             public ProgramIdParagraph withProgramId(CobolRightPadded<Space> programId) {
                 return t.programId == programId ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, programId, t.programName);
             }
@@ -544,6 +578,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         Space stop;
+        Space run;
         Cobol statement;
 
         @Override
