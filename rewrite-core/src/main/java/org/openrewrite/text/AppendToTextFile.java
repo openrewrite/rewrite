@@ -55,6 +55,7 @@ public class AppendToTextFile extends Recipe {
             example = "false",
             required = false)
     @Nullable Boolean appendNewline;
+
     @Option(displayName = "Existing file strategy",
             description = "Determines behavior if a file exists at this location prior to Rewrite execution.\n\n"
                     + "- `continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n"
