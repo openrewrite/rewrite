@@ -40,4 +40,5 @@ dependencies {
     modelImplementation(project(":rewrite-java-11"))
 
     testImplementation(project(":rewrite-test"))
+    testImplementation("io.github.classgraph:classgraph:latest.release")
 }
