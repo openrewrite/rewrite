@@ -221,6 +221,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindLocalFlowPathsStringTck : FindLocalFlowPathsStringTest
 
     @Nested
+    inner class FindLocalFlowToExternalSinkTck : FindLocalTaintFlowToExternalSinkTest
+
+    @Nested
     inner class FindLocalTaintFlowTck : FindLocalTaintFlowTest
 
     @Nested
