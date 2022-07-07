@@ -38,6 +38,7 @@ public class AppendToTextFile extends Recipe {
             description = "File name, using a relative path. If a non-plaintext file already exists at this location, then this recipe will do nothing.",
             example = "foo/bar/baz.txt")
     String relativeFileName;
+
     @Option(displayName = "Content",
             description = "Multiline text content to be appended to the file.",
             example = "Some text.")
