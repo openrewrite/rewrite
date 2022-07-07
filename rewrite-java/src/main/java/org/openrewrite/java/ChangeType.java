@@ -166,14 +166,16 @@ public class ChangeType extends Recipe {
         public J.Package visitPackage(J.Package pkg, ExecutionContext executionContext) {
             J.Package p = super.visitPackage(pkg, executionContext);
             String original = p.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
-            String oldPkg = originalType.getFullyQualifiedName().substring(0, originalType.getFullyQualifiedName().lastIndexOf('.'));
-            if (original.equals(oldPkg)) {
-                if (newFullyQualifiedTypeName.contains(".")) {
-                    String newPkg = newFullyQualifiedTypeName.substring(0, newFullyQualifiedTypeName.lastIndexOf('.'));
-                    p = p.withTemplate(JavaTemplate.builder(this::getCursor, newPkg).build(), p.getCoordinates().replace());
-                } else {
-                    getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
-                    p = null;
+            if (original.equals(originalType.getPackageName())) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
+                if (fq != null) {
+                    if (fq.getPackageName().isEmpty()) {
+                        getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
+                        p = null;
+                    } else {
+                        String newPkg = newFullyQualifiedTypeName.substring(0, newFullyQualifiedTypeName.lastIndexOf('.'));
+                        p = p.withTemplate(JavaTemplate.builder(this::getCursor, newPkg).build(), p.getCoordinates().replace());
+                    }
                 }
             }
             //noinspection ConstantConditions
