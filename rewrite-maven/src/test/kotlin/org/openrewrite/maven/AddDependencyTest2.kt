@@ -16,8 +16,10 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.maven.tree.Scope
 import org.openrewrite.test.RecipeSpec
@@ -90,6 +92,74 @@ class AddDependencyTest2 : RewriteTest {
                     <version>1</version>
                 </project>
             """
+        )
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1765")
+    @Test
+    fun `dependency added with test scope`() = rewriteRun(
+        { spec ->
+            spec
+                .recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath"))
+                .parser(JavaParser.fromJavaVersion().classpath("guava").logCompilationWarningsAndErrors(true).build())
+        },
+        mavenProject("server",
+            srcMainJava(
+                java(
+                    """
+                        public class A {
+                            public int asInt(String num){
+                                return Integer.parseInt(num);
+                            }
+                        }
+                    """,
+                )
+            ),
+            srcTestJava(
+                java(
+                    """
+                        import com.google.common.math.IntMath;
+                        public class ATest {
+                            boolean isPrime() {
+                                A a = new A();
+                                //noinspection UnstableApiUsage
+                                assert(IntMath.isPrime(a.asInt("1")));
+                            }
+                        }
+                    """,
+                )
+            ),
+            pomXml(
+                """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app-server</artifactId>
+                        <version>1</version>
+                    </project>
+                """,
+                """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app-server</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>29.0-jre</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            ) { spec ->
+                spec.afterRecipe { maven ->
+                    assertThat(
+                        maven.mavenResolutionResult()
+                            .findDependencies("com.google.guava", "guava", Scope.Test)
+                    ).isNotEmpty()
+                }
+            }
         )
     )
 

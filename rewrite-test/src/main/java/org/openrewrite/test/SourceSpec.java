@@ -38,6 +38,9 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     final String dsl;
 
     @Nullable
+    protected String sourceSetName;
+
+    @Nullable
     final String before;
 
     @Nullable
@@ -98,7 +101,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         }
 
         public Java sourceSet(String sourceSet) {
-            markers(SourceSpecMarkers.javaSourceSet(sourceSet));
+            sourceSetName = sourceSet;
             return this;
         }
     }
