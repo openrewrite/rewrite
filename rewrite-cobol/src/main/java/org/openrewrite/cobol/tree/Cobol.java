@@ -162,27 +162,28 @@ public interface Cobol extends Tree {
             }
         }
     }
-@ToString
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@RequiredArgsConstructor
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-class Display implements Statement {
-    @Getter
-    @Nullable
-    @With
-    @NonFinal
-    transient WeakReference<Padding> padding;
-    @Getter
-    @EqualsAndHashCode.Include
-    @With
-    UUID id;
-    @Getter
-    @With
-    Space prefix;
-    @Getter
-    @With
-    Markers markers;
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Display implements Statement {
+        @Getter
+        @Nullable
+        @With
+        @NonFinal
+        transient WeakReference<Padding> padding;
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+        @Getter
+        @With
+        Space prefix;
+        @Getter
+        @With
+        Markers markers;
         /**
          * Either an {@link Identifier} or {@link Literal}.
          */
@@ -211,37 +212,37 @@ class Display implements Statement {
             return p;
         }
 
-    @Nullable
-    public Cobol.Identifier getUpon() {
-        return upon == null ? null : upon.getElement();
-    }
-
-    public Display withUpon(@Nullable Cobol.Identifier upon) {
-        if (upon == null) {
-            return this.upon == null ? this : new Display(padding, id, prefix, markers, operands, null);
-        }
-        return getPadding().withUpon(CobolLeftPadded.withElement(this.upon, upon));
-    }
-
-    @RequiredArgsConstructor
-    public static class Padding {
-        private final Display t;
-
         @Nullable
-        public CobolLeftPadded<Cobol.Identifier> getUpon() {
-            return t.upon;
+        public Cobol.Identifier getUpon() {
+            return upon == null ? null : upon.getElement();
         }
 
-        public Display withUpon(@Nullable CobolLeftPadded<Cobol.Identifier> upon) {
-            return t.upon == upon ? t : new Display(t.padding, t.id, t.prefix, t.markers, t.operands, upon);
+        public Display withUpon(@Nullable Cobol.Identifier upon) {
+            if (upon == null) {
+                return this.upon == null ? this : new Display(padding, id, prefix, markers, operands, null);
+            }
+            return getPadding().withUpon(CobolLeftPadded.withElement(this.upon, upon));
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Display t;
+
+            @Nullable
+            public CobolLeftPadded<Cobol.Identifier> getUpon() {
+                return t.upon;
+            }
+
+            public Display withUpon(@Nullable CobolLeftPadded<Cobol.Identifier> upon) {
+                return t.upon == upon ? t : new Display(t.padding, t.id, t.prefix, t.markers, t.operands, upon);
+            }
         }
     }
-    }
 
-@Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@With
-class Identifier implements Cobol {
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Identifier implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
@@ -254,10 +255,10 @@ class Identifier implements Cobol {
         }
     }
 
-@Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@With
-class Literal implements Cobol {
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Literal implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
@@ -271,48 +272,39 @@ class Literal implements Cobol {
         }
     }
 
-@ToString
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@RequiredArgsConstructor
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-class IdentificationDivision implements Cobol {
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class IdentificationDivision implements Cobol {
+        @Getter
+        @Nullable
+        @With
+        @NonFinal
+        transient WeakReference<Padding> padding;
 
-    @Getter
-    @Nullable
-    @With
-    @NonFinal
-    transient WeakReference<Padding> padding;
-
-    @Getter
-    @EqualsAndHashCode.Include
-    @With
-    UUID id;
-
-    @Getter
-    @With
-    Space prefix;
-
-    @Getter
-    @With
-    Markers markers;
-
-        // identificationDivision
-        //   : (IDENTIFICATION | ID) DIVISION DOT_FS programIdParagraph identificationDivisionBody*
-        //   ;
-
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+        @Getter
+        @With
+        Space prefix;
+        @Getter
+        @With
+        Markers markers;
         CobolRightPadded<IdKeyword> identification;
         CobolRightPadded<Space> division;
         CobolRightPadded<Space> dot;
+        @Getter
+        @With
+        ProgramIdParagraph programIdParagraph;
 
         public enum IdKeyword {
             Identification,
             Id
         }
-
-    @Getter
-    @With
-    ProgramIdParagraph programIdParagraph;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -334,74 +326,71 @@ class IdentificationDivision implements Cobol {
             return p;
         }
 
-    public Cobol.IdentificationDivision.IdKeyword getIdentification() {
-        return identification.getElement();
-    }
-
-    public IdentificationDivision withIdentification(Cobol.IdentificationDivision.IdKeyword identification) {
-        //noinspection ConstantConditions
-        return getPadding().withIdentification(CobolRightPadded.withElement(this.identification, identification));
-    }
-
-    public Space getDivision() {
-        return division.getElement();
-    }
-
-    public IdentificationDivision withDivision(Space division) {
-        //noinspection ConstantConditions
-        return getPadding().withDivision(CobolRightPadded.withElement(this.division, division));
-    }
-
-    public Space getDot() {
-        return dot.getElement();
-    }
-
-    public IdentificationDivision withDot(Space dot) {
-        //noinspection ConstantConditions
-        return getPadding().withDot(CobolRightPadded.withElement(this.dot, dot));
-    }
-
-    @RequiredArgsConstructor
-    public static class Padding {
-        private final IdentificationDivision t;
-
-        public CobolRightPadded<Cobol.IdentificationDivision.IdKeyword> getIdentification() {
-            return t.identification;
+        public Cobol.IdentificationDivision.IdKeyword getIdentification() {
+            return identification.getElement();
         }
 
-        public IdentificationDivision withIdentification(CobolRightPadded<Cobol.IdentificationDivision.IdKeyword> identification) {
-            return t.identification == identification ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, identification, t.division, t.dot, t.programIdParagraph);
+        public IdentificationDivision withIdentification(Cobol.IdentificationDivision.IdKeyword identification) {
+            //noinspection ConstantConditions
+            return getPadding().withIdentification(CobolRightPadded.withElement(this.identification, identification));
         }
 
-        public CobolRightPadded<Space> getDivision() {
-            return t.division;
+        public Space getDivision() {
+            return division.getElement();
         }
 
-        public IdentificationDivision withDivision(CobolRightPadded<Space> division) {
-            return t.division == division ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, division, t.dot, t.programIdParagraph);
+        public IdentificationDivision withDivision(Space division) {
+            //noinspection ConstantConditions
+            return getPadding().withDivision(CobolRightPadded.withElement(this.division, division));
         }
 
-        public CobolRightPadded<Space> getDot() {
-            return t.dot;
+        public Space getDot() {
+            return dot.getElement();
         }
 
-        public IdentificationDivision withDot(CobolRightPadded<Space> dot) {
-            return t.dot == dot ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, t.division, dot, t.programIdParagraph);
+        public IdentificationDivision withDot(Space dot) {
+            //noinspection ConstantConditions
+            return getPadding().withDot(CobolRightPadded.withElement(this.dot, dot));
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final IdentificationDivision t;
+
+            public CobolRightPadded<Cobol.IdentificationDivision.IdKeyword> getIdentification() {
+                return t.identification;
+            }
+
+            public IdentificationDivision withIdentification(CobolRightPadded<Cobol.IdentificationDivision.IdKeyword> identification) {
+                return t.identification == identification ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, identification, t.division, t.dot, t.programIdParagraph);
+            }
+
+            public CobolRightPadded<Space> getDivision() {
+                return t.division;
+            }
+
+            public IdentificationDivision withDivision(CobolRightPadded<Space> division) {
+                return t.division == division ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, division, t.dot, t.programIdParagraph);
+            }
+
+            public CobolRightPadded<Space> getDot() {
+                return t.dot;
+            }
+
+            public IdentificationDivision withDot(CobolRightPadded<Space> dot) {
+                return t.dot == dot ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, t.division, dot, t.programIdParagraph);
+            }
         }
     }
-    }
 
-@Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@With
-class ProcedureDivision implements Cobol {
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ProcedureDivision implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
         Markers markers;
-        // procedureDivision
-        //   : PROCEDURE DIVISION procedureDivisionUsingClause? procedureDivisionGivingClause? DOT_FS procedureDeclaratives? procedureDivisionBody
-        //   ;
         ProcedureDivisionBody body;
 
         @Override
@@ -410,10 +399,10 @@ class ProcedureDivision implements Cobol {
         }
     }
 
-@Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@With
-class ProcedureDivisionBody implements Cobol {
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ProcedureDivisionBody implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
@@ -426,17 +415,14 @@ class ProcedureDivisionBody implements Cobol {
         }
     }
 
-@Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@With
-class Paragraphs implements Cobol {
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Paragraphs implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
         Markers markers;
-        // paragraphs
-        //   : sentence* paragraph*
-        //   ;
         List<Sentence> sentences;
 
         @Override
@@ -445,17 +431,14 @@ class Paragraphs implements Cobol {
         }
     }
 
-@Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@With
-class Sentence implements Cobol {
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Sentence implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
         Markers markers;
-        // sentence
-        //   : statement* DOT_FS
-        //   ;
         List<Statement> statements;
 
         @Override
@@ -464,31 +447,31 @@ class Sentence implements Cobol {
         }
     }
 
-@ToString
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@RequiredArgsConstructor
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-class ProgramIdParagraph implements Cobol {
-    @Getter
-    @Nullable
-    @With
-    @NonFinal
-    transient WeakReference<Padding> padding;
-    @Getter
-    @EqualsAndHashCode.Include
-    @With
-    UUID id;
-    @Getter
-    @With
-    Space prefix;
-    @Getter
-    @With
-    Markers markers;
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ProgramIdParagraph implements Cobol {
+        @Getter
+        @Nullable
+        @With
+        @NonFinal
+        transient WeakReference<Padding> padding;
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+        @Getter
+        @With
+        Space prefix;
+        @Getter
+        @With
+        Markers markers;
         CobolRightPadded<Space> programId;
-    @Getter
-    @With
-    String programName;
+        @Getter
+        @With
+        String programName;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -510,42 +493,41 @@ class ProgramIdParagraph implements Cobol {
             return p;
         }
 
-    public Space getProgramId() {
-        return programId.getElement();
-    }
-
-    public ProgramIdParagraph withProgramId(Space programId) {
-        //noinspection ConstantConditions
-        return getPadding().withProgramId(CobolRightPadded.withElement(this.programId, programId));
-    }
-
-    @RequiredArgsConstructor
-    public static class Padding {
-        private final ProgramIdParagraph t;
-
-        public CobolRightPadded<Space> getProgramId() {
-            return t.programId;
+        public Space getProgramId() {
+            return programId.getElement();
         }
 
-        public ProgramIdParagraph withProgramId(CobolRightPadded<Space> programId) {
-            return t.programId == programId ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, programId, t.programName);
+        public ProgramIdParagraph withProgramId(Space programId) {
+            //noinspection ConstantConditions
+            return getPadding().withProgramId(CobolRightPadded.withElement(this.programId, programId));
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ProgramIdParagraph t;
+
+            public CobolRightPadded<Space> getProgramId() {
+                return t.programId;
+            }
+
+            public ProgramIdParagraph withProgramId(CobolRightPadded<Space> programId) {
+                return t.programId == programId ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, programId, t.programName);
+            }
         }
     }
-    }
 
-@Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@With
-class ProgramUnit implements Cobol {
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ProgramUnit implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
         Markers markers;
-        // programUnit
-        //   : identificationDivision environmentDivision? dataDivision? procedureDivision? programUnit* endProgramStatement?
-        //   ;
         IdentificationDivision identificationDivision;
-        Optional<ProcedureDivision> procedureDivision;
+
+        @Nullable
+        ProcedureDivision procedureDivision;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -553,10 +535,10 @@ class ProgramUnit implements Cobol {
         }
     }
 
-@Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@With
-class Stop implements Statement {
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Stop implements Statement {
         @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
