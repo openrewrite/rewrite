@@ -16,6 +16,7 @@
 package org.openrewrite.cobol.internal;
 
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.FileAttributes;
@@ -114,22 +115,26 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
             // prefix will be attached to an ancestor node
             return Space.EMPTY;
         }
-        TerminalNode previousNode = previousTerminalNode(tree);
-        if (previousNode == null) {
-            return Space.build(source.substring(0, tree.getStart().getStartIndex()));
+        Token firstToken = tree.getStart();
+        Token previousToken = previousToken(tree);
+        if(previousToken == null) {
+            return Space.build(source.substring(0, firstToken.getStartIndex()));
         } else {
-            return Space.build(source.substring(previousNode.getSymbol().getStopIndex(), tree.getStart().getStartIndex()));
+            return Space.build(source.substring(previousToken.getStopIndex() + 1, firstToken.getStartIndex()));
         }
     }
 
     @Nullable
-    private TerminalNode previousTerminalNode(ParseTree n) {
         ParseTree parent = n.getParent();
         if (n.getParent() == null) {
             return null;
-        }
+        if(n.getParent() == null) return null;
         int pos = positionInParent(n);
-        return pos == 0 ? previousTerminalNode(parent) : lastTerminalNode(parent.getChild(pos - 1));
+        if(pos == 0) {
+            return previousToken(parent);
+        } else {
+            return lastTerminalNode(parent.getChild(pos-1));
+        }
     }
 
     private int positionInParent(ParseTree n) {
@@ -144,11 +149,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         return pos;
     }
 
-    private TerminalNode lastTerminalNode(ParseTree n) {
+    private Token lastTerminalNode(ParseTree n) {
         if (n instanceof TerminalNode) {
-            return (TerminalNode) n;
+            return ((TerminalNode) n).getSymbol();
         } else {
-            return lastTerminalNode(n.getChild(n.getChildCount() - 1));
+            return ((ParserRuleContext) n).stop;
         }
     }
 
@@ -218,8 +223,8 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
         Space s = prefix(ctx);
 
-        Space procedure = Space.build(ctx.PROCEDURE().getText());
-        Space division = Space.build(space(ctx.PROCEDURE(), ctx.DIVISION()) + ctx.DIVISION().getText());
+        CobolRightPadded<String> procedure = CobolRightPadded.build(ctx.PROCEDURE().getText()).withAfter(Space.build(space(ctx.PROCEDURE(), ctx.DIVISION())));
+        CobolRightPadded<String> division = Space.build( + ctx.DIVISION().getText());
         Cobol.ProcedureDivisionBody procedureDivisionBody = (Cobol.ProcedureDivisionBody) visitProcedureDivisionBody(ctx.procedureDivisionBody());
         return new Cobol.ProcedureDivision(
                 randomId(),
@@ -368,10 +373,10 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         Cobol.IdentificationDivision.IdKeyword idKeyword = ctx.IDENTIFICATION() == null ? Cobol.IdentificationDivision.IdKeyword.Id : Cobol.IdentificationDivision.IdKeyword.Identification;
         String space2 = space(ctx.DIVISION(), ctx.DOT_FS());
 
-        if (ctx.identificationDivisionBody() != null && ctx.identificationDivisionBody().size() != 0) {
-        CobolRightPadded<Cobol.IdentificationDivision.IdKeyword> identification = CobolRightPadded.build(idKeyword).withAfter(Space.build(space1));
-        CobolRightPadded<Space> division = CobolRightPadded.build(Space.build(ctx.DIVISION().getText())).withAfter(Space.build(space2));
-        Space dot = Space.build(ctx.DOT_FS().getText());
+
+        CobolRightPadded<String> identification = CobolRightPadded.build(idTerminal.getText()).withAfter(Space.build(space1));
+        CobolRightPadded<String> division = CobolRightPadded.build(ctx.DIVISION().getText()).withAfter(Space.build(space2));
+        String dot = ctx.DOT_FS().getText();
 
         return new Cobol.IdentificationDivision(
                 randomId(),
@@ -386,14 +391,14 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitProgramIdParagraph(CobolParser.ProgramIdParagraphContext ctx) {
-        CobolRightPadded<Space> programId = CobolRightPadded.build(Space.build("PROGRAM-ID"))
+        CobolRightPadded<Space> programId = CobolRightPadded.build(Space.build(ctx.PROGRAM_ID().getText()))
                 .withAfter(Space.build(space(ctx.PROGRAM_ID(), ctx.DOT_FS(0))));
-        CobolRightPadded<Space> dot1 = CobolRightPadded.build(Space.build("."))
+        CobolRightPadded<Space> dot1 = CobolRightPadded.build(Space.build(ctx.DOT_FS(0).getText()))
                 .withAfter(Space.build(space(ctx.DOT_FS(0), ctx.programName())));
         String programName = ctx.programName().getText();
         CobolLeftPadded<Space> dot2 = null;
         if(ctx.DOT_FS().size() > 1) {
-            dot2 = CobolLeftPadded.build(Space.build("."))
+            dot2 = CobolLeftPadded.build(Space.build(ctx.DOT_FS(1).getText()))
                     .withBefore(Space.build(space(ctx.programName(), ctx.DOT_FS(1))));
         }
         Space s = prefix(ctx);
