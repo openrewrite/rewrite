@@ -3786,9 +3786,8 @@ public interface J extends Tree {
         @Nullable
         JContainer<Expression> arguments;
 
-        @Nullable
         public List<Expression> getArguments() {
-            return arguments == null ? null : arguments.getElements();
+            return arguments == null ? Collections.emptyList() : arguments.getElements();
         }
 
         public NewClass withArguments(@Nullable List<Expression> arguments) {
