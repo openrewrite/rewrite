@@ -296,12 +296,11 @@ public interface Cobol extends Tree {
         @Getter
         @With
         Markers markers;
-        CobolRightPadded<IdKeyword> identification;
-        CobolRightPadded<Space> division;
-        @Getter
+        CobolRightPadded<String> identification;
+        CobolRightPadded<String> division;
         @Getter
         @With
-        ProgramIdParagraph programIdParagraph;
+        String dot;
 
         public enum IdKeyword {
             Identification,
@@ -332,7 +331,7 @@ public interface Cobol extends Tree {
             return p;
         }
 
-        public Cobol.IdentificationDivision.IdKeyword getIdentification() {
+    public String getIdentification() {
             return identification.getElement();
         }
 
@@ -340,7 +339,6 @@ public interface Cobol extends Tree {
             //noinspection ConstantConditions
             return getPadding().withIdentification(CobolRightPadded.withElement(this.identification, identification));
         }
-
         public Space getDivision() {
             return division.getElement();
         }
@@ -349,7 +347,6 @@ public interface Cobol extends Tree {
             //noinspection ConstantConditions
             return getPadding().withDivision(CobolRightPadded.withElement(this.division, division));
         }
-
         public Space getDot() {
             return dot.getElement();
         }
@@ -362,12 +359,12 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final IdentificationDivision t;
 
-            public CobolRightPadded<Cobol.IdentificationDivision.IdKeyword> getIdentification() {
+        public CobolRightPadded<String> getIdentification() {
                 return t.identification;
             }
 
-            public IdentificationDivision withIdentification(CobolRightPadded<Cobol.IdentificationDivision.IdKeyword> identification) {
-                return t.identification == identification ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, identification, t.division, t.dot, t.programIdParagraph);
+        public CobolRightPadded<String> getDivision() {
+            return t.division;
             }
 
             public CobolRightPadded<Space> getDivision() {
@@ -377,7 +374,6 @@ public interface Cobol extends Tree {
             public IdentificationDivision withDivision(CobolRightPadded<Space> division) {
                 return t.division == division ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, division, t.dot, t.programIdParagraph);
             }
-
             public CobolRightPadded<Space> getDot() {
                 return t.dot;
             }
@@ -396,8 +392,17 @@ public interface Cobol extends Tree {
         UUID id;
         Space prefix;
         Markers markers;
-        Space procedure;
-        Space division;
+        @Getter
+        @With
+        CobolRightPadded<String> procedure;
+        @Getter
+        @With
+        CobolRightPadded<String> division;
+        @Getter
+        @With
+        String dot;
+        @Getter
+        @With
         ProcedureDivisionBody body;
 
         @Override

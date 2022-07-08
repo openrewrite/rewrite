@@ -27,20 +27,16 @@ public interface Cobol {
     }
 
     class IdentificationDivision implements Cobol {
-        CobolRightPadded<IdKeyword> identification;
-        CobolRightPadded<Space> division;
-        CobolRightPadded<Space> dot;
+        CobolRightPadded<String> identification;
+        CobolRightPadded<String> division;
+        String dot;
         ProgramIdParagraph programIdParagraph;
-
-        public enum IdKeyword {
-            Identification,
-            Id
-        }
     }
 
     class ProcedureDivision implements Cobol {
-        Space procedure;
-        Space division;
+        CobolRightPadded<String> procedure;
+        CobolRightPadded<String> division;
+        String dot;
         ProcedureDivisionBody body;
     }
 
