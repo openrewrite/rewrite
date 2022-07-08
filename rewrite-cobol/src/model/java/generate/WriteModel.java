@@ -49,7 +49,7 @@ public class WriteModel extends Recipe {
                 "@AllArgsConstructor(access = AccessLevel.PRIVATE)").javaParser(parser).build();
 
         final JavaTemplate idField = JavaTemplate.builder(this::getCursor, "@EqualsAndHashCode.Include UUID id;").javaParser(parser).build();
-        final JavaTemplate prefixField = JavaTemplate.builder(this::getCursor, "Space prefix;").javaParser(parser).build();
+        final JavaTemplate prefixField = JavaTemplate.builder(this::getCursor, "String prefix;").javaParser(parser).build();
         final JavaTemplate markersField = JavaTemplate.builder(this::getCursor, "Markers markers;").javaParser(parser).build();
         final JavaTemplate paddingField = JavaTemplate.builder(this::getCursor, "@Nullable @NonFinal transient WeakReference<Padding> padding;").javaParser(parser).build();
 

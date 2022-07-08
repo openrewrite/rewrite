@@ -103,8 +103,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Display d = display;
         d = d.withPrefix(visitString(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
-        //d = d.getPadding().withOperands(ListUtils.map(d.getPadding().getOperands(), t -> (Cobol) visit(t, p)));
-        d = d.getPadding().withUpon(visitLeftPadded(d.getPadding().getUpon(), p));
+        d = d.withOperands(ListUtils.map(d.getOperands(), t -> visitLeftPadded(t, p)));
         return d;
     }
 

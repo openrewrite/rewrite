@@ -302,8 +302,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                operands,
-                null);
+                operands);
     }
 
     @Override
