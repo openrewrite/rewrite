@@ -31,110 +31,110 @@ import java.util.Scanner;
 
 public class CobolParserRunnerImpl {
 
-	// private final static Logger LOG = LoggerFactory.getLogger(CobolParserRunnerImpl.class);
+    // private final static Logger LOG = LoggerFactory.getLogger(CobolParserRunnerImpl.class);
 
-	protected String capitalize(final String line) {
-		return Character.toUpperCase(line.charAt(0)) + line.substring(1);
-	}
+    protected String capitalize(final String line) {
+        return Character.toUpperCase(line.charAt(0)) + line.substring(1);
+    }
 
-	protected CobolParserParams createDefaultParams() {
-		return new CobolParserParamsImpl();
-	}
+    protected CobolParserParams createDefaultParams() {
+        return new CobolParserParamsImpl();
+    }
 
-	protected CobolParserParams createDefaultParams(final CobolPreprocessor.CobolSourceFormatEnum format, final File cobolFile) {
-		final CobolParserParams result = createDefaultParams();
-		result.setFormat(format);
+    protected CobolParserParams createDefaultParams(final CobolPreprocessor.CobolSourceFormatEnum format, final File cobolFile) {
+        final CobolParserParams result = createDefaultParams();
+        result.setFormat(format);
 
-		final File copyBooksDirectory = cobolFile.getParentFile();
-		result.setCopyBookDirectories(Arrays.asList(copyBooksDirectory));
+        final File copyBooksDirectory = cobolFile.getParentFile();
+        result.setCopyBookDirectories(Arrays.asList(copyBooksDirectory));
 
-		return result;
-	}
+        return result;
+    }
 
-	protected String getCompilationUnitName(final File cobolFile) {
-		return capitalize(FilenameUtils.removeExtension(cobolFile.getName()));
-	}
+    protected String getCompilationUnitName(final File cobolFile) {
+        return capitalize(FilenameUtils.removeExtension(cobolFile.getName()));
+    }
 
-	protected void parseCode(final String cobolCode, final String compilationUnitName, final Program program,
-			final CobolParserParams params) throws IOException {
-		//LOG.trace("Parsing compilation unit {}.", compilationUnitName);
+    protected void parseCode(final String cobolCode, final String compilationUnitName, final Program program,
+                             final CobolParserParams params) throws IOException {
+        //LOG.trace("Parsing compilation unit {}.", compilationUnitName);
 
-		// preprocess input stream
-		final StringWithOriginalPositions preProcessedInput = new CobolPreprocessorImpl().processWithOriginalPositions(cobolCode, params);
+        // preprocess input stream
+        final StringWithOriginalPositions preProcessedInput = new CobolPreprocessorImpl().processWithOriginalPositions(cobolCode, params);
 
-		parsePreprocessInput(preProcessedInput, compilationUnitName, program, params);
-	}
+        parsePreprocessInput(preProcessedInput, compilationUnitName, program, params);
+    }
 
-	protected void parseFile(final File cobolFile, final Program program, final CobolParserParams params)
-			throws IOException {
-		if (!cobolFile.isFile()) {
-			throw new CobolParserException("Could not find file " + cobolFile.getAbsolutePath());
-		} else {
-			// determine the copy book name
-			final String compilationUnitName = getCompilationUnitName(cobolFile);
+    protected void parseFile(final File cobolFile, final Program program, final CobolParserParams params)
+            throws IOException {
+        if (!cobolFile.isFile()) {
+            throw new CobolParserException("Could not find file " + cobolFile.getAbsolutePath());
+        } else {
+            // determine the copy book name
+            final String compilationUnitName = getCompilationUnitName(cobolFile);
 
-			//LOG.info("Parsing compilation unit {}.", compilationUnitName);
+            //LOG.info("Parsing compilation unit {}.", compilationUnitName);
 
-			// preprocess input stream
-			final Charset charset = params.getCharset();
-			//LOG.info("Preprocessing file {} with line format {} and charset {}.", cobolFile.getName(), params.getFormat(),
-			//		charset);
-			//final String cobolFileContent = Files.readString(cobolFile.toPath(), charset);
-			final String cobolFileContent = new String(Files.readAllBytes(cobolFile.toPath()), charset);
-			final StringWithOriginalPositions preProcessedInput = new CobolPreprocessorImpl().processWithOriginalPositions(cobolFileContent, params);
+            // preprocess input stream
+            final Charset charset = params.getCharset();
+            //LOG.info("Preprocessing file {} with line format {} and charset {}.", cobolFile.getName(), params.getFormat(),
+            //		charset);
+            //final String cobolFileContent = Files.readString(cobolFile.toPath(), charset);
+            final String cobolFileContent = new String(Files.readAllBytes(cobolFile.toPath()), charset);
+            final StringWithOriginalPositions preProcessedInput = new CobolPreprocessorImpl().processWithOriginalPositions(cobolFileContent, params);
 
-			parsePreprocessInput(preProcessedInput, compilationUnitName, program, params);
-		}
-	}
+            parsePreprocessInput(preProcessedInput, compilationUnitName, program, params);
+        }
+    }
 
-	public CobolLexer lexer;
-	public CommonTokenStream tokens;
-	public CobolParser parser;
-	
-	protected void parsePreprocessInput(final StringWithOriginalPositions preProcessedInput, final String compilationUnitName,
-			final Program program, final CobolParserParams params) throws IOException {
-		// run the lexer
-		lexer = new CobolLexer(CharStreams.fromString(preProcessedInput.preprocessedText));
+    public CobolLexer lexer;
+    public CommonTokenStream tokens;
+    public CobolParser parser;
 
-		lexer.setTokenFactory(new CobolTokenFactory(preProcessedInput));
-		
-		if (!params.getIgnoreSyntaxErrors()) {
-			// register an error listener, so that preprocessing stops on errors
-			lexer.removeErrorListeners();
-			lexer.addErrorListener(new ThrowingErrorListener());
-		}
+    protected void parsePreprocessInput(final StringWithOriginalPositions preProcessedInput, final String compilationUnitName,
+                                        final Program program, final CobolParserParams params) throws IOException {
+        // run the lexer
+        lexer = new CobolLexer(CharStreams.fromString(preProcessedInput.preprocessedText));
 
-		// get a list of matched tokens
-		tokens = new CommonTokenStream(lexer);
+        lexer.setTokenFactory(new CobolTokenFactory(preProcessedInput));
 
-		// pass the tokens to the parser
-		parser = new CobolParser(tokens);
+        if (!params.getIgnoreSyntaxErrors()) {
+            // register an error listener, so that preprocessing stops on errors
+            lexer.removeErrorListeners();
+            lexer.addErrorListener(new ThrowingErrorListener());
+        }
 
-		if (!params.getIgnoreSyntaxErrors()) {
-			// register an error listener, so that preprocessing stops on errors
-			parser.removeErrorListeners();
-			parser.addErrorListener(new ThrowingErrorListener());
-		}
+        // get a list of matched tokens
+        tokens = new CommonTokenStream(lexer);
 
-		// specify our entry point
-		final CobolParser.StartRuleContext ctx = parser.startRule();
+        // pass the tokens to the parser
+        parser = new CobolParser(tokens);
 
-		// analyze contained compilation units
+        if (!params.getIgnoreSyntaxErrors()) {
+            // register an error listener, so that preprocessing stops on errors
+            parser.removeErrorListeners();
+            parser.addErrorListener(new ThrowingErrorListener());
+        }
+
+        // specify our entry point
+        final CobolParser.StartRuleContext ctx = parser.startRule();
+
+        // analyze contained compilation units
 //		final List<String> lines = splitLines(preProcessedInput.preprocessedText);
 //		final ParserVisitor visitor = new CobolCompilationUnitVisitorImpl(compilationUnitName, lines, tokens, program);
 //
 //		visitor.visit(ctx);
-	}
+    }
 
-	protected List<String> splitLines(final String preProcessedInput) {
-		final Scanner scanner = new Scanner(preProcessedInput);
-		final List<String> result = new ArrayList<String>();
+    protected List<String> splitLines(final String preProcessedInput) {
+        final Scanner scanner = new Scanner(preProcessedInput);
+        final List<String> result = new ArrayList<String>();
 
-		while (scanner.hasNextLine()) {
-			result.add(scanner.nextLine());
-		}
+        while (scanner.hasNextLine()) {
+            result.add(scanner.nextLine());
+        }
 
-		scanner.close();
-		return result;
-	}
+        scanner.close();
+        return result;
+    }
 }

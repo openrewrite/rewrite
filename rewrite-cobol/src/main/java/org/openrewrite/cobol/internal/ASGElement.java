@@ -18,11 +18,11 @@ import java.util.List;
  */
 public interface ASGElement extends ModelElement {
 
-	List<ASGElement> getChildren();
+    List<ASGElement> getChildren();
 
-	ParserRuleContext getCtx();
+    ParserRuleContext getCtx();
 
-	ASGElement getParent();
+    ASGElement getParent();
 
-	Program getProgram();
+    Program getProgram();
 }

@@ -19,56 +19,56 @@ import java.util.Map;
 
 public class ProgramImpl extends ASGElementImpl implements Program {
 
-	protected final ASGElementRegistry asgElementRegistry = new ASGElementRegistryImpl();
+    protected final ASGElementRegistry asgElementRegistry = new ASGElementRegistryImpl();
 
-	protected final Map<String, CompilationUnit> compilationUnits = new LinkedHashMap<String, CompilationUnit>();
+    protected final Map<String, CompilationUnit> compilationUnits = new LinkedHashMap<String, CompilationUnit>();
 
-	public ProgramImpl() {
-		super(null, null);
-	}
+    public ProgramImpl() {
+        super(null, null);
+    }
 
-	@Override
-	public ASGElementRegistry getASGElementRegistry() {
-		return asgElementRegistry;
-	}
+    @Override
+    public ASGElementRegistry getASGElementRegistry() {
+        return asgElementRegistry;
+    }
 
-	@Override
-	public CompilationUnit getCompilationUnit() {
-		final CompilationUnit result;
+    @Override
+    public CompilationUnit getCompilationUnit() {
+        final CompilationUnit result;
 
-		if (getCompilationUnits().isEmpty()) {
-			result = null;
-		} else {
-			result = getCompilationUnits().get(0);
-		}
+        if (getCompilationUnits().isEmpty()) {
+            result = null;
+        } else {
+            result = getCompilationUnits().get(0);
+        }
 
-		return result;
-	}
+        return result;
+    }
 
-	@Override
-	public CompilationUnit getCompilationUnit(final String name) {
-		final String compilationUnitKey = getCompilationUnitKey(name);
-		return compilationUnits.get(compilationUnitKey);
-	}
+    @Override
+    public CompilationUnit getCompilationUnit(final String name) {
+        final String compilationUnitKey = getCompilationUnitKey(name);
+        return compilationUnits.get(compilationUnitKey);
+    }
 
-	private String getCompilationUnitKey(final String name) {
-		return name.toLowerCase();
-	}
+    private String getCompilationUnitKey(final String name) {
+        return name.toLowerCase();
+    }
 
-	@Override
-	public List<CompilationUnit> getCompilationUnits() {
-		return new ArrayList<>(compilationUnits.values());
-	}
+    @Override
+    public List<CompilationUnit> getCompilationUnits() {
+        return new ArrayList<>(compilationUnits.values());
+    }
 
-	@Override
-	public void registerCompilationUnit(final CompilationUnit compilationUnit) {
-		final String compilationUnitKey = getCompilationUnitKey(compilationUnit.getName());
-		compilationUnits.put(compilationUnitKey, compilationUnit);
-	}
+    @Override
+    public void registerCompilationUnit(final CompilationUnit compilationUnit) {
+        final String compilationUnitKey = getCompilationUnitKey(compilationUnit.getName());
+        compilationUnits.put(compilationUnitKey, compilationUnit);
+    }
 
-	// Why is IntelliJ complaining about this ???
-	@Override
-	public Class<? extends Annotation> annotationType() {
-		return null;
-	}
+    // Why is IntelliJ complaining about this ???
+    @Override
+    public Class<? extends Annotation> annotationType() {
+        return null;
+    }
 }

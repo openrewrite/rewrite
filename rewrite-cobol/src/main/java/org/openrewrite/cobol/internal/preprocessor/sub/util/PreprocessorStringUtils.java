@@ -10,8 +10,8 @@ package org.openrewrite.cobol.internal.preprocessor.sub.util;
 
 public class PreprocessorStringUtils {
 
-	public static String trimQuotes(final String input) {
-		final String result = input.replaceAll("^[\"']|[\"']$", "");
-		return result;
-	}
+    public static String trimQuotes(final String input) {
+        final String result = input.replaceAll("^[\"']|[\"']$", "");
+        return result;
+    }
 }

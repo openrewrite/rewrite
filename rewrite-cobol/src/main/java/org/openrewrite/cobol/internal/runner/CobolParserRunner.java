@@ -17,9 +17,9 @@ import java.io.IOException;
 
 public interface CobolParserRunner {
 
-	Program analyzeCode(String cobolCode, String compilationUnitName, CobolParserParams params) throws IOException;
+    Program analyzeCode(String cobolCode, String compilationUnitName, CobolParserParams params) throws IOException;
 
-	Program analyzeFile(File cobolFile, CobolParserParams params) throws IOException;
+    Program analyzeFile(File cobolFile, CobolParserParams params) throws IOException;
 
-	Program analyzeFile(File cobolFile, CobolPreprocessor.CobolSourceFormatEnum format) throws IOException;
+    Program analyzeFile(File cobolFile, CobolPreprocessor.CobolSourceFormatEnum format) throws IOException;
 }

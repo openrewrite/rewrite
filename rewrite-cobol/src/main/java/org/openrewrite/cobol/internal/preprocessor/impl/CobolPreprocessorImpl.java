@@ -33,87 +33,87 @@ import org.openrewrite.cobol.internal.preprocessor.sub.line.writer.impl.CobolLin
 
 public class CobolPreprocessorImpl implements CobolPreprocessor {
 
-	// private final static Logger LOG = LoggerFactory.getLogger(CobolPreprocessorImpl.class);
+    // private final static Logger LOG = LoggerFactory.getLogger(CobolPreprocessorImpl.class);
 
-	protected CobolCommentEntriesMarker createCommentEntriesMarker() {
-		return new CobolCommentEntriesMarkerImpl();
-	}
+    protected CobolCommentEntriesMarker createCommentEntriesMarker() {
+        return new CobolCommentEntriesMarkerImpl();
+    }
 
-	protected CobolDocumentParser createDocumentParser() {
-		return new CobolDocumentParserImpl();
-	}
+    protected CobolDocumentParser createDocumentParser() {
+        return new CobolDocumentParserImpl();
+    }
 
-	protected CobolInlineCommentEntriesNormalizer createInlineCommentEntriesNormalizer() {
-		return new CobolInlineCommentEntriesNormalizerImpl();
-	}
+    protected CobolInlineCommentEntriesNormalizer createInlineCommentEntriesNormalizer() {
+        return new CobolInlineCommentEntriesNormalizerImpl();
+    }
 
-	protected CobolLineIndicatorProcessor createLineIndicatorProcessor() {
-		return new CobolLineIndicatorProcessorImpl();
-	}
+    protected CobolLineIndicatorProcessor createLineIndicatorProcessor() {
+        return new CobolLineIndicatorProcessorImpl();
+    }
 
-	protected CobolLineReader createLineReader() {
-		return new CobolLineReaderImpl();
-	}
+    protected CobolLineReader createLineReader() {
+        return new CobolLineReaderImpl();
+    }
 
-	protected CobolLineWriter createLineWriter() {
-		return new CobolLineWriterImpl();
-	}
+    protected CobolLineWriter createLineWriter() {
+        return new CobolLineWriterImpl();
+    }
 
-	protected StringWithOriginalPositions parseDocument(final String originalCode, final List<CobolLine> lines, final CobolParserParams params) {
-		final StringWithOriginalPositions code = createLineWriter().serialize(originalCode, lines);
-		final StringWithOriginalPositions result = createDocumentParser().processLines(code, params);
-		return result;
-	}
+    protected StringWithOriginalPositions parseDocument(final String originalCode, final List<CobolLine> lines, final CobolParserParams params) {
+        final StringWithOriginalPositions code = createLineWriter().serialize(originalCode, lines);
+        final StringWithOriginalPositions result = createDocumentParser().processLines(code, params);
+        return result;
+    }
 
-	@Override
-	public StringWithOriginalPositions processWithOriginalPositions(final File cobolFile, final CobolParserParams params) throws IOException {
-		final Charset charset = params.getCharset();
+    @Override
+    public StringWithOriginalPositions processWithOriginalPositions(final File cobolFile, final CobolParserParams params) throws IOException {
+        final Charset charset = params.getCharset();
 
-		//LOG.info("Preprocessing file {} with line format {} and charset {}.", cobolFile.getName(), params.getFormat(),
-		//		charset);
+        //LOG.info("Preprocessing file {} with line format {} and charset {}.", cobolFile.getName(), params.getFormat(),
+        //		charset);
 
-		//final String cobolFileContent = Files.readString(cobolFile.toPath(), charset);
-		final String cobolFileContent = new String(Files.readAllBytes(cobolFile.toPath()), charset);
-		final StringWithOriginalPositions result = processWithOriginalPositions(cobolFileContent, params);
-		return result;
-	}
+        //final String cobolFileContent = Files.readString(cobolFile.toPath(), charset);
+        final String cobolFileContent = new String(Files.readAllBytes(cobolFile.toPath()), charset);
+        final StringWithOriginalPositions result = processWithOriginalPositions(cobolFileContent, params);
+        return result;
+    }
 
-	@Override
-	public StringWithOriginalPositions processWithOriginalPositions(final String cobolCode, final CobolParserParams params) {
-		final List<CobolLine> lines = readLines(cobolCode, params);
-		
-		int cobolCodeLength = cobolCode.length();
-		int linesLength = lines.stream().map(l -> l.length()).reduce(0, Integer::sum)
-				+ (lines.size()-1) * 2; // newlines
-		//assert linesLength == cobolCodeLength;
-		
-		final List<CobolLine> rewrittenLines = rewriteLines(lines);
-		assert lines.size() == rewrittenLines.size();
-		for(int i=0; i<lines.size(); i++) {
-			assert lines.get(i).length() == rewrittenLines.get(i).originalLength();
-		}
-		int rewrittenLinesLength = rewrittenLines.stream().map(l -> l.originalLength()).reduce(0, Integer::sum)
-				+ (rewrittenLines.size()-1) * 2; // newlines
-		//assert linesLength == rewrittenLinesLength;
-		
-		final StringWithOriginalPositions result = parseDocument(cobolCode, rewrittenLines, params);
-		return result;
-	}
+    @Override
+    public StringWithOriginalPositions processWithOriginalPositions(final String cobolCode, final CobolParserParams params) {
+        final List<CobolLine> lines = readLines(cobolCode, params);
 
-	protected List<CobolLine> readLines(final String cobolCode, final CobolParserParams params) {
-		final List<CobolLine> lines = createLineReader().processLines(cobolCode, params);
-		return lines;
-	}
+        int cobolCodeLength = cobolCode.length();
+        int linesLength = lines.stream().map(l -> l.length()).reduce(0, Integer::sum)
+                + (lines.size() - 1) * 2; // newlines
+        //assert linesLength == cobolCodeLength;
 
-	/**
-	 * Normalizes lines of given COBOL source code, so that comment entries can be
-	 * parsed and lines have a unified line format.
-	 */
-	protected List<CobolLine> rewriteLines(final List<CobolLine> lines) {
-		final List<CobolLine> lineIndicatorProcessedLines = createLineIndicatorProcessor().processLines(lines);
-		final List<CobolLine> normalizedInlineCommentEntriesLines = createInlineCommentEntriesNormalizer()
-				.processLines(lineIndicatorProcessedLines);
-		final List<CobolLine> result = createCommentEntriesMarker().processLines(normalizedInlineCommentEntriesLines);
-		return result;
-	}
+        final List<CobolLine> rewrittenLines = rewriteLines(lines);
+        assert lines.size() == rewrittenLines.size();
+        for (int i = 0; i < lines.size(); i++) {
+            assert lines.get(i).length() == rewrittenLines.get(i).originalLength();
+        }
+        int rewrittenLinesLength = rewrittenLines.stream().map(l -> l.originalLength()).reduce(0, Integer::sum)
+                + (rewrittenLines.size() - 1) * 2; // newlines
+        //assert linesLength == rewrittenLinesLength;
+
+        final StringWithOriginalPositions result = parseDocument(cobolCode, rewrittenLines, params);
+        return result;
+    }
+
+    protected List<CobolLine> readLines(final String cobolCode, final CobolParserParams params) {
+        final List<CobolLine> lines = createLineReader().processLines(cobolCode, params);
+        return lines;
+    }
+
+    /**
+     * Normalizes lines of given COBOL source code, so that comment entries can be
+     * parsed and lines have a unified line format.
+     */
+    protected List<CobolLine> rewriteLines(final List<CobolLine> lines) {
+        final List<CobolLine> lineIndicatorProcessedLines = createLineIndicatorProcessor().processLines(lines);
+        final List<CobolLine> normalizedInlineCommentEntriesLines = createInlineCommentEntriesNormalizer()
+                .processLines(lineIndicatorProcessedLines);
+        final List<CobolLine> result = createCommentEntriesMarker().processLines(normalizedInlineCommentEntriesLines);
+        return result;
+    }
 }

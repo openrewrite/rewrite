@@ -19,12 +19,12 @@ import org.openrewrite.cobol.internal.preprocessor.sub.line.writer.CobolLineWrit
 
 public class CobolLineWriterImpl implements CobolLineWriter {
 
-	@Override
-	public StringWithOriginalPositions serialize(final String originalCode, final List<CobolLine> lines) {
-		final StringBufferWithOriginalPositions sb = new StringBufferWithOriginalPositions(originalCode);
+    @Override
+    public StringWithOriginalPositions serialize(final String originalCode, final List<CobolLine> lines) {
+        final StringBufferWithOriginalPositions sb = new StringBufferWithOriginalPositions(originalCode);
 
-		for (final CobolLine line : lines) {
-			final boolean notContinuationLine = !CobolLineTypeEnum.CONTINUATION.equals(line.getType());
+        for (final CobolLine line : lines) {
+            final boolean notContinuationLine = !CobolLineTypeEnum.CONTINUATION.equals(line.getType());
 
 			/*
 			 Order of line elements :
@@ -34,29 +34,29 @@ public class CobolLineWriterImpl implements CobolLineWriter {
 			 contentAreaB
 			 commentArea
 			 */
-			
-			if (notContinuationLine) {
-				if (line.getNumber() > 0) {
-					sb.append(CobolPreprocessor.NEWLINE);
-					sb.skip(1); // because we skip '\n\r' and add '\n'
-				}
 
-				sb.append(line.getBlankSequenceArea());
-				sb.skip(line.getSequenceAreaOriginal().length() - line.getBlankSequenceArea().length());
-				sb.append(line.getIndicatorArea());
-			} else {
-				sb.skip(line.getSequenceArea());
-				sb.skip(line.getSequenceAreaOriginal().length() - line.getSequenceArea().length());
-				sb.skip(line.getIndicatorArea());
-			}
+            if (notContinuationLine) {
+                if (line.getNumber() > 0) {
+                    sb.append(CobolPreprocessor.NEWLINE);
+                    sb.skip(1); // because we skip '\n\r' and add '\n'
+                }
 
-			sb.append(line.getContentArea());
-			sb.skip(line.getContentAreaOriginal().length() - line.getContentArea().length());
+                sb.append(line.getBlankSequenceArea());
+                sb.skip(line.getSequenceAreaOriginal().length() - line.getBlankSequenceArea().length());
+                sb.append(line.getIndicatorArea());
+            } else {
+                sb.skip(line.getSequenceArea());
+                sb.skip(line.getSequenceAreaOriginal().length() - line.getSequenceArea().length());
+                sb.skip(line.getIndicatorArea());
+            }
 
-			sb.skip(line.getCommentArea());
-			sb.skip(line.getCommentAreaOriginal().length() - line.getCommentArea().length());
-		}
+            sb.append(line.getContentArea());
+            sb.skip(line.getContentAreaOriginal().length() - line.getContentArea().length());
 
-		return sb.toStringWithMarkers();
-	}
+            sb.skip(line.getCommentArea());
+            sb.skip(line.getCommentAreaOriginal().length() - line.getCommentArea().length());
+        }
+
+        return sb.toStringWithMarkers();
+    }
 }

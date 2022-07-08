@@ -21,36 +21,36 @@ import java.util.List;
  */
 public abstract class ASGElementImpl implements ASGElement {
 
-	protected final ParserRuleContext ctx;
+    protected final ParserRuleContext ctx;
 
-	protected final Program program;
+    protected final Program program;
 
-	public ASGElementImpl(final Program program, final ParserRuleContext ctx) {
-		this.program = program;
-		this.ctx = ctx;
-	}
+    public ASGElementImpl(final Program program, final ParserRuleContext ctx) {
+        this.program = program;
+        this.ctx = ctx;
+    }
 
-	@Override
-	public List<ASGElement> getChildren() {
-		final ASGElementRegistry asgElementRegistry = program.getASGElementRegistry();
-		final List<ASGElement> result = ANTLRUtils.findASGElementChildren(ctx, asgElementRegistry);
-		return result;
-	}
+    @Override
+    public List<ASGElement> getChildren() {
+        final ASGElementRegistry asgElementRegistry = program.getASGElementRegistry();
+        final List<ASGElement> result = ANTLRUtils.findASGElementChildren(ctx, asgElementRegistry);
+        return result;
+    }
 
-	@Override
-	public ParserRuleContext getCtx() {
-		return ctx;
-	}
+    @Override
+    public ParserRuleContext getCtx() {
+        return ctx;
+    }
 
-	@Override
-	public ASGElement getParent() {
-		final ASGElementRegistry asgElementRegistry = program.getASGElementRegistry();
-		final ASGElement result = ANTLRUtils.findParent(ASGElement.class, ctx, asgElementRegistry);
-		return result;
-	}
+    @Override
+    public ASGElement getParent() {
+        final ASGElementRegistry asgElementRegistry = program.getASGElementRegistry();
+        final ASGElement result = ANTLRUtils.findParent(ASGElement.class, ctx, asgElementRegistry);
+        return result;
+    }
 
-	@Override
-	public Program getProgram() {
-		return program;
-	}
+    @Override
+    public Program getProgram() {
+        return program;
+    }
 }

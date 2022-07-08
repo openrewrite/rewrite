@@ -22,83 +22,83 @@ import org.openrewrite.cobol.internal.preprocessor.sub.util.PreprocessorStringUt
 
 public class LiteralCopyBookFinderImpl implements LiteralCopyBookFinder {
 
-	// private final static Logger LOG = LoggerFactory.getLogger(LiteralCopyBookFinderImpl.class);
+    // private final static Logger LOG = LoggerFactory.getLogger(LiteralCopyBookFinderImpl.class);
 
-	@Override
-	public File findCopyBook(final CobolParserParams params, final CobolPreprocessorParser.LiteralContext ctx) {
-		if (params.getCopyBookFiles() != null) {
-			for (final File copyBookFile : params.getCopyBookFiles()) {
-				if (isMatchingCopyBook(copyBookFile, null, ctx)) {
-					return copyBookFile;
-				}
-			}
-		}
+    @Override
+    public File findCopyBook(final CobolParserParams params, final CobolPreprocessorParser.LiteralContext ctx) {
+        if (params.getCopyBookFiles() != null) {
+            for (final File copyBookFile : params.getCopyBookFiles()) {
+                if (isMatchingCopyBook(copyBookFile, null, ctx)) {
+                    return copyBookFile;
+                }
+            }
+        }
 
-		if (params.getCopyBookDirectories() != null) {
-			for (final File copyBookDirectory : params.getCopyBookDirectories()) {
-				final File validCopyBook = findCopyBookInDirectory(copyBookDirectory, ctx);
+        if (params.getCopyBookDirectories() != null) {
+            for (final File copyBookDirectory : params.getCopyBookDirectories()) {
+                final File validCopyBook = findCopyBookInDirectory(copyBookDirectory, ctx);
 
-				if (validCopyBook != null) {
-					return validCopyBook;
-				}
-			}
-		}
+                if (validCopyBook != null) {
+                    return validCopyBook;
+                }
+            }
+        }
 
-		return null;
-	}
+        return null;
+    }
 
-	protected File findCopyBookInDirectory(final File copyBooksDirectory, final CobolPreprocessorParser.LiteralContext ctx) {
-		try {
-			for (final File copyBookCandidate : Files.walk(copyBooksDirectory.toPath()).map(Path::toFile)
-					.collect(Collectors.toList())) {
-				if (isMatchingCopyBook(copyBookCandidate, copyBooksDirectory, ctx)) {
-					return copyBookCandidate;
-				}
-			}
-		} catch (final IOException e) {
-			// LOG.warn(e.getMessage(), e);
-		}
+    protected File findCopyBookInDirectory(final File copyBooksDirectory, final CobolPreprocessorParser.LiteralContext ctx) {
+        try {
+            for (final File copyBookCandidate : Files.walk(copyBooksDirectory.toPath()).map(Path::toFile)
+                    .collect(Collectors.toList())) {
+                if (isMatchingCopyBook(copyBookCandidate, copyBooksDirectory, ctx)) {
+                    return copyBookCandidate;
+                }
+            }
+        } catch (final IOException e) {
+            // LOG.warn(e.getMessage(), e);
+        }
 
-		return null;
-	}
+        return null;
+    }
 
-	protected boolean isMatchingCopyBook(final File copyBookCandidate, final File cobolCopyDir,
-			final CobolPreprocessorParser.LiteralContext ctx) {
-		final String copyBookIdentifier = PreprocessorStringUtils.trimQuotes(ctx.getText()).replace("\\", "/");
-		final boolean result;
+    protected boolean isMatchingCopyBook(final File copyBookCandidate, final File cobolCopyDir,
+                                         final CobolPreprocessorParser.LiteralContext ctx) {
+        final String copyBookIdentifier = PreprocessorStringUtils.trimQuotes(ctx.getText()).replace("\\", "/");
+        final boolean result;
 
-		if (cobolCopyDir == null) {
-			result = isMatchingCopyBookRelative(copyBookCandidate, copyBookIdentifier);
-		} else {
-			result = isMatchingCopyBookAbsolute(copyBookCandidate, cobolCopyDir, copyBookIdentifier);
-		}
+        if (cobolCopyDir == null) {
+            result = isMatchingCopyBookRelative(copyBookCandidate, copyBookIdentifier);
+        } else {
+            result = isMatchingCopyBookAbsolute(copyBookCandidate, cobolCopyDir, copyBookIdentifier);
+        }
 
-		return result;
-	}
+        return result;
+    }
 
-	protected boolean isMatchingCopyBookAbsolute(final File copyBookCandidate, final File cobolCopyDir,
-			final String copyBookIdentifier) {
-		final Path copyBookCandidateAbsolutePath = Paths.get(copyBookCandidate.getAbsolutePath()).normalize();
-		final Path copyBookIdentifierAbsolutePath = Paths.get(cobolCopyDir.getAbsolutePath(), copyBookIdentifier)
-				.normalize();
-		final boolean result = copyBookIdentifierAbsolutePath.toString()
-				.equalsIgnoreCase(copyBookCandidateAbsolutePath.toString());
-		return result;
-	}
+    protected boolean isMatchingCopyBookAbsolute(final File copyBookCandidate, final File cobolCopyDir,
+                                                 final String copyBookIdentifier) {
+        final Path copyBookCandidateAbsolutePath = Paths.get(copyBookCandidate.getAbsolutePath()).normalize();
+        final Path copyBookIdentifierAbsolutePath = Paths.get(cobolCopyDir.getAbsolutePath(), copyBookIdentifier)
+                .normalize();
+        final boolean result = copyBookIdentifierAbsolutePath.toString()
+                .equalsIgnoreCase(copyBookCandidateAbsolutePath.toString());
+        return result;
+    }
 
-	protected boolean isMatchingCopyBookRelative(final File copyBookCandidate, final String copyBookIdentifier) {
-		final Path copyBookCandidateAbsolutePath = Paths.get(copyBookCandidate.getAbsolutePath()).normalize();
-		final Path copyBookIdentifierRelativePath;
+    protected boolean isMatchingCopyBookRelative(final File copyBookCandidate, final String copyBookIdentifier) {
+        final Path copyBookCandidateAbsolutePath = Paths.get(copyBookCandidate.getAbsolutePath()).normalize();
+        final Path copyBookIdentifierRelativePath;
 
-		if (copyBookIdentifier.startsWith("/") || copyBookIdentifier.startsWith("./")
-				|| copyBookIdentifier.startsWith("\\") || copyBookIdentifier.startsWith(".\\")) {
-			copyBookIdentifierRelativePath = Paths.get(copyBookIdentifier).normalize();
-		} else {
-			copyBookIdentifierRelativePath = Paths.get("/" + copyBookIdentifier).normalize();
-		}
+        if (copyBookIdentifier.startsWith("/") || copyBookIdentifier.startsWith("./")
+                || copyBookIdentifier.startsWith("\\") || copyBookIdentifier.startsWith(".\\")) {
+            copyBookIdentifierRelativePath = Paths.get(copyBookIdentifier).normalize();
+        } else {
+            copyBookIdentifierRelativePath = Paths.get("/" + copyBookIdentifier).normalize();
+        }
 
-		final boolean result = copyBookCandidateAbsolutePath.toString().toLowerCase()
-				.endsWith(copyBookIdentifierRelativePath.toString().toLowerCase());
-		return result;
-	}
+        final boolean result = copyBookCandidateAbsolutePath.toString().toLowerCase()
+                .endsWith(copyBookIdentifierRelativePath.toString().toLowerCase());
+        return result;
+    }
 }

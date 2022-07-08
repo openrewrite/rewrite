@@ -14,6 +14,6 @@ import org.openrewrite.cobol.internal.preprocessor.sub.CobolLine;
 
 public interface CobolLineRewriter {
 
-	List<CobolLine> processLines(List<CobolLine> lines);
+    List<CobolLine> processLines(List<CobolLine> lines);
 
 }

@@ -18,7 +18,7 @@ import org.openrewrite.cobol.internal.preprocessor.sub.CobolLine;
  */
 public interface CobolLineReader {
 
-	CobolLine parseLine(String line, int lineNumber, CobolParserParams params);
+    CobolLine parseLine(String line, int lineNumber, CobolParserParams params);
 
-	List<CobolLine> processLines(String lines, CobolParserParams params);
+    List<CobolLine> processLines(String lines, CobolParserParams params);
 }

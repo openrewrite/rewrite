@@ -21,53 +21,53 @@ import org.openrewrite.cobol.internal.grammar.CobolPreprocessorParser;
  */
 public class CobolDocumentContext {
 
-	private CobolReplacementMapping[] currentReplaceableReplacements;
+    private CobolReplacementMapping[] currentReplaceableReplacements;
 
-	private StringBuffer outputBuffer = new StringBuffer();
+    private StringBuffer outputBuffer = new StringBuffer();
 
-	public String read() {
-		return outputBuffer.toString();
-	}
+    public String read() {
+        return outputBuffer.toString();
+    }
 
-	/**
-	 * Replaces replaceables with replacements (COPY ... REPLACING ...).
-	 */
-	public void replaceReplaceablesByReplacements(final BufferedTokenStream tokens) {
-		if (currentReplaceableReplacements != null) {
-			Arrays.sort(currentReplaceableReplacements);
+    /**
+     * Replaces replaceables with replacements (COPY ... REPLACING ...).
+     */
+    public void replaceReplaceablesByReplacements(final BufferedTokenStream tokens) {
+        if (currentReplaceableReplacements != null) {
+            Arrays.sort(currentReplaceableReplacements);
 
-			for (final CobolReplacementMapping replaceableReplacement : currentReplaceableReplacements) {
-				final String currentOutput = outputBuffer.toString();
-				final String replacedOutput = replaceableReplacement.replace(currentOutput, tokens);
+            for (final CobolReplacementMapping replaceableReplacement : currentReplaceableReplacements) {
+                final String currentOutput = outputBuffer.toString();
+                final String replacedOutput = replaceableReplacement.replace(currentOutput, tokens);
 
-				outputBuffer = new StringBuffer();
-				outputBuffer.append(replacedOutput);
-			}
-		}
-	}
+                outputBuffer = new StringBuffer();
+                outputBuffer.append(replacedOutput);
+            }
+        }
+    }
 
-	public void storeReplaceablesAndReplacements(final List<CobolPreprocessorParser.ReplaceClauseContext> replaceClauses) {
-		if (replaceClauses == null) {
-			currentReplaceableReplacements = null;
-		} else {
-			final int length = replaceClauses.size();
-			currentReplaceableReplacements = new CobolReplacementMapping[length];
+    public void storeReplaceablesAndReplacements(final List<CobolPreprocessorParser.ReplaceClauseContext> replaceClauses) {
+        if (replaceClauses == null) {
+            currentReplaceableReplacements = null;
+        } else {
+            final int length = replaceClauses.size();
+            currentReplaceableReplacements = new CobolReplacementMapping[length];
 
-			int i = 0;
+            int i = 0;
 
-			for (final CobolPreprocessorParser.ReplaceClauseContext replaceClause : replaceClauses) {
-				final CobolReplacementMapping replaceableReplacement = new CobolReplacementMapping();
+            for (final CobolPreprocessorParser.ReplaceClauseContext replaceClause : replaceClauses) {
+                final CobolReplacementMapping replaceableReplacement = new CobolReplacementMapping();
 
-				replaceableReplacement.replaceable = replaceClause.replaceable();
-				replaceableReplacement.replacement = replaceClause.replacement();
+                replaceableReplacement.replaceable = replaceClause.replaceable();
+                replaceableReplacement.replacement = replaceClause.replacement();
 
-				currentReplaceableReplacements[i] = replaceableReplacement;
-				i++;
-			}
-		}
-	}
+                currentReplaceableReplacements[i] = replaceableReplacement;
+                i++;
+            }
+        }
+    }
 
-	public void write(final String text) {
-		outputBuffer.append(text);
-	}
+    public void write(final String text) {
+        outputBuffer.append(text);
+    }
 }

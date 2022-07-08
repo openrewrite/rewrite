@@ -16,5 +16,5 @@ import org.openrewrite.cobol.internal.preprocessor.sub.CobolLine;
  */
 public interface CobolCommentEntriesMarker extends CobolLineRewriter {
 
-	CobolLine processLine(CobolLine line);
+    CobolLine processLine(CobolLine line);
 }

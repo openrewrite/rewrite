@@ -27,118 +27,118 @@ import org.openrewrite.cobol.internal.runner.ThrowingErrorListener;
  */
 public class CobolDocumentParserImpl implements CobolDocumentParser {
 
-	protected final String[] triggers = new String[] { "cbl", "copy", "exec sql", "exec sqlims", "exec cics", "process",
-			"replace", "eject", "skip1", "skip2", "skip3", "title" };
+    protected final String[] triggers = new String[]{"cbl", "copy", "exec sql", "exec sqlims", "exec cics", "process",
+            "replace", "eject", "skip1", "skip2", "skip3", "title"};
 
-	protected boolean containsTrigger(final String code, final String[] triggers) {
-		final String codeLowerCase = code.toLowerCase();
-		boolean result = false;
+    protected boolean containsTrigger(final String code, final String[] triggers) {
+        final String codeLowerCase = code.toLowerCase();
+        boolean result = false;
 
-		for (final String trigger : triggers) {
-			final boolean containsTrigger = codeLowerCase.contains(trigger);
+        for (final String trigger : triggers) {
+            final boolean containsTrigger = codeLowerCase.contains(trigger);
 
-			if (containsTrigger) {
-				result = true;
-				break;
-			}
-		}
+            if (containsTrigger) {
+                result = true;
+                break;
+            }
+        }
 
-		return result;
-	}
+        return result;
+    }
 
-	protected CobolDocumentParserListener createDocumentParserListener(final CobolParserParams params,
-																	   final CommonTokenStream tokens) {
-		return new CobolDocumentParserListenerImpl(params, tokens);
-	}
+    protected CobolDocumentParserListener createDocumentParserListener(final CobolParserParams params,
+                                                                       final CommonTokenStream tokens) {
+        return new CobolDocumentParserListenerImpl(params, tokens);
+    }
 
-	@Override
-	public StringWithOriginalPositions processLines(final StringWithOriginalPositions code, final CobolParserParams params) {
-		final boolean requiresProcessorExecution = containsTrigger(code.preprocessedText, triggers);
-		final StringWithOriginalPositions result;
+    @Override
+    public StringWithOriginalPositions processLines(final StringWithOriginalPositions code, final CobolParserParams params) {
+        final boolean requiresProcessorExecution = containsTrigger(code.preprocessedText, triggers);
+        final StringWithOriginalPositions result;
 
-		if (requiresProcessorExecution) {
-			result = processWithParser(code, params);
-		} else {
-			result = code;
-		}
+        if (requiresProcessorExecution) {
+            result = processWithParser(code, params);
+        } else {
+            result = code;
+        }
 
-		return result;
-	}
+        return result;
+    }
 
-	protected StringWithOriginalPositions processWithParser(final StringWithOriginalPositions code, final CobolParserParams params) {
-		// run the lexer
-		final CobolPreprocessorLexer lexer = new CobolPreprocessorLexer(CharStreams.fromString(code.preprocessedText));
+    protected StringWithOriginalPositions processWithParser(final StringWithOriginalPositions code, final CobolParserParams params) {
+        // run the lexer
+        final CobolPreprocessorLexer lexer = new CobolPreprocessorLexer(CharStreams.fromString(code.preprocessedText));
 
-		if (!params.getIgnoreSyntaxErrors()) {
-			// register an error listener, so that preprocessing stops on errors
-			lexer.removeErrorListeners();
-			lexer.addErrorListener(new ThrowingErrorListener());
-		}
+        if (!params.getIgnoreSyntaxErrors()) {
+            // register an error listener, so that preprocessing stops on errors
+            lexer.removeErrorListeners();
+            lexer.addErrorListener(new ThrowingErrorListener());
+        }
 
-		// get a list of matched tokens
-		final CommonTokenStream tokens = new CommonTokenStream(lexer);
+        // get a list of matched tokens
+        final CommonTokenStream tokens = new CommonTokenStream(lexer);
 
-		// pass the tokens to the parser
-		final CobolPreprocessorParser parser = new CobolPreprocessorParser(tokens);
+        // pass the tokens to the parser
+        final CobolPreprocessorParser parser = new CobolPreprocessorParser(tokens);
 
-		if (!params.getIgnoreSyntaxErrors()) {
-			// register an error listener, so that preprocessing stops on errors
-			parser.removeErrorListeners();
-			parser.addErrorListener(new ThrowingErrorListener());
-		}
+        if (!params.getIgnoreSyntaxErrors()) {
+            // register an error listener, so that preprocessing stops on errors
+            parser.removeErrorListeners();
+            parser.addErrorListener(new ThrowingErrorListener());
+        }
 
-		// specify our entry point
-		final CobolPreprocessorParser.StartRuleContext startRule = parser.startRule();
+        // specify our entry point
+        final CobolPreprocessorParser.StartRuleContext startRule = parser.startRule();
 
-		// Lexing is done, display tokens
-		System.out.println("------------------------------");
-		for(int i=0; i<tokens.size(); i++) {
-			Token t = tokens.get(i);
-			int start = t.getStartIndex();
-			int stop = t.getStopIndex();
-			System.out.print(code.preprocessedText.substring(start, stop+1));
-		}
-		System.out.println("\n------------------------------");
-		
-		for(int i=0; i<tokens.size(); i++) {
-			Token t = tokens.get(i);
-			int start = t.getStartIndex();
-			int stop = t.getStopIndex();
-			if(t.getType() != Token.EOF) {
-				int originalStart = code.originalPositions[start];
-				int originalStop = code.originalPositions[stop];
-				System.out.print(code.originalText.substring(originalStart, originalStop+1));
-				System.out.print("");
-			}
-		}
-		System.out.println("\n------------------------------");
-		
-		for(int i=0; i<tokens.size(); i++) {
-			Token t = tokens.get(i);
-			int start = t.getStartIndex();
-			int stop = t.getStopIndex();
-			if(t.getType() != Token.EOF) {
-				int originalStart = code.originalPositions[start];
-				int originalStop = code.originalPositions[stop];
-				System.out.println("token #" + i + " (" + t.getTokenIndex() + ") :");
-				System.out.println("   text start=" + start + ", stop=" + stop + " <" + code.preprocessedText.substring(start, stop+1) + ">");
-				System.out.println("   orig start=" + originalStart + ", stop=" + originalStop + " <" + code.originalText.substring(originalStart, originalStop+1) + ">");
-				System.out.println("   channel=" + t.getChannel());
-				String text = code.preprocessedText.substring(start, stop+1);
-				String orig = code.originalText.substring(originalStart, originalStop+1);
-				//assert text.equals(orig);
-				System.out.print("");
-			}
-		}
+        // Lexing is done, display tokens
+        System.out.println("------------------------------");
+        for (int i = 0; i < tokens.size(); i++) {
+            Token t = tokens.get(i);
+            int start = t.getStartIndex();
+            int stop = t.getStopIndex();
+            System.out.print(code.preprocessedText.substring(start, stop + 1));
+        }
+        System.out.println("\n------------------------------");
 
-		// analyze contained copy books
-		final CobolDocumentParserListener listener = createDocumentParserListener(params, tokens);
-		final ParseTreeWalker walker = new ParseTreeWalker();
+        for (int i = 0; i < tokens.size(); i++) {
+            Token t = tokens.get(i);
+            int start = t.getStartIndex();
+            int stop = t.getStopIndex();
+            if (t.getType() != Token.EOF) {
+                int originalStart = code.originalPositions[start];
+                int originalStop = code.originalPositions[stop];
+                System.out.print(code.originalText.substring(originalStart, originalStop + 1));
+                System.out.print("");
+            }
+        }
+        System.out.println("\n------------------------------");
 
-		// XXX This is where the fun begins
-		walker.walk(listener, startRule);
+        for (int i = 0; i < tokens.size(); i++) {
+            Token t = tokens.get(i);
+            int start = t.getStartIndex();
+            int stop = t.getStopIndex();
+            if (t.getType() != Token.EOF) {
+                int originalStart = code.originalPositions[start];
+                int originalStop = code.originalPositions[stop];
+                System.out.println("token #" + i + " (" + t.getTokenIndex() + ") :");
+                System.out.println("   text start=" + start + ", stop=" + stop + " <" + code.preprocessedText.substring(start, stop + 1) + ">");
+                System.out.println("   orig start=" + originalStart + ", stop=" + originalStop + " <" + code.originalText.substring(originalStart, originalStop + 1) + ">");
+                System.out.println("   channel=" + t.getChannel());
+                String text = code.preprocessedText.substring(start, stop + 1);
+                String orig = code.originalText.substring(originalStart, originalStop + 1);
+                //assert text.equals(orig);
+                System.out.print("");
+            }
+        }
 
-		final String expandedText = listener.context().read();
-		return new StringWithOriginalPositions(code, expandedText);
-	}
+        // analyze contained copy books
+        final CobolDocumentParserListener listener = createDocumentParserListener(params, tokens);
+        final ParseTreeWalker walker = new ParseTreeWalker();
+
+        // XXX This is where the fun begins
+        walker.walk(listener, startRule);
+
+        final String expandedText = listener.context().read();
+        return new StringWithOriginalPositions(code, expandedText);
+    }
 }

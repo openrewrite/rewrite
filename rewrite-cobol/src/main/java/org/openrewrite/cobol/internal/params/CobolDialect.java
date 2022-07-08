@@ -9,5 +9,5 @@
 package org.openrewrite.cobol.internal.params;
 
 public enum CobolDialect {
-	ANSI85, MF, OSVS
+    ANSI85, MF, OSVS
 }

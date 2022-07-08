@@ -10,5 +10,5 @@ package org.openrewrite.cobol.internal.preprocessor.sub;
 
 public enum CobolLineTypeEnum {
 
-	BLANK, COMMENT, COMPILER_DIRECTIVE, CONTINUATION, DEBUG, NORMAL
+    BLANK, COMMENT, COMPILER_DIRECTIVE, CONTINUATION, DEBUG, NORMAL
 }

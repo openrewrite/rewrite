@@ -15,5 +15,5 @@ import org.openrewrite.cobol.internal.preprocessor.sub.CobolLine;
 
 public interface CobolLineWriter {
 
-	StringWithOriginalPositions serialize(String originalCode, List<CobolLine> lines);
+    StringWithOriginalPositions serialize(String originalCode, List<CobolLine> lines);
 }

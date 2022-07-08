@@ -14,13 +14,13 @@ import java.util.List;
 
 public interface Program extends ASGElement {
 
-	ASGElementRegistry getASGElementRegistry();
+    ASGElementRegistry getASGElementRegistry();
 
-	CompilationUnit getCompilationUnit();
+    CompilationUnit getCompilationUnit();
 
-	CompilationUnit getCompilationUnit(String name);
+    CompilationUnit getCompilationUnit(String name);
 
-	List<CompilationUnit> getCompilationUnits();
+    List<CompilationUnit> getCompilationUnits();
 
-	void registerCompilationUnit(CompilationUnit compilationUnit);
+    void registerCompilationUnit(CompilationUnit compilationUnit);
 }
