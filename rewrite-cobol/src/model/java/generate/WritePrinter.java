@@ -40,14 +40,6 @@ public class WritePrinter extends Recipe {
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
-
-//            visitSpace(azzert.getPrefix(), Space.Location.ASSERT_PREFIX, p);
-//            visitMarkers(azzert.getMarkers(), p);
-//        p.append("assert");
-//            visit(azzert.getCondition(), p);
-//            visitLeftPadded(":", azzert.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p);
-//        return azzert;
-
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 J.ClassDeclaration c = classDecl;

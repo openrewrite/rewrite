@@ -38,6 +38,8 @@ import java.util.Objects;
 import static java.util.stream.Collectors.toList;
 
 public class CobolParser implements Parser<Cobol.CompilationUnit> {
+    private static final List<String> COBOL_FILE_EXTENSIONS = Arrays.asList(".cbl", ".cpy");
+
     @Override
     public List<Cobol.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
@@ -56,7 +58,7 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                         parser.removeErrorListeners();
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
-                        Cobol.CompilationUnit compilationUnit = (Cobol.CompilationUnit) new CobolParserVisitor(
+                        Cobol.CompilationUnit compilationUnit = new CobolParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
                                 sourceFile.getFileAttributes(),
                                 sourceStr,
@@ -82,14 +84,15 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
-    private static String[] COBOL_FILE_EXTENSIONS = new String[] {
-            ".cbl", ".cpy"
-    };
-
     @Override
     public boolean accept(Path path) {
         String s = path.toString().toLowerCase();
-        return Arrays.stream(COBOL_FILE_EXTENSIONS).anyMatch(ext -> s.endsWith(ext));
+        for (String COBOL_FILE_EXTENSION : COBOL_FILE_EXTENSIONS) {
+            if (s.endsWith(COBOL_FILE_EXTENSION)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

@@ -18,8 +18,8 @@ tasks.register<JavaExec>("generateAntlrSources") {
 
 sourceSets {
     create("model") {
-        compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
-        runtimeClasspath += sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath
+        compileClasspath += sourceSets.main.get().output
+        runtimeClasspath += sourceSets.main.get().output
     }
 }
 
@@ -38,6 +38,7 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.+")
 
     modelImplementation(project(":rewrite-java-11"))
+    modelImplementation("org.projectlombok:lombok:1.18.24")
 
     testImplementation(project(":rewrite-test"))
     testImplementation("io.github.classgraph:classgraph:latest.release")
