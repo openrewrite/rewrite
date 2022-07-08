@@ -23,15 +23,20 @@ import java.util.stream.Collectors
 class RawPomTest {
     @Test
     fun profileActivationByJdk() {
-        assertThat(ProfileActivation(false, "17", null).isActive).isTrue()
-        assertThat(ProfileActivation(false, "[,18)", null).isActive).isTrue()
-        assertThat(ProfileActivation(false, "[,17]", null).isActive).isFalse()
+        val runtimeVersion = System.getProperty("java.version").substringBefore('.').toInt()
+        assertThat(ProfileActivation(false, runtimeVersion.toString(), null).isActive).isTrue
+        assertThat(ProfileActivation(false, "[,${runtimeVersion + 1})", null).isActive).isTrue
+        assertThat(ProfileActivation(false, "[,$runtimeVersion]", null).isActive).isFalse
     }
 
     @Test
     fun profileActivationByAbsenceOfProperty() {
-        assertThat(ProfileActivation(false, null,
-            ProfileActivation.Property("!inactive", null)).isActive).isTrue()
+        assertThat(
+            ProfileActivation(
+                false, null,
+                ProfileActivation.Property("!inactive", null)
+            ).isActive
+        ).isTrue
     }
 
     @Test
@@ -53,7 +58,8 @@ class RawPomTest {
                     </repository>
                   </repositories>
                 </project>
-            """.trimIndent().byteInputStream(), null)
+            """.trimIndent().byteInputStream(), null
+        )
 
         assertThat(pom.repositories!!.repositories).hasSize(1)
     }
@@ -333,12 +339,15 @@ class RawPomTest {
 
         assertThat(model.repositories.first()?.uri)
             .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots")
-        val java9Profile = model.profiles.stream().filter { p -> p.id!!.equals("java9+") }!!.collect(Collectors.toList())[0]
-        val java11Profile = model.profiles.stream().filter { p -> p.id!!.equals("java11+") }!!.collect(Collectors.toList())[0]
+        val java9Profile =
+            model.profiles.stream().filter { p -> p.id!!.equals("java9+") }!!.collect(Collectors.toList())[0]
+        val java11Profile =
+            model.profiles.stream().filter { p -> p.id!!.equals("java11+") }!!.collect(Collectors.toList())[0]
         assertThat(java9Profile.dependencies[0].groupId).isEqualTo("javax.xml.bind")
         assertThat(java11Profile.dependencies).isEmpty()
 
-        val rewriteProfile = model.profiles.stream().filter { p -> p.id!!.equals("plugin-stuff") }!!.collect(Collectors.toList())[0]
+        val rewriteProfile =
+            model.profiles.stream().filter { p -> p.id!!.equals("plugin-stuff") }!!.collect(Collectors.toList())[0]
 
         assertThat(rewriteProfile.plugins).hasSize(2)
         jacocoPlugin = rewriteProfile.plugins.stream()
@@ -431,6 +440,7 @@ class RawPomTest {
         val child = plugin.getConfiguration("grandparent.parent.child", ConfigChild::class.java)
         assertThat(child!!.stringValue).isEqualTo("fred")
         assertThat(child.intValue).isEqualTo(123)
-        assertThat(plugin.getConfigurationList("grandparent.parent.child.stringList", String::class.java)).hasSize(4).contains("f", "r", "e", "d")
+        assertThat(plugin.getConfigurationList("grandparent.parent.child.stringList", String::class.java)).hasSize(4)
+            .contains("f", "r", "e", "d")
     }
 }
