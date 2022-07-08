@@ -3610,6 +3610,10 @@ public interface J extends Tree {
             return v.visitNewArray(this, p);
         }
 
+        public CoordinateBuilder.NewArray getCoordinates() {
+            return new CoordinateBuilder.NewArray(this);
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {

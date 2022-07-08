@@ -454,6 +454,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
 
             @Override
+            public J visitNewArray(J.NewArray newArray, Integer integer) {
+                if (loc.equals(NEW_ARRAY_PREFIX) && newArray.isScope(insertionPoint)) {
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
+                            .withPrefix(newArray.getPrefix()), integer, getCursor().getParentOrThrow());
+                }
+                return super.visitNewArray(newArray, integer);
+            }
+
+            @Override
             public J visitPackage(J.Package pkg, Integer integer) {
                 if (loc.equals(PACKAGE_PREFIX) && pkg.isScope(insertionPoint)) {
                     return pkg.withExpression(substitutions.unsubstitute(templateParser.parsePackage(substitutedTemplate)));
