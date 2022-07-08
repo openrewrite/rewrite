@@ -83,6 +83,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(procedureDivision.getPrefix(), p);
         visitRightPadded(procedureDivision.getProcedure(), p);
         visitRightPadded(procedureDivision.getDivision(), p);
+        p.append(procedureDivision.getDot());
         visitProcedureDivisionBody(procedureDivision.getBody(), p);
         return procedureDivision;
     }
@@ -131,7 +132,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         for(Statement statement : sentence.getStatements()) {
             visit(statement, p);
         }
-        visitSpace(sentence.getDot(), p);
+        visitLeftPadded(sentence.getDot(), p);
         return sentence;
     }
 
