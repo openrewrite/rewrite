@@ -270,41 +270,41 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         """
     )
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1985")
     @Test
-    fun newArray(jp: JavaParser) = assertChanged(
+    fun arrayAccess(jp: JavaParser) = assertChanged(
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-
-                override fun visitNewArray(newArray: J.NewArray, p: ExecutionContext): J {
-                    if ((newArray.dimensions[0].index as J.Literal).value == 1) {
+                override fun visitArrayAccess(arrayAccess: J.ArrayAccess, p: ExecutionContext): J {
+                    if ((arrayAccess.dimension.index as J.Literal).value == 0) {
                         val t = JavaTemplate.builder({ cursor }, "Some.method()")
                             .javaParser {
                                 JavaParser.fromJavaVersion()
                                     .logCompilationWarningsAndErrors(true)
                                     .dependsOn("""
                                         public class Some {
-                                            public static int[] method() {
-                                                return new int[0];
+                                            public static int method() {
+                                                return 0;
                                             }
                                         }
                                     """.trimIndent()).build()
                             }.build()
-                        return newArray.withTemplate(t, newArray.coordinates.replace())
+                        return arrayAccess.withTemplate(t, arrayAccess.coordinates.replace())
                     }
-                    return super.visitNewArray(newArray, p)
+                    return super.visitArrayAccess(arrayAccess, p)
                 }
             }
         },
         before = """
             public class Test {
-                int[] array = new int[1];
+                int[] arrayAccess = new int[1];
+                int i = arrayAccess[0];
             }
         """,
         after = """
             public class Test {
-                int[] array = Some.method();
+                int[] arrayAccess = new int[1];
+                int i = Some.method();
             }
         """
     )
@@ -381,6 +381,45 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         after = """
             public class Test {
                 String literal = Some.method();
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1985")
+    @Test
+    fun newArray(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+
+                override fun visitNewArray(newArray: J.NewArray, p: ExecutionContext): J {
+                    if ((newArray.dimensions[0].index as J.Literal).value == 1) {
+                        val t = JavaTemplate.builder({ cursor }, "Some.method()")
+                            .javaParser {
+                                JavaParser.fromJavaVersion()
+                                    .logCompilationWarningsAndErrors(true)
+                                    .dependsOn("""
+                                        public class Some {
+                                            public static int[] method() {
+                                                return new int[0];
+                                            }
+                                        }
+                                    """.trimIndent()).build()
+                            }.build()
+                        return newArray.withTemplate(t, newArray.coordinates.replace())
+                    }
+                    return super.visitNewArray(newArray, p)
+                }
+            }
+        },
+        before = """
+            public class Test {
+                int[] array = new int[1];
+            }
+        """,
+        after = """
+            public class Test {
+                int[] array = Some.method();
             }
         """
     )

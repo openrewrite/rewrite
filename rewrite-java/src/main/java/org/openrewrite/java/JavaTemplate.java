@@ -117,6 +117,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
 
             @Override
+            public J visitArrayAccess(J.ArrayAccess arrayAccess, Integer integer) {
+                if (loc.equals(ARRAY_ACCESS_PREFIX) && arrayAccess.isScope(insertionPoint)) {
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
+                            .withPrefix(arrayAccess.getPrefix()), integer, getCursor().getParentOrThrow());
+                }
+                return super.visitArrayAccess(arrayAccess, integer);
+            }
+
+            @Override
             public J visitBinary(J.Binary binary, Integer integer) {
                 if (loc.equals(BINARY_PREFIX) && binary.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))

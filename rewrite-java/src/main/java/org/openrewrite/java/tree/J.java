@@ -278,6 +278,10 @@ public interface J extends Tree {
             return v.visitArrayAccess(this, p);
         }
 
+        public CoordinateBuilder.ArrayAccess getCoordinates() {
+            return new CoordinateBuilder.ArrayAccess(this);
+        }
+
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
