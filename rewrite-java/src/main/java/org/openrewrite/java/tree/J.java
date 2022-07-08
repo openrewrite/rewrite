@@ -606,6 +606,10 @@ public interface J extends Tree {
             return v.visitBinary(this, p);
         }
 
+        public CoordinateBuilder.Binary getCoordinates() {
+            return new CoordinateBuilder.Binary(this);
+        }
+
         @Override
         public List<J> getSideEffects() {
             List<J> sideEffects = new ArrayList<>(2);

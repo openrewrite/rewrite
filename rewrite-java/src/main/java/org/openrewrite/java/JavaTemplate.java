@@ -117,6 +117,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
 
             @Override
+            public J visitBinary(J.Binary binary, Integer integer) {
+                if (loc.equals(BINARY_PREFIX) && binary.isScope(insertionPoint)) {
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
+                            .withPrefix(binary.getPrefix()), integer, getCursor().getParentOrThrow());
+                }
+                return super.visitBinary(binary, integer);
+            }
+
+            @Override
             public J visitBlock(J.Block block, Integer p) {
                 switch (loc) {
                     case BLOCK_END: {

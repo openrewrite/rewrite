@@ -69,6 +69,16 @@ public abstract class CoordinateBuilder {
         }
     }
 
+    public static class Binary extends CoordinateBuilder {
+        public Binary(J.Binary tree) {
+            super(tree);
+        }
+
+        public JavaCoordinates replace() {
+            return replace(Space.Location.BINARY_PREFIX);
+        }
+    }
+
     public static class Block extends Statement {
         Block(J.Block tree) {
             super(tree);

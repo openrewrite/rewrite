@@ -308,4 +308,43 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Suppress("ConstantConditions")
+    @Test
+    fun binary(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+
+                override fun visitBinary(binary: J.Binary, p: ExecutionContext): J {
+                    if (binary.operator == J.Binary.Type.Equal) {
+                        val t = JavaTemplate.builder({ cursor }, "Some.method()")
+                            .javaParser {
+                                JavaParser.fromJavaVersion()
+                                    .logCompilationWarningsAndErrors(true)
+                                    .dependsOn("""
+                                        public class Some {
+                                            public static boolean method() {
+                                                return true;
+                                            }
+                                        }
+                                    """.trimIndent()).build()
+                            }.build()
+                        return binary.withTemplate(t, binary.coordinates.replace())
+                    }
+                    return super.visitBinary(binary, p)
+                }
+            }
+        },
+        before = """
+            public class Test {
+                boolean binary = 1 == 1;
+            }
+        """,
+        after = """
+            public class Test {
+                boolean binary = Some.method();
+            }
+        """
+    )
 }
