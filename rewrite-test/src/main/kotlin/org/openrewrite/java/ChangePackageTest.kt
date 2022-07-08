@@ -120,6 +120,69 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
     )
 
     @Test
+    fun updateMethodType() = assertChanged(
+        dependsOn = arrayOf("""
+            package org.openrewrite;
+            public class Test {
+            }
+            """,
+            """
+            package org.foo;
+            
+            import org.openrewrite.Test;
+            
+            public class Example {
+                public static Test method(Test test) {
+                    return test;
+                }
+            }
+        """),
+        before = """
+            import org.openrewrite.Test;
+            import org.foo.Example;
+            
+            public class A {
+                Test local = Example.method(null);
+            }
+        """,
+        after = """
+            import org.openrewrite.test.Test;
+            import org.foo.Example;
+            
+            public class A {
+                Test local = Example.method(null);
+            }
+        """,
+        afterConditions = { cu ->
+            val methodType = cu.typesInUse.usedMethods.toTypedArray()[0]
+            assertThat(methodType.returnType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.test.Test")
+            assertThat(methodType.parameterTypes[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.test.Test")
+        }
+    )
+
+    @Test
+    fun updateVariableType() = assertChanged(
+        dependsOn = arrayOf(testClass),
+        before = """
+            import org.openrewrite.Test;
+            
+            public class A {
+                Test a;
+            }
+        """,
+        after = """
+            import org.openrewrite.test.Test;
+            
+            public class A {
+                Test a;
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.typesInUse.variables.toTypedArray()[0].type.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.test.Test")
+        }
+    )
+
+    @Test
     fun renamePackage(jp: JavaParser) = assertChanged(
         jp,
         before = """
