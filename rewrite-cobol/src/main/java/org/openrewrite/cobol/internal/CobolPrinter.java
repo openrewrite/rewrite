@@ -18,7 +18,6 @@ package org.openrewrite.cobol.internal;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.cobol.CobolVisitor;
 import org.openrewrite.cobol.tree.*;
-import org.openrewrite.internal.lang.Nullable;
 
 public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
 
@@ -36,7 +35,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public <T> CobolRightPadded<T> visitRightPadded(@Nullable CobolRightPadded<T> right, PrintOutputCapture<P> p) {
+    public <T> CobolRightPadded<T> visitRightPadded(CobolRightPadded<T> right, PrintOutputCapture<P> p) {
         p.append(right.getElement().toString());
         p.append(right.getAfter().toString());
         return right;
@@ -82,8 +81,8 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
 
     public Cobol visitProcedureDivision(Cobol.ProcedureDivision procedureDivision, PrintOutputCapture<P> p) {
         visitSpace(procedureDivision.getPrefix(), p);
-        visitSpace(procedureDivision.getProcedure(), p);
-        visitSpace(procedureDivision.getDivision(), p);
+        visitRightPadded(procedureDivision.getProcedure(), p);
+        visitRightPadded(procedureDivision.getDivision(), p);
         visitProcedureDivisionBody(procedureDivision.getBody(), p);
         return procedureDivision;
     }
@@ -106,8 +105,8 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitProgramUnit(Cobol.ProgramUnit programUnit, PrintOutputCapture<P> p) {
         visitSpace(programUnit.getPrefix(), p);
         visitIdentificationDivision(programUnit.getIdentificationDivision(), p);
-        if(programUnit.getProcedureDivision().isPresent()) {
-            visitProcedureDivision(programUnit.getProcedureDivision().get(), p);
+        if(programUnit.getProcedureDivision() != null) {
+            visitProcedureDivision(programUnit.getProcedureDivision(), p);
         }
         return programUnit;
     }

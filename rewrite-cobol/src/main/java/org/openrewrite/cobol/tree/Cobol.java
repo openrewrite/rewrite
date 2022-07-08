@@ -29,7 +29,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 public interface Cobol extends Tree {
@@ -169,9 +168,7 @@ public interface Cobol extends Tree {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Display implements Statement {
-        @Getter
         @Nullable
-        @With
         @NonFinal
         transient WeakReference<Padding> padding;
         @Getter
@@ -280,9 +277,7 @@ public interface Cobol extends Tree {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class IdentificationDivision implements Cobol {
-        @Getter
         @Nullable
-        @With
         @NonFinal
         transient WeakReference<Padding> padding;
 
@@ -307,9 +302,9 @@ public interface Cobol extends Tree {
             Id
         }
 
-    @Getter
-    @With
-    ProgramIdParagraph programIdParagraph;
+        @Getter
+        @With
+        ProgramIdParagraph programIdParagraph;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -331,56 +326,44 @@ public interface Cobol extends Tree {
             return p;
         }
 
-    public String getIdentification() {
+        public String getIdentification() {
             return identification.getElement();
         }
 
-        public IdentificationDivision withIdentification(Cobol.IdentificationDivision.IdKeyword identification) {
+        public IdentificationDivision withIdentification(String identification) {
             //noinspection ConstantConditions
             return getPadding().withIdentification(CobolRightPadded.withElement(this.identification, identification));
         }
-        public Space getDivision() {
+
+        public String getDivision() {
             return division.getElement();
         }
 
-        public IdentificationDivision withDivision(Space division) {
+        public IdentificationDivision withDivision(String division) {
             //noinspection ConstantConditions
             return getPadding().withDivision(CobolRightPadded.withElement(this.division, division));
         }
-        public Space getDot() {
-            return dot.getElement();
-        }
 
-        public IdentificationDivision withDot(Space dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolRightPadded.withElement(this.dot, dot));
-        }
         @RequiredArgsConstructor
         public static class Padding {
             private final IdentificationDivision t;
 
-        public CobolRightPadded<String> getIdentification() {
+            public CobolRightPadded<String> getIdentification() {
                 return t.identification;
             }
 
-        public CobolRightPadded<String> getDivision() {
-            return t.division;
+            public IdentificationDivision withIdentification(CobolRightPadded<String> identification) {
+                return t.identification == identification ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, identification, t.division, t.dot, t.programIdParagraph);
             }
 
-            public CobolRightPadded<Space> getDivision() {
+            public CobolRightPadded<String> getDivision() {
                 return t.division;
             }
 
-            public IdentificationDivision withDivision(CobolRightPadded<Space> division) {
+            public IdentificationDivision withDivision(CobolRightPadded<String> division) {
                 return t.division == division ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, division, t.dot, t.programIdParagraph);
             }
-            public CobolRightPadded<Space> getDot() {
-                return t.dot;
-            }
 
-            public IdentificationDivision withDot(CobolRightPadded<Space> dot) {
-                return t.dot == dot ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, t.division, dot, t.programIdParagraph);
-            }
         }
     }
 
@@ -466,9 +449,7 @@ public interface Cobol extends Tree {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class ProgramIdParagraph implements Cobol {
-        @Getter
         @Nullable
-        @With
         @NonFinal
         transient WeakReference<Padding> padding;
         @Getter
@@ -483,25 +464,25 @@ public interface Cobol extends Tree {
         Markers markers;
 
 
-    // programIdParagraph
-    //   : PROGRAM_ID DOT_FS programName (IS? (COMMON | INITIAL | LIBRARY | DEFINITION | RECURSIVE) PROGRAM?)? DOT_FS? commentEntry?
-    //   ;
-    @Getter
-    @With
-    CobolRightPadded<Space> programId;
+        // programIdParagraph
+        //   : PROGRAM_ID DOT_FS programName (IS? (COMMON | INITIAL | LIBRARY | DEFINITION | RECURSIVE) PROGRAM?)? DOT_FS? commentEntry?
+        //   ;
+        @Getter
+        @With
+        CobolRightPadded<Space> programId;
 
-    @Getter
-    @With
-    CobolRightPadded<Space> dot1;
+        @Getter
+        @With
+        CobolRightPadded<Space> dot1;
 
         @Getter
         @With
         String programName;
 
-    @Getter
-    @With
-    @Nullable
-    CobolLeftPadded<Space> dot2;
+        @Getter
+        @With
+        @Nullable
+        CobolLeftPadded<Space> dot2;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -540,17 +521,17 @@ public interface Cobol extends Tree {
                 return t.programId;
             }
 
-        public CobolRightPadded<Space> getDot1() {
-            return t.dot1;
-        }
+            public CobolRightPadded<Space> getDot1() {
+                return t.dot1;
+            }
 
-        public CobolLeftPadded<Space> getDot2() {
-            return t.dot2;
-        }
+            public CobolLeftPadded<Space> getDot2() {
+                return t.dot2;
+            }
 
 
             public ProgramIdParagraph withProgramId(CobolRightPadded<Space> programId) {
-                return t.programId == programId ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, programId, t.programName);
+                return t.programId == programId ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, programId, t.dot1, t.programName, t.dot2);
             }
         }
     }
