@@ -277,6 +277,29 @@ interface ChangeTypeTest : JavaRecipeTest {
     )
 
     @Test
+    fun multiDimensionalArray() = assertChanged(
+        dependsOn = arrayOf(a1, a2),
+        before = """
+            import a.A1;
+            
+            public class A {
+                A1[][] multiDimensionalArray;
+            }
+        """,
+        after = """
+            import a.A2;
+            
+            public class A {
+                A2[][] multiDimensionalArray;
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("a.A1")).isEmpty()
+            assertThat(cu.findType("a.A2")).isNotEmpty()
+        }
+    )
+
+    @Test
     fun classDecl(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(
@@ -921,8 +944,7 @@ interface ChangeTypeTest : JavaRecipeTest {
             after = """
             package de;
             public class Class1 {}
-        """,
-        expectedCyclesThatMakeChanges = 2
+        """
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1291")
@@ -1254,8 +1276,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 public static class Target {
                 }
             }
-        """,
-        expectedCyclesThatMakeChanges = 2
+        """
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
@@ -1334,8 +1355,100 @@ interface ChangeTypeTest : JavaRecipeTest {
             package a.b;
             class Target {
             }
+        """
+    )
+
+    @Test
+    fun updateMethodType() = assertChanged(
+        recipe = ChangeType("a.A1", "a.A2", false),
+        dependsOn = arrayOf("""
+            package a;
+            public class A1 {
+            }
+            """,
+            """
+            package org.foo;
+            
+            import a.A1;
+            
+            public class Example {
+                public A1 method(A1 a1) {
+                    return a1;
+                }
+            }
+        """),
+        before = """
+            import a.A1;
+            import org.foo.Example;
+            
+            public class Test {
+                A1 local = new Example().method(null);
+            }
         """,
-        expectedCyclesThatMakeChanges = 2
+        after = """
+            import a.A2;
+            import org.foo.Example;
+            
+            public class Test {
+                A2 local = new Example().method(null);
+            }
+        """,
+        afterConditions = { cu ->
+            val methodType = cu.typesInUse.usedMethods.toTypedArray()[0]
+            assertThat(methodType.returnType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("a.A2")
+            assertThat(methodType.parameterTypes[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("a.A2")
+        }
+    )
+
+    @Test
+    fun updateVariableType() = assertChanged(
+        dependsOn = arrayOf(a1, a2),
+        before = """
+            import a.A1;
+            
+            public class Test {
+                A1 a;
+            }
+        """,
+        after = """
+            import a.A2;
+            
+            public class Test {
+                A2 a;
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.typesInUse.variables.toTypedArray()[0].type.asFullyQualified()!!.fullyQualifiedName).isEqualTo("a.A2")
+            assertThat(cu.findType("a.A1")).isEmpty()
+            assertThat(cu.findType("a.A2")).isNotEmpty()
+        }
+    )
+
+    @Test
+    fun boundedGenericType() = assertChanged(
+        dependsOn = arrayOf(a1, a2),
+        before = """
+            import a.A1;
+            
+            public class Test {
+                <T extends A1> T method(T t) {
+                    return t;
+                }
+            }
+        """,
+        after = """
+            import a.A2;
+            
+            public class Test {
+                <T extends A2> T method(T t) {
+                    return t;
+                }
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("a.A1")).isEmpty()
+            assertThat(cu.findType("a.A2")).isNotEmpty()
+        }
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")

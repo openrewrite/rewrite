@@ -26,6 +26,8 @@ import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Stack;
 
 @Value
@@ -72,7 +74,7 @@ public class ChangeType extends Recipe {
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 JavaSourceFile sf = super.visitJavaSourceFile(cu, executionContext);
                 if (!Boolean.TRUE.equals(ignoreDefinition)) {
-                    Boolean visit = executionContext.getMessage("TARGET_CLASS");
+                    Boolean visit = getCursor().pollNearestMessage("TARGET_CLASS");
                     if (visit != null && visit) {
                         return sf.withMarkers(sf.getMarkers().searchResult());
                     }
@@ -86,7 +88,7 @@ public class ChangeType extends Recipe {
                 J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, executionContext);
                 if (!Boolean.TRUE.equals(ignoreDefinition) &&
                         TypeUtils.isOfClassType(cd.getType(), oldFullyQualifiedTypeName)) {
-                    executionContext.putMessage("TARGET_CLASS", true);
+                    getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "TARGET_CLASS", true);
                 }
                 return cd;
             }
@@ -104,6 +106,8 @@ public class ChangeType extends Recipe {
 
         @Nullable
         private final Boolean ignoreDefinition;
+
+        private final Map<String, JavaType> oldNameToChangedType = new HashMap<>();
 
         private ChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
@@ -157,29 +161,26 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public @Nullable J postVisit(J tree, ExecutionContext executionContext) {
-            if (tree instanceof J.MethodDeclaration) {
-                J.MethodDeclaration method = (J.MethodDeclaration) tree;
-                tree = method.withMethodType(updateType(method.getMethodType()));
-            } else if (tree instanceof J.MethodInvocation) {
-                J.MethodInvocation method = (J.MethodInvocation) tree;
-                tree = method.withMethodType(updateType(method.getMethodType()));
-            }
+        public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext executionContext) {
+            return updateType(javaType);
+        }
 
-            if (tree instanceof TypedTree) {
-                if (tree instanceof J.MethodDeclaration) {
-                    J.MethodDeclaration m = (J.MethodDeclaration) tree;
-                    return m.withMethodType(updateType(m.getMethodType()));
-                } else if (tree instanceof J.MethodInvocation) {
-                    J.MethodInvocation m = (J.MethodInvocation) tree;
-                    return m.withMethodType(updateType(m.getMethodType()));
-                } else if (tree instanceof J.NewClass) {
-                    J.NewClass n = (J.NewClass) tree;
-                    return n.withConstructorType(updateType(n.getConstructorType()));
-                }
-                return ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
+        @Override
+        public @Nullable J postVisit(J tree, ExecutionContext executionContext) {
+            J j = super.postVisit(tree, executionContext);
+            if (j instanceof J.MethodDeclaration) {
+                J.MethodDeclaration method = (J.MethodDeclaration) j;
+                j = method.withMethodType(updateType(method.getMethodType()));
+            } else if (j instanceof J.MethodInvocation) {
+                J.MethodInvocation method = (J.MethodInvocation) j;
+                j = method.withMethodType(updateType(method.getMethodType()));
+            } else if (j instanceof J.NewClass) {
+                J.NewClass n = (J.NewClass) j;
+                j = n.withConstructorType(updateType(n.getConstructorType()));
+            } else if (tree instanceof TypedTree) {
+                j = ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             }
-            return tree;
+            return j;
         }
 
         @Override
@@ -231,30 +232,29 @@ public class ChangeType extends Recipe {
         public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
             // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
             // Then transform it, otherwise leave it alone
-            J.Identifier i = visitAndCast(ident, ctx, super::visitIdentifier);
-
-            if (TypeUtils.isOfClassType(i.getType(), originalType.getFullyQualifiedName())) {
+            if (TypeUtils.isOfClassType(ident.getType(), originalType.getFullyQualifiedName())) {
                 String className = originalType.getClassName();
-                JavaType.FullyQualified iType = TypeUtils.asFullyQualified(i.getType());
+                JavaType.FullyQualified iType = TypeUtils.asFullyQualified(ident.getType());
                 if (iType != null && iType.getOwningClass() != null) {
                     className = originalType.getFullyQualifiedName().substring(iType.getOwningClass().getFullyQualifiedName().length() + 1);
                 }
 
-                if (i.getSimpleName().equals(className)) {
+                if (ident.getSimpleName().equals(className)) {
                     if (targetType instanceof JavaType.FullyQualified) {
                         if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
                             return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
                                     .withType(null)
-                                    .withPrefix(i.getPrefix()));
+                                    .withPrefix(ident.getPrefix()));
                         } else {
-                            i = i.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
+                            ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
                         }
                     } else if (targetType instanceof JavaType.Primitive) {
-                        i = i.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
+                        ident = ident.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
                     }
                 }
             }
-            return i.withType(updateType(i.getType()));
+            ident = ident.withType(updateType(ident.getType()));
+            return visitAndCast(ident, ctx, super::visitIdentifier);
         }
 
         @Override
@@ -339,27 +339,61 @@ public class ChangeType extends Recipe {
             return typeTree;
         }
 
-        private JavaType updateType(@Nullable JavaType type) {
-            JavaType.GenericTypeVariable gtv = TypeUtils.asGeneric(type);
-            if (gtv != null) {
-                return gtv.withBounds(ListUtils.map(gtv.getBounds(), bound -> {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(bound);
-                    if (fq != null) {
-                        if (fq.getFullyQualifiedName().equals(originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified) {
+        private JavaType updateType(@Nullable JavaType oldType) {
+            if (oldType != null && !(oldType instanceof JavaType.Unknown)) {
+                JavaType type = oldNameToChangedType.get(oldType.toString());
+                if (type != null) {
+                    return type;
+                }
+            }
+
+            if (oldType instanceof JavaType.Parameterized) {
+                JavaType.Parameterized pt = (JavaType.Parameterized) oldType;
+                pt = pt.withTypeParameters(ListUtils.map(pt.getTypeParameters(), tp -> {
+                    if (tp instanceof JavaType.FullyQualified) {
+                        JavaType.FullyQualified tpFq = (JavaType.FullyQualified) tp;
+                        if (isTargetFullyQualifiedType(tpFq)) {
                             return targetType;
                         }
                     }
-                    return bound;
+                    return tp;
                 }));
+
+                if (isTargetFullyQualifiedType(pt)) {
+                    pt = pt.withType((JavaType.FullyQualified) updateType(pt.getType()));
+                }
+                oldNameToChangedType.put(oldType.toString(), pt);
+                return pt;
+            } else if (oldType instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
+                if (isTargetFullyQualifiedType(original)) {
+                    return targetType;
+                }
+            } else if (oldType instanceof JavaType.GenericTypeVariable) {
+                JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;
+                gtv = gtv.withBounds(ListUtils.map(gtv.getBounds(), b -> {
+                    if (b instanceof JavaType.FullyQualified && isTargetFullyQualifiedType((JavaType.FullyQualified) b)) {
+                        return updateType(b);
+                    }
+                    return b;
+                }));
+
+                oldNameToChangedType.put(oldType.toString(), gtv);
+                return gtv;
+            } else if (oldType instanceof JavaType.Variable) {
+                JavaType.Variable variable = (JavaType.Variable) oldType;
+                variable = variable.withType(updateType(variable.getType()));
+                oldNameToChangedType.put(oldType.toString(), variable);
+                return variable;
+            } else if (oldType instanceof JavaType.Array) {
+                JavaType.Array array = (JavaType.Array) oldType;
+                array = array.withElemType(updateType(array.getElemType()));
+                oldNameToChangedType.put(oldType.toString(), array);
+                return array;
             }
 
-            JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(type);
-            if (fqt != null && fqt.getFullyQualifiedName().equals(originalType.getFullyQualifiedName())) {
-                return targetType;
-            }
-
-            //noinspection ConstantConditions
-            return type;
+            // noinspection ConstantConditions
+            return oldType;
         }
 
         @Nullable
@@ -370,6 +404,10 @@ public class ChangeType extends Recipe {
                         .withParameterTypes(ListUtils.map(mt.getParameterTypes(), this::updateType));
             }
             return null;
+        }
+
+        private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
+            return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified;
         }
     }
 
