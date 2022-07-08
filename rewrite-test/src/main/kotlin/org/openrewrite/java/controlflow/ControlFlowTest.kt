@@ -1056,7 +1056,37 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
-
+    @Test
+    fun `for each loop over new array`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                int test() {
+                    int x = start();
+                    x++;
+                    for (int i : new int[]{1, 2, 3, 5}) {
+                        System.out.println(i);
+                    }
+                    return 5;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                    int x = start();
+                    x++;
+                    for (int i : new int[]{1, 2, 3, 5}) /*~~(L)~~>*/{
+                        System.out.println(i);
+                    }
+                    return /*~~(L)~~>*/5;
+                }
+            }
+            """
+        )
+    )
 
     @Test
     fun typecast() = rewriteRun(
