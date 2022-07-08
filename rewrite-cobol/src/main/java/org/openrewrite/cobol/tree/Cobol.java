@@ -49,9 +49,9 @@ public interface Cobol extends Tree {
         return v instanceof CobolVisitor;
     }
 
-    Space getPrefix();
+    String getPrefix();
 
-    <P extends Cobol> P withPrefix(Space prefix);
+    <P extends Cobol> P withPrefix(String prefix);
 
     <P extends Cobol> P withMarkers(Markers markers);
 
@@ -81,7 +81,7 @@ public interface Cobol extends Tree {
 
         @With
         @Getter
-        Space prefix;
+        String prefix;
 
         @With
         @Getter
@@ -121,7 +121,7 @@ public interface Cobol extends Tree {
 
         @With
         @Getter
-        Space eof;
+        String eof;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -177,7 +177,7 @@ public interface Cobol extends Tree {
         UUID id;
         @Getter
         @With
-        Space prefix;
+        String prefix;
         @Getter
         @With
         Markers markers;
@@ -244,7 +244,7 @@ public interface Cobol extends Tree {
     class Identifier implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        Space prefix;
+        String prefix;
         Markers markers;
         String simpleName;
 
@@ -260,7 +260,7 @@ public interface Cobol extends Tree {
     class Literal implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        Space prefix;
+        String prefix;
         Markers markers;
         Object value;
         String valueSource;
@@ -287,7 +287,7 @@ public interface Cobol extends Tree {
         UUID id;
         @Getter
         @With
-        Space prefix;
+        String prefix;
         @Getter
         @With
         Markers markers;
@@ -373,7 +373,7 @@ public interface Cobol extends Tree {
     class ProcedureDivision implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        Space prefix;
+        String prefix;
         Markers markers;
         @Getter
         @With
@@ -400,7 +400,7 @@ public interface Cobol extends Tree {
     class ProcedureDivisionBody implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        Space prefix;
+        String prefix;
         Markers markers;
         Paragraphs paragraphs;
 
@@ -416,7 +416,7 @@ public interface Cobol extends Tree {
     class Paragraphs implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        Space prefix;
+        String prefix;
         Markers markers;
         List<Sentence> sentences;
 
@@ -432,7 +432,7 @@ public interface Cobol extends Tree {
     class Sentence implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        Space prefix;
+        String prefix;
         Markers markers;
         List<Statement> statements;
         CobolLeftPadded<String> dot;
@@ -458,7 +458,7 @@ public interface Cobol extends Tree {
         UUID id;
         @Getter
         @With
-        Space prefix;
+        String prefix;
         @Getter
         @With
         Markers markers;
@@ -469,11 +469,11 @@ public interface Cobol extends Tree {
         //   ;
         @Getter
         @With
-        CobolRightPadded<Space> programId;
+        CobolRightPadded<String> programId;
 
         @Getter
         @With
-        CobolRightPadded<Space> dot1;
+        CobolRightPadded<String> dot1;
 
         @Getter
         @With
@@ -482,7 +482,7 @@ public interface Cobol extends Tree {
         @Getter
         @With
         @Nullable
-        CobolLeftPadded<Space> dot2;
+        CobolLeftPadded<String> dot2;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -504,11 +504,11 @@ public interface Cobol extends Tree {
             return p;
         }
 
-        public Space getProgramId() {
+        public String getProgramId() {
             return programId.getElement();
         }
 
-        public ProgramIdParagraph withProgramId(Space programId) {
+        public ProgramIdParagraph withProgramId(String programId) {
             //noinspection ConstantConditions
             return getPadding().withProgramId(CobolRightPadded.withElement(this.programId, programId));
         }
@@ -517,20 +517,20 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final ProgramIdParagraph t;
 
-            public CobolRightPadded<Space> getProgramId() {
+            public CobolRightPadded<String> getProgramId() {
                 return t.programId;
             }
 
-            public CobolRightPadded<Space> getDot1() {
+            public CobolRightPadded<String> getDot1() {
                 return t.dot1;
             }
 
-            public CobolLeftPadded<Space> getDot2() {
+            public CobolLeftPadded<String> getDot2() {
                 return t.dot2;
             }
 
 
-            public ProgramIdParagraph withProgramId(CobolRightPadded<Space> programId) {
+            public ProgramIdParagraph withProgramId(CobolRightPadded<String> programId) {
                 return t.programId == programId ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, programId, t.dot1, t.programName, t.dot2);
             }
         }
@@ -542,7 +542,7 @@ public interface Cobol extends Tree {
     class ProgramUnit implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        Space prefix;
+        String prefix;
         Markers markers;
         IdentificationDivision identificationDivision;
 
@@ -561,10 +561,10 @@ public interface Cobol extends Tree {
     class Stop implements Statement {
         @EqualsAndHashCode.Include
         UUID id;
-        Space prefix;
+        String prefix;
         Markers markers;
-        Space stop;
-        Space run;
+        String stop;
+        String run;
         Cobol statement;
 
         @Override

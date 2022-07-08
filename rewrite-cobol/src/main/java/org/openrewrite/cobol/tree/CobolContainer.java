@@ -34,24 +34,24 @@ import static java.util.Collections.emptyList;
 public class CobolContainer<T> {
     private transient Padding<T> padding;
 
-    private static final CobolContainer<?> EMPTY = new CobolContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);
+    private static final CobolContainer<?> EMPTY = new CobolContainer<>("", emptyList(), Markers.EMPTY);
 
-    private final Space before;
+    private final String before;
     private final List<CobolRightPadded<T>> elements;
     private final Markers markers;
 
-    private CobolContainer(Space before, List<CobolRightPadded<T>> elements, Markers markers) {
+    private CobolContainer(String before, List<CobolRightPadded<T>> elements, Markers markers) {
         this.before = before;
         this.elements = elements;
         this.markers = markers;
     }
 
     public static <T> CobolContainer<T> build(List<CobolRightPadded<T>> elements) {
-        return build(Space.EMPTY, elements, Markers.EMPTY);
+        return build("", elements, Markers.EMPTY);
     }
 
     @JsonCreator
-    public static <T> CobolContainer<T> build(Space before, List<CobolRightPadded<T>> elements, Markers markers) {
+    public static <T> CobolContainer<T> build(String before, List<CobolRightPadded<T>> elements, Markers markers) {
         if (before.isEmpty() && elements.isEmpty()) {
             return empty();
         }
@@ -63,7 +63,7 @@ public class CobolContainer<T> {
         return (CobolContainer<T>) EMPTY;
     }
 
-    public CobolContainer<T> withBefore(Space before) {
+    public CobolContainer<T> withBefore(String before) {
         return getBefore() == before ? this : build(before, elements, markers);
     }
 
@@ -79,7 +79,7 @@ public class CobolContainer<T> {
         return CobolRightPadded.getElements(elements);
     }
 
-    public Space getBefore() {
+    public String getBefore() {
         return before;
     }
 
@@ -87,8 +87,8 @@ public class CobolContainer<T> {
         return getPadding().withElements(ListUtils.map(elements, t -> t.map(map)));
     }
 
-    public Space getLastSpace() {
-        return elements.isEmpty() ? Space.EMPTY : elements.get(elements.size() - 1).getAfter();
+    public String getLastSpace() {
+        return elements.isEmpty() ? "" : elements.get(elements.size() - 1).getAfter();
     }
 
     public Padding<T> getPadding() {
@@ -117,7 +117,7 @@ public class CobolContainer<T> {
             if (elements == null || elements.isEmpty()) {
                 return null;
             }
-            return CobolContainer.build(Space.EMPTY, CobolRightPadded.withElements(emptyList(), elements), Markers.EMPTY);
+            return CobolContainer.build("", CobolRightPadded.withElements(emptyList(), elements), Markers.EMPTY);
         }
         if (elements == null || elements.isEmpty()) {
             return null;
