@@ -463,24 +463,14 @@ public interface Cobol extends Tree {
         @With
         Markers markers;
 
-
-        // programIdParagraph
-        //   : PROGRAM_ID DOT_FS programName (IS? (COMMON | INITIAL | LIBRARY | DEFINITION | RECURSIVE) PROGRAM?)? DOT_FS? commentEntry?
-        //   ;
-        @Getter
-        @With
         CobolRightPadded<String> programId;
 
-        @Getter
-        @With
         CobolRightPadded<String> dot1;
 
         @Getter
         @With
         String programName;
 
-        @Getter
-        @With
         @Nullable
         CobolLeftPadded<String> dot2;
 
@@ -525,6 +515,7 @@ public interface Cobol extends Tree {
                 return t.dot1;
             }
 
+            @Nullable
             public CobolLeftPadded<String> getDot2() {
                 return t.dot2;
             }

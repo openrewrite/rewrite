@@ -18,42 +18,46 @@ package org.openrewrite.cobol.internal;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.cobol.CobolVisitor;
 import org.openrewrite.cobol.tree.*;
+import org.openrewrite.internal.lang.Nullable;
 
 public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
 
     @Override
     public String visitString(String space, PrintOutputCapture<P> p) {
-        p.append(space.toString());
+        p.append(space);
         return space;
     }
 
     @Override
-    public <T> CobolLeftPadded<T> visitLeftPadded(CobolLeftPadded<T> left, PrintOutputCapture<P> p) {
-        p.append(left.getBefore().toString());
-        p.append(left.getElement().toString());
+    public <T> CobolLeftPadded<T> visitLeftPadded(@Nullable CobolLeftPadded<T> left, PrintOutputCapture<P> p) {
+        if (left != null) {
+            p.append(left.getBefore());
+            p.append(left.getElement().toString());
+        }
         return left;
     }
 
     @Override
-    public <T> CobolRightPadded<T> visitRightPadded(CobolRightPadded<T> right, PrintOutputCapture<P> p) {
-        p.append(right.getElement().toString());
-        p.append(right.getAfter().toString());
+    public <T> CobolRightPadded<T> visitRightPadded(@Nullable CobolRightPadded<T> right, PrintOutputCapture<P> p) {
+        if (right != null) {
+            p.append(right.getElement().toString());
+            p.append(right.getAfter());
+        }
         return right;
     }
 
     public Cobol visitDisplay(Cobol.Display display, PrintOutputCapture<P> p) {
         visitString(display.getPrefix(), p);
         p.append("DISPLAY");
-        for(CobolLeftPadded<String> operand : display.getOperands()) {
+        for (CobolLeftPadded<String> operand : display.getOperands()) {
             visitLeftPadded(operand, p);
         }
-        //visitLeftPadded(display.getPadding().getUpon(), p);
         return display;
     }
 
     @Override
     public Cobol visitDocument(Cobol.CompilationUnit compilationUnit, PrintOutputCapture<P> p) {
-        for(Cobol.ProgramUnit pu : compilationUnit.getProgramUnits()) {
+        for (Cobol.ProgramUnit pu : compilationUnit.getProgramUnits()) {
             visitProgramUnit(pu, p);
         }
         return compilationUnit;
@@ -106,7 +110,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitProgramUnit(Cobol.ProgramUnit programUnit, PrintOutputCapture<P> p) {
         visitString(programUnit.getPrefix(), p);
         visitIdentificationDivision(programUnit.getIdentificationDivision(), p);
-        if(programUnit.getProcedureDivision() != null) {
+        if (programUnit.getProcedureDivision() != null) {
             visitProcedureDivision(programUnit.getProcedureDivision(), p);
         }
         return programUnit;
@@ -115,13 +119,13 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitStop(Cobol.Stop stop, PrintOutputCapture<P> p) {
         visitString(stop.getPrefix(), p);
         visitString(stop.getStop(), p);
-        if(stop.getRun() != null) visitString(stop.getRun(), p);
+        if (stop.getRun() != null) visitString(stop.getRun(), p);
         return stop;
     }
 
     public Cobol visitParagraphs(Cobol.Paragraphs paragraphs, PrintOutputCapture<P> p) {
         visitString(paragraphs.getPrefix(), p);
-        for(Cobol.Sentence sentence : paragraphs.getSentences()) {
+        for (Cobol.Sentence sentence : paragraphs.getSentences()) {
             visitSentence(sentence, p);
         }
         return paragraphs;
@@ -129,7 +133,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
 
     public Cobol visitSentence(Cobol.Sentence sentence, PrintOutputCapture<P> p) {
         visitString(sentence.getPrefix(), p);
-        for(Statement statement : sentence.getStatements()) {
+        for (Statement statement : sentence.getStatements()) {
             visit(statement, p);
         }
         visitLeftPadded(sentence.getDot(), p);
