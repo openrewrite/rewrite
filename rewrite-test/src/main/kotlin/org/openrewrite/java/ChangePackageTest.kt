@@ -114,6 +114,47 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             }
         """,
         afterConditions = { cu ->
+            assertThat(cu.typesInUse.typesInUse).hasSize(1)
+            assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
+        }
+    )
+
+    @Test
+    fun typesInUseContainsOneMethodTypeReference() = assertChanged(
+        dependsOn = arrayOf(testClass),
+        before = """
+            import org.openrewrite.Test;
+            
+            public class A {
+                void method() {
+                    Test a = test(null);
+                    Test b = test(null);
+                    Test c = test(null);
+                }
+                
+                Test test(Test test) {
+                    return test;
+                }
+            }
+        """,
+        after = """
+            import org.openrewrite.test.Test;
+            
+            public class A {
+                void method() {
+                    Test a = test(null);
+                    Test b = test(null);
+                    Test c = test(null);
+                }
+                
+                Test test(Test test) {
+                    return test;
+                }
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.typesInUse.usedMethods).hasSize(1)
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
         }

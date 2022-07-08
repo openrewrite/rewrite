@@ -213,7 +213,7 @@ public class ChangePackage extends Recipe {
 
         @Nullable
         private JavaType updateType(@Nullable JavaType oldType) {
-            if (oldType == null) {
+            if (oldType == null || oldType instanceof JavaType.Unknown) {
                 return oldType;
             }
 
@@ -235,7 +235,7 @@ public class ChangePackage extends Recipe {
                 }));
 
                 if (isTargetFullyQualifiedType(pt)) {
-                    pt = pt.withType(pt.getType().withFullyQualifiedName(getNewPackageName(pt.getPackageName()) + "." + pt.getClassName()));
+                    pt = pt.withType((JavaType.FullyQualified) updateType(pt.getType()));
                 }
 
                 oldNameToChangedType.put(oldType.toString(), pt);
@@ -272,6 +272,25 @@ public class ChangePackage extends Recipe {
             return oldType;
         }
 
+        @Nullable
+        private JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
+            if (oldMethodType != null) {
+                JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType.toString());
+                if (method != null) {
+                    return method;
+                }
+
+                method = oldMethodType;
+                method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
+                        .withReturnType(updateType(method.getReturnType()))
+                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType));
+                oldNameToChangedType.put(oldMethodType.toString(), method);
+                return method;
+            }
+            return null;
+        }
+
+
         private String getNewPackageName(String packageName) {
             return (recursive == null || recursive) && !newPackageName.endsWith(packageName.substring(oldPackageName.length()))?
                     newPackageName + packageName.substring(oldPackageName.length()) : newPackageName;
@@ -285,16 +304,6 @@ public class ChangePackage extends Recipe {
 
         private boolean isTargetRecursivePackageName(String packageName) {
             return (recursive == null || recursive) && packageName.startsWith(oldPackageName) && !packageName.startsWith(newPackageName);
-        }
-
-        @Nullable
-        private JavaType.Method updateType(@Nullable JavaType.Method mt) {
-            if (mt != null) {
-                return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
-                        .withReturnType(updateType(mt.getReturnType()))
-                        .withParameterTypes(ListUtils.map(mt.getParameterTypes(), this::updateType));
-            }
-            return null;
         }
     }
 }
