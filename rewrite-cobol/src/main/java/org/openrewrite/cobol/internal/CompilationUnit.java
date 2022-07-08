@@ -18,17 +18,17 @@ import java.util.List;
 
 public interface CompilationUnit extends ASGElement, NamedElement {
 
-	Cobol.ProgramUnit addProgramUnit(CobolParser.ProgramUnitContext ctx);
+    Cobol.ProgramUnit addProgramUnit(CobolParser.ProgramUnitContext ctx);
 
-	List<String> getLines();
+    List<String> getLines();
 
-	Cobol.ProgramUnit getProgramUnit();
+    Cobol.ProgramUnit getProgramUnit();
 
-	List<Cobol.ProgramUnit> getProgramUnits();
+    List<Cobol.ProgramUnit> getProgramUnits();
 
-	CommonTokenStream getTokens();
+    CommonTokenStream getTokens();
 
-	int incrementFillerCounter();
+    int incrementFillerCounter();
 
-	void setLines(List<String> lines);
+    void setLines(List<String> lines);
 }

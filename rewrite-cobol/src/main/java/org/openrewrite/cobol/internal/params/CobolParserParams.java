@@ -16,34 +16,34 @@ import java.util.List;
 
 public interface CobolParserParams {
 
-	/**
-	 * @see https://docs.oracle.com/javase/8/docs/technotes/guides/intl/encoding.doc.html
-	 */
-	Charset getCharset();
+    /**
+     * @see https://docs.oracle.com/javase/8/docs/technotes/guides/intl/encoding.doc.html
+     */
+    Charset getCharset();
 
-	List<File> getCopyBookDirectories();
+    List<File> getCopyBookDirectories();
 
-	List<String> getCopyBookExtensions();
+    List<String> getCopyBookExtensions();
 
-	List<File> getCopyBookFiles();
+    List<File> getCopyBookFiles();
 
-	CobolDialect getDialect();
+    CobolDialect getDialect();
 
-	CobolPreprocessor.CobolSourceFormatEnum getFormat();
+    CobolPreprocessor.CobolSourceFormatEnum getFormat();
 
-	boolean getIgnoreSyntaxErrors();
+    boolean getIgnoreSyntaxErrors();
 
-	void setCharset(Charset charset);
+    void setCharset(Charset charset);
 
-	void setCopyBookDirectories(List<File> copyBookDirectories);
+    void setCopyBookDirectories(List<File> copyBookDirectories);
 
-	void setCopyBookExtensions(List<String> copyBookExtensions);
+    void setCopyBookExtensions(List<String> copyBookExtensions);
 
-	void setCopyBookFiles(List<File> copyBookFiles);
+    void setCopyBookFiles(List<File> copyBookFiles);
 
-	void setDialect(CobolDialect dialect);
+    void setDialect(CobolDialect dialect);
 
-	void setFormat(CobolPreprocessor.CobolSourceFormatEnum format);
+    void setFormat(CobolPreprocessor.CobolSourceFormatEnum format);
 
-	void setIgnoreSyntaxErrors(boolean ignoreSyntaxErrors);
+    void setIgnoreSyntaxErrors(boolean ignoreSyntaxErrors);
 }

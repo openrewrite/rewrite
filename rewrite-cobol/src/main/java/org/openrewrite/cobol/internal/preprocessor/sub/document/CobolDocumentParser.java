@@ -13,5 +13,5 @@ import org.openrewrite.cobol.internal.params.CobolParserParams;
 
 public interface CobolDocumentParser {
 
-	StringWithOriginalPositions processLines(StringWithOriginalPositions code, CobolParserParams params);
+    StringWithOriginalPositions processLines(StringWithOriginalPositions code, CobolParserParams params);
 }

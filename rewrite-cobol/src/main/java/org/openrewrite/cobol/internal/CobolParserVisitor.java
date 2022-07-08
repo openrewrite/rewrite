@@ -54,18 +54,18 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     private String space(ParseTree ctx1, ParseTree ctx2) {
         int stop;
-        if(ctx1 instanceof ParserRuleContext) {
-            stop = ((ParserRuleContext)ctx1).getStop().getStopIndex();
-        } else if(ctx1 instanceof TerminalNode) {
-            stop = ((TerminalNode)ctx1).getSymbol().getStopIndex();
+        if (ctx1 instanceof ParserRuleContext) {
+            stop = ((ParserRuleContext) ctx1).getStop().getStopIndex();
+        } else if (ctx1 instanceof TerminalNode) {
+            stop = ((TerminalNode) ctx1).getSymbol().getStopIndex();
         } else {
             throw new IllegalArgumentException();
         }
         int start;
-        if(ctx2 instanceof ParserRuleContext) {
-            start = ((ParserRuleContext)ctx2).getStart().getStartIndex();
-        } else if(ctx2 instanceof TerminalNode) {
-            start = ((TerminalNode)ctx2).getSymbol().getStartIndex();
+        if (ctx2 instanceof ParserRuleContext) {
+            start = ((ParserRuleContext) ctx2).getStart().getStartIndex();
+        } else if (ctx2 instanceof TerminalNode) {
+            start = ((TerminalNode) ctx2).getSymbol().getStartIndex();
         } else {
             throw new IllegalArgumentException();
         }
@@ -78,13 +78,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     }
 
     private String prefix(ParserRuleContext tree) {
-        if(positionInParent(tree) == 0) {
+        if (positionInParent(tree) == 0) {
             // prefix will be attached to an ancestor node
             return "";
         }
         Token firstToken = tree.getStart();
         Token previousToken = previousToken(tree);
-        if(previousToken == null) {
+        if (previousToken == null) {
             return source.substring(0, firstToken.getStartIndex());
         } else {
             return source.substring(previousToken.getStopIndex() + 1, firstToken.getStartIndex());
@@ -110,15 +110,15 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
             return null;
         }
         int pos = positionInParent(n);
-        if(pos == 0) {
+        if (pos == 0) {
             return previousToken(parent);
         } else {
-            return lastToken(parent.getChild(pos-1));
+            return lastToken(parent.getChild(pos - 1));
         }
     }
 
     private Token lastToken(ParseTree n) {
-        if(n instanceof TerminalNode) {
+        if (n instanceof TerminalNode) {
             return ((TerminalNode) n).getSymbol();
         } else {
             return ((ParserRuleContext) n).stop;
@@ -201,7 +201,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitProcedureDivisionBody(CobolParser.ProcedureDivisionBodyContext ctx) {
-        if(ctx.procedureSection() != null && ctx.procedureSection().size() > 0) {
+        if (ctx.procedureSection() != null && ctx.procedureSection().size() > 0) {
             throw new UnsupportedOperationException("Not implemented");
         }
         Cobol.Paragraphs paragraphs = (Cobol.Paragraphs) visitParagraphs(ctx.paragraphs());
@@ -215,12 +215,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitParagraphs(CobolParser.ParagraphsContext ctx) {
-        if(ctx.paragraph() != null && ctx.paragraph().size() > 0) {
+        if (ctx.paragraph() != null && ctx.paragraph().size() > 0) {
             throw new UnsupportedOperationException("Not implemented");
         }
         List<Cobol.Sentence> sentences = new ArrayList<>();
-        for(int i=0; i<ctx.sentence().size(); i++) {
-            sentences.add( (Cobol.Sentence) visitSentence(ctx.sentence(i)));
+        for (int i = 0; i < ctx.sentence().size(); i++) {
+            sentences.add((Cobol.Sentence) visitSentence(ctx.sentence(i)));
         }
         return new Cobol.Paragraphs(
                 randomId(),
@@ -232,11 +232,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     @Override
     public Cobol visitSentence(CobolParser.SentenceContext ctx) {
         List<Statement> statements = new ArrayList<>();
-        for(int i=0; i<ctx.statement().size(); i++) {
-            statements.add( (Statement) visit(ctx.statement(i)));
+        for (int i = 0; i < ctx.statement().size(); i++) {
+            statements.add((Statement) visit(ctx.statement(i)));
         }
         CobolLeftPadded<String> dot = CobolLeftPadded.build(ctx.DOT_FS().getText())
-                .withBefore(ctx.statement().size() == 0 ? "" : space(ctx.statement(ctx.statement().size()-1), ctx.DOT_FS()));
+                .withBefore(ctx.statement().size() == 0 ? "" : space(ctx.statement(ctx.statement().size() - 1), ctx.DOT_FS()));
         return new Cobol.Sentence(
                 randomId(),
                 prefix(ctx),
@@ -247,16 +247,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitStopStatement(CobolParser.StopStatementContext ctx) {
-        if(ctx.literal() != null) {
+        if (ctx.literal() != null) {
             throw new UnsupportedOperationException("Not implemented");
         }
-        if(ctx.stopStatementGiving() != null) {
+        if (ctx.stopStatementGiving() != null) {
             throw new UnsupportedOperationException("Not implemented");
         }
 
         String stop = ctx.STOP().getText();
         String run = null;
-        if(ctx.RUN() != null) {
+        if (ctx.RUN() != null) {
             run = space(ctx.STOP(), ctx.RUN()) + ctx.RUN().getText();
         }
         return new Cobol.Stop(
@@ -270,28 +270,28 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitDisplayStatement(CobolParser.DisplayStatementContext ctx) {
-        if(ctx.displayAt() != null) {
+        if (ctx.displayAt() != null) {
             throw new UnsupportedOperationException("Not implemented");
         }
-        if(ctx.displayUpon() != null) {
+        if (ctx.displayUpon() != null) {
             throw new UnsupportedOperationException("Not implemented");
         }
-        if(ctx.displayWith() != null) {
+        if (ctx.displayWith() != null) {
             throw new UnsupportedOperationException("Not implemented");
         }
-        if(ctx.onExceptionClause() != null) {
+        if (ctx.onExceptionClause() != null) {
             throw new UnsupportedOperationException("Not implemented");
         }
-        if(ctx.notOnExceptionClause() != null) {
+        if (ctx.notOnExceptionClause() != null) {
             throw new UnsupportedOperationException("Not implemented");
         }
-        if(ctx.END_DISPLAY() != null) {
+        if (ctx.END_DISPLAY() != null) {
             throw new UnsupportedOperationException("Not implemented");
         }
 
         List<CobolLeftPadded<String>> operands = new ArrayList<>();
         ParseTree previousCtx = ctx.DISPLAY();
-        for(int i=0; i<ctx.displayOperand().size(); i++) {
+        for (int i = 0; i < ctx.displayOperand().size(); i++) {
             ParserRuleContext operandCtx = ctx.displayOperand(i);
             String before = space(previousCtx, operandCtx);
             previousCtx = operandCtx;
@@ -308,7 +308,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     @Override
     public Cobol visitIdentificationDivision(CobolParser.IdentificationDivisionContext ctx) {
 
-        if(ctx.identificationDivisionBody() != null && ctx.identificationDivisionBody().size() != 0) {
+        if (ctx.identificationDivisionBody() != null && ctx.identificationDivisionBody().size() != 0) {
             throw new UnsupportedOperationException("Not implemented");
         }
 
@@ -340,7 +340,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
                 .withAfter(space(ctx.DOT_FS(0), ctx.programName()));
         String programName = ctx.programName().getText();
         CobolLeftPadded<String> dot2 = null;
-        if(ctx.DOT_FS().size() > 1) {
+        if (ctx.DOT_FS().size() > 1) {
             dot2 = CobolLeftPadded.build(ctx.DOT_FS(1).getText())
                     .withBefore(space(ctx.programName(), ctx.DOT_FS(1)));
         }

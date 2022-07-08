@@ -20,32 +20,32 @@ import org.openrewrite.cobol.internal.preprocessor.sub.util.TokenUtils;
  */
 public class CobolHiddenTokenCollectorListenerImpl extends CobolPreprocessorBaseListener {
 
-	boolean firstTerminal = true;
+    boolean firstTerminal = true;
 
-	private final StringBuffer outputBuffer = new StringBuffer();
+    private final StringBuffer outputBuffer = new StringBuffer();
 
-	private final BufferedTokenStream tokens;
+    private final BufferedTokenStream tokens;
 
-	public CobolHiddenTokenCollectorListenerImpl(final BufferedTokenStream tokens) {
-		this.tokens = tokens;
-	}
+    public CobolHiddenTokenCollectorListenerImpl(final BufferedTokenStream tokens) {
+        this.tokens = tokens;
+    }
 
-	public String read() {
-		return outputBuffer.toString();
-	}
+    public String read() {
+        return outputBuffer.toString();
+    }
 
-	@Override
-	public void visitTerminal(final TerminalNode node) {
-		if (!firstTerminal) {
-			final int tokPos = node.getSourceInterval().a;
-			outputBuffer.append(TokenUtils.getHiddenTokensToLeft(tokPos, tokens));
-		}
+    @Override
+    public void visitTerminal(final TerminalNode node) {
+        if (!firstTerminal) {
+            final int tokPos = node.getSourceInterval().a;
+            outputBuffer.append(TokenUtils.getHiddenTokensToLeft(tokPos, tokens));
+        }
 
-		if (!TokenUtils.isEOF(node)) {
-			final String text = node.getText();
-			outputBuffer.append(text);
-		}
+        if (!TokenUtils.isEOF(node)) {
+            final String text = node.getText();
+            outputBuffer.append(text);
+        }
 
-		firstTerminal = false;
-	}
+        firstTerminal = false;
+    }
 }

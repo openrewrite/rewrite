@@ -26,49 +26,50 @@ import java.util.Arrays;
 
 public class Main {
 
-	public static void main(String[] args) throws IOException {
-			//new File("src/test/resources/io/proleap/cobol/asg/HelloWorld.cbl");
-			//new File("src/test/resources/io/proleap/cobol/preprocessor/fixed/LineContinuation.cbl");
+    public static void main(String[] args) throws IOException {
+        //new File("src/test/resources/io/proleap/cobol/asg/HelloWorld.cbl");
+        //new File("src/test/resources/io/proleap/cobol/preprocessor/fixed/LineContinuation.cbl");
 
-		String DIR;
-		File inputFile;
-		
-		String testName = "copyinws";
-		
-		switch(testName) {
-		case "copyinws":
-			DIR = "src/test/resources/io/proleap/cobol/preprocessor/copy/copyinws";
-			inputFile = new File(DIR + "/SM201A.CBL");
-			break;
-		case "CobolWorld":
-			DIR = "src/test/resources/io/proleap/cobol/preprocessor/copy/cobolword/variable";
-			inputFile = new File(DIR + "/CopyCblWord.cbl");
-			break;
-		case "CopyReplace":
-			DIR = "src/test/resources/io/proleap/cobol/preprocessor/copy/copyreplace/variable";
-			inputFile = new File(DIR + "/CopyReplace.cbl");;
-			break;
-		default:
-			return;
-		}
-		
-		CobolPreprocessor.CobolSourceFormatEnum format = CobolPreprocessor.CobolSourceFormatEnum.FIXED;
+        String DIR;
+        File inputFile;
 
-		CobolParserRunnerImpl parser = new CobolParserRunnerImpl();
-		CobolParserParams params = new CobolParserParamsImpl();
-		
-		params.setFormat(format);
-		final File copyBooksDirectory = new File(DIR + "/copybooks");
-		params.setCopyBookDirectories(Arrays.asList(copyBooksDirectory));
+        String testName = "copyinws";
 
-		//Program program = parser.analyzeFile(inputFile, params);
-		final Program program = new ProgramImpl();
-		parser.parseFile(inputFile, program, params);
+        switch (testName) {
+            case "copyinws":
+                DIR = "src/test/resources/io/proleap/cobol/preprocessor/copy/copyinws";
+                inputFile = new File(DIR + "/SM201A.CBL");
+                break;
+            case "CobolWorld":
+                DIR = "src/test/resources/io/proleap/cobol/preprocessor/copy/cobolword/variable";
+                inputFile = new File(DIR + "/CopyCblWord.cbl");
+                break;
+            case "CopyReplace":
+                DIR = "src/test/resources/io/proleap/cobol/preprocessor/copy/copyreplace/variable";
+                inputFile = new File(DIR + "/CopyReplace.cbl");
+                ;
+                break;
+            default:
+                return;
+        }
 
-		System.out.println();
-		throw new Error("Stop here!");
+        CobolPreprocessor.CobolSourceFormatEnum format = CobolPreprocessor.CobolSourceFormatEnum.FIXED;
 
-		// navigate on ASG
+        CobolParserRunnerImpl parser = new CobolParserRunnerImpl();
+        CobolParserParams params = new CobolParserParamsImpl();
+
+        params.setFormat(format);
+        final File copyBooksDirectory = new File(DIR + "/copybooks");
+        params.setCopyBookDirectories(Arrays.asList(copyBooksDirectory));
+
+        //Program program = parser.analyzeFile(inputFile, params);
+        final Program program = new ProgramImpl();
+        parser.parseFile(inputFile, program, params);
+
+        System.out.println();
+        throw new Error("Stop here!");
+
+        // navigate on ASG
 //		Printer printer = new Printer(System.out);
 //		for(CompilationUnit compilationUnit : program.getCompilationUnits()) {
 //			System.out.println("Printing compilation unit " + compilationUnit.getName());
@@ -82,6 +83,6 @@ public class Main {
 		DataDescriptionEntry dataDescriptionEntry = dataDivision.getWorkingStorageSection().getDataDescriptionEntry("ITEMS");
 		Integer levelNumber = dataDescriptionEntry.getLevelNumber();
 		*/
-	}
+    }
 }
 

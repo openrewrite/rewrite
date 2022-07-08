@@ -21,29 +21,29 @@ import org.openrewrite.cobol.internal.preprocessor.sub.document.impl.CobolHidden
 
 public class TokenUtils {
 
-	public static String getHiddenTokensToLeft(final int tokPos, final BufferedTokenStream tokens) {
-		final List<Token> refChannel = tokens.getHiddenTokensToLeft(tokPos, CobolPreprocessorLexer.HIDDEN);
-		final StringBuffer sb = new StringBuffer();
+    public static String getHiddenTokensToLeft(final int tokPos, final BufferedTokenStream tokens) {
+        final List<Token> refChannel = tokens.getHiddenTokensToLeft(tokPos, CobolPreprocessorLexer.HIDDEN);
+        final StringBuffer sb = new StringBuffer();
 
-		if (refChannel != null) {
-			for (final Token refToken : refChannel) {
-				final String text = refToken.getText();
-				sb.append(text);
-			}
-		}
+        if (refChannel != null) {
+            for (final Token refToken : refChannel) {
+                final String text = refToken.getText();
+                sb.append(text);
+            }
+        }
 
-		return sb.toString();
-	}
+        return sb.toString();
+    }
 
-	public static String getTextIncludingHiddenTokens(final ParseTree ctx, final BufferedTokenStream tokens) {
-		final CobolHiddenTokenCollectorListenerImpl listener = new CobolHiddenTokenCollectorListenerImpl(tokens);
-		final ParseTreeWalker walker = new ParseTreeWalker();
-		walker.walk(listener, ctx);
+    public static String getTextIncludingHiddenTokens(final ParseTree ctx, final BufferedTokenStream tokens) {
+        final CobolHiddenTokenCollectorListenerImpl listener = new CobolHiddenTokenCollectorListenerImpl(tokens);
+        final ParseTreeWalker walker = new ParseTreeWalker();
+        walker.walk(listener, ctx);
 
-		return listener.read();
-	}
+        return listener.read();
+    }
 
-	public static boolean isEOF(final TerminalNode node) {
-		return Token.EOF == node.getSymbol().getType();
-	}
+    public static boolean isEOF(final TerminalNode node) {
+        return Token.EOF == node.getSymbol().getType();
+    }
 }

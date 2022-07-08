@@ -19,35 +19,35 @@ import org.openrewrite.cobol.internal.preprocessor.sub.line.rewriter.CobolInline
 
 public class CobolInlineCommentEntriesNormalizerImpl implements CobolInlineCommentEntriesNormalizer {
 
-	protected static final String denormalizedCommentEntryRegex = "\\*>[^ ]";
+    protected static final String denormalizedCommentEntryRegex = "\\*>[^ ]";
 
-	protected final Pattern denormalizedCommentEntryPattern = Pattern.compile(denormalizedCommentEntryRegex);
+    protected final Pattern denormalizedCommentEntryPattern = Pattern.compile(denormalizedCommentEntryRegex);
 
-	@Override
-	public CobolLine processLine(final CobolLine line) {
-		final Matcher matcher = denormalizedCommentEntryPattern.matcher(line.getContentArea());
-		final CobolLine result;
+    @Override
+    public CobolLine processLine(final CobolLine line) {
+        final Matcher matcher = denormalizedCommentEntryPattern.matcher(line.getContentArea());
+        final CobolLine result;
 
-		if (!matcher.find()) {
-			result = line;
-		} else {
-			final String newContentArea = line.getContentArea().replace(CobolPreprocessor.COMMENT_TAG,
-					CobolPreprocessor.COMMENT_TAG + CobolPreprocessor.WS);
-			result = CobolLine.copyCobolLineWithContentArea(newContentArea, line);
-		}
+        if (!matcher.find()) {
+            result = line;
+        } else {
+            final String newContentArea = line.getContentArea().replace(CobolPreprocessor.COMMENT_TAG,
+                    CobolPreprocessor.COMMENT_TAG + CobolPreprocessor.WS);
+            result = CobolLine.copyCobolLineWithContentArea(newContentArea, line);
+        }
 
-		return result;
-	}
+        return result;
+    }
 
-	@Override
-	public List<CobolLine> processLines(final List<CobolLine> lines) {
-		final List<CobolLine> result = new ArrayList<CobolLine>();
+    @Override
+    public List<CobolLine> processLines(final List<CobolLine> lines) {
+        final List<CobolLine> result = new ArrayList<CobolLine>();
 
-		for (final CobolLine line : lines) {
-			final CobolLine processedLine = processLine(line);
-			result.add(processedLine);
-		}
+        for (final CobolLine line : lines) {
+            final CobolLine processedLine = processLine(line);
+            result.add(processedLine);
+        }
 
-		return result;
-	}
+        return result;
+    }
 }

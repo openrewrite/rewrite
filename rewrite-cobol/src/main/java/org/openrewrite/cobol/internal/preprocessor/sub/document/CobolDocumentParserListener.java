@@ -13,5 +13,5 @@ import org.openrewrite.cobol.internal.preprocessor.sub.document.impl.CobolDocume
 
 public interface CobolDocumentParserListener extends CobolPreprocessorListener {
 
-	CobolDocumentContext context();
+    CobolDocumentContext context();
 }

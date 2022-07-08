@@ -15,5 +15,5 @@ import org.openrewrite.cobol.internal.params.CobolParserParams;
 
 public interface FilenameCopyBookFinder {
 
-	File findCopyBook(CobolParserParams params, CobolPreprocessorParser.FilenameContext ctx);
+    File findCopyBook(CobolParserParams params, CobolPreprocessorParser.FilenameContext ctx);
 }

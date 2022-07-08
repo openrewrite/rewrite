@@ -10,9 +10,9 @@ package org.openrewrite.cobol.internal;
 
 public class CobolParserException extends RuntimeException {
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	public CobolParserException(final String message) {
-		super(message);
-	}
+    public CobolParserException(final String message) {
+        super(message);
+    }
 }

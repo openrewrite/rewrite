@@ -10,5 +10,5 @@ package org.openrewrite.cobol.internal;
 
 public interface NamedElement {
 
-	String getName();
+    String getName();
 }
