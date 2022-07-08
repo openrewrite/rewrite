@@ -393,4 +393,27 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             x.y.z: abc
         """
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2016")
+    fun relocatesPropertyWithSamePrefix() = assertChanged(
+        recipe = ChangePropertyKey(
+            "spring.elasticsearch.rest.sniffer.interval",
+            "spring.elasticsearch.restclient.sniffer.interval",
+            true,
+            null
+        ),
+        before = """
+            spring:
+              elasticsearch:
+                rest:
+                  sniffer:
+                    interval: 1
+        """,
+        after = """
+            spring:
+              elasticsearch:
+                  restclient.sniffer.interval: 1
+        """
+    )
 }

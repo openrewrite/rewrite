@@ -116,9 +116,9 @@ public class ChangePropertyKey extends Recipe {
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
-                    String value = propertyEntry.getKey().getValue();
+                    String value = propertyEntry.getKey().getValue() + ".";
 
-                    if (!propertyToTest.startsWith(value) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
+                    if (!propertyToTest.startsWith(value ) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
                         doAfterVisit(new InsertSubpropertyVisitor<>(
                                 propertyEntry,
                                 propertyToTest,
@@ -126,7 +126,7 @@ public class ChangePropertyKey extends Recipe {
                         ));
                         break;
                     }
-                    propertyToTest = propertyToTest.substring(value.length() + 1);
+                    propertyToTest = propertyToTest.substring(value.length());
                 }
             }
 
