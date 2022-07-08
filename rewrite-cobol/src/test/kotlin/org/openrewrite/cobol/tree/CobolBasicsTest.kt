@@ -29,6 +29,16 @@ class CobolBasicsTest : CobolTreeTest {
         """)
 
     @Test
+    fun columns() = roundTrip(
+        """
+000010 IDENTIFICATION  DIVISION .
+000020 PROGRAM-ID    . HELLO     .
+000030 PROCEDURE DIVISION.
+000040 DISPLAY 'Hello world!'.
+000050 STOP RUN.
+""")
+
+    @Test
     fun arithmetic() = roundTrip(
         """
         IDENTIFICATION DIVISION .
