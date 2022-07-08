@@ -6,10 +6,11 @@
  * of the MIT license. See the LICENSE file for details.
  */
 
-package org.openrewrite.cobol;
+package org.openrewrite.cobol.internal;
 
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.cobol.internal.ASGElement;
+import org.openrewrite.cobol.internal.NamedElement;
 import org.openrewrite.cobol.internal.grammar.CobolParser;
 import org.openrewrite.cobol.tree.Cobol;
 

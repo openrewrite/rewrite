@@ -10,8 +10,6 @@ package org.openrewrite.cobol.internal.runner.impl;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.openrewrite.cobol.CompilationUnit;
-import org.openrewrite.cobol.ProgramImpl;
 import org.openrewrite.cobol.internal.CobolParserException;
 import org.openrewrite.cobol.internal.Program;
 import org.openrewrite.cobol.internal.StringWithOriginalPositions;
