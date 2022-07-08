@@ -305,6 +305,44 @@ class ChangeJavaCompatibilityTest : GradleRecipeTest {
             """
         )
 
+        @Test
+        fun changeSourceCompatibility_JavaPluginExtensionFieldAccess() = assertChanged(
+            recipe = ChangeJavaCompatibility(newVersion, "source"),
+            before = """
+                plugins {
+                    java
+                }
+                
+                java.sourceCompatibility = "1.7"
+            """,
+            after = """
+                plugins {
+                    java
+                }
+                
+                java.sourceCompatibility = ${coerce(newVersion)}
+            """
+        )
+
+        @Test
+        fun changeTargetCompatibility_JavaPluginExtensionFieldAccess() = assertChanged(
+            recipe = ChangeJavaCompatibility(newVersion, "target"),
+            before = """
+                plugins {
+                    java
+                }
+                
+                java.targetCompatibility = "1.7"
+            """,
+            after = """
+                plugins {
+                    java
+                }
+                
+                java.targetCompatibility = ${coerce(newVersion)}
+            """
+        )
+
         private fun coerce(version: String): String {
             return if (version.startsWith("VERSION_")) "JavaVersion.$version" else version
         }
