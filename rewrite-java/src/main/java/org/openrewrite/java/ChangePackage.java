@@ -164,7 +164,7 @@ public class ChangePackage extends Recipe {
                 pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, changingTo).build(), pkg.getCoordinates().replace());
             }
             //noinspection ConstantConditions
-            return pkg;
+            return super.visitPackage(pkg, context);
         }
 
         @Override
@@ -238,7 +238,6 @@ public class ChangePackage extends Recipe {
                     pt = pt.withType(pt.getType().withFullyQualifiedName(getNewPackageName(pt.getPackageName()) + "." + pt.getClassName()));
                 }
 
-                // Saves oldType to prevent recomputing type parameters.
                 oldNameToChangedType.put(oldType.toString(), pt);
                 return pt;
             } else if (oldType instanceof JavaType.FullyQualified) {
@@ -257,9 +256,13 @@ public class ChangePackage extends Recipe {
                     return b;
                 }));
 
-                // Saves oldType to prevent recomputing type bounds.
                 oldNameToChangedType.put(oldType.toString(), gtv);
                 return gtv;
+            } else if (oldType instanceof JavaType.Variable) {
+                JavaType.Variable variable = (JavaType.Variable) oldType;
+                variable = variable.withType(updateType(variable.getType()));
+                oldNameToChangedType.put(oldType.toString(), variable);
+                return variable;
             } else if (oldType instanceof JavaType.Array) {
                 JavaType.Array array = (JavaType.Array) oldType;
                 array = array.withElemType(updateType(array.getElemType()));
