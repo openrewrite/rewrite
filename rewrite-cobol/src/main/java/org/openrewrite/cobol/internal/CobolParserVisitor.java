@@ -124,19 +124,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         }
     }
 
-    @Nullable
-        ParseTree parent = n.getParent();
-        if (n.getParent() == null) {
-            return null;
-        if(n.getParent() == null) return null;
-        int pos = positionInParent(n);
-        if(pos == 0) {
-            return previousToken(parent);
-        } else {
-            return lastTerminalNode(parent.getChild(pos-1));
-        }
-    }
-
     private int positionInParent(ParseTree n) {
         ParseTree parent = n.getParent();
         int pos;
@@ -148,6 +135,29 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         assert pos < parent.getChildCount();
         return pos;
     }
+
+    @Nullable
+    private Token previousToken(ParseTree n) {
+        ParseTree parent = n.getParent();
+        if (n.getParent() == null) {
+            return null;
+        }
+        int pos = positionInParent(n);
+        if(pos == 0) {
+            return previousToken(parent);
+        } else {
+            return lastToken(parent.getChild(pos-1));
+        }
+    }
+
+    private Token lastToken(ParseTree n) {
+        if(n instanceof TerminalNode) {
+            return ((TerminalNode) n).getSymbol();
+        } else {
+            return ((ParserRuleContext) n).stop;
+        }
+    }
+
 
     private Token lastTerminalNode(ParseTree n) {
         if (n instanceof TerminalNode) {
@@ -192,11 +202,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     @Override
     public Cobol visitProgramUnit(CobolParser.ProgramUnitContext ctx) {
         Cobol.IdentificationDivision identificationDivision = (Cobol.IdentificationDivision) visitIdentificationDivision(ctx.identificationDivision());
-        Optional<Cobol.ProcedureDivision> procedureDivision;
+        Cobol.ProcedureDivision procedureDivision;
         if (ctx.procedureDivision() == null) {
-            procedureDivision = Optional.empty();
+            procedureDivision = null;
         } else {
-            procedureDivision = Optional.of((Cobol.ProcedureDivision) visitProcedureDivision(ctx.procedureDivision()));
+            procedureDivision = (Cobol.ProcedureDivision) visitProcedureDivision(ctx.procedureDivision());
         }
         return new Cobol.ProgramUnit(
                 randomId(),
@@ -224,7 +234,8 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         Space s = prefix(ctx);
 
         CobolRightPadded<String> procedure = CobolRightPadded.build(ctx.PROCEDURE().getText()).withAfter(Space.build(space(ctx.PROCEDURE(), ctx.DIVISION())));
-        CobolRightPadded<String> division = Space.build( + ctx.DIVISION().getText());
+        CobolRightPadded<String> division = CobolRightPadded.build(ctx.DIVISION().getText()).withAfter(Space.build(space(ctx.DIVISION(), ctx.DOT_FS())));
+        String dot = ctx.DOT_FS().getText();
         Cobol.ProcedureDivisionBody procedureDivisionBody = (Cobol.ProcedureDivisionBody) visitProcedureDivisionBody(ctx.procedureDivisionBody());
         return new Cobol.ProcedureDivision(
                 randomId(),
@@ -232,6 +243,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
                 Markers.EMPTY,
                 procedure,
                 division,
+                dot,
                 procedureDivisionBody
         );
     }
