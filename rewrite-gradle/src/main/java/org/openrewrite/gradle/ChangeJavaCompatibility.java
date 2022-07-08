@@ -75,8 +75,17 @@ public class ChangeJavaCompatibility extends Recipe {
             public J visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
                 J.Assignment a = (J.Assignment) super.visitAssignment(assignment, executionContext);
 
-                J.Identifier var = (J.Identifier) a.getVariable();
-                if (!(compatibilityType + "Compatibility").equals(var.getSimpleName())) {
+                if (a.getVariable() instanceof J.Identifier) {
+                    J.Identifier var = (J.Identifier) a.getVariable();
+                    if (!(compatibilityType + "Compatibility").equals(var.getSimpleName())) {
+                        return a;
+                    }
+                } else if (a.getVariable() instanceof J.FieldAccess) {
+                    J.FieldAccess fieldAccess = (J.FieldAccess) a.getVariable();
+                    if (!(compatibilityType + "Compatibility").equals(fieldAccess.getSimpleName())) {
+                        return a;
+                    }
+                } else {
                     return a;
                 }
 
