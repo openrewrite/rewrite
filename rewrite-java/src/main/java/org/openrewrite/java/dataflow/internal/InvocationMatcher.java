@@ -146,8 +146,13 @@ public interface InvocationMatcher {
         }
 
         private static Optional<Expression> extractCallExpression(Cursor cursor) {
-            J stop = cursor.dropParentUntil(v -> v instanceof J.MethodInvocation || v instanceof J.NewClass || v instanceof J.Block).getValue();
-            if (stop instanceof J.Block) {
+            J stop = cursor.dropParentUntil(v ->
+                    v instanceof J.MethodInvocation || // Valid call expression
+                            v instanceof J.NewClass || // Valid call expression
+                            v instanceof J.Block || // Exit case
+                            v instanceof J.CompilationUnit // Exit case
+            ).getValue();
+            if (stop instanceof J.CompilationUnit || stop instanceof J.Block) {
                 return Optional.empty();
             }
             return Optional.of((Expression) stop);
