@@ -30,7 +30,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.BiFunction;
 
 import static org.openrewrite.Tree.randomId;
@@ -45,8 +44,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     private final Charset charset;
     private final boolean charsetBomMarked;
 
-    private int cursor = 0;
-
     public CobolParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
         this.fileAttributes = fileAttributes;
@@ -55,13 +52,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         this.charsetBomMarked = charsetBomMarked;
     }
 
-    private int startIndex(ParserRuleContext ctx) {
-        return ctx.start.getStartIndex();
-    }
-
-    private int stopIndex(ParserRuleContext ctx) {
-        return ctx.stop.getStopIndex();
-    }
+//    private int startIndex(ParserRuleContext ctx) {
+//        return ctx.start.getStartIndex();
+//    }
+//
+//    private int stopIndex(ParserRuleContext ctx) {
+//        return ctx.stop.getStopIndex();
+//    }
 
 //    private String space(TerminalNode n1, TerminalNode n2) {
 //        return source.substring(n1.getSymbol().getStopIndex() + 1, n2.getSymbol().getStartIndex());
@@ -99,28 +96,28 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         return source.substring(stop + 1, start);
     }
 
-    private Space prefix(TerminalNode terminal) {
+    private String prefix(TerminalNode terminal) {
         // prefix is attached to the outermost node, namely never to a terminal
-        return Space.EMPTY;
+        return "";
 //        TerminalNode previousNode = previousTerminalNode(terminal);
 //        if(previousNode == null) {
-//            return Space.build(source.substring(0, terminal.getSymbol().getStartIndex()));
+//            return source.substring(0, terminal.getSymbol().getStartIndex()));
 //        } else {
-//            return Space.build(source.substring(previousNode.getSymbol().getStopIndex()+1, terminal.getSymbol().getStartIndex()));
+//            return source.substring(previousNode.getSymbol().getStopIndex()+1, terminal.getSymbol().getStartIndex()));
 //        }
     }
 
-    private Space prefix(ParserRuleContext tree) {
+    private String prefix(ParserRuleContext tree) {
         if(positionInParent(tree) == 0) {
             // prefix will be attached to an ancestor node
-            return Space.EMPTY;
+            return "";
         }
         Token firstToken = tree.getStart();
         Token previousToken = previousToken(tree);
         if(previousToken == null) {
-            return Space.build(source.substring(0, firstToken.getStartIndex()));
+            return source.substring(0, firstToken.getStartIndex());
         } else {
-            return Space.build(source.substring(previousToken.getStopIndex() + 1, firstToken.getStartIndex()));
+            return source.substring(previousToken.getStopIndex() + 1, firstToken.getStartIndex());
         }
     }
 
@@ -170,7 +167,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol.CompilationUnit visitStartRule(CobolParser.StartRuleContext ctx) {
-        return visitCompilationUnit(ctx.compilationUnit()).withEof(sourceBefore(source.substring(cursor)));
+        return visitCompilationUnit(ctx.compilationUnit()).withEof(ctx.EOF().getText());
     }
 
     @Override
@@ -195,7 +192,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
                 null,
                 // List<CobolRightPadded<Cobol>> programUnits;
                 programUnits,
-                Space.EMPTY
+                ""
         );
     }
 
@@ -231,10 +228,10 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
             throw new UnsupportedOperationException("Not implemented");
         }
 
-        Space s = prefix(ctx);
+        String s = prefix(ctx);
 
-        CobolRightPadded<String> procedure = CobolRightPadded.build(ctx.PROCEDURE().getText()).withAfter(Space.build(space(ctx.PROCEDURE(), ctx.DIVISION())));
-        CobolRightPadded<String> division = CobolRightPadded.build(ctx.DIVISION().getText()).withAfter(Space.build(space(ctx.DIVISION(), ctx.DOT_FS())));
+        CobolRightPadded<String> procedure = CobolRightPadded.build(ctx.PROCEDURE().getText()).withAfter(space(ctx.PROCEDURE(), ctx.DIVISION()));
+        CobolRightPadded<String> division = CobolRightPadded.build(ctx.DIVISION().getText()).withAfter(space(ctx.DIVISION(), ctx.DOT_FS()));
         String dot = ctx.DOT_FS().getText();
         Cobol.ProcedureDivisionBody procedureDivisionBody = (Cobol.ProcedureDivisionBody) visitProcedureDivisionBody(ctx.procedureDivisionBody());
         return new Cobol.ProcedureDivision(
@@ -294,7 +291,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
             statements.add( (Statement) visit(ctx.statement(i)));
         }
         CobolLeftPadded<String> dot = CobolLeftPadded.build(ctx.DOT_FS().getText())
-                .withBefore(Space.build(ctx.statement().size() == 0 ? "" : space(ctx.statement(ctx.statement().size()-1), ctx.DOT_FS())));
+                .withBefore(ctx.statement().size() == 0 ? "" : space(ctx.statement(ctx.statement().size()-1), ctx.DOT_FS()));
         return new Cobol.Sentence(
                 randomId(),
                 prefix(ctx),
@@ -315,10 +312,10 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
             throw new UnsupportedOperationException("Not implemented");
         }
 
-        Space stop = Space.build(ctx.STOP().getText());
-        Space run = null;
+        String stop = ctx.STOP().getText();
+        String run = null;
         if(ctx.RUN() != null) {
-            run = Space.build(space(ctx.STOP(), ctx.RUN()) + ctx.RUN().getText());
+            run = space(ctx.STOP(), ctx.RUN()) + ctx.RUN().getText();
         }
         return new Cobol.Stop(
                 randomId(),
@@ -358,7 +355,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         ParseTree previousCtx = ctx.DISPLAY();
         for(int i=0; i<ctx.displayOperand().size(); i++) {
             ParserRuleContext operandCtx = ctx.displayOperand(i);
-            Space before = Space.build(space(previousCtx, operandCtx));
+            String before = space(previousCtx, operandCtx);
             previousCtx = operandCtx;
             String element = operandCtx.getText();
             operands.add(new CobolLeftPadded<>(before, element, Markers.EMPTY));
@@ -385,8 +382,8 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         String space2 = space(ctx.DIVISION(), ctx.DOT_FS());
 
 
-        CobolRightPadded<String> identification = CobolRightPadded.build(idTerminal.getText()).withAfter(Space.build(space1));
-        CobolRightPadded<String> division = CobolRightPadded.build(ctx.DIVISION().getText()).withAfter(Space.build(space2));
+        CobolRightPadded<String> identification = CobolRightPadded.build(idTerminal.getText()).withAfter(space1);
+        CobolRightPadded<String> division = CobolRightPadded.build(ctx.DIVISION().getText()).withAfter(space2);
         String dot = ctx.DOT_FS().getText();
 
         return new Cobol.IdentificationDivision(
@@ -402,17 +399,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitProgramIdParagraph(CobolParser.ProgramIdParagraphContext ctx) {
-        CobolRightPadded<Space> programId = CobolRightPadded.build(Space.build(ctx.PROGRAM_ID().getText()))
-                .withAfter(Space.build(space(ctx.PROGRAM_ID(), ctx.DOT_FS(0))));
-        CobolRightPadded<Space> dot1 = CobolRightPadded.build(Space.build(ctx.DOT_FS(0).getText()))
-                .withAfter(Space.build(space(ctx.DOT_FS(0), ctx.programName())));
+        CobolRightPadded<String> programId = CobolRightPadded.build(ctx.PROGRAM_ID().getText())
+                .withAfter(space(ctx.PROGRAM_ID(), ctx.DOT_FS(0)));
+        CobolRightPadded<String> dot1 = CobolRightPadded.build(ctx.DOT_FS(0).getText())
+                .withAfter(space(ctx.DOT_FS(0), ctx.programName()));
         String programName = ctx.programName().getText();
-        CobolLeftPadded<Space> dot2 = null;
+        CobolLeftPadded<String> dot2 = null;
         if(ctx.DOT_FS().size() > 1) {
-            dot2 = CobolLeftPadded.build(Space.build(ctx.DOT_FS(1).getText()))
-                    .withBefore(Space.build(space(ctx.programName(), ctx.DOT_FS(1))));
+            dot2 = CobolLeftPadded.build(ctx.DOT_FS(1).getText())
+                    .withBefore(space(ctx.programName(), ctx.DOT_FS(1)));
         }
-        Space s = prefix(ctx);
+        String s = prefix(ctx);
         return new Cobol.ProgramIdParagraph(
                 randomId(),
                 prefix(ctx),
@@ -425,84 +422,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     }
 
     @Nullable
-    private <C extends ParserRuleContext, T> T convert(@Nullable C ctx, BiFunction<C, Space, T> conversion) {
+    private <C extends ParserRuleContext, T> T convert(@Nullable C ctx, BiFunction<C, String, T> conversion) {
         if (ctx == null) {
             return null;
         }
         T t = conversion.apply(ctx, prefix(ctx));
-        if (ctx.getStop() != null) {
-            cursor = ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1);
-        }
 
         return t;
     }
 
-    private <T> T convert(TerminalNode node, BiFunction<TerminalNode, Space, T> conversion) {
+    private <T> T convert(TerminalNode node, BiFunction<TerminalNode, String, T> conversion) {
         T t = conversion.apply(node, prefix(node));
-        cursor = node.getSymbol().getStopIndex() + 1;
         return t;
-    }
-
-    private void skip(TerminalNode node) {
-        cursor = node.getSymbol().getStopIndex() + 1;
-    }
-
-    /**
-     * @return Source from <code>cursor</code> to next occurrence of <code>untilDelim</code>,
-     * and if not found in the remaining source, the empty String. If <code>stop</code> is reached before
-     * <code>untilDelim</code> return the empty String.
-     */
-    private Space sourceBefore(String untilDelim) {
-        int delimIndex = positionOfNext(untilDelim, null);
-        if (delimIndex < 0) {
-            return Space.EMPTY; // unable to find this delimiter
-        }
-
-        String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
-        return Space.format(prefix);
-    }
-
-    private int positionOfNext(String untilDelim, @Nullable Character stop) {
-        boolean inMultiLineComment = false;
-        boolean inSingleLineComment = false;
-
-        int delimIndex = cursor;
-        for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
-            if (inSingleLineComment) {
-                if (source.charAt(delimIndex) == '\n') {
-                    inSingleLineComment = false;
-                }
-            } else {
-                if (source.length() - untilDelim.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex = delimIndex + 2;
-                            break;
-                    }
-                }
-
-                if (!inMultiLineComment && !inSingleLineComment) {
-                    if (stop != null && source.charAt(delimIndex) == stop) {
-                        return -1; // reached stop word before finding the delimiter
-                    }
-
-                    if (source.startsWith(untilDelim, delimIndex)) {
-                        break; // found it!
-                    }
-                }
-            }
-        }
-
-        return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
     }
 }
