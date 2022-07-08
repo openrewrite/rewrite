@@ -51,8 +51,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     String artifactPattern;
 
     @Option(displayName = "Only if versions match",
-            description = "Only remove the explicit version if it matches the managed dependency version.",
-            example = "true",
+            description = "Only remove the explicit version if it matches the managed dependency version. Default true.",
+            example = "false",
             required = false)
     @Nullable
     Boolean onlyIfVersionsMatch;
@@ -93,10 +93,14 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             private boolean matchesVersion(ResolvedDependency d) {
-                return Boolean.TRUE.equals(onlyIfVersionsMatch) &&
+                return ignoreVersionMatching() ||
                         d.getRequested().getVersion() != null
                         && d.getRequested().getVersion().equals(getResolutionResult().getPom().getManagedVersion(d.getGroupId(), d.getArtifactId(),
                         d.getRequested().getType(), d.getRequested().getClassifier()));
+            }
+
+            private boolean ignoreVersionMatching() {
+                return Boolean.FALSE.equals(onlyIfVersionsMatch);
             }
 
             private boolean matchesScope(ResolvedDependency d, Xml.Tag dependencyTag) {
