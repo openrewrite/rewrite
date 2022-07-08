@@ -179,6 +179,16 @@ public abstract class CoordinateBuilder {
         }
     }
 
+    public static class Literal extends CoordinateBuilder {
+        public Literal(J.Literal tree) {
+            super(tree);
+        }
+
+        public JavaCoordinates replace() {
+            return replace(Space.Location.LITERAL_PREFIX);
+        }
+    }
+
     public static class MethodDeclaration extends Statement {
         MethodDeclaration(J.MethodDeclaration tree) {
             super(tree);

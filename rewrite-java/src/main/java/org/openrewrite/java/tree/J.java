@@ -2794,6 +2794,10 @@ public interface J extends Tree {
             return v.visitLiteral(this, p);
         }
 
+        public CoordinateBuilder.Literal getCoordinates() {
+            return new CoordinateBuilder.Literal(this);
+        }
+
         /**
          * See <a href="https://docs.oracle.com/javase/specs/jls/se7/html/jls-3.html#jls-3.3">jls-3.3</a>.
          * <p>

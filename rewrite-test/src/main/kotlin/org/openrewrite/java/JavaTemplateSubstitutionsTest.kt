@@ -347,4 +347,41 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun literal(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitLiteral(literal: J.Literal, p: ExecutionContext): J {
+                    if ("literal" == literal.value) {
+                        val t = JavaTemplate.builder({ cursor }, "Some.method()")
+                            .javaParser {
+                                JavaParser.fromJavaVersion()
+                                    .logCompilationWarningsAndErrors(true)
+                                    .dependsOn("""
+                                        public class Some {
+                                            public static String method() {
+                                                return "";
+                                            }
+                                        }
+                                    """.trimIndent()).build()
+                            }.build()
+                        return literal.withTemplate(t, literal.coordinates.replace())
+                    }
+                    return super.visitLiteral(literal, p)
+                }
+            }
+        },
+        before = """
+            public class Test {
+                String literal = "literal";
+            }
+        """,
+        after = """
+            public class Test {
+                String literal = Some.method();
+            }
+        """
+    )
 }

@@ -301,6 +301,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
 
             @Override
+            public J visitLiteral(J.Literal literal, Integer integer) {
+                if (loc.equals(LITERAL_PREFIX) && literal.isScope(insertionPoint)) {
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
+                            .withPrefix(literal.getPrefix()), integer, getCursor().getParentOrThrow());
+                }
+                return super.visitLiteral(literal, integer);
+            }
+
+            @Override
             public J visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
                 if (method.isScope(insertionPoint)) {
                     switch (loc) {
