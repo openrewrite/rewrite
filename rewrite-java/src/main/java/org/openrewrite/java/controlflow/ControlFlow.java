@@ -532,7 +532,9 @@ public final class ControlFlow {
                 fakeConditionalTemplate = JavaTemplate.builder(this::getCursor, "#{any(java.lang.Iterable)}.iterator().hasNext()").build();
             }
             final JavaCoordinates coordinates;
-            if (iterable instanceof Statement) {
+            if (iterable instanceof J.NewArray) {
+                coordinates = ((J.NewArray) iterable).getCoordinates().replace();
+            } else if (iterable instanceof Statement) {
                 coordinates = ((Statement) iterable).getCoordinates().replace();
             } else if (iterable instanceof J.Identifier) {
                 coordinates = ((J.Identifier) iterable).getCoordinates().replace();
