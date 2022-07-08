@@ -29,7 +29,7 @@ public abstract class CoordinateBuilder {
         return new JavaCoordinates(tree, location, JavaCoordinates.Mode.BEFORE, null);
     }
 
-    JavaCoordinates after(Space.Location location) {
+    JavaCoordinates after(@SuppressWarnings("SameParameterValue") Space.Location location) {
         return new JavaCoordinates(tree, location, JavaCoordinates.Mode.AFTER, null);
     }
 
@@ -37,7 +37,12 @@ public abstract class CoordinateBuilder {
         return new JavaCoordinates(tree, location, JavaCoordinates.Mode.REPLACEMENT, null);
     }
 
-    public static class Statement extends CoordinateBuilder {
+    /**
+     * Even though statements are not a superset of expressions,
+     * this provides a way for statements that are
+     * also expressions to have a generic coordinate.
+     */
+    public static class Statement extends Expression {
         public Statement(org.openrewrite.java.tree.Statement tree) {
             super(tree);
         }
@@ -55,7 +60,24 @@ public abstract class CoordinateBuilder {
         }
     }
 
-    public static class Annotation extends CoordinateBuilder {
+    public static class Expression extends CoordinateBuilder {
+        /**
+         * @param tree This is of type {@link J} only so that
+         *             statements that are not expressions can call
+         *             super on this type. Since {@link Statement}
+         *             overrides {@link #replace}, this is not
+         *             otherwise a problem.
+         */
+        public Expression(J tree) {
+            super(tree);
+        }
+
+        public JavaCoordinates replace() {
+            return replace(Space.Location.EXPRESSION_PREFIX);
+        }
+    }
+
+    public static class Annotation extends Expression {
         Annotation(J.Annotation tree) {
             super(tree);
         }
@@ -66,26 +88,6 @@ public abstract class CoordinateBuilder {
 
         public JavaCoordinates replaceArguments() {
             return replace(Space.Location.ANNOTATION_ARGUMENTS);
-        }
-    }
-
-    public static class ArrayAccess extends CoordinateBuilder {
-        public ArrayAccess(J.ArrayAccess tree) {
-            super(tree);
-        }
-
-        public JavaCoordinates replace() {
-            return replace(Space.Location.ARRAY_ACCESS_PREFIX);
-        }
-    }
-
-    public static class Binary extends CoordinateBuilder {
-        public Binary(J.Binary tree) {
-            super(tree);
-        }
-
-        public JavaCoordinates replace() {
-            return replace(Space.Location.BINARY_PREFIX);
         }
     }
 
@@ -167,7 +169,7 @@ public abstract class CoordinateBuilder {
         }
     }
 
-    public static class Identifier extends CoordinateBuilder {
+    public static class Identifier extends Expression {
         public Identifier(J.Identifier tree) {
             super(tree);
         }
@@ -186,16 +188,6 @@ public abstract class CoordinateBuilder {
             public JavaCoordinates replace() {
                 return replace(Space.Location.LAMBDA_PARAMETERS_PREFIX);
             }
-        }
-    }
-
-    public static class Literal extends CoordinateBuilder {
-        public Literal(J.Literal tree) {
-            super(tree);
-        }
-
-        public JavaCoordinates replace() {
-            return replace(Space.Location.LITERAL_PREFIX);
         }
     }
 
@@ -251,16 +243,6 @@ public abstract class CoordinateBuilder {
          */
         public JavaCoordinates replaceMethod() {
             return replace(Space.Location.METHOD_INVOCATION_NAME);
-        }
-    }
-
-    public static class NewArray extends CoordinateBuilder {
-        public NewArray(J.NewArray tree) {
-            super(tree);
-        }
-
-        public JavaCoordinates replace() {
-            return replace(Space.Location.NEW_ARRAY_PREFIX);
         }
     }
 

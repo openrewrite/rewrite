@@ -119,6 +119,7 @@ public interface G extends J {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public SourceFile withCharset(Charset charset) {
             return withCharsetName(charset.name());
@@ -386,7 +387,7 @@ public interface G extends J {
 
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
-            throw new UnsupportedOperationException("ExpressionStatement has no concept of coordinates");
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -441,6 +442,11 @@ public interface G extends J {
             G.MapEntry m = this;
             m = m.withType(v.visitType(type, p));
             return m;
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         public Padding getPadding() {
@@ -523,6 +529,11 @@ public interface G extends J {
             return m;
         }
 
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -600,6 +611,11 @@ public interface G extends J {
             ListLiteral l = this;
             l = l.withType(v.visitType(type, p));
             return l;
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         public Padding getPadding() {
@@ -746,13 +762,10 @@ public interface G extends J {
             return b;
         }
 
-//        @Override
-//        public List<J> getSideEffects() {
-//            List<J> sideEffects = new ArrayList<>(2);
-//            sideEffects.addAll(left.getSideEffects());
-//            sideEffects.addAll(right.getSideEffects());
-//            return sideEffects;
-//        }
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
 
         public enum Type {
             Find,

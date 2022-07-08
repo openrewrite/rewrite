@@ -35,4 +35,6 @@ public interface Expression extends J {
     default List<J> getSideEffects() {
         return emptyList();
     }
+
+    CoordinateBuilder.Expression getCoordinates();
 }

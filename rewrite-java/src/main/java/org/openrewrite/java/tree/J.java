@@ -148,6 +148,11 @@ public interface J extends Tree {
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -278,8 +283,8 @@ public interface J extends Tree {
             return v.visitArrayAccess(this, p);
         }
 
-        public CoordinateBuilder.ArrayAccess getCoordinates() {
-            return new CoordinateBuilder.ArrayAccess(this);
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         @Override
@@ -327,6 +332,11 @@ public interface J extends Tree {
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
     }
 
@@ -610,8 +620,8 @@ public interface J extends Tree {
             return v.visitBinary(this, p);
         }
 
-        public CoordinateBuilder.Binary getCoordinates() {
-            return new CoordinateBuilder.Binary(this);
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         @Override
@@ -1247,6 +1257,7 @@ public interface J extends Tree {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public SourceFile withCharset(Charset charset) {
             return withCharsetName(charset.name());
@@ -2525,6 +2536,16 @@ public interface J extends Tree {
             return v.visitInstanceOf(this, p);
         }
 
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -2553,10 +2574,6 @@ public interface J extends Tree {
             }
         }
 
-        @Override
-        public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2798,8 +2815,8 @@ public interface J extends Tree {
             return v.visitLiteral(this, p);
         }
 
-        public CoordinateBuilder.Literal getCoordinates() {
-            return new CoordinateBuilder.Literal(this);
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         /**
@@ -2875,6 +2892,11 @@ public interface J extends Tree {
 
         public MemberReference withReference(Identifier reference) {
             return getPadding().withReference(this.reference.withElement(reference));
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         /**
@@ -3622,8 +3644,8 @@ public interface J extends Tree {
             return v.visitNewArray(this, p);
         }
 
-        public CoordinateBuilder.NewArray getCoordinates() {
-            return new CoordinateBuilder.NewArray(this);
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         public Padding getPadding() {
@@ -3963,6 +3985,11 @@ public interface J extends Tree {
             return v.visitParameterizedType(this, p);
         }
 
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -4053,6 +4080,11 @@ public interface J extends Tree {
             return tree.getElement() instanceof Expression ? withTree(((Expression) tree.getElement()).withType(type)) :
                     tree.getElement() instanceof NameTree ? withTree(((NameTree) tree.getElement()).withType(type)) :
                             this;
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         public Padding<J2> getPadding() {
@@ -4154,6 +4186,11 @@ public interface J extends Tree {
                             this;
         }
 
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
         public Padding<J2> getPadding() {
             Padding<J2> p;
             if (this.padding == null) {
@@ -4233,6 +4270,11 @@ public interface J extends Tree {
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
     }
 
@@ -4671,6 +4713,11 @@ public interface J extends Tree {
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
     }
 
@@ -5303,6 +5350,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitWildcard(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         public enum Bound {

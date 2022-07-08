@@ -136,6 +136,38 @@ interface JavaTemplateTest : JavaRecipeTest {
         cycles = 1
     )
 
+    @Suppress("UnaryPlus", "UnusedAssignment")
+    @Test
+    fun replaceExpressionWithAnotherExpression() = assertChanged(
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitUnary(unary: J.Unary, p: ExecutionContext): J {
+                    return unary.withTemplate(
+                        JavaTemplate.builder({ this.cursor }, "#{any()}++").build(),
+                        unary.coordinates.replace(),
+                        unary.expression
+                    )
+                }
+            }
+        },
+        before = """
+            class Test {
+                void test(int i) {
+                    int n = +i;
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void test(int i) {
+                    int n = i++;
+                }
+            }
+        """,
+        expectedCyclesThatMakeChanges = 1,
+        cycles = 1
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1796")
     @Test
     fun replaceFieldAccessWithMethodInvocation() = assertChanged(
@@ -366,9 +398,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "Object::toString")
-                    .doAfterVariableSubstitution { t -> println(t) }
-                    .build()
+                val t = JavaTemplate.builder({ cursor }, "Object::toString").build()
 
                 override fun visitLambda(lambda: J.Lambda, p: ExecutionContext): J {
                     return lambda.withTemplate(t, lambda.coordinates.replace())
@@ -2049,7 +2079,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                                     .build(),
                                 cd.body.coordinates.firstStatement()
                             )
-                        );
+                        )
                     }
                     return cd
                 }
@@ -2072,6 +2102,7 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("UnusedAssignment")
     @Issue("https://github.com/openrewrite/rewrite/issues/1821")
     @Test
     fun assignmentNotPartOfVariableDeclaration() = assertChanged(

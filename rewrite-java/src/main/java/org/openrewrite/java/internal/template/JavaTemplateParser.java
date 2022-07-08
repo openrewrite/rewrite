@@ -47,7 +47,7 @@ public class JavaTemplateParser {
     private static final String PACKAGE_STUB = "package #{}; class $Template {}";
     private static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
     private static final String LAMBDA_PARAMETER_STUB = "class $Template { { Object o = (#{}) -> {}; } }";
-    private static final String IDENTIFIER_STUB = "class $Template { { Object o = #{}; } }";
+    private static final String EXPRESSION_STUB = "class $Template { { Object o = #{}; } }";
     private static final String EXTENDS_STUB = "class $Template extends #{} {}";
     private static final String IMPLEMENTS_STUB = "class $Template implements #{} {}";
     private static final String THROWS_STUB = "abstract class $Template { abstract void $template() throws #{}; }";
@@ -97,8 +97,8 @@ public class JavaTemplateParser {
         }).get(0);
     }
 
-    public J parseIdentifier(String template) {
-        @Language("java") String stub = addImports(substitute(IDENTIFIER_STUB, template));
+    public J parseExpression(String template) {
+        @Language("java") String stub = addImports(substitute(EXPRESSION_STUB, template));
         onBeforeParseTemplate.accept(stub);
 
         return cache(stub, () -> {

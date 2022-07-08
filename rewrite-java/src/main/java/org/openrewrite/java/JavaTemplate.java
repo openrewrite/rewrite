@@ -32,7 +32,6 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -114,24 +113,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 }
 
                 return super.visitAnnotation(annotation, integer);
-            }
-
-            @Override
-            public J visitArrayAccess(J.ArrayAccess arrayAccess, Integer integer) {
-                if (loc.equals(ARRAY_ACCESS_PREFIX) && arrayAccess.isScope(insertionPoint)) {
-                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
-                            .withPrefix(arrayAccess.getPrefix()), integer, getCursor().getParentOrThrow());
-                }
-                return super.visitArrayAccess(arrayAccess, integer);
-            }
-
-            @Override
-            public J visitBinary(J.Binary binary, Integer integer) {
-                if (loc.equals(BINARY_PREFIX) && binary.isScope(insertionPoint)) {
-                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
-                            .withPrefix(binary.getPrefix()), integer, getCursor().getParentOrThrow());
-                }
-                return super.visitBinary(binary, integer);
             }
 
             @Override
@@ -284,9 +265,18 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
 
             @Override
+            public J visitExpression(Expression expression, Integer p) {
+                if (loc.equals(EXPRESSION_PREFIX) && expression.isScope(insertionPoint)) {
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate))
+                            .withPrefix(expression.getPrefix()), p, getCursor().getParentOrThrow());
+                }
+                return expression;
+            }
+
+            @Override
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
                 if (loc.equals(FIELD_ACCESS_PREFIX) && fa.isScope(insertionPoint)) {
-                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate))
                             .withPrefix(fa.getPrefix()), p, getCursor().getParentOrThrow());
                 }
                 return super.visitFieldAccess(fa, p);
@@ -294,8 +284,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
             @Override
             public J visitIdentifier(J.Identifier ident, Integer p) {
+                // ONLY for backwards compatibility, otherwise the same as expression replacement
                 if (loc.equals(IDENTIFIER_PREFIX) && ident.isScope(insertionPoint)) {
-                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate))
                             .withPrefix(ident.getPrefix()), p, getCursor().getParentOrThrow());
                 }
                 return super.visitIdentifier(ident, p);
@@ -307,15 +298,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate)));
                 }
                 return maybeReplaceStatement(lambda, J.class, 0);
-            }
-
-            @Override
-            public J visitLiteral(J.Literal literal, Integer integer) {
-                if (loc.equals(LITERAL_PREFIX) && literal.isScope(insertionPoint)) {
-                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
-                            .withPrefix(literal.getPrefix()), integer, getCursor().getParentOrThrow());
-                }
-                return super.visitLiteral(literal, integer);
             }
 
             @Override
@@ -478,15 +460,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     return m;
                 }
                 return maybeReplaceStatement(method, J.class, 0);
-            }
-
-            @Override
-            public J visitNewArray(J.NewArray newArray, Integer integer) {
-                if (loc.equals(NEW_ARRAY_PREFIX) && newArray.isScope(insertionPoint)) {
-                    return autoFormat(substitutions.unsubstitute(templateParser.parseIdentifier(substitutedTemplate))
-                            .withPrefix(newArray.getPrefix()), integer, getCursor().getParentOrThrow());
-                }
-                return super.visitNewArray(newArray, integer);
             }
 
             @Override
