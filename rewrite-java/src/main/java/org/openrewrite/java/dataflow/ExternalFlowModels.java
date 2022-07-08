@@ -15,35 +15,31 @@
  */
 package org.openrewrite.java.dataflow;
 
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.ScanResult;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.dataflow.internal.InvocationMatcher;
+import org.openrewrite.java.dataflow.internal.csv.CSVLoader;
+import org.openrewrite.java.dataflow.internal.csv.GenericExternalModel;
+import org.openrewrite.java.dataflow.internal.csv.Mergable;
+import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-import java.io.*;
 import java.lang.ref.WeakReference;
-import java.net.URI;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
  * Loads and stores models from the `model.csv` file to be used for data flow and taint tracking analysis.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-class ExternalFlowModels {
+final class ExternalFlowModels {
     private static final String CURSOR_MESSAGE_KEY = "OPTIMIZED_FLOW_MODELS";
-    private static final Pattern ARGUMENT_MATCHER = Pattern.compile("Argument\\[(-?\\d+)\\.?\\.?(\\d+)?]");
     private static final ExternalFlowModels instance = new ExternalFlowModels();
 
     public static ExternalFlowModels instance() {
@@ -126,23 +122,7 @@ class ExternalFlowModels {
      */
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
     private static class Optimizer {
-        private final Map<FlowModel.MethodMatcherKey, MethodMatcher> methodMapperCache =
-                new HashMap<>();
-
-        private MethodMatcher provideMethodMatcher(FlowModel.MethodMatcherKey key) {
-            return methodMapperCache.computeIfAbsent(
-                    key,
-                    k -> new MethodMatcher(k.signature, k.matchOverrides)
-            );
-        }
-
-        private Set<MethodMatcher> provideMethodMatchers(Collection<FlowModel> models) {
-            return models
-                    .stream()
-                    .map(FlowModel::asMethodMatcherKey)
-                    .map(this::provideMethodMatcher)
-                    .collect(Collectors.toSet());
-        }
+        private final MethodMatcherCache methodMatcherCache = MethodMatcherCache.create();
 
         /**
          * Return the 'optimized' {@link AdditionalFlowStepPredicate} for the {@link MethodMatcher}.
@@ -165,22 +145,13 @@ class ExternalFlowModels {
         private List<AdditionalFlowStepPredicate> optimize(Collection<FlowModel> models) {
             Map<Integer, List<FlowModel>> flowFromArgumentIndexToReturn = new HashMap<>();
             models.forEach(model -> {
-                Matcher argumentMatcher = ARGUMENT_MATCHER.matcher(model.input);
-
-                if (argumentMatcher.matches() && ("ReturnValue".equals(model.output) || model.isConstructor())) {
-                    int argumentIndexStart = Integer.parseInt(argumentMatcher.group(1));
-                    flowFromArgumentIndexToReturn.computeIfAbsent(argumentIndexStart, k -> new ArrayList<>())
-                            .add(model);
-                    // argumentMatcher.group(2) is null for Argument[x] since ARGUMENT_MATCHER matches Argument[x] and
-                    // Argument[x..y], and so the null check below ensures that no exception is thrown when Argument[x]
-                    // is matched
-                    if (argumentMatcher.group(2) != null) {
-                        int argumentIndexEnd = Integer.parseInt(argumentMatcher.group(2));
-                        for (int i = argumentIndexStart + 1; i <= argumentIndexEnd; i++) {
-                            flowFromArgumentIndexToReturn.computeIfAbsent(i, k -> new ArrayList<>())
+                if ("ReturnValue".equals(model.output) || model.isConstructor()) {
+                    model.getArgumentRange().ifPresent(argumentRange -> {
+                        for (int i = argumentRange.getStart(); i <= argumentRange.getEnd(); i++) {
+                            flowFromArgumentIndexToReturn.computeIfAbsent(i, __ -> new ArrayList<>())
                                     .add(model);
                         }
-                    }
+                    });
                 }
             });
 
@@ -188,7 +159,7 @@ class ExternalFlowModels {
                     .entrySet()
                     .stream()
                     .map(entry -> {
-                        Set<MethodMatcher> methodMatchers = provideMethodMatchers(entry.getValue());
+                        Set<MethodMatcher> methodMatchers = methodMatcherCache.provideMethodMatchers(entry.getValue());
                         return forFlowFromArgumentIndexToReturn(
                                 entry.getKey(),
                                 methodMatchers
@@ -213,7 +184,7 @@ class ExternalFlowModels {
     }
 
     @AllArgsConstructor
-    static class FullyQualifiedNameToFlowModels {
+    static class FullyQualifiedNameToFlowModels implements Mergable<FullyQualifiedNameToFlowModels> {
         private final Map<String, List<FlowModel>> value;
         private final Map<String, List<FlowModel>> taint;
 
@@ -221,7 +192,8 @@ class ExternalFlowModels {
             return value.isEmpty() && taint.isEmpty();
         }
 
-        FullyQualifiedNameToFlowModels merge(FullyQualifiedNameToFlowModels other) {
+        @Override
+        public FullyQualifiedNameToFlowModels merge(FullyQualifiedNameToFlowModels other) {
             if (this.isEmpty()) {
                 return other;
             } else if (other.isEmpty()) {
@@ -266,77 +238,31 @@ class ExternalFlowModels {
         }
 
         static FullyQualifiedNameToFlowModels empty() {
-            return new FullyQualifiedNameToFlowModels(new HashMap<>(), new HashMap<>());
+            return new FullyQualifiedNameToFlowModels(new HashMap<>(0), new HashMap<>(0));
         }
     }
 
     @AllArgsConstructor
-    static class FlowModel {
+    static class FlowModel implements GenericExternalModel {
         // namespace, type, subtypes, name, signature, ext, input, output, kind
+        @Getter
         String namespace;
+        @Getter
         String type;
+        @Getter
         boolean subtypes;
+        @Getter
         String name;
+        @Getter
         String signature;
         String ext;
         String input;
         String output;
         String kind;
 
-        final String getFullyQualifiedName() {
-            return namespace + "." + type;
-        }
-
-        boolean isConstructor() {
-            // If the type and the name are the same, then this the signature for a constructor
-            return this.type.equals(this.name);
-        }
-
-        @Deprecated
-        AdditionalFlowStepPredicate asAdditionalFlowStepPredicate() {
-            MethodMatcherKey key = asMethodMatcherKey();
-            InvocationMatcher matcher = InvocationMatcher.fromMethodMatcher(
-                    new MethodMatcher(
-                            key.signature,
-                            key.matchOverrides
-                    )
-            );
-            Matcher argumentMatcher = ARGUMENT_MATCHER.matcher(input);
-            if ("Argument[-1]".equals(input) && "ReturnValue".equals(output)) {
-                return (srcExpression, srcCursor, sinkExpression, sinkCursor) ->
-                        matcher.advanced().isSelect(srcCursor);
-            } else if (argumentMatcher.matches() && "ReturnValue".equals(output)) {
-                int argumentIndex = Integer.parseInt(argumentMatcher.group(1));
-                return (srcExpression, srcCursor, sinkExpression, sinkCursor) ->
-                        matcher.advanced().isParameter(srcCursor, argumentIndex);
-            }
-
-            return (srcExpression, srcCursor, sinkExpression, sinkCursor) -> false;
-        }
-
-        MethodMatcherKey asMethodMatcherKey() {
-            final String signature;
-            if (this.signature.isEmpty()) {
-                signature = "(..)";
-            } else {
-                signature = this.signature;
-            }
-            final String fullSignature;
-            if (this.isConstructor()) {
-                fullSignature = namespace + '.' + type + ' ' + "<constructor>" + signature;
-            } else {
-                fullSignature = namespace + '.' + type + ' ' + name + signature;
-            }
-            return new MethodMatcherKey(
-                    fullSignature,
-                    subtypes
-            );
-        }
-
-        @Data
-        static class MethodMatcherKey {
-            final String signature;
-            final boolean matchOverrides;
+        @Override
+        public String getArguments() {
+            return input;
         }
     }
 
@@ -351,43 +277,37 @@ class ExternalFlowModels {
         }
 
         private FullyQualifiedNameToFlowModels loadModelFromFile() {
-            final FullyQualifiedNameToFlowModels[] models = {FullyQualifiedNameToFlowModels.empty()};
-            try (ScanResult scanResult = new ClassGraph().acceptPaths("data-flow").enableMemoryMapping().scan()) {
-                scanResult.getResourcesWithLeafName("model.csv")
-                        .forEachInputStreamIgnoringIOException((res, input) -> models[0] = models[0].merge(loadCvs(input, res.getURI())));
-            }
-            return models[0];
+            return CSVLoader.loadFromFile(
+                    "model.csv",
+                    FullyQualifiedNameToFlowModels.empty(),
+                    Loader::createFullyQualifiedNameToFlowModels,
+                    tokens -> new FlowModel(
+                            tokens[0],
+                            tokens[1],
+                            Boolean.parseBoolean(tokens[2]),
+                            tokens[3],
+                            tokens[4],
+                            tokens[5],
+                            tokens[6],
+                            tokens[7],
+                            tokens[8]
+                    )
+            );
         }
 
-        private FullyQualifiedNameToFlowModels loadCvs(InputStream input, URI source) {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-            List<FlowModel> flowModels = new ArrayList<>();
-            try {
-                //noinspection UnusedAssignment skip the header line
-                String line = reader.readLine();
-                while ((line = reader.readLine()) != null) {
-                    String[] tokens = line.split(";");
-                    flowModels.add(new FlowModel(tokens[0], tokens[1], Boolean.parseBoolean(tokens[2]), tokens[3], tokens[4], tokens[5], tokens[6], tokens[7], tokens[8]));
+        private static FullyQualifiedNameToFlowModels createFullyQualifiedNameToFlowModels(Iterable<FlowModel> flowModels) {
+            Map<String, List<FlowModel>> value = new HashMap<>();
+            Map<String, List<FlowModel>> taint = new HashMap<>();
+            for (FlowModel model : flowModels) {
+                if ("value".equals(model.kind)) {
+                    value.computeIfAbsent(model.getFullyQualifiedName(), k -> new ArrayList<>()).add(model);
+                } else if ("taint".equals(model.kind)) {
+                    taint.computeIfAbsent(model.getFullyQualifiedName(), k -> new ArrayList<>()).add(model);
+                } else {
+                    throw new IllegalArgumentException("Unknown kind: " + model.kind);
                 }
-                return createFullyQualifiedNameToFlowModels(flowModels);
-            } catch (IOException e) {
-                throw new UncheckedIOException("Failed to read data-flow values from " + source, e);
             }
+            return new FullyQualifiedNameToFlowModels(value, taint);
         }
-    }
-
-    private static FullyQualifiedNameToFlowModels createFullyQualifiedNameToFlowModels(Iterable<FlowModel> flowModels) {
-        Map<String, List<FlowModel>> value = new HashMap<>();
-        Map<String, List<FlowModel>> taint = new HashMap<>();
-        for (FlowModel model : flowModels) {
-            if ("value".equals(model.kind)) {
-                value.computeIfAbsent(model.getFullyQualifiedName(), k -> new ArrayList<>()).add(model);
-            } else if ("taint".equals(model.kind)) {
-                taint.computeIfAbsent(model.getFullyQualifiedName(), k -> new ArrayList<>()).add(model);
-            } else {
-                throw new IllegalArgumentException("Unknown kind: " + model.kind);
-            }
-        }
-        return new FullyQualifiedNameToFlowModels(value, taint);
     }
 }
