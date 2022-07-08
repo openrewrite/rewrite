@@ -293,9 +293,8 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         for(int i=0; i<ctx.statement().size(); i++) {
             statements.add( (Statement) visit(ctx.statement(i)));
         }
-        Space dot = ctx.statement().size() == 0
-                        ? Space.build("")
-                        : Space.build(space(ctx.statement(ctx.statement().size()-1), ctx.DOT_FS()));
+        CobolLeftPadded<String> dot = CobolLeftPadded.build(ctx.DOT_FS().getText())
+                .withBefore(Space.build(ctx.statement().size() == 0 ? "" : space(ctx.statement(ctx.statement().size()-1), ctx.DOT_FS())));
         return new Cobol.Sentence(
                 randomId(),
                 prefix(ctx),

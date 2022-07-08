@@ -435,7 +435,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         List<Statement> statements;
-        Space dot;
+        CobolLeftPadded<String> dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
