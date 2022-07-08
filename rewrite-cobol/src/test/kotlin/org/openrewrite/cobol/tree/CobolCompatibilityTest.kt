@@ -19,14 +19,17 @@ import io.github.classgraph.ClassGraph
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import org.openrewrite.internal.StringUtils
+import org.openrewrite.test.RewriteTest
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.stream.Stream
 
-class CobolCompatibilityTest : CobolTreeTest {
+class CobolCompatibilityTest : RewriteTest {
     @ParameterizedTest
     @MethodSource
-    fun nist(resourcePath: Path) = roundTrip(StringUtils.readFully(javaClass.getResourceAsStream("/$resourcePath")))
+    fun nist(resourcePath: Path) = rewriteRun(
+        cobol(StringUtils.readFully(javaClass.getResourceAsStream("/$resourcePath")))
+    )
 
     companion object {
         @JvmStatic

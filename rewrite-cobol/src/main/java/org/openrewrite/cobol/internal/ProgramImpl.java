@@ -6,9 +6,8 @@
  * of the MIT license. See the LICENSE file for details.
  */
 
-package org.openrewrite.cobol;
+package org.openrewrite.cobol.internal;
 
-import org.openrewrite.cobol.internal.Program;
 import org.openrewrite.cobol.internal.registry.ASGElementRegistry;
 import org.openrewrite.cobol.internal.registry.impl.ASGElementRegistryImpl;
 

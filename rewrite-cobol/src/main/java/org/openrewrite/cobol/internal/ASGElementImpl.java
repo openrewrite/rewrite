@@ -6,7 +6,7 @@
  * of the MIT license. See the LICENSE file for details.
  */
 
-package org.openrewrite.cobol;
+package org.openrewrite.cobol.internal;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.openrewrite.cobol.internal.ASGElement;

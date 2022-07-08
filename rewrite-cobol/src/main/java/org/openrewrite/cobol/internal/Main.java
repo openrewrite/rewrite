@@ -16,7 +16,6 @@
 
 package org.openrewrite.cobol.internal;
 
-import org.openrewrite.cobol.ProgramImpl;
 import org.openrewrite.cobol.internal.params.CobolParserParams;
 import org.openrewrite.cobol.internal.params.impl.CobolParserParamsImpl;
 import org.openrewrite.cobol.internal.preprocessor.CobolPreprocessor;

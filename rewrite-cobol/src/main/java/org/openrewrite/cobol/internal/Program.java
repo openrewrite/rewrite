@@ -8,9 +8,7 @@
 
 package org.openrewrite.cobol.internal;
 
-import org.openrewrite.cobol.CompilationUnit;
 import org.openrewrite.cobol.internal.registry.ASGElementRegistry;
-import org.openrewrite.cobol.tree.Cobol;
 
 import java.util.List;
 
