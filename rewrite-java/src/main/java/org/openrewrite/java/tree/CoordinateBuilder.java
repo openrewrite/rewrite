@@ -224,6 +224,16 @@ public abstract class CoordinateBuilder {
         }
     }
 
+    public static class NewArray extends CoordinateBuilder {
+        public NewArray(J.NewArray tree) {
+            super(tree);
+        }
+
+        public JavaCoordinates replace() {
+            return replace(Space.Location.NEW_ARRAY_PREFIX);
+        }
+    }
+
     public static class Package extends Statement {
         Package(J.Package tree) {
             super(tree);

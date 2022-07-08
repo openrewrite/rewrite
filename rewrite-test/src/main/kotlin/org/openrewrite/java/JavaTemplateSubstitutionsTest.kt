@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
@@ -265,6 +266,45 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
                         int n;
                     }
                 }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1985")
+    @Test
+    fun newArray(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+
+                override fun visitNewArray(newArray: J.NewArray, p: ExecutionContext): J {
+                    if ((newArray.dimensions[0].index as J.Literal).value == 1) {
+                        val t = JavaTemplate.builder({ cursor }, "Some.method()")
+                            .javaParser {
+                                JavaParser.fromJavaVersion()
+                                    .logCompilationWarningsAndErrors(true)
+                                    .dependsOn("""
+                                        public class Some {
+                                            public static int[] method() {
+                                                return new int[0];
+                                            }
+                                        }
+                                    """.trimIndent()).build()
+                            }.build()
+                        return newArray.withTemplate(t, newArray.coordinates.replace())
+                    }
+                    return super.visitNewArray(newArray, p)
+                }
+            }
+        },
+        before = """
+            public class Test {
+                int[] array = new int[1];
+            }
+        """,
+        after = """
+            public class Test {
+                int[] array = Some.method();
             }
         """
     )
