@@ -164,7 +164,7 @@ public class ChangePackage extends Recipe {
                 pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, changingTo).build(), pkg.getCoordinates().replace());
             }
             //noinspection ConstantConditions
-            return super.visitPackage(pkg, context);
+            return pkg;
         }
 
         @Override
