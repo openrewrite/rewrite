@@ -1394,9 +1394,10 @@ interface ChangeTypeTest : JavaRecipeTest {
             }
         """,
         afterConditions = { cu ->
-            val methodType = cu.typesInUse.usedMethods.toTypedArray()[0]
-            assertThat(methodType.returnType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("a.A2")
-            assertThat(methodType.parameterTypes[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("a.A2")
+            val methodType = cu.typesInUse.usedMethods.filter { "a.A2" == it.returnType.asFullyQualified()!!.fullyQualifiedName }
+            assertThat(methodType).hasSize(1)
+            assertThat(methodType[0].returnType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("a.A2")
+            assertThat(methodType[0].parameterTypes[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("a.A2")
         }
     )
 
