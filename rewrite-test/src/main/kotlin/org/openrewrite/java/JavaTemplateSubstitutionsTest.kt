@@ -270,6 +270,121 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         """
     )
 
+    @Test
+    fun arrayAccess(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitArrayAccess(arrayAccess: J.ArrayAccess, p: ExecutionContext): J {
+                    if ((arrayAccess.dimension.index as J.Literal).value == 0) {
+                        val t = JavaTemplate.builder({ cursor }, "Some.method()")
+                            .javaParser {
+                                JavaParser.fromJavaVersion()
+                                    .logCompilationWarningsAndErrors(true)
+                                    .dependsOn("""
+                                        public class Some {
+                                            public static int method() {
+                                                return 0;
+                                            }
+                                        }
+                                    """.trimIndent()).build()
+                            }.build()
+                        return arrayAccess.withTemplate(t, arrayAccess.coordinates.replace())
+                    }
+                    return super.visitArrayAccess(arrayAccess, p)
+                }
+            }
+        },
+        before = """
+            public class Test {
+                int[] arrayAccess = new int[1];
+                int i = arrayAccess[0];
+            }
+        """,
+        after = """
+            public class Test {
+                int[] arrayAccess = new int[1];
+                int i = Some.method();
+            }
+        """
+    )
+
+    @Suppress("ConstantConditions")
+    @Test
+    fun binary(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+
+                override fun visitBinary(binary: J.Binary, p: ExecutionContext): J {
+                    if (binary.operator == J.Binary.Type.Equal) {
+                        val t = JavaTemplate.builder({ cursor }, "Some.method()")
+                            .javaParser {
+                                JavaParser.fromJavaVersion()
+                                    .logCompilationWarningsAndErrors(true)
+                                    .dependsOn("""
+                                        public class Some {
+                                            public static boolean method() {
+                                                return true;
+                                            }
+                                        }
+                                    """.trimIndent()).build()
+                            }.build()
+                        return binary.withTemplate(t, binary.coordinates.replace())
+                    }
+                    return super.visitBinary(binary, p)
+                }
+            }
+        },
+        before = """
+            public class Test {
+                boolean binary = 1 == 1;
+            }
+        """,
+        after = """
+            public class Test {
+                boolean binary = Some.method();
+            }
+        """
+    )
+
+    @Test
+    fun literal(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitLiteral(literal: J.Literal, p: ExecutionContext): J {
+                    if ("literal" == literal.value) {
+                        val t = JavaTemplate.builder({ cursor }, "Some.method()")
+                            .javaParser {
+                                JavaParser.fromJavaVersion()
+                                    .logCompilationWarningsAndErrors(true)
+                                    .dependsOn("""
+                                        public class Some {
+                                            public static String method() {
+                                                return "";
+                                            }
+                                        }
+                                    """.trimIndent()).build()
+                            }.build()
+                        return literal.withTemplate(t, literal.coordinates.replace())
+                    }
+                    return super.visitLiteral(literal, p)
+                }
+            }
+        },
+        before = """
+            public class Test {
+                String literal = "literal";
+            }
+        """,
+        after = """
+            public class Test {
+                String literal = Some.method();
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1985")
     @Test
     fun newArray(jp: JavaParser) = assertChanged(

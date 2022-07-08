@@ -278,6 +278,10 @@ public interface J extends Tree {
             return v.visitArrayAccess(this, p);
         }
 
+        public CoordinateBuilder.ArrayAccess getCoordinates() {
+            return new CoordinateBuilder.ArrayAccess(this);
+        }
+
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
@@ -604,6 +608,10 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitBinary(this, p);
+        }
+
+        public CoordinateBuilder.Binary getCoordinates() {
+            return new CoordinateBuilder.Binary(this);
         }
 
         @Override
@@ -2788,6 +2796,10 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitLiteral(this, p);
+        }
+
+        public CoordinateBuilder.Literal getCoordinates() {
+            return new CoordinateBuilder.Literal(this);
         }
 
         /**
