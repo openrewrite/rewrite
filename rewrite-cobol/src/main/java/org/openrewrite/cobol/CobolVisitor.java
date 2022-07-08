@@ -159,7 +159,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Stop s = stop;
         s = s.withPrefix(visitString(s.getPrefix(), p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        s = s.withStatement((Cobol) visit(s.getStatement(), p));
+        s = s.withStatement(visit(s.getStatement(), p));
         return s;
     }
 
