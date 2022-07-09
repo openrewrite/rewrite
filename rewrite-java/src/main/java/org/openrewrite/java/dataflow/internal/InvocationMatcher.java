@@ -20,10 +20,7 @@ import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
 
 import java.util.Collection;
 import java.util.List;
@@ -82,8 +79,8 @@ public interface InvocationMatcher {
 
         public boolean isAnyArgument(Cursor cursor) {
             Expression expression = ensureCursorIsExpression(cursor);
-            return extractCallExpression(cursor).map(call -> {
-                return getCallArguments(call).contains(expression)
+            return nearestMethodCall(cursor).map(call -> {
+                return call.getArguments().contains(expression)
                         && matcher.matches(call); // Do the matcher.matches(...) last as this can be expensive
             }).orElse(false);
         }
@@ -94,15 +91,23 @@ public interface InvocationMatcher {
 
         public boolean isParameter(Cursor cursor, int parameterIndex) {
             Expression expression = ensureCursorIsExpression(cursor);
-            return extractCallExpression(cursor).map(call -> {
-                List<Expression> arguments = getCallArguments(call);
+            if (parameterIndex < 0) {
+                throw new IllegalArgumentException("parameterIndex < 0");
+            }
+            return nearestMethodCall(cursor).map(call -> {
+                List<Expression> arguments = call.getArguments();
                 if (parameterIndex >= arguments.size()) {
                     return false;
                 }
                 if (doesMethodHaveVarargs(call)) {
                     // The varargs parameter is the last one, so we need to check if the expression is the last
                     // parameter or any further argument
-                    final int finalParameterIndex = getType(call).getParameterTypes().size() - 1;
+                    final int finalParameterIndex =
+                            getType(call)
+                                    .map(JavaType.Method::getParameterTypes)
+                                    .map(List::size)
+                                    .map(size -> size - 1)
+                                    .orElse(-1);
                     if (finalParameterIndex == parameterIndex) {
                         List<Expression> varargs = arguments.subList(finalParameterIndex, arguments.size());
                         return varargs.contains(expression) &&
@@ -114,46 +119,20 @@ public interface InvocationMatcher {
             }).orElse(false);
         }
 
-        private static boolean doesMethodHaveVarargs(Expression expression) {
-            return getType(expression).hasFlags(Flag.Varargs);
+        private static boolean doesMethodHaveVarargs(MethodCall expression) {
+            return getType(expression).map(type -> type.hasFlags(Flag.Varargs)).orElse(false);
         }
 
-        private static JavaType.Method getType(Expression expression) {
-            final JavaType.Method type;
-            if (expression instanceof J.MethodInvocation) {
-                type = ((J.MethodInvocation) expression).getMethodType();
-            } else if (expression instanceof J.NewClass) {
-                type = ((J.NewClass) expression).getConstructorType();
-            } else {
-                throw new IllegalArgumentException("Expression is not a method invocation or new class");
-            }
-            if (type == null) {
-                throw new IllegalArgumentException("Type information is missing for " + expression);
-            }
-            return type;
+        private static Optional<JavaType.Method> getType(MethodCall expression) {
+            return Optional.ofNullable(expression.getMethodType());
         }
 
-        private static List<Expression> getCallArguments(Expression call) {
-            if (call instanceof J.MethodInvocation) {
-                return ((J.MethodInvocation) call).getArguments();
-            } else if (call instanceof J.NewClass) {
-                return ((J.NewClass) call).getArguments();
-            } else {
-                throw new IllegalArgumentException("Unknown call type: " + call.getClass());
+        private static Optional<MethodCall> nearestMethodCall(Cursor cursor) {
+            J closestJ = cursor.dropParentUntil(J.class::isInstance).getValue();
+            if (closestJ instanceof MethodCall) {
+                return Optional.of((MethodCall) closestJ);
             }
-        }
-
-        private static Optional<Expression> extractCallExpression(Cursor cursor) {
-            J stop = cursor.dropParentUntil(v ->
-                    v instanceof J.MethodInvocation || // Valid call expression
-                            v instanceof J.NewClass || // Valid call expression
-                            v instanceof J.Block || // Exit case
-                            v instanceof J.CompilationUnit // Exit case
-            ).getValue();
-            if (stop instanceof J.CompilationUnit || stop instanceof J.Block) {
-                return Optional.empty();
-            }
-            return Optional.of((Expression) stop);
+            return Optional.empty();
         }
 
         private static Expression ensureCursorIsExpression(Cursor cursor) {

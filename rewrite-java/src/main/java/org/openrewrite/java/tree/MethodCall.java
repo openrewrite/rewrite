@@ -21,12 +21,14 @@ import java.util.List;
 
 /**
  * Either a {@link org.openrewrite.java.tree.J.MethodInvocation} or
+ * a {@link org.openrewrite.java.tree.J.MemberReference} or
  * a {@link org.openrewrite.java.tree.J.NewClass}.
  */
-public interface MethodCall extends J {
+public interface MethodCall extends Expression {
     @Nullable
     JavaType getType();
 
+    @Override
     MethodCall withType(@Nullable JavaType type);
 
     @Nullable
