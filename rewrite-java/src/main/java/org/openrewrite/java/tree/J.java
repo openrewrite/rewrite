@@ -2844,7 +2844,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MemberReference implements J, Expression, TypedTree {
+    final class MemberReference implements J, Expression, TypedTree, MethodCall {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2883,6 +2883,16 @@ public interface J extends Tree {
 
         public MemberReference withTypeParameters(@Nullable List<Expression> typeParameters) {
             return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
+        }
+
+        @Override
+        public List<Expression> getArguments() {
+            return emptyList();
+        }
+
+        @Override
+        public MemberReference withArguments(List<Expression> arguments) {
+            return this;
         }
 
         JLeftPadded<Identifier> reference;
