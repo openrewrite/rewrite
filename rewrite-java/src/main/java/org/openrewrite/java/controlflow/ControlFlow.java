@@ -531,16 +531,7 @@ public final class ControlFlow {
             } else {
                 fakeConditionalTemplate = JavaTemplate.builder(this::getCursor, "#{any(java.lang.Iterable)}.iterator().hasNext()").build();
             }
-            final JavaCoordinates coordinates;
-            if (iterable instanceof J.NewArray) {
-                coordinates = ((J.NewArray) iterable).getCoordinates().replace();
-            } else if (iterable instanceof Statement) {
-                coordinates = ((Statement) iterable).getCoordinates().replace();
-            } else if (iterable instanceof J.Identifier) {
-                coordinates = ((J.Identifier) iterable).getCoordinates().replace();
-            } else {
-                coordinates = new JavaCoordinates(iterable, Space.Location.ANY, JavaCoordinates.Mode.REPLACEMENT, null);
-            }
+            final JavaCoordinates coordinates = iterable.getCoordinates().replace();
             J.MethodInvocation fakeConditional = iterable.withTemplate(fakeConditionalTemplate, coordinates, iterable);
             if (iterable == fakeConditional) {
                 throw new IllegalStateException("Failed to create a fake conditional!");
