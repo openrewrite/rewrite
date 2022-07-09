@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.J.*;
 import org.openrewrite.marker.Marker;
@@ -505,7 +506,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         if (enoom.getInitializer() != null) {
             visitSpace(initializer.getPrefix(), Space.Location.NEW_CLASS_PREFIX, p);
             visitSpace(initializer.getNew(), Space.Location.NEW_PREFIX, p);
-            visitContainer("(", initializer.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+            if (!initializer.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+                visitContainer("(", initializer.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+            }
             visit(initializer.getBody(), p);
         }
         return enoom;
@@ -768,7 +771,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
         p.append("new");
         visit(newClass.getClazz(), p);
-        visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+        if (!newClass.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+            visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+        }
         visit(newClass.getBody(), p);
         return newClass;
     }
@@ -1033,7 +1038,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
     @Override
     public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-        if(marker instanceof SearchResult) {
+        if (marker instanceof SearchResult) {
             String description = ((SearchResult) marker).getDescription();
             p.append("/*~~")
                     .append(description == null ? "" : "(" + description + ")~~")

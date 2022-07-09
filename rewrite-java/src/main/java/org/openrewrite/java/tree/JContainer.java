@@ -59,7 +59,7 @@ public class JContainer<T> {
 
     @JsonCreator
     public static <T> JContainer<T> build(Space before, List<JRightPadded<T>> elements, Markers markers) {
-        if (before.isEmpty() && elements.isEmpty()) {
+        if (before.isEmpty() && elements.isEmpty() && markers.getMarkers().isEmpty()) {
             return empty();
         }
         return new JContainer<>(before, elements, markers);

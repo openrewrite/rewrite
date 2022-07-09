@@ -1006,7 +1006,7 @@ public class SemanticallyEqual {
                         nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
                         nullMissMatch(newClass.getBody(), compareTo.getBody()) ||
                         nullMissMatch(newClass.getArguments(), compareTo.getArguments()) ||
-                        newClass.getArguments() != null && compareTo.getArguments() != null && newClass.getArguments().size() != compareTo.getArguments().size()) {
+                        compareTo.getArguments() != null && newClass.getArguments().size() != compareTo.getArguments().size()) {
                     isEqual.set(false);
                     return newClass;
                 }

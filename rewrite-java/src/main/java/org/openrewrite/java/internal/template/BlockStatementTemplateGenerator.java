@@ -210,7 +210,7 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
-            if (n.getArguments() != null && n.getArguments().stream().noneMatch(arg -> referToSameElement(prior, arg))) {
+            if (n.getArguments().stream().noneMatch(arg -> referToSameElement(prior, arg))) {
                 n = n.withBody(null).withPrefix(Space.EMPTY);
                 before.insert(0, n.printTrimmed(cursor).trim());
                 after.append(';');

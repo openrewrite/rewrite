@@ -22,10 +22,13 @@ import org.openrewrite.marker.Marker;
 import java.util.UUID;
 
 /**
- * See the Groovy style guide on <a href="http://www.groovy-lang.org/style-guide.html#_omitting_parentheses">Ommitting parentheses</a>.
+ * See the Groovy style guide on <a href="http://www.groovy-lang.org/style-guide.html#_omitting_parentheses">Omitting parentheses</a>.
+ *
+ * @deprecated Use {@link org.openrewrite.java.marker.OmitParentheses} instead.
  */
 @Value
 @With
+@Deprecated
 public class OmitParentheses implements Marker {
     UUID id;
 }

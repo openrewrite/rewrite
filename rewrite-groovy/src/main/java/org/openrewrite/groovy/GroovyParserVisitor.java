@@ -1431,11 +1431,11 @@ public class GroovyParserVisitor {
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
 
-            OmitParentheses omitParentheses = null;
+            org.openrewrite.java.marker.OmitParentheses omitParentheses = null;
             if (source.charAt(cursor) == '(') {
                 cursor++;
             } else {
-                omitParentheses = new OmitParentheses(randomId());
+                omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
                 beforeOpenParen = EMPTY;
                 cursor = saveCursor;
             }
@@ -1459,7 +1459,7 @@ public class GroovyParserVisitor {
                         after = whitespace();
                         if (source.charAt(cursor) == ')') {
                             // the next argument will have an OmitParentheses marker
-                            omitParentheses = new OmitParentheses(randomId());
+                            omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
                         }
                         cursor++;
                     }

@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("UnnecessarySemicolon")
+
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
@@ -23,6 +25,7 @@ import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
 interface EnumTest : JavaTreeTest {
 
+    @Suppress("Since15")
     @Issue("https://github.com/openrewrite/rewrite/issues/379")
     @Test
     fun enumWithAnnotations(jp: JavaParser) = assertParsePrintAndProcess(
@@ -44,15 +47,23 @@ interface EnumTest : JavaTreeTest {
                 A1(1) {
                     @Override
                     void foo() {}
-                },
+                };
 
+                A(int n) {}
+                
+                abstract void foo();
+            }
+        """
+    )
+
+    @Test
+    fun anonymousClassInitializerNoParentheses(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, CompilationUnit, """
+            public enum A {
                 A2 {
                     @Override
                     void foo() {}
                 };
-                
-                A() {}
-                A(int n) {}
                 
                 abstract void foo();
             }

@@ -53,11 +53,11 @@ public class RedundantFileCreation extends Recipe {
                         if (arg instanceof J.NewClass) {
                             J.NewClass newClassArg = (J.NewClass) arg;
                             if (newClassArg.getClazz() != null &&
-                                    TypeUtils.isOfClassType(newClassArg.getClazz().getType(), "java.io.File") &&
-                                    newClassArg.getArguments() != null &&
-                                    newClassArg.getArguments().size() == 1) {
-                                maybeRemoveImport("java.io.File");
-                                return newClassArg.getArguments().get(0);
+                                    TypeUtils.isOfClassType(newClassArg.getClazz().getType(), "java.io.File")) {
+                                if (newClassArg.getArguments().size() == 1 && !(newClassArg.getArguments().get(0) instanceof J.Empty)) {
+                                    maybeRemoveImport("java.io.File");
+                                    return newClassArg.getArguments().get(0);
+                                }
                             }
                         }
                         return arg;

@@ -34,6 +34,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -1029,12 +1030,15 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         // for enum definitions with anonymous class initializers, endPos of node identifier will be -1
         TypeTree clazz = endPos(node.getIdentifier()) >= 0 ? convertOrNull(node.getIdentifier()) : null;
 
-        JContainer<Expression> args = null;
+        JContainer<Expression> args;
         if (positionOfNext("(", '{') > -1) {
             args = JContainer.build(sourceBefore("("),
                     node.getArguments().isEmpty() ?
                             singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                             convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
+        } else {
+            args = JContainer.empty();
+            args = args.withMarkers(args.getMarkers().add(new OmitParentheses(randomId())));
         }
 
         J.Block body = null;

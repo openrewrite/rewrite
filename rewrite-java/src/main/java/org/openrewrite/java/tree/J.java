@@ -3805,16 +3805,14 @@ public interface J extends Tree {
         @Getter
         TypeTree clazz;
 
-        @Nullable
         JContainer<Expression> arguments;
 
-        @Nullable
         public List<Expression> getArguments() {
-            return arguments == null ? null : arguments.getElements();
+            return arguments.getElements();
         }
 
-        public NewClass withArguments(@Nullable List<Expression> arguments) {
-            return getPadding().withArguments(JContainer.withElementsNullable(this.arguments, arguments));
+        public NewClass withArguments(List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
 
         @With
@@ -3887,12 +3885,11 @@ public interface J extends Tree {
                 return t.enclosing == enclosing ? t : new NewClass(t.id, t.prefix, t.markers, enclosing, t.nooh, t.clazz, t.arguments, t.body, t.constructorType);
             }
 
-            @Nullable
             public JContainer<Expression> getArguments() {
                 return t.arguments;
             }
 
-            public NewClass withArguments(@Nullable JContainer<Expression> arguments) {
+            public NewClass withArguments(JContainer<Expression> arguments) {
                 return t.arguments == arguments ? t : new NewClass(t.id, t.prefix, t.markers, t.enclosing, t.nooh, t.clazz, arguments, t.body, t.constructorType);
             }
         }

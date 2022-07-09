@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-class EnumTest : GroovyTreeTest {
+class xEnumTest : GroovyTreeTest {
 
     @Disabled
     @Test

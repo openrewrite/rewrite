@@ -1028,12 +1028,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         // for enum definitions with anonymous class initializers, endPos of node identifier will be -1
         TypeTree clazz = endPos(node.getIdentifier()) >= 0 ? convertOrNull(node.getIdentifier()) : null;
 
-        JContainer<Expression> args = null;
+        JContainer<Expression> args;
         if (positionOfNext("(", '{') > -1) {
             args = JContainer.build(sourceBefore("("),
                     node.getArguments().isEmpty() ?
                             singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                             convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
+        } else {
+            args = JContainer.<Expression>empty()
+                    .withMarkers(Markers.build(singletonList(new OmitParentheses(randomId()))));
         }
 
         J.Block body = null;

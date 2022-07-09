@@ -26,7 +26,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -138,8 +137,7 @@ public interface InvocationMatcher {
             if (call instanceof J.MethodInvocation) {
                 return ((J.MethodInvocation) call).getArguments();
             } else if (call instanceof J.NewClass) {
-                List<Expression> arguments = ((J.NewClass) call).getArguments();
-                return arguments == null ? Collections.emptyList() : arguments;
+                return ((J.NewClass) call).getArguments();
             } else {
                 throw new IllegalArgumentException("Unknown call type: " + call.getClass());
             }

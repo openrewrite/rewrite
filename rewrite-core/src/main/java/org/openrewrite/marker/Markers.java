@@ -69,13 +69,14 @@ public class Markers implements Tree {
      * @return A new {@link Markers} with an added marker.
      */
     public Markers add(Marker marker) {
-        if (markers.stream().anyMatch(marker::equals)) {
-            return this;
-        } else {
-            List<Marker> updatedmarker = new ArrayList<>(markers);
-            updatedmarker.add(marker);
-            return new Markers(id, updatedmarker);
+        for (Marker m : markers) {
+            if (marker.equals(m)) {
+                return this;
+            }
         }
+        List<Marker> updatedmarker = new ArrayList<>(markers);
+        updatedmarker.add(marker);
+        return new Markers(id, updatedmarker);
     }
 
     /**

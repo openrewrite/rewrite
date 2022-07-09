@@ -1333,7 +1333,7 @@ public class CombineSemanticallyEqualCatchBlocks extends Recipe {
                             nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
                             nullMissMatch(newClass.getBody(), compareTo.getBody()) ||
                             nullMissMatch(newClass.getArguments(), compareTo.getArguments()) ||
-                            newClass.getArguments() != null && compareTo.getArguments() != null && newClass.getArguments().size() != compareTo.getArguments().size() ||
+                            newClass.getArguments().size() != compareTo.getArguments().size() ||
                             doesNotContainSameComments(newClass.getPrefix(), compareTo.getPrefix()) ||
                             doesNotContainSameComments(newClass.getNew(), compareTo.getNew())) {
                         isEqual.set(false);
@@ -1349,27 +1349,25 @@ public class CombineSemanticallyEqualCatchBlocks extends Recipe {
                     if (newClass.getBody() != null && compareTo.getBody() != null) {
                         this.visit(newClass.getBody(), compareTo.getBody());
                     }
-                    if (newClass.getArguments() != null && compareTo.getArguments() != null) {
-                        boolean containsLiteral = false;
-                        if (!compareMethodArguments) {
-                            for (int i = 0; i < newClass.getArguments().size(); i++) {
-                                if (newClass.getArguments().get(i) instanceof J.Literal || compareTo.getArguments().get(i) instanceof J.Literal) {
-                                    containsLiteral = true;
-                                    break;
-                                }
-                            }
-                            if (!containsLiteral) {
-                                if (nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
-                                        newClass.getConstructorType() != null && compareTo.getConstructorType() != null && !TypeUtils.isOfType(newClass.getConstructorType(), compareTo.getConstructorType())) {
-                                    isEqual.set(false);
-                                    return newClass;
-                                }
+                    boolean containsLiteral = false;
+                    if (!compareMethodArguments) {
+                        for (int i = 0; i < newClass.getArguments().size(); i++) {
+                            if (newClass.getArguments().get(i) instanceof J.Literal || compareTo.getArguments().get(i) instanceof J.Literal) {
+                                containsLiteral = true;
+                                break;
                             }
                         }
-                        if (compareMethodArguments || containsLiteral) {
-                            for (int i = 0; i < newClass.getArguments().size(); i++) {
-                                this.visit(newClass.getArguments().get(i), compareTo.getArguments().get(i));
+                        if (!containsLiteral) {
+                            if (nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
+                                    newClass.getConstructorType() != null && compareTo.getConstructorType() != null && !TypeUtils.isOfType(newClass.getConstructorType(), compareTo.getConstructorType())) {
+                                isEqual.set(false);
+                                return newClass;
                             }
+                        }
+                    }
+                    if (compareMethodArguments || containsLiteral) {
+                        for (int i = 0; i < newClass.getArguments().size(); i++) {
+                            this.visit(newClass.getArguments().get(i), compareTo.getArguments().get(i));
                         }
                     }
                 }

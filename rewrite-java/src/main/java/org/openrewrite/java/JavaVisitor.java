@@ -804,7 +804,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                         null :
                         visitTypeName(m.getReturnTypeExpression(), p));
         m = m.getAnnotations().withName(m.getAnnotations().getName().withAnnotations(ListUtils.map(m.getAnnotations().getName().getAnnotations(), a -> visitAndCast(a, p))));
-        m = m.withName(visitAndCast(m.getName(), p));
+        m = m.withName((J.Identifier) visitNonNull(m.getName(), p));
         m = m.getPadding().withParameters(visitContainer(m.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, p));
         if (m.getPadding().getThrows() != null) {
             m = m.getPadding().withThrows(visitContainer(m.getPadding().getThrows(), JContainer.Location.THROWS, p));
@@ -848,7 +848,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             m = m.getPadding().withTypeParameters(visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
         m = m.getPadding().withTypeParameters(visitTypeNames(m.getPadding().getTypeParameters(), p));
-        m = m.withName(visitAndCast(m.getName(), p));
+        m = m.withName((J.Identifier) visitNonNull(m.getName(), p));
         m = m.getPadding().withArguments(visitContainer(m.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p));
         m = m.withMethodType((JavaType.Method) visitType(m.getMethodType(), p));
         return m;
@@ -935,12 +935,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         n = n.withNew(visitSpace(n.getNew(), Space.Location.NEW_PREFIX, p));
         n = n.withClazz(visitAndCast(n.getClazz(), p));
-        n = n.withClazz(n.getClazz() == null ?
-                null :
-                visitTypeName(n.getClazz(), p));
-        if (n.getPadding().getArguments() != null) {
-            n = n.getPadding().withArguments(visitContainer(n.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, p));
-        }
+        n = n.withClazz(n.getClazz() == null ? null : visitTypeName(n.getClazz(), p));
+        n = n.getPadding().withArguments(visitContainer(n.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, p));
         n = n.withBody(visitAndCast(n.getBody(), p));
         n = n.withConstructorType((JavaType.Method) visitType(n.getConstructorType(), p));
         return n;
@@ -1245,8 +1241,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 right : new JRightPadded<>(t, after, markers);
     }
 
-    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
+    public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
         if (left == null) {
+            //noinspection ConstantConditions
             return null;
         }
 
@@ -1266,6 +1263,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             if (left.getElement() == null && before == left.getBefore()) {
                 return left;
             }
+            //noinspection ConstantConditions
             return null;
         }
 

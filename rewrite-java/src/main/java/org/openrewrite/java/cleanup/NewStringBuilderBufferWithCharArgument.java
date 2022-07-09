@@ -68,16 +68,19 @@ public class NewStringBuilderBufferWithCharArgument extends Recipe {
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
                 J.NewClass nc = super.visitNewClass(newClass, executionContext);
-                if ((TypeUtils.isOfClassType(nc.getType(), "java.lang.StringBuilder") || TypeUtils.isOfClassType(nc.getType(), "java.lang.StringBuffer"))
-                        && nc.getArguments() != null && nc.getArguments().get(0).getType() == JavaType.Primitive.Char) {
-                    nc = nc.withArguments(ListUtils.mapFirst(nc.getArguments(), arg -> {
-                        J.Literal l = (J.Literal) arg;
-                        l = l.withType(JavaType.buildType("String"));
-                        if (l.getValueSource() != null) {
-                            l = l.withValueSource(l.getValueSource().replace("'", "\""));
-                        }
-                        return l;
-                    }));
+                if ((TypeUtils.isOfClassType(nc.getType(), "java.lang.StringBuilder") ||
+                        TypeUtils.isOfClassType(nc.getType(), "java.lang.StringBuffer"))) {
+                    nc.getArguments();
+                    if (nc.getArguments().get(0).getType() == JavaType.Primitive.Char) {
+                        nc = nc.withArguments(ListUtils.mapFirst(nc.getArguments(), arg -> {
+                            J.Literal l = (J.Literal) arg;
+                            l = l.withType(JavaType.buildType("String"));
+                            if (l.getValueSource() != null) {
+                                l = l.withValueSource(l.getValueSource().replace("'", "\""));
+                            }
+                            return l;
+                        }));
+                    }
                 }
                 return nc;
             }

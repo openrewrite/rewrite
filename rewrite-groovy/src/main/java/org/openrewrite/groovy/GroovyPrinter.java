@@ -47,7 +47,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitJavaSourceFile(JavaSourceFile sourceFile, PrintOutputCapture<P> p) {
         G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
-        if(cu.getShebang() != null) {
+        if (cu.getShebang() != null) {
             p.append(cu.getShebang());
         }
         visitSpace(cu.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p);
@@ -80,13 +80,13 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitGStringValue(G.GString.Value value, PrintOutputCapture<P> p) {
         visitMarkers(value.getMarkers(), p);
-        if(value.isEnclosedInBraces()) {
+        if (value.isEnclosedInBraces()) {
             p.out.append("${");
         } else {
             p.out.append("$");
         }
         visit(value.getTree(), p);
-        if(value.isEnclosedInBraces()) {
+        if (value.isEnclosedInBraces()) {
             p.out.append('}');
         }
         return value;
@@ -139,7 +139,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         visitSpace(binary.getPadding().getOperator().getBefore(), GSpace.Location.BINARY_OPERATOR, p);
         p.append(keyword);
         visit(binary.getRight(), p);
-        if(binary.getOperator() == G.Binary.Type.Access) {
+        if (binary.getOperator() == G.Binary.Type.Access) {
             visitSpace(binary.getAfter(), GSpace.Location.BINARY_SUFFIX, p);
             p.append("]");
         }
@@ -196,7 +196,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitTypeCast(J.TypeCast t, PrintOutputCapture<P> p) {
-            if(!t.getMarkers().findFirst(AsStyleTypeCast.class).isPresent()) {
+            if (!t.getMarkers().findFirst(AsStyleTypeCast.class).isPresent()) {
                 return super.visitTypeCast(t, p);
             }
             visitSpace(t.getPrefix(), Space.Location.TYPE_CAST_PREFIX, p);
@@ -279,7 +279,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             visit(method.getName(), p);
             Optional<EmptyArgumentListPrecedesArgument> maybeEal = method.getMarkers().findFirst(EmptyArgumentListPrecedesArgument.class);
             // If a recipe changed the number or kind of arguments then this marker is nonsense, even if the recipe forgets to remove it
-            if(maybeEal.isPresent() && method.getArguments().size() == 1 && method.getArguments().get(0) instanceof J.Lambda) {
+            if (maybeEal.isPresent() && method.getArguments().size() == 1 && method.getArguments().get(0) instanceof J.Lambda) {
                 EmptyArgumentListPrecedesArgument eal = maybeEal.get();
                 visitSpace(eal.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append("(");
@@ -293,12 +293,18 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
                 boolean omitParens = arg.getElement().getMarkers()
-                        .findFirst(OmitParentheses.class).isPresent();
+                        .findFirst(OmitParentheses.class)
+                        .isPresent() ||
+                        arg.getElement().getMarkers()
+                                .findFirst(org.openrewrite.java.marker.OmitParentheses.class)
+                                .isPresent();
 
                 if (i == 0 && !omitParens) {
                     p.out.append('(');
-                } else if (i > 0 && omitParens && !args.get(0).getElement().getMarkers()
-                        .findFirst(OmitParentheses.class).isPresent()) {
+                } else if (i > 0 && omitParens && (
+                        !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
+                                !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent()
+                )) {
                     p.out.append(')');
                 } else if (i > 0) {
                     p.out.append(',');
