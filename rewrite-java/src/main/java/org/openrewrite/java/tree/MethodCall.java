@@ -13,16 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.marker;
+package org.openrewrite.java.tree;
 
-import lombok.Value;
-import lombok.With;
-import org.openrewrite.marker.Marker;
+import org.openrewrite.internal.lang.Nullable;
 
-import java.util.UUID;
+import java.util.List;
 
-@Value
-@With
-public class OmitParentheses implements Marker {
-    UUID id;
+/**
+ * Either a {@link org.openrewrite.java.tree.J.MethodInvocation} or
+ * a {@link org.openrewrite.java.tree.J.NewClass}.
+ */
+public interface MethodCall extends J {
+    @Nullable
+    JavaType getType();
+
+    MethodCall withType(@Nullable JavaType type);
+
+    @Nullable
+    JavaType.Method getMethodType();
+
+    MethodCall withMethodType(@Nullable JavaType.Method methodType);
+
+    List<Expression> getArguments();
+
+    MethodCall withArguments(List<Expression> arguments);
 }

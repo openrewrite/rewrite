@@ -819,6 +819,7 @@ public interface J extends Tree {
 
         /**
          * Determines if the passed cursor is an {@link J.Block} that is static or initializer block.
+         *
          * @param cursor Must point to a {@link J.Block}
          * @return True if the cursor represents a static or initializer block, false otherwise.
          */
@@ -3283,7 +3284,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MethodInvocation implements J, Statement, Expression, TypedTree {
+    final class MethodInvocation implements J, Statement, Expression, TypedTree, MethodCall {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -3753,7 +3754,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class NewClass implements J, Statement, Expression, TypedTree {
+    final class NewClass implements J, Statement, Expression, TypedTree, MethodCall {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -3829,6 +3830,24 @@ public interface J extends Tree {
         @Override
         public JavaType getType() {
             return constructorType == null ? null : constructorType.getDeclaringType();
+        }
+
+        /**
+         * This is an alias for {@link #getConstructorType()}.
+         * @return The constructor type.
+         */
+        @Nullable
+        public JavaType.Method getMethodType() {
+            return getConstructorType();
+        }
+
+        /**
+         * This is an alias for {@link #withConstructorType(JavaType.Method)}.
+         * @param methodType The constructor type.
+         * @return An instance with the new constructor type.
+         */
+        public NewClass withMethodType(@Nullable JavaType.Method methodType) {
+            return withConstructorType(methodType);
         }
 
         @SuppressWarnings("unchecked")
