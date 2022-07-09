@@ -25,7 +25,7 @@ import java.util.*;
 @NoArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
 final class MethodMatcherCache {
     private final Map<GenericExternalModel.MethodMatcherKey, MethodMatcher> methodMapperCache =
-            new HashMap<>();
+            new WeakHashMap<>();
 
     private MethodMatcher provideMethodMatcher(GenericExternalModel.MethodMatcherKey key) {
         return methodMapperCache.computeIfAbsent(
