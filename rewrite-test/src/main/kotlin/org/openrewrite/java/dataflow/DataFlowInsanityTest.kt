@@ -20,20 +20,52 @@ import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.tree.Expression
+import org.openrewrite.java.tree.J
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
 @Suppress("FunctionName")
 interface DataFlowInsanityTest : RewriteTest {
+
+    fun JavaIsoVisitor<ExecutionContext>.doRunDataFlow() {
+        dataflow().findSinks(object : LocalTaintFlowSpec<Expression, Expression>() {
+            override fun isSource(source: Expression, cursor: Cursor) = true
+
+            override fun isSink(sink: Expression, cursor: Cursor) = true
+        })
+    }
+
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                override fun visitExpression(expression: Expression, p: ExecutionContext): Expression {
-                    dataflow().findSinks(object : LocalFlowSpec<Expression, Expression>() {
-                        override fun isSource(source: Expression, cursor: Cursor) = true
+                override fun visitClassDeclaration(
+                    classDecl: J.ClassDeclaration,
+                    p: ExecutionContext
+                ): J.ClassDeclaration {
+                    // Force a case where data flow occurs inside a `doAfterVisit` on a non-top-level visitor run.
+                    object : JavaIsoVisitor<ExecutionContext>() {
+                        override fun visitMethodDeclaration(
+                            method: J.MethodDeclaration,
+                            p: ExecutionContext
+                        ): J.MethodDeclaration {
+                            // The doAfterVisit
+                            doAfterVisit(object : JavaIsoVisitor<ExecutionContext>() {
+                                override fun visitMethodInvocation(
+                                    method: J.MethodInvocation,
+                                    p: ExecutionContext
+                                ): J.MethodInvocation {
+                                    doRunDataFlow()
+                                    return super.visitMethodInvocation(method, p)
+                                }
+                            })
+                            return method
+                        }
+                    }.visitNonNull(classDecl, p, cursor)
+                    return classDecl
+                }
 
-                        override fun isSink(sink: Expression, cursor: Cursor) = true
-                    })
+                override fun visitExpression(expression: Expression, p: ExecutionContext): Expression {
+                    doRunDataFlow()
                     return super.visitExpression(expression, p)
                 }
             }
