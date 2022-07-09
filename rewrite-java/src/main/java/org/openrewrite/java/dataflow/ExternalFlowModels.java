@@ -22,9 +22,9 @@ import lombok.NoArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.internal.InvocationMatcher;
-import org.openrewrite.java.dataflow.internal.csv.CSVLoader;
+import org.openrewrite.java.dataflow.internal.csv.CsvLoader;
 import org.openrewrite.java.dataflow.internal.csv.GenericExternalModel;
-import org.openrewrite.java.dataflow.internal.csv.Mergable;
+import org.openrewrite.java.dataflow.internal.csv.Mergeable;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -129,7 +129,7 @@ final class ExternalFlowModels {
          */
         private AdditionalFlowStepPredicate forFlowFromArgumentIndexToReturn(
                 int argumentIndex,
-                Set<MethodMatcher> methodMatchers
+                Collection<MethodMatcher> methodMatchers
         ) {
             InvocationMatcher callMatcher = InvocationMatcher.fromMethodMatchers(methodMatchers);
             if (argumentIndex == -1) {
@@ -159,7 +159,7 @@ final class ExternalFlowModels {
                     .entrySet()
                     .stream()
                     .map(entry -> {
-                        Set<MethodMatcher> methodMatchers = methodMatcherCache.provideMethodMatchers(entry.getValue());
+                        Collection<MethodMatcher> methodMatchers = methodMatcherCache.provideMethodMatchers(entry.getValue());
                         return forFlowFromArgumentIndexToReturn(
                                 entry.getKey(),
                                 methodMatchers
@@ -184,7 +184,7 @@ final class ExternalFlowModels {
     }
 
     @AllArgsConstructor
-    static class FullyQualifiedNameToFlowModels implements Mergable<FullyQualifiedNameToFlowModels> {
+    static class FullyQualifiedNameToFlowModels implements Mergeable<FullyQualifiedNameToFlowModels> {
         private final Map<String, List<FlowModel>> value;
         private final Map<String, List<FlowModel>> taint;
 
@@ -247,14 +247,19 @@ final class ExternalFlowModels {
         // namespace, type, subtypes, name, signature, ext, input, output, kind
         @Getter
         String namespace;
+
         @Getter
         String type;
+
         @Getter
         boolean subtypes;
+
         @Getter
         String name;
+
         @Getter
         String signature;
+
         String ext;
         String input;
         String output;
@@ -277,7 +282,7 @@ final class ExternalFlowModels {
         }
 
         private FullyQualifiedNameToFlowModels loadModelFromFile() {
-            return CSVLoader.loadFromFile(
+            return CsvLoader.loadFromFile(
                     "model.csv",
                     FullyQualifiedNameToFlowModels.empty(),
                     Loader::createFullyQualifiedNameToFlowModels,

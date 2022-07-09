@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 public final class ControlFlowSummary {
     private final ControlFlowNode.Start start;
     private final ControlFlowNode.End end;
+
     @Getter(lazy = true)
     private final Set<ControlFlowNode> allNodes = getAllControlFlowNodes(start);
 

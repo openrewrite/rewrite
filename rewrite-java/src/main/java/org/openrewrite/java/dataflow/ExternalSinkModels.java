@@ -23,9 +23,9 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.internal.InvocationMatcher;
-import org.openrewrite.java.dataflow.internal.csv.CSVLoader;
+import org.openrewrite.java.dataflow.internal.csv.CsvLoader;
 import org.openrewrite.java.dataflow.internal.csv.GenericExternalModel;
-import org.openrewrite.java.dataflow.internal.csv.Mergable;
+import org.openrewrite.java.dataflow.internal.csv.Mergeable;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -74,7 +74,6 @@ public final class ExternalSinkModels {
         );
     }
 
-
     /**
      * True if the {@code expression} {@code cursor} is specified as a sink with the given {@code kind} in the
      * CSV flow model.
@@ -106,30 +105,28 @@ public final class ExternalSinkModels {
 
         private SinkNodePredicate sinkNodePredicateForArgumentIndex(
                 int argumentIndex,
-                Set<MethodMatcher> methodMatchers
+                Collection<MethodMatcher> methodMatchers
         ) {
             InvocationMatcher invocationMatcher = InvocationMatcher.fromMethodMatchers(methodMatchers);
-            if (argumentIndex == -1) {
-                return (expression, cursor) -> invocationMatcher.advanced().isSelect(cursor);
-            } else {
-                return (expression, cursor) -> invocationMatcher.advanced().isParameter(cursor, argumentIndex);
-            }
+            return argumentIndex == -1 ?
+                    ((expression, cursor) -> invocationMatcher.advanced().isSelect(cursor)) :
+                    ((expression, cursor) -> invocationMatcher.advanced().isParameter(cursor, argumentIndex));
         }
 
         private List<SinkNodePredicate> optimize(Collection<SinkModel> models) {
             Map<Integer, List<SinkModel>> sinkForArgument = new HashMap<>();
-            models.forEach(model -> {
+            for (SinkModel model : models) {
                 model.getArgumentRange().ifPresent(argumentRange -> {
                     for (int i = argumentRange.getStart(); i <= argumentRange.getEnd(); i++) {
                         sinkForArgument.computeIfAbsent(i, __ -> new ArrayList<>()).add(model);
                     }
                 });
-            });
+            }
             return sinkForArgument
                     .entrySet()
                     .stream()
                     .map(entry -> {
-                        Set<MethodMatcher> methodMatchers = methodMatcherCache.provideMethodMatchers(entry.getValue());
+                        Collection<MethodMatcher> methodMatchers = methodMatcherCache.provideMethodMatchers(entry.getValue());
                         return sinkNodePredicateForArgumentIndex(
                                 entry.getKey(),
                                 methodMatchers
@@ -163,7 +160,7 @@ public final class ExternalSinkModels {
     }
 
     @AllArgsConstructor
-    static class FullyQualifiedNameToSinkModels implements Mergable<FullyQualifiedNameToSinkModels> {
+    static class FullyQualifiedNameToSinkModels implements Mergeable<FullyQualifiedNameToSinkModels> {
         private final Map<String, List<SinkModel>> fqnToSinkModels;
 
         boolean isEmpty() {
@@ -216,14 +213,19 @@ public final class ExternalSinkModels {
         // namespace, type, subtypes, name, signature, ext, input, kind, generated
         @Getter
         String namespace;
+
         @Getter
         String type;
+
         @Getter
         boolean subtypes;
+
         @Getter
         String name;
+
         @Getter
         String signature;
+
         String ext;
         String input;
         String kind;
@@ -237,7 +239,7 @@ public final class ExternalSinkModels {
 
     static class Loader {
         static FullyQualifiedNameToSinkModels load() {
-            return CSVLoader.loadFromFile(
+            return CsvLoader.loadFromFile(
                     "sinks.csv",
                     FullyQualifiedNameToSinkModels.empty(),
                     Loader::createFullyQualifiedNameToFlowModels,

@@ -28,6 +28,7 @@ import java.lang.reflect.Type;
 public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
     protected final Type sourceType;
     protected final Type sinkType;
+
     protected LocalFlowSpec() {
         Type superClass = this.getClass().getGenericSuperclass();
         if (superClass instanceof Class) {

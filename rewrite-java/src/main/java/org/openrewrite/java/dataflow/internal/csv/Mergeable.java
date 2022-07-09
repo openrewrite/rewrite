@@ -15,6 +15,6 @@
  */
 package org.openrewrite.java.dataflow.internal.csv;
 
-public interface Mergable <M extends Mergable> {
+public interface Mergeable<M extends Mergeable> {
     M merge(M other);
 }

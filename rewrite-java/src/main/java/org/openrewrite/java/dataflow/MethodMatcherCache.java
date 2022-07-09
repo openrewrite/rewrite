@@ -20,11 +20,7 @@ import lombok.NoArgsConstructor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.internal.csv.GenericExternalModel;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.*;
 
 @NoArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
 final class MethodMatcherCache {
@@ -38,11 +34,13 @@ final class MethodMatcherCache {
         );
     }
 
-    Set<MethodMatcher> provideMethodMatchers(Collection<? extends GenericExternalModel> models) {
-        return models
-                .stream()
-                .map(GenericExternalModel::asMethodMatcherKey)
-                .map(this::provideMethodMatcher)
-                .collect(Collectors.toSet());
+    Collection<MethodMatcher> provideMethodMatchers(Collection<? extends GenericExternalModel> models) {
+        List<MethodMatcher> mms = new ArrayList<>();
+        for (GenericExternalModel model : models) {
+            GenericExternalModel.MethodMatcherKey asMethodMatcherKey = model.asMethodMatcherKey();
+            MethodMatcher methodMatcher = provideMethodMatcher(asMethodMatcherKey);
+            mms.add(methodMatcher);
+        }
+        return mms;
     }
 }

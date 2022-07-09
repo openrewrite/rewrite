@@ -19,8 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.controlflow.ControlFlow;
-import org.openrewrite.java.controlflow.ControlFlowNode;
-import org.openrewrite.java.controlflow.ControlFlowSummary;
 import org.openrewrite.java.dataflow.analysis.ForwardFlow;
 import org.openrewrite.java.dataflow.analysis.SinkFlow;
 import org.openrewrite.java.dataflow.analysis.SourceFlow;
@@ -33,9 +31,9 @@ import java.util.Set;
 @Incubating(since = "7.24.0")
 @RequiredArgsConstructor(staticName = "startingAt")
 public class Dataflow {
-    final Cursor start;
+    private final Cursor start;
 
-    public <Source extends Expression, Sink extends J> Optional<SinkFlow<Source, Sink>> findSinks(LocalFlowSpec<Source, Sink> spec) {;
+    public <Source extends Expression, Sink extends J> Optional<SinkFlow<Source, Sink>> findSinks(LocalFlowSpec<Source, Sink> spec) {
         Object value = start.getValue();
         if (spec.getSourceType().isAssignableFrom(value.getClass())) {
             //noinspection unchecked
@@ -49,12 +47,7 @@ public class Dataflow {
                 SinkFlow<Source, Sink> flow = new SinkFlow<>(start, spec, reachable);
 
                 ForwardFlow.findSinks(flow);
-
-                if (flow.isNotEmpty()) {
-                    return Optional.of(flow);
-                } else {
-                    return Optional.empty();
-                }
+                return flow.isNotEmpty() ? Optional.of(flow) : Optional.empty();
             });
         }
         return Optional.empty();

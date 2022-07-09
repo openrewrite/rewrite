@@ -33,7 +33,8 @@ public class ControlFlowBasicBlockVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.MethodDeclaration methodDeclaration = getCursor().firstEnclosing(J.MethodDeclaration.class);
-        if (block == methodDeclaration.getBody() &&
+        if (methodDeclaration != null &&
+                block == methodDeclaration.getBody() &&
                 methodDeclaration.getName().getSimpleName().equals(methodName)) {
             ControlFlow.startingAt(getCursor()).findControlFlow().ifPresent(summary -> {
                 Set<J> inBasicBlock = summary.getBasicBlocks().stream().flatMap(b ->

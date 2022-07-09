@@ -28,9 +28,9 @@ import java.util.Optional;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Guard {
     private final Cursor cursor;
+
     @Getter
     private final Expression expression;
-
 
     public static Optional<Guard> from(Cursor cursor) {
         if (!(cursor.getValue() instanceof Expression)) {
@@ -101,7 +101,7 @@ public class Guard {
                 e instanceof J.Assignment ||
                 e instanceof J.AssignmentOperation ||
                 e instanceof J.Ternary ||
-                e instanceof J.Unary && ((J.Unary) e).getOperator() == J.Unary.Type.Not;
+                (e instanceof J.Unary && ((J.Unary) e).getOperator() == J.Unary.Type.Not);
     }
 
     private static Optional<JavaType> getTypeSafe(Expression e) {

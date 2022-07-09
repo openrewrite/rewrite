@@ -22,20 +22,20 @@ import java.io.*;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-public class CSVLoader {
-    public static <R extends Mergable, E> R loadFromFile(String csvFileName, R emptyModel, Function<Iterable<E>, R> merger, Function<String[], E> csvMapper) {
-        final Mergable[] models = new Mergable[]{emptyModel};
+public class CsvLoader {
+    public static <R extends Mergeable<R>, E> R loadFromFile(String csvFileName, R emptyModel, Function<Iterable<E>, R> merger, Function<String[], E> csvMapper) {
+        AtomicReference<R> model = new AtomicReference<>(emptyModel);
         try (ScanResult scanResult = new ClassGraph().acceptPaths("data-flow").enableMemoryMapping().scan()) {
             scanResult.getResourcesWithLeafName(csvFileName)
-                    .forEachInputStreamIgnoringIOException((res, input) -> models[0] = models[0].merge(loadCvs(input, res.getURI(), merger, csvMapper)));
+                    .forEachInputStreamIgnoringIOException((res, input) -> model.set(model.get().merge(loadCvs(input, res.getURI(), merger, csvMapper))));
         }
-        //noinspection unchecked
-        return (R) models[0];
+        return model.get();
     }
 
-    private static <R extends Mergable, E> R loadCvs(InputStream input, URI source, Function<Iterable<E>, R> merger, Function<String[], E> csvMapper) {
+    private static <R extends Mergeable<R>, E> R loadCvs(InputStream input, URI source, Function<Iterable<E>, R> merger, Function<String[], E> csvMapper) {
         BufferedReader reader = new BufferedReader(new InputStreamReader(input));
         try {
             List<E> models = new ArrayList<E>();

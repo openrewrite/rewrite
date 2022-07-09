@@ -31,10 +31,11 @@ import java.util.stream.Stream;
 
 @Incubating(since = "7.25.0")
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public final class ControlFlow {
+public class ControlFlow {
     private static final String CONTROL_FLOW_MESSAGE_KEY = "__CONTROL_FLOW_SUMMARY";
+
     @Nullable
-    private final Cursor start;
+    private Cursor start;
 
     /**
      * A return value of {@link Optional#empty()} indicates that control flow can not be computed for the given
@@ -72,7 +73,6 @@ public final class ControlFlow {
     }
 
     private static class ControlFlowAnalysis<P> extends JavaIsoVisitor<P> {
-
         /**
          * @implNote This MUST be 'protected' or package-private. This is set by annonymous inner classes.
          */
@@ -138,7 +138,7 @@ public final class ControlFlow {
         }
 
         ControlFlowAnalysis<P> visitRecursiveTransferringExit(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
-            final ControlFlowAnalysis<P> analysis = visitRecursive(start, toVisit, param);
+            ControlFlowAnalysis<P> analysis = visitRecursive(start, toVisit, param);
             if (!analysis.exitFlow.isEmpty()) {
                 this.exitFlow.addAll(analysis.exitFlow);
             }
@@ -146,7 +146,7 @@ public final class ControlFlow {
         }
 
         ControlFlowAnalysis<P> visitRecursiveTransferringAll(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
-            final ControlFlowAnalysis<P> analysis = visitRecursiveTransferringExit(start, toVisit, param);
+            ControlFlowAnalysis<P> analysis = visitRecursiveTransferringExit(start, toVisit, param);
             if (!analysis.continueFlow.isEmpty()) {
                 this.continueFlow.addAll(analysis.continueFlow);
             }
@@ -317,7 +317,8 @@ public final class ControlFlow {
                     }
 
                     @Override
-                    public @Nullable J getFalsePart() {
+                    @Nullable
+                    public J getFalsePart() {
                         return ifStatement.getElsePart();
                     }
                 };
@@ -336,7 +337,7 @@ public final class ControlFlow {
                     }
 
                     @Override
-                    public @Nullable J getFalsePart() {
+                    public J getFalsePart() {
                         return ternary.getFalsePart();
                     }
                 };
@@ -451,7 +452,7 @@ public final class ControlFlow {
             //  - Update
             addCursorToBasicBlock(); // Add the for node first
             // First the control is invoked
-            final ControlFlowNode.BasicBlock[] entryBlock = new ControlFlowNode.BasicBlock[1];
+            ControlFlowNode.BasicBlock[] entryBlock = new ControlFlowNode.BasicBlock[1];
             ControlFlowAnalysis<P> controlAnalysisFirstBit = new ControlFlowAnalysis<P>(current) {
                 @Override
                 public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
@@ -525,13 +526,12 @@ public final class ControlFlow {
         }
 
         private J.MethodInvocation createFakeConditionalMethod(Expression iterable) {
-            final JavaTemplate fakeConditionalTemplate;
-            if (iterable.getType() instanceof JavaType.Array) {
-                fakeConditionalTemplate = JavaTemplate.builder(this::getCursor, "Arrays.asList(#{any()}).iterator().hasNext()").imports("java.util.Arrays").build();
-            } else {
-                fakeConditionalTemplate = JavaTemplate.builder(this::getCursor, "#{any(java.lang.Iterable)}.iterator().hasNext()").build();
-            }
-            final JavaCoordinates coordinates = iterable.getCoordinates().replace();
+            JavaTemplate fakeConditionalTemplate = iterable.getType() instanceof JavaType.Array ?
+                    JavaTemplate.builder(this::getCursor, "Arrays.asList(#{any()}).iterator().hasNext()")
+                            .imports("java.util.Arrays")
+                            .build() :
+                    JavaTemplate.builder(this::getCursor, "#{any(java.lang.Iterable)}.iterator().hasNext()").build();
+            JavaCoordinates coordinates = iterable.getCoordinates().replace();
             J.MethodInvocation fakeConditional = iterable.withTemplate(fakeConditionalTemplate, coordinates, iterable);
             if (iterable == fakeConditional) {
                 throw new IllegalStateException("Failed to create a fake conditional!");
