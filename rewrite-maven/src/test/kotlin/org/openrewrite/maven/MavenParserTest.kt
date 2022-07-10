@@ -96,10 +96,28 @@ class MavenParserTest : RewriteTest {
     )
 
     @Test
-    fun rewriteCircleci() {
-        val rr = parse("org.openrewrite.recipe:rewrite-circleci:1.1.0")
-        assertThat(rr.dependencies[Scope.Runtime]!!.map { it.artifactId }).contains("rewrite-yaml")
-    }
+    fun rewriteCircleci() = rewriteRun(
+        pomXml(
+            """
+                <project>
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>app</artifactId>
+                    <version>0.0.1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite.recipe</groupId>
+                            <artifactId>rewrite-circleci</artifactId>
+                            <version>1.1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+        ) { spec ->
+            spec.beforeRecipe { pomXml ->
+                assertThat(pomXml.mavenResolutionResult().dependencies[Scope.Runtime]!!.map { it.artifactId }).contains("rewrite-yaml")
+            }
+        }
+    )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1085")
     @Test
@@ -137,8 +155,7 @@ class MavenParserTest : RewriteTest {
             spec.afterRecipe { pomXml ->
                 assertThat(
                     pomXml.mavenResolutionResult().findDependencies("com.google.guava", "guava", null)[0].version
-                )
-                    .isEqualTo("14.0")
+                ).isEqualTo("14.0")
             }
         }
     )
