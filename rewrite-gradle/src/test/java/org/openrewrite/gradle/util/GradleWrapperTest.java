@@ -16,7 +16,7 @@
 package org.openrewrite.gradle.util;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ipc.http.HttpUrlConnectionSender;
+import org.openrewrite.InMemoryExecutionContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,7 +24,7 @@ public class GradleWrapperTest {
 
     @Test
     void wrapper() {
-        GradleWrapper gw = GradleWrapper.validate("7.x", "bin", new HttpUrlConnectionSender()).getValue();
+        GradleWrapper gw = GradleWrapper.validate(new InMemoryExecutionContext(), "7.x", "bin", null).getValue();
         assertThat(gw).isNotNull();
         assertThat(gw.getVersion()).startsWith("7.");
     }

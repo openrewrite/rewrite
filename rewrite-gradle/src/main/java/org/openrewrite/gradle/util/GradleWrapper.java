@@ -16,9 +16,7 @@
 package org.openrewrite.gradle.util;
 
 import lombok.Value;
-import org.openrewrite.FileAttributes;
-import org.openrewrite.Tree;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.Markers;
@@ -50,13 +48,20 @@ public class GradleWrapper {
     String version;
     DistributionType distributionType;
 
-    public static Validated validate(String version, @Nullable String distributionTypeName, HttpSender httpSender) {
+    public static Validated validate(ExecutionContext ctx,
+                                     String version,
+                                     @Nullable String distribution,
+                                     @Nullable Validated cachedValidation) {
+        if (cachedValidation != null) {
+            return cachedValidation;
+        }
+        String distributionTypeName = distribution != null ? distribution : DistributionType.Bin.name().toLowerCase();
+        GradleWrapper wrapper = null;
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+
         //noinspection unchecked
         return new Validated.Both(
                 Validated.test("distributionType", "must be a valid distribution type", distributionTypeName, dt -> {
-                    if (distributionTypeName == null) {
-                        return true;
-                    }
                     try {
                         DistributionType.valueOf(dt);
                         return true;
@@ -91,12 +96,10 @@ public class GradleWrapper {
                     return wrapper;
                 }
 
-                DistributionType distributionType = distributionTypeName == null ?
-                        DistributionType.Bin :
-                        Arrays.stream(DistributionType.values())
-                                .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
-                                .findAny()
-                                .orElseThrow(() -> new IllegalArgumentException("Unknown distribution type " + distributionTypeName));
+                DistributionType distributionType = Arrays.stream(DistributionType.values())
+                        .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
+                        .findAny()
+                        .orElseThrow(() -> new IllegalArgumentException("Unknown distribution type " + distributionTypeName));
                 VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
 
                 //noinspection resource

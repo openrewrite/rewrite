@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "UnusedReturnValue"})
 public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final MavenPomCache DEFAULT_POM_CACHE = new InMemoryMavenPomCache();
 
@@ -55,48 +55,54 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return new MavenExecutionContextView(ctx);
     }
 
-    public void setResolutionListener(ResolutionEventListener listener) {
+    public MavenExecutionContextView setResolutionListener(ResolutionEventListener listener) {
         putMessage(MAVEN_RESOLUTION_LISTENER, listener);
+        return this;
     }
 
     public ResolutionEventListener getResolutionListener() {
         return getMessage(MAVEN_RESOLUTION_LISTENER, ResolutionEventListener.NOOP);
     }
 
-    public void setMirrors(Collection<MavenRepositoryMirror> mirrors) {
+    public MavenExecutionContextView setMirrors(Collection<MavenRepositoryMirror> mirrors) {
         putMessage(MAVEN_MIRRORS, mirrors);
+        return this;
     }
 
     public Collection<MavenRepositoryMirror> getMirrors() {
         return getMessage(MAVEN_MIRRORS, emptyList());
     }
 
-    public void setCredentials(Collection<MavenRepositoryCredentials> credentials) {
+    public MavenExecutionContextView setCredentials(Collection<MavenRepositoryCredentials> credentials) {
         putMessage(MAVEN_CREDENTIALS, credentials);
+        return this;
     }
 
     public Collection<MavenRepositoryCredentials> getCredentials() {
         return getMessage(MAVEN_CREDENTIALS, emptyList());
     }
 
-    public void setPomCache(MavenPomCache pomCache) {
+    public MavenExecutionContextView setPomCache(MavenPomCache pomCache) {
         putMessage(MAVEN_POM_CACHE, pomCache);
+        return this;
     }
 
     public MavenPomCache getPomCache() {
         return getMessage(MAVEN_POM_CACHE, DEFAULT_POM_CACHE);
     }
 
-    public void setLocalRepository(MavenRepository localRepository) {
+    public MavenExecutionContextView setLocalRepository(MavenRepository localRepository) {
         putMessage(MAVEN_LOCAL_REPOSITORY, localRepository);
+        return this;
     }
 
     public MavenRepository getLocalRepository() {
         return getMessage(MAVEN_LOCAL_REPOSITORY, MAVEN_LOCAL_DEFAULT);
     }
 
-    public void setRepositories(List<MavenRepository> repositories) {
+    public MavenExecutionContextView setRepositories(List<MavenRepository> repositories) {
         putMessage(MAVEN_REPOSITORIES, repositories);
+        return this;
     }
 
     public List<MavenRepository> getRepositories() {
@@ -109,17 +115,18 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      *
      * @param pinnedSnapshotVersions A set of group:artifact:version and the dated snapshot version to pin them to.
      */
-    public void setPinnedSnapshotVersions(Collection<ResolvedGroupArtifactVersion> pinnedSnapshotVersions) {
+    public MavenExecutionContextView setPinnedSnapshotVersions(Collection<ResolvedGroupArtifactVersion> pinnedSnapshotVersions) {
         putMessage(MAVEN_PINNED_SNAPSHOT_VERSIONS, pinnedSnapshotVersions);
+        return this;
     }
 
     public Collection<ResolvedGroupArtifactVersion> getPinnedSnapshotVersions() {
         return getMessage(MAVEN_PINNED_SNAPSHOT_VERSIONS, emptyList());
     }
 
-    public void setMavenSettings(@Nullable MavenSettings settings, String... activeProfiles) {
+    public MavenExecutionContextView setMavenSettings(@Nullable MavenSettings settings, String... activeProfiles) {
         if (settings == null) {
-            return;
+            return this;
         }
 
         if (settings.getServers() != null) {
@@ -157,5 +164,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                 })
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList()));
+
+        return this;
     }
 }

@@ -15,10 +15,10 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 
 public class HttpSenderExecutionContextView extends DelegatingExecutionContext {
-
     private static final String HTTP_SENDER = "org.openrewrite.httpSender";
 
     public HttpSenderExecutionContextView(ExecutionContext delegate) {
@@ -26,17 +26,18 @@ public class HttpSenderExecutionContextView extends DelegatingExecutionContext {
     }
 
     public static HttpSenderExecutionContextView view(ExecutionContext ctx) {
-        if(ctx instanceof HttpSenderExecutionContextView) {
+        if (ctx instanceof HttpSenderExecutionContextView) {
             return (HttpSenderExecutionContextView) ctx;
         }
         return new HttpSenderExecutionContextView(ctx);
     }
 
-    public void setHttpSender(org.openrewrite.ipc.http.HttpSender httpSender) {
+    public HttpSenderExecutionContextView setHttpSender(HttpSender httpSender) {
         putMessage(HTTP_SENDER, httpSender);
+        return this;
     }
 
-    public org.openrewrite.ipc.http.HttpSender getHttpSender() {
+    public HttpSender getHttpSender() {
         return getMessage(HTTP_SENDER, new HttpUrlConnectionSender());
     }
 }

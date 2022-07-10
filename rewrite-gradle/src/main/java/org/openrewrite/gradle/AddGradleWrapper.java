@@ -16,7 +16,10 @@
 package org.openrewrite.gradle;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.GradleWrapper;
@@ -72,15 +75,7 @@ public class AddGradleWrapper extends Recipe {
 
     @Override
     public Validated validate(ExecutionContext ctx) {
-        String dist = distribution != null ? distribution : DistributionType.Bin.name().toLowerCase();
-        GradleWrapper wrapper = gradleWrapper != null ? gradleWrapper.getValue() : null;
-        if (wrapper == null ||
-                !wrapper.getVersion().equals(version) ||
-                !wrapper.getDistributionType().name().toLowerCase().equals(dist)) {
-            org.openrewrite.ipc.http.HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-            gradleWrapper = super.validate().and(GradleWrapper.validate(version, distribution, httpSender));
-        }
-        return gradleWrapper;
+        return super.validate(ctx).and(GradleWrapper.validate(ctx, version, distribution, gradleWrapper));
     }
 
     //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.

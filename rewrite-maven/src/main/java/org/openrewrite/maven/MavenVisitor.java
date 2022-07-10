@@ -306,7 +306,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId, ExecutionContext ctx) {
-        return new MavenPomDownloader(emptyMap(), new HttpUrlConnectionSender(), ctx)
+        return new MavenPomDownloader(emptyMap(), ctx)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), null, getResolutionResult().getPom().getRepositories());
     }
 }

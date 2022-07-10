@@ -72,8 +72,8 @@ public class HttpUrlConnectionSender implements HttpSender {
 
     @Override
     public Response send(Request request) {
+        HttpURLConnection con;
         try {
-            HttpURLConnection con;
             if (proxy != null) {
                 con = (HttpURLConnection) request.getUrl().openConnection(proxy);
             } else {
@@ -108,7 +108,7 @@ public class HttpUrlConnectionSender implements HttpSender {
             InputStream is;
             if (con.getErrorStream() != null) {
                 is = con.getErrorStream();
-            } else if (con.getInputStream() != null) {
+            } else if (status < 400 && con.getInputStream() != null) {
                 is = con.getInputStream();
             } else {
                 return new Response(status, new ByteArrayInputStream(new byte[0]), onClose);

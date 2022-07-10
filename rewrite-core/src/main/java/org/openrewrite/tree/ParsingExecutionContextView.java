@@ -32,8 +32,9 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
         return new ParsingExecutionContextView(ctx);
     }
 
-    public void setParsingListener(ParsingEventListener listener) {
+    public ParsingExecutionContextView setParsingListener(ParsingEventListener listener) {
         putMessage(PARSING_LISTENER, listener);
+        return this;
     }
 
     public ParsingEventListener getParsingListener() {

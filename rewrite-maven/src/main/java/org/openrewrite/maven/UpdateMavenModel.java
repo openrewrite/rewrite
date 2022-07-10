@@ -129,7 +129,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
     }
 
     private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) {
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, new HttpUrlConnectionSender(), ctx);
+        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx);
         ResolvedPom resolved = resolutionResult.getPom().resolve(ctx, downloader);
         return resolutionResult
                 .withPom(resolved)

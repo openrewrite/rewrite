@@ -17,11 +17,11 @@ package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawPom;
 import org.openrewrite.maven.tree.MavenResolutionResult;
@@ -43,13 +43,17 @@ import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 public class MavenParser implements Parser<Xml.Document> {
+    @SuppressWarnings("DeprecatedIsStillUsed")
+    @Deprecated
+    @Nullable
     private final HttpSender httpSender;
+
     private final Collection<String> activeProfiles;
 
     /**
-     * @param activeProfiles  The maven profile names set to be active. Profiles are typically defined in the settings.xml
+     * @param activeProfiles The maven profile names set to be active. Profiles are typically defined in the settings.xml
      */
-    private MavenParser(HttpSender httpSender, Collection<String> activeProfiles) {
+    private MavenParser(@Nullable HttpSender httpSender, Collection<String> activeProfiles) {
         this.httpSender = httpSender;
         this.activeProfiles = activeProfiles;
     }
@@ -96,7 +100,10 @@ public class MavenParser implements Parser<Xml.Document> {
 
         List<Xml.Document> parsed = new ArrayList<>();
 
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, httpSender, ctx);
+        if(httpSender != null) {
+            ctx = HttpSenderExecutionContextView.view(ctx).setHttpSender(httpSender);
+        }
+        MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
@@ -146,7 +153,11 @@ public class MavenParser implements Parser<Xml.Document> {
 
     public static class Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
-        private HttpSender httpSender = new HttpUrlConnectionSender();
+
+        @SuppressWarnings("DeprecatedIsStillUsed")
+        @Deprecated
+        @Nullable
+        private HttpSender httpSender;
 
         public Builder activeProfiles(@Nullable String... profiles) {
             //noinspection ConstantConditions
@@ -156,6 +167,12 @@ public class MavenParser implements Parser<Xml.Document> {
             return this;
         }
 
+        /**
+         * @param httpSender The HTTP sender to use.
+         * @return This builder
+         * @deprecated Use {@link org.openrewrite.HttpSenderExecutionContextView#setHttpSender(HttpSender)} instead.
+         */
+        @Deprecated
         public Builder httpSender(HttpSender httpSender) {
             this.httpSender = httpSender;
             return this;

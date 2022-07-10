@@ -23,33 +23,63 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import org.openrewrite.HttpSenderExecutionContextView
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.ipc.http.HttpUrlConnectionSender
 import org.openrewrite.maven.MavenParser
 import org.openrewrite.maven.tree.GroupArtifactVersion
 import org.openrewrite.maven.tree.MavenRepository
+import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
 
-class MavenPomDownloaderTest {
 
-    @Test
-    fun normalizeAccept500() {
-        val downloader = MavenPomDownloader(emptyMap(), InMemoryExecutionContext())
-        val originalRepo = MavenRepository("id", "https://httpstat.us/500", true, true, false, null, null)
-        val normalizedRepo = downloader.normalizeRepository(originalRepo, null)
-        assertThat(normalizedRepo).isEqualTo(originalRepo)
+@Suppress("HttpUrlsUsage")
+class MavenPomDownloaderTest {
+    private val ctx = HttpSenderExecutionContextView.view(InMemoryExecutionContext())
+        .setHttpSender(HttpUrlConnectionSender(Duration.ofMillis(100), Duration.ofMillis(100)))
+
+    private fun mockServer(responseCode: Int, block: (MockWebServer) -> Unit) {
+        MockWebServer().apply {
+            dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    return MockResponse()
+                        .setResponseCode(responseCode)
+                        .setBody("")
+                }
+            }
+        }.use { mockRepo ->
+            mockRepo.start()
+            block(mockRepo)
+            assertThat(mockRepo.requestCount)
+                .isGreaterThan(0)
+                .`as`("The mock repository received no requests. The test is not using it.d")
+        }
     }
 
-    @Test
-    fun normalizeAccept404() {
-        val downloader = MavenPomDownloader(emptyMap(), InMemoryExecutionContext())
-        val originalRepo = MavenRepository("id", "https://httpstat.us/400", true, true, false, null, null)
-        val normalizedRepo = downloader.normalizeRepository(originalRepo, null)
-        assertThat(normalizedRepo).isEqualTo(originalRepo)
+    @ParameterizedTest
+    @ValueSource(ints = [500, 400])
+    fun normalizeAcceptErrorStatuses(status: Int) {
+        val downloader = MavenPomDownloader(emptyMap(), ctx)
+        mockServer(status) { mockRepo ->
+            val originalRepo = MavenRepository(
+                "id",
+                "http://${mockRepo.hostName}:${mockRepo.port}/maven",
+                true,
+                true,
+                false,
+                null,
+                null
+            )
+            val normalizedRepo = downloader.normalizeRepository(originalRepo, null)
+            assertThat(normalizedRepo).isEqualTo(originalRepo)
+        }
     }
 
     @Test
     fun normalizeRejectConnectException() {
-        val downloader = MavenPomDownloader(emptyMap(), InMemoryExecutionContext())
+        val downloader = MavenPomDownloader(emptyMap(), ctx)
         val normalizedRepository = downloader.normalizeRepository(
             MavenRepository("id", "https://localhost", true, true, false, null, null),
             null
@@ -59,18 +89,38 @@ class MavenPomDownloaderTest {
 
     @Test
     fun invalidArtifact() {
-        val downloader = MavenPomDownloader(emptyMap(), InMemoryExecutionContext())
-
+        val downloader = MavenPomDownloader(emptyMap(), ctx)
         val gav = GroupArtifactVersion("fred", "fred", "1.0.0")
-        val repositories = listOf(
-            MavenRepository("id", "https://httpstat.us/500", true, true, false, null, null),
-            MavenRepository("id2", "https://httpstat.us/400", true, true, false, null, null)
-        )
 
-        assertThatThrownBy {downloader.download(gav, null, null, repositories)}
-            .isInstanceOf(MavenDownloadingException::class.java)
-            .hasMessageContaining("https://httpstat.us/500")
-            .hasMessageContaining("https://httpstat.us/400")
+        mockServer(500) { repo1 ->
+            mockServer(400) { repo2 ->
+                val repositories = listOf(
+                    MavenRepository(
+                        "id",
+                        "http://${repo1.hostName}:${repo1.port}/maven",
+                        true,
+                        true,
+                        false,
+                        null,
+                        null
+                    ),
+                    MavenRepository(
+                        "id2",
+                        "http://${repo2.hostName}:${repo2.port}/maven",
+                        true,
+                        true,
+                        false,
+                        null,
+                        null
+                    )
+                )
+
+                assertThatThrownBy { downloader.download(gav, null, null, repositories) }
+                    .isInstanceOf(MavenDownloadingException::class.java)
+                    .hasMessageContaining("http://${repo1.hostName}:${repo1.port}/maven")
+                    .hasMessageContaining("http://${repo2.hostName}:${repo2.port}/maven")
+            }
+        }
     }
 
     @Test
@@ -80,7 +130,6 @@ class MavenPomDownloaderTest {
             dispatcher = object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
                     return MockResponse().apply {
-                        println("snapshot repo: " + request.path)
                         setResponseCode(200)
                         if (request.path!!.contains("maven-metadata")) {
                             setBody(
@@ -129,7 +178,7 @@ class MavenPomDownloaderTest {
             dispatcher = object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
                     return MockResponse().apply {
-                        if(request.path!!.contains("maven-metadata")) {
+                        if (request.path!!.contains("maven-metadata")) {
                             metadataPaths.incrementAndGet()
                         }
                         setResponseCode(404)
@@ -142,7 +191,7 @@ class MavenPomDownloaderTest {
             releaseRepoServer.start()
             return snapshotRepo.use { snapshotRepoServer ->
                 snapshotRepoServer.start()
-                MavenParser.builder().build().parse(
+                MavenParser.builder().build().parse(ctx,
                     """
                         <project>
                             <modelVersion>4.0.0</modelVersion>

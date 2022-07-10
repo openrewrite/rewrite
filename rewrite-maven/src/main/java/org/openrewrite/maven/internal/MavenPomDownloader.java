@@ -22,11 +22,11 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import io.vavr.CheckedFunction1;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.*;
@@ -63,9 +63,16 @@ public class MavenPomDownloader {
     private final CheckedFunction1<HttpSender.Request, byte[]> sendRequest;
 
     public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx) {
-        this(projectPoms, new HttpUrlConnectionSender(), ctx);
+        this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
     }
 
+    /**
+     * @param projectPoms Project poms on disk.
+     * @param httpSender The HTTP sender.
+     * @param ctx The execution context.
+     * @deprecated Use {@link #MavenPomDownloader(Map, ExecutionContext)} instead.
+     */
+    @Deprecated
     public MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
         this.projectPoms = projectPoms;
         this.httpSender = httpSender;
