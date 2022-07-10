@@ -246,7 +246,10 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
             if (t != null) {
                 for (TreeVisitor<T, P> v : afterVisit) {
-                    t = v.visit(t, p);
+                    if (v != null) {
+                        v.setCursor(getCursor());
+                        t = v.visit(t, p);
+                    }
                 }
             }
 
