@@ -25,6 +25,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.TypeValidation;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -64,7 +65,6 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 import static org.openrewrite.test.ParserTypeUtils.parserType;
 
 @SuppressWarnings("unused")
-@Incubating(since = "7.20.1")
 public interface RewriteTest extends SourceSpecs {
     static Recipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
         return new AdHocRecipe(visitor);
@@ -150,26 +150,15 @@ public interface RewriteTest extends SourceSpecs {
 
         Map<ParserSupplier, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
 
-        nextSource:
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
             // ----- method specific parser -------------------------
-            for (Parser<?> parser : testMethodSpec.parsers) {
-                if (parserType(parser).equals(sourceSpec.sourceFileType)) {
-                    sourceSpecsByParser.computeIfAbsent(
-                            new ParserSupplier(sourceSpec.sourceFileType, sourceSpec.dsl, () -> parser),
-                            p -> new ArrayList<>()).add(sourceSpec);
-                    continue nextSource;
-                }
+            if (RewriteTestUtils.groupSourceSpecsByParser(testMethodSpec, sourceSpecsByParser, sourceSpec)) {
+                continue;
             }
 
             // ----- test default parser -------------------------
-            for (Parser<?> parser : testClassSpec.parsers) {
-                if (parserType(parser).equals(sourceSpec.sourceFileType)) {
-                    sourceSpecsByParser.computeIfAbsent(
-                            new ParserSupplier(sourceSpec.sourceFileType, sourceSpec.dsl, () -> parser),
-                            p -> new ArrayList<>()).add(sourceSpec);
-                    continue nextSource;
-                }
+            if (RewriteTestUtils.groupSourceSpecsByParser(testClassSpec, sourceSpecsByParser, sourceSpec)) {
+                continue;
             }
 
             // ----- default parsers for each SourceFile type -------------------------
@@ -230,7 +219,7 @@ public interface RewriteTest extends SourceSpecs {
 
         Map<SourceFile, SourceSpec<?>> specBySourceFile = new HashMap<>(sourceSpecs.length);
         for (Map.Entry<ParserSupplier, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
-            Map<SourceSpec<?>, Parser.Input> inputs = new HashMap<>(sourceSpecsForParser.getValue().size());
+            Map<SourceSpec<?>, Parser.Input> inputs = new LinkedHashMap<>(sourceSpecsForParser.getValue().size());
             for (SourceSpec<?> sourceSpec : sourceSpecsForParser.getValue()) {
                 if (sourceSpec.before == null) {
                     continue;
@@ -249,8 +238,13 @@ public interface RewriteTest extends SourceSpecs {
             Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
 
             Iterator<SourceSpec<?>> sourceSpecIter = inputs.keySet().iterator();
-            for (SourceFile sourceFile : sourceSpecsForParser.getKey().get()
-                    .parseInputs(inputs.values(), relativeTo, executionContext)) {
+
+            //noinspection unchecked,rawtypes
+            List<SourceFile> sourceFiles = (List) sourceSpecsForParser.getKey().get()
+                    .parseInputs(inputs.values(), relativeTo, executionContext);
+
+            for (int i = 0; i < sourceFiles.size(); i++) {
+                SourceFile sourceFile = sourceFiles.get(i);
                 sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
                         sourceFile.getMarkers().getMarkers(), testClassSpec.allSources.markers)));
                 sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
@@ -267,6 +261,19 @@ public interface RewriteTest extends SourceSpecs {
                     }
                     return m;
                 }))));
+
+                // Validate that printing a parsed AST yields the same source text
+                int j = 0;
+                for (Parser.Input input : inputs.values()) {
+                    if (j++ == i) {
+                        assertThat(sourceFile.printAll())
+                                .as("When parsing and printing the source code back to text without modifications, " +
+                                        "the printed source didn't match the original source code. This means there is a bug in the " +
+                                        "parser implementation itself. Please open an issue to report this, providing a sample of the " +
+                                        "code that generated this error!")
+                                .isEqualTo(StringUtils.readFully(input.getSource()));
+                    }
+                }
 
                 //noinspection unchecked
                 ((Consumer<SourceFile>) nextSpec.beforeRecipe).accept(sourceFile);
@@ -444,5 +451,19 @@ public interface RewriteTest extends SourceSpecs {
                 throw new UnsupportedOperationException("RewriteTest is not intended to be iterated.");
             }
         };
+    }
+}
+
+class RewriteTestUtils {
+    static boolean groupSourceSpecsByParser(RecipeSpec testMethodSpec, Map<ParserSupplier, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {
+        for (Parser<?> parser : testMethodSpec.parsers) {
+            if (parserType(parser).equals(sourceSpec.sourceFileType)) {
+                sourceSpecsByParser.computeIfAbsent(
+                        new ParserSupplier(sourceSpec.sourceFileType, sourceSpec.dsl, () -> parser),
+                        p -> new ArrayList<>()).add(sourceSpec);
+                return true;
+            }
+        }
+        return false;
     }
 }
