@@ -1452,6 +1452,32 @@ interface ChangeTypeTest : JavaRecipeTest {
         }
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2034")
+    @Test
+    fun changeConstructor() = assertChanged(
+        recipe = ChangeType("a.A1", "a.A2", false),
+        before = """
+            package a;
+            
+            public class A1 {
+                public A1() {
+                }
+            }
+        """,
+        after = """
+            package a;
+            
+            public class A2 {
+                public A2() {
+                }
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("a.A1")).isEmpty()
+            assertThat(cu.findType("a.A2")).isNotEmpty()
+        }
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {

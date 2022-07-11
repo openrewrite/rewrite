@@ -414,10 +414,12 @@ public class ChangeType extends Recipe {
     private static class ChangeClassDefinition extends JavaIsoVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType.Class targetType;
+        private final MethodMatcher originalConstructor;
 
         private ChangeClassDefinition(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.ShallowClass.build(newFullyQualifiedTypeName);
+            this.originalConstructor = new MethodMatcher(oldFullyQualifiedTypeName + "<constructor>(..)");
         }
 
         @Override
@@ -499,32 +501,44 @@ public class ChangeType extends Recipe {
             return cd;
         }
 
+        @Override
+        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+            if (method.isConstructor() && originalConstructor.matches(method.getMethodType())) {
+                method = method.withName(method.getName().withSimpleName(targetType.getClassName()));
+                method = method.withMethodType(updateType(method.getMethodType()));
+            }
+            return super.visitMethodDeclaration(method, executionContext);
+        }
+
         private String getNewClassName(JavaType.FullyQualified fq) {
             return fq.getOwningClass() == null ? fq.getClassName() :
                     fq.getFullyQualifiedName().substring(fq.getOwningClass().getFullyQualifiedName().length() + 1);
         }
 
-        private JavaType updateType(@Nullable JavaType type) {
-            JavaType.GenericTypeVariable gtv = TypeUtils.asGeneric(type);
-            if (gtv != null) {
-                return gtv.withBounds(ListUtils.map(gtv.getBounds(), bound -> {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(bound);
-                    if (fq != null) {
-                        if (fq.getFullyQualifiedName().equals(originalType.getFullyQualifiedName())) {
-                            return targetType;
-                        }
-                    }
-                    return bound;
-                }));
-            }
-
-            JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(type);
-            if (fqt != null && fqt.getFullyQualifiedName().equals(originalType.getFullyQualifiedName())) {
-                return targetType;
+        private JavaType updateType(@Nullable JavaType oldType) {
+            if (oldType instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
+                if (isTargetFullyQualifiedType(original)) {
+                    return targetType;
+                }
             }
 
             //noinspection ConstantConditions
-            return type;
+            return oldType;
+        }
+
+        @Nullable
+        private JavaType.Method updateType(@Nullable JavaType.Method mt) {
+            if (mt != null) {
+                return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
+                        .withReturnType(updateType(mt.getReturnType()))
+                        .withParameterTypes(ListUtils.map(mt.getParameterTypes(), this::updateType));
+            }
+            return null;
+        }
+
+        private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
+            return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName());
         }
     }
 }
