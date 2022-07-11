@@ -380,7 +380,20 @@ public class GroovyParserVisitor {
                         sourceBefore("("),
                         annotation.getMembers().entrySet().stream()
                                 .map(arg -> {
-                                    Space argPrefix = sourceBefore(arg.getKey());
+                                    Space argPrefix;
+                                    if("value".equals(arg.getKey())) {
+                                        // Determine whether the value is implicit or explicit
+                                        int saveCursor = cursor;
+                                        argPrefix = whitespace();
+                                        if(!source.startsWith("value", cursor)) {
+                                            return new JRightPadded<Expression>(
+                                                    ((Expression) bodyVisitor.visit(arg.getValue())).withPrefix(argPrefix),
+                                                    arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","),
+                                                    Markers.EMPTY);
+                                        }
+                                        cursor = saveCursor;
+                                    }
+                                    argPrefix = sourceBefore(arg.getKey());
                                     J.Identifier argName = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, arg.getKey(), null, null);
                                     J.Assignment assign = new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
                                             argName, padLeft(sourceBefore("="), bodyVisitor.visit(arg.getValue())),
@@ -439,8 +452,8 @@ public class GroovyParserVisitor {
                     paramType = visitTypeTree(param.getOriginType());
                 }
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
-                        new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
-                                new J.Identifier(randomId(), EMPTY, Markers.EMPTY, param.getName(), null, null),
+                        new J.VariableDeclarations.NamedVariable(randomId(), EMPTY, Markers.EMPTY,
+                                new J.Identifier(randomId(), whitespace(), Markers.EMPTY, param.getName(), null, null),
                                 emptyList(), null, null)
                 );
                 cursor += param.getName().length();
@@ -455,8 +468,8 @@ public class GroovyParserVisitor {
                 }
                 Space rightPad = sourceBefore(i == unparsedParams.length - 1 ? ")" : ",");
 
-                params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), paramType.getPrefix(),
-                        Markers.EMPTY, paramAnnotations, emptyList(), paramType.withPrefix(EMPTY),
+                params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), EMPTY,
+                        Markers.EMPTY, paramAnnotations, emptyList(), paramType,
                         null, emptyList(),
                         singletonList(paramName))).withAfter(rightPad));
             }
