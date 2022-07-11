@@ -49,9 +49,9 @@ public interface Cobol extends Tree {
         return v instanceof CobolVisitor;
     }
 
-    String getPrefix();
+    Space getPrefix();
 
-    <P extends Cobol> P withPrefix(String prefix);
+    <P extends Cobol> P withPrefix(Space prefix);
 
     <P extends Cobol> P withMarkers(Markers markers);
 
@@ -81,7 +81,7 @@ public interface Cobol extends Tree {
 
         @With
         @Getter
-        String prefix;
+        Space prefix;
 
         @With
         @Getter
@@ -168,7 +168,7 @@ public interface Cobol extends Tree {
     class Display implements Statement {
         @EqualsAndHashCode.Include
         UUID id;
-        String prefix;
+        Space prefix;
         Markers markers;
         /**
          * Either an {@link Identifier} or {@link Literal}.
@@ -187,7 +187,7 @@ public interface Cobol extends Tree {
     class Identifier implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        String prefix;
+        Space prefix;
         Markers markers;
         String simpleName;
 
@@ -203,7 +203,7 @@ public interface Cobol extends Tree {
     class Literal implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        String prefix;
+        Space prefix;
         Markers markers;
         Object value;
         String valueSource;
@@ -231,7 +231,7 @@ public interface Cobol extends Tree {
         UUID id;
         @Getter
         @With
-        String prefix;
+        Space prefix;
         @Getter
         @With
         Markers markers;
@@ -321,7 +321,7 @@ public interface Cobol extends Tree {
         UUID id;
         @Getter
         @With
-        String prefix;
+        Space prefix;
         @Getter
         @With
         Markers markers;
@@ -400,7 +400,7 @@ public interface Cobol extends Tree {
     class ProcedureDivisionBody implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        String prefix;
+        Space prefix;
         Markers markers;
         Paragraphs paragraphs;
 
@@ -416,7 +416,7 @@ public interface Cobol extends Tree {
     class Paragraphs implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        String prefix;
+        Space prefix;
         Markers markers;
         List<Sentence> sentences;
 
@@ -443,7 +443,7 @@ public interface Cobol extends Tree {
         UUID id;
         @Getter
         @With
-        String prefix;
+        Space prefix;
         @Getter
         @With
         Markers markers;
@@ -512,7 +512,7 @@ public interface Cobol extends Tree {
         UUID id;
         @Getter
         @With
-        String prefix;
+        Space prefix;
         @Getter
         @With
         Markers markers;
@@ -606,7 +606,7 @@ public interface Cobol extends Tree {
     class ProgramUnit implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-        String prefix;
+        Space prefix;
         Markers markers;
         IdentificationDivision identificationDivision;
 
@@ -625,10 +625,10 @@ public interface Cobol extends Tree {
     class Stop implements Statement {
         @EqualsAndHashCode.Include
         UUID id;
-        String prefix;
+        Space prefix;
         Markers markers;
         String stop;
-        String run;
+        CobolLeftPadded<String> run;
         Cobol statement;
 
         @Override

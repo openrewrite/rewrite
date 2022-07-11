@@ -81,14 +81,14 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                         Cobol.CompilationUnit compilationUnit = new CobolParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
                                 sourceFile.getFileAttributes(),
-                                sourceStr,
+                                preProcessedInput,
                                 is.getCharset(),
                                 is.isCharsetBomMarked()
                         ).visitStartRule(start);
 
                         String test = compilationUnit.print(new Cursor(null, compilationUnit));
-                        System.out.println("source= " + quote(sourceStr));
-                        System.out.println("parsed= " + quote(test));
+                        System.out.println("source= " + StringWithOriginalPositions.quote(sourceStr));
+                        System.out.println("parsed= " + StringWithOriginalPositions.quote(test));
                         assert test.equals(sourceStr);
 
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
@@ -102,44 +102,6 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                 })
                 .filter(Objects::nonNull)
                 .collect(toList());
-    }
-
-    private static String quote(CharSequence str) {
-        if (str == null)
-            return "null";
-        int len = str.length();
-        StringBuilder buf = new StringBuilder(len + 10);
-        buf.append("\"");
-        for (int i = 0; i < len; i++) {
-            char c = str.charAt(i);
-            switch (c) {
-                case '\n':
-                    buf.append("\\n");
-                    break;
-                case '\r':
-                    buf.append("\\r");
-                    break;
-                case '\t':
-                    buf.append("\\t");
-                    break;
-                case '\"':
-                    buf.append("\\\"");
-                    break;
-                case '\\':
-                    buf.append("\\\\");
-                    break;
-                default:
-                    if (c >= ' ' && c < 65000) {
-                        // ASCII
-                        buf.append(c);
-                    } else {
-                        // Unicode
-                        buf.append(String.format("\\u%04x", (int) c));
-                    }
-            }
-        }
-        buf.append("\"");
-        return buf.toString();
     }
 
     @Override
