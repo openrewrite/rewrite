@@ -25,6 +25,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.TypeValidation;

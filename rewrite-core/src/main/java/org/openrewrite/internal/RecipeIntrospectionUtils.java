@@ -15,7 +15,6 @@
  */
 package org.openrewrite.internal;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -26,6 +25,7 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.config.RecipeIntrospectionException;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -34,11 +34,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
 
+@SuppressWarnings("unused")
 public class RecipeIntrospectionUtils {
     @Nullable
     public static TreeVisitor<?, ExecutionContext> recipeApplicableTest(Recipe recipe) {
@@ -96,8 +96,10 @@ public class RecipeIntrospectionUtils {
             return recipeClass.getConstructors()[0];
         } else {
             for (Constructor<?> constructor : constructors) {
-                if (constructor.isAnnotationPresent(JsonCreator.class)) {
-                    return constructor;
+                for(Annotation annotation : constructor.getAnnotations()) {
+                    if ("com.fasterxml.jackson.annotation.JsonCreator".equals(annotation.annotationType().getName())) {
+                        return constructor;
+                    }
                 }
             }
             throw new RecipeIntrospectionException("Unable to locate primary constructor for Recipe " + recipeClass);
