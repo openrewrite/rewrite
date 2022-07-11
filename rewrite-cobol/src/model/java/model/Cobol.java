@@ -81,7 +81,7 @@ public interface Cobol {
 
     class Stop implements Statement {
         String stop;
-        String run;
+        CobolLeftPadded<String> run;
         Cobol statement;
     }
 }

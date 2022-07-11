@@ -18,7 +18,7 @@ public class CobolLine {
         return new CobolLine(line.sequenceArea, line.sequenceAreaOriginal, line.indicatorArea,
                 line.indicatorAreaOriginal, extractContentAreaA(contentArea), line.contentAreaAOriginal,
                 extractContentAreaB(contentArea), line.contentAreaBOriginal, line.commentArea, line.commentAreaOriginal,
-                line.format, line.dialect, line.number, line.type, line.predecessor, line.successor);
+                line.format, line.dialect, line.number, line.type, line.predecessor, line.successor, line.newLine);
     }
 
     public static CobolLine copyCobolLineWithIndicatorAndContentArea(final String indicatorArea,
@@ -26,14 +26,14 @@ public class CobolLine {
         return new CobolLine(line.sequenceArea, line.sequenceAreaOriginal, indicatorArea, line.indicatorAreaOriginal,
                 extractContentAreaA(contentArea), line.contentAreaAOriginal, extractContentAreaB(contentArea),
                 line.contentAreaBOriginal, line.commentArea, line.commentAreaOriginal, line.format, line.dialect,
-                line.number, line.type, line.predecessor, line.successor);
+                line.number, line.type, line.predecessor, line.successor, line.newLine);
     }
 
     public static CobolLine copyCobolLineWithIndicatorArea(final String indicatorArea, final CobolLine line) {
         return new CobolLine(line.sequenceArea, line.sequenceAreaOriginal, indicatorArea, line.indicatorAreaOriginal,
                 line.contentAreaA, line.contentAreaAOriginal, line.contentAreaB, line.contentAreaBOriginal,
                 line.commentArea, line.commentAreaOriginal, line.format, line.dialect, line.number, line.type,
-                line.predecessor, line.successor);
+                line.predecessor, line.successor, line.newLine);
     }
 
     public static String createBlankSequenceArea(final CobolSourceFormatEnum format) {
@@ -53,9 +53,9 @@ public class CobolLine {
     public static CobolLine newCobolLine(final String sequenceArea, final String indicatorArea,
                                          final String contentAreaA, final String contentAreaB, final String commentArea,
                                          final CobolSourceFormatEnum format, final CobolDialect dialect, final int number,
-                                         final CobolLineTypeEnum type) {
+                                         final CobolLineTypeEnum type, String newLine) {
         return new CobolLine(sequenceArea, sequenceArea, indicatorArea, indicatorArea, contentAreaA, contentAreaA,
-                contentAreaB, contentAreaB, commentArea, commentArea, format, dialect, number, type, null, null);
+                contentAreaB, contentAreaB, commentArea, commentArea, format, dialect, number, type, null, null, newLine);
     }
 
     public int length() {
@@ -88,6 +88,8 @@ public class CobolLine {
 
     protected String contentAreaBOriginal;
 
+    protected String newLine;
+
     protected CobolDialect dialect;
 
     protected CobolSourceFormatEnum format;
@@ -112,7 +114,8 @@ public class CobolLine {
                         final String indicatorAreaOriginal, final String contentAreaA, final String contentAreaAOriginal,
                         final String contentAreaB, final String contentAreaBOriginal, final String commentArea,
                         final String commentAreaOriginal, final CobolSourceFormatEnum format, final CobolDialect dialect,
-                        final int number, final CobolLineTypeEnum type, final CobolLine predecessor, final CobolLine successor) {
+                        final int number, final CobolLineTypeEnum type, final CobolLine predecessor, final CobolLine successor,
+                        final String newLine) {
         this.sequenceArea = sequenceArea;
         this.indicatorArea = indicatorArea;
         this.contentAreaA = contentAreaA;
@@ -124,6 +127,8 @@ public class CobolLine {
         this.contentAreaAOriginal = contentAreaAOriginal;
         this.contentAreaBOriginal = contentAreaBOriginal;
         this.commentAreaOriginal = commentAreaOriginal;
+
+        this.newLine = newLine;
 
         this.format = format;
         this.dialect = dialect;
@@ -168,6 +173,10 @@ public class CobolLine {
 
     public String getContentAreaOriginal() {
         return contentAreaAOriginal + contentAreaBOriginal;
+    }
+
+    public String getNewLine() {
+        return newLine;
     }
 
     public CobolDialect getDialect() {

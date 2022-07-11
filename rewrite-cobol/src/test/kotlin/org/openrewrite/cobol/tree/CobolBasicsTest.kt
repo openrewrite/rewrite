@@ -37,7 +37,7 @@ class CobolBasicsTest : RewriteTest {
     fun columns() = rewriteRun(
         cobol(
         """
-                |000010  IDENTIFICATION  DIVISION .
+                |000010  IDENTIFICATION  DIVISION .                                      Comment starting column 72           
                 |000020  PROGRAM-ID    . HELLO     .
                 |000030  PROCEDURE DIVISION.
                 |000040  DISPLAY 'Hello world!'.

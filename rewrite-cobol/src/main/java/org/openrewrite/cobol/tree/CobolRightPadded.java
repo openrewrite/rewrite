@@ -44,7 +44,7 @@ public class CobolRightPadded<T> {
     T element;
 
     @With
-    String after;
+    Space after;
 
     @With
     Markers markers;
@@ -86,7 +86,7 @@ public class CobolRightPadded<T> {
                 CobolRightPadded<P> found = beforeById.get(t.getId());
                 after.add(found.withElement(t));
             } else {
-                after.add(new CobolRightPadded<>(t, "", Markers.EMPTY));
+                after.add(new CobolRightPadded<>(t, Space.EMPTY, Markers.EMPTY));
             }
         }
 
@@ -94,7 +94,7 @@ public class CobolRightPadded<T> {
     }
 
     public static <T> CobolRightPadded<T> build(T element) {
-        return new CobolRightPadded<>(element, "", Markers.EMPTY);
+        return new CobolRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
     }
 
     @Nullable
@@ -103,7 +103,7 @@ public class CobolRightPadded<T> {
             if (elements == null) {
                 return null;
             }
-            return new CobolRightPadded<>(elements, "", Markers.EMPTY);
+            return new CobolRightPadded<>(elements, Space.EMPTY, Markers.EMPTY);
         }
         if (elements == null) {
             return null;

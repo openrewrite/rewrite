@@ -27,7 +27,7 @@ import java.util.function.UnaryOperator;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
 public class CobolLeftPadded<T> {
-    String before;
+    Space before;
     T element;
     Markers markers;
 
@@ -41,7 +41,7 @@ public class CobolLeftPadded<T> {
             if (elements == null) {
                 return null;
             }
-            return new CobolLeftPadded<>("", elements, Markers.EMPTY);
+            return new CobolLeftPadded<>(Space.EMPTY, elements, Markers.EMPTY);
         }
         if (elements == null) {
             return null;
@@ -55,6 +55,6 @@ public class CobolLeftPadded<T> {
     }
 
     public static <T> CobolLeftPadded<T> build(T element) {
-        return new CobolLeftPadded<>("", element, Markers.EMPTY);
+        return new CobolLeftPadded<>(Space.EMPTY, element, Markers.EMPTY);
     }
 }

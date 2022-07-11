@@ -37,8 +37,8 @@ public class CobolLineWriterImpl implements CobolLineWriter {
 
             if (notContinuationLine) {
                 if (line.getNumber() > 0) {
-                    sb.append(CobolPreprocessor.NEWLINE);
-                    sb.skip(1); // because we skip '\n\r' and add '\n'
+                    sb.append(line.getNewLine());
+                    //sb.skip(line.getNewLine().length());
                 }
 
                 sb.append(line.getBlankSequenceArea());

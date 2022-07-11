@@ -25,11 +25,31 @@ public class StringWithOriginalPositions {
 
     public String preprocessedText;
 
-    public StringWithOriginalPositions(String text, String originalCode, int[] originalPositions) {
+    public StringWithOriginalPositions(String text, String originalText, int[] originalPositions) {
         assert text.length() == originalPositions.length;
         this.preprocessedText = text;
-        this.originalText = originalCode;
+        this.originalText = originalText;
         this.originalPositions = originalPositions;
+
+        // preprocessedText[i] == originalText[originalPositions[i]]
+        // or originalPositions[i] == -1 if preprocessedText[i] does not correspond to an original
+
+        StringBuffer sb = new StringBuffer();
+        for(int i=0; i<preprocessedText.length(); i++) {
+            int pos = originalPositions[i];
+            if(pos != -1) {
+                if(pos < originalText.length()) {
+                    char c = originalText.charAt(pos);
+                    sb.append(c);
+                } else {
+                    sb.append("%");
+                }
+            }
+        }
+
+        System.out.println(quote(preprocessedText));
+        System.out.println(quote(sb.toString()));
+        System.out.println();
     }
 
     // Scaffolding, to be removed.
@@ -45,5 +65,43 @@ public class StringWithOriginalPositions {
 
     public String getOriginalText(int start, int stop) {
         return originalText.substring(originalPositions[start], originalPositions[stop] + 1);
+    }
+
+    public static String quote(CharSequence str) {
+        if (str == null)
+            return "null";
+        int len = str.length();
+        StringBuilder buf = new StringBuilder(len + 10);
+        buf.append("\"");
+        for (int i = 0; i < len; i++) {
+            char c = str.charAt(i);
+            switch (c) {
+                case '\n':
+                    buf.append("\\n");
+                    break;
+                case '\r':
+                    buf.append("\\r");
+                    break;
+                case '\t':
+                    buf.append("\\t");
+                    break;
+                case '\"':
+                    buf.append("\\\"");
+                    break;
+                case '\\':
+                    buf.append("\\\\");
+                    break;
+                default:
+                    if (c >= ' ' && c < 65000) {
+                        // ASCII
+                        buf.append(c);
+                    } else {
+                        // Unicode
+                        buf.append(String.format("\\u%04x", (int) c));
+                    }
+            }
+        }
+        buf.append("\"");
+        return buf.toString();
     }
 }

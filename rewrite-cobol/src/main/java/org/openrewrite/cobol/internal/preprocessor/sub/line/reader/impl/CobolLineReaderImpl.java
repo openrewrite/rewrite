@@ -20,6 +20,8 @@ import org.openrewrite.cobol.internal.preprocessor.exception.CobolPreprocessorEx
 import org.openrewrite.cobol.internal.preprocessor.sub.CobolLine;
 import org.openrewrite.cobol.internal.preprocessor.sub.CobolLineTypeEnum;
 import org.openrewrite.cobol.internal.preprocessor.sub.line.reader.CobolLineReader;
+import org.openrewrite.cobol.internal.preprocessor.sub.line.reader.CobolScanner;
+import org.openrewrite.cobol.internal.preprocessor.sub.line.reader.Line;
 
 public class CobolLineReaderImpl implements CobolLineReader {
 
@@ -51,7 +53,7 @@ public class CobolLineReaderImpl implements CobolLineReader {
     }
 
     @Override
-    public CobolLine parseLine(final String line, final int lineNumber, final CobolParserParams params) {
+    public CobolLine parseLine(final String line, final String newLine, final int lineNumber, final CobolParserParams params) {
         final CobolPreprocessor.CobolSourceFormatEnum format = params.getFormat();
         final Pattern pattern = format.getPattern();
         final Matcher matcher = pattern.matcher(line);
@@ -96,7 +98,7 @@ public class CobolLineReaderImpl implements CobolLineReader {
             final CobolLineTypeEnum type = determineType(indicatorArea);
 
             result = CobolLine.newCobolLine(sequenceArea, indicatorArea, contentAreaA, contentAreaB, commentArea,
-                    params.getFormat(), params.getDialect(), lineNumber, type);
+                    params.getFormat(), params.getDialect(), lineNumber, type, newLine);
         }
 
         return result;
@@ -104,17 +106,18 @@ public class CobolLineReaderImpl implements CobolLineReader {
 
     @Override
     public List<CobolLine> processLines(final String lines, final CobolParserParams params) {
-        final Scanner scanner = new Scanner(lines);
+        final CobolScanner scanner = new CobolScanner(lines);
         final List<CobolLine> result = new ArrayList<CobolLine>();
 
-        String currentLine = null;
+        Line currentLine = null;
+        String currentNewLine = null;
         CobolLine lastCobolLine = null;
         int lineNumber = 0;
 
         while (scanner.hasNextLine()) {
             currentLine = scanner.nextLine();
 
-            final CobolLine currentCobolLine = parseLine(currentLine, lineNumber, params);
+            final CobolLine currentCobolLine = parseLine(currentLine.getText(), currentLine.getNewLine(), lineNumber, params);
             currentCobolLine.setPredecessor(lastCobolLine);
             result.add(currentCobolLine);
 
