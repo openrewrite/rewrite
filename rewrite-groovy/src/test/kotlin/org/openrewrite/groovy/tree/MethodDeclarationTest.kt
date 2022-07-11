@@ -89,9 +89,9 @@ class MethodDeclarationTest : GroovyTreeTest {
     )
 
     @Test
-    fun returnValue() = assertParsePrintAndProcess("""
+    fun returnNull() = assertParsePrintAndProcess("""
         def foo() {
-            return 1
+            return null
         }
     """)
 }
