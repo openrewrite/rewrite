@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.search
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
@@ -28,14 +28,44 @@ import java.util.*
 
 interface UsesJavaVersionTest : JavaRecipeTest {
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2035")
+    @Test
+    fun mavenCompilerSources() {
+        val java8 = getMajorVersion("1.8")
+        assertThat(java8).isEqualTo(8)
+
+        val java11 = getMajorVersion("11")
+        assertThat(java11).isEqualTo(11)
+
+        val java17 = getMajorVersion("17")
+        assertThat(java17).isEqualTo(17)
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2035")
+    @Test
+    fun javaRuntimeVersions() {
+        val java8 = getMajorVersion("1.8.0.332")
+        assertThat(java8).isEqualTo(8)
+
+        val java11 = getMajorVersion("11.0.15")
+        assertThat(java11).isEqualTo(11)
+
+        val java17 = getMajorVersion("17.0.3")
+        assertThat(java17).isEqualTo(17)
+    }
+
+    fun getMajorVersion(versionNumber: String): Int {
+        return JavaVersion(UUID.randomUUID(), "", "", versionNumber, versionNumber).majorVersion
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/983")
     @Test
     fun invalidJavaVersion(jp: JavaParser) {
         val sourceFiles = sourceFilesWithJavaVersion()
         val recipe = toRecipe { UsesJavaVersion(-1, Int.MAX_VALUE) }
         val result = recipe.run(sourceFiles, executionContext)
-        Assertions.assertThat(result).isNotNull
-        Assertions.assertThat(result.isEmpty()).isTrue
+        assertThat(result).isNotNull
+        assertThat(result.isEmpty()).isTrue
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/983")
@@ -44,9 +74,9 @@ interface UsesJavaVersionTest : JavaRecipeTest {
         val sourceFiles = sourceFilesWithJavaVersion()
         val recipe = toRecipe { UsesJavaVersion(getJavaVersion().majorVersion) }
         val result = recipe.run(sourceFiles, executionContext)
-        Assertions.assertThat(result).isNotNull
-        Assertions.assertThat(result.isNotEmpty())
-        Assertions.assertThat(result[0].after!!.markers.markers.map {
+        assertThat(result).isNotNull
+        assertThat(result.isNotEmpty())
+        assertThat(result[0].after!!.markers.markers.map {
             j -> j is SearchResult
         }.any()).isTrue
     }
@@ -54,8 +84,8 @@ interface UsesJavaVersionTest : JavaRecipeTest {
     @Test
     fun usesJavaVersion(jp: JavaParser) {
         val usesJavaVersion = UsesJavaVersion<ExecutionContext>(8, 11)
-        Assertions.assertThat(usesJavaVersion.majorVersionMin).isEqualTo(8)
-        Assertions.assertThat(usesJavaVersion.majorVersionMax).isEqualTo(11)
+        assertThat(usesJavaVersion.majorVersionMin).isEqualTo(8)
+        assertThat(usesJavaVersion.majorVersionMax).isEqualTo(11)
     }
 
     private fun sourceFilesWithJavaVersion(): List<J.CompilationUnit> {
