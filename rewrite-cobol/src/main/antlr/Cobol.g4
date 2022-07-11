@@ -45,8 +45,9 @@ identificationDivisionBody
 
 // - program id paragraph ----------------------------------
 
-
-
+programIdParagraph
+   : PROGRAM_ID DOT_FS programName (IS? (COMMON | INITIAL | LIBRARY | DEFINITION | RECURSIVE) PROGRAM?)? DOT_FS? commentEntry?
+   ;
 
 // - author paragraph ----------------------------------
 

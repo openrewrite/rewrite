@@ -18,18 +18,25 @@ package org.openrewrite.cobol;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.cobol.internal.CobolParserVisitor;
+import org.openrewrite.cobol.internal.*;
 import org.openrewrite.cobol.internal.grammar.CobolLexer;
+import org.openrewrite.cobol.internal.params.CobolParserParams;
+import org.openrewrite.cobol.internal.params.impl.CobolParserParamsImpl;
+import org.openrewrite.cobol.internal.preprocessor.CobolPreprocessor;
+import org.openrewrite.cobol.internal.preprocessor.impl.CobolPreprocessorImpl;
 import org.openrewrite.cobol.tree.Cobol;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
+import org.openrewrite.cobol.internal.grammar.CobolParser.StartRuleContext;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -52,11 +59,24 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                     try {
                         EncodingDetectingInputStream is = sourceFile.getSource();
                         String sourceStr = is.readFully();
-                        org.openrewrite.cobol.internal.grammar.CobolParser parser = new org.openrewrite.cobol.internal.grammar.CobolParser(new CommonTokenStream(new CobolLexer(
-                                CharStreams.fromString(sourceStr))));
+
+                        CobolPreprocessor.CobolSourceFormatEnum format = CobolPreprocessor.CobolSourceFormatEnum.FIXED;
+                        CobolParserParams params = new CobolParserParamsImpl();
+                        params.setFormat(format);
+
+                        StringWithOriginalPositions preProcessedInput = new CobolPreprocessorImpl().processWithOriginalPositions(sourceStr, params);
+
+                        /////////////////
+
+                        CobolLexer lexer = new CobolLexer(CharStreams.fromString(preProcessedInput.preprocessedText));
+                        CobolTokenStream tokens = new CobolTokenStream(preProcessedInput.preprocessedText, lexer);
+
+                        org.openrewrite.cobol.internal.grammar.CobolParser parser = new org.openrewrite.cobol.internal.grammar.CobolParser(tokens);
 
                         parser.removeErrorListeners();
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+
+                        StartRuleContext start = parser.startRule();
 
                         Cobol.CompilationUnit compilationUnit = new CobolParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
@@ -64,7 +84,12 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                                 sourceStr,
                                 is.getCharset(),
                                 is.isCharsetBomMarked()
-                        ).visitStartRule(parser.startRule());
+                        ).visitStartRule(start);
+
+                        String test = compilationUnit.print(new Cursor(null, compilationUnit));
+                        System.out.println("source= " + quote(sourceStr));
+                        System.out.println("parsed= " + quote(test));
+                        assert test.equals(sourceStr);
 
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, compilationUnit);
@@ -77,6 +102,44 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                 })
                 .filter(Objects::nonNull)
                 .collect(toList());
+    }
+
+    private static String quote(CharSequence str) {
+        if (str == null)
+            return "null";
+        int len = str.length();
+        StringBuilder buf = new StringBuilder(len + 10);
+        buf.append("\"");
+        for (int i = 0; i < len; i++) {
+            char c = str.charAt(i);
+            switch (c) {
+                case '\n':
+                    buf.append("\\n");
+                    break;
+                case '\r':
+                    buf.append("\\r");
+                    break;
+                case '\t':
+                    buf.append("\\t");
+                    break;
+                case '\"':
+                    buf.append("\\\"");
+                    break;
+                case '\\':
+                    buf.append("\\\\");
+                    break;
+                default:
+                    if (c >= ' ' && c < 65000) {
+                        // ASCII
+                        buf.append(c);
+                    } else {
+                        // Unicode
+                        buf.append(String.format("\\u%04x", (int) c));
+                    }
+            }
+        }
+        buf.append("\"");
+        return buf.toString();
     }
 
     @Override
