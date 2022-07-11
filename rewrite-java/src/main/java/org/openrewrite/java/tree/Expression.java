@@ -20,6 +20,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 
 public interface Expression extends J {
     @Nullable
@@ -34,6 +35,26 @@ public interface Expression extends J {
      */
     default List<J> getSideEffects() {
         return emptyList();
+    }
+
+    /**
+     * If this expression is a {@link J.Parentheses} return the expression inside the parentheses {@code this}.
+     * Otherwise, return this. This operation is performed recursively to return the first non-parenthetical
+     * expression.
+     *
+     * @return The expression as if all surround parentheses were removed. Never a {@link J.Parentheses} instance.
+     */
+    default Expression unwrap() {
+        return requireNonNull(unwrap(this));
+    }
+
+    @Nullable
+    static Expression unwrap(@Nullable Expression expr) {
+        if (expr instanceof J.Parentheses<?> && ((J.Parentheses<?>) expr).getTree() instanceof Expression) {
+            return ((Expression) ((J.Parentheses<?>) expr).getTree()).unwrap();
+        } else {
+            return expr;
+        }
     }
 
     CoordinateBuilder.Expression getCoordinates();

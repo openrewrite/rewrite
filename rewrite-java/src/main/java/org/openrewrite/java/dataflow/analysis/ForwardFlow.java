@@ -195,7 +195,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         public J visitIdentifier(J.Identifier ident, Integer p) {
             // If the variable side of an assignment is not a flow step, so we don't need to do anything
             J.Assignment parentAssignment = getCursor().firstEnclosing(J.Assignment.class);
-            if (parentAssignment != null && unwrap(parentAssignment.getVariable()) == ident) {
+            if (parentAssignment != null && parentAssignment.getVariable().unwrap() == ident) {
                 return ident;
             }
             // If the identifier is a field access then it is not local flow
@@ -243,7 +243,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         @Override
         public J visitAssignment(J.Assignment assignment, Integer integer) {
             J.Assignment a = (J.Assignment) super.visitAssignment(assignment, integer);
-            Expression left = unwrap(a.getVariable());
+            Expression left = a.getVariable().unwrap();
             if (left instanceof J.Identifier) {
                 String variableName = ((J.Identifier) left).getSimpleName();
                 FlowGraph variableNameFlowGraph = flowsByIdentifier.peek().get(variableName);
@@ -333,7 +333,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                 } else {
                     variable = ((J.VariableDeclarations.NamedVariable) ancestor).getName();
                 }
-                variable = unwrap(variable);
+                variable = variable.unwrap();
                 if (variable instanceof J.Identifier) {
                     nextVariableName = ((J.Identifier) variable).getSimpleName();
                     break;
@@ -341,13 +341,5 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             }
         }
         return new VariableNameToFlowGraph(nextVariableName, nextFlowGraph);
-    }
-
-    private static Expression unwrap(Expression expression) {
-        if (expression instanceof J.Parentheses) {
-            return unwrap((Expression) ((J.Parentheses<?>) expression).getTree());
-        } else {
-            return expression;
-        }
     }
 }
