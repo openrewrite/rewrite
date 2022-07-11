@@ -265,7 +265,7 @@ public interface RewriteTest extends SourceSpecs {
                 // Validate that printing a parsed AST yields the same source text
                 int j = 0;
                 for (Parser.Input input : inputs.values()) {
-                    if (j++ == i) {
+                    if (j++ == i && !(sourceFile instanceof Quark)) {
                         assertThat(sourceFile.printAll())
                                 .as("When parsing and printing the source code back to text without modifications, " +
                                         "the printed source didn't match the original source code. This means there is a bug in the " +
