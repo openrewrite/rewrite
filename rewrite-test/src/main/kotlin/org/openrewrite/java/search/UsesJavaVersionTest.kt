@@ -31,8 +31,11 @@ interface UsesJavaVersionTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2035")
     @Test
     fun mavenCompilerSources() {
-        val java8 = getMajorVersion("1.8")
+        val java8 = getMajorVersion("8")
         assertThat(java8).isEqualTo(8)
+
+        val java1dot8 = getMajorVersion("1.8")
+        assertThat(java1dot8).isEqualTo(8)
 
         val java11 = getMajorVersion("11")
         assertThat(java11).isEqualTo(11)
