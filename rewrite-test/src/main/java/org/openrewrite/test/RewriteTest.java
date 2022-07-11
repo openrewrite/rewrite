@@ -278,6 +278,11 @@ public interface RewriteTest extends SourceSpecs {
                 //noinspection unchecked
                 ((Consumer<SourceFile>) nextSpec.beforeRecipe).accept(sourceFile);
 
+                if(nextSpec.after == null && nextSpec.before != null && !(sourceFile instanceof Quark)) {
+                    assertThat(sourceFile.printAll())
+                            .as("Printing the source file should exactly reproduce the source it was parsed from")
+                            .isEqualTo(trimIndentPreserveCRLF(nextSpec.before));
+                }
                 specBySourceFile.put(sourceFile, nextSpec);
             }
         }
