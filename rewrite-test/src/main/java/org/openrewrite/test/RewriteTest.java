@@ -240,7 +240,13 @@ public interface RewriteTest extends SourceSpecs {
                 if (sourceSpec.before == null) {
                     continue;
                 }
-                String beforeTrimmed = trimIndentPreserveCRLF(sourceSpec.before);
+                String beforeTrimmed;
+                if(sourceSpec.sourceFileType == Cobol.CompilationUnit.class) {
+                    // do not trim source code of column-based languages
+                    beforeTrimmed = sourceSpec.before;
+                } else {
+                    beforeTrimmed = trimIndentPreserveCRLF(sourceSpec.before);
+                }
                 Path sourcePath;
                 if (sourceSpec.sourcePath != null) {
                     sourcePath = sourceSpec.dir.resolve(sourceSpec.sourcePath);

@@ -65,7 +65,7 @@ public class CobolParserRunnerImpl {
         parsePreprocessInput(preProcessedInput, compilationUnitName, program, params);
     }
 
-    protected void parseFile(final File cobolFile, final Program program, final CobolParserParams params)
+    public void parseFile(final File cobolFile, final Program program, final CobolParserParams params)
             throws IOException {
         if (!cobolFile.isFile()) {
             throw new CobolParserException("Could not find file " + cobolFile.getAbsolutePath());
@@ -88,7 +88,7 @@ public class CobolParserRunnerImpl {
     }
 
     public CobolLexer lexer;
-    public CommonTokenStream tokens;
+    public CobolTokenStream tokens;
     public CobolParser parser;
 
     protected void parsePreprocessInput(final StringWithOriginalPositions preProcessedInput, final String compilationUnitName,
@@ -105,7 +105,10 @@ public class CobolParserRunnerImpl {
         }
 
         // get a list of matched tokens
-        tokens = new CommonTokenStream(lexer);
+        tokens = new CobolTokenStream(preProcessedInput.preprocessedText, lexer);
+
+        // remove trailing whitespace from tokens
+        tokens.removeTrailingWhitespace();
 
         // pass the tokens to the parser
         parser = new CobolParser(tokens);
