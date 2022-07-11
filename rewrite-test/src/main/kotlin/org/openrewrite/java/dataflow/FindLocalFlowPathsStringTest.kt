@@ -492,6 +492,40 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
     )
 
     @Test
+    fun `assignment of value inside of if block`() = rewriteRun(
+        java(
+            """
+            class Test {
+                String source() {
+                    return null;
+                }
+                void test(boolean condition) {
+                    String a = null;
+                    if (condition) {
+                        a = source();
+                        System.out.println(a);
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                String source() {
+                    return null;
+                }
+                void test(boolean condition) {
+                    String a = null;
+                    if (condition) {
+                        a = /*~~>*/source();
+                        System.out.println(/*~~>*/a);
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
     fun `reassignment of a variable breaks flow`() = rewriteRun(
         { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
             """

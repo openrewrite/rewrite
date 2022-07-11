@@ -126,6 +126,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class DataFlowInsanityTck : DataFlowInsanityTest
 
     @Nested
+    inner class DataFlowRealWorldExamplesTck : DataFlowRealWorldExamplesTest
+
+    @Nested
     inner class DefaultComesLastTck : DefaultComesLastTest
 
     @Nested

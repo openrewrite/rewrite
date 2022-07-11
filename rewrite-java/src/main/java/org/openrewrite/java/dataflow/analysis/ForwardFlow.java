@@ -41,6 +41,10 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             // The parent statement of the source. Data flow can not start before the source.
             Object taintStmt = null;
             Cursor taintStmtCursorParent = null;
+            if (variableNameToFlowGraph.currentCursor != null && variableNameToFlowGraph.currentCursor.getValue() instanceof J) {
+                taintStmt = variableNameToFlowGraph.currentCursor.getValue();
+                taintStmtCursorParent = variableNameToFlowGraph.currentCursor.getParent();
+            }
             while (cursorPath.hasNext()) {
                 taintStmtCursorParent = cursorPath.next();
                 Object next = taintStmtCursorParent.getValue();
@@ -266,18 +270,20 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         @Nullable
         String nextVariableName;
         FlowGraph nextFlowGraph;
+        Cursor currentCursor;
     }
 
     private static VariableNameToFlowGraph computeVariableAssignment(Iterator<Cursor> cursorPath, FlowGraph currentFlow, LocalFlowSpec<?, ?> spec) {
+        Cursor ancestorCursor = null;
         if (cursorPath.hasNext()) {
             // Must avoid inspecting the 'current' node to compute the variable assignment.
             // This is because we perform filtering here, and filtered types may be valid 'source' types.
-            cursorPath.next();
+            ancestorCursor = cursorPath.next();
         }
         String nextVariableName = null;
         FlowGraph nextFlowGraph = currentFlow;
         while (cursorPath.hasNext()) {
-            Cursor ancestorCursor = cursorPath.next();
+            ancestorCursor = cursorPath.next();
             Object ancestor = ancestorCursor.getValue();
             if (ancestor instanceof Expression) {
                 // Offer the cursor of the current flow graph, and a next possible expression to
@@ -340,7 +346,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                 }
             }
         }
-        return new VariableNameToFlowGraph(nextVariableName, nextFlowGraph);
+        return new VariableNameToFlowGraph(nextVariableName, nextFlowGraph, ancestorCursor);
     }
 
     private static Expression unwrap(Expression expression) {
