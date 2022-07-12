@@ -25,6 +25,8 @@ dependencies {
     api("org.junit.jupiter:junit-jupiter-api:latest.release")
     api("org.junit.jupiter:junit-jupiter-params:latest.release")
 
+    implementation(project(":rewrite-visualizer"))
+
     implementation(platform("org.jetbrains.kotlin:kotlin-bom"))
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")

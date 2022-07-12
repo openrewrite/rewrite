@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.dataflow
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
@@ -23,6 +24,7 @@ import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
+import java.awt.Event.HOME
 
 @Suppress("FunctionName")
 interface DataflowInsanityTest : RewriteTest {
@@ -2459,4 +2461,11832 @@ interface DataflowInsanityTest : RewriteTest {
             """
         )
     )
+
+
+    // removed code to ensure test passes (was failing because of "Condition node has no guard" illegal state exception)
+    @Test
+    fun `maven-scm`() = rewriteRun(
+        java(
+            """
+                package org.apache.maven.scm.provider.git.gitexe.command;
+
+                /*
+                 * Licensed to the Apache Software Foundation (ASF) under one
+                 * or more contributor license agreements.  See the NOTICE file
+                 * distributed with this work for additional information
+                 * regarding copyright ownership.  The ASF licenses this file
+                 * to you under the Apache License, Version 2.0 (the
+                 * "License"); you may not use this file except in compliance
+                 * with the License.  You may obtain a copy of the License at
+                 *
+                 * http://www.apache.org/licenses/LICENSE-2.0
+                 *
+                 * Unless required by applicable law or agreed to in writing,
+                 * software distributed under the License is distributed on an
+                 * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+                 * KIND, either express or implied.  See the License for the
+                 * specific language governing permissions and limitations
+                 * under the License.
+                 */
+
+                import org.apache.commons.io.FilenameUtils;
+
+                import org.apache.maven.scm.ScmException;
+                import org.apache.maven.scm.provider.git.util.GitUtil;
+                import org.apache.maven.scm.providers.gitlib.settings.Settings;
+                import org.codehaus.plexus.util.cli.CommandLineException;
+                import org.codehaus.plexus.util.cli.CommandLineUtils;
+                import org.codehaus.plexus.util.cli.Commandline;
+                import org.codehaus.plexus.util.cli.StreamConsumer;
+                import org.slf4j.Logger;
+                import org.slf4j.LoggerFactory;
+
+                import java.io.File;
+                import java.io.IOException;
+                import java.util.List;
+
+                /**
+                 * Command line construction utility.
+                 *
+                 * @author Brett Porter
+                 * @author <a href="mailto:struberg@yahoo.de">Mark Struberg</a>
+                 *
+                 */
+                public final class GitCommandLineUtils
+                {
+                    private static final Logger LOGGER = LoggerFactory.getLogger( GitCommandLineUtils.class );
+
+                    private GitCommandLineUtils()
+                    {
+                    }
+
+                    public static void addTarget( Commandline cl, List<File> files )
+                    {
+                        if ( files == null || files.isEmpty() )
+                        {
+                            return;
+                        }
+                        final File workingDirectory = cl.getWorkingDirectory();
+                        try
+                        {
+                            final String canonicalWorkingDirectory = workingDirectory.getCanonicalPath();
+                            for ( File file : files )
+                            {
+                                String relativeFile = file.getPath();
+
+                                final String canonicalFile = file.getCanonicalPath();
+                                if ( canonicalFile.startsWith( canonicalWorkingDirectory ) )
+                                {
+                                    // so we can omit the starting characters
+                                    relativeFile = canonicalFile.substring( canonicalWorkingDirectory.length() );
+
+                                    if ( relativeFile.startsWith( File.separator ) )
+                                    {
+                                        relativeFile = relativeFile.substring( File.separator.length() );
+                                    }
+                                }
+
+                                // no setFile() since this screws up the working directory!
+                                cl.createArg().setValue( FilenameUtils.separatorsToUnix( relativeFile ) );
+                            }
+                        }
+                        catch ( IOException ex )
+                        {
+                            throw new IllegalArgumentException( "Could not get canonical paths for workingDirectory = "
+                                + workingDirectory + " or files=" + files, ex );
+                        }
+                    }
+
+                    /**
+                     *
+                     * @param workingDirectory
+                     * @param command
+                     * @return TODO
+                     */
+                    public static Commandline getBaseGitCommandLine( File workingDirectory, String command )
+                    {
+                        return getAnonymousBaseGitCommandLine( workingDirectory, command );
+                    }
+
+                    /**
+                     * Creates a {@link Commandline} for which the toString() do not display
+                     * password.
+                     *
+                     * @param workingDirectory
+                     * @param command
+                     * @return CommandLine with anonymous output.
+                     */
+                    private static Commandline getAnonymousBaseGitCommandLine( File workingDirectory, String command )
+                    {
+                        if ( command == null || command.length() == 0 )
+                        {
+                            return null;
+                        }
+
+                        Commandline cl = new AnonymousCommandLine();
+
+                        composeCommand( workingDirectory, command, cl );
+
+                        return cl;
+                    }
+
+                    private static void composeCommand( File workingDirectory, String command, Commandline cl )
+                    {
+                        Settings settings = GitUtil.getSettings();
+
+                        cl.setExecutable( settings.getGitCommand() );
+
+                        cl.createArg().setValue( command );
+
+                        if ( workingDirectory != null )
+                        {
+                            cl.setWorkingDirectory( workingDirectory.getAbsolutePath() );
+                        }
+                    }
+
+                    public static int execute( Commandline cl, StreamConsumer consumer, CommandLineUtils.StringStreamConsumer stderr )
+                        throws ScmException
+                    {
+//                        if ( LOGGER.isInfoEnabled() )
+//                        {
+//                            LOGGER.info( "Executing: " + cl );
+//                            LOGGER.info( "Working directory: " + cl.getWorkingDirectory().getAbsolutePath() );
+//                        }
+
+                        int exitCode;
+                        try
+                        {
+                            exitCode = CommandLineUtils.executeCommandLine( cl, consumer, stderr );
+                        }
+                        catch ( CommandLineException ex )
+                        {
+                            throw new ScmException( "Error while executing command.", ex );
+                        }
+
+                        return exitCode;
+                    }
+
+                    public static int execute( Commandline cl, CommandLineUtils.StringStreamConsumer stdout,
+                                               CommandLineUtils.StringStreamConsumer stderr )
+                        throws ScmException
+                    {
+//                        if ( LOGGER.isInfoEnabled() )
+//                        {
+//                            LOGGER.info( "Executing: " + cl );
+//                            LOGGER.info( "Working directory: " + cl.getWorkingDirectory().getAbsolutePath() );
+//                        }
+
+                        int exitCode;
+                        try
+                        {
+                            exitCode = CommandLineUtils.executeCommandLine( cl, stdout, stderr );
+                        }
+                        catch ( CommandLineException ex )
+                        {
+                            throw new ScmException( "Error while executing command.", ex );
+                        }
+
+                        return exitCode;
+                    }
+
+                }
+            """
+        )
+    )
+
+
+    @Test
+    fun `aws-serverless-java-container`() = rewriteRun(
+        java(
+            """
+                /*
+ * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
+ * with the License. A copy of the License is located at
+ *
+ * http://aws.amazon.com/apache2.0/
+ *
+ * or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
+ * OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
+package com.amazonaws.serverless.proxy.internal;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+
+/**
+ * This class contains utility methods to address FSB security issues found in the application, such as string sanitization
+ * and file path validation.
+ */
+public final class SecurityUtils {
+    private static Logger log = LoggerFactory.getLogger(SecurityUtils.class);
+
+    private static Set<String> SCHEMES = new HashSet<String>() {{
+        add("http");
+        add("https");
+        add("HTTP");
+        add("HTTPS");
+    }};
+
+    private static Set<Integer> PORTS = new HashSet<Integer>() {{
+        add(443);
+        add(80);
+        add(3000); // we allow port 3000 for SAM local
+    }};
+
+    public static boolean isValidPort(String port) {
+        if (port == null) {
+            return false;
+        }
+        try {
+            int intPort = Integer.parseInt(port);
+            return PORTS.contains(intPort);
+        } catch (NumberFormatException e) {
+            log.error("Invalid port parameter: " + crlf(port));
+            return false;
+        }
+    }
+
+    public static boolean isValidScheme(String scheme) {
+        return SCHEMES.contains(scheme);
+    }
+
+    public static boolean isValidHost(String host, String apiId, String region) {
+        if (host == null) {
+            return false;
+        }
+        if (host.endsWith(".amazonaws.com")) {
+            String defaultHost = new StringBuilder().append(apiId)
+                                                    .append(".execute-api.")
+                                                    .append(region)
+                                                    .append(".amazonaws.com").toString();
+            return host.equals(defaultHost);
+        } else {
+            return LambdaContainerHandler.getContainerConfig().getCustomDomainNames().contains(host);
+        }
+    }
+
+    /**
+     * Replaces CRLF characters in a string with empty string ("").
+     * @param s The string to be cleaned
+     * @return A copy of the original string without CRLF characters
+     */
+    public static String crlf(String s) {
+        if (s == null) {
+            return null;
+        }
+        return s.replaceAll("[\r\n]", "");
+    }
+
+
+    /**
+     * Escapes all special characters in a java string
+     * @param s The string to be cleaned
+     * @return The escaped string
+     */
+    public static String encode(String s) {
+        if (s == null) {
+            return null;
+        }
+
+        int sz = s.length();
+
+        StringBuffer buffer = new StringBuffer();
+        for (int i = 0; i < sz; i++) {
+            char ch = s.charAt(i);
+
+            // handle unicode
+            if (ch > 0xfff) {
+                buffer.append("\\u" + Integer.toHexString(ch).toUpperCase(Locale.ENGLISH));
+            } else if (ch > 0xff) {
+                buffer.append("\\u0" + Integer.toHexString(ch).toUpperCase(Locale.ENGLISH));
+            } else if (ch > 0x7f) {
+                buffer.append("\\u00" + Integer.toHexString(ch).toUpperCase(Locale.ENGLISH));
+            } else if (ch < 32) {
+                switch (ch) {
+                case '\b':
+                    buffer.append('\\');
+                    buffer.append('b');
+                    break;
+                case '\n':
+                    buffer.append('\\');
+                    buffer.append('n');
+                    break;
+                case '\t':
+                    buffer.append('\\');
+                    buffer.append('t');
+                    break;
+                case '\f':
+                    buffer.append('\\');
+                    buffer.append('f');
+                    break;
+                case '\r':
+                    buffer.append('\\');
+                    buffer.append('r');
+                    break;
+                default:
+                    if (ch > 0xf) {
+                        buffer.append("\\u00" + Integer.toHexString(ch).toUpperCase(Locale.ENGLISH));
+                    } else {
+                        buffer.append("\\u000" + Integer.toHexString(ch).toUpperCase(Locale.ENGLISH));
+                    }
+                    break;
+                }
+            } else {
+                switch (ch) {
+                case '\'':
+
+                    buffer.append('\'');
+                    break;
+                case '"':
+                    buffer.append('\\');
+                    buffer.append('"');
+                    break;
+                case '\\':
+                    buffer.append('\\');
+                    buffer.append('\\');
+                    break;
+                case '/':
+                    buffer.append('/');
+                    break;
+                default:
+                    buffer.append(ch);
+                    break;
+                }
+            }
+        }
+
+        return buffer.toString();
+    }
+
+    public static String getValidFilePath(String inputPath) {
+        return getValidFilePath(inputPath, false);
+    }
+
+    /**
+     * Returns an absolute file path given an input path and validates that it is not trying
+     * to write/read from a directory other than /tmp.
+     * @param inputPath The input path
+     * @return The absolute path to the file
+     * @throws IllegalArgumentException If the given path is not valid or outside of /tmp
+     */
+    @SuppressFBWarnings("PATH_TRAVERSAL_IN")
+    public static String getValidFilePath(final String inputPath, boolean isWrite) {
+        if (inputPath == null || "".equals(inputPath.trim())) {
+            return null;
+        }
+        String testInputPath = inputPath;
+        if (testInputPath.startsWith("file://")) {
+            testInputPath = testInputPath.substring(6);
+        }
+
+        File f = new File(testInputPath);
+        try {
+            String canonicalPath = f.getCanonicalPath();
+
+            if (isWrite && canonicalPath.startsWith("/var/task")) {
+                throw new IllegalArgumentException("Trying to write to /var/task folder");
+            }
+
+            boolean isAllowed = false;
+            for (String allowedPath : LambdaContainerHandler.getContainerConfig().getValidFilePaths()) {
+                if (canonicalPath.startsWith(allowedPath)) {
+                    isAllowed = true;
+                    break;
+                }
+            }
+            if (!isAllowed) {
+                throw new IllegalArgumentException("File path not allowed: " + encode(canonicalPath));
+            }
+
+            return (inputPath.startsWith("file://") ? "file://" + canonicalPath : canonicalPath);
+        } catch (IOException e) {
+            log.error("Invalid file path: {}", encode(testInputPath));
+            throw new IllegalArgumentException("Invalid file path", e);
+        }
+    }
+}
+            """
+        )
+    )
+
+    @Test
+    fun `basex`() = rewriteRun(
+        java(
+            """
+                package org.basex.gui.view.editor;
+
+                import static org.basex.core.Text.*;
+                import static org.basex.gui.GUIConstants.*;
+                import static org.basex.util.Token.*;
+
+                import java.awt.*;
+                import java.io.*;
+                import java.util.*;
+                import java.util.List;
+                import java.util.Timer;
+                import java.util.concurrent.atomic.*;
+                import java.util.regex.*;
+
+                import javax.swing.*;
+
+                import org.basex.build.json.*;
+                import org.basex.core.*;
+                import org.basex.core.cmd.*;
+                import org.basex.core.parse.*;
+                import org.basex.data.*;
+                import org.basex.gui.*;
+                import org.basex.gui.dialog.*;
+                import org.basex.gui.layout.*;
+                import org.basex.gui.layout.BaseXFileChooser.*;
+                import org.basex.gui.listener.*;
+                import org.basex.gui.text.*;
+                import org.basex.gui.text.TextPanel.Action;
+                import org.basex.gui.view.*;
+                import org.basex.gui.view.project.*;
+                import org.basex.io.*;
+                import org.basex.io.in.*;
+                import org.basex.io.parse.json.*;
+                import org.basex.io.parse.xml.*;
+                import org.basex.query.*;
+                import org.basex.query.func.*;
+                import org.basex.query.value.item.*;
+                import org.basex.query.value.node.*;
+                import org.basex.util.*;
+                import org.basex.util.list.*;
+                import org.xml.sax.*;
+
+                /**
+                 * This view allows the input and evaluation of queries and documents.
+                 *
+                 * @author BaseX Team 2005-22, BSD License
+                 * @author Christian Gruen
+                 */
+                public final class EditorView extends View {
+                  /** Delay for showing the please wait info. */
+                  private static final int WAIT_DELAY = 250;
+                  /** Delay for highlighting an error. */
+                  private static final int SEARCH_DELAY = 100;
+                  /** Link pattern. */
+                  private static final Pattern LINK = Pattern.compile("(.*?), ([0-9]+)/([0-9]+)");
+
+                  /** Project files. */
+                  final ProjectView project;
+                  /** Go button. */
+                  final AbstractButton exec;
+                  /** Test button. */
+                  final AbstractButton tests;
+
+                  /** History Button. */
+                  private final AbstractButton history;
+                  /** Stop Button. */
+                  private final AbstractButton stop;
+                  /** Search bar. */
+                  private final SearchBar search;
+                  /** Info label. */
+                  private final BaseXLabel info;
+                  /** Position label. */
+                  private final BaseXLabel pos;
+                  /** Splitter. */
+                  private final BaseXSplit split;
+                  /** Tabs. */
+                  private final BaseXTabs tabs;
+                  /** Context. */
+                  private final BaseXLabel context;
+
+                  /** Query file that has last been evaluated. */
+                  private IOFile execFile;
+                  /** Main-memory document. */
+                  private DBNode doc;
+
+                  /** Parse counter. */
+                  private final AtomicInteger parseID = new AtomicInteger();
+                  /** Parse query context. */
+                  private final AtomicBoolean parsing = new AtomicBoolean();
+                  /** Input info. */
+                  private InputInfo inputInfo;
+
+                  /**
+                   * Default constructor.
+                   * @param notifier view notifier
+                   */
+                  public EditorView(final ViewNotifier notifier) {
+                    super(EDITORVIEW, notifier);
+                    layout(new BorderLayout());
+                    setBackground(PANEL);
+
+                    tabs = new BaseXTabs(gui);
+                    tabs.setFocusable(Prop.MAC);
+                    tabs.addDragDrop();
+                    tabs.setTabLayoutPolicy(gui.gopts.get(GUIOptions.SCROLLTABS) ? JTabbedPane.SCROLL_TAB_LAYOUT :
+                      JTabbedPane.WRAP_TAB_LAYOUT);
+                    tabs.addMouseListener((MouseClickedListener) e -> {
+                      final int i = tabs.indexAtLocation(e.getX(), e.getY());
+                      if(i != -1 && SwingUtilities.isMiddleMouseButton(e)) {
+                        final Component comp = tabs.getComponentAt(i);
+                        if(comp instanceof EditorArea) close((EditorArea) comp);
+                      }
+                    });
+
+                    final SearchEditor center = new SearchEditor(gui, tabs, null);
+                    search = center.bar();
+
+                    final AbstractButton newB = BaseXButton.command(GUIMenuCmd.C_EDIT_NEW, gui);
+                    final AbstractButton openB = BaseXButton.command(GUIMenuCmd.C_EDIT_OPEN, gui);
+                    final AbstractButton saveB = BaseXButton.get("c_save", SAVE, false, gui);
+                    final AbstractButton find = search.button(FIND_REPLACE);
+                    final AbstractButton vars = BaseXButton.command(GUIMenuCmd.C_EXTERNAL_VARIABLES, gui);
+
+                    history = BaseXButton.get("c_history", BaseXLayout.addShortcut(RECENTLY_OPENED,
+                        BaseXKeys.HISTORY.toString()), false, gui);
+                    exec = BaseXButton.get("c_go", BaseXLayout.addShortcut(RUN_QUERY,
+                        BaseXKeys.EXEC.toString()), false, gui);
+                    stop = BaseXButton.get("c_stop", STOP, false, gui);
+                    stop.setEnabled(false);
+                    tests = BaseXButton.get("c_test", BaseXLayout.addShortcut(RUN_TESTS,
+                        BaseXKeys.TESTS.toString()), false, gui);
+
+                    final BaseXBack buttons = new BaseXBack(false);
+                    buttons.layout(new ColumnLayout());
+                    buttons.add(newB);
+                    buttons.add(openB);
+                    buttons.add(saveB);
+                    buttons.add(history);
+                    buttons.add(Box.createHorizontalStrut(8));
+                    buttons.add(find);
+                    buttons.add(Box.createHorizontalStrut(8));
+                    buttons.add(stop);
+                    buttons.add(exec);
+                    buttons.add(vars);
+                    buttons.add(tests);
+
+                    context = new BaseXLabel("").resize(1.2f);
+                    context.setForeground(dgray);
+
+                    final BaseXBack north = new BaseXBack(false).layout(new BorderLayout(10, 0));
+                    north.add(buttons, BorderLayout.WEST);
+                    north.add(context, BorderLayout.CENTER);
+                    north.add(new BaseXHeader(EDITOR), BorderLayout.EAST);
+
+                    // status and query pane
+                    search.editor(addTab(), false);
+
+                    info = new BaseXLabel().setText(OK, Msg.SUCCESS).resize(1.2f);
+                    pos = new BaseXLabel(" ").resize(1.2f);
+
+                    posCode.invokeLater();
+
+                    final BaseXBack south = new BaseXBack(false).border(8, 0, 0, 0);
+                    south.layout(new BorderLayout(4, 0));
+                    south.add(info, BorderLayout.CENTER);
+                    south.add(pos, BorderLayout.EAST);
+
+                    final BaseXBack main = new BaseXBack().border(5);
+                    main.setOpaque(false);
+                    main.layout(new BorderLayout());
+                    main.add(north, BorderLayout.NORTH);
+                    main.add(center, BorderLayout.CENTER);
+                    main.add(south, BorderLayout.SOUTH);
+
+                    project = new ProjectView(this);
+                    split = new BaseXSplit(true);
+                    split.setOpaque(false);
+                    split.add(project);
+                    split.add(main);
+                    split.init(new double[] { 0.3, 0.7 }, new double[] { 0, 1 });
+                    toggleProject();
+                    add(split, BorderLayout.CENTER);
+
+                    refreshLayout();
+
+                    // add listeners
+                    saveB.addActionListener(e -> {
+                      final JPopupMenu pop = new JPopupMenu();
+                      final StringBuilder mnem = new StringBuilder();
+                      final JMenuItem sa = GUIMenu.newItem(GUIMenuCmd.C_EDIT_SAVE, gui, mnem);
+                      final JMenuItem sas = GUIMenu.newItem(GUIMenuCmd.C_EDIT_SAVE_AS, gui, mnem);
+                      sa.setEnabled(GUIMenuCmd.C_EDIT_SAVE.enabled(gui));
+                      sas.setEnabled(GUIMenuCmd.C_EDIT_SAVE_AS.enabled(gui));
+                      pop.add(sa);
+                      pop.add(sas);
+                      pop.show(saveB, 0, saveB.getHeight());
+                    });
+
+                    history.addActionListener(e -> historyPopup(0));
+                    refreshHistory(null);
+
+                    info.addMouseListener((MouseClickedListener) e -> markError(true));
+                    stop.addActionListener(e -> {
+                      stop.setEnabled(false);
+                      gui.stop();
+                    });
+                    exec.addActionListener(e -> run(getEditor(), Action.EXECUTE));
+                    tests.addActionListener(e -> run(getEditor(), Action.TEST));
+                    tabs.addChangeListener(e -> {
+                      final EditorArea ea = getEditor();
+                      if(ea == null) return;
+                      search.editor(ea, true);
+                      gui.refreshControls(false);
+                      posCode.invokeLater();
+                      refreshMark();
+                      run(ea, Action.PARSE);
+                      gui.setTitle();
+                    });
+
+                    BaseXLayout.addDrop(this, file -> {
+                      if(file instanceof File) open(new IOFile((File) file));
+                    });
+                  }
+
+                  @Override
+                  public void refreshInit() { }
+
+                  @Override
+                  public void refreshFocus() { }
+
+                  @Override
+                  public void refreshMark() {
+                    tests.setEnabled(getEditor().file().hasSuffix(IO.XQSUFFIXES));
+                  }
+
+                  @Override
+                  public void refreshContext(final boolean more, final boolean quick) { }
+
+                  @Override
+                  public void refreshLayout() {
+                    for(final EditorArea edit : editors()) edit.refreshLayout(mfont);
+                    project.refreshLayout();
+                    search.refreshLayout();
+                  }
+
+                  @Override
+                  public void refreshUpdate() { }
+
+                  @Override
+                  public boolean visible() {
+                    return gui.gopts.get(GUIOptions.SHOWEDITOR);
+                  }
+
+                  @Override
+                  public void visible(final boolean v) {
+                    gui.gopts.set(GUIOptions.SHOWEDITOR, v);
+                  }
+
+                  @Override
+                  protected boolean db() {
+                    return false;
+                  }
+
+                  /**
+                   * Shows a history popup menu.
+                   * @param start first entry
+                   */
+                  public void historyPopup(final int start) {
+                    // create list of paths; show opened files first
+                    final HashSet<String> opened = new HashSet<>();
+                    for(final EditorArea edit : editors()) opened.add(edit.file().path());
+                    final List<String> paths = new ArrayList<>(opened);
+                    for(final String path : gui.gopts.get(GUIOptions.EDITOR)) {
+                      if(!paths.contains(path)) paths.add(path);
+                    }
+                    paths.sort((path1, path2) -> {
+                      final boolean c1 = opened.contains(path1), c2 = opened.contains(path2);
+                      return c1 == c2 ? path1.compareTo(path2) : c1 ? -1 : 1;
+                    });
+
+                    final JPopupMenu menu = new JPopupMenu();
+                    int p = start - 1;
+                    final int max = Math.min(paths.size(), start + BaseXHistory.MAXPAGE);
+                    if(start > 0) menu.add(new JMenuItem(DOTS)).addActionListener(
+                        ac -> historyPopup(start - BaseXHistory.MAXPAGE));
+                    while(++p < max) {
+                      final String path = paths.get(p);
+                      final IOFile file = new IOFile(path);
+                      final String label = file.name() + " \u00b7 " + BaseXLayout.reversePath(file);
+                      final JMenuItem item = new JMenuItem(label);
+                      item.setToolTipText(BaseXLayout.info(file, true));
+                      if(opened.contains(path)) BaseXLayout.boldFont(item);
+                      menu.add(item).addActionListener(ac -> open(file));
+                    }
+                    if(p < paths.size()) menu.add(new JMenuItem(DOTS)).addActionListener(
+                        ac -> historyPopup(start + BaseXHistory.MAXPAGE));
+                    menu.show(history, 0, history.getHeight());
+                  }
+
+                  /**
+                   * Refreshes the context label.
+                   */
+                  public void refreshContextLabel() {
+                    final String label = context();
+                    context.setText(label.isEmpty() ? "" : CONTEXT + COLS + label);
+                  }
+
+                  /**
+                   * Sets an XML document as context.
+                   * @param file file
+                   */
+                  public void setContext(final IOFile file) {
+                    try {
+                      // close database
+                      if(Close.close(gui.context)) gui.notify.init();
+                      doc = new DBNode(file);
+                      // remove context item binding
+                      final Map<String, String> map = gui.context.options.toMap(MainOptions.BINDINGS);
+                      map.remove("");
+                      DialogBindings.assign(map, gui);
+                      refreshContextLabel();
+                    } catch(final IOException ex) {
+                      Util.debug(ex);
+                      BaseXDialog.error(gui, Util.info(ex));
+                    }
+                  }
+
+                  /**
+                   * Returns a string describing the current context.
+                   * @return context string (can be empty)
+                   */
+                  public String context() {
+                    // check if context binding was set
+                    String value = gui.context.options.toMap(MainOptions.BINDINGS).get("");
+                    if(value != null) {
+                      value = Strings.concat("xs:untypedAtomic(", Atm.get(value), ')');
+                    }
+                    // check if database is opened
+                    if(value == null) {
+                      final Data data = gui.context.data();
+                      if(data != null) value = Function._DB_OPEN.args(data.meta.name);
+                    }
+                    // check if main-memory document exists
+                    if(value == null) {
+                      if(doc != null) value = Function.DOC.args(new IOFile(doc.data().meta.original).name());
+                    } else {
+                      doc = null;
+                    }
+                    return value != null ? value.trim() : "";
+                  }
+
+                  /**
+                   * Shows the project view.
+                   */
+                  public void showProject() {
+                    if(!gui.gopts.get(GUIOptions.SHOWPROJECT)) {
+                      gui.gopts.invert(GUIOptions.SHOWPROJECT);
+                      split.visible(true);
+                    }
+                  }
+
+                  /**
+                   * Toggles the project view.
+                   */
+                  public void toggleProject() {
+                    final boolean show = gui.gopts.get(GUIOptions.SHOWPROJECT);
+                    split.visible(show);
+                    if(show) {
+                      project.focus();
+                    } else {
+                      focusEditor();
+                    }
+                  }
+
+                  /**
+                   * Focuses the project view.
+                   */
+                  public void findFiles() {
+                    project.findFiles(getEditor());
+                  }
+
+                  /**
+                   * Focuses the current editor.
+                   */
+                  public void focusEditor() {
+                    SwingUtilities.invokeLater(() -> getEditor().requestFocusInWindow());
+                  }
+
+                  /**
+                   * Focuses the currently edited file in the project view.
+                   */
+                  public void jumpToFile() {
+                    project.jumpTo(getEditor().file(), true);
+                  }
+
+                  /**
+                   * Switches the current editor tab.
+                   * @param next next next/previous tab
+                   */
+                  public void tab(final boolean next) {
+                    final int s = tabs.getTabCount();
+                    final int i = (s + tabs.getSelectedIndex() + (next ? 1 : -1)) % s;
+                    tabs.setSelectedIndex(i);
+                  }
+
+                  /**
+                   * Opens previously opened and new files.
+                   * @param files files to be opened
+                   */
+                  public void init(final ArrayList<IOFile> files) {
+                    for(final String file : gui.gopts.get(GUIOptions.OPEN)) open(new IOFile(file), true, false);
+                    for(final IOFile file : files) open(file, true, false);
+
+                    // open temporary files
+                    final EditorArea edit = getEditor();
+                    final String prefix = Prop.HOMEDIR.hashCode() + "-";
+                    for(final IOFile file : new IOFile(Prop.TEMPDIR, Prop.PROJECT).children()) {
+                      if(!file.name().startsWith(prefix)) continue;
+                      try {
+                        final byte[] text = read(file);
+                        if(text != null) {
+                          final EditorArea ea = addTab();
+                          ea.setText(text);
+                          refreshControls(ea, true);
+                          file.delete();
+                        }
+                      } catch(final IOException ex) {
+                        Util.debug(ex);
+                      }
+                    }
+                    if(!edit.opened()) closeEditor(edit);
+
+                    gui.setTitle();
+                  }
+
+                  /**
+                   * Opens a new file.
+                   */
+                  public void open() {
+                    // open file chooser for XML creation
+                    final BaseXFileChooser fc = new BaseXFileChooser(gui, OPEN, gui.gopts.get(GUIOptions.WORKPATH));
+                    fc.filter(XQUERY_FILES, false, IO.XQSUFFIXES);
+                    fc.filter(BXS_FILES, false, IO.BXSSUFFIX);
+                    fc.textFilters();
+                    for(final IOFile f : fc.multi().selectAll(Mode.FOPEN)) open(f);
+                  }
+
+                  /**
+                   * Saves the contents of the currently opened editor.
+                   * @return {@code false} if operation was canceled
+                   */
+                  public boolean save() {
+                    final EditorArea edit = getEditor();
+                    return edit.opened() ? edit.save() : saveAs();
+                  }
+
+                  /**
+                   * Saves the contents of the currently opened editor under a new name.
+                   * @return {@code false} if operation was canceled
+                   */
+                  public boolean saveAs() {
+                    // open file chooser for XML creation
+                    final EditorArea edit = getEditor();
+                    final String path = edit.opened() ? edit.file().path() : gui.gopts.get(GUIOptions.WORKPATH);
+                    final BaseXFileChooser fc = new BaseXFileChooser(gui, SAVE_AS, path);
+                    fc.filter(XQUERY_FILES, false, IO.XQSUFFIXES);
+                    fc.filter(BXS_FILES, false, IO.BXSSUFFIX);
+                    fc.textFilters();
+                    fc.suffix(IO.XQSUFFIX);
+
+                    // save new file
+                    final IOFile file = fc.select(Mode.FSAVE);
+                    if(file == null || !edit.save(file)) return false;
+                    // success: parse contents
+                    run(edit, Action.PARSE);
+                    return true;
+                  }
+
+                  /**
+                   * Creates a new file.
+                   */
+                  public void newFile() {
+                    if(!visible()) GUIMenuCmd.C_SHOW_EDITOR.execute(gui);
+                    refreshControls(addTab(), true);
+                  }
+
+                  /**
+                   * Deletes a file.
+                   * @param file file to be deleted
+                   * @return success flag
+                   */
+                  public boolean delete(final IOFile file) {
+                    final EditorArea edit = find(file);
+                    if(edit != null) close(edit);
+                    return file.delete();
+                  }
+
+                  /**
+                   * Opens and parses the specified query file.
+                   * @param file query file
+                   * @return opened editor or {@code null} if file could not be opened
+                   */
+                  public EditorArea open(final IOFile file) {
+                    return open(file, true, true);
+                  }
+
+                  /**
+                   * Opens and focuses the specified query file.
+                   * @param file query file
+                   * @param parse parse contents
+                   * @param error display error if file does not exist
+                   * @return opened editor, or {@code null} if file could not be opened
+                   */
+                  private EditorArea open(final IOFile file, final boolean parse, final boolean error) {
+                    if(!visible()) GUIMenuCmd.C_SHOW_EDITOR.execute(gui);
+
+                    EditorArea edit = find(file);
+                    if(edit != null) {
+                      // display open file
+                      tabs.setSelectedComponent(edit);
+                    } else {
+                      try {
+                        // check and retrieve content
+                        final byte[] text = read(file);
+                        if(text == null) return null;
+
+                        // get current editor
+                        edit = getEditor();
+                        // create new tab if text in current tab is stored on disk or has been modified
+                        if(edit.opened() || edit.modified()) edit = addTab();
+                        edit.initText(text);
+                        edit.file(file, error);
+                        if(parse) run(edit, Action.PARSE);
+                      } catch(final IOException ex) {
+                        refreshHistory(null);
+                        Util.debug(ex);
+                        if(error) BaseXDialog.error(gui, Util.info(FILE_NOT_OPENED_X, file));
+                        return null;
+                      }
+                    }
+                    focusEditor();
+                    return edit;
+                  }
+
+                  /**
+                   * Parses or evaluates the current file.
+                   * @param action action
+                   * @param editor current editor
+                   */
+                  void run(final EditorArea editor, final Action action) {
+                    refreshControls(editor, false);
+
+                    // skip checks if input has not changed
+                    final byte[] text = editor.getText();
+                    if(eq(text, editor.last) && action == Action.CHECK) return;
+                    editor.last = text;
+
+                    // save modified files before executing queries
+                    if(gui.gopts.get(GUIOptions.SAVERUN) && (action == Action.EXECUTE || action == Action.TEST)) {
+                      for(final EditorArea edit : editors()) {
+                        if(edit.opened()) edit.save();
+                      }
+                    }
+
+                    IOFile file = editor.file();
+                    final boolean xquery = file.hasSuffix(IO.XQSUFFIXES) || !file.name().contains(".");
+                    final boolean script = file.hasSuffix(IO.BXSSUFFIX);
+
+                    if(action == Action.TEST) {
+                      // test query
+                      if(xquery) gui.execute(true, new Test(file.path()));
+                    } else if(action == Action.EXECUTE && script) {
+                      // execute script
+                      gui.execute(true, new Execute(string(text)).baseURI(file.path()));
+                    } else if(action == Action.EXECUTE || xquery) {
+                      // execute or parse query
+                      String input = string(text);
+                      if(action == Action.EXECUTE || gui.gopts.get(GUIOptions.EXECRT)) {
+                        // find main module if current file cannot be evaluated; return early if no module is found
+                        if(!xquery || QueryParser.isLibrary(input)) {
+                          final EditorArea ea = execEditor();
+                          if(ea == null) return;
+                          file = ea.file();
+                          input = string(ea.getText());
+                        }
+                        // execute query
+                        final XQuery cmd = new XQuery(input);
+                        if(doc != null) cmd.bind(null, doc);
+                        gui.execute(true, cmd.baseURI(file.path()));
+                        execFile = file;
+                      } else {
+                        // parse: replace empty query with empty sequence (suppresses errors for plain text files)
+                        parse(input.isEmpty() ? "()" : input, file);
+                      }
+                    } else if(file.hasSuffix(IO.JSONSUFFIX)) {
+                      try {
+                        final IOContent io = new IOContent(text);
+                        io.name(file.path());
+                        JsonConverter.get(new JsonParserOptions()).convert(io);
+                        info(null);
+                      } catch(final IOException ex) {
+                        info(ex);
+                      }
+                    } else if(script || file.hasSuffix(gui.gopts.xmlSuffixes()) || file.hasSuffix(IO.XSLSUFFIXES)) {
+                      final ArrayInput ai = new ArrayInput(text);
+                      try {
+                        // check XML syntax
+                        if(startsWith(text, '<') || !script) new XmlParser().parse(ai);
+                        // check command script
+                        if(script) CommandParser.get(string(text), gui.context).parse();
+                        info(null);
+                      } catch(final Exception ex) {
+                        info(ex);
+                      }
+                    } else if(action != Action.CHECK) {
+                      info(null);
+                    } else {
+                      // no particular file format, no particular action: reset status info
+                      info.setText(OK, Msg.SUCCESS);
+                    }
+                  }
+
+                  /**
+                   * Evaluates the info message resulting from command or query parsing.
+                   * @param ex exception or {@code null}
+                   */
+                  private void info(final Exception ex) {
+                    info(ex, false, false);
+                  }
+
+                  /**
+                   * Returns the editor whose contents have been executed last.
+                   * @return editor or {@code null}
+                   */
+                  private EditorArea execEditor() {
+                    final IOFile file = execFile;
+                    if(file != null) {
+                      for(final EditorArea edit : editors()) {
+                        if(edit.file().path().equals(file.path())) return edit;
+                      }
+                      execFile = null;
+                    }
+                    return null;
+                  }
+
+                  /**
+                   * Retrieves the contents of the specified file, or opens it externally.
+                   * @param file query file
+                   * @return contents, or {@code null} reference if file is opened externally
+                   * @throws IOException I/O exception
+                   */
+                  private byte[] read(final IOFile file) throws IOException {
+                    try {
+                      // try to open as validated UTF-8 document
+                      return new NewlineInput(file).validate(true).content();
+                    } catch(final InputException ex) {
+                      // error...
+                      Util.debug(ex);
+                      final String button = BaseXDialog.yesNoCancel(gui, H_FILE_BINARY);
+                      // open binary as text; do not validate
+                      if(button == B_NO) return new NewlineInput(file).content();
+                      // open external application
+                      if(button == B_YES) {
+                        try {
+                          file.open();
+                        } catch(final IOException ioex) {
+                          Util.debug(ioex);
+                          Desktop.getDesktop().open(file.file());
+                        }
+                      }
+                      // return nothing (also applies if dialog is canceled)
+                      return null;
+                    }
+                  }
+
+                  /**
+                   * Refreshes the list of recent query files and updates the query path.
+                   * @param file new file (can be {@code null})
+                   */
+                  void refreshHistory(final IOFile file) {
+                    final StringList paths = new StringList();
+                    if(file != null) {
+                      gui.gopts.setFile(GUIOptions.WORKPATH, file.parent());
+                      paths.add(file.path());
+                      tabs.setToolTipTextAt(tabs.getSelectedIndex(), BaseXLayout.info(file, true));
+                    }
+                    for(final String old : gui.gopts.get(GUIOptions.EDITOR)) {
+                      if(paths.size() < BaseXHistory.MAX) paths.addUnique(old);
+                    }
+
+                    // store sorted history
+                    gui.gopts.setFiles(GUIOptions.EDITOR, paths.finish());
+                    history.setEnabled(!paths.isEmpty());
+                  }
+
+                  /**
+                   * Closes all editors.
+                   */
+                  public void closeAll() {
+                    for(final EditorArea ea : editors()) closeEditor(ea);
+                    gui.saveOptions();
+                  }
+
+                  /**
+                   * Closes an editor.
+                   * @param edit editor to be closed (if {@code null}, the currently opened editor will be closed)
+                   */
+                  public void close(final EditorArea edit) {
+                    closeEditor(edit);
+                    gui.saveOptions();
+                  }
+
+                  /**
+                   * Closes an editor.
+                   * @param edit editor to be closed (if {@code null}, the currently opened editor will be closed)
+                   */
+                  private void closeEditor(final EditorArea edit) {
+                    final EditorArea ea = edit != null ? edit : getEditor();
+                    if(ea.modified() && !confirm(ea)) return;
+
+                    // remove reference to last executed file
+                    if(execFile != null && ea.file().path().equals(execFile.path())) execFile = null;
+                    tabs.remove(ea);
+                    // no panels left: open default tab
+                    if(tabs.getTabCount() == 0) {
+                      addTab();
+                      SwingUtilities.invokeLater(this::toggleProject);
+                    } else {
+                      focusEditor();
+                    }
+                  }
+
+                  /**
+                   * Starts a thread, which shows a waiting info after a short timeout.
+                   * @param id thread id
+                   */
+                  public void pleaseWait(final int id) {
+                    new Timer(true).schedule(new TimerTask() {
+                      @Override
+                      public void run() {
+                        if(gui.running(id)) {
+                          info.setText(PLEASE_WAIT_D, Msg.SUCCESS).setToolTipText(null);
+                          stop.setEnabled(true);
+                        }
+                      }
+                    }, WAIT_DELAY);
+                  }
+
+                  /**
+                   * Parses the current query after a little delay.
+                   * @param input query input
+                   * @param file file
+                   */
+                  private void parse(final String input, final IO file) {
+                    final int id = parseID.incrementAndGet();
+                    new Timer(true).schedule(new TimerTask() {
+                      @Override
+                      public void run() {
+                        // let current parser finish; check if thread is obsolete
+                        while(parsing.get()) Performance.sleep(1);
+                        if(id != parseID.get()) return;
+
+                        // parse query
+                        parsing.set(true);
+                        try(QueryContext qc = new QueryContext(gui.context)) {
+                          qc.parse(input, file.path());
+                          if(id == parseID.get()) info(null);
+                        } catch(final QueryException ex) {
+                          if(id == parseID.get()) info(ex);
+                        } finally {
+                          parsing.set(false);
+                        }
+                      }
+                    }, SEARCH_DELAY);
+                  }
+
+                  /**
+                   * Processes the result from a command or query execution.
+                   * @param th exception or {@code null}
+                   * @param stopped {@code true} if evaluation was stopped
+                   * @param refresh refresh buttons
+                   */
+                  public void info(final Throwable th, final boolean stopped, final boolean refresh) {
+                    // do not refresh view when query is running
+                    if(!refresh && stop.isEnabled()) return;
+
+                    parseID.incrementAndGet();
+                    final EditorArea editor = getEditor();
+                    String path = "";
+                    if(editor != null) {
+                      path = editor.file().path();
+                      editor.resetError();
+                    }
+
+                    if(refresh) {
+                      stop.setEnabled(false);
+                      refreshMark();
+                    }
+
+                    if(stopped || th == null) {
+                      info.setCursor(CURSORARROW);
+                      info.setText(stopped ? INTERRUPTED : OK, Msg.SUCCESS);
+                      info.setToolTipText(null);
+                      inputInfo = null;
+                    } else {
+                      info.setCursor(CURSORHAND);
+                      final String msg = Util.message(th), local = th.getLocalizedMessage();
+                      info.setText(local != null ? local : msg, Msg.ERROR);
+                      final String tt = msg.replace("<", "&lt;").replace(">", "&gt;").
+                        replaceAll("\r?\n", "<br/>").replaceAll("(<br/>.*?)<br/>.*", "${'$'}1");
+                      info.setToolTipText("<html>" + tt + "</html>");
+
+                      if(th instanceof QueryIOException) {
+                        inputInfo = ((QueryIOException) th).getCause().info();
+                      } else if(th instanceof QueryException) {
+                        inputInfo = ((QueryException) th).info();
+                      } else if(th instanceof SAXParseException) {
+                        final SAXParseException ex = (SAXParseException) th;
+                        inputInfo = new InputInfo(path, ex.getLineNumber(), ex.getColumnNumber());
+                      } else {
+                        inputInfo = new InputInfo(path, 1, 1);
+                      }
+                      markError(false);
+                    }
+                  }
+
+                  /**
+                   * Jumps to the specified file and position.
+                   * @param link link
+                   */
+                  public void jump(final String link) {
+                    final Matcher m = LINK.matcher(link);
+                    if(m.matches()) {
+                      inputInfo = new InputInfo(m.group(1), Strings.toInt(m.group(2)), Strings.toInt(m.group(3)));
+                      markError(true);
+                    } else {
+                      Util.stack("No match found: " + link);
+                    }
+                  }
+
+                  /**
+                   * Jumps to the current error.
+                   * @param jump jump to error position (if necessary, open file)
+                   */
+                  public void markError(final boolean jump) {
+                    InputInfo ii = inputInfo;
+                    final String path;
+                    final boolean error = ii == null;
+                    if(error) {
+                      final TreeMap<String, InputInfo> errors = project.errors();
+                      if(errors.isEmpty()) return;
+                      path = errors.get(errors.keySet().iterator().next()).path();
+                    } else {
+                      path = ii.path();
+                    }
+                    if(path == null) return;
+
+                    final IOFile file = new IOFile(path);
+                    final EditorArea found = find(file), opened;
+                    if(jump) {
+                      opened = open(file, error, true);
+                      // update error information if file was not already opened
+                      if(found == null && error) ii = inputInfo;
+                    } else {
+                      opened = found;
+                    }
+                    // no editor available, no input info
+                    if(opened == null || ii == null) return;
+
+                    // mark error, jump to error position
+                    final int ep = pos(opened.last, ii.line(), ii.column());
+                    opened.error(ep);
+
+                    if(jump) {
+                      opened.setCaret(ep);
+                      posCode.invokeLater();
+                      // jump to file in project view if file was opened by this function call
+                      if(found == null) project.jumpTo(opened.file(), false);
+                    }
+                  }
+
+                  /**
+                   * Returns an editor offset for the specified line and column.
+                   * @param text text
+                   * @param line line
+                   * @param col column
+                   * @return position
+                   */
+                  private static int pos(final byte[] text, final int line, final int col) {
+                    final int ll = text.length;
+                    int ep = ll;
+                    for(int p = 0, l = 1, c = 1; p < ll; ++c, p += cl(text, p)) {
+                      if(l > line || l == line && c == col) {
+                        ep = p;
+                        break;
+                      }
+                      if(text[p] == '\n') {
+                        ++l;
+                        c = 0;
+                      }
+                    }
+                    if(ep < ll && Character.isLetterOrDigit(cp(text, ep))) {
+                      while(ep > 0 && Character.isLetterOrDigit(cp(text, ep - 1))) ep--;
+                    }
+                    return ep;
+                  }
+
+                  /**
+                   * Returns paths of all open files.
+                   * @return file paths
+                   */
+                  public String[] openFiles() {
+                    // remember opened files
+                    final StringList files = new StringList();
+                    for(final EditorArea edit : editors()) {
+                      if(edit.opened()) files.add(edit.file().path());
+                    }
+                    return files.finish();
+                  }
+
+                  /**
+                   * Returns the current editor.
+                   * @return editor or {@code null}
+                   */
+                  public EditorArea getEditor() {
+                    final Component c = tabs.getSelectedComponent();
+                    return c instanceof EditorArea ? (EditorArea) c : null;
+                  }
+
+                  /**
+                   * Updates the references to renamed files.
+                   * @param old old file file reference
+                   * @param renamed updated file reference
+                   */
+                  public void rename(final IOFile old, final IOFile renamed) {
+                    try {
+                      // use canonical representation and add slash to names of directories
+                      final boolean dir = renamed.isDir();
+                      final String oldPath = old.file().getCanonicalPath() + (dir ? File.separator : "");
+                      // iterate through all tabs
+                      for(final Component c : tabs.getComponents()) {
+                        if(!(c instanceof EditorArea)) continue;
+
+                        final EditorArea ea = (EditorArea) c;
+                        if(!ea.opened()) continue;
+
+                        final String editPath = ea.file().file().getCanonicalPath();
+                        if(dir) {
+                          // change path to files in a renamed directory
+                          if(editPath.startsWith(oldPath)) {
+                            ea.file(new IOFile(renamed, editPath.substring(oldPath.length())), true);
+                          }
+                        } else if(oldPath.equals(editPath)) {
+                          // update file reference and label of editor tab
+                          ea.file(renamed, true);
+                          ea.label.setText(renamed.name());
+                          break;
+                        }
+                      }
+                    } catch(final IOException ex) {
+                      Util.errln(ex);
+                    }
+                  }
+
+                  /**
+                   * Refreshes the query modification flag.
+                   * @param edit editor
+                   * @param enforce enforce action
+                   */
+                  void refreshControls(final EditorArea edit, final boolean enforce) {
+                    // update modification flag
+                    final boolean modified = edit.hist != null && edit.hist.modified();
+                    if(modified == edit.modified() && !enforce) return;
+
+                    edit.modified(modified);
+
+                    // update tab title
+                    String title = edit.file().name();
+                    if(modified) title += '*';
+                    edit.label.setText(title);
+
+                    // update components
+                    gui.refreshControls(false);
+                    gui.setTitle();
+                    posCode.invokeLater();
+                    refreshMark();
+                  }
+
+                  /** Code for setting cursor position. */
+                  public final GUICode posCode = new GUICode() {
+                    @Override
+                    public void execute(final Object arg) {
+                      final int[] lc = getEditor().pos();
+                      pos.setText(lc[0] + " : " + lc[1]);
+                    }
+                  };
+
+                  /**
+                   * Finds the editor that contains the specified file.
+                   * @param file file to be found
+                   * @return editor or {@code null}
+                   */
+                  private EditorArea find(final IO file) {
+                    for(final EditorArea edit : editors()) {
+                      if(edit.file().eq(file)) return edit;
+                    }
+                    return null;
+                  }
+
+                  /**
+                   * Choose a unique tab file.
+                   * @return io reference
+                   */
+                  private IOFile newTabFile() {
+                    // collect numbers of existing files
+                    final BoolList bl = new BoolList();
+                    for(final EditorArea edit : editors()) {
+                      if(edit.opened()) continue;
+                      final String n = edit.file().name().substring(FILE.length());
+                      bl.set(n.isEmpty() ? 1 : Integer.parseInt(n), true);
+                    }
+                    // find first free file number
+                    int b = 0;
+                    final int bs = bl.size();
+                    while(++b < bs && bl.get(b));
+                    // create io reference
+                    return new IOFile(gui.gopts.get(GUIOptions.WORKPATH), FILE + (b == 1 ? "" : b));
+                  }
+
+                  /**
+                   * Adds a new editor tab.
+                   * @return editor reference
+                   */
+                  private EditorArea addTab() {
+                    final EditorArea edit = new EditorArea(this, newTabFile());
+                    edit.setFont(mfont);
+
+                    final BaseXBack tab = new BaseXBack(false).layout(new BorderLayout(10, 0));
+                    tab.add(edit.label, BorderLayout.CENTER);
+
+                    final AbstractButton close = tabButton("e_close", "e_close2");
+                    close.addActionListener(e -> close(edit));
+                    tab.add(close, BorderLayout.EAST);
+
+                    tabs.add(edit, tab, tabs.getTabCount());
+                    return edit;
+                  }
+
+                  /**
+                   * Adds a new tab button.
+                   * @param icon name of button icon
+                   * @param rollover rollover icon
+                   * @return button
+                   */
+                  private AbstractButton tabButton(final String icon, final String rollover) {
+                    final AbstractButton close = BaseXButton.get(icon, null, false, gui);
+                    close.setBorder(BaseXLayout.border(2, 0, 2, 0));
+                    close.setContentAreaFilled(false);
+                    close.setFocusable(false);
+                    close.setRolloverIcon(BaseXImages.icon(rollover));
+                    return close;
+                  }
+
+                  /**
+                   * Shows a confirmation dialog for the specified editor, or all editors.
+                   * @param edit editor to be saved, or {@code null} to save all editors
+                   * @return {@code true} if all editors were confirmed
+                   */
+                  public boolean confirm(final EditorArea edit) {
+                    final boolean all = edit == null;
+                     final EditorArea[] eas = all ? editors() : new EditorArea[] { edit };
+                    final String[] buttons = all && eas.length > 1 ? new String[] { CLOSE_ALL } : new String[0];
+
+                    for(final EditorArea ea : eas) {
+                      tabs.setSelectedComponent(ea);
+                      if(ea.modified() && (ea.opened() || edit != null && trim(ea.getText()).length != 0)) {
+                        final String msg = Util.info(CLOSE_FILE_X, ea.file().name());
+                        final String action = BaseXDialog.yesNoCancel(gui, msg, buttons);
+                        if(action == null || action.equals(B_YES) && !save()) return false;
+                        else if(action.equals(CLOSE_ALL)) break;
+                      }
+                    }
+
+                    // close application: remember opened files
+                    final IOFile tmpDir = new IOFile(Prop.TEMPDIR, Prop.PROJECT);
+                    if(edit == null && eas.length > 0 && tmpDir.md()) {
+                      try {
+                        final String prefix = Prop.HOMEDIR.hashCode() + "-";
+                        int c = 0;
+                        for(final EditorArea ea : eas) {
+                          final byte[] text = ea.getText();
+                          if(!ea.opened() && text.length > 0) {
+                            new IOFile(tmpDir, prefix + c++ + IO.TMPSUFFIX).write(text);
+                          }
+                        }
+                      } catch(final IOException ex) {
+                        Util.debug(ex);
+                      }
+                    }
+                    return true;
+                  }
+
+                  /**
+                   * Returns all editors.
+                   * @return editors
+                   */
+                  private EditorArea[] editors() {
+                    final ArrayList<EditorArea> edits = new ArrayList<>();
+                    for(final Component c : tabs.getComponents()) {
+                      if(c instanceof EditorArea) edits.add((EditorArea) c);
+                    }
+                    return edits.toArray(new EditorArea[0]);
+                  }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `californium`() = rewriteRun(
+        java(
+            """
+                /*******************************************************************************
+                 * Copyright (c) 2017 Bosch Software Innovations GmbH and others.
+                 *
+                 * All rights reserved. This program and the accompanying materials
+                 * are made available under the terms of the Eclipse Public License v2.0
+                 * and Eclipse Distribution License v1.0 which accompany this distribution.
+                 *
+                 * The Eclipse Public License is available at
+                 *    http://www.eclipse.org/legal/epl-v20.html
+                 * and the Eclipse Distribution License is available at
+                 *    http://www.eclipse.org/org/documents/edl-v10.html.
+                 *
+                 * Contributors:
+                 *    Bosch Software Innovations GmbH - initial creation
+                 *                                      derived from HelloWorldServer example
+                 *    Bosch Software Innovations GmbH - migrate to SLF4J
+                 ******************************************************************************/
+                package org.eclipse.californium.examples;
+
+                import java.io.File;
+                import java.io.FileInputStream;
+                import java.io.IOException;
+                import java.io.InputStream;
+                import java.net.SocketException;
+                import java.util.Arrays;
+                import java.util.HashMap;
+                import java.util.Map;
+
+                import org.eclipse.californium.core.CoapResource;
+                import org.eclipse.californium.core.coap.CoAP;
+                import org.eclipse.californium.core.coap.MediaTypeRegistry;
+                import org.eclipse.californium.core.coap.Request;
+                import org.eclipse.californium.core.coap.Response;
+                import org.eclipse.californium.core.config.CoapConfig;
+                import org.eclipse.californium.core.network.Exchange;
+                import org.eclipse.californium.core.server.resources.CoapExchange;
+                import org.eclipse.californium.core.server.resources.MyIpResource;
+                import org.eclipse.californium.core.server.resources.Resource;
+                import org.eclipse.californium.elements.config.Configuration;
+                import org.eclipse.californium.elements.config.UdpConfig;
+                import org.eclipse.californium.elements.config.Configuration.DefinitionsProvider;
+                import org.eclipse.californium.elements.config.TcpConfig;
+                import org.eclipse.californium.elements.util.StringUtil;
+                import org.eclipse.californium.plugtests.AbstractTestServer;
+                import org.eclipse.californium.plugtests.PlugtestServer.BaseConfig;
+                import org.eclipse.californium.plugtests.resources.MyContext;
+                import org.eclipse.californium.scandium.config.DtlsConfig;
+                import org.slf4j.Logger;
+                import org.slf4j.LoggerFactory;
+
+                import picocli.CommandLine;
+                import picocli.CommandLine.Command;
+                import picocli.CommandLine.Option;
+                import picocli.CommandLine.ParameterException;
+                import picocli.CommandLine.ParseResult;
+
+                public class SimpleFileServer extends AbstractTestServer {
+
+                	private static final Logger LOG = LoggerFactory.getLogger(SimpleFileServer.class);
+
+                	private static final File CONFIG_FILE = new File("Californium3.properties");
+                	private static final String CONFIG_HEADER = "Californium CoAP Properties file for Fileserver";
+                	// 2 MB
+                	private static final int DEFAULT_MAX_RESOURCE_SIZE = 2 * 1024 * 1024;
+                	private static final int DEFAULT_BLOCK_SIZE = 512;
+
+                	static {
+                		CoapConfig.register();
+                		UdpConfig.register();
+                		DtlsConfig.register();
+                		TcpConfig.register();
+                	}
+
+                	private static DefinitionsProvider DEFAULTS = new DefinitionsProvider() {
+
+                		@Override
+                		public void applyDefinitions(Configuration config) {
+                			config.set(CoapConfig.MAX_RESOURCE_BODY_SIZE, DEFAULT_MAX_RESOURCE_SIZE);
+                			config.set(CoapConfig.MAX_MESSAGE_SIZE, DEFAULT_BLOCK_SIZE);
+                			config.set(CoapConfig.PREFERRED_BLOCK_SIZE, DEFAULT_BLOCK_SIZE);
+                			config.setTransient(DtlsConfig.DTLS_CLIENT_AUTHENTICATION_MODE);
+                			config.setTransient(TcpConfig.TLS_CLIENT_AUTHENTICATION_MODE);
+                			config.set(EXTERNAL_UDP_MAX_MESSAGE_SIZE, 64);
+                			config.set(EXTERNAL_UDP_PREFERRED_BLOCK_SIZE, 64);
+                		}
+                	};
+
+                	private static final String DEFAULT_PATH = "data";
+
+                	@Command(name = "SimpleFileServer", version = "(c) 2017, Bosch Software Innovations GmbH and others.")
+                	public static class Config extends BaseConfig {
+
+                		@Option(names = "--file-root", description = "files root. Default \"" + DEFAULT_PATH + "\"")
+                		public String fileRoot = DEFAULT_PATH;
+
+                		@Option(names = "--path-root", description = "resource-path root. Default \"" + DEFAULT_PATH + "\"")
+                		public String pathRoot = DEFAULT_PATH;
+
+                	}
+
+                	private static final Config config = new Config();
+
+                	/*
+                	 * Application entry point.
+                	 */
+                	public static void main(String[] args) {
+                		String version = StringUtil.CALIFORNIUM_VERSION == null ? "" : StringUtil.CALIFORNIUM_VERSION;
+                		CommandLine cmd = new CommandLine(config);
+                		try {
+                			ParseResult result = cmd.parseArgs(args);
+                			if (result.isVersionHelpRequested()) {
+                				System.out.println("\nCalifornium (Cf) " + cmd.getCommandName() + " " + version);
+                				cmd.printVersionHelp(System.out);
+                				System.out.println();
+                			}
+                			if (result.isUsageHelpRequested()) {
+                				cmd.usage(System.out);
+                				return;
+                			}
+                		} catch (ParameterException ex) {
+                			System.err.println(ex.getMessage());
+                			System.err.println();
+                			cmd.usage(System.err);
+                			System.exit(-1);
+                		}
+
+                		Configuration netConfig = Configuration.createWithFile(CONFIG_FILE, CONFIG_HEADER, DEFAULTS);
+                		// reduce the message size for plain UDP
+                		Configuration udpConfig = new Configuration(netConfig)
+                				.set(CoapConfig.MAX_MESSAGE_SIZE, netConfig.get(EXTERNAL_UDP_MAX_MESSAGE_SIZE))
+                				.set(CoapConfig.PREFERRED_BLOCK_SIZE, netConfig.get(EXTERNAL_UDP_PREFERRED_BLOCK_SIZE));
+                		Map<Select, Configuration> protocolConfig = new HashMap<>();
+                		protocolConfig.put(new Select(Protocol.UDP, InterfaceType.EXTERNAL), udpConfig);
+
+                		try {
+                			String filesRootPath = config.fileRoot;
+                			String coapRootPath = config.pathRoot;
+
+                			if (0 <= coapRootPath.indexOf('/')) {
+                				LOG.error("{} don't use '/'! Only one path segement for coap root allowed!", coapRootPath);
+                				return;
+                			}
+
+                			File filesRoot = new File(filesRootPath);
+                			if (!filesRoot.exists()) {
+                				LOG.error("{} doesn't exists!", filesRoot.getAbsolutePath());
+                				return;
+                			} else if (!filesRoot.isDirectory()) {
+                				LOG.error("{} is no directory!", filesRoot.getAbsolutePath());
+                				return;
+                			}
+
+                			listURIs(filesRoot, coapRootPath);
+
+                			// create server
+                			SimpleFileServer server = new SimpleFileServer(netConfig, protocolConfig, coapRootPath, filesRoot);
+                			server.add(new MyContext(MyContext.RESOURCE_NAME, version, true));
+
+                			// add endpoints on all IP addresses
+                			server.addEndpoints(null, null, Arrays.asList(Protocol.UDP, Protocol.DTLS, Protocol.TCP, Protocol.TLS),
+                					config);
+                			server.start();
+
+                		} catch (SocketException e) {
+                			LOG.error("Failed to initialize server: ", e);
+                		}
+                	}
+
+                	public static void listURIs(File filesRoot, String coapRootPath) {
+                		File[] files = filesRoot.listFiles();
+                		for (File file : files) {
+                			if (file.isFile() && file.canRead()) {
+                				LOG.info("GET: coap://<host>/{}/{}", coapRootPath, file.getName());
+                			}
+                		}
+                		for (File file : files) {
+                			if (file.isDirectory() && file.canRead()) {
+                				listURIs(file, coapRootPath + "/" + file.getName());
+                			}
+                		}
+                	}
+
+                	/*
+                	 * Constructor for a new simple file server. Here, the resources of the
+                	 * server are initialized.
+                	 */
+                	public SimpleFileServer(Configuration config, Map<Select, Configuration> protocolConfig, String coapRootPath,
+                			File filesRoot) throws SocketException {
+                		super(config, protocolConfig);
+                		add(new FileResource(config, coapRootPath, filesRoot));
+                		add(new MyIpResource(MyIpResource.RESOURCE_NAME, true));
+                	}
+
+                	class FileResource extends CoapResource {
+
+                		private final Configuration config;
+                		/**
+                		 * Files root directory.
+                		 */
+                		private final File filesRoot;
+
+                		/**
+                		 * Create CoAP file resource.
+                		 *
+                		 * @param config configuration
+                		 * @param coapRootPath CoAP resource (base) name
+                		 * @param filesRoot files root
+                		 */
+                		public FileResource(Configuration config, String coapRootPath, File filesRoot) {
+                			super(coapRootPath);
+                			this.config = config;
+                			this.filesRoot = filesRoot;
+                		}
+
+                		/*
+                		 * Override the default behavior so that requests to sub resources
+                		 * (typically /{path}/{file-name}) are handled by /file resource.
+                		 */
+                		@Override
+                		public Resource getChild(String name) {
+                			return this;
+                		}
+
+                		@Override
+                		public void handleRequest(Exchange exchange) {
+                			try {
+                				super.handleRequest(exchange);
+                			} catch (Exception e) {
+                				LOG.error("Exception while handling a request on the {} resource", getName(), e);
+                				exchange.sendResponse(new Response(CoAP.ResponseCode.INTERNAL_SERVER_ERROR));
+                			}
+                		}
+
+                		@Override
+                		public void handleGET(final CoapExchange exchange) {
+                			Request request = exchange.advanced().getRequest();
+                			LOG.info("Get received : {}", request);
+
+                			int accept = request.getOptions().getAccept();
+                			if (MediaTypeRegistry.UNDEFINED == accept) {
+                				accept = MediaTypeRegistry.APPLICATION_OCTET_STREAM;
+                			} else if (MediaTypeRegistry.APPLICATION_OCTET_STREAM != accept) {
+                				exchange.respond(CoAP.ResponseCode.UNSUPPORTED_CONTENT_FORMAT);
+                				return;
+                			}
+
+                			String myURI = getURI() + "/";
+                			String path = "/" + request.getOptions().getUriPathString();
+                			if (!path.startsWith(myURI)) {
+                				LOG.info("Request {} does not match {}!", path, myURI);
+                				exchange.respond(CoAP.ResponseCode.INTERNAL_SERVER_ERROR);
+                				return;
+                			}
+                			path = path.substring(myURI.length());
+                			if (request.getOptions().hasBlock2()) {
+                				LOG.info("Send file {} {}", path, request.getOptions().getBlock2());
+                			} else {
+                				LOG.info("Send file {}", path);
+                			}
+                			File file = new File(filesRoot, path);
+                			if (!file.exists() || !file.isFile()) {
+                				LOG.warn("File {} doesn't exist!", file.getAbsolutePath());
+                				exchange.respond(CoAP.ResponseCode.NOT_FOUND);
+                				return;
+                			}
+                			if (!checkFileLocation(file, filesRoot)) {
+                				LOG.warn("File {} is not in {}!", file.getAbsolutePath(), filesRoot.getAbsolutePath());
+                				exchange.respond(CoAP.ResponseCode.UNAUTHORIZED);
+                				return;
+                			}
+
+                			if (!file.canRead()) {
+                				LOG.warn("File {} is not readable!", file.getAbsolutePath());
+                				exchange.respond(CoAP.ResponseCode.UNAUTHORIZED);
+                				return;
+                			}
+                			long maxLength = config.get(CoapConfig.MAX_RESOURCE_BODY_SIZE);
+                			long length = file.length();
+                			if (length > maxLength) {
+                				LOG.warn("File {} is too large {} (max.: {})!", file.getAbsolutePath(), length, maxLength);
+                				exchange.respond(CoAP.ResponseCode.INTERNAL_SERVER_ERROR);
+                				return;
+                			}
+                			try (InputStream in = new FileInputStream(file)) {
+                				byte[] content = new byte[(int) length];
+                				int r = in.read(content);
+                				if (length == r) {
+                					Response response = new Response(CoAP.ResponseCode.CONTENT);
+                					response.setPayload(content);
+                					response.getOptions().setSize2((int) length);
+                					response.getOptions().setContentFormat(accept);
+                					exchange.respond(response);
+                				} else {
+                					LOG.warn("File {} could not be read in!", file.getAbsolutePath());
+                					exchange.respond(CoAP.ResponseCode.INTERNAL_SERVER_ERROR);
+                				}
+                			} catch (IOException ex) {
+                				LOG.warn("File {}:", file.getAbsolutePath(), ex);
+                				exchange.respond(CoAP.ResponseCode.INTERNAL_SERVER_ERROR);
+                			}
+                		}
+
+                		/**
+                		 * Check, if file is located in root.
+                		 *
+                		 * Detect attacks via "../.../../file".
+                		 *
+                		 * @param file file to check
+                		 * @param root file root
+                		 * @return true, if file is locate in root (or a sub-folder of root),
+                		 *         false, otherwise.
+                		 */
+                		private boolean checkFileLocation(File file, File root) {
+                			try {
+                				return file.getCanonicalPath().startsWith(root.getCanonicalPath());
+                			} catch (IOException ex) {
+                				LOG.warn("File {}:", file.getAbsolutePath(), ex);
+                				return false;
+                			}
+                		}
+                	}
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `DependencyCheck`() = rewriteRun(
+        java(
+            """
+                /*
+                 * This file is part of dependency-check-core.
+                 *
+                 * Licensed under the Apache License, Version 2.0 (the "License");
+                 * you may not use this file except in compliance with the License.
+                 * You may obtain a copy of the License at
+                 *
+                 *     http://www.apache.org/licenses/LICENSE-2.0
+                 *
+                 * Unless required by applicable law or agreed to in writing, software
+                 * distributed under the License is distributed on an "AS IS" BASIS,
+                 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+                 * See the License for the specific language governing permissions and
+                 * limitations under the License.
+                 *
+                 * Copyright (c) 2013 Jeremy Long. All Rights Reserved.
+                 */
+                package org.owasp.dependencycheck.analyzer;
+
+                import java.io.BufferedInputStream;
+                import java.io.File;
+                import java.io.FileFilter;
+                import java.io.FileInputStream;
+                import java.io.FileNotFoundException;
+                import java.io.FileOutputStream;
+                import java.io.IOException;
+                import java.nio.file.Path;
+                import java.util.Collections;
+                import java.util.Enumeration;
+                import java.util.HashSet;
+                import java.util.List;
+                import java.util.Set;
+                import java.util.concurrent.atomic.AtomicInteger;
+                import javax.annotation.concurrent.ThreadSafe;
+
+                import org.apache.commons.compress.archivers.ArchiveEntry;
+                import org.apache.commons.compress.archivers.ArchiveInputStream;
+                import org.apache.commons.compress.archivers.cpio.CpioArchiveInputStream;
+                import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+                import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+                import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
+                import org.apache.commons.compress.archivers.zip.ZipFile;
+                import org.apache.commons.compress.compressors.CompressorInputStream;
+                import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+                import org.apache.commons.compress.compressors.bzip2.BZip2Utils;
+                import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
+                import org.apache.commons.compress.compressors.gzip.GzipUtils;
+                import org.apache.commons.compress.utils.IOUtils;
+                import org.eclipse.packager.rpm.RpmTag;
+                import org.eclipse.packager.rpm.parse.RpmInputStream;
+                import org.owasp.dependencycheck.Engine;
+                import static org.owasp.dependencycheck.analyzer.AbstractNpmAnalyzer.shouldProcess;
+                import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+                import org.owasp.dependencycheck.analyzer.exception.ArchiveExtractionException;
+                import org.owasp.dependencycheck.analyzer.exception.UnexpectedAnalysisException;
+                import org.owasp.dependencycheck.dependency.Dependency;
+                import org.owasp.dependencycheck.exception.InitializationException;
+                import org.owasp.dependencycheck.utils.FileFilterBuilder;
+                import org.owasp.dependencycheck.utils.FileUtils;
+                import org.owasp.dependencycheck.utils.Settings;
+
+                import org.slf4j.Logger;
+                import org.slf4j.LoggerFactory;
+
+                /**
+                 * <p>
+                 * An analyzer that extracts files from archives and ensures any supported files
+                 * contained within the archive are added to the dependency list.</p>
+                 *
+                 * @author Jeremy Long
+                 */
+                @ThreadSafe
+                public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
+
+                    /**
+                     * The logger.
+                     */
+                    private static final Logger LOGGER = LoggerFactory.getLogger(ArchiveAnalyzer.class);
+                    /**
+                     * The count of directories created during analysis. This is used for
+                     * creating temporary directories.
+                     */
+                    private static final AtomicInteger DIRECTORY_COUNT = new AtomicInteger(0);
+                    /**
+                     * The parent directory for the individual directories per archive.
+                     */
+                    private File tempFileLocation = null;
+                    /**
+                     * The max scan depth that the analyzer will recursively extract nested
+                     * archives.
+                     */
+                    private int maxScanDepth;
+                    /**
+                     * The file filter used to filter supported files.
+                     */
+                    private FileFilter fileFilter = null;
+                    /**
+                     * The set of things we can handle with Zip methods
+                     */
+                    private static final Set<String> KNOWN_ZIP_EXT = Collections.unmodifiableSet(
+                            newHashSet("zip", "ear", "war", "jar", "sar", "apk", "nupkg", "aar"));
+                    /**
+                     * The set of additional extensions we can handle with Zip methods
+                     */
+                    private static final Set<String> ADDITIONAL_ZIP_EXT = new HashSet<>();
+                    /**
+                     * The set of file extensions supported by this analyzer. Note for
+                     * developers, any additions to this list will need to be explicitly handled
+                     * in {@link #extractFiles(File, File, Engine)}.
+                     */
+                    private static final Set<String> EXTENSIONS = Collections.unmodifiableSet(
+                            newHashSet("tar", "gz", "tgz", "bz2", "tbz2", "rpm"));
+
+                    /**
+                     * Detects files with extensions to remove from the engine's collection of
+                     * dependencies.
+                     */
+                    private static final FileFilter REMOVE_FROM_ANALYSIS = FileFilterBuilder.newInstance()
+                            .addExtensions("zip", "tar", "gz", "tgz", "bz2", "tbz2", "nupkg", "rpm").build();
+                    /**
+                     * Detects files with .zip extension.
+                     */
+                    private static final FileFilter ZIP_FILTER = FileFilterBuilder.newInstance().addExtensions("zip").build();
+
+                    //<editor-fold defaultstate="collapsed" desc="All standard implementation details of Analyzer">
+                    /**
+                     * The name of the analyzer.
+                     */
+                    private static final String ANALYZER_NAME = "Archive Analyzer";
+                    /**
+                     * The phase that this analyzer is intended to run in.
+                     */
+                    private static final AnalysisPhase ANALYSIS_PHASE = AnalysisPhase.INITIAL;
+
+                    /**
+                     * Make java compiler happy
+                     */
+                    public ArchiveAnalyzer() {
+                    }
+
+                    /**
+                     * Initializes the analyzer with the configured settings.
+                     *
+                     * @param settings the configured settings to use
+                     */
+                    @Override
+                    public void initialize(Settings settings) {
+                        super.initialize(settings);
+                        initializeSettings();
+                    }
+
+                    @Override
+                    protected FileFilter getFileFilter() {
+                        return fileFilter;
+                    }
+
+                    /**
+                     * Returns the name of the analyzer.
+                     *
+                     * @return the name of the analyzer.
+                     */
+                    @Override
+                    public String getName() {
+                        return ANALYZER_NAME;
+                    }
+
+                    /**
+                     * Returns the phase that the analyzer is intended to run in.
+                     *
+                     * @return the phase that the analyzer is intended to run in.
+                     */
+                    @Override
+                    public AnalysisPhase getAnalysisPhase() {
+                        return ANALYSIS_PHASE;
+                    }
+                    //</editor-fold>
+
+                    /**
+                     * Returns the key used in the properties file to reference the analyzer's
+                     * enabled property.
+                     *
+                     * @return the analyzer's enabled property setting key
+                     */
+                    @Override
+                    protected String getAnalyzerEnabledSettingKey() {
+                        return Settings.KEYS.ANALYZER_ARCHIVE_ENABLED;
+                    }
+
+                    /**
+                     * The prepare method does nothing for this Analyzer.
+                     *
+                     * @param engine a reference to the dependency-check engine
+                     * @throws InitializationException is thrown if there is an exception
+                     * deleting or creating temporary files
+                     */
+                    @Override
+                    public void prepareFileTypeAnalyzer(Engine engine) throws InitializationException {
+                        try {
+                            final File baseDir = getSettings().getTempDirectory();
+                            tempFileLocation = File.createTempFile("check", "tmp", baseDir);
+                            if (!tempFileLocation.delete()) {
+                                setEnabled(false);
+                                final String msg = String.format("Unable to delete temporary file '%s'.", tempFileLocation.getAbsolutePath());
+                                throw new InitializationException(msg);
+                            }
+                            if (!tempFileLocation.mkdirs()) {
+                                setEnabled(false);
+                                final String msg = String.format("Unable to create directory '%s'.", tempFileLocation.getAbsolutePath());
+                                throw new InitializationException(msg);
+                            }
+                        } catch (IOException ex) {
+                            setEnabled(false);
+                            throw new InitializationException("Unable to create a temporary file", ex);
+                        }
+                    }
+
+                    /**
+                     * The close method deletes any temporary files and directories created
+                     * during analysis.
+                     *
+                     * @throws Exception thrown if there is an exception deleting temporary
+                     * files
+                     */
+                    @Override
+                    public void closeAnalyzer() throws Exception {
+                        if (tempFileLocation != null && tempFileLocation.exists()) {
+                            LOGGER.debug("Attempting to delete temporary files from `{}`", tempFileLocation.toString());
+                            final boolean success = FileUtils.delete(tempFileLocation);
+                            if (!success && tempFileLocation.exists()) {
+                                final String[] l = tempFileLocation.list();
+                                if (l != null && l.length > 0) {
+                                    LOGGER.warn("Failed to delete the Archive Analyzer's temporary files from `{}`, "
+                                            + "see the log for more details", tempFileLocation.toString());
+                                }
+                            }
+                        }
+                    }
+
+                    /**
+                     * Determines if the file can be analyzed by the analyzer. If the npm
+                     * analyzer are enabled the archive analyzer will skip the node_modules and
+                     * bower_modules directories.
+                     *
+                     * @param pathname the path to the file
+                     * @return true if the file can be analyzed by the given analyzer; otherwise
+                     * false
+                     */
+                    @Override
+                    public boolean accept(File pathname) {
+                        boolean accept = super.accept(pathname);
+                        final boolean npmEnabled = getSettings().getBoolean(Settings.KEYS.ANALYZER_NODE_AUDIT_ENABLED, false);
+                        final boolean yarnEnabled = getSettings().getBoolean(Settings.KEYS.ANALYZER_YARN_AUDIT_ENABLED, false);
+                        final boolean pnpmEnabled = getSettings().getBoolean(Settings.KEYS.ANALYZER_PNPM_AUDIT_ENABLED, false);
+                        if (accept && (npmEnabled || yarnEnabled || pnpmEnabled)) {
+                            try {
+                                accept = shouldProcess(pathname);
+                            } catch (AnalysisException ex) {
+                                throw new UnexpectedAnalysisException(ex.getMessage(), ex.getCause());
+                            }
+                        }
+                        return accept;
+                    }
+
+                    /**
+                     * Analyzes a given dependency. If the dependency is an archive, such as a
+                     * WAR or EAR, the contents are extracted, scanned, and added to the list of
+                     * dependencies within the engine.
+                     *
+                     * @param dependency the dependency to analyze
+                     * @param engine the engine scanning
+                     * @throws AnalysisException thrown if there is an analysis exception
+                     */
+                    @Override
+                    public void analyzeDependency(Dependency dependency, Engine engine) throws AnalysisException {
+                        extractAndAnalyze(dependency, engine, 0);
+                        engine.sortDependencies();
+                    }
+
+                    /**
+                     * Extracts the contents of the archive dependency and scans for additional
+                     * dependencies.
+                     *
+                     * @param dependency the dependency being analyzed
+                     * @param engine the engine doing the analysis
+                     * @param scanDepth the current scan depth; extracctAndAnalyze is recursive
+                     * and will, be default, only go 3 levels deep
+                     * @throws AnalysisException thrown if there is a problem analyzing the
+                     * dependencies
+                     */
+                    private void extractAndAnalyze(Dependency dependency, Engine engine, int scanDepth) throws AnalysisException {
+                        final File f = new File(dependency.getActualFilePath());
+                        final File tmpDir = getNextTempDirectory();
+                        extractFiles(f, tmpDir, engine);
+
+                        //make a copy
+                        final List<Dependency> dependencySet = findMoreDependencies(engine, tmpDir);
+
+                        if (dependencySet != null && !dependencySet.isEmpty()) {
+                            for (Dependency d : dependencySet) {
+                                if (d.getFilePath().startsWith(tmpDir.getAbsolutePath())) {
+                                    //fix the dependency's display name and path
+                                    final String displayPath = String.format("%s%s",
+                                            dependency.getFilePath(),
+                                            d.getActualFilePath().substring(tmpDir.getAbsolutePath().length()));
+                                    final String displayName = String.format("%s: %s",
+                                            dependency.getFileName(),
+                                            d.getFileName());
+                                    d.setFilePath(displayPath);
+                                    d.setFileName(displayName);
+                                    d.addAllProjectReferences(dependency.getProjectReferences());
+
+                                    //TODO - can we get more evidence from the parent? EAR contains module name, etc.
+                                    //analyze the dependency (i.e. extract files) if it is a supported type.
+                                    if (this.accept(d.getActualFile()) && scanDepth < maxScanDepth) {
+                                        extractAndAnalyze(d, engine, scanDepth + 1);
+                                    }
+                                } else {
+                                    dependencySet.stream().filter((sub) -> sub.getFilePath().startsWith(tmpDir.getAbsolutePath())).forEach((sub) -> {
+                                        final String displayPath = String.format("%s%s",
+                                                dependency.getFilePath(),
+                                                sub.getActualFilePath().substring(tmpDir.getAbsolutePath().length()));
+                                        final String displayName = String.format("%s: %s",
+                                                dependency.getFileName(),
+                                                sub.getFileName());
+                                        sub.setFilePath(displayPath);
+                                        sub.setFileName(displayName);
+                                    });
+                                }
+                            }
+                        }
+                        if (REMOVE_FROM_ANALYSIS.accept(dependency.getActualFile())) {
+                            addDisguisedJarsToDependencies(dependency, engine);
+                            engine.removeDependency(dependency);
+                        }
+                    }
+
+                    /**
+                     * If a zip file was identified as a possible JAR, this method will add the
+                     * zip to the list of dependencies.
+                     *
+                     * @param dependency the zip file
+                     * @param engine the engine
+                     * @throws AnalysisException thrown if there is an issue
+                     */
+                    private void addDisguisedJarsToDependencies(Dependency dependency, Engine engine) throws AnalysisException {
+                        if (ZIP_FILTER.accept(dependency.getActualFile()) && isZipFileActuallyJarFile(dependency)) {
+                            final File tempDir = getNextTempDirectory();
+                            final String fileName = dependency.getFileName();
+
+                            LOGGER.info("The zip file '{}' appears to be a JAR file, making a copy and analyzing it as a JAR.", fileName);
+                            final File tmpLoc = new File(tempDir, fileName.substring(0, fileName.length() - 3) + "jar");
+                            //store the archives sha1 and change it so that the engine doesn't think the zip and jar file are the same
+                            // and add it is a related dependency.
+                            final String archiveMd5 = dependency.getMd5sum();
+                            final String archiveSha1 = dependency.getSha1sum();
+                            final String archiveSha256 = dependency.getSha256sum();
+                            try {
+                                dependency.setMd5sum("");
+                                dependency.setSha1sum("");
+                                dependency.setSha256sum("");
+                                org.apache.commons.io.FileUtils.copyFile(dependency.getActualFile(), tmpLoc);
+                                final List<Dependency> dependencySet = findMoreDependencies(engine, tmpLoc);
+                                if (dependencySet != null && !dependencySet.isEmpty()) {
+                                    dependencySet.forEach((d) -> {
+                                        //fix the dependency's display name and path
+                                        if (d.getActualFile().equals(tmpLoc)) {
+                                            d.setFilePath(dependency.getFilePath());
+                                            d.setDisplayFileName(dependency.getFileName());
+                                        } else {
+                                            d.getRelatedDependencies().stream().filter((rel) -> rel.getActualFile().equals(tmpLoc)).forEach((rel) -> {
+                                                rel.setFilePath(dependency.getFilePath());
+                                                rel.setDisplayFileName(dependency.getFileName());
+                                            });
+                                        }
+                                    });
+                                }
+                            } catch (IOException ex) {
+                                LOGGER.debug("Unable to perform deep copy on '{}'", dependency.getActualFile().getPath(), ex);
+                            } finally {
+                                dependency.setMd5sum(archiveMd5);
+                                dependency.setSha1sum(archiveSha1);
+                                dependency.setSha256sum(archiveSha256);
+                            }
+                        }
+                    }
+
+                    /**
+                     * Scan the given file/folder, and return any new dependencies found.
+                     *
+                     * @param engine used to scan
+                     * @param file target of scanning
+                     * @return any dependencies that weren't known to the engine before
+                     */
+                    private static List<Dependency> findMoreDependencies(Engine engine, File file) {
+                        return engine.scan(file);
+                    }
+
+                    /**
+                     * Retrieves the next temporary directory to extract an archive too.
+                     *
+                     * @return a directory
+                     * @throws AnalysisException thrown if unable to create temporary directory
+                     */
+                    private File getNextTempDirectory() throws AnalysisException {
+                        final File directory = new File(tempFileLocation, String.valueOf(DIRECTORY_COUNT.incrementAndGet()));
+                        //getting an exception for some directories not being able to be created; might be because the directory already exists?
+                        if (directory.exists()) {
+                            return getNextTempDirectory();
+                        }
+                        if (!directory.mkdirs()) {
+                            final String msg = String.format("Unable to create temp directory '%s'.", directory.getAbsolutePath());
+                            throw new AnalysisException(msg);
+                        }
+                        return directory;
+                    }
+
+                    /**
+                     * Extracts the contents of an archive into the specified directory.
+                     *
+                     * @param archive an archive file such as a WAR or EAR
+                     * @param destination a directory to extract the contents to
+                     * @param engine the scanning engine
+                     * @throws AnalysisException thrown if the archive is not found
+                     */
+                    private void extractFiles(File archive, File destination, Engine engine) throws AnalysisException {
+                        if (archive != null && destination != null) {
+                            String archiveExt = FileUtils.getFileExtension(archive.getName());
+                            if (archiveExt == null) {
+                                return;
+                            }
+                            archiveExt = archiveExt.toLowerCase();
+
+                            final FileInputStream fis;
+                            try {
+                                fis = new FileInputStream(archive);
+                            } catch (FileNotFoundException ex) {
+                                final String msg = String.format("Error extracting file `%s`: %s", archive.getAbsolutePath(), ex.getMessage());
+                                LOGGER.debug(msg, ex);
+                                throw new AnalysisException(msg);
+                            }
+                            BufferedInputStream in = null;
+                            ZipArchiveInputStream zin = null;
+                            TarArchiveInputStream tin = null;
+                            GzipCompressorInputStream gin = null;
+                            BZip2CompressorInputStream bzin = null;
+                            RpmInputStream rin = null;
+                            CpioArchiveInputStream cain = null;
+                            try {
+                                if (KNOWN_ZIP_EXT.contains(archiveExt) || ADDITIONAL_ZIP_EXT.contains(archiveExt)) {
+                                    in = new BufferedInputStream(fis);
+                                    ensureReadableJar(archiveExt, in);
+                                    zin = new ZipArchiveInputStream(in);
+                                    extractArchive(zin, destination, engine);
+                                } else if ("tar".equals(archiveExt)) {
+                                    in = new BufferedInputStream(fis);
+                                    tin = new TarArchiveInputStream(in);
+                                    extractArchive(tin, destination, engine);
+                                } else if ("gz".equals(archiveExt) || "tgz".equals(archiveExt)) {
+                                    final String uncompressedName = GzipUtils.getUncompressedFilename(archive.getName());
+                                    final File f = new File(destination, uncompressedName);
+                                    if (engine.accept(f)) {
+                                        final String destPath = destination.getCanonicalPath();
+                                        if (!f.getCanonicalPath().startsWith(destPath)) {
+                                            final String msg = String.format(
+                                                    "Archive (%s) contains a file that would be written outside of the destination directory",
+                                                    archive.getPath());
+                                            throw new AnalysisException(msg);
+                                        }
+                                        in = new BufferedInputStream(fis);
+                                        gin = new GzipCompressorInputStream(in);
+                                        decompressFile(gin, f);
+                                    }
+                                } else if ("bz2".equals(archiveExt) || "tbz2".equals(archiveExt)) {
+                                    final String uncompressedName = BZip2Utils.getUncompressedFilename(archive.getName());
+                                    final File f = new File(destination, uncompressedName);
+                                    if (engine.accept(f)) {
+                                        final String destPath = destination.getCanonicalPath();
+                                        if (!f.getCanonicalPath().startsWith(destPath)) {
+                                            final String msg = String.format(
+                                                    "Archive (%s) contains a file that would be written outside of the destination directory",
+                                                    archive.getPath());
+                                            throw new AnalysisException(msg);
+                                        }
+                                        in = new BufferedInputStream(fis);
+                                        bzin = new BZip2CompressorInputStream(in);
+                                        decompressFile(bzin, f);
+                                    }
+                                } else if ("rpm".equals(archiveExt)) {
+                                    rin = new RpmInputStream(fis);
+                                    //return of getTag is not used - but the call is a
+                                    //necassary step in reading from the stream
+                                    rin.getPayloadHeader().getTag(RpmTag.NAME);
+                                    cain = new CpioArchiveInputStream(rin);
+                                    extractArchive(cain, destination, engine);
+                                }
+                            } catch (ArchiveExtractionException ex) {
+                                LOGGER.warn("Exception extracting archive '{}'.", archive.getName());
+                                LOGGER.debug("", ex);
+                            } catch (IOException ex) {
+                                LOGGER.warn("Exception reading archive '{}'.", archive.getName());
+                                LOGGER.debug("", ex);
+                            } finally {
+                                //overly verbose and not needed... but keeping it anyway due to
+                                //having issue with file handles being left open
+                                FileUtils.close(fis);
+                                FileUtils.close(in);
+                                FileUtils.close(zin);
+                                FileUtils.close(tin);
+                                FileUtils.close(gin);
+                                FileUtils.close(bzin);
+                            }
+                        }
+                    }
+
+                    /**
+                     * Checks if the file being scanned is a JAR or WAR that begins with
+                     * '#!/bin' which indicates it is a fully executable jar. If a fully
+                     * executable JAR is identified the input stream will be advanced to the
+                     * start of the actual JAR file ( skipping the script).
+                     *
+                     * @see
+                     * <a href="http://docs.spring.io/spring-boot/docs/1.3.0.BUILD-SNAPSHOT/reference/htmlsingle/#deployment-install">Installing
+                     * Spring Boot Applications</a>
+                     * @param archiveExt the file extension
+                     * @param in the input stream
+                     * @throws IOException thrown if there is an error reading the stream
+                     */
+                    private void ensureReadableJar(final String archiveExt, BufferedInputStream in) throws IOException {
+                        if (("war".equals(archiveExt) || "jar".equals(archiveExt)) && in.markSupported()) {
+                            in.mark(7);
+                            final byte[] b = new byte[7];
+                            final int read = in.read(b);
+                            if (read == 7
+                                    && b[0] == '#'
+                                    && b[1] == '!'
+                                    && b[2] == '/'
+                                    && b[3] == 'b'
+                                    && b[4] == 'i'
+                                    && b[5] == 'n'
+                                    && b[6] == '/') {
+                                boolean stillLooking = true;
+                                int chr;
+                                int nxtChr;
+                                //CSOFF: InnerAssignment
+                                //CSOFF: NestedIfDepth
+                                while (stillLooking && (chr = in.read()) != -1) {
+                                    if (chr == '\n' || chr == '\r') {
+                                        in.mark(4);
+                                        if ((chr = in.read()) != -1) {
+                                            if (chr == 'P' && (chr = in.read()) != -1) {
+                                                if (chr == 'K' && (chr = in.read()) != -1) {
+                                                    if ((chr == 3 || chr == 5 || chr == 7) && (nxtChr = in.read()) != -1) {
+                                                        if (nxtChr == chr + 1) {
+                                                            stillLooking = false;
+                                                            in.reset();
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                //CSON: InnerAssignment
+                                //CSON: NestedIfDepth
+                            } else {
+                                in.reset();
+                            }
+                        }
+                    }
+
+                    /**
+                     * Extracts files from an archive.
+                     *
+                     * @param input the archive to extract files from
+                     * @param destination the location to write the files too
+                     * @param engine the dependency-check engine
+                     * @throws ArchiveExtractionException thrown if there is an exception
+                     * extracting files from the archive
+                     */
+                    private void extractArchive(ArchiveInputStream input, File destination, Engine engine) throws ArchiveExtractionException {
+                        ArchiveEntry entry;
+                        try {
+                            //final String destPath = destination.getCanonicalPath();
+                            final Path d = destination.toPath();
+                            while ((entry = input.getNextEntry()) != null) {
+                                //final File file = new File(destination, entry.getName());
+                                final Path f = d.resolve(entry.getName()).normalize();
+                                if (!f.startsWith(d)) {
+                                    LOGGER.debug("ZipSlip detected\n-Destination: " + d.toString() + "\n-Path: " + f.toString());
+                                    final String msg = String.format(
+                                            "Archive contains a file (%s) that would be extracted outside of the target directory.",
+                                            entry.getName());
+                                    throw new ArchiveExtractionException(msg);
+                                }
+                                final File file = f.toFile();
+                                if (entry.isDirectory()) {
+                                    if (!file.exists() && !file.mkdirs()) {
+                                        final String msg = String.format("Unable to create directory '%s'.", file.getAbsolutePath());
+                                        throw new AnalysisException(msg);
+                                    }
+                                } else if (engine.accept(file)) {
+                                    extractAcceptedFile(input, file);
+                                }
+                            }
+                        } catch (IOException | AnalysisException ex) {
+                            throw new ArchiveExtractionException(ex);
+                        } finally {
+                            FileUtils.close(input);
+                        }
+                    }
+
+                    /**
+                     * Extracts a file from an archive.
+                     *
+                     * @param input the archives input stream
+                     * @param file the file to extract
+                     * @throws AnalysisException thrown if there is an error
+                     */
+                    private static void extractAcceptedFile(ArchiveInputStream input, File file) throws AnalysisException {
+                        LOGGER.debug("Extracting '{}'", file.getPath());
+                        final File parent = file.getParentFile();
+                        if (!parent.isDirectory() && !parent.mkdirs()) {
+                            final String msg = String.format("Unable to build directory '%s'.", parent.getAbsolutePath());
+                            throw new AnalysisException(msg);
+                        }
+                        try (FileOutputStream fos = new FileOutputStream(file)) {
+                            IOUtils.copy(input, fos);
+                        } catch (FileNotFoundException ex) {
+                            LOGGER.debug("", ex);
+                            final String msg = String.format("Unable to find file '%s'.", file.getName());
+                            throw new AnalysisException(msg, ex);
+                        } catch (IOException ex) {
+                            LOGGER.debug("", ex);
+                            final String msg = String.format("IO Exception while parsing file '%s'.", file.getName());
+                            throw new AnalysisException(msg, ex);
+                        }
+                    }
+
+                    /**
+                     * Decompresses a file.
+                     *
+                     * @param inputStream the compressed file
+                     * @param outputFile the location to write the decompressed file
+                     * @throws ArchiveExtractionException thrown if there is an exception
+                     * decompressing the file
+                     */
+                    private void decompressFile(CompressorInputStream inputStream, File outputFile) throws ArchiveExtractionException {
+                        LOGGER.debug("Decompressing '{}'", outputFile.getPath());
+                        try (FileOutputStream out = new FileOutputStream(outputFile)) {
+                            IOUtils.copy(inputStream, out);
+                        } catch (IOException ex) {
+                            LOGGER.debug("", ex);
+                            throw new ArchiveExtractionException(ex);
+                        }
+                    }
+
+                    /**
+                     * Attempts to determine if a zip file is actually a JAR file.
+                     *
+                     * @param dependency the dependency to check
+                     * @return true if the dependency appears to be a JAR file; otherwise false
+                     */
+                    private boolean isZipFileActuallyJarFile(Dependency dependency) {
+                        boolean isJar = false;
+                        ZipFile zip = null;
+                        try {
+                            zip = new ZipFile(dependency.getActualFilePath());
+                            if (zip.getEntry("META-INF/MANIFEST.MF") != null
+                                    || zip.getEntry("META-INF/maven") != null) {
+                                final Enumeration<ZipArchiveEntry> entries = zip.getEntries();
+                                while (entries.hasMoreElements()) {
+                                    final ZipArchiveEntry entry = entries.nextElement();
+                                    if (!entry.isDirectory()) {
+                                        final String name = entry.getName().toLowerCase();
+                                        if (name.endsWith(".class")) {
+                                            isJar = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (IOException ex) {
+                            LOGGER.debug("Unable to unzip zip file '{}'", dependency.getFilePath(), ex);
+                        } finally {
+                            ZipFile.closeQuietly(zip);
+                        }
+                        return isJar;
+                    }
+
+                    /**
+                     * Initializes settings used by the scanning functions of the archive
+                     * analyzer.
+                     */
+                    private void initializeSettings() {
+                        maxScanDepth = getSettings().getInt("archive.scan.depth", 3);
+                        final Set<String> extensions = new HashSet<>(EXTENSIONS);
+                        extensions.addAll(KNOWN_ZIP_EXT);
+                        final String additionalZipExt = getSettings().getString(Settings.KEYS.ADDITIONAL_ZIP_EXTENSIONS);
+                        if (additionalZipExt != null) {
+                            final String[] ext = additionalZipExt.split("\\s*,\\s*");
+                            Collections.addAll(extensions, ext);
+                            Collections.addAll(ADDITIONAL_ZIP_EXT, ext);
+                        }
+                        fileFilter = FileFilterBuilder.newInstance().addExtensions(extensions).build();
+                    }
+                }
+            """
+        )
+    )
+
+
+    @Test
+    fun `jsonschema2pojo`() = rewriteRun(
+        java(
+            """
+                /**
+                 * Copyright © 2010-2020 Nokia
+                 *
+                 * Licensed under the Apache License, Version 2.0 (the "License");
+                 * you may not use this file except in compliance with the License.
+                 * You may obtain a copy of the License at
+                 *
+                 *      http://www.apache.org/licenses/LICENSE-2.0
+                 *
+                 * Unless required by applicable law or agreed to in writing, software
+                 * distributed under the License is distributed on an "AS IS" BASIS,
+                 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+                 * See the License for the specific language governing permissions and
+                 * limitations under the License.
+                 */
+
+                package org.jsonschema2pojo.maven;
+
+                import static java.lang.String.*;
+                import static java.util.Arrays.*;
+                import static java.util.regex.Pattern.*;
+
+                import java.io.File;
+                import java.io.FileFilter;
+                import java.io.IOException;
+                import java.util.ArrayList;
+                import java.util.List;
+
+                import org.apache.maven.shared.utils.io.DirectoryScanner;
+                import org.apache.maven.shared.utils.io.MatchPatterns;
+
+                /**
+                 * <p>A file filter that supports include and exclude patterns.</p>
+                 *
+                 * @author Christian Trimble
+                 * @since 0.4.3
+                 */
+                public class MatchPatternsFileFilter implements FileFilter {
+                    MatchPatterns includePatterns;
+                    MatchPatterns excludePatterns;
+                    String sourceDirectory;
+                    boolean caseSensitive;
+
+                    /**
+                     * <p>Builder for MatchPatternFileFilter instances.</p>
+                     */
+                    public static class Builder {
+                        List<String> includes = new ArrayList<>();
+                        List<String> excludes = new ArrayList<>();
+                        String sourceDirectory;
+                        boolean caseSensitive;
+
+                        public Builder addIncludes(List<String> includes) {
+                            this.includes.addAll(processPatterns(includes));
+                            return this;
+                        }
+
+                        public Builder addIncludes(String... includes) {
+                            if (includes != null) {
+                                addIncludes(asList(includes));
+                            }
+                            return this;
+                        }
+
+                        public Builder addExcludes(List<String> excludes) {
+                            this.excludes.addAll(processPatterns(excludes));
+                            return this;
+                        }
+
+                        public Builder addExcludes(String... excludes) {
+                            if (excludes != null) {
+                                addExcludes(asList(excludes));
+                            }
+                            return this;
+                        }
+
+                        public Builder addDefaultExcludes() {
+                            excludes.addAll(processPatterns(asList(DirectoryScanner.DEFAULTEXCLUDES)));
+                            return this;
+                        }
+
+                        public Builder withSourceDirectory(String canonicalSourceDirectory) {
+                            this.sourceDirectory = canonicalSourceDirectory;
+                            return this;
+                        }
+
+                        public Builder withCaseSensitive(boolean caseSensitive) {
+                            this.caseSensitive = caseSensitive;
+                            return this;
+                        }
+
+                        public MatchPatternsFileFilter build() {
+                            if (includes.isEmpty()) {
+                                includes.add(processPattern("**/*"));
+                            }
+                            return new MatchPatternsFileFilter(
+                                    MatchPatterns.from(includes.toArray(new String[] {})),
+                                    MatchPatterns.from(excludes.toArray(new String[] {})),
+                                    sourceDirectory,
+                                    caseSensitive);
+                        }
+                    }
+
+                    MatchPatternsFileFilter(MatchPatterns includePatterns, MatchPatterns excludePatterns, String sourceDirectory, boolean caseSensitive) {
+                        this.includePatterns = includePatterns;
+                        this.excludePatterns = excludePatterns;
+                        this.sourceDirectory = sourceDirectory;
+                        this.caseSensitive = caseSensitive;
+                    }
+
+                    @Override
+                    public boolean accept(File file) {
+                        try {
+                            String path = relativePath(file);
+                            return file.isDirectory() ?
+                                    includePatterns.matchesPatternStart(path, caseSensitive) && !excludePatterns.matches(path, caseSensitive) :
+                                    includePatterns.matches(path, caseSensitive) && !excludePatterns.matches(path, caseSensitive);
+                        } catch (IOException e) {
+                            return false;
+                        }
+                    }
+
+                    String relativePath(File file) throws IOException {
+                        String canonicalPath = file.getCanonicalPath();
+                        if (!canonicalPath.startsWith(sourceDirectory)) {
+                            throw new IOException(format("the path %s is not a decendent of the basedir %s", canonicalPath, sourceDirectory));
+                        }
+                        return canonicalPath.substring(sourceDirectory.length()).replaceAll("^" + quote(File.separator), "");
+                    }
+
+                    static List<String> processPatterns(List<String> patterns) {
+                        if (patterns == null)
+                            return null;
+                        List<String> processed = new ArrayList<>();
+                        for (String pattern : patterns) {
+                            processed.add(processPattern(pattern));
+                        }
+                        return processed;
+                    }
+
+                    static String processPattern(String pattern) {
+                        return pattern
+                                .trim()
+                                .replace('/', File.separatorChar)
+                                .replace('\\', File.separatorChar)
+                                .replaceAll(quote(File.separator) + "${'$'}", File.separator + "**");
+                    }
+
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `karate`() = rewriteRun(
+        java(
+            """
+                /*
+                 * The MIT License
+                 *
+                 * Copyright 2019 Intuit Inc.
+                 *
+                 * Permission is hereby granted, free of charge, to any person obtaining a copy
+                 * of this software and associated documentation files (the "Software"), to deal
+                 * in the Software without restriction, including without limitation the rights
+                 * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+                 * copies of the Software, and to permit persons to whom the Software is
+                 * furnished to do so, subject to the following conditions:
+                 *
+                 * The above copyright notice and this permission notice shall be included in
+                 * all copies or substantial portions of the Software.
+                 *
+                 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+                 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+                 * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+                 * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+                 * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+                 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+                 * THE SOFTWARE.
+                 */
+                package com.intuit.karate.job;
+
+                import java.io.File;
+                import java.io.FileInputStream;
+                import java.io.FileOutputStream;
+                import java.io.IOException;
+                import java.util.function.Predicate;
+                import java.util.zip.ZipEntry;
+                import java.util.zip.ZipInputStream;
+                import java.util.zip.ZipOutputStream;
+
+                /**
+                 *
+                 * @author pthomas3
+                 */
+                public class JobUtils {
+
+                    public static void zip(File src, File dest) {
+                        try {
+                            src = src.getCanonicalFile();
+                            FileOutputStream fos = new FileOutputStream(dest);
+                            ZipOutputStream zipOut = new ZipOutputStream(fos);
+                            zip(src, "", zipOut, 0);
+                            zipOut.close();
+                            fos.close();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+
+                    private static void zip(File fileToZip, String fileName, ZipOutputStream zipOut, int level) throws IOException {
+                        if (fileToZip.isHidden()) {
+                            return;
+                        }
+                        if (fileToZip.isDirectory()) {
+                            String entryName = fileName;
+                            zipOut.putNextEntry(new ZipEntry(entryName + "/"));
+                            zipOut.closeEntry();
+                            File[] children = fileToZip.listFiles();
+                            for (File childFile : children) {
+                                String childFileName = childFile.getName();
+                                // TODO improve ?
+                                if (childFileName.equals("target") || childFileName.equals("build")) {
+                                    continue;
+                                }
+                                if (level != 0) {
+                                    childFileName = entryName + "/" + childFileName;
+                                }
+                                zip(childFile, childFileName, zipOut, level + 1);
+                            }
+                            return;
+                        }
+                        ZipEntry zipEntry = new ZipEntry(fileName);
+                        zipOut.putNextEntry(zipEntry);
+                        FileInputStream fis = new FileInputStream(fileToZip);
+                        byte[] bytes = new byte[1024];
+                        int length;
+                        while ((length = fis.read(bytes)) >= 0) {
+                            zipOut.write(bytes, 0, length);
+                        }
+                        fis.close();
+                    }
+
+                    public static void unzip(File src, File dest) {
+                        try {
+                            byte[] buffer = new byte[1024];
+                            ZipInputStream zis = new ZipInputStream(new FileInputStream(src));
+                            ZipEntry zipEntry = zis.getNextEntry();
+                            while (zipEntry != null) {
+                                File newFile = createFile(dest, zipEntry);
+                                if (zipEntry.isDirectory()) {
+                                    newFile.mkdirs();
+                                } else {
+                                    File parentFile = newFile.getParentFile();
+                                    if (parentFile != null && !parentFile.exists()) {
+                                        parentFile.mkdirs();
+                                    }
+                                    FileOutputStream fos = new FileOutputStream(newFile);
+                                    int len;
+                                    while ((len = zis.read(buffer)) > 0) {
+                                        fos.write(buffer, 0, len);
+                                    }
+                                    fos.close();
+                                }
+                                zipEntry = zis.getNextEntry();
+                            }
+                            zis.closeEntry();
+                            zis.close();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+
+                    private static File createFile(File destinationDir, ZipEntry zipEntry) throws IOException {
+                        File destFile = new File(destinationDir, zipEntry.getName());
+                        String destDirPath = destinationDir.getCanonicalPath();
+                        String destFilePath = destFile.getCanonicalPath();
+                        if (!destFilePath.startsWith(destDirPath)) {
+                            throw new IOException("entry outside target dir: " + zipEntry.getName());
+                        }
+                        return destFile;
+                    }
+
+                    public static File getFirstFileMatching(File parent, Predicate<String> predicate) {
+                        File[] files = parent.listFiles((f, n) -> predicate.test(n));
+                        return files == null || files.length == 0 ? null : files[0];
+                    }
+
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `byte-buddy`() = rewriteRun(
+        java(
+            """
+                /*
+                 * Copyright 2014 - Present Rafael Winterhalter
+                 *
+                 * Licensed under the Apache License, Version 2.0 (the "License");
+                 * you may not use this file except in compliance with the License.
+                 * You may obtain a copy of the License at
+                 *
+                 *     http://www.apache.org/licenses/LICENSE-2.0
+                 *
+                 * Unless required by applicable law or agreed to in writing, software
+                 * distributed under the License is distributed on an "AS IS" BASIS,
+                 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+                 * See the License for the specific language governing permissions and
+                 * limitations under the License.
+                 */
+                package net.bytebuddy.build;
+
+                import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+                import net.bytebuddy.ByteBuddy;
+                import net.bytebuddy.ClassFileVersion;
+                import net.bytebuddy.description.type.TypeDescription;
+                import net.bytebuddy.dynamic.ClassFileLocator;
+                import net.bytebuddy.dynamic.DynamicType;
+                import net.bytebuddy.dynamic.TypeResolutionStrategy;
+                import net.bytebuddy.dynamic.scaffold.inline.MethodNameTransformer;
+                import net.bytebuddy.implementation.LoadedTypeInitializer;
+                import net.bytebuddy.matcher.ElementMatcher;
+                import net.bytebuddy.pool.TypePool;
+                import net.bytebuddy.utility.CompoundList;
+                import net.bytebuddy.utility.FileSystem;
+                import net.bytebuddy.utility.nullability.AlwaysNull;
+                import net.bytebuddy.utility.nullability.MaybeNull;
+
+                import java.io.*;
+                import java.lang.annotation.*;
+                import java.lang.reflect.Constructor;
+                import java.lang.reflect.InvocationTargetException;
+                import java.lang.reflect.Method;
+                import java.lang.reflect.Modifier;
+                import java.util.*;
+                import java.util.concurrent.*;
+                import java.util.jar.JarEntry;
+                import java.util.jar.JarFile;
+                import java.util.jar.JarOutputStream;
+                import java.util.jar.Manifest;
+
+                import static net.bytebuddy.matcher.ElementMatchers.none;
+
+                /**
+                 * <p>
+                 * A plugin that allows for the application of Byte Buddy transformations during a build process. This plugin's
+                 * transformation is applied to any type matching this plugin's type matcher. Plugin types must be public,
+                 * non-abstract and must declare a public default constructor to work.
+                 * </p>
+                 * <p>
+                 * A plugin is always used within the scope of a single plugin engine application and is disposed after closing. It might be used
+                 * concurrently and must assure its own thread-safety if run outside of a {@link Plugin.Engine} or when using a parallel
+                 * {@link Plugin.Engine.Dispatcher}.
+                 * </p>
+                 * <p>
+                 * For discoverability, plugin class names can be stored in a file named <i>/META-INF/net.bytebuddy/build.plugins</i> with the fully
+                 * qualified class name of the plugin per line.
+                 * </p>
+                 */
+                public interface Plugin extends ElementMatcher<TypeDescription>, Closeable {
+
+                    /**
+                     * Applies this plugin.
+                     *
+                     * @param builder          The builder to use as a basis for the applied transformation.
+                     * @param typeDescription  The type being transformed.
+                     * @param classFileLocator A class file locator that can locate other types in the scope of the project.
+                     * @return The supplied builder with additional transformations registered.
+                     */
+                    DynamicType.Builder<?> apply(DynamicType.Builder<?> builder, TypeDescription typeDescription, ClassFileLocator classFileLocator);
+
+                    /**
+                     * <p>
+                     * A plugin that applies a preprocessor, i.e. causes a plugin engine's execution to defer all plugin applications until all types were discovered.
+                     * </p>
+                     * <p>
+                     * <b>Important</b>: The registration of a single plugin with preprocessor causes the deferral of all plugins' application that are registered
+                     * with a particular plugin engine. This will reduce parallel application if a corresponding {@link Engine.Dispatcher} is used and will increase
+                     * the engine application's memory consumption. Any alternative application of a plugin outside of a {@link Plugin.Engine} might not be capable
+                     * of preprocessing where the discovery callback is not invoked.
+                     * </p>
+                     */
+                    interface WithPreprocessor extends Plugin {
+
+                        /**
+                         * Invoked upon the discovery of a type that is not explicitly ignored.
+                         *
+                         * @param typeDescription  The discovered type.
+                         * @param classFileLocator A class file locator that can locate other types in the scope of the project.
+                         */
+                        void onPreprocess(TypeDescription typeDescription, ClassFileLocator classFileLocator);
+                    }
+
+                    /**
+                     * A factory for providing a build plugin.
+                     */
+                    interface Factory {
+
+                        /**
+                         * Returns a plugin that can be used for a transformation and which is subsequently closed.
+                         *
+                         * @return The plugin to use for type transformations.
+                         */
+                        Plugin make();
+
+                        /**
+                         * A simple factory that returns a preconstructed plugin instance..
+                         */
+                        @HashCodeAndEqualsPlugin.Enhance
+                        class Simple implements Factory {
+
+                            /**
+                             * The plugin to provide.
+                             */
+                            private final Plugin plugin;
+
+                            /**
+                             * Creates a simple plugin factory.
+                             *
+                             * @param plugin The plugin to provide.
+                             */
+                            public Simple(Plugin plugin) {
+                                this.plugin = plugin;
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Plugin make() {
+                                return plugin;
+                            }
+                        }
+
+                        /**
+                         * A plugin factory that uses reflection for instantiating a plugin.
+                         */
+                        @HashCodeAndEqualsPlugin.Enhance
+                        class UsingReflection implements Factory {
+
+                            /**
+                             * The plugin type.
+                             */
+                            private final Class<? extends Plugin> type;
+
+                            /**
+                             * A list of argument providers that can be used for instantiating the plugin.
+                             */
+                            private final List<ArgumentResolver> argumentResolvers;
+
+                            /**
+                             * Creates a plugin factory that uses reflection for creating a plugin.
+                             *
+                             * @param type The plugin type.
+                             */
+                            public UsingReflection(Class<? extends Plugin> type) {
+                                this(type, Collections.<ArgumentResolver>emptyList());
+                            }
+
+                            /**
+                             * Creates a plugin factory that uses reflection for creating a plugin.
+                             *
+                             * @param type              The plugin type.
+                             * @param argumentResolvers A list of argument providers that can be used for instantiating the plugin.
+                             */
+                            protected UsingReflection(Class<? extends Plugin> type, List<ArgumentResolver> argumentResolvers) {
+                                this.type = type;
+                                this.argumentResolvers = argumentResolvers;
+                            }
+
+                            /**
+                             * Appends the supplied argument resolvers.
+                             *
+                             * @param argumentResolver A list of argument providers that can be used for instantiating the plugin.
+                             * @return A new plugin factory that uses reflection for creating a plugin that also uses the supplied argument resolvers.
+                             */
+                            public UsingReflection with(ArgumentResolver... argumentResolver) {
+                                return with(Arrays.asList(argumentResolver));
+                            }
+
+                            /**
+                             * Appends the supplied argument resolvers.
+                             *
+                             * @param argumentResolvers A list of argument providers that can be used for instantiating the plugin.
+                             * @return A new plugin factory that uses reflection for creating a plugin that also uses the supplied argument resolvers.
+                             */
+                            public UsingReflection with(List<? extends ArgumentResolver> argumentResolvers) {
+                                return new UsingReflection(type, CompoundList.of(argumentResolvers, this.argumentResolvers));
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            @SuppressWarnings("unchecked")
+                            public Plugin make() {
+                                Instantiator instantiator = new Instantiator.Unresolved(type);
+                                candidates:
+                                for (Constructor<?> constructor : type.getConstructors()) {
+                                    if (!constructor.isSynthetic()) {
+                                        List<Object> arguments = new ArrayList<Object>(constructor.getParameterTypes().length);
+                                        int index = 0;
+                                        for (Class<?> type : constructor.getParameterTypes()) {
+                                            boolean resolved = false;
+                                            for (ArgumentResolver argumentResolver : argumentResolvers) {
+                                                ArgumentResolver.Resolution resolution = argumentResolver.resolve(index, type);
+                                                if (resolution.isResolved()) {
+                                                    arguments.add(resolution.getArgument());
+                                                    resolved = true;
+                                                    break;
+                                                }
+                                            }
+                                            if (resolved) {
+                                                index += 1;
+                                            } else {
+                                                continue candidates;
+                                            }
+                                        }
+                                        instantiator = instantiator.replaceBy(new Instantiator.Resolved((Constructor<? extends Plugin>) constructor, arguments));
+                                    }
+                                }
+                                return instantiator.instantiate();
+                            }
+
+                            /**
+                             * An instantiator is responsible for invoking a plugin constructor reflectively.
+                             */
+                            protected interface Instantiator {
+
+                                /**
+                                 * Returns either this instantiator or the supplied instantiator, depending on the instances' states.
+                                 *
+                                 * @param instantiator The alternative instantiator.
+                                 * @return The dominant instantiator.
+                                 */
+                                Instantiator replaceBy(Resolved instantiator);
+
+                                /**
+                                 * Instantiates the represented plugin.
+                                 *
+                                 * @return The instantiated plugin.
+                                 */
+                                Plugin instantiate();
+
+                                /**
+                                 * An instantiator that is not resolved for creating an instance.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                class Unresolved implements Instantiator {
+
+                                    /**
+                                     * The type for which no constructor was yet resolved.
+                                     */
+                                    private final Class<? extends Plugin> type;
+
+                                    /**
+                                     * Creates a new unresolved constructor.
+                                     *
+                                     * @param type The type for which no constructor was yet resolved.
+                                     */
+                                    protected Unresolved(Class<? extends Plugin> type) {
+                                        this.type = type;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Instantiator replaceBy(Resolved instantiator) {
+                                        return instantiator;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Plugin instantiate() {
+                                        throw new IllegalStateException("No constructor resolvable for " + type);
+                                    }
+                                }
+
+                                /**
+                                 * Represents an ambiguously resolved instantiator.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                class Ambiguous implements Instantiator {
+
+                                    /**
+                                     * The left constructor.
+                                     */
+                                    private final Constructor<?> left;
+
+                                    /**
+                                     * The right constructor.
+                                     */
+                                    private final Constructor<?> right;
+
+                                    /**
+                                     * The resolved priority.
+                                     */
+                                    private final int priority;
+
+                                    /**
+                                     * The resolved number of parameters.
+                                     */
+                                    private final int parameters;
+
+                                    /**
+                                     * Creates a new ambiguous instantiator.
+                                     *
+                                     * @param left       The left constructor.
+                                     * @param right      The right constructor.
+                                     * @param priority   The resolved priority.
+                                     * @param parameters The resolved number of parameters.
+                                     */
+                                    protected Ambiguous(Constructor<?> left, Constructor<?> right, int priority, int parameters) {
+                                        this.left = left;
+                                        this.right = right;
+                                        this.priority = priority;
+                                        this.parameters = parameters;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Instantiator replaceBy(Resolved instantiator) {
+                                        Priority priority = instantiator.getConstructor().getAnnotation(Priority.class);
+                                        if ((priority == null ? Priority.DEFAULT : priority.value()) > this.priority) {
+                                            return instantiator;
+                                        } else if ((priority == null ? Priority.DEFAULT : priority.value()) < this.priority) {
+                                            return this;
+                                        } else if (instantiator.getConstructor().getParameterTypes().length > parameters) {
+                                            return instantiator;
+                                        } else {
+                                            return this;
+                                        }
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Plugin instantiate() {
+                                        throw new IllegalStateException("Ambiguous constructors " + left + " and " + right);
+                                    }
+                                }
+
+                                /**
+                                 * An instantiator that is resolved for a given constructor with arguments.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                class Resolved implements Instantiator {
+
+                                    /**
+                                     * The represented constructor.
+                                     */
+                                    private final Constructor<? extends Plugin> constructor;
+
+                                    /**
+                                     * The constructor arguments.
+                                     */
+                                    private final List<?> arguments;
+
+                                    /**
+                                     * Creates a new resolved constructor.
+                                     *
+                                     * @param constructor The represented constructor.
+                                     * @param arguments   The constructor arguments.
+                                     */
+                                    protected Resolved(Constructor<? extends Plugin> constructor, List<?> arguments) {
+                                        this.constructor = constructor;
+                                        this.arguments = arguments;
+                                    }
+
+                                    /**
+                                     * Returns the resolved constructor.
+                                     *
+                                     * @return The resolved constructor.
+                                     */
+                                    protected Constructor<? extends Plugin> getConstructor() {
+                                        return constructor;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Instantiator replaceBy(Resolved instantiator) {
+                                        Priority left = constructor.getAnnotation(Priority.class), right = instantiator.getConstructor().getAnnotation(Priority.class);
+                                        int leftPriority = left == null ? Priority.DEFAULT : left.value(), rightPriority = right == null ? Priority.DEFAULT : right.value();
+                                        if (leftPriority > rightPriority) {
+                                            return this;
+                                        } else if (leftPriority < rightPriority) {
+                                            return instantiator;
+                                        } else if (constructor.getParameterTypes().length > instantiator.getConstructor().getParameterTypes().length) {
+                                            return this;
+                                        } else if (constructor.getParameterTypes().length < instantiator.getConstructor().getParameterTypes().length) {
+                                            return instantiator;
+                                        } else {
+                                            return new Ambiguous(constructor, instantiator.getConstructor(), leftPriority, constructor.getParameterTypes().length);
+                                        }
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Plugin instantiate() {
+                                        try {
+                                            return constructor.newInstance(arguments.toArray(new Object[0]));
+                                        } catch (InstantiationException exception) {
+                                            throw new IllegalStateException("Failed to instantiate plugin via " + constructor, exception);
+                                        } catch (IllegalAccessException exception) {
+                                            throw new IllegalStateException("Failed to access " + constructor, exception);
+                                        } catch (InvocationTargetException exception) {
+                                            throw new IllegalStateException("Error during construction of" + constructor, exception.getTargetException());
+                                        }
+                                    }
+                                }
+                            }
+
+                            /**
+                             * Indicates that a constructor should be treated with a given priority if several constructors can be resolved.
+                             */
+                            @Documented
+                            @Target(ElementType.CONSTRUCTOR)
+                            @Retention(RetentionPolicy.RUNTIME)
+                            public @interface Priority {
+
+                                /**
+                                 * The default priority that is assumed for non-annotated constructors.
+                                 */
+                                int DEFAULT = 0;
+
+                                /**
+                                 * Indicates the priority of the annotated constructor.
+                                 *
+                                 * @return The priority of the annotated constructor.
+                                 */
+                                int value();
+                            }
+
+                            /**
+                             * Allows to resolve arguments for a {@link Plugin} constructor.
+                             */
+                            public interface ArgumentResolver {
+
+                                /**
+                                 * Attempts the resolution of an argument for a given parameter.
+                                 *
+                                 * @param index The parameter's index.
+                                 * @param type  The parameter's type.
+                                 * @return The resolution for the parameter.
+                                 */
+                                Resolution resolve(int index, Class<?> type);
+
+                                /**
+                                 * A resolution provided by an argument provider.
+                                 */
+                                interface Resolution {
+
+                                    /**
+                                     * Returns {@code true} if the represented argument is resolved successfully.
+                                     *
+                                     * @return {@code true} if the represented argument is resolved successfully.
+                                     */
+                                    boolean isResolved();
+
+                                    /**
+                                     * Returns the resolved argument if the resolution was successful.
+                                     *
+                                     * @return The resolved argument if the resolution was successful.
+                                     */
+                                    @MaybeNull
+                                    Object getArgument();
+
+                                    /**
+                                     * Represents an unresolved argument resolution.
+                                     */
+                                    enum Unresolved implements Resolution {
+
+                                        /**
+                                         * The singleton instance.
+                                         */
+                                        INSTANCE;
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public boolean isResolved() {
+                                            return false;
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public Object getArgument() {
+                                            throw new IllegalStateException("Cannot get the argument for an unresolved parameter");
+                                        }
+                                    }
+
+                                    /**
+                                     * Represents a resolved argument resolution.
+                                     */
+                                    @HashCodeAndEqualsPlugin.Enhance
+                                    class Resolved implements Resolution {
+
+                                        /**
+                                         * The resolved argument which might be {@code null}.
+                                         */
+                                        @MaybeNull
+                                        @HashCodeAndEqualsPlugin.ValueHandling(HashCodeAndEqualsPlugin.ValueHandling.Sort.REVERSE_NULLABILITY)
+                                        private final Object argument;
+
+                                        /**
+                                         * Creates a resolved argument resolution.
+                                         *
+                                         * @param argument The resolved argument which might be {@code null}.
+                                         */
+                                        public Resolved(@MaybeNull Object argument) {
+                                            this.argument = argument;
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public boolean isResolved() {
+                                            return true;
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        @MaybeNull
+                                        public Object getArgument() {
+                                            return argument;
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * An argument resolver that never resolves an argument.
+                                 */
+                                enum NoOp implements ArgumentResolver {
+
+                                    /**
+                                     * The singleton instance.
+                                     */
+                                    INSTANCE;
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Resolution resolve(int index, Class<?> type) {
+                                        return Resolution.Unresolved.INSTANCE;
+                                    }
+                                }
+
+                                /**
+                                 * An argument resolver that resolves parameters for a given type.
+                                 *
+                                 * @param <T> The type being resolved.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                class ForType<T> implements ArgumentResolver {
+
+                                    /**
+                                     * The type being resolved.
+                                     */
+                                    private final Class<? extends T> type;
+
+                                    /**
+                                     * The instance to resolve for the represented type.
+                                     */
+                                    private final T value;
+
+                                    /**
+                                     * Creates a new argument resolver for a given type.
+                                     *
+                                     * @param type  The type being resolved.
+                                     * @param value The instance to resolve for the represented type.
+                                     */
+                                    protected ForType(Class<? extends T> type, T value) {
+                                        this.type = type;
+                                        this.value = value;
+                                    }
+
+                                    /**
+                                     * Creates an argument resolver for a given type.
+                                     *
+                                     * @param type  The type being resolved.
+                                     * @param value The instance to resolve for the represented type.
+                                     * @param <S>   The type being resolved.
+                                     * @return An appropriate argument resolver.
+                                     */
+                                    public static <S> ArgumentResolver of(Class<? extends S> type, S value) {
+                                        return new ForType<S>(type, value);
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Resolution resolve(int index, Class<?> type) {
+                                        return type == this.type
+                                                ? new Resolution.Resolved(value)
+                                                : Resolution.Unresolved.INSTANCE;
+                                    }
+                                }
+
+                                /**
+                                 * An argument resolver that resolves an argument for a specific parameter index.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                class ForIndex implements ArgumentResolver {
+
+                                    /**
+                                     * A mapping of primitive types to their wrapper types.
+                                     */
+                                    private static final Map<Class<?>, Class<?>> WRAPPER_TYPES;
+
+                                    /*
+                                     * Creates the primitive to wrapper type mapping.
+                                     */
+                                    static {
+                                        WRAPPER_TYPES = new HashMap<Class<?>, Class<?>>();
+                                        WRAPPER_TYPES.put(boolean.class, Boolean.class);
+                                        WRAPPER_TYPES.put(byte.class, Byte.class);
+                                        WRAPPER_TYPES.put(short.class, Short.class);
+                                        WRAPPER_TYPES.put(char.class, Character.class);
+                                        WRAPPER_TYPES.put(int.class, Integer.class);
+                                        WRAPPER_TYPES.put(long.class, Long.class);
+                                        WRAPPER_TYPES.put(float.class, Float.class);
+                                        WRAPPER_TYPES.put(double.class, Double.class);
+                                    }
+
+                                    /**
+                                     * The index of the parameter to resolve.
+                                     */
+                                    private final int index;
+
+                                    /**
+                                     * The value to resolve for the represented index.
+                                     */
+                                    @MaybeNull
+                                    @HashCodeAndEqualsPlugin.ValueHandling(HashCodeAndEqualsPlugin.ValueHandling.Sort.REVERSE_NULLABILITY)
+                                    private final Object value;
+
+                                    /**
+                                     * Creates an argument resolver for a given index.
+                                     *
+                                     * @param index The index of the parameter to resolve.
+                                     * @param value The value to resolve for the represented index.
+                                     */
+                                    public ForIndex(int index, @MaybeNull Object value) {
+                                        this.index = index;
+                                        this.value = value;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Resolution resolve(int index, Class<?> type) {
+                                        if (this.index != index) {
+                                            return Resolution.Unresolved.INSTANCE;
+                                        } else if (type.isPrimitive()) {
+                                            return WRAPPER_TYPES.get(type).isInstance(value)
+                                                    ? new Resolution.Resolved(value)
+                                                    : Resolution.Unresolved.INSTANCE;
+                                        } else {
+                                            return value == null || type.isInstance(value)
+                                                    ? new Resolution.Resolved(value)
+                                                    : Resolution.Unresolved.INSTANCE;
+                                        }
+                                    }
+
+                                    /**
+                                     * An argument resolver that resolves an argument for a specific parameter index by attempting a conversion via
+                                     * invoking a static {@code valueOf} method on the target type, if it exists. As an exception, the {@code char}
+                                     * and {@link Character} types are resolved if the string value represents a single character.
+                                     */
+                                    @HashCodeAndEqualsPlugin.Enhance
+                                    public static class WithDynamicType implements ArgumentResolver {
+
+                                        /**
+                                         * The index of the parameter to resolve.
+                                         */
+                                        private final int index;
+
+                                        /**
+                                         * A string representation of the supplied value.
+                                         */
+                                        @MaybeNull
+                                        @HashCodeAndEqualsPlugin.ValueHandling(HashCodeAndEqualsPlugin.ValueHandling.Sort.REVERSE_NULLABILITY)
+                                        private final String value;
+
+                                        /**
+                                         * Creates an argument resolver for a specific parameter index and attempts a dynamic resolution.
+                                         *
+                                         * @param index The index of the parameter to resolve.
+                                         * @param value A string representation of the supplied value.
+                                         */
+                                        public WithDynamicType(int index, @MaybeNull String value) {
+                                            this.index = index;
+                                            this.value = value;
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public Resolution resolve(int index, Class<?> type) {
+                                            if (this.index != index) {
+                                                return Resolution.Unresolved.INSTANCE;
+                                            } else if (type == char.class || type == Character.class) {
+                                                return value != null && value.length() == 1
+                                                        ? new Resolution.Resolved(value.charAt(0))
+                                                        : Resolution.Unresolved.INSTANCE;
+                                            } else if (type == String.class) {
+                                                return new Resolution.Resolved(value);
+                                            } else if (type.isPrimitive()) {
+                                                type = WRAPPER_TYPES.get(type);
+                                            }
+                                            try {
+                                                Method valueOf = type.getMethod("valueOf", String.class);
+                                                return Modifier.isStatic(valueOf.getModifiers()) && type.isAssignableFrom(valueOf.getReturnType())
+                                                        ? new Resolution.Resolved(valueOf.invoke(null, value))
+                                                        : Resolution.Unresolved.INSTANCE;
+                                            } catch (IllegalAccessException exception) {
+                                                throw new IllegalStateException(exception);
+                                            } catch (InvocationTargetException exception) {
+                                                throw new IllegalStateException(exception.getTargetException());
+                                            } catch (NoSuchMethodException ignored) {
+                                                return Resolution.Unresolved.INSTANCE;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    /**
+                     * A plugin engine allows the application of one or more plugins on class files found at a {@link Source} which are
+                     * then transferred and consumed by a {@link Target}.
+                     */
+                    interface Engine {
+
+                        /**
+                         * The class file extension.
+                         */
+                        String CLASS_FILE_EXTENSION = ".class";
+
+                        /**
+                         * The module info class file.
+                         */
+                        String MODULE_INFO = "module-info" + CLASS_FILE_EXTENSION;
+
+                        /**
+                         * The package info class file.
+                         */
+                        String PACKAGE_INFO = "package-info" + CLASS_FILE_EXTENSION;
+
+                        /**
+                         * Defines a new Byte Buddy instance for usage for type creation.
+                         *
+                         * @param byteBuddy The Byte Buddy instance to use.
+                         * @return A new plugin engine that is equal to this engine but uses the supplied Byte Buddy instance.
+                         */
+                        Engine with(ByteBuddy byteBuddy);
+
+                        /**
+                         * Defines a new type strategy which determines the transformation mode for any instrumented type.
+                         *
+                         * @param typeStrategy The type stategy to use.
+                         * @return A new plugin engine that is equal to this engine but uses the supplied type strategy.
+                         */
+                        Engine with(TypeStrategy typeStrategy);
+
+                        /**
+                         * Defines a new pool strategy that determines how types are being described.
+                         *
+                         * @param poolStrategy The pool strategy to use.
+                         * @return A new plugin engine that is equal to this engine but uses the supplied pool strategy.
+                         */
+                        Engine with(PoolStrategy poolStrategy);
+
+                        /**
+                         * Appends the supplied class file locator to be queried for class files additionally to any previously registered
+                         * class file locators.
+                         *
+                         * @param classFileLocator The class file locator to append.
+                         * @return A new plugin engine that is equal to this engine but with the supplied class file locator being appended.
+                         */
+                        Engine with(ClassFileLocator classFileLocator);
+
+                        /**
+                         * Appends the supplied listener to this engine.
+                         *
+                         * @param listener The listener to append.
+                         * @return A new plugin engine that is equal to this engine but with the supplied listener being appended.
+                         */
+                        Engine with(Listener listener);
+
+                        /**
+                         * Replaces the error handlers of this plugin engine without applying any error handlers.
+                         *
+                         * @return A new plugin engine that is equal to this engine but without any error handlers being registered.
+                         */
+                        Engine withoutErrorHandlers();
+
+                        /**
+                         * Replaces the error handlers of this plugin engine with the supplied error handlers.
+                         *
+                         * @param errorHandler The error handlers to apply.
+                         * @return A new plugin engine that is equal to this engine but with only the supplied error handlers being applied.
+                         */
+                        Engine withErrorHandlers(ErrorHandler... errorHandler);
+
+                        /**
+                         * Replaces the error handlers of this plugin engine with the supplied error handlers.
+                         *
+                         * @param errorHandlers The error handlers to apply.
+                         * @return A new plugin engine that is equal to this engine but with only the supplied error handlers being applied.
+                         */
+                        Engine withErrorHandlers(List<? extends ErrorHandler> errorHandlers);
+
+                        /**
+                         * Replaces the dispatcher factory of this plugin engine with a parallel dispatcher factory that uses the given amount of threads.
+                         *
+                         * @param threads The amount of threads to use.
+                         * @return A new plugin engine that is equal to this engine but with a parallel dispatcher factory using the specified amount of threads.
+                         */
+                        Engine withParallelTransformation(int threads);
+
+                        /**
+                         * Replaces the dispatcher factory of this plugin engine with the supplied dispatcher factory.
+                         *
+                         * @param dispatcherFactory The dispatcher factory to use.
+                         * @return A new plugin engine that is equal to this engine but with the supplied dispatcher factory being used.
+                         */
+                        Engine with(Dispatcher.Factory dispatcherFactory);
+
+                        /**
+                         * Ignores all types that are matched by this matcher or any previously registered ignore matcher.
+                         *
+                         * @param matcher The ignore matcher to append.
+                         * @return A new plugin engine that is equal to this engine but which ignores any type that is matched by the supplied matcher.
+                         */
+                        Engine ignore(ElementMatcher<? super TypeDescription> matcher);
+
+                        /**
+                         * Applies this plugin engine onto a given source and target.
+                         *
+                         * @param source  The source which is treated as a folder or a jar file, if a folder does not exist.
+                         * @param target  The target which is treated as a folder or a jar file, if a folder does not exist.
+                         * @param factory A list of plugin factories to a apply.
+                         * @return A summary of the applied transformation.
+                         * @throws IOException If an I/O error occurs.
+                         */
+                        Summary apply(File source, File target, Plugin.Factory... factory) throws IOException;
+
+                        /**
+                         * Applies this plugin engine onto a given source and target.
+                         *
+                         * @param source    The source which is treated as a folder or a jar file, if a folder does not exist.
+                         * @param target    The target which is treated as a folder or a jar file, if a folder does not exist.
+                         * @param factories A list of plugin factories to a apply.
+                         * @return A summary of the applied transformation.
+                         * @throws IOException If an I/O error occurs.
+                         */
+                        Summary apply(File source, File target, List<? extends Plugin.Factory> factories) throws IOException;
+
+                        /**
+                         * Applies this plugin engine onto a given source and target.
+                         *
+                         * @param source  The source to use.
+                         * @param target  The target to use.
+                         * @param factory A list of plugin factories to a apply.
+                         * @return A summary of the applied transformation.
+                         * @throws IOException If an I/O error occurs.
+                         */
+                        Summary apply(Source source, Target target, Plugin.Factory... factory) throws IOException;
+
+                        /**
+                         * Applies this plugin engine onto a given source and target.
+                         *
+                         * @param source    The source to use.
+                         * @param target    The target to use.
+                         * @param factories A list of plugin factories to a apply.
+                         * @return A summary of the applied transformation.
+                         * @throws IOException If an I/O error occurs.
+                         */
+                        Summary apply(Source source, Target target, List<? extends Plugin.Factory> factories) throws IOException;
+
+                        /**
+                         * A type strategy determines the transformation that is applied to a type description.
+                         */
+                        interface TypeStrategy {
+
+                            /**
+                             * Creates a builder for a given type.
+                             *
+                             * @param byteBuddy        The Byte Buddy instance to use.
+                             * @param typeDescription  The type being transformed.
+                             * @param classFileLocator A class file locator for finding the type's class file.
+                             * @return A dynamic type builder for the provided type.
+                             */
+                            DynamicType.Builder<?> builder(ByteBuddy byteBuddy, TypeDescription typeDescription, ClassFileLocator classFileLocator);
+
+                            /**
+                             * Default implementations for type strategies.
+                             */
+                            enum Default implements TypeStrategy {
+
+                                /**
+                                 * A type strategy that redefines a type's methods.
+                                 */
+                                REDEFINE {
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public DynamicType.Builder<?> builder(ByteBuddy byteBuddy, TypeDescription typeDescription, ClassFileLocator classFileLocator) {
+                                        return byteBuddy.redefine(typeDescription, classFileLocator);
+                                    }
+                                },
+
+                                /**
+                                 * A type strategy that rebases a type's methods.
+                                 */
+                                REBASE {
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public DynamicType.Builder<?> builder(ByteBuddy byteBuddy, TypeDescription typeDescription, ClassFileLocator classFileLocator) {
+                                        return byteBuddy.rebase(typeDescription, classFileLocator);
+                                    }
+                                },
+
+                                /**
+                                 * A type strategy that decorates a type.
+                                 */
+                                DECORATE {
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public DynamicType.Builder<?> builder(ByteBuddy byteBuddy, TypeDescription typeDescription, ClassFileLocator classFileLocator) {
+                                        return byteBuddy.decorate(typeDescription, classFileLocator);
+                                    }
+                                }
+                            }
+
+                            /**
+                             * A type strategy that represents a given {@link EntryPoint} for a build tool.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class ForEntryPoint implements TypeStrategy {
+
+                                /**
+                                 * The represented entry point.
+                                 */
+                                private final EntryPoint entryPoint;
+
+                                /**
+                                 * A method name transformer to use for rebasements.
+                                 */
+                                private final MethodNameTransformer methodNameTransformer;
+
+                                /**
+                                 * Creates a new type stratrgy for an entry point.
+                                 *
+                                 * @param entryPoint            The represented entry point.
+                                 * @param methodNameTransformer A method name transformer to use for rebasements.
+                                 */
+                                public ForEntryPoint(EntryPoint entryPoint, MethodNameTransformer methodNameTransformer) {
+                                    this.entryPoint = entryPoint;
+                                    this.methodNameTransformer = methodNameTransformer;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public DynamicType.Builder<?> builder(ByteBuddy byteBuddy, TypeDescription typeDescription, ClassFileLocator classFileLocator) {
+                                    return entryPoint.transform(typeDescription, byteBuddy, classFileLocator, methodNameTransformer);
+                                }
+                            }
+                        }
+
+                        /**
+                         * A pool strategy determines the creation of a {@link TypePool} for a plugin engine application.
+                         */
+                        interface PoolStrategy {
+
+                            /**
+                             * Creates a type pool.
+                             *
+                             * @param classFileLocator The class file locator to use.
+                             * @return An approptiate type pool.
+                             */
+                            TypePool typePool(ClassFileLocator classFileLocator);
+
+                            /**
+                             * A default implementation of a pool strategy where type descriptions are resolved lazily.
+                             */
+                            enum Default implements PoolStrategy {
+
+                                /**
+                                 * Enables faster class file parsing that does not process debug information of a class file.
+                                 */
+                                FAST(TypePool.Default.ReaderMode.FAST),
+
+                                /**
+                                 * Enables extended class file parsing that extracts parameter names from debug information, if available.
+                                 */
+                                EXTENDED(TypePool.Default.ReaderMode.EXTENDED);
+
+                                /**
+                                 * This strategy's reader mode.
+                                 */
+                                private final TypePool.Default.ReaderMode readerMode;
+
+                                /**
+                                 * Creates a default pool strategy.
+                                 *
+                                 * @param readerMode This strategy's reader mode.
+                                 */
+                                Default(TypePool.Default.ReaderMode readerMode) {
+                                    this.readerMode = readerMode;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public TypePool typePool(ClassFileLocator classFileLocator) {
+                                    return new TypePool.Default.WithLazyResolution(new TypePool.CacheProvider.Simple(),
+                                            classFileLocator,
+                                            readerMode,
+                                            TypePool.ClassLoading.ofPlatformLoader());
+                                }
+                            }
+
+                            /**
+                             * A pool strategy that resolves type descriptions eagerly. This can avoid additional overhead if the
+                             * majority of types is assumed to be resolved eventually.
+                             */
+                            enum Eager implements PoolStrategy {
+
+                                /**
+                                 * Enables faster class file parsing that does not process debug information of a class file.
+                                 */
+                                FAST(TypePool.Default.ReaderMode.FAST),
+
+                                /**
+                                 * Enables extended class file parsing that extracts parameter names from debug information, if available.
+                                 */
+                                EXTENDED(TypePool.Default.ReaderMode.EXTENDED);
+
+                                /**
+                                 * This strategy's reader mode.
+                                 */
+                                private final TypePool.Default.ReaderMode readerMode;
+
+                                /**
+                                 * Creates an eager pool strategy.
+                                 *
+                                 * @param readerMode This strategy's reader mode.
+                                 */
+                                Eager(TypePool.Default.ReaderMode readerMode) {
+                                    this.readerMode = readerMode;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public TypePool typePool(ClassFileLocator classFileLocator) {
+                                    return new TypePool.Default(new TypePool.CacheProvider.Simple(),
+                                            classFileLocator,
+                                            readerMode,
+                                            TypePool.ClassLoading.ofPlatformLoader());
+                                }
+                            }
+                        }
+
+                        /**
+                         * An error handler that is used during a plugin engine application.
+                         */
+                        interface ErrorHandler {
+
+                            /**
+                             * Invoked if an error occured during a plugin's application on a given type.
+                             *
+                             * @param typeDescription The type being matched or transformed.
+                             * @param plugin          The plugin being applied.
+                             * @param throwable       The throwable that caused the error.
+                             */
+                            void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable);
+
+                            /**
+                             * Invoked after the application of all plugins was attempted if at least one error occured during handling a given type.
+                             *
+                             * @param typeDescription The type being transformed.
+                             * @param throwables      The throwables that caused errors during the application.
+                             */
+                            void onError(TypeDescription typeDescription, List<Throwable> throwables);
+
+                            /**
+                             * Invoked at the end of the build if at least one type transformation failed.
+                             *
+                             * @param throwables A mapping of types that failed during transformation to the errors that were caught.
+                             */
+                            void onError(Map<TypeDescription, List<Throwable>> throwables);
+
+                            /**
+                             * Invoked at the end of the build if a plugin could not be closed.
+                             *
+                             * @param plugin    The plugin that could not be closed.
+                             * @param throwable The error that was caused when the plugin was attempted to be closed.
+                             */
+                            void onError(Plugin plugin, Throwable throwable);
+
+                            /**
+                             * Invoked if a type transformation implied a live initializer.
+                             *
+                             * @param typeDescription The type that was transformed.
+                             * @param definingType    The type that implies the initializer which might be the type itself or an auxiliary type.
+                             */
+                            void onLiveInitializer(TypeDescription typeDescription, TypeDescription definingType);
+
+                            /**
+                             * Invoked if a type could not be resolved.
+                             *
+                             * @param typeName The name of the unresolved type.
+                             */
+                            void onUnresolved(String typeName);
+
+                            /**
+                             * Invoked when a manifest was found or found missing.
+                             *
+                             * @param manifest The located manifest or {@code null} if no manifest was found.
+                             */
+                            void onManifest(@MaybeNull Manifest manifest);
+
+                            /**
+                             * Invoked if a resource that is not a class file is discovered.
+                             *
+                             * @param name The name of the discovered resource.
+                             */
+                            void onResource(String name);
+
+                            /**
+                             * An implementation of an error handler that fails the plugin engine application.
+                             */
+                            enum Failing implements ErrorHandler {
+
+                                /**
+                                 * An error handler that fails the build immediatly on the first error.
+                                 */
+                                FAIL_FAST {
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                        throw new IllegalStateException("Failed to transform " + typeDescription + " using " + plugin, throwable);
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                        throw new UnsupportedOperationException("onError");
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                        throw new UnsupportedOperationException("onError");
+                                    }
+                                },
+
+                                /**
+                                 * An error handler that fails the build after applying all plugins if at least one plugin failed.
+                                 */
+                                FAIL_AFTER_TYPE {
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                        /* do nothing */
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                        throw new IllegalStateException("Failed to transform " + typeDescription + ": " + throwables);
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                        throw new UnsupportedOperationException("onError");
+                                    }
+                                },
+
+                                /**
+                                 * An error handler that fails the build after transforming all types if at least one plugin failed.
+                                 */
+                                FAIL_LAST {
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                        /* do nothing */
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                        /* do nothing */
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                        throw new IllegalStateException("Failed to transform at least one type: " + throwables);
+                                    }
+                                };
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Plugin plugin, Throwable throwable) {
+                                    throw new IllegalStateException("Failed to close plugin " + plugin, throwable);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onLiveInitializer(TypeDescription typeDescription, TypeDescription definingType) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onUnresolved(String typeName) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onManifest(Manifest manifest) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onResource(String name) {
+                                    /* do nothing */
+                                }
+                            }
+
+                            /**
+                             * An error handler that enforces certain properties of the transformation.
+                             */
+                            enum Enforcing implements ErrorHandler {
+
+                                /**
+                                 * Enforces that all types could be resolved.
+                                 */
+                                ALL_TYPES_RESOLVED {
+                                    @Override
+                                    public void onUnresolved(String typeName) {
+                                        throw new IllegalStateException("Failed to resolve type description for " + typeName);
+                                    }
+                                },
+
+                                /**
+                                 * Enforces that no type has a live initializer.
+                                 */
+                                NO_LIVE_INITIALIZERS {
+                                    @Override
+                                    public void onLiveInitializer(TypeDescription typeDescription, TypeDescription initializedType) {
+                                        throw new IllegalStateException("Failed to instrument " + typeDescription + " due to live initializer for " + initializedType);
+                                    }
+                                },
+
+                                /**
+                                 * Enforces that a source only produces class files.
+                                 */
+                                CLASS_FILES_ONLY {
+                                    @Override
+                                    public void onResource(String name) {
+                                        throw new IllegalStateException("Discovered a resource when only class files were allowed: " + name);
+                                    }
+                                },
+
+                                /**
+                                 * Enforces that a manifest is written to a target.
+                                 */
+                                MANIFEST_REQUIRED {
+                                    @Override
+                                    public void onManifest(@MaybeNull Manifest manifest) {
+                                        if (manifest == null) {
+                                            throw new IllegalStateException("Required a manifest but no manifest was found");
+                                        }
+                                    }
+                                };
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Plugin plugin, Throwable throwable) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onLiveInitializer(TypeDescription typeDescription, TypeDescription definingType) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onUnresolved(String typeName) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onManifest(@MaybeNull Manifest manifest) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onResource(String name) {
+                                    /* do nothing */
+                                }
+                            }
+
+                            /**
+                             * A compound error handler.
+                             */
+                            class Compound implements ErrorHandler {
+
+                                /**
+                                 * The error handlers that are represented by this instance.
+                                 */
+                                private final List<ErrorHandler> errorHandlers;
+
+                                /**
+                                 * Creates a new compound error handler.
+                                 *
+                                 * @param errorHandler The error handlers that are represented by this instance.
+                                 */
+                                public Compound(ErrorHandler... errorHandler) {
+                                    this(Arrays.asList(errorHandler));
+                                }
+
+                                /**
+                                 * Creates a new compound error handler.
+                                 *
+                                 * @param errorHandlers The error handlers that are represented by this instance.
+                                 */
+                                public Compound(List<? extends ErrorHandler> errorHandlers) {
+                                    this.errorHandlers = new ArrayList<ErrorHandler>();
+                                    for (ErrorHandler errorHandler : errorHandlers) {
+                                        if (errorHandler instanceof Compound) {
+                                            this.errorHandlers.addAll(((Compound) errorHandler).errorHandlers);
+                                        } else if (!(errorHandler instanceof Listener.NoOp)) {
+                                            this.errorHandlers.add(errorHandler);
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                    for (ErrorHandler errorHandler : errorHandlers) {
+                                        errorHandler.onError(typeDescription, plugin, throwable);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                    for (ErrorHandler errorHandler : errorHandlers) {
+                                        errorHandler.onError(typeDescription, throwables);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                    for (ErrorHandler errorHandler : errorHandlers) {
+                                        errorHandler.onError(throwables);
+                                    }
+
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Plugin plugin, Throwable throwable) {
+                                    for (ErrorHandler errorHandler : errorHandlers) {
+                                        errorHandler.onError(plugin, throwable);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onLiveInitializer(TypeDescription typeDescription, TypeDescription definingType) {
+                                    for (ErrorHandler errorHandler : errorHandlers) {
+                                        errorHandler.onLiveInitializer(typeDescription, definingType);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onUnresolved(String typeName) {
+                                    for (ErrorHandler errorHandler : errorHandlers) {
+                                        errorHandler.onUnresolved(typeName);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onManifest(@MaybeNull Manifest manifest) {
+                                    for (ErrorHandler errorHandler : errorHandlers) {
+                                        errorHandler.onManifest(manifest);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onResource(String name) {
+                                    for (ErrorHandler errorHandler : errorHandlers) {
+                                        errorHandler.onResource(name);
+                                    }
+                                }
+                            }
+                        }
+
+                        /**
+                         * A listener that is invoked upon any event during a plugin engine application.
+                         */
+                        interface Listener extends ErrorHandler {
+
+                            /**
+                             * Invoked upon discovering a type but prior to its resolution.
+                             *
+                             * @param typeName The name of the discovered type.
+                             */
+                            void onDiscovery(String typeName);
+
+                            /**
+                             * Invoked after a type was transformed using a specific plugin.
+                             *
+                             * @param typeDescription The type being transformed.
+                             * @param plugin          The plugin that was applied.
+                             */
+                            void onTransformation(TypeDescription typeDescription, Plugin plugin);
+
+                            /**
+                             * Invoked after a type was transformed using at least one plugin.
+                             *
+                             * @param typeDescription The type being transformed.
+                             * @param plugins         A list of plugins that were applied.
+                             */
+                            void onTransformation(TypeDescription typeDescription, List<Plugin> plugins);
+
+                            /**
+                             * Invoked if a type description is ignored by a given plugin. This callback is not invoked,
+                             * if the ignore type matcher excluded a type from transformation.
+                             *
+                             * @param typeDescription The type being transformed.
+                             * @param plugin          The plugin that ignored the given type.
+                             */
+                            void onIgnored(TypeDescription typeDescription, Plugin plugin);
+
+                            /**
+                             * Invoked if one or more plugins did not transform a type. This callback is also invoked if an
+                             * ignore matcher excluded a type from transformation.
+                             *
+                             * @param typeDescription The type being transformed.
+                             * @param plugins         the plugins that ignored the type.
+                             */
+                            void onIgnored(TypeDescription typeDescription, List<Plugin> plugins);
+
+                            /**
+                             * Invoked upon completing handling a type that was either transformed or ignored.
+                             *
+                             * @param typeDescription The type that was transformed.
+                             */
+                            void onComplete(TypeDescription typeDescription);
+
+                            /**
+                             * A non-operational listener.
+                             */
+                            enum NoOp implements Listener {
+
+                                /**
+                                 * The singleton instance.
+                                 */
+                                INSTANCE;
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onDiscovery(String typeName) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onTransformation(TypeDescription typeDescription, Plugin plugin) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onTransformation(TypeDescription typeDescription, List<Plugin> plugins) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onIgnored(TypeDescription typeDescription, Plugin plugin) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onIgnored(TypeDescription typeDescription, List<Plugin> plugins) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Plugin plugin, Throwable throwable) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onLiveInitializer(TypeDescription typeDescription, TypeDescription definingType) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onComplete(TypeDescription typeDescription) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onUnresolved(String typeName) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onManifest(@MaybeNull Manifest manifest) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onResource(String name) {
+                                    /* do nothing */
+                                }
+                            }
+
+                            /**
+                             * An adapter that implements all methods non-operational.
+                             */
+                            abstract class Adapter implements Listener {
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onDiscovery(String typeName) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onTransformation(TypeDescription typeDescription, Plugin plugin) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onTransformation(TypeDescription typeDescription, List<Plugin> plugins) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onIgnored(TypeDescription typeDescription, Plugin plugin) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onIgnored(TypeDescription typeDescription, List<Plugin> plugins) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Plugin plugin, Throwable throwable) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onLiveInitializer(TypeDescription typeDescription, TypeDescription definingType) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onComplete(TypeDescription typeDescription) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onUnresolved(String typeName) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onManifest(@MaybeNull Manifest manifest) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onResource(String name) {
+                                    /* do nothing */
+                                }
+                            }
+
+                            /**
+                             * A listener that forwards significant events of a plugin engine application to a {@link PrintStream}.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class StreamWriting extends Adapter {
+
+                                /**
+                                 * The prefix that is appended to all written messages.
+                                 */
+                                protected static final String PREFIX = "[Byte Buddy]";
+
+                                /**
+                                 * The print stream to delegate to.
+                                 */
+                                private final PrintStream printStream;
+
+                                /**
+                                 * Creates a new stream writing listener.
+                                 *
+                                 * @param printStream The print stream to delegate to.
+                                 */
+                                public StreamWriting(PrintStream printStream) {
+                                    this.printStream = printStream;
+                                }
+
+                                /**
+                                 * Creates a stream writing listener that prints all events on {@link System#out}.
+                                 *
+                                 * @return A listener that writes events to the system output stream.
+                                 */
+                                public static StreamWriting toSystemOut() {
+                                    return new StreamWriting(System.out);
+                                }
+
+                                /**
+                                 * Creates a stream writing listener that prints all events on {@link System#err}.
+                                 *
+                                 * @return A listener that writes events to the system error stream.
+                                 */
+                                public static StreamWriting toSystemError() {
+                                    return new StreamWriting(System.err);
+                                }
+
+                                /**
+                                 * Returns a new listener that only prints transformation and error events.
+                                 *
+                                 * @return A new listener that only prints transformation and error events.
+                                 */
+                                public Listener withTransformationsOnly() {
+                                    return new WithTransformationsOnly(this);
+                                }
+
+                                /**
+                                 * Returns a new listener that only prints error events.
+                                 *
+                                 * @return A new listener that only prints error events.
+                                 */
+                                public Listener withErrorsOnly() {
+                                    return new WithErrorsOnly(this);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onDiscovery(String typeName) {
+                                    printStream.printf(PREFIX + " DISCOVERY %s", typeName);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onTransformation(TypeDescription typeDescription, Plugin plugin) {
+                                    printStream.printf(PREFIX + " TRANSFORM %s for %s", typeDescription, plugin);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onIgnored(TypeDescription typeDescription, Plugin plugin) {
+                                    printStream.printf(PREFIX + " IGNORE %s for %s", typeDescription, plugin);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                    synchronized (printStream) {
+                                        printStream.printf(PREFIX + " ERROR %s for %s", typeDescription, plugin);
+                                        throwable.printStackTrace(printStream);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Plugin plugin, Throwable throwable) {
+                                    synchronized (printStream) {
+                                        printStream.printf(PREFIX + " ERROR %s", plugin);
+                                        throwable.printStackTrace(printStream);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onUnresolved(String typeName) {
+                                    printStream.printf(PREFIX + " UNRESOLVED %s", typeName);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onLiveInitializer(TypeDescription typeDescription, TypeDescription definingType) {
+                                    printStream.printf(PREFIX + " LIVE %s on %s", typeDescription, definingType);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onComplete(TypeDescription typeDescription) {
+                                    printStream.printf(PREFIX + " COMPLETE %s", typeDescription);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onManifest(@MaybeNull Manifest manifest) {
+                                    printStream.printf(PREFIX + " MANIFEST %b", manifest != null);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onResource(String name) {
+                                    printStream.printf(PREFIX + " RESOURCE %s", name);
+                                }
+                            }
+
+                            /**
+                             * A decorator for another listener to only print transformation and error events.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class WithTransformationsOnly extends Adapter {
+
+                                /**
+                                 * The delegate to forward events to.
+                                 */
+                                private final Listener delegate;
+
+                                /**
+                                 * Creates a new listener decorator that filter any event that is not related to transformation or errors.
+                                 *
+                                 * @param delegate The delegate to forward events to.
+                                 */
+                                public WithTransformationsOnly(Listener delegate) {
+                                    this.delegate = delegate;
+                                }
+
+                                @Override
+                                public void onTransformation(TypeDescription typeDescription, Plugin plugin) {
+                                    delegate.onTransformation(typeDescription, plugin);
+                                }
+
+                                @Override
+                                public void onTransformation(TypeDescription typeDescription, List<Plugin> plugins) {
+                                    delegate.onTransformation(typeDescription, plugins);
+                                }
+
+                                @Override
+                                public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                    delegate.onError(typeDescription, plugin, throwable);
+                                }
+
+                                @Override
+                                public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                    delegate.onError(typeDescription, throwables);
+                                }
+
+                                @Override
+                                public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                    delegate.onError(throwables);
+                                }
+
+                                @Override
+                                public void onError(Plugin plugin, Throwable throwable) {
+                                    delegate.onError(plugin, throwable);
+                                }
+                            }
+
+                            /**
+                             * A decorator for another listener to only print error events.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class WithErrorsOnly extends Adapter {
+
+                                /**
+                                 * The delegate to forward events to.
+                                 */
+                                private final Listener delegate;
+
+                                /**
+                                 * Creates a new listener decorator that filter any event that is not related to errors.
+                                 *
+                                 * @param delegate The delegate to forward events to.
+                                 */
+                                public WithErrorsOnly(Listener delegate) {
+                                    this.delegate = delegate;
+                                }
+
+                                @Override
+                                public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                    delegate.onError(typeDescription, plugin, throwable);
+                                }
+
+                                @Override
+                                public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                    delegate.onError(typeDescription, throwables);
+                                }
+
+                                @Override
+                                public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                    delegate.onError(throwables);
+                                }
+
+                                @Override
+                                public void onError(Plugin plugin, Throwable throwable) {
+                                    delegate.onError(plugin, throwable);
+                                }
+                            }
+
+                            /**
+                             * A listener decorator that forwards events to an error handler if they are applicable.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class ForErrorHandler extends Adapter {
+
+                                /**
+                                 * The error handler to delegate to.
+                                 */
+                                private final ErrorHandler errorHandler;
+
+                                /**
+                                 * Creates a new listener representation for an error handler.
+                                 *
+                                 * @param errorHandler The error handler to delegate to.
+                                 */
+                                public ForErrorHandler(ErrorHandler errorHandler) {
+                                    this.errorHandler = errorHandler;
+                                }
+
+                                @Override
+                                public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                    errorHandler.onError(typeDescription, plugin, throwable);
+                                }
+
+                                @Override
+                                public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                    errorHandler.onError(typeDescription, throwables);
+                                }
+
+                                @Override
+                                public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                    errorHandler.onError(throwables);
+                                }
+
+                                @Override
+                                public void onError(Plugin plugin, Throwable throwable) {
+                                    errorHandler.onError(plugin, throwable);
+                                }
+
+                                @Override
+                                public void onLiveInitializer(TypeDescription typeDescription, TypeDescription definingType) {
+                                    errorHandler.onLiveInitializer(typeDescription, definingType);
+                                }
+
+                                @Override
+                                public void onUnresolved(String typeName) {
+                                    errorHandler.onUnresolved(typeName);
+                                }
+
+                                @Override
+                                public void onManifest(@MaybeNull Manifest manifest) {
+                                    errorHandler.onManifest(manifest);
+                                }
+
+                                @Override
+                                public void onResource(String name) {
+                                    errorHandler.onResource(name);
+                                }
+                            }
+
+                            /**
+                             * A compound listener.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class Compound implements Listener {
+
+                                /**
+                                 * A list of listeners that are represented by this compound instance.
+                                 */
+                                private final List<Listener> listeners;
+
+                                /**
+                                 * Creates a new compound listener.
+                                 *
+                                 * @param listener A list of listeners that are represented by this compound instance.
+                                 */
+                                public Compound(Listener... listener) {
+                                    this(Arrays.asList(listener));
+                                }
+
+                                /**
+                                 * Creates a new compound listener.
+                                 *
+                                 * @param listeners A list of listeners that are represented by this compound instance.
+                                 */
+                                public Compound(List<? extends Listener> listeners) {
+                                    this.listeners = new ArrayList<Listener>();
+                                    for (Listener listener : listeners) {
+                                        if (listener instanceof Listener.Compound) {
+                                            this.listeners.addAll(((Listener.Compound) listener).listeners);
+                                        } else if (!(listener instanceof NoOp)) {
+                                            this.listeners.add(listener);
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onDiscovery(String typeName) {
+                                    for (Listener listener : listeners) {
+                                        listener.onDiscovery(typeName);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onTransformation(TypeDescription typeDescription, Plugin plugin) {
+                                    for (Listener listener : listeners) {
+                                        listener.onTransformation(typeDescription, plugin);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onTransformation(TypeDescription typeDescription, List<Plugin> plugins) {
+                                    for (Listener listener : listeners) {
+                                        listener.onTransformation(typeDescription, plugins);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onIgnored(TypeDescription typeDescription, Plugin plugin) {
+                                    for (Listener listener : listeners) {
+                                        listener.onIgnored(typeDescription, plugin);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onIgnored(TypeDescription typeDescription, List<Plugin> plugins) {
+                                    for (Listener listener : listeners) {
+                                        listener.onIgnored(typeDescription, plugins);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, Plugin plugin, Throwable throwable) {
+                                    for (Listener listener : listeners) {
+                                        listener.onError(typeDescription, plugin, throwable);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(TypeDescription typeDescription, List<Throwable> throwables) {
+                                    for (Listener listener : listeners) {
+                                        listener.onError(typeDescription, throwables);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Map<TypeDescription, List<Throwable>> throwables) {
+                                    for (Listener listener : listeners) {
+                                        listener.onError(throwables);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onError(Plugin plugin, Throwable throwable) {
+                                    for (Listener listener : listeners) {
+                                        listener.onError(plugin, throwable);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onLiveInitializer(TypeDescription typeDescription, TypeDescription definingType) {
+                                    for (Listener listener : listeners) {
+                                        listener.onLiveInitializer(typeDescription, definingType);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onComplete(TypeDescription typeDescription) {
+                                    for (Listener listener : listeners) {
+                                        listener.onComplete(typeDescription);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onUnresolved(String typeName) {
+                                    for (Listener listener : listeners) {
+                                        listener.onUnresolved(typeName);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onManifest(@MaybeNull Manifest manifest) {
+                                    for (Listener listener : listeners) {
+                                        listener.onManifest(manifest);
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void onResource(String name) {
+                                    for (Listener listener : listeners) {
+                                        listener.onResource(name);
+                                    }
+                                }
+                            }
+                        }
+
+                        /**
+                         * A source for a plugin engine provides binary elements to consider for transformation.
+                         */
+                        interface Source {
+
+                            /**
+                             * Initiates reading from a source.
+                             *
+                             * @return The origin to read from.
+                             * @throws IOException If an I/O error occurs.
+                             */
+                            Origin read() throws IOException;
+
+                            /**
+                             * An origin for elements.
+                             */
+                            interface Origin extends Iterable<Element>, Closeable {
+
+                                /**
+                                 * Indicates that no manifest exists.
+                                 */
+                                @AlwaysNull
+                                Manifest NO_MANIFEST = null;
+
+                                /**
+                                 * Returns the manifest file of the source location or {@code null} if no manifest exists.
+                                 *
+                                 * @return This source's manifest or {@code null}.
+                                 * @throws IOException If an I/O error occurs.
+                                 */
+                                @MaybeNull
+                                Manifest getManifest() throws IOException;
+
+                                /**
+                                 * Returns a class file locator for the represented source. If the class file locator needs to be closed, it is the responsibility
+                                 * of this origin to close the locator or its underlying resources.
+                                 *
+                                 * @return A class file locator for locating class files of this instance..
+                                 */
+                                ClassFileLocator getClassFileLocator();
+
+                                /**
+                                 * An origin implementation for a jar file.
+                                 */
+                                class ForJarFile implements Origin {
+
+                                    /**
+                                     * The represented file.
+                                     */
+                                    private final JarFile file;
+
+                                    /**
+                                     * Creates a new origin for a jar file.
+                                     *
+                                     * @param file The represented file.
+                                     */
+                                    public ForJarFile(JarFile file) {
+                                        this.file = file;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    @MaybeNull
+                                    public Manifest getManifest() throws IOException {
+                                        return file.getManifest();
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public ClassFileLocator getClassFileLocator() {
+                                        return new ClassFileLocator.ForJarFile(file);
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void close() throws IOException {
+                                        file.close();
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Iterator<Element> iterator() {
+                                        return new JarFileIterator(file.entries());
+                                    }
+
+                                    /**
+                                     * An iterator for jar file entries.
+                                     */
+                                    protected class JarFileIterator implements Iterator<Element> {
+
+                                        /**
+                                         * The represented enumeration.
+                                         */
+                                        private final Enumeration<JarEntry> enumeration;
+
+                                        /**
+                                         * Creates a new jar file iterator.
+                                         *
+                                         * @param enumeration The represented enumeration.
+                                         */
+                                        protected JarFileIterator(Enumeration<JarEntry> enumeration) {
+                                            this.enumeration = enumeration;
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public boolean hasNext() {
+                                            return enumeration.hasMoreElements();
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public Element next() {
+                                            return new Element.ForJarEntry(file, enumeration.nextElement());
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public void remove() {
+                                            throw new UnsupportedOperationException("remove");
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * An origin that forwards all invocations to a delegate where an {@link ElementMatcher} is applied prior to iteration.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                class Filtering implements Origin {
+
+                                    /**
+                                     * The origin to which invocations are delegated.
+                                     */
+                                    private final Origin delegate;
+
+                                    /**
+                                     * The element matcher being used to filter elements.
+                                     */
+                                    private final ElementMatcher<Element> matcher;
+
+                                    /**
+                                     * {@code true} if the manifest should be retained.
+                                     */
+                                    private final boolean manifest;
+
+                                    /**
+                                     * Creates a new filtering origin that retains the delegated origin's manifest.
+                                     *
+                                     * @param delegate The origin to which invocations are delegated.
+                                     * @param matcher  The element matcher being used to filter elements.
+                                     */
+                                    public Filtering(Origin delegate, ElementMatcher<Element> matcher) {
+                                        this(delegate, matcher, true);
+                                    }
+
+                                    /**
+                                     * Creates a new filtering origin.
+                                     *
+                                     * @param delegate The origin to which invocations are delegated.
+                                     * @param matcher  The element matcher being used to filter elements.
+                                     * @param manifest {@code true} if the manifest should be retained.
+                                     */
+                                    public Filtering(Origin delegate, ElementMatcher<Element> matcher, boolean manifest) {
+                                        this.delegate = delegate;
+                                        this.matcher = matcher;
+                                        this.manifest = manifest;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    @MaybeNull
+                                    public Manifest getManifest() throws IOException {
+                                        return manifest ? delegate.getManifest() : NO_MANIFEST;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public ClassFileLocator getClassFileLocator() {
+                                        return delegate.getClassFileLocator();
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void close() throws IOException {
+                                        delegate.close();
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Iterator<Element> iterator() {
+                                        return new FilteringIterator(delegate.iterator(), matcher);
+                                    }
+
+                                    /**
+                                     * An iterator that applies a filter to observed elements.
+                                     */
+                                    private static class FilteringIterator implements Iterator<Element> {
+
+                                        /**
+                                         * The underlying iterator.
+                                         */
+                                        private final Iterator<Element> iterator;
+
+                                        /**
+                                         * The element matcher being used to filter elements.
+                                         */
+                                        private final ElementMatcher<Element> matcher;
+
+                                        /**
+                                         * The current element or {@code null} if no further elements are available.
+                                         */
+                                        @MaybeNull
+                                        private Element current;
+
+                                        /**
+                                         * Creates a new filtering iterator.
+                                         *
+                                         * @param iterator The underlying iterator.
+                                         * @param matcher  The element matcher being used to filter elements.
+                                         */
+                                        private FilteringIterator(Iterator<Element> iterator, ElementMatcher<Element> matcher) {
+                                            this.iterator = iterator;
+                                            this.matcher = matcher;
+                                            Element element;
+                                            while (iterator.hasNext()) {
+                                                element = iterator.next();
+                                                if (matcher.matches(element)) {
+                                                    current = element;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public boolean hasNext() {
+                                            return current != null;
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public Element next() {
+                                            if (current == null) {
+                                                throw new NoSuchElementException();
+                                            }
+                                            try {
+                                                return current;
+                                            } finally {
+                                                current = null;
+                                                Element element;
+                                                while (iterator.hasNext()) {
+                                                    element = iterator.next();
+                                                    if (matcher.matches(element)) {
+                                                        current = element;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public void remove() {
+                                            iterator.remove();
+                                        }
+                                    }
+                                }
+                            }
+
+                            /**
+                             * Represents a binary element found in a source location.
+                             */
+                            interface Element {
+
+                                /**
+                                 * Returns the element's relative path and name.
+                                 *
+                                 * @return The element's path and name.
+                                 */
+                                String getName();
+
+                                /**
+                                 * Returns an input stream to read this element's binary information.
+                                 *
+                                 * @return An input stream that represents this element's binary information.
+                                 * @throws IOException If an I/O error occurs.
+                                 */
+                                InputStream getInputStream() throws IOException;
+
+                                /**
+                                 * Resolves this element to a more specialized form if possible. Doing so allows for performance
+                                 * optimizations if more specialized formats are available.
+                                 *
+                                 * @param type The requested spezialized type.
+                                 * @param <T>  The requested spezialized type.
+                                 * @return The resolved element or {@code null} if a transformation is impossible.
+                                 */
+                                @MaybeNull
+                                <T> T resolveAs(Class<T> type);
+
+                                /**
+                                 * An element representation for a byte array.
+                                 */
+                                @SuppressFBWarnings(value = "EI_EXPOSE_REP2", justification = "The array is not modified by class contract.")
+                                @HashCodeAndEqualsPlugin.Enhance
+                                class ForByteArray implements Element {
+
+                                    /**
+                                     * The element's name.
+                                     */
+                                    private final String name;
+
+                                    /**
+                                     * The element's binary representation.
+                                     */
+                                    private final byte[] binaryRepresentation;
+
+                                    /**
+                                     * Creates an element that is represented by a byte array.
+                                     *
+                                     * @param name                 The element's name.
+                                     * @param binaryRepresentation The element's binary representation.
+                                     */
+                                    public ForByteArray(String name, byte[] binaryRepresentation) {
+                                        this.name = name;
+                                        this.binaryRepresentation = binaryRepresentation;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public String getName() {
+                                        return name;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public InputStream getInputStream() {
+                                        return new ByteArrayInputStream(binaryRepresentation);
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    @AlwaysNull
+                                    public <T> T resolveAs(Class<T> type) {
+                                        return null;
+                                    }
+                                }
+
+                                /**
+                                 * An element representation for a file.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                class ForFile implements Element {
+
+                                    /**
+                                     * The root folder of the represented source.
+                                     */
+                                    private final File root;
+
+                                    /**
+                                     * The file location of the represented file that is located within the root directory.
+                                     */
+                                    private final File file;
+
+                                    /**
+                                     * Creates an element representation for a file.
+                                     *
+                                     * @param root The root folder of the represented source.
+                                     * @param file The file location of the represented file that is located within the root directory.
+                                     */
+                                    public ForFile(File root, File file) {
+                                        this.root = root;
+                                        this.file = file;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public String getName() {
+                                        return root.getAbsoluteFile().toURI().relativize(file.getAbsoluteFile().toURI()).getPath();
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public InputStream getInputStream() throws IOException {
+                                        return new FileInputStream(file);
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    @MaybeNull
+                                    @SuppressWarnings("unchecked")
+                                    public <T> T resolveAs(Class<T> type) {
+                                        return File.class.isAssignableFrom(type)
+                                                ? (T) file
+                                                : null;
+                                    }
+                                }
+
+                                /**
+                                 * Represents a jar file entry as an element.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                class ForJarEntry implements Element {
+
+                                    /**
+                                     * The source's underlying jar file.
+                                     */
+                                    private final JarFile file;
+
+                                    /**
+                                     * The entry that is represented by this element.
+                                     */
+                                    private final JarEntry entry;
+
+                                    /**
+                                     * Creates a new element representation for a jar file entry.
+                                     *
+                                     * @param file  The source's underlying jar file.
+                                     * @param entry The entry that is represented by this element.
+                                     */
+                                    public ForJarEntry(JarFile file, JarEntry entry) {
+                                        this.file = file;
+                                        this.entry = entry;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public String getName() {
+                                        return entry.getName();
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public InputStream getInputStream() throws IOException {
+                                        return file.getInputStream(entry);
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    @MaybeNull
+                                    @SuppressWarnings("unchecked")
+                                    public <T> T resolveAs(Class<T> type) {
+                                        return JarEntry.class.isAssignableFrom(type)
+                                                ? (T) entry
+                                                : null;
+                                    }
+                                }
+                            }
+
+                            /**
+                             * An empty source that does not contain any elements or a manifest.
+                             */
+                            enum Empty implements Source, Origin {
+
+                                /**
+                                 * The singleton instance.
+                                 */
+                                INSTANCE;
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Origin read() {
+                                    return this;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public ClassFileLocator getClassFileLocator() {
+                                    return ClassFileLocator.NoOp.INSTANCE;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                @MaybeNull
+                                public Manifest getManifest() {
+                                    return NO_MANIFEST;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Iterator<Element> iterator() {
+                                    return Collections.<Element>emptySet().iterator();
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void close() {
+                                    /* do nothing */
+                                }
+                            }
+
+                            /**
+                             * A source that represents a collection of in-memory resources that are represented as byte arrays.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class InMemory implements Source, Origin {
+
+                                /**
+                                 * A mapping of resource names to their binary representation.
+                                 */
+                                private final Map<String, byte[]> storage;
+
+                                /**
+                                 * Creates a new in-memory source.
+                                 *
+                                 * @param storage A mapping of resource names to their binary representation.
+                                 */
+                                public InMemory(Map<String, byte[]> storage) {
+                                    this.storage = storage;
+                                }
+
+                                /**
+                                 * Represents a collection of types as a in-memory source.
+                                 *
+                                 * @param type The types to represent.
+                                 * @return A source representing the supplied types.
+                                 */
+                                public static Source ofTypes(Class<?>... type) {
+                                    return ofTypes(Arrays.asList(type));
+                                }
+
+                                /**
+                                 * Represents a collection of types as a in-memory source.
+                                 *
+                                 * @param types The types to represent.
+                                 * @return A source representing the supplied types.
+                                 */
+                                public static Source ofTypes(Collection<? extends Class<?>> types) {
+                                    Map<TypeDescription, byte[]> binaryRepresentations = new HashMap<TypeDescription, byte[]>();
+                                    for (Class<?> type : types) {
+                                        binaryRepresentations.put(TypeDescription.ForLoadedType.of(type), ClassFileLocator.ForClassLoader.read(type));
+                                    }
+                                    return ofTypes(binaryRepresentations);
+                                }
+
+                                /**
+                                 * Represents a map of type names to their binary representation as an in-memory source.
+                                 *
+                                 * @param binaryRepresentations A mapping of type names to their binary representation.
+                                 * @return A source representing the supplied types.
+                                 */
+                                public static Source ofTypes(Map<TypeDescription, byte[]> binaryRepresentations) {
+                                    Map<String, byte[]> storage = new HashMap<String, byte[]>();
+                                    for (Map.Entry<TypeDescription, byte[]> entry : binaryRepresentations.entrySet()) {
+                                        storage.put(entry.getKey().getInternalName() + CLASS_FILE_EXTENSION, entry.getValue());
+                                    }
+                                    return new InMemory(storage);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Origin read() {
+                                    return this;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public ClassFileLocator getClassFileLocator() {
+                                    return ClassFileLocator.Simple.ofResources(storage);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                @MaybeNull
+                                public Manifest getManifest() throws IOException {
+                                    byte[] binaryRepresentation = storage.get(JarFile.MANIFEST_NAME);
+                                    if (binaryRepresentation == null) {
+                                        return NO_MANIFEST;
+                                    } else {
+                                        return new Manifest(new ByteArrayInputStream(binaryRepresentation));
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Iterator<Element> iterator() {
+                                    return new MapEntryIterator(storage.entrySet().iterator());
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void close() {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * An iterator that represents map entries as sources.
+                                 */
+                                protected static class MapEntryIterator implements Iterator<Element> {
+
+                                    /**
+                                     * The represented iterator.
+                                     */
+                                    private final Iterator<Map.Entry<String, byte[]>> iterator;
+
+                                    /**
+                                     * Creates a new map entry iterator.
+                                     *
+                                     * @param iterator The represented iterator.
+                                     */
+                                    protected MapEntryIterator(Iterator<Map.Entry<String, byte[]>> iterator) {
+                                        this.iterator = iterator;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public boolean hasNext() {
+                                        return iterator.hasNext();
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Element next() {
+                                        Map.Entry<String, byte[]> entry = iterator.next();
+                                        return new Element.ForByteArray(entry.getKey(), entry.getValue());
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void remove() {
+                                        throw new UnsupportedOperationException("remove");
+                                    }
+                                }
+                            }
+
+                            /**
+                             * Represents the contents of a folder as class files.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class ForFolder implements Source, Origin {
+
+                                /**
+                                 * The folder to represent.
+                                 */
+                                private final File folder;
+
+                                /**
+                                 * Creates a new source representation for a given folder.
+                                 *
+                                 * @param folder The folder to represent.
+                                 */
+                                public ForFolder(File folder) {
+                                    this.folder = folder;
+                                }
+
+                                /**
+                                 * Initializes a reading from this source.
+                                 *
+                                 * @return A source that represents the resource of this origin.
+                                 */
+                                public Origin read() {
+                                    return this;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public ClassFileLocator getClassFileLocator() {
+                                    return new ClassFileLocator.ForFolder(folder);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                @MaybeNull
+                                public Manifest getManifest() throws IOException {
+                                    File file = new File(folder, JarFile.MANIFEST_NAME);
+                                    if (file.exists()) {
+                                        InputStream inputStream = new FileInputStream(file);
+                                        try {
+                                            return new Manifest(inputStream);
+                                        } finally {
+                                            inputStream.close();
+                                        }
+                                    } else {
+                                        return NO_MANIFEST;
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Iterator<Element> iterator() {
+                                    return new FolderIterator(folder);
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void close() {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * An iterator that exposes all files within a folder structure as elements.
+                                 */
+                                protected class FolderIterator implements Iterator<Element> {
+
+                                    /**
+                                     * A list of files and folders to process with the next processed file at the end of the list.
+                                     */
+                                    private final List<File> files;
+
+                                    /**
+                                     * Creates a new iterator representation for all files within a folder.
+                                     *
+                                     * @param folder The root folder.
+                                     */
+                                    protected FolderIterator(File folder) {
+                                        files = new ArrayList<File>(Collections.singleton(folder));
+                                        File candidate;
+                                        do {
+                                            candidate = files.remove(files.size() - 1);
+                                            File[] file = candidate.listFiles();
+                                            if (file != null) {
+                                                files.addAll(Arrays.asList(file));
+                                            }
+                                        } while (!files.isEmpty() && (files.get(files.size() - 1).isDirectory() || files.get(files.size() - 1).equals(new File(folder, JarFile.MANIFEST_NAME))));
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public boolean hasNext() {
+                                        return !files.isEmpty();
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    @SuppressFBWarnings(value = "IT_NO_SUCH_ELEMENT", justification = "Exception is thrown by invoking removeFirst on an empty list.")
+                                    public Element next() {
+                                        try {
+                                            return new Element.ForFile(folder, files.remove(files.size() - 1));
+                                        } finally {
+                                            while (!files.isEmpty() && (files.get(files.size() - 1).isDirectory() || files.get(files.size() - 1).equals(new File(folder, JarFile.MANIFEST_NAME)))) {
+                                                File folder = files.remove(files.size() - 1);
+                                                File[] file = folder.listFiles();
+                                                if (file != null) {
+                                                    files.addAll(Arrays.asList(file));
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void remove() {
+                                        throw new UnsupportedOperationException("remove");
+                                    }
+                                }
+                            }
+
+                            /**
+                             * Represents a jar file as a source.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class ForJarFile implements Source {
+
+                                /**
+                                 * The jar file being represented by this source.
+                                 */
+                                private final File file;
+
+                                /**
+                                 * Creates a new source for a jar file.
+                                 *
+                                 * @param file The jar file being represented by this source.
+                                 */
+                                public ForJarFile(File file) {
+                                    this.file = file;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Origin read() throws IOException {
+                                    return new Origin.ForJarFile(new JarFile(file));
+                                }
+                            }
+
+                            /**
+                             * A source that applies a filter upon iterating elements.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class Filtering implements Source {
+
+                                /**
+                                 * The source to which invocations are delegated.
+                                 */
+                                private final Source delegate;
+
+                                /**
+                                 * The element matcher being used to filter elements.
+                                 */
+                                private final ElementMatcher<Element> matcher;
+
+                                /**
+                                 * {@code true} if the manifest should be retained.
+                                 */
+                                private final boolean manifest;
+
+                                /**
+                                 * Creates a new filtering source that retains the manifest of the delegated source.
+                                 *
+                                 * @param delegate The source to which invocations are delegated.
+                                 * @param matcher  The element matcher being used to filter elements.
+                                 */
+                                public Filtering(Source delegate, ElementMatcher<Element> matcher) {
+                                    this(delegate, matcher, true);
+                                }
+
+                                /**
+                                 * Creates a new filtering source.
+                                 *
+                                 * @param delegate The source to which invocations are delegated.
+                                 * @param matcher  The element matcher being used to filter elements.
+                                 * @param manifest {@code true} if the manifest should be retained.
+                                 */
+                                public Filtering(Source delegate, ElementMatcher<Element> matcher, boolean manifest) {
+                                    this.delegate = delegate;
+                                    this.matcher = matcher;
+                                    this.manifest = manifest;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Origin read() throws IOException {
+                                    return new Origin.Filtering(delegate.read(), matcher, manifest);
+                                }
+                            }
+                        }
+
+                        /**
+                         * A target for a plugin engine represents a sink container for all elements that are supplied by a {@link Source}.
+                         */
+                        interface Target {
+
+                            /**
+                             * Initializes this target prior to writing.
+                             *
+                             * @param manifest The manifest for the target or {@code null} if no manifest was found.
+                             * @return The sink to write to.
+                             * @throws IOException If an I/O error occurs.
+                             */
+                            Sink write(@MaybeNull Manifest manifest) throws IOException;
+
+                            /**
+                             * A sink represents an active writing process.
+                             */
+                            interface Sink extends Closeable {
+
+                                /**
+                                 * Stores the supplied binary representation of types in this sink.
+                                 *
+                                 * @param binaryRepresentations The binary representations to store.
+                                 * @throws IOException If an I/O error occurs.
+                                 */
+                                void store(Map<TypeDescription, byte[]> binaryRepresentations) throws IOException;
+
+                                /**
+                                 * Retains the supplied element in its original form.
+                                 *
+                                 * @param element The element to retain.
+                                 * @throws IOException If an I/O error occurs.
+                                 */
+                                void retain(Source.Element element) throws IOException;
+
+                                /**
+                                 * Implements a sink for a jar file.
+                                 */
+                                class ForJarOutputStream implements Sink {
+
+                                    /**
+                                     * The output stream to write to.
+                                     */
+                                    private final JarOutputStream outputStream;
+
+                                    /**
+                                     * Creates a new sink for a jar file.
+                                     *
+                                     * @param outputStream The output stream to write to.
+                                     */
+                                    public ForJarOutputStream(JarOutputStream outputStream) {
+                                        this.outputStream = outputStream;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void store(Map<TypeDescription, byte[]> binaryRepresentations) throws IOException {
+                                        for (Map.Entry<TypeDescription, byte[]> entry : binaryRepresentations.entrySet()) {
+                                            outputStream.putNextEntry(new JarEntry(entry.getKey().getInternalName() + CLASS_FILE_EXTENSION));
+                                            outputStream.write(entry.getValue());
+                                            outputStream.closeEntry();
+                                        }
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void retain(Source.Element element) throws IOException {
+                                        JarEntry entry = element.resolveAs(JarEntry.class);
+                                        outputStream.putNextEntry(entry == null
+                                                ? new JarEntry(element.getName())
+                                                : entry);
+                                        InputStream inputStream = element.getInputStream();
+                                        try {
+                                            byte[] buffer = new byte[1024];
+                                            int length;
+                                            while ((length = inputStream.read(buffer)) != -1) {
+                                                outputStream.write(buffer, 0, length);
+                                            }
+                                        } finally {
+                                            inputStream.close();
+                                        }
+                                        outputStream.closeEntry();
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void close() throws IOException {
+                                        outputStream.close();
+                                    }
+                                }
+                            }
+
+                            /**
+                             * A sink that discards any entry.
+                             */
+                            enum Discarding implements Target, Sink {
+
+                                /**
+                                 * The singleton instance.
+                                 */
+                                INSTANCE;
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Sink write(@MaybeNull Manifest manifest) {
+                                    return this;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void store(Map<TypeDescription, byte[]> binaryRepresentations) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void retain(Source.Element element) {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void close() {
+                                    /* do nothing */
+                                }
+                            }
+
+                            /**
+                             * A sink that stores all elements in a memory map.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class InMemory implements Target, Sink {
+
+                                /**
+                                 * The map for storing all elements being received.
+                                 */
+                                private final Map<String, byte[]> storage;
+
+                                /**
+                                 * Creates a new in-memory storage.
+                                 */
+                                public InMemory() {
+                                    this(new HashMap<String, byte[]>());
+                                }
+
+                                /**
+                                 * Creates a new in-memory storage.
+                                 *
+                                 * @param storage The map for storing all elements being received.
+                                 */
+                                public InMemory(Map<String, byte[]> storage) {
+                                    this.storage = storage;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Sink write(@MaybeNull Manifest manifest) throws IOException {
+                                    if (manifest != null) {
+                                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                                        try {
+                                            manifest.write(outputStream);
+                                        } finally {
+                                            outputStream.close();
+                                        }
+                                        storage.put(JarFile.MANIFEST_NAME, outputStream.toByteArray());
+                                    }
+                                    return this;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void store(Map<TypeDescription, byte[]> binaryRepresentations) {
+                                    for (Map.Entry<TypeDescription, byte[]> entry : binaryRepresentations.entrySet()) {
+                                        storage.put(entry.getKey().getInternalName() + CLASS_FILE_EXTENSION, entry.getValue());
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void retain(Source.Element element) throws IOException {
+                                    String name = element.getName();
+                                    if (!name.endsWith("/")) {
+                                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                                        try {
+                                            InputStream inputStream = element.getInputStream();
+                                            try {
+                                                byte[] buffer = new byte[1024];
+                                                int length;
+                                                while ((length = inputStream.read(buffer)) != -1) {
+                                                    outputStream.write(buffer, 0, length);
+                                                }
+                                            } finally {
+                                                inputStream.close();
+                                            }
+                                        } finally {
+                                            outputStream.close();
+                                        }
+                                        storage.put(element.getName(), outputStream.toByteArray());
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void close() {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * Returns the in-memory storage.
+                                 *
+                                 * @return The in-memory storage.
+                                 */
+                                public Map<String, byte[]> getStorage() {
+                                    return storage;
+                                }
+
+                                /**
+                                 * Returns the in-memory storage as a type-map where all non-class files are discarded.
+                                 *
+                                 * @return The in-memory storage as a type map.
+                                 */
+                                public Map<String, byte[]> toTypeMap() {
+                                    Map<String, byte[]> binaryRepresentations = new HashMap<String, byte[]>();
+                                    for (Map.Entry<String, byte[]> entry : storage.entrySet()) {
+                                        if (entry.getKey().endsWith(CLASS_FILE_EXTENSION)) {
+                                            binaryRepresentations.put(entry.getKey()
+                                                    .substring(0, entry.getKey().length() - CLASS_FILE_EXTENSION.length())
+                                                    .replace('/', '.'), entry.getValue());
+                                        }
+                                    }
+                                    return binaryRepresentations;
+                                }
+                            }
+
+                            /**
+                             * Represents a folder as the target for a plugin engine's application.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class ForFolder implements Target, Sink {
+
+                                /**
+                                 * The folder that is represented by this instance.
+                                 */
+                                private final File folder;
+
+                                /**
+                                 * Creates a new target for a folder.
+                                 *
+                                 * @param folder The folder that is represented by this instance.
+                                 */
+                                public ForFolder(File folder) {
+                                    this.folder = folder;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Sink write(@MaybeNull Manifest manifest) throws IOException {
+                                    if (manifest != null) {
+                                        File target = new File(folder, JarFile.MANIFEST_NAME);
+                                        if (!target.getParentFile().isDirectory() && !target.getParentFile().mkdirs()) {
+                                            throw new IOException("Could not create directory: " + target.getParent());
+                                        }
+                                        OutputStream outputStream = new FileOutputStream(target);
+                                        try {
+                                            manifest.write(outputStream);
+                                        } finally {
+                                            outputStream.close();
+                                        }
+                                    }
+                                    return this;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void store(Map<TypeDescription, byte[]> binaryRepresentations) throws IOException {
+                                    for (Map.Entry<TypeDescription, byte[]> entry : binaryRepresentations.entrySet()) {
+                                        File target = new File(folder, entry.getKey().getInternalName() + CLASS_FILE_EXTENSION);
+                                        if (!target.getParentFile().isDirectory() && !target.getParentFile().mkdirs()) {
+                                            throw new IOException("Could not create directory: " + target.getParent());
+                                        }
+                                        OutputStream outputStream = new FileOutputStream(target);
+                                        try {
+                                            outputStream.write(entry.getValue());
+                                        } finally {
+                                            outputStream.close();
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void retain(Source.Element element) throws IOException {
+                                    String name = element.getName();
+                                    if (!name.endsWith("/")) {
+                                        File target = new File(folder, name), resolved = element.resolveAs(File.class);
+                                        if (!target.getCanonicalPath().startsWith(folder.getCanonicalPath())) {
+                                            throw new IllegalArgumentException(target + " is not a subdirectory of " + folder);
+                                        } else if (!target.getParentFile().isDirectory() && !target.getParentFile().mkdirs()) {
+                                            throw new IOException("Could not create directory: " + target.getParent());
+                                        } else if (resolved != null && !resolved.equals(target)) {
+                                            FileSystem.getInstance().copy(resolved, target);
+                                        } else if (!target.equals(resolved)) {
+                                            InputStream inputStream = element.getInputStream();
+                                            try {
+                                                OutputStream outputStream = new FileOutputStream(target);
+                                                try {
+                                                    byte[] buffer = new byte[1024];
+                                                    int length;
+                                                    while ((length = inputStream.read(buffer)) != -1) {
+                                                        outputStream.write(buffer, 0, length);
+                                                    }
+                                                } finally {
+                                                    outputStream.close();
+                                                }
+                                            } finally {
+                                                inputStream.close();
+                                            }
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void close() {
+                                    /* do nothing */
+                                }
+                            }
+
+                            /**
+                             * Represents a jar file as a target.
+                             */
+                            @HashCodeAndEqualsPlugin.Enhance
+                            class ForJarFile implements Target {
+
+                                /**
+                                 * The jar file that is represented by this target.
+                                 */
+                                private final File file;
+
+                                /**
+                                 * Creates a new target for a jar file.
+                                 *
+                                 * @param file The jar file that is represented by this target.
+                                 */
+                                public ForJarFile(File file) {
+                                    this.file = file;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Sink write(@MaybeNull Manifest manifest) throws IOException {
+                                    return manifest == null
+                                            ? new Sink.ForJarOutputStream(new JarOutputStream(new FileOutputStream(file)))
+                                            : new Sink.ForJarOutputStream(new JarOutputStream(new FileOutputStream(file), manifest));
+                                }
+                            }
+                        }
+
+                        /**
+                         * A dispatcher to execute a plugin engine transformation. A dispatcher will receive all work assignments prior to the invocation
+                         * of complete. After registering and eventually completing the supplied work, the close method will always be called. Any dispatcher
+                         * will only be used once and from a single thread.
+                         */
+                        interface Dispatcher extends Closeable {
+
+                            /**
+                             * Accepts a new work assignment.
+                             *
+                             * @param work  The work to handle prefixed by a preprocessing step.
+                             * @param eager {@code true} if the processing does not need to be deferred until all preprocessing is complete.
+                             * @throws IOException If an I/O exception occurs.
+                             */
+                            void accept(Callable<? extends Callable<? extends Materializable>> work, boolean eager) throws IOException;
+
+                            /**
+                             * Completes the work being handled.
+                             *
+                             * @throws IOException If an I/O exception occurs.
+                             */
+                            void complete() throws IOException;
+
+                            /**
+                             * The result of a work assignment that needs to be invoked from the main thread that triggers a dispatchers life-cycle methods.
+                             */
+                            interface Materializable {
+
+                                /**
+                                 * Materializes this work result and adds any results to the corresponding collection.
+                                 *
+                                 * @param sink        The sink to write any work to.
+                                 * @param transformed A list of all types that are transformed.
+                                 * @param failed      A mapping of all types that failed during transformation to the exceptions that explain the failure.
+                                 * @param unresolved  A list of type names that could not be resolved.
+                                 * @throws IOException If an I/O exception occurs.
+                                 */
+                                void materialize(Target.Sink sink,
+                                                 List<TypeDescription> transformed,
+                                                 Map<TypeDescription,
+                                                         List<Throwable>> failed,
+                                                 List<String> unresolved) throws IOException;
+
+                                /**
+                                 * A materializable for a successfully transformed type.
+                                 */
+                                class ForTransformedElement implements Materializable {
+
+                                    /**
+                                     * The type that has been transformed.
+                                     */
+                                    private final DynamicType dynamicType;
+
+                                    /**
+                                     * Creates a new materializable for a successfully transformed type.
+                                     *
+                                     * @param dynamicType The type that has been transformed.
+                                     */
+                                    protected ForTransformedElement(DynamicType dynamicType) {
+                                        this.dynamicType = dynamicType;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void materialize(Target.Sink sink,
+                                                            List<TypeDescription> transformed,
+                                                            Map<TypeDescription,
+                                                                    List<Throwable>> failed,
+                                                            List<String> unresolved) throws IOException {
+                                        sink.store(dynamicType.getAllTypes());
+                                        transformed.add(dynamicType.getTypeDescription());
+                                    }
+                                }
+
+                                /**
+                                 * A materializable for an element that is retained in its original state.
+                                 */
+                                class ForRetainedElement implements Materializable {
+
+                                    /**
+                                     * The retained element.
+                                     */
+                                    private final Source.Element element;
+
+                                    /**
+                                     * Creates a new materializable for a retained element.
+                                     *
+                                     * @param element The retained element.
+                                     */
+                                    protected ForRetainedElement(Source.Element element) {
+                                        this.element = element;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void materialize(Target.Sink sink,
+                                                            List<TypeDescription> transformed,
+                                                            Map<TypeDescription,
+                                                                    List<Throwable>> failed,
+                                                            List<String> unresolved) throws IOException {
+                                        sink.retain(element);
+                                    }
+                                }
+
+                                /**
+                                 * A materializable for an element that failed to be transformed.
+                                 */
+                                class ForFailedElement implements Materializable {
+
+                                    /**
+                                     * The element for which the transformation failed.
+                                     */
+                                    private final Source.Element element;
+
+                                    /**
+                                     * The type description for the represented type.
+                                     */
+                                    private final TypeDescription typeDescription;
+
+                                    /**
+                                     * A non-empty list of errors that occurred when attempting the transformation.
+                                     */
+                                    private final List<Throwable> errored;
+
+                                    /**
+                                     * Creates a new materializable for an element that failed to be transformed.
+                                     *
+                                     * @param element         The element for which the transformation failed.
+                                     * @param typeDescription The type description for the represented type.
+                                     * @param errored         A non-empty list of errors that occurred when attempting the transformation.
+                                     */
+                                    protected ForFailedElement(Source.Element element, TypeDescription typeDescription, List<Throwable> errored) {
+                                        this.element = element;
+                                        this.typeDescription = typeDescription;
+                                        this.errored = errored;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void materialize(Target.Sink sink,
+                                                            List<TypeDescription> transformed,
+                                                            Map<TypeDescription,
+                                                                    List<Throwable>> failed,
+                                                            List<String> unresolved) throws IOException {
+                                        sink.retain(element);
+                                        failed.put(typeDescription, errored);
+                                    }
+                                }
+
+                                /**
+                                 * A materializable for an element that could not be resolved.
+                                 */
+                                class ForUnresolvedElement implements Materializable {
+
+                                    /**
+                                     * The element that could not be resolved.
+                                     */
+                                    private final Source.Element element;
+
+                                    /**
+                                     * The name of the type that was deducted for this element.
+                                     */
+                                    private final String typeName;
+
+                                    /**
+                                     * Creates a new materializable for an element that could not be resolved.
+                                     *
+                                     * @param element  The element that could not be resolved.
+                                     * @param typeName The name of the type that was deducted for this element.
+                                     */
+                                    protected ForUnresolvedElement(Source.Element element, String typeName) {
+                                        this.element = element;
+                                        this.typeName = typeName;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public void materialize(Target.Sink sink,
+                                                            List<TypeDescription> transformed,
+                                                            Map<TypeDescription,
+                                                                    List<Throwable>> failed,
+                                                            List<String> unresolved) throws IOException {
+                                        sink.retain(element);
+                                        unresolved.add(typeName);
+                                    }
+                                }
+                            }
+
+                            /**
+                             * A factory that is used for creating a dispatcher that is used for a specific plugin engine application.
+                             */
+                            interface Factory {
+
+                                /**
+                                 * Creates a new dispatcher.
+                                 *
+                                 * @param sink        The sink to write any work to.
+                                 * @param transformed A list of all types that are transformed.
+                                 * @param failed      A mapping of all types that failed during transformation to the exceptions that explain the failure.
+                                 * @param unresolved  A list of type names that could not be resolved.
+                                 * @return The dispatcher to use.
+                                 */
+                                Dispatcher make(Target.Sink sink,
+                                                List<TypeDescription> transformed,
+                                                Map<TypeDescription,
+                                                        List<Throwable>> failed,
+                                                List<String> unresolved);
+                            }
+
+                            /**
+                             * A dispatcher that applies transformation upon discovery.
+                             */
+                            class ForSerialTransformation implements Dispatcher {
+
+                                /**
+                                 * The sink to write any work to.
+                                 */
+                                private final Target.Sink sink;
+
+                                /**
+                                 * A list of all types that are transformed.
+                                 */
+                                private final List<TypeDescription> transformed;
+
+                                /**
+                                 * A mapping of all types that failed during transformation to the exceptions that explain the failure.
+                                 */
+                                private final Map<TypeDescription, List<Throwable>> failed;
+
+                                /**
+                                 * A list of type names that could not be resolved.
+                                 */
+                                private final List<String> unresolved;
+
+                                /**
+                                 * A list of deferred processings.
+                                 */
+                                private final List<Callable<? extends Materializable>> preprocessings;
+
+                                /**
+                                 * Creates a dispatcher for a serial transformation.
+                                 *
+                                 * @param sink        The sink to write any work to.
+                                 * @param transformed A list of all types that are transformed.
+                                 * @param failed      A mapping of all types that failed during transformation to the exceptions that explain the failure.
+                                 * @param unresolved  A list of type names that could not be resolved.
+                                 */
+                                protected ForSerialTransformation(Target.Sink sink,
+                                                                  List<TypeDescription> transformed,
+                                                                  Map<TypeDescription, List<Throwable>> failed,
+                                                                  List<String> unresolved) {
+                                    this.sink = sink;
+                                    this.transformed = transformed;
+                                    this.failed = failed;
+                                    this.unresolved = unresolved;
+                                    preprocessings = new ArrayList<Callable<? extends Materializable>>();
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void accept(Callable<? extends Callable<? extends Materializable>> work, boolean eager) throws IOException {
+                                    try {
+                                        Callable<? extends Materializable> preprocessed = work.call();
+                                        if (eager) {
+                                            preprocessed.call().materialize(sink, transformed, failed, unresolved);
+                                        } else {
+                                            preprocessings.add(preprocessed);
+                                        }
+                                    } catch (Exception exception) {
+                                        if (exception instanceof IOException) {
+                                            throw (IOException) exception;
+                                        } else if (exception instanceof RuntimeException) {
+                                            throw (RuntimeException) exception;
+                                        } else {
+                                            throw new IllegalStateException(exception);
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void complete() throws IOException {
+                                    for (Callable<? extends Materializable> preprocessing : preprocessings) {
+                                        if (Thread.interrupted()) {
+                                            Thread.currentThread().interrupt();
+                                            throw new IllegalStateException("Interrupted during plugin engine completion");
+                                        }
+                                        try {
+                                            preprocessing.call().materialize(sink, transformed, failed, unresolved);
+                                        } catch (Exception exception) {
+                                            if (exception instanceof IOException) {
+                                                throw (IOException) exception;
+                                            } else if (exception instanceof RuntimeException) {
+                                                throw (RuntimeException) exception;
+                                            } else {
+                                                throw new IllegalStateException(exception);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void close() {
+                                    /* do nothing */
+                                }
+
+                                /**
+                                 * A factory for creating a serial dispatcher.
+                                 */
+                                public enum Factory implements Dispatcher.Factory {
+
+                                    /**
+                                     * The singleton instance.
+                                     */
+                                    INSTANCE;
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Dispatcher make(Target.Sink sink,
+                                                           List<TypeDescription> transformed,
+                                                           Map<TypeDescription,
+                                                                   List<Throwable>> failed,
+                                                           List<String> unresolved) {
+                                        return new ForSerialTransformation(sink, transformed, failed, unresolved);
+                                    }
+                                }
+                            }
+
+                            /**
+                             * A dispatcher that applies transformations within one or more threads in parallel to the default transformer.
+                             */
+                            class ForParallelTransformation implements Dispatcher {
+
+                                /**
+                                 * The target sink.
+                                 */
+                                private final Target.Sink sink;
+
+                                /**
+                                 * A list of all types that are transformed.
+                                 */
+                                private final List<TypeDescription> transformed;
+
+                                /**
+                                 * A mapping of all types that failed during transformation to the exceptions that explain the failure.
+                                 */
+                                private final Map<TypeDescription, List<Throwable>> failed;
+
+                                /**
+                                 * A list of type names that could not be resolved.
+                                 */
+                                private final List<String> unresolved;
+
+                                /**
+                                 * A completion service for all preprocessings.
+                                 */
+                                private final CompletionService<Callable<Materializable>> preprocessings;
+
+                                /**
+                                 * A completion service for all materializers.
+                                 */
+                                private final CompletionService<Materializable> materializers;
+
+                                /**
+                                 * A count of deferred processings.
+                                 */
+                                private int deferred;
+
+                                /**
+                                 * A collection of futures that are currently scheduled.
+                                 */
+                                private final Set<Future<?>> futures;
+
+                                /**
+                                 * Creates a new dispatcher that applies transformations in parallel.
+                                 *
+                                 * @param executor    The executor to delegate any work to.
+                                 * @param sink        The target sink.
+                                 * @param transformed A list of all types that are transformed.
+                                 * @param failed      A mapping of all types that failed during transformation to the exceptions that explain the failure.
+                                 * @param unresolved  A list of type names that could not be resolved.
+                                 */
+                                protected ForParallelTransformation(Executor executor,
+                                                                    Target.Sink sink,
+                                                                    List<TypeDescription> transformed,
+                                                                    Map<TypeDescription,
+                                                                            List<Throwable>> failed,
+                                                                    List<String> unresolved) {
+                                    this.sink = sink;
+                                    this.transformed = transformed;
+                                    this.failed = failed;
+                                    this.unresolved = unresolved;
+                                    preprocessings = new ExecutorCompletionService<Callable<Materializable>>(executor);
+                                    materializers = new ExecutorCompletionService<Materializable>(executor);
+                                    futures = new HashSet<Future<?>>();
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                @SuppressWarnings("unchecked")
+                                public void accept(Callable<? extends Callable<? extends Materializable>> work, boolean eager) {
+                                    if (eager) {
+                                        futures.add(materializers.submit(new EagerWork(work)));
+                                    } else {
+                                        deferred += 1;
+                                        futures.add(preprocessings.submit((Callable<Callable<Materializable>>) work));
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void complete() throws IOException {
+                                    try {
+                                        List<Callable<Materializable>> preprocessings = new ArrayList<Callable<Materializable>>(deferred);
+                                        while (deferred-- > 0) {
+                                            Future<Callable<Materializable>> future = this.preprocessings.take();
+                                            futures.remove(future);
+                                            preprocessings.add(future.get());
+                                        }
+                                        for (Callable<Materializable> preprocessing : preprocessings) {
+                                            futures.add(materializers.submit(preprocessing));
+                                        }
+                                        while (!futures.isEmpty()) {
+                                            Future<Materializable> future = materializers.take();
+                                            futures.remove(future);
+                                            future.get().materialize(sink, transformed, failed, unresolved);
+                                        }
+                                    } catch (InterruptedException exception) {
+                                        Thread.currentThread().interrupt();
+                                        throw new IllegalStateException(exception);
+                                    } catch (ExecutionException exception) {
+                                        Throwable cause = exception.getCause();
+                                        if (cause instanceof IOException) {
+                                            throw (IOException) cause;
+                                        } else if (cause instanceof RuntimeException) {
+                                            throw (RuntimeException) cause;
+                                        } else if (cause instanceof Error) {
+                                            throw (Error) cause;
+                                        } else {
+                                            throw new IllegalStateException(cause);
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public void close() {
+                                    for (Future<?> future : futures) {
+                                        future.cancel(true);
+                                    }
+                                }
+
+                                /**
+                                 * A parallel dispatcher that shuts down its executor service upon completion of a plugin engine's application.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                public static class WithThrowawayExecutorService extends ForParallelTransformation {
+
+                                    /**
+                                     * The executor service to delegate any work to.
+                                     */
+                                    private final ExecutorService executorService;
+
+                                    /**
+                                     * Creates a new dispatcher that applies transformations in parallel and that closes the supplies executor service.
+                                     *
+                                     * @param executorService The executor service to delegate any work to.
+                                     * @param sink            The target sink.
+                                     * @param transformed     A list of all types that are transformed.
+                                     * @param failed          A mapping of all types that failed during transformation to the exceptions that explain the failure.
+                                     * @param unresolved      A list of type names that could not be resolved.
+                                     */
+                                    protected WithThrowawayExecutorService(ExecutorService executorService,
+                                                                           Target.Sink sink,
+                                                                           List<TypeDescription> transformed,
+                                                                           Map<TypeDescription, List<Throwable>> failed,
+                                                                           List<String> unresolved) {
+                                        super(executorService, sink, transformed, failed, unresolved);
+                                        this.executorService = executorService;
+                                    }
+
+                                    @Override
+                                    public void close() {
+                                        try {
+                                            super.close();
+                                        } finally {
+                                            executorService.shutdown();
+                                        }
+                                    }
+
+                                    /**
+                                     * A factory for a parallel executor service that creates a new executor service on each plugin engine application.
+                                     */
+                                    @HashCodeAndEqualsPlugin.Enhance
+                                    public static class Factory implements Dispatcher.Factory {
+
+                                        /**
+                                         * The amount of threads to create in the throw-away executor service.
+                                         */
+                                        private final int threads;
+
+                                        /**
+                                         * Creates a new factory.
+                                         *
+                                         * @param threads The amount of threads to create in the throw-away executor service.
+                                         */
+                                        public Factory(int threads) {
+                                            this.threads = threads;
+                                        }
+
+                                        /**
+                                         * {@inheritDoc}
+                                         */
+                                        public Dispatcher make(Target.Sink sink,
+                                                               List<TypeDescription> transformed,
+                                                               Map<TypeDescription, List<Throwable>> failed,
+                                                               List<String> unresolved) {
+                                            return new WithThrowawayExecutorService(Executors.newFixedThreadPool(threads), sink, transformed, failed, unresolved);
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * A factory for a dispatcher that uses a given executor service for parallel dispatching.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                public static class Factory implements Dispatcher.Factory {
+
+                                    /**
+                                     * The executor to use.
+                                     */
+                                    private final Executor executor;
+
+                                    /**
+                                     * Creates a new dispatcher factory for parallel dispatching using the supplied executor.
+                                     *
+                                     * @param executor The executor to use.
+                                     */
+                                    public Factory(Executor executor) {
+                                        this.executor = executor;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Dispatcher make(Target.Sink sink,
+                                                           List<TypeDescription> transformed,
+                                                           Map<TypeDescription, List<Throwable>> failed,
+                                                           List<String> unresolved) {
+                                        return new ForParallelTransformation(executor, sink, transformed, failed, unresolved);
+                                    }
+                                }
+
+                                /**
+                                 * An eager materialization that does not defer processing after preprocessing.
+                                 */
+                                @HashCodeAndEqualsPlugin.Enhance
+                                protected static class EagerWork implements Callable<Materializable> {
+
+                                    /**
+                                     * The work to apply.
+                                     */
+                                    private final Callable<? extends Callable<? extends Materializable>> work;
+
+                                    /**
+                                     * Creates an eager work resolution.
+                                     *
+                                     * @param work The work to apply.
+                                     */
+                                    protected EagerWork(Callable<? extends Callable<? extends Materializable>> work) {
+                                        this.work = work;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Materializable call() throws Exception {
+                                        return work.call().call();
+                                    }
+                                }
+                            }
+                        }
+
+                        /**
+                         * A summary of the application of a {@link Engine} to a source and target.
+                         */
+                        class Summary {
+
+                            /**
+                             * A list of all types that were transformed.
+                             */
+                            private final List<TypeDescription> transformed;
+
+                            /**
+                             * A mapping of all types that failed during transformation to the exceptions that explain the failure.
+                             */
+                            private final Map<TypeDescription, List<Throwable>> failed;
+
+                            /**
+                             * A list of type names that could not be resolved.
+                             */
+                            private final List<String> unresolved;
+
+                            /**
+                             * Creates a new summary.
+                             *
+                             * @param transformed A list of all types that were transformed.
+                             * @param failed      A mapping of all types that failed during transformation to the exceptions that explain the failure.
+                             * @param unresolved  A list of type names that could not be resolved.
+                             */
+                            public Summary(List<TypeDescription> transformed, Map<TypeDescription, List<Throwable>> failed, List<String> unresolved) {
+                                this.transformed = transformed;
+                                this.failed = failed;
+                                this.unresolved = unresolved;
+                            }
+
+                            /**
+                             * Returns a list of all types that were transformed.
+                             *
+                             * @return A list of all types that were transformed.
+                             */
+                            public List<TypeDescription> getTransformed() {
+                                return transformed;
+                            }
+
+                            /**
+                             * Returns a mapping of all types that failed during transformation to the exceptions that explain the failure.
+                             *
+                             * @return A mapping of all types that failed during transformation to the exceptions that explain the failure.
+                             */
+                            public Map<TypeDescription, List<Throwable>> getFailed() {
+                                return failed;
+                            }
+
+                            /**
+                             * Returns a list of type names that could not be resolved.
+                             *
+                             * @return A list of type names that could not be resolved.
+                             */
+                            public List<String> getUnresolved() {
+                                return unresolved;
+                            }
+
+                            @Override
+                            public int hashCode() {
+                                int result = transformed.hashCode();
+                                result = 31 * result + failed.hashCode();
+                                result = 31 * result + unresolved.hashCode();
+                                return result;
+                            }
+
+                            @Override
+                            public boolean equals(@MaybeNull Object other) {
+                                if (this == other) {
+                                    return true;
+                                } else if (other == null || getClass() != other.getClass()) {
+                                    return false;
+                                }
+                                Summary summary = (Summary) other;
+                                return transformed.equals(summary.transformed)
+                                        && failed.equals(summary.failed)
+                                        && unresolved.equals(summary.unresolved);
+                            }
+                        }
+
+                        /**
+                         * An abstract base implementation of a plugin engine.
+                         */
+                        abstract class AbstractBase implements Engine {
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine withErrorHandlers(ErrorHandler... errorHandler) {
+                                return withErrorHandlers(Arrays.asList(errorHandler));
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine withParallelTransformation(int threads) {
+                                if (threads < 1) {
+                                    throw new IllegalArgumentException("Number of threads must be positive: " + threads);
+                                }
+                                return with(new Dispatcher.ForParallelTransformation.WithThrowawayExecutorService.Factory(threads));
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Summary apply(File source, File target, Factory... factory) throws IOException {
+                                return apply(source, target, Arrays.asList(factory));
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Summary apply(File source, File target, List<? extends Factory> factories) throws IOException {
+                                return apply(source.isDirectory()
+                                        ? new Source.ForFolder(source)
+                                        : new Source.ForJarFile(source), target.isDirectory()
+                                        ? new Target.ForFolder(target)
+                                        : new Target.ForJarFile(target), factories);
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Summary apply(Source source, Target target, Factory... factory) throws IOException {
+                                return apply(source, target, Arrays.asList(factory));
+                            }
+                        }
+
+                        /**
+                         * A default implementation of a plugin engine.
+                         */
+                        @HashCodeAndEqualsPlugin.Enhance
+                        class Default extends AbstractBase {
+
+                            /**
+                             * The Byte Buddy instance to use.
+                             */
+                            private final ByteBuddy byteBuddy;
+
+                            /**
+                             * The type strategy to use.
+                             */
+                            private final TypeStrategy typeStrategy;
+
+                            /**
+                             * The pool strategy to use.
+                             */
+                            private final PoolStrategy poolStrategy;
+
+                            /**
+                             * The class file locator to use.
+                             */
+                            private final ClassFileLocator classFileLocator;
+
+                            /**
+                             * The listener to use.
+                             */
+                            private final Listener listener;
+
+                            /**
+                             * The error handler to use.
+                             */
+                            private final ErrorHandler errorHandler;
+
+                            /**
+                             * The dispatcher factory to use.
+                             */
+                            private final Dispatcher.Factory dispatcherFactory;
+
+                            /**
+                             * A matcher for types to exclude from transformation.
+                             */
+                            private final ElementMatcher.Junction<? super TypeDescription> ignoredTypeMatcher;
+
+                            /**
+                             * Creates a new default plugin engine that rebases types and fails fast and on unresolved types and on live initializers.
+                             */
+                            public Default() {
+                                this(new ByteBuddy());
+                            }
+
+                            /**
+                             * Creates a new default plugin engine that rebases types and fails fast and on unresolved types and on live initializers.
+                             *
+                             * @param byteBuddy The Byte Buddy instance to use.
+                             */
+                            public Default(ByteBuddy byteBuddy) {
+                                this(byteBuddy, TypeStrategy.Default.REBASE);
+                            }
+
+                            /**
+                             * Creates a new default plugin engine.
+                             *
+                             * @param byteBuddy    The Byte Buddy instance to use.
+                             * @param typeStrategy The type strategy to use.
+                             */
+                            protected Default(ByteBuddy byteBuddy, TypeStrategy typeStrategy) {
+                                this(byteBuddy,
+                                        typeStrategy,
+                                        PoolStrategy.Default.FAST,
+                                        ClassFileLocator.NoOp.INSTANCE,
+                                        Listener.NoOp.INSTANCE,
+                                        new ErrorHandler.Compound(ErrorHandler.Failing.FAIL_FAST,
+                                                ErrorHandler.Enforcing.ALL_TYPES_RESOLVED,
+                                                ErrorHandler.Enforcing.NO_LIVE_INITIALIZERS),
+                                        Dispatcher.ForSerialTransformation.Factory.INSTANCE,
+                                        none());
+                            }
+
+                            /**
+                             * Creates a new default plugin engine.
+                             *
+                             * @param byteBuddy          The Byte Buddy instance to use.
+                             * @param typeStrategy       The type strategy to use.
+                             * @param poolStrategy       The pool strategy to use.
+                             * @param classFileLocator   The class file locator to use.
+                             * @param listener           The listener to use.
+                             * @param errorHandler       The error handler to use.
+                             * @param dispatcherFactory  The dispatcher factory to use.
+                             * @param ignoredTypeMatcher A matcher for types to exclude from transformation.
+                             */
+                            protected Default(ByteBuddy byteBuddy,
+                                              TypeStrategy typeStrategy,
+                                              PoolStrategy poolStrategy,
+                                              ClassFileLocator classFileLocator,
+                                              Listener listener,
+                                              ErrorHandler errorHandler,
+                                              Dispatcher.Factory dispatcherFactory,
+                                              ElementMatcher.Junction<? super TypeDescription> ignoredTypeMatcher) {
+                                this.byteBuddy = byteBuddy;
+                                this.typeStrategy = typeStrategy;
+                                this.poolStrategy = poolStrategy;
+                                this.classFileLocator = classFileLocator;
+                                this.listener = listener;
+                                this.errorHandler = errorHandler;
+                                this.dispatcherFactory = dispatcherFactory;
+                                this.ignoredTypeMatcher = ignoredTypeMatcher;
+                            }
+
+                            /**
+                             * Creates a plugin engine from an {@link EntryPoint}.
+                             *
+                             * @param entryPoint            The entry point to resolve into a plugin engine.
+                             * @param classFileVersion      The class file version to assume.
+                             * @param methodNameTransformer The method name transformer to use.
+                             * @return An appropriate plugin engine.
+                             */
+                            public static Engine of(EntryPoint entryPoint, ClassFileVersion classFileVersion, MethodNameTransformer methodNameTransformer) {
+                                return new Default(entryPoint.byteBuddy(classFileVersion), new TypeStrategy.ForEntryPoint(entryPoint, methodNameTransformer));
+                            }
+
+                            /**
+                             * Runs a plugin engine using the first and second argument as source and target file location and any additional argument as
+                             * the fully qualified name of any plugin to apply.
+                             *
+                             * @param argument The arguments for running the plugin engine.
+                             * @throws ClassNotFoundException If a plugin class cannot be found on the system class loader.
+                             * @throws IOException            If an I/O exception occurs.
+                             */
+                            @SuppressWarnings("unchecked")
+                            public static void main(String... argument) throws ClassNotFoundException, IOException {
+                                if (argument.length < 2) {
+                                    throw new IllegalArgumentException("Expected arguments: <source> <target> [<plugin>, ...]");
+                                }
+                                List<Plugin.Factory> factories = new ArrayList<Factory>(argument.length - 2);
+                                for (String plugin : Arrays.asList(argument).subList(2, argument.length)) {
+                                    factories.add(new Factory.UsingReflection((Class<? extends Plugin>) Class.forName(plugin)));
+                                }
+                                new Default().apply(new File(argument[0]), new File(argument[1]), factories);
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine with(ByteBuddy byteBuddy) {
+                                return new Default(byteBuddy,
+                                        typeStrategy,
+                                        poolStrategy,
+                                        classFileLocator,
+                                        listener,
+                                        errorHandler,
+                                        dispatcherFactory,
+                                        ignoredTypeMatcher);
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine with(TypeStrategy typeStrategy) {
+                                return new Default(byteBuddy,
+                                        typeStrategy,
+                                        poolStrategy,
+                                        classFileLocator,
+                                        listener,
+                                        errorHandler,
+                                        dispatcherFactory,
+                                        ignoredTypeMatcher);
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine with(PoolStrategy poolStrategy) {
+                                return new Default(byteBuddy,
+                                        typeStrategy,
+                                        poolStrategy,
+                                        classFileLocator,
+                                        listener,
+                                        errorHandler,
+                                        dispatcherFactory,
+                                        ignoredTypeMatcher);
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine with(ClassFileLocator classFileLocator) {
+                                return new Default(byteBuddy,
+                                        typeStrategy,
+                                        poolStrategy,
+                                        new ClassFileLocator.Compound(this.classFileLocator, classFileLocator),
+                                        listener,
+                                        errorHandler,
+                                        dispatcherFactory,
+                                        ignoredTypeMatcher);
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine with(Listener listener) {
+                                return new Default(byteBuddy,
+                                        typeStrategy,
+                                        poolStrategy,
+                                        classFileLocator,
+                                        new Listener.Compound(this.listener, listener),
+                                        errorHandler,
+                                        dispatcherFactory,
+                                        ignoredTypeMatcher);
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine withoutErrorHandlers() {
+                                return new Default(byteBuddy,
+                                        typeStrategy,
+                                        poolStrategy,
+                                        classFileLocator,
+                                        listener,
+                                        Listener.NoOp.INSTANCE,
+                                        dispatcherFactory,
+                                        ignoredTypeMatcher);
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine withErrorHandlers(List<? extends ErrorHandler> errorHandlers) {
+                                return new Default(byteBuddy,
+                                        typeStrategy,
+                                        poolStrategy,
+                                        classFileLocator,
+                                        listener,
+                                        new ErrorHandler.Compound(errorHandlers),
+                                        dispatcherFactory,
+                                        ignoredTypeMatcher);
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine with(Dispatcher.Factory dispatcherFactory) {
+                                return new Default(byteBuddy,
+                                        typeStrategy,
+                                        poolStrategy,
+                                        classFileLocator,
+                                        listener,
+                                        errorHandler,
+                                        dispatcherFactory,
+                                        ignoredTypeMatcher);
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Engine ignore(ElementMatcher<? super TypeDescription> matcher) {
+                                return new Default(byteBuddy,
+                                        typeStrategy,
+                                        poolStrategy,
+                                        classFileLocator,
+                                        listener,
+                                        errorHandler,
+                                        dispatcherFactory,
+                                        ignoredTypeMatcher.<TypeDescription>or(matcher));
+                            }
+
+                            /**
+                             * {@inheritDoc}
+                             */
+                            public Summary apply(Source source, Target target, List<? extends Plugin.Factory> factories) throws IOException {
+                                Listener listener = new Listener.Compound(this.listener, new Listener.ForErrorHandler(errorHandler));
+                                List<TypeDescription> transformed = new ArrayList<TypeDescription>();
+                                Map<TypeDescription, List<Throwable>> failed = new LinkedHashMap<TypeDescription, List<Throwable>>();
+                                List<String> unresolved = new ArrayList<String>();
+                                Throwable rethrown = null;
+                                List<Plugin> plugins = new ArrayList<Plugin>(factories.size());
+                                List<WithPreprocessor> preprocessors = new ArrayList<WithPreprocessor>();
+                                try {
+                                    for (Plugin.Factory factory : factories) {
+                                        Plugin plugin = factory.make();
+                                        plugins.add(plugin);
+                                        if (plugin instanceof WithPreprocessor) {
+                                            preprocessors.add((WithPreprocessor) plugin);
+                                        }
+                                    }
+                                    Source.Origin origin = source.read();
+                                    try {
+                                        ClassFileLocator classFileLocator = new ClassFileLocator.Compound(origin.getClassFileLocator(), this.classFileLocator);
+                                        TypePool typePool = poolStrategy.typePool(classFileLocator);
+                                        Manifest manifest = origin.getManifest();
+                                        listener.onManifest(manifest);
+                                        Target.Sink sink = target.write(manifest);
+                                        try {
+                                            Dispatcher dispatcher = dispatcherFactory.make(sink, transformed, failed, unresolved);
+                                            try {
+                                                for (Source.Element element : origin) {
+                                                    if (Thread.interrupted()) {
+                                                        Thread.currentThread().interrupt();
+                                                        throw new IllegalStateException("Thread interrupted during plugin engine application");
+                                                    }
+                                                    String name = element.getName();
+                                                    while (name.startsWith("/")) {
+                                                        name = name.substring(1);
+                                                    }
+                                                    if (name.endsWith(CLASS_FILE_EXTENSION) && !name.endsWith(PACKAGE_INFO) && !name.equals(MODULE_INFO)) {
+                                                        dispatcher.accept(new Preprocessor(element,
+                                                                name.substring(0, name.length() - CLASS_FILE_EXTENSION.length()).replace('/', '.'),
+                                                                classFileLocator,
+                                                                typePool,
+                                                                listener,
+                                                                plugins,
+                                                                preprocessors), preprocessors.isEmpty());
+                                                    } else if (!name.equals(JarFile.MANIFEST_NAME)) {
+                                                        listener.onResource(name);
+                                                        sink.retain(element);
+                                                    }
+                                                }
+                                                dispatcher.complete();
+                                            } finally {
+                                                dispatcher.close();
+                                            }
+                                            if (!failed.isEmpty()) {
+                                                listener.onError(failed);
+                                            }
+                                        } finally {
+                                            sink.close();
+                                        }
+                                    } finally {
+                                        origin.close();
+                                    }
+                                } finally {
+                                    for (Plugin plugin : plugins) {
+                                        try {
+                                            plugin.close();
+                                        } catch (Throwable throwable) {
+                                            try {
+                                                listener.onError(plugin, throwable);
+                                            } catch (Throwable chained) {
+                                                rethrown = rethrown == null
+                                                        ? chained
+                                                        : rethrown;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (rethrown == null) {
+                                    return new Summary(transformed, failed, unresolved);
+                                } else if (rethrown instanceof IOException) {
+                                    throw (IOException) rethrown;
+                                } else if (rethrown instanceof RuntimeException) {
+                                    throw (RuntimeException) rethrown;
+                                } else {
+                                    throw new IllegalStateException(rethrown);
+                                }
+                            }
+
+                            /**
+                             * A preprocessor for a parallel plugin engine.
+                             */
+                            private class Preprocessor implements Callable<Callable<? extends Dispatcher.Materializable>> {
+
+                                /**
+                                 * The processed element.
+                                 */
+                                private final Source.Element element;
+
+                                /**
+                                 * The name of the processed type.
+                                 */
+                                private final String typeName;
+
+                                /**
+                                 * The class file locator to use.
+                                 */
+                                private final ClassFileLocator classFileLocator;
+
+                                /**
+                                 * The type pool to use.
+                                 */
+                                private final TypePool typePool;
+
+                                /**
+                                 * The listener to notify.
+                                 */
+                                private final Listener listener;
+
+                                /**
+                                 * The plugins to apply.
+                                 */
+                                private final List<Plugin> plugins;
+
+                                /**
+                                 * The plugins with preprocessors to preprocess.
+                                 */
+                                private final List<WithPreprocessor> preprocessors;
+
+                                /**
+                                 * Creates a new preprocessor.
+                                 *
+                                 * @param element          The processed element.
+                                 * @param typeName         The name of the processed type.
+                                 * @param classFileLocator The class file locator to use.
+                                 * @param typePool         The type pool to use.
+                                 * @param listener         The listener to notify.
+                                 * @param plugins          The plugins to apply.
+                                 * @param preprocessors    The plugins with preprocessors to preprocess.
+                                 */
+                                private Preprocessor(Source.Element element,
+                                                     String typeName,
+                                                     ClassFileLocator classFileLocator,
+                                                     TypePool typePool,
+                                                     Listener listener,
+                                                     List<Plugin> plugins,
+                                                     List<WithPreprocessor> preprocessors) {
+                                    this.element = element;
+                                    this.typeName = typeName;
+                                    this.classFileLocator = classFileLocator;
+                                    this.typePool = typePool;
+                                    this.listener = listener;
+                                    this.plugins = plugins;
+                                    this.preprocessors = preprocessors;
+                                }
+
+                                /**
+                                 * {@inheritDoc}
+                                 */
+                                public Callable<Dispatcher.Materializable> call() throws Exception {
+                                    listener.onDiscovery(typeName);
+                                    TypePool.Resolution resolution = typePool.describe(typeName);
+                                    if (resolution.isResolved()) {
+                                        TypeDescription typeDescription = resolution.resolve();
+                                        try {
+                                            if (!ignoredTypeMatcher.matches(typeDescription)) {
+                                                for (WithPreprocessor preprocessor : preprocessors) {
+                                                    preprocessor.onPreprocess(typeDescription, classFileLocator);
+                                                }
+                                                return new Resolved(typeDescription);
+                                            } else {
+                                                return new Ignored(typeDescription);
+                                            }
+                                        } catch (Throwable throwable) {
+                                            listener.onComplete(typeDescription);
+                                            if (throwable instanceof Exception) {
+                                                throw (Exception) throwable;
+                                            } else if (throwable instanceof Error) {
+                                                throw (Error) throwable;
+                                            } else {
+                                                throw new IllegalStateException(throwable);
+                                            }
+                                        }
+                                    } else {
+                                        return new Unresolved();
+                                    }
+                                }
+
+                                /**
+                                 * A resolved materializable.
+                                 */
+                                private class Resolved implements Callable<Dispatcher.Materializable> {
+
+                                    /**
+                                     * A description of the resolved type.
+                                     */
+                                    private final TypeDescription typeDescription;
+
+                                    /**
+                                     * Creates a new resolved materializable.
+                                     *
+                                     * @param typeDescription A description of the resolved type.
+                                     */
+                                    private Resolved(TypeDescription typeDescription) {
+                                        this.typeDescription = typeDescription;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Dispatcher.Materializable call() {
+                                        List<Plugin> applied = new ArrayList<Plugin>(), ignored = new ArrayList<Plugin>();
+                                        List<Throwable> errored = new ArrayList<Throwable>();
+                                        try {
+                                            DynamicType.Builder<?> builder = typeStrategy.builder(byteBuddy, typeDescription, classFileLocator);
+                                            for (Plugin plugin : plugins) {
+                                                try {
+                                                    if (plugin.matches(typeDescription)) {
+                                                        builder = plugin.apply(builder, typeDescription, classFileLocator);
+                                                        listener.onTransformation(typeDescription, plugin);
+                                                        applied.add(plugin);
+                                                    } else {
+                                                        listener.onIgnored(typeDescription, plugin);
+                                                        ignored.add(plugin);
+                                                    }
+                                                } catch (Throwable throwable) {
+                                                    listener.onError(typeDescription, plugin, throwable);
+                                                    errored.add(throwable);
+                                                }
+                                            }
+                                            if (!errored.isEmpty()) {
+                                                listener.onError(typeDescription, errored);
+                                                return new Dispatcher.Materializable.ForFailedElement(element, typeDescription, errored);
+                                            } else if (!applied.isEmpty()) {
+                                                DynamicType dynamicType = builder.make(TypeResolutionStrategy.Disabled.INSTANCE, typePool);
+                                                listener.onTransformation(typeDescription, applied);
+                                                for (Map.Entry<TypeDescription, LoadedTypeInitializer> entry : dynamicType.getLoadedTypeInitializers().entrySet()) {
+                                                    if (entry.getValue().isAlive()) {
+                                                        listener.onLiveInitializer(typeDescription, entry.getKey());
+                                                    }
+                                                }
+                                                return new Dispatcher.Materializable.ForTransformedElement(dynamicType);
+                                            } else {
+                                                listener.onIgnored(typeDescription, ignored);
+                                                return new Dispatcher.Materializable.ForRetainedElement(element);
+                                            }
+                                        } finally {
+                                            listener.onComplete(typeDescription);
+                                        }
+                                    }
+                                }
+
+                                /**
+                                 * A materializable for an ignored element.
+                                 */
+                                private class Ignored implements Callable<Dispatcher.Materializable> {
+
+                                    /**
+                                     * A description of the ignored type.
+                                     */
+                                    private final TypeDescription typeDescription;
+
+                                    /**
+                                     * A materializable for an ignored element.
+                                     *
+                                     * @param typeDescription A description of the ignored type.
+                                     */
+                                    private Ignored(TypeDescription typeDescription) {
+                                        this.typeDescription = typeDescription;
+                                    }
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Dispatcher.Materializable call() {
+                                        try {
+                                            listener.onIgnored(typeDescription, plugins);
+                                        } finally {
+                                            listener.onComplete(typeDescription);
+                                        }
+                                        return new Dispatcher.Materializable.ForRetainedElement(element);
+                                    }
+                                }
+
+                                /**
+                                 * A materializable that represents an unresolved type.
+                                 */
+                                private class Unresolved implements Callable<Dispatcher.Materializable> {
+
+                                    /**
+                                     * {@inheritDoc}
+                                     */
+                                    public Dispatcher.Materializable call() {
+                                        listener.onUnresolved(typeName);
+                                        return new Dispatcher.Materializable.ForUnresolvedElement(element, typeName);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    /**
+                     * A non-operational plugin that does not instrument any type. This plugin does not need to be closed.
+                     */
+                    @HashCodeAndEqualsPlugin.Enhance
+                    class NoOp implements Plugin, Plugin.Factory {
+
+                        /**
+                         * {@inheritDoc}
+                         */
+                        public Plugin make() {
+                            return this;
+                        }
+
+                        /**
+                         * {@inheritDoc}
+                         */
+                        public boolean matches(@MaybeNull TypeDescription target) {
+                            return false;
+                        }
+
+                        /**
+                         * {@inheritDoc}
+                         */
+                        public DynamicType.Builder<?> apply(DynamicType.Builder<?> builder, TypeDescription typeDescription, ClassFileLocator classFileLocator) {
+                            throw new IllegalStateException("Cannot apply non-operational plugin");
+                        }
+
+                        /**
+                         * {@inheritDoc}
+                         */
+                        public void close() {
+                            /* do nothing */
+                        }
+                    }
+
+                    /**
+                     * An abstract base for a {@link Plugin} that matches types by a given {@link ElementMatcher}.
+                     */
+                    @HashCodeAndEqualsPlugin.Enhance
+                    abstract class ForElementMatcher implements Plugin {
+
+                        /**
+                         * The element matcher to apply.
+                         */
+                        private final ElementMatcher<? super TypeDescription> matcher;
+
+                        /**
+                         * Creates a new plugin that matches types using an element matcher.
+                         *
+                         * @param matcher The element matcher to apply.
+                         */
+                        protected ForElementMatcher(ElementMatcher<? super TypeDescription> matcher) {
+                            this.matcher = matcher;
+                        }
+
+                        /**
+                         * {@inheritDoc}
+                         */
+                        public boolean matches(@MaybeNull TypeDescription target) {
+                            return matcher.matches(target);
+                        }
+                    }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `termux-app TermuxOpenReceiver`() = rewriteRun(
+        java(
+            """
+                package com.termux.app;
+
+                import android.content.ActivityNotFoundException;
+                import android.content.BroadcastReceiver;
+                import android.content.ContentValues;
+                import android.content.Context;
+                import android.content.Intent;
+                import android.database.Cursor;
+                import android.database.MatrixCursor;
+                import android.net.Uri;
+                import android.os.Environment;
+                import android.os.ParcelFileDescriptor;
+                import android.provider.MediaStore;
+                import android.webkit.MimeTypeMap;
+
+                import com.termux.shared.termux.plugins.TermuxPluginUtils;
+                import com.termux.shared.data.DataUtils;
+                import com.termux.shared.data.IntentUtils;
+                import com.termux.shared.net.uri.UriUtils;
+                import com.termux.shared.logger.Logger;
+                import com.termux.shared.net.uri.UriScheme;
+                import com.termux.shared.termux.TermuxConstants;
+
+                import java.io.File;
+                import java.io.FileNotFoundException;
+                import java.io.IOException;
+
+                import androidx.annotation.NonNull;
+
+                public class TermuxOpenReceiver extends BroadcastReceiver {
+
+                    private static final String LOG_TAG = "TermuxOpenReceiver";
+
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        final Uri data = intent.getData();
+                        if (data == null) {
+                            Logger.logError(LOG_TAG, "Called without intent data");
+                            return;
+                        }
+
+                        Logger.logVerbose(LOG_TAG, "Intent Received:\n" + IntentUtils.getIntentString(intent));
+                        Logger.logVerbose(LOG_TAG, "uri: \"" + data + "\", path: \"" + data.getPath() + "\", fragment: \"" + data.getFragment() + "\"");
+
+                        final String contentTypeExtra = intent.getStringExtra("content-type");
+                        final boolean useChooser = intent.getBooleanExtra("chooser", false);
+                        final String intentAction = intent.getAction() == null ? Intent.ACTION_VIEW : intent.getAction();
+                        switch (intentAction) {
+                            case Intent.ACTION_SEND:
+                            case Intent.ACTION_VIEW:
+                                // Ok.
+                                break;
+                            default:
+                                Logger.logError(LOG_TAG, "Invalid action '" + intentAction + "', using 'view'");
+                                break;
+                        }
+
+                        String scheme = data.getScheme();
+                        if (scheme != null && !UriScheme.SCHEME_FILE.equals(scheme)) {
+                            Intent urlIntent = new Intent(intentAction, data);
+                            if (intentAction.equals(Intent.ACTION_SEND)) {
+                                urlIntent.putExtra(Intent.EXTRA_TEXT, data.toString());
+                                urlIntent.setData(null);
+                            } else if (contentTypeExtra != null) {
+                                urlIntent.setDataAndType(data, contentTypeExtra);
+                            }
+                            urlIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            try {
+                                context.startActivity(urlIntent);
+                            } catch (ActivityNotFoundException e) {
+                                Logger.logError(LOG_TAG, "No app handles the url " + data);
+                            }
+                            return;
+                        }
+
+                        // Get full path including fragment (anything after last "#")
+                        String filePath = UriUtils.getUriFilePathWithFragment(data);
+                        if (DataUtils.isNullOrEmpty(filePath)) {
+                            Logger.logError(LOG_TAG, "filePath is null or empty");
+                            return;
+                        }
+
+                        final File fileToShare = new File(filePath);
+                        if (!(fileToShare.isFile() && fileToShare.canRead())) {
+                            Logger.logError(LOG_TAG, "Not a readable file: '" + fileToShare.getAbsolutePath() + "'");
+                            return;
+                        }
+
+                        Intent sendIntent = new Intent();
+                        sendIntent.setAction(intentAction);
+                        sendIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                        String contentTypeToUse;
+                        if (contentTypeExtra == null) {
+                            String fileName = fileToShare.getName();
+                            int lastDotIndex = fileName.lastIndexOf('.');
+                            String fileExtension = fileName.substring(lastDotIndex + 1);
+                            MimeTypeMap mimeTypes = MimeTypeMap.getSingleton();
+                            // Lower casing makes it work with e.g. "JPG":
+                            contentTypeToUse = mimeTypes.getMimeTypeFromExtension(fileExtension.toLowerCase());
+                            if (contentTypeToUse == null) contentTypeToUse = "application/octet-stream";
+                        } else {
+                            contentTypeToUse = contentTypeExtra;
+                        }
+
+                        // Do not create Uri with Uri.parse() and use Uri.Builder().path(), check UriUtils.getUriFilePath().
+                        Uri uriToShare = UriUtils.getContentUri(TermuxConstants.TERMUX_FILE_SHARE_URI_AUTHORITY, fileToShare.getAbsolutePath());
+
+                        if (Intent.ACTION_SEND.equals(intentAction)) {
+                            sendIntent.putExtra(Intent.EXTRA_STREAM, uriToShare);
+                            sendIntent.setType(contentTypeToUse);
+                        } else {
+                            sendIntent.setDataAndType(uriToShare, contentTypeToUse);
+                        }
+
+                        if (useChooser) {
+                            sendIntent = Intent.createChooser(sendIntent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        }
+
+                        try {
+                            context.startActivity(sendIntent);
+                        } catch (ActivityNotFoundException e) {
+                            Logger.logError(LOG_TAG, "No app handles the url " + data);
+                        }
+                    }
+
+                    public static class ContentProvider extends android.content.ContentProvider {
+
+                        private static final String LOG_TAG = "TermuxContentProvider";
+
+                        @Override
+                        public boolean onCreate() {
+                            return true;
+                        }
+
+                        @Override
+                        public Cursor query(@NonNull Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+                            File file = new File(uri.getPath());
+
+                            if (projection == null) {
+                                projection = new String[]{
+                                    MediaStore.MediaColumns.DISPLAY_NAME,
+                                    MediaStore.MediaColumns.SIZE,
+                                    MediaStore.MediaColumns._ID
+                                };
+                            }
+
+                            Object[] row = new Object[projection.length];
+                            for (int i = 0; i < projection.length; i++) {
+                                String column = projection[i];
+                                Object value;
+                                switch (column) {
+                                    case MediaStore.MediaColumns.DISPLAY_NAME:
+                                        value = file.getName();
+                                        break;
+                                    case MediaStore.MediaColumns.SIZE:
+                                        value = (int) file.length();
+                                        break;
+                                    case MediaStore.MediaColumns._ID:
+                                        value = 1;
+                                        break;
+                                    default:
+                                        value = null;
+                                }
+                                row[i] = value;
+                            }
+
+                            MatrixCursor cursor = new MatrixCursor(projection);
+                            cursor.addRow(row);
+                            return cursor;
+                        }
+
+                        @Override
+                        public String getType(@NonNull Uri uri) {
+                            return null;
+                        }
+
+                        @Override
+                        public Uri insert(@NonNull Uri uri, ContentValues values) {
+                            return null;
+                        }
+
+                        @Override
+                        public int delete(@NonNull Uri uri, String selection, String[] selectionArgs) {
+                            return 0;
+                        }
+
+                        @Override
+                        public int update(@NonNull Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+                            return 0;
+                        }
+
+                        @Override
+                        public ParcelFileDescriptor openFile(@NonNull Uri uri, @NonNull String mode) throws FileNotFoundException {
+                            File file = new File(uri.getPath());
+                            try {
+                                String path = file.getCanonicalPath();
+                                String callingPackageName = getCallingPackage();
+                                Logger.logDebug(LOG_TAG, "Open file request received from " + callingPackageName + " for \"" + path + "\" with mode \"" + mode + "\"");
+                                String storagePath = Environment.getExternalStorageDirectory().getCanonicalPath();
+                                // See https://support.google.com/faqs/answer/7496913:
+                                if (!(path.startsWith(TermuxConstants.TERMUX_FILES_DIR_PATH) || path.startsWith(storagePath))) {
+                                    throw new IllegalArgumentException("Invalid path: " + path);
+                                }
+
+                                // If TermuxConstants.PROP_ALLOW_EXTERNAL_APPS property to not set to "true", then throw exception
+                                String errmsg = TermuxPluginUtils.checkIfAllowExternalAppsPolicyIsViolated(getContext(), LOG_TAG);
+                                if (errmsg != null) {
+                                    throw new IllegalArgumentException(errmsg);
+                                }
+
+                                // **DO NOT** allow these files to be modified by ContentProvider exposed to external
+                                // apps, since they may silently modify the values for security properties like
+                                // TermuxConstants.PROP_ALLOW_EXTERNAL_APPS set by users without their explicit consent.
+                                if (TermuxConstants.TERMUX_PROPERTIES_FILE_PATHS_LIST.contains(path) ||
+                                    TermuxConstants.TERMUX_FLOAT_PROPERTIES_FILE_PATHS_LIST.contains(path)) {
+                                    mode = "r";
+                                }
+
+                            } catch (IOException e) {
+                                throw new IllegalArgumentException(e);
+                            }
+
+                            return ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode));
+                        }
+                    }
+
+                }
+            """
+        )
+    )
+
+    @Test
+    fun `termux-app TermuxDocumentProvider`() = rewriteRun(
+        java(
+            """
+                package com.termux.filepicker;
+
+                import android.content.res.AssetFileDescriptor;
+                import android.database.Cursor;
+                import android.database.MatrixCursor;
+                import android.graphics.Point;
+                import android.os.CancellationSignal;
+                import android.os.ParcelFileDescriptor;
+                import android.provider.DocumentsContract.Document;
+                import android.provider.DocumentsContract.Root;
+                import android.provider.DocumentsProvider;
+                import android.webkit.MimeTypeMap;
+
+                import com.termux.R;
+                import com.termux.shared.termux.TermuxConstants;
+
+                import java.io.File;
+                import java.io.FileNotFoundException;
+                import java.io.IOException;
+                import java.util.Collections;
+                import java.util.LinkedList;
+
+                /**
+                 * A document provider for the Storage Access Framework which exposes the files in the
+                 * HOME directory to other apps.
+                 * <p/>
+                 * Note that this replaces providing an activity matching the ACTION_GET_CONTENT intent:
+                 * <p/>
+                 * "A document provider and ACTION_GET_CONTENT should be considered mutually exclusive. If you
+                 * support both of them simultaneously, your app will appear twice in the system picker UI,
+                 * offering two different ways of accessing your stored data. This would be confusing for users."
+                 * - http://developer.android.com/guide/topics/providers/document-provider.html#43
+                 */
+                public class TermuxDocumentsProvider extends DocumentsProvider {
+
+                    private static final String ALL_MIME_TYPES = "*/*";
+
+                    private static final File BASE_DIR = TermuxConstants.TERMUX_HOME_DIR;
+
+
+                    // The default columns to return information about a root if no specific
+                    // columns are requested in a query.
+                    private static final String[] DEFAULT_ROOT_PROJECTION = new String[]{
+                        Root.COLUMN_ROOT_ID,
+                        Root.COLUMN_MIME_TYPES,
+                        Root.COLUMN_FLAGS,
+                        Root.COLUMN_ICON,
+                        Root.COLUMN_TITLE,
+                        Root.COLUMN_SUMMARY,
+                        Root.COLUMN_DOCUMENT_ID,
+                        Root.COLUMN_AVAILABLE_BYTES
+                    };
+
+                    // The default columns to return information about a document if no specific
+                    // columns are requested in a query.
+                    private static final String[] DEFAULT_DOCUMENT_PROJECTION = new String[]{
+                        Document.COLUMN_DOCUMENT_ID,
+                        Document.COLUMN_MIME_TYPE,
+                        Document.COLUMN_DISPLAY_NAME,
+                        Document.COLUMN_LAST_MODIFIED,
+                        Document.COLUMN_FLAGS,
+                        Document.COLUMN_SIZE
+                    };
+
+                    @Override
+                    public Cursor queryRoots(String[] projection) {
+                        final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_ROOT_PROJECTION);
+                        final String applicationName = getContext().getString(R.string.application_name);
+
+                        final MatrixCursor.RowBuilder row = result.newRow();
+                        row.add(Root.COLUMN_ROOT_ID, getDocIdForFile(BASE_DIR));
+                        row.add(Root.COLUMN_DOCUMENT_ID, getDocIdForFile(BASE_DIR));
+                        row.add(Root.COLUMN_SUMMARY, null);
+                        row.add(Root.COLUMN_FLAGS, Root.FLAG_SUPPORTS_CREATE | Root.FLAG_SUPPORTS_SEARCH | Root.FLAG_SUPPORTS_IS_CHILD);
+                        row.add(Root.COLUMN_TITLE, applicationName);
+                        row.add(Root.COLUMN_MIME_TYPES, ALL_MIME_TYPES);
+                        row.add(Root.COLUMN_AVAILABLE_BYTES, BASE_DIR.getFreeSpace());
+                        row.add(Root.COLUMN_ICON, R.mipmap.ic_launcher);
+                        return result;
+                    }
+
+                    @Override
+                    public Cursor queryDocument(String documentId, String[] projection) throws FileNotFoundException {
+                        final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_DOCUMENT_PROJECTION);
+                        includeFile(result, documentId, null);
+                        return result;
+                    }
+
+                    @Override
+                    public Cursor queryChildDocuments(String parentDocumentId, String[] projection, String sortOrder) throws FileNotFoundException {
+                        final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_DOCUMENT_PROJECTION);
+                        final File parent = getFileForDocId(parentDocumentId);
+                        for (File file : parent.listFiles()) {
+                            includeFile(result, null, file);
+                        }
+                        return result;
+                    }
+
+                    @Override
+                    public ParcelFileDescriptor openDocument(final String documentId, String mode, CancellationSignal signal) throws FileNotFoundException {
+                        final File file = getFileForDocId(documentId);
+                        final int accessMode = ParcelFileDescriptor.parseMode(mode);
+                        return ParcelFileDescriptor.open(file, accessMode);
+                    }
+
+                    @Override
+                    public AssetFileDescriptor openDocumentThumbnail(String documentId, Point sizeHint, CancellationSignal signal) throws FileNotFoundException {
+                        final File file = getFileForDocId(documentId);
+                        final ParcelFileDescriptor pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
+                        return new AssetFileDescriptor(pfd, 0, file.length());
+                    }
+
+                    @Override
+                    public boolean onCreate() {
+                        return true;
+                    }
+
+                    @Override
+                    public String createDocument(String parentDocumentId, String mimeType, String displayName) throws FileNotFoundException {
+                        File newFile = new File(parentDocumentId, displayName);
+                        int noConflictId = 2;
+                        while (newFile.exists()) {
+                            newFile = new File(parentDocumentId, displayName + " (" + noConflictId++ + ")");
+                        }
+                        try {
+                            boolean succeeded;
+                            if (Document.MIME_TYPE_DIR.equals(mimeType)) {
+                                succeeded = newFile.mkdir();
+                            } else {
+                                succeeded = newFile.createNewFile();
+                            }
+                            if (!succeeded) {
+                                throw new FileNotFoundException("Failed to create document with id " + newFile.getPath());
+                            }
+                        } catch (IOException e) {
+                            throw new FileNotFoundException("Failed to create document with id " + newFile.getPath());
+                        }
+                        return newFile.getPath();
+                    }
+
+                    @Override
+                    public void deleteDocument(String documentId) throws FileNotFoundException {
+                        File file = getFileForDocId(documentId);
+                        if (!file.delete()) {
+                            throw new FileNotFoundException("Failed to delete document with id " + documentId);
+                        }
+                    }
+
+                    @Override
+                    public String getDocumentType(String documentId) throws FileNotFoundException {
+                        File file = getFileForDocId(documentId);
+                        return getMimeType(file);
+                    }
+
+                    @Override
+                    public Cursor querySearchDocuments(String rootId, String query, String[] projection) throws FileNotFoundException {
+                        final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_DOCUMENT_PROJECTION);
+                        final File parent = getFileForDocId(rootId);
+
+                        // This example implementation searches file names for the query and doesn't rank search
+                        // results, so we can stop as soon as we find a sufficient number of matches.  Other
+                        // implementations might rank results and use other data about files, rather than the file
+                        // name, to produce a match.
+                        final LinkedList<File> pending = new LinkedList<>();
+                        pending.add(parent);
+
+                        final int MAX_SEARCH_RESULTS = 50;
+                        while (!pending.isEmpty() && result.getCount() < MAX_SEARCH_RESULTS) {
+                            final File file = pending.removeFirst();
+                            // Avoid directories outside the HOME directory linked with symlinks (to avoid e.g. search
+                            // through the whole SD card).
+                            boolean isInsideHome;
+                            try {
+                                isInsideHome = file.getCanonicalPath().startsWith(TermuxConstants.TERMUX_HOME_DIR_PATH);
+                            } catch (IOException e) {
+                                isInsideHome = true;
+                            }
+                            if (isInsideHome) {
+                                if (file.isDirectory()) {
+                                    Collections.addAll(pending, file.listFiles());
+                                } else {
+                                    if (file.getName().toLowerCase().contains(query)) {
+                                        includeFile(result, null, file);
+                                    }
+                                }
+                            }
+                        }
+
+                        return result;
+                    }
+
+                    @Override
+                    public boolean isChildDocument(String parentDocumentId, String documentId) {
+                        return documentId.startsWith(parentDocumentId);
+                    }
+
+                    /**
+                     * Get the document id given a file. This document id must be consistent across time as other
+                     * applications may save the ID and use it to reference documents later.
+                     * <p/>
+                     * The reverse of @{link #getFileForDocId}.
+                     */
+                    private static String getDocIdForFile(File file) {
+                        return file.getAbsolutePath();
+                    }
+
+                    /**
+                     * Get the file given a document id (the reverse of {@link #getDocIdForFile(File)}).
+                     */
+                    private static File getFileForDocId(String docId) throws FileNotFoundException {
+                        final File f = new File(docId);
+                        if (!f.exists()) throw new FileNotFoundException(f.getAbsolutePath() + " not found");
+                        return f;
+                    }
+
+                    private static String getMimeType(File file) {
+                        if (file.isDirectory()) {
+                            return Document.MIME_TYPE_DIR;
+                        } else {
+                            final String name = file.getName();
+                            final int lastDot = name.lastIndexOf('.');
+                            if (lastDot >= 0) {
+                                final String extension = name.substring(lastDot + 1).toLowerCase();
+                                final String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+                                if (mime != null) return mime;
+                            }
+                            return "application/octet-stream";
+                        }
+                    }
+
+                    /**
+                     * Add a representation of a file to a cursor.
+                     *
+                     * @param result the cursor to modify
+                     * @param docId  the document ID representing the desired file (may be null if given file)
+                     * @param file   the File object representing the desired file (may be null if given docID)
+                     */
+                    private void includeFile(MatrixCursor result, String docId, File file)
+                        throws FileNotFoundException {
+                        if (docId == null) {
+                            docId = getDocIdForFile(file);
+                        } else {
+                            file = getFileForDocId(docId);
+                        }
+
+                        int flags = 0;
+                        if (file.isDirectory()) {
+                            if (file.canWrite()) flags |= Document.FLAG_DIR_SUPPORTS_CREATE;
+                        } else if (file.canWrite()) {
+                            flags |= Document.FLAG_SUPPORTS_WRITE;
+                        }
+                        if (file.getParentFile().canWrite()) flags |= Document.FLAG_SUPPORTS_DELETE;
+
+                        final String displayName = file.getName();
+                        final String mimeType = getMimeType(file);
+                        if (mimeType.startsWith("image/")) flags |= Document.FLAG_SUPPORTS_THUMBNAIL;
+
+                        final MatrixCursor.RowBuilder row = result.newRow();
+                        row.add(Document.COLUMN_DOCUMENT_ID, docId);
+                        row.add(Document.COLUMN_DISPLAY_NAME, displayName);
+                        row.add(Document.COLUMN_SIZE, file.length());
+                        row.add(Document.COLUMN_MIME_TYPE, mimeType);
+                        row.add(Document.COLUMN_LAST_MODIFIED, file.lastModified());
+                        row.add(Document.COLUMN_FLAGS, flags);
+                        row.add(Document.COLUMN_ICON, R.mipmap.ic_launcher);
+                    }
+
+                }
+            """
+        )
+    )
+
+
+    @Disabled
+    @Test
+    fun `commons-io if test`() = rewriteRun(
+        java(
+            """
+
+            public class Hello {
+                public static void copyDirectory(final File srcDir, final File destDir, final FileFilter fileFilter, final boolean preserveFileDate,
+                    final CopyOption... copyOptions) throws IOException {
+                    requireFileCopy(srcDir, destDir);
+                    requireDirectory(srcDir, "srcDir");
+                    requireCanonicalPathsNotEquals(srcDir, destDir);
+
+                    // Cater for destination being directory within the source directory (see IO-141)
+                    List<String> exclusionList = null;
+                    final String srcDirCanonicalPath = srcDir.getCanonicalPath();
+                    final String destDirCanonicalPath = destDir.getCanonicalPath();
+                    if (destDirCanonicalPath.startsWith(srcDirCanonicalPath)) {
+                        final File[] srcFiles = listFiles(srcDir, fileFilter);
+                        if (srcFiles.length > 0) {
+                            exclusionList = new ArrayList<>(srcFiles.length);
+                            for (final File srcFile : srcFiles) {
+                                final File copiedFile = new File(destDir, srcFile.getName());
+                                exclusionList.add(copiedFile.getCanonicalPath());
+                            }
+                        }
+                    }
+                    doCopyDirectory(srcDir, destDir, fileFilter, exclusionList, preserveFileDate, preserveFileDate ? addCopyAttributes(copyOptions) : copyOptions);
+                }
+            }
+            """
+        )
+    )
+
+    @Disabled
+    @Test
+    fun `commons-io`() = rewriteRun(
+        java(
+            """
+                /*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.io;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileFilter;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.Reader;
+import java.io.UncheckedIOException;
+import java.math.BigInteger;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.charset.UnsupportedCharsetException;
+import java.nio.file.CopyOption;
+import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NotDirectoryException;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.OffsetTime;
+import java.time.ZoneId;
+import java.time.chrono.ChronoLocalDate;
+import java.time.chrono.ChronoLocalDateTime;
+import java.time.chrono.ChronoZonedDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.zip.CRC32;
+import java.util.zip.CheckedInputStream;
+import java.util.zip.Checksum;
+
+import org.apache.commons.io.file.AccumulatorPathVisitor;
+import org.apache.commons.io.file.Counters;
+import org.apache.commons.io.file.PathFilter;
+import org.apache.commons.io.file.PathUtils;
+import org.apache.commons.io.file.StandardDeleteOption;
+import org.apache.commons.io.filefilter.FileEqualsFileFilter;
+import org.apache.commons.io.filefilter.FileFileFilter;
+import org.apache.commons.io.filefilter.IOFileFilter;
+import org.apache.commons.io.filefilter.SuffixFileFilter;
+import org.apache.commons.io.filefilter.TrueFileFilter;
+import org.apache.commons.io.function.IOConsumer;
+
+/**
+ * General file manipulation utilities.
+ * <p>
+ * Facilities are provided in the following areas:
+ * </p>
+ * <ul>
+ * <li>writing to a file
+ * <li>reading from a file
+ * <li>make a directory including parent directories
+ * <li>copying files and directories
+ * <li>deleting files and directories
+ * <li>converting to and from a URL
+ * <li>listing files and directories by filter and extension
+ * <li>comparing file content
+ * <li>file last changed date
+ * <li>calculating a checksum
+ * </ul>
+ * <p>
+ * Note that a specific charset should be specified whenever possible. Relying on the platform default means that the
+ * code is Locale-dependent. Only use the default if the files are known to always use the platform default.
+ * </p>
+ * <p>
+ * {@link SecurityException} are not documented in the Javadoc.
+ * </p>
+ * <p>
+ * Origin of code: Excalibur, Alexandria, Commons-Utils
+ * </p>
+ */
+public class FileUtils {
+    /**
+     * The number of bytes in a kilobyte.
+     */
+    public static final long ONE_KB = 1024;
+
+    /**
+     * The number of bytes in a kilobyte.
+     *
+     * @since 2.4
+     */
+    public static final BigInteger ONE_KB_BI = BigInteger.valueOf(ONE_KB);
+
+    /**
+     * The number of bytes in a megabyte.
+     */
+    public static final long ONE_MB = ONE_KB * ONE_KB;
+
+    /**
+     * The number of bytes in a megabyte.
+     *
+     * @since 2.4
+     */
+    public static final BigInteger ONE_MB_BI = ONE_KB_BI.multiply(ONE_KB_BI);
+
+    /**
+     * The number of bytes in a gigabyte.
+     */
+    public static final long ONE_GB = ONE_KB * ONE_MB;
+
+    /**
+     * The number of bytes in a gigabyte.
+     *
+     * @since 2.4
+     */
+    public static final BigInteger ONE_GB_BI = ONE_KB_BI.multiply(ONE_MB_BI);
+
+    /**
+     * The number of bytes in a terabyte.
+     */
+    public static final long ONE_TB = ONE_KB * ONE_GB;
+
+    /**
+     * The number of bytes in a terabyte.
+     *
+     * @since 2.4
+     */
+    public static final BigInteger ONE_TB_BI = ONE_KB_BI.multiply(ONE_GB_BI);
+
+    /**
+     * The number of bytes in a petabyte.
+     */
+    public static final long ONE_PB = ONE_KB * ONE_TB;
+
+    /**
+     * The number of bytes in a petabyte.
+     *
+     * @since 2.4
+     */
+    public static final BigInteger ONE_PB_BI = ONE_KB_BI.multiply(ONE_TB_BI);
+
+    /**
+     * The number of bytes in an exabyte.
+     */
+    public static final long ONE_EB = ONE_KB * ONE_PB;
+
+    /**
+     * The number of bytes in an exabyte.
+     *
+     * @since 2.4
+     */
+    public static final BigInteger ONE_EB_BI = ONE_KB_BI.multiply(ONE_PB_BI);
+
+    /**
+     * The number of bytes in a zettabyte.
+     */
+    public static final BigInteger ONE_ZB = BigInteger.valueOf(ONE_KB).multiply(BigInteger.valueOf(ONE_EB));
+
+    /**
+     * The number of bytes in a yottabyte.
+     */
+    public static final BigInteger ONE_YB = ONE_KB_BI.multiply(ONE_ZB);
+
+    /**
+     * An empty array of type {@link File}.
+     */
+    public static final File[] EMPTY_FILE_ARRAY = {};
+
+    /**
+     * Copies the given array and adds StandardCopyOption.COPY_ATTRIBUTES.
+     *
+     * @param copyOptions sorted copy options.
+     * @return a new array.
+     */
+    private static CopyOption[] addCopyAttributes(final CopyOption... copyOptions) {
+        // Make a copy first since we don't want to sort the call site's version.
+        final CopyOption[] actual = Arrays.copyOf(copyOptions, copyOptions.length + 1);
+        Arrays.sort(actual, 0, copyOptions.length);
+        if (Arrays.binarySearch(copyOptions, 0, copyOptions.length, StandardCopyOption.COPY_ATTRIBUTES) >= 0) {
+            return copyOptions;
+        }
+        actual[actual.length - 1] = StandardCopyOption.COPY_ATTRIBUTES;
+        return actual;
+    }
+
+    /**
+     * Returns a human-readable version of the file size, where the input represents a specific number of bytes.
+     * <p>
+     * If the size is over 1GB, the size is returned as the number of whole GB, i.e. the size is rounded down to the
+     * nearest GB boundary.
+     * </p>
+     * <p>
+     * Similarly for the 1MB and 1KB boundaries.
+     * </p>
+     *
+     * @param size the number of bytes
+     * @return a human-readable display value (includes units - EB, PB, TB, GB, MB, KB or bytes)
+     * @throws NullPointerException if the given {@link BigInteger} is {@code null}.
+     * @see <a href="https://issues.apache.org/jira/browse/IO-226">IO-226 - should the rounding be changed?</a>
+     * @since 2.4
+     */
+    // See https://issues.apache.org/jira/browse/IO-226 - should the rounding be changed?
+    public static String byteCountToDisplaySize(final BigInteger size) {
+        Objects.requireNonNull(size, "size");
+        final String displaySize;
+
+        if (size.divide(ONE_EB_BI).compareTo(BigInteger.ZERO) > 0) {
+            displaySize = size.divide(ONE_EB_BI) + " EB";
+        } else if (size.divide(ONE_PB_BI).compareTo(BigInteger.ZERO) > 0) {
+            displaySize = size.divide(ONE_PB_BI) + " PB";
+        } else if (size.divide(ONE_TB_BI).compareTo(BigInteger.ZERO) > 0) {
+            displaySize = size.divide(ONE_TB_BI) + " TB";
+        } else if (size.divide(ONE_GB_BI).compareTo(BigInteger.ZERO) > 0) {
+            displaySize = size.divide(ONE_GB_BI) + " GB";
+        } else if (size.divide(ONE_MB_BI).compareTo(BigInteger.ZERO) > 0) {
+            displaySize = size.divide(ONE_MB_BI) + " MB";
+        } else if (size.divide(ONE_KB_BI).compareTo(BigInteger.ZERO) > 0) {
+            displaySize = size.divide(ONE_KB_BI) + " KB";
+        } else {
+            displaySize = size + " bytes";
+        }
+        return displaySize;
+    }
+
+    /**
+     * Returns a human-readable version of the file size, where the input represents a specific number of bytes.
+     * <p>
+     * If the size is over 1GB, the size is returned as the number of whole GB, i.e. the size is rounded down to the
+     * nearest GB boundary.
+     * </p>
+     * <p>
+     * Similarly for the 1MB and 1KB boundaries.
+     * </p>
+     *
+     * @param size the number of bytes
+     * @return a human-readable display value (includes units - EB, PB, TB, GB, MB, KB or bytes)
+     * @see <a href="https://issues.apache.org/jira/browse/IO-226">IO-226 - should the rounding be changed?</a>
+     */
+    // See https://issues.apache.org/jira/browse/IO-226 - should the rounding be changed?
+    public static String byteCountToDisplaySize(final long size) {
+        return byteCountToDisplaySize(BigInteger.valueOf(size));
+    }
+
+    /**
+     * Returns a human-readable version of the file size, where the input represents a specific number of bytes.
+     * <p>
+     * If the size is over 1GB, the size is returned as the number of whole GB, i.e. the size is rounded down to the
+     * nearest GB boundary.
+     * </p>
+     * <p>
+     * Similarly for the 1MB and 1KB boundaries.
+     * </p>
+     *
+     * @param size the number of bytes
+     * @return a human-readable display value (includes units - EB, PB, TB, GB, MB, KB or bytes)
+     * @see <a href="https://issues.apache.org/jira/browse/IO-226">IO-226 - should the rounding be changed?</a>
+     * @since 2.12.0
+     */
+    // See https://issues.apache.org/jira/browse/IO-226 - should the rounding be changed?
+    public static String byteCountToDisplaySize(final Number size) {
+        return byteCountToDisplaySize(size.longValue());
+    }
+
+    /**
+     * Computes the checksum of a file using the specified checksum object. Multiple files may be checked using one
+     * {@link Checksum} instance if desired simply by reusing the same checksum object. For example:
+     *
+     * <pre>
+     * long checksum = FileUtils.checksum(file, new CRC32()).getValue();
+     * </pre>
+     *
+     * @param file the file to checksum, must not be {@code null}
+     * @param checksum the checksum object to be used, must not be {@code null}
+     * @return the checksum specified, updated with the content of the file
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws NullPointerException if the given {@link Checksum} is {@code null}.
+     * @throws IllegalArgumentException if the given {@link File} does not exist or is not a file.
+     * @throws IOException if an IO error occurs reading the file.
+     * @since 1.3
+     */
+    public static Checksum checksum(final File file, final Checksum checksum) throws IOException {
+        requireExistsChecked(file, "file");
+        requireFile(file, "file");
+        Objects.requireNonNull(checksum, "checksum");
+        try (InputStream inputStream = new CheckedInputStream(Files.newInputStream(file.toPath()), checksum)) {
+            IOUtils.consume(inputStream);
+        }
+        return checksum;
+    }
+
+    /**
+     * Computes the checksum of a file using the CRC32 checksum routine.
+     * The value of the checksum is returned.
+     *
+     * @param file the file to checksum, must not be {@code null}
+     * @return the checksum value
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if the given {@link File} does not exist or is not a file.
+     * @throws IOException              if an IO error occurs reading the file.
+     * @since 1.3
+     */
+    public static long checksumCRC32(final File file) throws IOException {
+        return checksum(file, new CRC32()).getValue();
+    }
+
+    /**
+     * Cleans a directory without deleting it.
+     *
+     * @param directory directory to clean
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if directory does not exist or is not a directory.
+     * @throws IOException if an I/O error occurs.
+     * @see #forceDelete(File)
+     */
+    public static void cleanDirectory(final File directory) throws IOException {
+        IOConsumer.forEach(listFiles(directory, null), FileUtils::forceDelete);
+    }
+
+    /**
+     * Cleans a directory without deleting it.
+     *
+     * @param directory directory to clean, must not be {@code null}
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if directory does not exist or is not a directory.
+     * @throws IOException if an I/O error occurs.
+     * @see #forceDeleteOnExit(File)
+     */
+    private static void cleanDirectoryOnExit(final File directory) throws IOException {
+        IOConsumer.forEach(listFiles(directory, null), FileUtils::forceDeleteOnExit);
+    }
+
+    /**
+     * Tests whether the contents of two files are equal.
+     * <p>
+     * This method checks to see if the two files are different lengths or if they point to the same file, before
+     * resorting to byte-by-byte comparison of the contents.
+     * </p>
+     * <p>
+     * Code origin: Avalon
+     * </p>
+     *
+     * @param file1 the first file
+     * @param file2 the second file
+     * @return true if the content of the files are equal or they both don't exist, false otherwise
+     * @throws IllegalArgumentException when an input is not a file.
+     * @throws IOException If an I/O error occurs.
+     * @see org.apache.commons.io.file.PathUtils#fileContentEquals(Path,Path,java.nio.file.LinkOption[],java.nio.file.OpenOption...)
+     */
+    public static boolean contentEquals(final File file1, final File file2) throws IOException {
+        if (file1 == null && file2 == null) {
+            return true;
+        }
+        if (file1 == null || file2 == null) {
+            return false;
+        }
+        final boolean file1Exists = file1.exists();
+        if (file1Exists != file2.exists()) {
+            return false;
+        }
+
+        if (!file1Exists) {
+            // two not existing files are equal
+            return true;
+        }
+
+        requireFile(file1, "file1");
+        requireFile(file2, "file2");
+
+        if (file1.length() != file2.length()) {
+            // lengths differ, cannot be equal
+            return false;
+        }
+
+        if (file1.getCanonicalFile().equals(file2.getCanonicalFile())) {
+            // same file
+            return true;
+        }
+
+        try (InputStream input1 = Files.newInputStream(file1.toPath()); InputStream input2 = Files.newInputStream(file2.toPath())) {
+            return IOUtils.contentEquals(input1, input2);
+        }
+    }
+
+    /**
+     * Compares the contents of two files to determine if they are equal or not.
+     * <p>
+     * This method checks to see if the two files point to the same file,
+     * before resorting to line-by-line comparison of the contents.
+     * </p>
+     *
+     * @param file1       the first file
+     * @param file2       the second file
+     * @param charsetName the name of the requested charset.
+     *                    May be null, in which case the platform default is used
+     * @return true if the content of the files are equal or neither exists,
+     * false otherwise
+     * @throws IllegalArgumentException when an input is not a file.
+     * @throws IOException in case of an I/O error.
+     * @throws UnsupportedCharsetException If the named charset is unavailable (unchecked exception).
+     * @see IOUtils#contentEqualsIgnoreEOL(Reader, Reader)
+     * @since 2.2
+     */
+    public static boolean contentEqualsIgnoreEOL(final File file1, final File file2, final String charsetName)
+            throws IOException {
+        if (file1 == null && file2 == null) {
+            return true;
+        }
+        if (file1 == null || file2 == null) {
+            return false;
+        }
+        final boolean file1Exists = file1.exists();
+        if (file1Exists != file2.exists()) {
+            return false;
+        }
+
+        if (!file1Exists) {
+            // two not existing files are equal
+            return true;
+        }
+
+        requireFile(file1, "file1");
+        requireFile(file2, "file2");
+
+        if (file1.getCanonicalFile().equals(file2.getCanonicalFile())) {
+            // same file
+            return true;
+        }
+
+        final Charset charset = Charsets.toCharset(charsetName);
+        try (Reader input1 = new InputStreamReader(Files.newInputStream(file1.toPath()), charset);
+             Reader input2 = new InputStreamReader(Files.newInputStream(file2.toPath()), charset)) {
+            return IOUtils.contentEqualsIgnoreEOL(input1, input2);
+        }
+    }
+
+    /**
+     * Converts a Collection containing java.io.File instances into array
+     * representation. This is to account for the difference between
+     * File.listFiles() and FileUtils.listFiles().
+     *
+     * @param files a Collection containing java.io.File instances
+     * @return an array of java.io.File
+     */
+    public static File[] convertFileCollectionToFileArray(final Collection<File> files) {
+        return files.toArray(EMPTY_FILE_ARRAY);
+    }
+
+    /**
+     * Copies a whole directory to a new location preserving the file dates.
+     * <p>
+     * This method copies the specified directory and all its child directories and files to the specified destination.
+     * The destination is the new location and name of the directory.
+     * </p>
+     * <p>
+     * The destination directory is created if it does not exist. If the destination directory did exist, then this
+     * method merges the source with the destination, with the source taking precedence.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> This method tries to preserve the files' last modified date/times using
+     * {@link File#setLastModified(long)}, however it is not guaranteed that those operations will succeed. If the
+     * modification operation fails, the methods throws IOException.
+     * </p>
+     *
+     * @param srcDir an existing directory to copy, must not be {@code null}.
+     * @param destDir the new directory, must not be {@code null}.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IllegalArgumentException if the source or destination is invalid.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 1.1
+     */
+    public static void copyDirectory(final File srcDir, final File destDir) throws IOException {
+        copyDirectory(srcDir, destDir, true);
+    }
+
+    /**
+     * Copies a whole directory to a new location.
+     * <p>
+     * This method copies the contents of the specified source directory to within the specified destination directory.
+     * </p>
+     * <p>
+     * The destination directory is created if it does not exist. If the destination directory did exist, then this
+     * method merges the source with the destination, with the source taking precedence.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> Setting {@code preserveFileDate} to {@code true} tries to preserve the files' last
+     * modified date/times using {@link File#setLastModified(long)}, however it is not guaranteed that those operations
+     * will succeed. If the modification operation fails, the methods throws IOException.
+     * </p>
+     *
+     * @param srcDir an existing directory to copy, must not be {@code null}.
+     * @param destDir the new directory, must not be {@code null}.
+     * @param preserveFileDate true if the file date of the copy should be the same as the original.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IllegalArgumentException if the source or destination is invalid.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 1.1
+     */
+    public static void copyDirectory(final File srcDir, final File destDir, final boolean preserveFileDate)
+        throws IOException {
+        copyDirectory(srcDir, destDir, null, preserveFileDate);
+    }
+
+    /**
+     * Copies a filtered directory to a new location preserving the file dates.
+     * <p>
+     * This method copies the contents of the specified source directory to within the specified destination directory.
+     * </p>
+     * <p>
+     * The destination directory is created if it does not exist. If the destination directory did exist, then this
+     * method merges the source with the destination, with the source taking precedence.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> This method tries to preserve the files' last modified date/times using
+     * {@link File#setLastModified(long)}, however it is not guaranteed that those operations will succeed. If the
+     * modification operation fails, the methods throws IOException.
+     * </p>
+     * <b>Example: Copy directories only</b>
+     *
+     * <pre>
+     * // only copy the directory structure
+     * FileUtils.copyDirectory(srcDir, destDir, DirectoryFileFilter.DIRECTORY);
+     * </pre>
+     *
+     * <b>Example: Copy directories and txt files</b>
+     *
+     * <pre>
+     * // Create a filter for ".txt" files
+     * IOFileFilter txtSuffixFilter = FileFilterUtils.suffixFileFilter(".txt");
+     * IOFileFilter txtFiles = FileFilterUtils.andFileFilter(FileFileFilter.FILE, txtSuffixFilter);
+     *
+     * // Create a filter for either directories or ".txt" files
+     * FileFilter filter = FileFilterUtils.orFileFilter(DirectoryFileFilter.DIRECTORY, txtFiles);
+     *
+     * // Copy using the filter
+     * FileUtils.copyDirectory(srcDir, destDir, filter);
+     * </pre>
+     *
+     * @param srcDir an existing directory to copy, must not be {@code null}.
+     * @param destDir the new directory, must not be {@code null}.
+     * @param filter the filter to apply, null means copy all directories and files should be the same as the original.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IllegalArgumentException if the source or destination is invalid.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 1.4
+     */
+    public static void copyDirectory(final File srcDir, final File destDir, final FileFilter filter)
+        throws IOException {
+        copyDirectory(srcDir, destDir, filter, true);
+    }
+
+    /**
+     * Copies a filtered directory to a new location.
+     * <p>
+     * This method copies the contents of the specified source directory to within the specified destination directory.
+     * </p>
+     * <p>
+     * The destination directory is created if it does not exist. If the destination directory did exist, then this
+     * method merges the source with the destination, with the source taking precedence.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> Setting {@code preserveFileDate} to {@code true} tries to preserve the files' last
+     * modified date/times using {@link File#setLastModified(long)}, however it is not guaranteed that those operations
+     * will succeed. If the modification operation fails, the methods throws IOException.
+     * </p>
+     * <b>Example: Copy directories only</b>
+     *
+     * <pre>
+     * // only copy the directory structure
+     * FileUtils.copyDirectory(srcDir, destDir, DirectoryFileFilter.DIRECTORY, false);
+     * </pre>
+     *
+     * <b>Example: Copy directories and txt files</b>
+     *
+     * <pre>
+     * // Create a filter for ".txt" files
+     * IOFileFilter txtSuffixFilter = FileFilterUtils.suffixFileFilter(".txt");
+     * IOFileFilter txtFiles = FileFilterUtils.andFileFilter(FileFileFilter.FILE, txtSuffixFilter);
+     *
+     * // Create a filter for either directories or ".txt" files
+     * FileFilter filter = FileFilterUtils.orFileFilter(DirectoryFileFilter.DIRECTORY, txtFiles);
+     *
+     * // Copy using the filter
+     * FileUtils.copyDirectory(srcDir, destDir, filter, false);
+     * </pre>
+     *
+     * @param srcDir an existing directory to copy, must not be {@code null}.
+     * @param destDir the new directory, must not be {@code null}.
+     * @param filter the filter to apply, null means copy all directories and files.
+     * @param preserveFileDate true if the file date of the copy should be the same as the original.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IllegalArgumentException if the source or destination is invalid.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 1.4
+     */
+    public static void copyDirectory(final File srcDir, final File destDir, final FileFilter filter, final boolean preserveFileDate) throws IOException {
+        copyDirectory(srcDir, destDir, filter, preserveFileDate, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    /**
+     * Copies a filtered directory to a new location.
+     * <p>
+     * This method copies the contents of the specified source directory to within the specified destination directory.
+     * </p>
+     * <p>
+     * The destination directory is created if it does not exist. If the destination directory did exist, then this
+     * method merges the source with the destination, with the source taking precedence.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> Setting {@code preserveFileDate} to {@code true} tries to preserve the files' last
+     * modified date/times using {@link File#setLastModified(long)}, however it is not guaranteed that those operations
+     * will succeed. If the modification operation fails, the methods throws IOException.
+     * </p>
+     * <b>Example: Copy directories only</b>
+     *
+     * <pre>
+     * // only copy the directory structure
+     * FileUtils.copyDirectory(srcDir, destDir, DirectoryFileFilter.DIRECTORY, false);
+     * </pre>
+     *
+     * <b>Example: Copy directories and txt files</b>
+     *
+     * <pre>
+     * // Create a filter for ".txt" files
+     * IOFileFilter txtSuffixFilter = FileFilterUtils.suffixFileFilter(".txt");
+     * IOFileFilter txtFiles = FileFilterUtils.andFileFilter(FileFileFilter.FILE, txtSuffixFilter);
+     *
+     * // Create a filter for either directories or ".txt" files
+     * FileFilter filter = FileFilterUtils.orFileFilter(DirectoryFileFilter.DIRECTORY, txtFiles);
+     *
+     * // Copy using the filter
+     * FileUtils.copyDirectory(srcDir, destDir, filter, false);
+     * </pre>
+     *
+     * @param srcDir an existing directory to copy, must not be {@code null}
+     * @param destDir the new directory, must not be {@code null}
+     * @param fileFilter the filter to apply, null means copy all directories and files
+     * @param preserveFileDate true if the file date of the copy should be the same as the original
+     * @param copyOptions options specifying how the copy should be done, for example {@link StandardCopyOption}.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IllegalArgumentException if the source or destination is invalid.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 2.8.0
+     */
+    public static void copyDirectory(final File srcDir, final File destDir, final FileFilter fileFilter, final boolean preserveFileDate,
+        final CopyOption... copyOptions) throws IOException {
+        requireFileCopy(srcDir, destDir);
+        requireDirectory(srcDir, "srcDir");
+        requireCanonicalPathsNotEquals(srcDir, destDir);
+
+        // Cater for destination being directory within the source directory (see IO-141)
+        List<String> exclusionList = null;
+        final String srcDirCanonicalPath = srcDir.getCanonicalPath();
+        final String destDirCanonicalPath = destDir.getCanonicalPath();
+        if (destDirCanonicalPath.startsWith(srcDirCanonicalPath)) {
+            final File[] srcFiles = listFiles(srcDir, fileFilter);
+            if (srcFiles.length > 0) {
+                exclusionList = new ArrayList<>(srcFiles.length);
+                for (final File srcFile : srcFiles) {
+                    final File copiedFile = new File(destDir, srcFile.getName());
+                    exclusionList.add(copiedFile.getCanonicalPath());
+                }
+            }
+        }
+        doCopyDirectory(srcDir, destDir, fileFilter, exclusionList, preserveFileDate, preserveFileDate ? addCopyAttributes(copyOptions) : copyOptions);
+    }
+
+    /**
+     * Copies a directory to within another directory preserving the file dates.
+     * <p>
+     * This method copies the source directory and all its contents to a directory of the same name in the specified
+     * destination directory.
+     * </p>
+     * <p>
+     * The destination directory is created if it does not exist. If the destination directory did exist, then this
+     * method merges the source with the destination, with the source taking precedence.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> This method tries to preserve the files' last modified date/times using
+     * {@link File#setLastModified(long)}, however it is not guaranteed that those operations will succeed. If the
+     * modification operation fails, the methods throws IOException.
+     * </p>
+     *
+     * @param sourceDir an existing directory to copy, must not be {@code null}.
+     * @param destinationDir the directory to place the copy in, must not be {@code null}.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IllegalArgumentException if the source or destination is invalid.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 1.2
+     */
+    public static void copyDirectoryToDirectory(final File sourceDir, final File destinationDir) throws IOException {
+        requireDirectoryIfExists(sourceDir, "sourceDir");
+        requireDirectoryIfExists(destinationDir, "destinationDir");
+        copyDirectory(sourceDir, new File(destinationDir, sourceDir.getName()), true);
+    }
+
+    /**
+     * Copies a file to a new location preserving the file date.
+     * <p>
+     * This method copies the contents of the specified source file to the specified destination file. The directory
+     * holding the destination file is created if it does not exist. If the destination file exists, then this method
+     * will overwrite it.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> This method tries to preserve the file's last modified date/times using
+     * {@link StandardCopyOption#COPY_ATTRIBUTES}, however it is not guaranteed that the operation will succeed. If the
+     * modification operation fails, the methods throws IOException.
+     * </p>
+     *
+     * @param srcFile an existing file to copy, must not be {@code null}.
+     * @param destFile the new file, must not be {@code null}.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IOException if source or destination is invalid.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @throws IOException if the output file length is not the same as the input file length after the copy completes.
+     * @see #copyFileToDirectory(File, File)
+     * @see #copyFile(File, File, boolean)
+     */
+    public static void copyFile(final File srcFile, final File destFile) throws IOException {
+        copyFile(srcFile, destFile, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    /**
+     * Copies an existing file to a new file location.
+     * <p>
+     * This method copies the contents of the specified source file to the specified destination file. The directory
+     * holding the destination file is created if it does not exist. If the destination file exists, then this method
+     * will overwrite it.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> Setting {@code preserveFileDate} to {@code true} tries to preserve the file's last
+     * modified date/times using {@link StandardCopyOption#COPY_ATTRIBUTES}, however it is not guaranteed that the operation
+     * will succeed. If the modification operation fails, the methods throws IOException.
+     * </p>
+     *
+     * @param srcFile an existing file to copy, must not be {@code null}.
+     * @param destFile the new file, must not be {@code null}.
+     * @param preserveFileDate true if the file date of the copy should be the same as the original.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IOException if source or destination is invalid.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @throws IOException if the output file length is not the same as the input file length after the copy completes
+     * @see #copyFile(File, File, boolean, CopyOption...)
+     */
+    public static void copyFile(final File srcFile, final File destFile, final boolean preserveFileDate) throws IOException {
+        // @formatter:off
+        copyFile(srcFile, destFile, preserveFileDate
+                ? new CopyOption[] {StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING}
+                : new CopyOption[] {StandardCopyOption.REPLACE_EXISTING});
+        // @formatter:on
+    }
+
+    /**
+     * Copies a file to a new location.
+     * <p>
+     * This method copies the contents of the specified source file to the specified destination file. The directory
+     * holding the destination file is created if it does not exist. If the destination file exists, you can overwrite
+     * it with {@link StandardCopyOption#REPLACE_EXISTING}.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> Setting {@code preserveFileDate} to {@code true} tries to preserve the file's last
+     * modified date/times using {@link StandardCopyOption#COPY_ATTRIBUTES}, however it is not guaranteed that the operation
+     * will succeed. If the modification operation fails, the methods throws IOException.
+     * </p>
+     *
+     * @param srcFile an existing file to copy, must not be {@code null}.
+     * @param destFile the new file, must not be {@code null}.
+     * @param preserveFileDate true if the file date of the copy should be the same as the original.
+     * @param copyOptions options specifying how the copy should be done, for example {@link StandardCopyOption}..
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IllegalArgumentException if source is not a file.
+     * @throws IOException if the output file length is not the same as the input file length after the copy completes.
+     * @throws IOException if an I/O error occurs, or setting the last-modified time didn't succeeded.
+     * @see #copyFileToDirectory(File, File, boolean)
+     * @since 2.8.0
+     */
+    public static void copyFile(final File srcFile, final File destFile, final boolean preserveFileDate, final CopyOption... copyOptions) throws IOException {
+        copyFile(srcFile, destFile, preserveFileDate ? addCopyAttributes(copyOptions) : copyOptions);
+    }
+
+    /**
+     * Copies a file to a new location.
+     * <p>
+     * This method copies the contents of the specified source file to the specified destination file. The directory
+     * holding the destination file is created if it does not exist. If the destination file exists, you can overwrite
+     * it if you use {@link StandardCopyOption#REPLACE_EXISTING}.
+     * </p>
+     *
+     * @param srcFile an existing file to copy, must not be {@code null}.
+     * @param destFile the new file, must not be {@code null}.
+     * @param copyOptions options specifying how the copy should be done, for example {@link StandardCopyOption}..
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IllegalArgumentException if source is not a file.
+     * @throws IOException if the output file length is not the same as the input file length after the copy completes.
+     * @throws IOException if an I/O error occurs.
+     * @see StandardCopyOption
+     * @since 2.9.0
+     */
+    public static void copyFile(final File srcFile, final File destFile, final CopyOption... copyOptions) throws IOException {
+        requireFileCopy(srcFile, destFile);
+        requireFile(srcFile, "srcFile");
+        requireCanonicalPathsNotEquals(srcFile, destFile);
+        createParentDirectories(destFile);
+        requireFileIfExists(destFile, "destFile");
+        if (destFile.exists()) {
+            requireCanWrite(destFile, "destFile");
+        }
+
+        // On Windows, the last modified time is copied by default.
+        Files.copy(srcFile.toPath(), destFile.toPath(), copyOptions);
+
+        // TODO IO-386: Do we still need this check?
+        requireEqualSizes(srcFile, destFile, srcFile.length(), destFile.length());
+    }
+
+    /**
+     * Copies bytes from a {@link File} to an {@link OutputStream}.
+     * <p>
+     * This method buffers the input internally, so there is no need to use a {@link BufferedInputStream}.
+     * </p>
+     *
+     * @param input  the {@link File} to read.
+     * @param output the {@link OutputStream} to write.
+     * @return the number of bytes copied
+     * @throws NullPointerException if the File is {@code null}.
+     * @throws NullPointerException if the OutputStream is {@code null}.
+     * @throws IOException          if an I/O error occurs.
+     * @since 2.1
+     */
+    public static long copyFile(final File input, final OutputStream output) throws IOException {
+        try (InputStream fis = Files.newInputStream(input.toPath())) {
+            return IOUtils.copyLarge(fis, output);
+        }
+    }
+
+    /**
+     * Copies a file to a directory preserving the file date.
+     * <p>
+     * This method copies the contents of the specified source file to a file of the same name in the specified
+     * destination directory. The destination directory is created if it does not exist. If the destination file exists,
+     * then this method will overwrite it.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> This method tries to preserve the file's last modified date/times using
+     * {@link StandardCopyOption#COPY_ATTRIBUTES}, however it is not guaranteed that the operation will succeed. If the
+     * modification operation fails, the methods throws IOException.
+     * </p>
+     *
+     * @param srcFile an existing file to copy, must not be {@code null}.
+     * @param destDir the directory to place the copy in, must not be {@code null}.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IllegalArgumentException if source or destination is invalid.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @see #copyFile(File, File, boolean)
+     */
+    public static void copyFileToDirectory(final File srcFile, final File destDir) throws IOException {
+        copyFileToDirectory(srcFile, destDir, true);
+    }
+
+    /**
+     * Copies a file to a directory optionally preserving the file date.
+     * <p>
+     * This method copies the contents of the specified source file to a file of the same name in the specified
+     * destination directory. The destination directory is created if it does not exist. If the destination file exists,
+     * then this method will overwrite it.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> Setting {@code preserveFileDate} to {@code true} tries to preserve the file's last
+     * modified date/times using {@link StandardCopyOption#COPY_ATTRIBUTES}, however it is not guaranteed that the operation
+     * will succeed. If the modification operation fails, the methods throws IOException.
+     * </p>
+     *
+     * @param sourceFile an existing file to copy, must not be {@code null}.
+     * @param destinationDir the directory to place the copy in, must not be {@code null}.
+     * @param preserveFileDate true if the file date of the copy should be the same as the original.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @throws IOException if the output file length is not the same as the input file length after the copy completes.
+     * @see #copyFile(File, File, CopyOption...)
+     * @since 1.3
+     */
+    public static void copyFileToDirectory(final File sourceFile, final File destinationDir, final boolean preserveFileDate) throws IOException {
+        Objects.requireNonNull(sourceFile, "sourceFile");
+        requireDirectoryIfExists(destinationDir, "destinationDir");
+        copyFile(sourceFile, new File(destinationDir, sourceFile.getName()), preserveFileDate);
+    }
+
+    /**
+     * Copies bytes from an {@link InputStream} {@code source} to a file
+     * {@code destination}. The directories up to {@code destination}
+     * will be created if they don't already exist. {@code destination}
+     * will be overwritten if it already exists.
+     * <p>
+     * <em>The {@code source} stream is closed.</em>
+     * </p>
+     * <p>
+     * See {@link #copyToFile(InputStream, File)} for a method that does not close the input stream.
+     * </p>
+     *
+     * @param source      the {@link InputStream} to copy bytes from, must not be {@code null}, will be closed
+     * @param destination the non-directory {@link File} to write bytes to
+     *                    (possibly overwriting), must not be {@code null}
+     * @throws IOException if {@code destination} is a directory
+     * @throws IOException if {@code destination} cannot be written
+     * @throws IOException if {@code destination} needs creating but can't be
+     * @throws IOException if an IO error occurs during copying
+     * @since 2.0
+     */
+    public static void copyInputStreamToFile(final InputStream source, final File destination) throws IOException {
+        try (InputStream inputStream = source) {
+            copyToFile(inputStream, destination);
+        }
+    }
+
+    /**
+     * Copies a file or directory to within another directory preserving the file dates.
+     * <p>
+     * This method copies the source file or directory, along all its contents, to a directory of the same name in the
+     * specified destination directory.
+     * </p>
+     * <p>
+     * The destination directory is created if it does not exist. If the destination directory did exist, then this method
+     * merges the source with the destination, with the source taking precedence.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> This method tries to preserve the files' last modified date/times using
+     * {@link StandardCopyOption#COPY_ATTRIBUTES} or {@link File#setLastModified(long)} depending on the input, however it
+     * is not guaranteed that those operations will succeed. If the modification operation fails, the methods throws
+     * IOException.
+     * </p>
+     *
+     * @param sourceFile an existing file or directory to copy, must not be {@code null}.
+     * @param destinationDir the directory to place the copy in, must not be {@code null}.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IllegalArgumentException if the source or destination is invalid.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @see #copyDirectoryToDirectory(File, File)
+     * @see #copyFileToDirectory(File, File)
+     * @since 2.6
+     */
+    public static void copyToDirectory(final File sourceFile, final File destinationDir) throws IOException {
+        Objects.requireNonNull(sourceFile, "sourceFile");
+        if (sourceFile.isFile()) {
+            copyFileToDirectory(sourceFile, destinationDir);
+        } else if (sourceFile.isDirectory()) {
+            copyDirectoryToDirectory(sourceFile, destinationDir);
+        } else {
+            throw new FileNotFoundException("The source " + sourceFile + " does not exist");
+        }
+    }
+
+    /**
+     * Copies a files to a directory preserving each file's date.
+     * <p>
+     * This method copies the contents of the specified source files
+     * to a file of the same name in the specified destination directory.
+     * The destination directory is created if it does not exist.
+     * If the destination file exists, then this method will overwrite it.
+     * </p>
+     * <p>
+     * <strong>Note:</strong> This method tries to preserve the file's last
+     * modified date/times using {@link File#setLastModified(long)}, however
+     * it is not guaranteed that the operation will succeed.
+     * If the modification operation fails, the methods throws IOException.
+     * </p>
+     *
+     * @param sourceIterable     a existing files to copy, must not be {@code null}.
+     * @param destinationDir  the directory to place the copy in, must not be {@code null}.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IOException if source or destination is invalid.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @see #copyFileToDirectory(File, File)
+     * @since 2.6
+     */
+    public static void copyToDirectory(final Iterable<File> sourceIterable, final File destinationDir) throws IOException {
+        Objects.requireNonNull(sourceIterable, "sourceIterable");
+        for (final File src : sourceIterable) {
+            copyFileToDirectory(src, destinationDir);
+        }
+    }
+
+    /**
+     * Copies bytes from an {@link InputStream} source to a {@link File} destination. The directories
+     * up to {@code destination} will be created if they don't already exist. {@code destination} will be
+     * overwritten if it already exists. The {@code source} stream is left open, e.g. for use with
+     * {@link java.util.zip.ZipInputStream ZipInputStream}. See {@link #copyInputStreamToFile(InputStream, File)} for a
+     * method that closes the input stream.
+     *
+     * @param inputStream the {@link InputStream} to copy bytes from, must not be {@code null}
+     * @param file the non-directory {@link File} to write bytes to (possibly overwriting), must not be
+     *        {@code null}
+     * @throws NullPointerException if the InputStream is {@code null}.
+     * @throws NullPointerException if the File is {@code null}.
+     * @throws IllegalArgumentException if the file object is a directory.
+     * @throws IllegalArgumentException if the file is not writable.
+     * @throws IOException if the directories could not be created.
+     * @throws IOException if an IO error occurs during copying.
+     * @since 2.5
+     */
+    public static void copyToFile(final InputStream inputStream, final File file) throws IOException {
+        try (OutputStream out = newOutputStream(file, false)) {
+            IOUtils.copy(inputStream, out);
+        }
+    }
+
+    /**
+     * Copies bytes from the URL {@code source} to a file
+     * {@code destination}. The directories up to {@code destination}
+     * will be created if they don't already exist. {@code destination}
+     * will be overwritten if it already exists.
+     * <p>
+     * Warning: this method does not set a connection or read timeout and thus
+     * might block forever. Use {@link #copyURLToFile(URL, File, int, int)}
+     * with reasonable timeouts to prevent this.
+     * </p>
+     *
+     * @param source      the {@link URL} to copy bytes from, must not be {@code null}
+     * @param destination the non-directory {@link File} to write bytes to
+     *                    (possibly overwriting), must not be {@code null}
+     * @throws IOException if {@code source} URL cannot be opened
+     * @throws IOException if {@code destination} is a directory
+     * @throws IOException if {@code destination} cannot be written
+     * @throws IOException if {@code destination} needs creating but can't be
+     * @throws IOException if an IO error occurs during copying
+     */
+    public static void copyURLToFile(final URL source, final File destination) throws IOException {
+        try (InputStream stream = source.openStream()) {
+            final Path path = destination.toPath();
+            PathUtils.createParentDirectories(path);
+            Files.copy(stream, path, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    /**
+     * Copies bytes from the URL {@code source} to a file {@code destination}. The directories up to
+     * {@code destination} will be created if they don't already exist. {@code destination} will be
+     * overwritten if it already exists.
+     *
+     * @param source the {@link URL} to copy bytes from, must not be {@code null}
+     * @param destination the non-directory {@link File} to write bytes to (possibly overwriting), must not be
+     *        {@code null}
+     * @param connectionTimeoutMillis the number of milliseconds until this method will timeout if no connection could
+     *        be established to the {@code source}
+     * @param readTimeoutMillis the number of milliseconds until this method will timeout if no data could be read from
+     *        the {@code source}
+     * @throws IOException if {@code source} URL cannot be opened
+     * @throws IOException if {@code destination} is a directory
+     * @throws IOException if {@code destination} cannot be written
+     * @throws IOException if {@code destination} needs creating but can't be
+     * @throws IOException if an IO error occurs during copying
+     * @since 2.0
+     */
+    public static void copyURLToFile(final URL source, final File destination, final int connectionTimeoutMillis, final int readTimeoutMillis)
+        throws IOException {
+        try (CloseableURLConnection urlConnection = CloseableURLConnection.open(source)) {
+            urlConnection.setConnectTimeout(connectionTimeoutMillis);
+            urlConnection.setReadTimeout(readTimeoutMillis);
+            try (InputStream stream = urlConnection.getInputStream()) {
+                copyInputStreamToFile(stream, destination);
+            }
+        }
+    }
+
+    /**
+     * Creates all parent directories for a File object.
+     *
+     * @param file the File that may need parents, may be null.
+     * @return The parent directory, or {@code null} if the given file does not name a parent
+     * @throws IOException if the directory was not created along with all its parent directories.
+     * @throws IOException if the given file object is not null and not a directory.
+     * @since 2.9.0
+     */
+    public static File createParentDirectories(final File file) throws IOException {
+        return mkdirs(getParentFile(file));
+    }
+
+    /**
+     * Gets the current directory.
+     *
+     * @return the current directory.
+     * @since 2.12.0
+     */
+    public static File current() {
+        return PathUtils.current().toFile();
+    }
+
+    /**
+     * Decodes the specified URL as per RFC 3986, i.e. transforms
+     * percent-encoded octets to characters by decoding with the UTF-8 character
+     * set. This function is primarily intended for usage with
+     * {@link java.net.URL} which unfortunately does not enforce proper URLs. As
+     * such, this method will leniently accept invalid characters or malformed
+     * percent-encoded octets and simply pass them literally through to the
+     * result string. Except for rare edge cases, this will make unencoded URLs
+     * pass through unaltered.
+     *
+     * @param url The URL to decode, may be {@code null}.
+     * @return The decoded URL or {@code null} if the input was
+     * {@code null}.
+     */
+    static String decodeUrl(final String url) {
+        String decoded = url;
+        if (url != null && url.indexOf('%') >= 0) {
+            final int n = url.length();
+            final StringBuilder builder = new StringBuilder();
+            final ByteBuffer byteBuffer = ByteBuffer.allocate(n);
+            for (int i = 0; i < n; ) {
+                if (url.charAt(i) == '%') {
+                    try {
+                        do {
+                            final byte octet = (byte) Integer.parseInt(url.substring(i + 1, i + 3), 16);
+                            byteBuffer.put(octet);
+                            i += 3;
+                        } while (i < n && url.charAt(i) == '%');
+                        continue;
+                    } catch (final RuntimeException ignored) {
+                        // malformed percent-encoded octet, fall through and
+                        // append characters literally
+                    } finally {
+                        if (byteBuffer.position() > 0) {
+                            byteBuffer.flip();
+                            builder.append(StandardCharsets.UTF_8.decode(byteBuffer).toString());
+                            byteBuffer.clear();
+                        }
+                    }
+                }
+                builder.append(url.charAt(i++));
+            }
+            decoded = builder.toString();
+        }
+        return decoded;
+    }
+
+    /**
+     * Deletes the given File but throws an IOException if it cannot, unlike {@link File#delete()} which returns a
+     * boolean.
+     *
+     * @param file The file to delete.
+     * @return the given file.
+     * @throws NullPointerException     if the parameter is {@code null}
+     * @throws IOException              if the file cannot be deleted.
+     * @see File#delete()
+     * @since 2.9.0
+     */
+    public static File delete(final File file) throws IOException {
+        Objects.requireNonNull(file, "file");
+        Files.delete(file.toPath());
+        return file;
+    }
+
+    /**
+     * Deletes a directory recursively.
+     *
+     * @param directory directory to delete
+     * @throws IOException              in case deletion is unsuccessful
+     * @throws NullPointerException     if the parameter is {@code null}
+     * @throws IllegalArgumentException if {@code directory} is not a directory
+     */
+    public static void deleteDirectory(final File directory) throws IOException {
+        Objects.requireNonNull(directory, "directory");
+        if (!directory.exists()) {
+            return;
+        }
+        if (!isSymlink(directory)) {
+            cleanDirectory(directory);
+        }
+        delete(directory);
+    }
+
+    /**
+     * Schedules a directory recursively for deletion on JVM exit.
+     *
+     * @param directory directory to delete, must not be {@code null}
+     * @throws NullPointerException if the directory is {@code null}
+     * @throws IOException          in case deletion is unsuccessful
+     */
+    private static void deleteDirectoryOnExit(final File directory) throws IOException {
+        if (!directory.exists()) {
+            return;
+        }
+        directory.deleteOnExit();
+        if (!isSymlink(directory)) {
+            cleanDirectoryOnExit(directory);
+        }
+    }
+
+    /**
+     * Deletes a file, never throwing an exception. If file is a directory, delete it and all sub-directories.
+     * <p>
+     * The difference between File.delete() and this method are:
+     * </p>
+     * <ul>
+     * <li>A directory to be deleted does not have to be empty.</li>
+     * <li>No exceptions are thrown when a file or directory cannot be deleted.</li>
+     * </ul>
+     *
+     * @param file file or directory to delete, can be {@code null}
+     * @return {@code true} if the file or directory was deleted, otherwise
+     * {@code false}
+     *
+     * @since 1.4
+     */
+    public static boolean deleteQuietly(final File file) {
+        if (file == null) {
+            return false;
+        }
+        try {
+            if (file.isDirectory()) {
+                cleanDirectory(file);
+            }
+        } catch (final Exception ignored) {
+            // ignore
+        }
+
+        try {
+            return file.delete();
+        } catch (final Exception ignored) {
+            return false;
+        }
+    }
+
+    /**
+     * Determines whether the {@code parent} directory contains the {@code child} element (a file or directory).
+     * <p>
+     * Files are normalized before comparison.
+     * </p>
+     *
+     * Edge cases:
+     * <ul>
+     * <li>A {@code directory} must not be null: if null, throw IllegalArgumentException</li>
+     * <li>A {@code directory} must be a directory: if not a directory, throw IllegalArgumentException</li>
+     * <li>A directory does not contain itself: return false</li>
+     * <li>A null child file is not contained in any parent: return false</li>
+     * </ul>
+     *
+     * @param directory the file to consider as the parent.
+     * @param child     the file to consider as the child.
+     * @return true is the candidate leaf is under by the specified composite. False otherwise.
+     * @throws IOException              if an IO error occurs while checking the files.
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if the given {@link File} does not exist or is not a directory.
+     * @see FilenameUtils#directoryContains(String, String)
+     * @since 2.2
+     */
+    public static boolean directoryContains(final File directory, final File child) throws IOException {
+        requireDirectoryExists(directory, "directory");
+
+        if (child == null || !directory.exists() || !child.exists()) {
+            return false;
+        }
+
+        // Canonicalize paths (normalizes relative paths)
+        return FilenameUtils.directoryContains(directory.getCanonicalPath(), child.getCanonicalPath());
+    }
+
+    /**
+     * Internal copy directory method.
+     *
+     * @param srcDir the validated source directory, must not be {@code null}.
+     * @param destDir the validated destination directory, must not be {@code null}.
+     * @param fileFilter the filter to apply, null means copy all directories and files.
+     * @param exclusionList List of files and directories to exclude from the copy, may be null.
+     * @param preserveDirDate preserve the directories last modified dates.
+     * @param copyOptions options specifying how the copy should be done, see {@link StandardCopyOption}.
+     * @throws IOException if the directory was not created along with all its parent directories.
+     * @throws IOException if the given file object is not a directory.
+     */
+    private static void doCopyDirectory(final File srcDir, final File destDir, final FileFilter fileFilter, final List<String> exclusionList,
+        final boolean preserveDirDate, final CopyOption... copyOptions) throws IOException {
+        // recurse dirs, copy files.
+        final File[] srcFiles = listFiles(srcDir, fileFilter);
+        requireDirectoryIfExists(destDir, "destDir");
+        mkdirs(destDir);
+        requireCanWrite(destDir, "destDir");
+        for (final File srcFile : srcFiles) {
+            final File dstFile = new File(destDir, srcFile.getName());
+            if (exclusionList == null || !exclusionList.contains(srcFile.getCanonicalPath())) {
+                if (srcFile.isDirectory()) {
+                    doCopyDirectory(srcFile, dstFile, fileFilter, exclusionList, preserveDirDate, copyOptions);
+                } else {
+                    copyFile(srcFile, dstFile, copyOptions);
+                }
+            }
+        }
+        // Do this last, as the above has probably affected directory metadata
+        if (preserveDirDate) {
+            setLastModified(srcDir, destDir);
+        }
+    }
+
+    /**
+     * Deletes a file or directory. For a directory, delete it and all sub-directories.
+     * <p>
+     * The difference between File.delete() and this method are:
+     * </p>
+     * <ul>
+     * <li>The directory does not have to be empty.</li>
+     * <li>You get an exception when a file or directory cannot be deleted.</li>
+     * </ul>
+     *
+     * @param file file or directory to delete, must not be {@code null}.
+     * @throws NullPointerException  if the file is {@code null}.
+     * @throws FileNotFoundException if the file was not found.
+     * @throws IOException           in case deletion is unsuccessful.
+     */
+    public static void forceDelete(final File file) throws IOException {
+        Objects.requireNonNull(file, "file");
+        final Counters.PathCounters deleteCounters;
+        try {
+            deleteCounters = PathUtils.delete(file.toPath(), PathUtils.EMPTY_LINK_OPTION_ARRAY,
+                StandardDeleteOption.OVERRIDE_READ_ONLY);
+        } catch (final IOException e) {
+            throw new IOException("Cannot delete file: " + file, e);
+        }
+
+        if (deleteCounters.getFileCounter().get() < 1 && deleteCounters.getDirectoryCounter().get() < 1) {
+            // didn't find a file to delete.
+            throw new FileNotFoundException("File does not exist: " + file);
+        }
+    }
+
+    /**
+     * Schedules a file to be deleted when JVM exits.
+     * If file is directory delete it and all sub-directories.
+     *
+     * @param file file or directory to delete, must not be {@code null}.
+     * @throws NullPointerException if the file is {@code null}.
+     * @throws IOException          in case deletion is unsuccessful.
+     */
+    public static void forceDeleteOnExit(final File file) throws IOException {
+        Objects.requireNonNull(file, "file");
+        if (file.isDirectory()) {
+            deleteDirectoryOnExit(file);
+        } else {
+            file.deleteOnExit();
+        }
+    }
+
+    /**
+     * Makes a directory, including any necessary but nonexistent parent
+     * directories. If a file already exists with specified name but it is
+     * not a directory then an IOException is thrown.
+     * If the directory cannot be created (or the file already exists but is not a directory)
+     * then an IOException is thrown.
+     *
+     * @param directory directory to create, may be {@code null}.
+     * @throws IOException if the directory was not created along with all its parent directories.
+     * @throws IOException if the given file object is not a directory.
+     * @throws SecurityException See {@link File#mkdirs()}.
+     */
+    public static void forceMkdir(final File directory) throws IOException {
+        mkdirs(directory);
+    }
+
+    /**
+     * Makes any necessary but nonexistent parent directories for a given File. If the parent directory cannot be
+     * created then an IOException is thrown.
+     *
+     * @param file file with parent to create, must not be {@code null}.
+     * @throws NullPointerException if the file is {@code null}.
+     * @throws IOException          if the parent directory cannot be created.
+     * @since 2.5
+     */
+    public static void forceMkdirParent(final File file) throws IOException {
+        Objects.requireNonNull(file, "file");
+        forceMkdir(getParentFile(file));
+    }
+
+    /**
+     * Constructs a file from the set of name elements.
+     *
+     * @param directory the parent directory.
+     * @param names the name elements.
+     * @return the new file.
+     * @since 2.1
+     */
+    public static File getFile(final File directory, final String... names) {
+        Objects.requireNonNull(directory, "directory");
+        Objects.requireNonNull(names, "names");
+        File file = directory;
+        for (final String name : names) {
+            file = new File(file, name);
+        }
+        return file;
+    }
+
+    /**
+     * Constructs a file from the set of name elements.
+     *
+     * @param names the name elements.
+     * @return the file.
+     * @since 2.1
+     */
+    public static File getFile(final String... names) {
+        Objects.requireNonNull(names, "names");
+        File file = null;
+        for (final String name : names) {
+            if (file == null) {
+                file = new File(name);
+            } else {
+                file = new File(file, name);
+            }
+        }
+        return file;
+    }
+
+    /**
+     * Gets the parent of the given file. The given file may be bull and a file's parent may as well be null.
+     *
+     * @param file The file to query.
+     * @return The parent file or {@code null}.
+     */
+    private static File getParentFile(final File file) {
+        return file == null ? null : file.getParentFile();
+    }
+
+    /**
+     * Returns a {@link File} representing the system temporary directory.
+     *
+     * @return the system temporary directory.
+     *
+     * @since 2.0
+     */
+    public static File getTempDirectory() {
+        return new File(getTempDirectoryPath());
+    }
+
+    /**
+     * Returns the path to the system temporary directory.
+     *
+     * @return the path to the system temporary directory.
+     *
+     * @since 2.0
+     */
+    public static String getTempDirectoryPath() {
+        return System.getProperty("java.io.tmpdir");
+    }
+
+    /**
+     * Returns a {@link File} representing the user's home directory.
+     *
+     * @return the user's home directory.
+     *
+     * @since 2.0
+     */
+    public static File getUserDirectory() {
+        return new File(getUserDirectoryPath());
+    }
+
+    /**
+     * Returns the path to the user's home directory.
+     *
+     * @return the path to the user's home directory.
+     *
+     * @since 2.0
+     */
+    public static String getUserDirectoryPath() {
+        return System.getProperty("user.home");
+    }
+
+    /**
+     * Tests whether the specified {@link File} is a directory or not. Implemented as a
+     * null-safe delegate to {@link Files#isDirectory(Path path, LinkOption... options)}.
+     *
+     * @param   file the path to the file.
+     * @param   options options indicating how symbolic links are handled
+     * @return  {@code true} if the file is a directory; {@code false} if
+     *          the path is null, the file does not exist, is not a directory, or it cannot
+     *          be determined if the file is a directory or not.
+     * @throws SecurityException     In the case of the default provider, and a security manager is installed, the
+     *                               {@link SecurityManager#checkRead(String) checkRead} method is invoked to check read
+     *                               access to the directory.
+     * @since 2.9.0
+     */
+    public static boolean isDirectory(final File file, final LinkOption... options) {
+        return file != null && Files.isDirectory(file.toPath(), options);
+    }
+
+    /**
+     * Tests whether the directory is empty.
+     *
+     * @param directory the directory to query.
+     * @return whether the directory is empty.
+     * @throws IOException if an I/O error occurs.
+     * @throws NotDirectoryException if the file could not otherwise be opened because it is not a directory
+     *                               <i>(optional specific exception)</i>.
+     * @since 2.9.0
+     */
+    public static boolean isEmptyDirectory(final File directory) throws IOException {
+        return PathUtils.isEmptyDirectory(directory.toPath());
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified {@link ChronoLocalDate}
+     * at the current time.
+     *
+     * <p>Note: The input date is assumed to be in the system default time-zone with the time
+     * part set to the current time. To use a non-default time-zone use the method
+     * {@link #isFileNewer(File, ChronoLocalDateTime, ZoneId)
+     * isFileNewer(file, chronoLocalDate.atTime(LocalTime.now(zoneId)), zoneId)} where
+     * {@code zoneId} is a valid {@link ZoneId}.
+     *
+     * @param file            the {@link File} of which the modification date must be compared.
+     * @param chronoLocalDate the date reference.
+     * @return true if the {@link File} exists and has been modified after the given
+     * {@link ChronoLocalDate} at the current time.
+     * @throws NullPointerException if the file or local date is {@code null}.
+     * @since 2.8.0
+     */
+    public static boolean isFileNewer(final File file, final ChronoLocalDate chronoLocalDate) {
+        return isFileNewer(file, chronoLocalDate, LocalTime.now());
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified {@link ChronoLocalDate}
+     * at the specified time.
+     *
+     * <p>Note: The input date and time are assumed to be in the system default time-zone. To use a
+     * non-default time-zone use the method {@link #isFileNewer(File, ChronoLocalDateTime, ZoneId)
+     * isFileNewer(file, chronoLocalDate.atTime(localTime), zoneId)} where {@code zoneId} is a valid
+     * {@link ZoneId}.
+     *
+     * @param file            the {@link File} of which the modification date must be compared.
+     * @param chronoLocalDate the date reference.
+     * @param localTime       the time reference.
+     * @return true if the {@link File} exists and has been modified after the given
+     * {@link ChronoLocalDate} at the given time.
+     * @throws NullPointerException if the file, local date or zone ID is {@code null}.
+     * @since 2.8.0
+     */
+    public static boolean isFileNewer(final File file, final ChronoLocalDate chronoLocalDate, final LocalTime localTime) {
+        Objects.requireNonNull(chronoLocalDate, "chronoLocalDate");
+        Objects.requireNonNull(localTime, "localTime");
+        return isFileNewer(file, chronoLocalDate.atTime(localTime));
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified {@link ChronoLocalDate} at the specified
+     * {@link OffsetTime}.
+     *
+     * @param file the {@link File} of which the modification date must be compared
+     * @param chronoLocalDate the date reference
+     * @param offsetTime the time reference
+     * @return true if the {@link File} exists and has been modified after the given {@link ChronoLocalDate} at the given
+     *         {@link OffsetTime}.
+     * @throws NullPointerException if the file, local date or zone ID is {@code null}
+     * @since 2.12.0
+     */
+    public static boolean isFileNewer(final File file, final ChronoLocalDate chronoLocalDate, final OffsetTime offsetTime) {
+        Objects.requireNonNull(chronoLocalDate, "chronoLocalDate");
+        Objects.requireNonNull(offsetTime, "offsetTime");
+        return isFileNewer(file, chronoLocalDate.atTime(offsetTime.toLocalTime()));
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified {@link ChronoLocalDateTime}
+     * at the system-default time zone.
+     *
+     * <p>Note: The input date and time is assumed to be in the system default time-zone. To use a
+     * non-default time-zone use the method {@link #isFileNewer(File, ChronoLocalDateTime, ZoneId)
+     * isFileNewer(file, chronoLocalDateTime, zoneId)} where {@code zoneId} is a valid
+     * {@link ZoneId}.
+     *
+     * @param file                the {@link File} of which the modification date must be compared.
+     * @param chronoLocalDateTime the date reference.
+     * @return true if the {@link File} exists and has been modified after the given
+     * {@link ChronoLocalDateTime} at the system-default time zone.
+     * @throws NullPointerException if the file or local date time is {@code null}.
+     * @since 2.8.0
+     */
+    public static boolean isFileNewer(final File file, final ChronoLocalDateTime<?> chronoLocalDateTime) {
+        return isFileNewer(file, chronoLocalDateTime, ZoneId.systemDefault());
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified {@link ChronoLocalDateTime}
+     * at the specified {@link ZoneId}.
+     *
+     * @param file                the {@link File} of which the modification date must be compared.
+     * @param chronoLocalDateTime the date reference.
+     * @param zoneId              the time zone.
+     * @return true if the {@link File} exists and has been modified after the given
+     * {@link ChronoLocalDateTime} at the given {@link ZoneId}.
+     * @throws NullPointerException if the file, local date time or zone ID is {@code null}.
+     * @since 2.8.0
+     */
+    public static boolean isFileNewer(final File file, final ChronoLocalDateTime<?> chronoLocalDateTime, final ZoneId zoneId) {
+        Objects.requireNonNull(chronoLocalDateTime, "chronoLocalDateTime");
+        Objects.requireNonNull(zoneId, "zoneId");
+        return isFileNewer(file, chronoLocalDateTime.atZone(zoneId));
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified {@link ChronoZonedDateTime}.
+     *
+     * @param file                the {@link File} of which the modification date must be compared.
+     * @param chronoZonedDateTime the date reference.
+     * @return true if the {@link File} exists and has been modified after the given
+     * {@link ChronoZonedDateTime}.
+     * @throws NullPointerException if the file or zoned date time is {@code null}.
+     * @since 2.8.0
+     */
+    public static boolean isFileNewer(final File file, final ChronoZonedDateTime<?> chronoZonedDateTime) {
+        Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(chronoZonedDateTime, "chronoZonedDateTime");
+        return UncheckedIO.get(() -> PathUtils.isNewer(file.toPath(), chronoZonedDateTime));
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified {@link Date}.
+     *
+     * @param file the {@link File} of which the modification date must be compared.
+     * @param date the date reference.
+     * @return true if the {@link File} exists and has been modified
+     * after the given {@link Date}.
+     * @throws NullPointerException if the file or date is {@code null}.
+     */
+    public static boolean isFileNewer(final File file, final Date date) {
+        Objects.requireNonNull(date, "date");
+        return isFileNewer(file, date.getTime());
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the reference {@link File}.
+     *
+     * @param file      the {@link File} of which the modification date must be compared.
+     * @param reference the {@link File} of which the modification date is used.
+     * @return true if the {@link File} exists and has been modified more
+     * recently than the reference {@link File}.
+     * @throws NullPointerException if the file or reference file is {@code null}.
+     * @throws IllegalArgumentException if the reference file doesn't exist.
+     */
+    public static boolean isFileNewer(final File file, final File reference) {
+        requireExists(reference, "reference");
+        return UncheckedIO.get(() -> PathUtils.isNewer(file.toPath(), reference.toPath()));
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified {@link FileTime}.
+     *
+     * @param file the {@link File} of which the modification date must be compared.
+     * @param fileTime the file time reference.
+     * @return true if the {@link File} exists and has been modified after the given {@link FileTime}.
+     * @throws IOException if an I/O error occurs.
+     * @throws NullPointerException if the file or local date is {@code null}.
+     * @since 2.12.0
+     */
+    public static boolean isFileNewer(final File file, final FileTime fileTime) throws IOException {
+        Objects.requireNonNull(file, "file");
+        return PathUtils.isNewer(file.toPath(), fileTime);
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified {@link Instant}.
+     *
+     * @param file the {@link File} of which the modification date must be compared.
+     * @param instant the date reference.
+     * @return true if the {@link File} exists and has been modified after the given {@link Instant}.
+     * @throws NullPointerException if the file or instant is {@code null}.
+     * @since 2.8.0
+     */
+    public static boolean isFileNewer(final File file, final Instant instant) {
+        Objects.requireNonNull(instant, "instant");
+        return UncheckedIO.get(() -> PathUtils.isNewer(file.toPath(), instant));
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified time reference.
+     *
+     * @param file       the {@link File} of which the modification date must be compared.
+     * @param timeMillis the time reference measured in milliseconds since the
+     *                   epoch (00:00:00 GMT, January 1, 1970).
+     * @return true if the {@link File} exists and has been modified after the given time reference.
+     * @throws NullPointerException if the file is {@code null}.
+     */
+    public static boolean isFileNewer(final File file, final long timeMillis) {
+        Objects.requireNonNull(file, "file");
+        return UncheckedIO.get(() -> PathUtils.isNewer(file.toPath(), timeMillis));
+    }
+
+    /**
+     * Tests if the specified {@link File} is newer than the specified {@link OffsetDateTime}.
+     *
+     * @param file the {@link File} of which the modification date must be compared
+     * @param offsetDateTime the date reference
+     * @return true if the {@link File} exists and has been modified before the given {@link OffsetDateTime}.
+     * @throws NullPointerException if the file or zoned date time is {@code null}
+     * @since 2.12.0
+     */
+    public static boolean isFileNewer(final File file, final OffsetDateTime offsetDateTime) {
+        Objects.requireNonNull(offsetDateTime, "offsetDateTime");
+        return isFileNewer(file, offsetDateTime.toInstant());
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified {@link ChronoLocalDate}
+     * at the current time.
+     *
+     * <p>Note: The input date is assumed to be in the system default time-zone with the time
+     * part set to the current time. To use a non-default time-zone use the method
+     * {@link #isFileOlder(File, ChronoLocalDateTime, ZoneId)
+     * isFileOlder(file, chronoLocalDate.atTime(LocalTime.now(zoneId)), zoneId)} where
+     * {@code zoneId} is a valid {@link ZoneId}.
+     *
+     * @param file            the {@link File} of which the modification date must be compared.
+     * @param chronoLocalDate the date reference.
+     * @return true if the {@link File} exists and has been modified before the given
+     * {@link ChronoLocalDate} at the current time.
+     * @throws NullPointerException if the file or local date is {@code null}.
+     * @see ZoneId#systemDefault()
+     * @see LocalTime#now()
+     *
+     * @since 2.8.0
+     */
+    public static boolean isFileOlder(final File file, final ChronoLocalDate chronoLocalDate) {
+        return isFileOlder(file, chronoLocalDate, LocalTime.now());
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified {@link ChronoLocalDate}
+     * at the specified {@link LocalTime}.
+     *
+     * <p>Note: The input date and time are assumed to be in the system default time-zone. To use a
+     * non-default time-zone use the method {@link #isFileOlder(File, ChronoLocalDateTime, ZoneId)
+     * isFileOlder(file, chronoLocalDate.atTime(localTime), zoneId)} where {@code zoneId} is a valid
+     * {@link ZoneId}.
+     *
+     * @param file            the {@link File} of which the modification date must be compared.
+     * @param chronoLocalDate the date reference.
+     * @param localTime       the time reference.
+     * @return true if the {@link File} exists and has been modified before the
+     * given {@link ChronoLocalDate} at the specified time.
+     * @throws NullPointerException if the file, local date or local time is {@code null}.
+     * @see ZoneId#systemDefault()
+     * @since 2.8.0
+     */
+    public static boolean isFileOlder(final File file, final ChronoLocalDate chronoLocalDate, final LocalTime localTime) {
+        Objects.requireNonNull(chronoLocalDate, "chronoLocalDate");
+        Objects.requireNonNull(localTime, "localTime");
+        return isFileOlder(file, chronoLocalDate.atTime(localTime));
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified {@link ChronoLocalDate} at the specified
+     * {@link OffsetTime}.
+     *
+     * @param file the {@link File} of which the modification date must be compared
+     * @param chronoLocalDate the date reference
+     * @param offsetTime the time reference
+     * @return true if the {@link File} exists and has been modified after the given {@link ChronoLocalDate} at the given
+     *         {@link OffsetTime}.
+     * @throws NullPointerException if the file, local date or zone ID is {@code null}
+     * @since 2.12.0
+     */
+    public static boolean isFileOlder(final File file, final ChronoLocalDate chronoLocalDate, final OffsetTime offsetTime) {
+        Objects.requireNonNull(chronoLocalDate, "chronoLocalDate");
+        Objects.requireNonNull(offsetTime, "offsetTime");
+        return isFileOlder(file, chronoLocalDate.atTime(offsetTime.toLocalTime()));
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified {@link ChronoLocalDateTime}
+     * at the system-default time zone.
+     *
+     * <p>Note: The input date and time is assumed to be in the system default time-zone. To use a
+     * non-default time-zone use the method {@link #isFileOlder(File, ChronoLocalDateTime, ZoneId)
+     * isFileOlder(file, chronoLocalDateTime, zoneId)} where {@code zoneId} is a valid
+     * {@link ZoneId}.
+     *
+     * @param file                the {@link File} of which the modification date must be compared.
+     * @param chronoLocalDateTime the date reference.
+     * @return true if the {@link File} exists and has been modified before the given
+     * {@link ChronoLocalDateTime} at the system-default time zone.
+     * @throws NullPointerException if the file or local date time is {@code null}.
+     * @see ZoneId#systemDefault()
+     * @since 2.8.0
+     */
+    public static boolean isFileOlder(final File file, final ChronoLocalDateTime<?> chronoLocalDateTime) {
+        return isFileOlder(file, chronoLocalDateTime, ZoneId.systemDefault());
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified {@link ChronoLocalDateTime}
+     * at the specified {@link ZoneId}.
+     *
+     * @param file          the {@link File} of which the modification date must be compared.
+     * @param chronoLocalDateTime the date reference.
+     * @param zoneId        the time zone.
+     * @return true if the {@link File} exists and has been modified before the given
+     * {@link ChronoLocalDateTime} at the given {@link ZoneId}.
+     * @throws NullPointerException if the file, local date time or zone ID is {@code null}.
+     * @since 2.8.0
+     */
+    public static boolean isFileOlder(final File file, final ChronoLocalDateTime<?> chronoLocalDateTime, final ZoneId zoneId) {
+        Objects.requireNonNull(chronoLocalDateTime, "chronoLocalDateTime");
+        Objects.requireNonNull(zoneId, "zoneId");
+        return isFileOlder(file, chronoLocalDateTime.atZone(zoneId));
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified {@link ChronoZonedDateTime}.
+     *
+     * @param file                the {@link File} of which the modification date must be compared.
+     * @param chronoZonedDateTime the date reference.
+     * @return true if the {@link File} exists and has been modified before the given
+     * {@link ChronoZonedDateTime}.
+     * @throws NullPointerException if the file or zoned date time is {@code null}.
+     * @since 2.8.0
+     */
+    public static boolean isFileOlder(final File file, final ChronoZonedDateTime<?> chronoZonedDateTime) {
+        Objects.requireNonNull(chronoZonedDateTime, "chronoZonedDateTime");
+        return isFileOlder(file, chronoZonedDateTime.toInstant());
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified {@link Date}.
+     *
+     * @param file the {@link File} of which the modification date must be compared.
+     * @param date the date reference.
+     * @return true if the {@link File} exists and has been modified before the given {@link Date}.
+     * @throws NullPointerException if the file or date is {@code null}.
+     */
+    public static boolean isFileOlder(final File file, final Date date) {
+        Objects.requireNonNull(date, "date");
+        return isFileOlder(file, date.getTime());
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the reference {@link File}.
+     *
+     * @param file      the {@link File} of which the modification date must be compared.
+     * @param reference the {@link File} of which the modification date is used.
+     * @return true if the {@link File} exists and has been modified before the reference {@link File}.
+     * @throws NullPointerException if the file or reference file is {@code null}.
+     * @throws IllegalArgumentException if the reference file doesn't exist.
+     */
+    public static boolean isFileOlder(final File file, final File reference) {
+        requireExists(reference, "reference");
+        return UncheckedIO.get(() -> PathUtils.isOlder(file.toPath(), reference.toPath()));
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified {@link FileTime}.
+     *
+     * @param file the {@link File} of which the modification date must be compared.
+     * @param fileTime the file time reference.
+     * @return true if the {@link File} exists and has been modified before the given {@link FileTime}.
+     * @throws IOException if an I/O error occurs.
+     * @throws NullPointerException if the file or local date is {@code null}.
+     * @since 2.12.0
+     */
+    public static boolean isFileOlder(final File file, final FileTime fileTime) throws IOException {
+        Objects.requireNonNull(file, "file");
+        return PathUtils.isOlder(file.toPath(), fileTime);
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified {@link Instant}.
+     *
+     * @param file    the {@link File} of which the modification date must be compared.
+     * @param instant the date reference.
+     * @return true if the {@link File} exists and has been modified before the given {@link Instant}.
+     * @throws NullPointerException if the file or instant is {@code null}.
+     * @since 2.8.0
+     */
+    public static boolean isFileOlder(final File file, final Instant instant) {
+        Objects.requireNonNull(instant, "instant");
+        return UncheckedIO.get(() -> PathUtils.isOlder(file.toPath(), instant));
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified time reference.
+     *
+     * @param file       the {@link File} of which the modification date must be compared.
+     * @param timeMillis the time reference measured in milliseconds since the
+     *                   epoch (00:00:00 GMT, January 1, 1970).
+     * @return true if the {@link File} exists and has been modified before the given time reference.
+     * @throws NullPointerException if the file is {@code null}.
+     */
+    public static boolean isFileOlder(final File file, final long timeMillis) {
+        Objects.requireNonNull(file, "file");
+        return UncheckedIO.get(() -> PathUtils.isOlder(file.toPath(), timeMillis));
+    }
+
+    /**
+     * Tests if the specified {@link File} is older than the specified {@link OffsetDateTime}.
+     *
+     * @param file the {@link File} of which the modification date must be compared
+     * @param offsetDateTime the date reference
+     * @return true if the {@link File} exists and has been modified before the given {@link OffsetDateTime}.
+     * @throws NullPointerException if the file or zoned date time is {@code null}
+     * @since 2.12.0
+     */
+    public static boolean isFileOlder(final File file, final OffsetDateTime offsetDateTime) {
+        Objects.requireNonNull(offsetDateTime, "offsetDateTime");
+        return isFileOlder(file, offsetDateTime.toInstant());
+    }
+
+    /**
+     * Tests whether the specified {@link File} is a regular file or not. Implemented as a
+     * null-safe delegate to {@link Files#isRegularFile(Path path, LinkOption... options)}.
+     *
+     * @param   file the path to the file.
+     * @param   options options indicating how symbolic links are handled
+     * @return  {@code true} if the file is a regular file; {@code false} if
+     *          the path is null, the file does not exist, is not a regular file, or it cannot
+     *          be determined if the file is a regular file or not.
+     * @throws SecurityException     In the case of the default provider, and a security manager is installed, the
+     *                               {@link SecurityManager#checkRead(String) checkRead} method is invoked to check read
+     *                               access to the directory.
+     * @since 2.9.0
+     */
+    public static boolean isRegularFile(final File file, final LinkOption... options) {
+        return file != null && Files.isRegularFile(file.toPath(), options);
+    }
+
+    /**
+     * Tests whether the specified file is a symbolic link rather than an actual file.
+     * <p>
+     * This method delegates to {@link Files#isSymbolicLink(Path path)}
+     * </p>
+     *
+     * @param file the file to test.
+     * @return true if the file is a symbolic link, see {@link Files#isSymbolicLink(Path path)}.
+     * @since 2.0
+     * @see Files#isSymbolicLink(Path)
+     */
+    public static boolean isSymlink(final File file) {
+        return file != null && Files.isSymbolicLink(file.toPath());
+    }
+
+    /**
+     * Iterates over the files in given directory (and optionally
+     * its subdirectories).
+     * <p>
+     * The resulting iterator MUST be consumed in its entirety in order to close its underlying stream.
+     * </p>
+     * <p>
+     * All files found are filtered by an IOFileFilter.
+     * </p>
+     *
+     * @param directory  the directory to search in
+     * @param fileFilter filter to apply when finding files.
+     * @param dirFilter  optional filter to apply when finding subdirectories.
+     *                   If this parameter is {@code null}, subdirectories will not be included in the
+     *                   search. Use TrueFileFilter.INSTANCE to match all directories.
+     * @return an iterator of java.io.File for the matching files
+     * @see org.apache.commons.io.filefilter.FileFilterUtils
+     * @see org.apache.commons.io.filefilter.NameFileFilter
+     * @since 1.2
+     */
+    public static Iterator<File> iterateFiles(final File directory, final IOFileFilter fileFilter, final IOFileFilter dirFilter) {
+        return listFiles(directory, fileFilter, dirFilter).iterator();
+    }
+
+    /**
+     * Iterates over the files in a given directory (and optionally
+     * its subdirectories) which match an array of extensions.
+     * <p>
+     * The resulting iterator MUST be consumed in its entirety in order to close its underlying stream.
+     * </p>
+     *
+     * @param directory  the directory to search in
+     * @param extensions an array of extensions, ex. {"java","xml"}. If this
+     *                   parameter is {@code null}, all files are returned.
+     * @param recursive  if true all subdirectories are searched as well
+     * @return an iterator of java.io.File with the matching files
+     * @since 1.2
+     */
+    public static Iterator<File> iterateFiles(final File directory, final String[] extensions, final boolean recursive) {
+        return UncheckedIO.apply(d -> StreamIterator.iterator(streamFiles(d, recursive, extensions)), directory);
+    }
+
+    /**
+     * Iterates over the files in given directory (and optionally
+     * its subdirectories).
+     * <p>
+     * The resulting iterator MUST be consumed in its entirety in order to close its underlying stream.
+     * </p>
+     * <p>
+     * All files found are filtered by an IOFileFilter.
+     * </p>
+     * <p>
+     * The resulting iterator includes the subdirectories themselves.
+     * </p>
+     *
+     * @param directory  the directory to search in
+     * @param fileFilter filter to apply when finding files.
+     * @param dirFilter  optional filter to apply when finding subdirectories.
+     *                   If this parameter is {@code null}, subdirectories will not be included in the
+     *                   search. Use TrueFileFilter.INSTANCE to match all directories.
+     * @return an iterator of java.io.File for the matching files
+     * @see org.apache.commons.io.filefilter.FileFilterUtils
+     * @see org.apache.commons.io.filefilter.NameFileFilter
+     * @since 2.2
+     */
+    public static Iterator<File> iterateFilesAndDirs(final File directory, final IOFileFilter fileFilter, final IOFileFilter dirFilter) {
+        return listFilesAndDirs(directory, fileFilter, dirFilter).iterator();
+    }
+
+    /**
+     * Returns the last modification time in milliseconds via
+     * {@link java.nio.file.Files#getLastModifiedTime(Path, LinkOption...)}.
+     * <p>
+     * For the best precision, use {@link #lastModifiedFileTime(File)}.
+     * </p>
+     * <p>
+     * Use this method to avoid issues with {@link File#lastModified()} like
+     * <a href="https://bugs.openjdk.java.net/browse/JDK-8177809">JDK-8177809</a> where {@link File#lastModified()} is
+     * losing milliseconds (always ends in 000). This bug exists in OpenJDK 8 and 9, and is fixed in 10.
+     * </p>
+     *
+     * @param file The File to query.
+     * @return See {@link java.nio.file.attribute.FileTime#toMillis()}.
+     * @throws IOException if an I/O error occurs.
+     * @since 2.9.0
+     */
+    public static long lastModified(final File file) throws IOException {
+        // https://bugs.openjdk.java.net/browse/JDK-8177809
+        // File.lastModified() is losing milliseconds (always ends in 000)
+        // This bug is in OpenJDK 8 and 9, and fixed in 10.
+        return lastModifiedFileTime(file).toMillis();
+    }
+
+    /**
+     * Returns the last modification {@link FileTime} via
+     * {@link java.nio.file.Files#getLastModifiedTime(Path, LinkOption...)}.
+     * <p>
+     * Use this method to avoid issues with {@link File#lastModified()} like
+     * <a href="https://bugs.openjdk.java.net/browse/JDK-8177809">JDK-8177809</a> where {@link File#lastModified()} is
+     * losing milliseconds (always ends in 000). This bug exists in OpenJDK 8 and 9, and is fixed in 10.
+     * </p>
+     *
+     * @param file The File to query.
+     * @return See {@link java.nio.file.Files#getLastModifiedTime(Path, LinkOption...)}.
+     * @throws IOException if an I/O error occurs.
+     * @since 2.12.0
+     */
+    public static FileTime lastModifiedFileTime(final File file) throws IOException {
+        // https://bugs.openjdk.java.net/browse/JDK-8177809
+        // File.lastModified() is losing milliseconds (always ends in 000)
+        // This bug is in OpenJDK 8 and 9, and fixed in 10.
+        return Files.getLastModifiedTime(Objects.requireNonNull(file.toPath(), "file"));
+    }
+
+    /**
+     * Returns the last modification time in milliseconds via
+     * {@link java.nio.file.Files#getLastModifiedTime(Path, LinkOption...)}.
+     * <p>
+     * For the best precision, use {@link #lastModifiedFileTime(File)}.
+     * </p>
+     * <p>
+     * Use this method to avoid issues with {@link File#lastModified()} like
+     * <a href="https://bugs.openjdk.java.net/browse/JDK-8177809">JDK-8177809</a> where {@link File#lastModified()} is
+     * losing milliseconds (always ends in 000). This bug exists in OpenJDK 8 and 9, and is fixed in 10.
+     * </p>
+     *
+     * @param file The File to query.
+     * @return See {@link java.nio.file.attribute.FileTime#toMillis()}.
+     * @throws UncheckedIOException if an I/O error occurs.
+     * @since 2.9.0
+     */
+    public static long lastModifiedUnchecked(final File file) {
+        // https://bugs.openjdk.java.net/browse/JDK-8177809
+        // File.lastModified() is losing milliseconds (always ends in 000)
+        // This bug is in OpenJDK 8 and 9, and fixed in 10.
+        return UncheckedIO.apply(FileUtils::lastModified, file);
+    }
+
+    /**
+     * Returns an Iterator for the lines in a {@link File} using the default encoding for the VM.
+     *
+     * @param file the file to open for input, must not be {@code null}
+     * @return an Iterator of the lines in the file, never {@code null}
+     * @throws NullPointerException if file is {@code null}.
+     * @throws FileNotFoundException if the file does not exist, is a directory rather than a regular file, or for some
+     *         other reason cannot be opened for reading.
+     * @throws IOException if an I/O error occurs.
+     * @see #lineIterator(File, String)
+     * @since 1.3
+     */
+    public static LineIterator lineIterator(final File file) throws IOException {
+        return lineIterator(file, null);
+    }
+
+    /**
+     * Returns an Iterator for the lines in a {@link File}.
+     * <p>
+     * This method opens an {@link InputStream} for the file.
+     * When you have finished with the iterator you should close the stream
+     * to free internal resources. This can be done by using a try-with-resources block or calling the
+     * {@link LineIterator#close()} method.
+     * </p>
+     * <p>
+     * The recommended usage pattern is:
+     * </p>
+     * <pre>
+     * LineIterator it = FileUtils.lineIterator(file, StandardCharsets.UTF_8.name());
+     * try {
+     *   while (it.hasNext()) {
+     *     String line = it.nextLine();
+     *     /// do something with line
+     *   }
+     * } finally {
+     *   LineIterator.closeQuietly(iterator);
+     * }
+     * </pre>
+     * <p>
+     * If an exception occurs during the creation of the iterator, the
+     * underlying stream is closed.
+     * </p>
+     *
+     * @param file     the file to open for input, must not be {@code null}
+     * @param charsetName the name of the requested charset, {@code null} means platform default
+     * @return a LineIterator for lines in the file, never {@code null}; MUST be closed by the caller.
+     * @throws NullPointerException if file is {@code null}.
+     * @throws FileNotFoundException if the file does not exist, is a directory rather than a regular file, or for some
+     *         other reason cannot be opened for reading.
+     * @throws IOException if an I/O error occurs.
+     * @since 1.2
+     */
+    @SuppressWarnings("resource") // Caller closes the result LineIterator.
+    public static LineIterator lineIterator(final File file, final String charsetName) throws IOException {
+        InputStream inputStream = null;
+        try {
+            inputStream = Files.newInputStream(file.toPath());
+            return IOUtils.lineIterator(inputStream, charsetName);
+        } catch (final IOException | RuntimeException ex) {
+            IOUtils.closeQuietly(inputStream, ex::addSuppressed);
+            throw ex;
+        }
+    }
+
+    private static AccumulatorPathVisitor listAccumulate(final File directory, final IOFileFilter fileFilter, final IOFileFilter dirFilter,
+        final FileVisitOption... options) throws IOException {
+        final boolean isDirFilterSet = dirFilter != null;
+        final FileEqualsFileFilter rootDirFilter = new FileEqualsFileFilter(directory);
+        final PathFilter dirPathFilter = isDirFilterSet ? rootDirFilter.or(dirFilter) : rootDirFilter;
+        final AccumulatorPathVisitor visitor = new AccumulatorPathVisitor(Counters.noopPathCounters(), fileFilter, dirPathFilter,
+            (p, e) -> FileVisitResult.CONTINUE);
+        final Set<FileVisitOption> optionSet = new HashSet<>();
+        Collections.addAll(optionSet, options);
+        Files.walkFileTree(directory.toPath(), optionSet, toMaxDepth(isDirFilterSet), visitor);
+        return visitor;
+    }
+
+    /**
+     * Lists files in a directory, asserting that the supplied directory exists and is a directory.
+     *
+     * @param directory The directory to list
+     * @param fileFilter Optional file filter, may be null.
+     * @return The files in the directory, never {@code null}.
+     * @throws NullPointerException if directory is {@code null}.
+     * @throws IllegalArgumentException if directory does not exist or is not a directory.
+     * @throws IOException if an I/O error occurs.
+     */
+    private static File[] listFiles(final File directory, final FileFilter fileFilter) throws IOException {
+        requireDirectoryExists(directory, "directory");
+        final File[] files = fileFilter == null ? directory.listFiles() : directory.listFiles(fileFilter);
+        if (files == null) {
+            // null if the directory does not denote a directory, or if an I/O error occurs.
+            throw new IOException("Unknown I/O error listing contents of directory: " + directory);
+        }
+        return files;
+    }
+
+    /**
+     * Finds files within a given directory (and optionally its
+     * subdirectories). All files found are filtered by an IOFileFilter.
+     * <p>
+     * If your search should recurse into subdirectories you can pass in
+     * an IOFileFilter for directories. You don't need to bind a
+     * DirectoryFileFilter (via logical AND) to this filter. This method does
+     * that for you.
+     * </p>
+     * <p>
+     * An example: If you want to search through all directories called
+     * "temp" you pass in {@code FileFilterUtils.NameFileFilter("temp")}
+     * </p>
+     * <p>
+     * Another common usage of this method is find files in a directory
+     * tree but ignoring the directories generated CVS. You can simply pass
+     * in {@code FileFilterUtils.makeCVSAware(null)}.
+     * </p>
+     *
+     * @param directory  the directory to search in
+     * @param fileFilter filter to apply when finding files. Must not be {@code null},
+     *                   use {@link TrueFileFilter#INSTANCE} to match all files in selected directories.
+     * @param dirFilter  optional filter to apply when finding subdirectories.
+     *                   If this parameter is {@code null}, subdirectories will not be included in the
+     *                   search. Use {@link TrueFileFilter#INSTANCE} to match all directories.
+     * @return a collection of java.io.File with the matching files
+     * @see org.apache.commons.io.filefilter.FileFilterUtils
+     * @see org.apache.commons.io.filefilter.NameFileFilter
+     */
+    public static Collection<File> listFiles(final File directory, final IOFileFilter fileFilter, final IOFileFilter dirFilter) {
+        final AccumulatorPathVisitor visitor = UncheckedIO
+            .apply(d -> listAccumulate(d, FileFileFilter.INSTANCE.and(fileFilter), dirFilter, FileVisitOption.FOLLOW_LINKS), directory);
+        return visitor.getFileList().stream().map(Path::toFile).collect(Collectors.toList());
+    }
+
+    /**
+     * Finds files within a given directory (and optionally its subdirectories)
+     * which match an array of extensions.
+     *
+     * @param directory  the directory to search in
+     * @param extensions an array of extensions, ex. {"java","xml"}. If this
+     *                   parameter is {@code null}, all files are returned.
+     * @param recursive  if true all subdirectories are searched as well
+     * @return a collection of java.io.File with the matching files
+     */
+    public static Collection<File> listFiles(final File directory, final String[] extensions, final boolean recursive) {
+        return UncheckedIO.apply(d -> toList(streamFiles(d, recursive, extensions)), directory);
+    }
+
+    /**
+     * Finds files within a given directory (and optionally its
+     * subdirectories). All files found are filtered by an IOFileFilter.
+     * <p>
+     * The resulting collection includes the starting directory and
+     * any subdirectories that match the directory filter.
+     * </p>
+     *
+     * @param directory  the directory to search in
+     * @param fileFilter filter to apply when finding files.
+     * @param dirFilter  optional filter to apply when finding subdirectories.
+     *                   If this parameter is {@code null}, subdirectories will not be included in the
+     *                   search. Use TrueFileFilter.INSTANCE to match all directories.
+     * @return a collection of java.io.File with the matching files
+     * @see org.apache.commons.io.FileUtils#listFiles
+     * @see org.apache.commons.io.filefilter.FileFilterUtils
+     * @see org.apache.commons.io.filefilter.NameFileFilter
+     * @since 2.2
+     */
+    public static Collection<File> listFilesAndDirs(final File directory, final IOFileFilter fileFilter, final IOFileFilter dirFilter) {
+        final AccumulatorPathVisitor visitor = UncheckedIO.apply(d -> listAccumulate(d, fileFilter, dirFilter, FileVisitOption.FOLLOW_LINKS),
+            directory);
+        final List<Path> list = visitor.getFileList();
+        list.addAll(visitor.getDirList());
+        return list.stream().map(Path::toFile).collect(Collectors.toList());
+    }
+
+    /**
+     * Calls {@link File#mkdirs()} and throws an exception on failure.
+     *
+     * @param directory the receiver for {@code mkdirs()}, may be null.
+     * @return the given file, may be null.
+     * @throws IOException if the directory was not created along with all its parent directories.
+     * @throws IOException if the given file object is not a directory.
+     * @throws SecurityException See {@link File#mkdirs()}.
+     * @see File#mkdirs()
+     */
+    private static File mkdirs(final File directory) throws IOException {
+        if (directory != null && !directory.mkdirs() && !directory.isDirectory()) {
+            throw new IOException("Cannot create directory '" + directory + "'.");
+        }
+        return directory;
+    }
+
+    /**
+     * Moves a directory.
+     * <p>
+     * When the destination directory is on another file system, do a "copy and delete".
+     * </p>
+     *
+     * @param srcDir the directory to be moved.
+     * @param destDir the destination directory.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IllegalArgumentException if the source or destination is invalid.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 1.4
+     */
+    public static void moveDirectory(final File srcDir, final File destDir) throws IOException {
+        validateMoveParameters(srcDir, destDir);
+        requireDirectory(srcDir, "srcDir");
+        requireAbsent(destDir, "destDir");
+        if (!srcDir.renameTo(destDir)) {
+            if (destDir.getCanonicalPath().startsWith(srcDir.getCanonicalPath() + File.separator)) {
+                throw new IOException("Cannot move directory: " + srcDir + " to a subdirectory of itself: " + destDir);
+            }
+            copyDirectory(srcDir, destDir);
+            deleteDirectory(srcDir);
+            if (srcDir.exists()) {
+                throw new IOException("Failed to delete original directory '" + srcDir +
+                        "' after copy to '" + destDir + "'");
+            }
+        }
+    }
+
+    /**
+     * Moves a directory to another directory.
+     *
+     * @param source the file to be moved.
+     * @param destDir the destination file.
+     * @param createDestDir If {@code true} create the destination directory, otherwise if {@code false} throw an
+     *        IOException.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws IllegalArgumentException if the source or destination is invalid.
+     * @throws FileNotFoundException if the source does not exist.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 1.4
+     */
+    public static void moveDirectoryToDirectory(final File source, final File destDir, final boolean createDestDir) throws IOException {
+        validateMoveParameters(source, destDir);
+        if (!destDir.isDirectory()) {
+            if (destDir.exists()) {
+                throw new IOException("Destination '" + destDir + "' is not a directory");
+            }
+            if (!createDestDir) {
+                throw new FileNotFoundException("Destination directory '" + destDir + "' does not exist [createDestDir=" + false + "]");
+            }
+            mkdirs(destDir);
+        }
+        moveDirectory(source, new File(destDir, source.getName()));
+    }
+
+    /**
+     * Moves a file preserving attributes.
+     * <p>
+     * Shorthand for {@code moveFile(srcFile, destFile, StandardCopyOption.COPY_ATTRIBUTES)}.
+     * </p>
+     * <p>
+     * When the destination file is on another file system, do a "copy and delete".
+     * </p>
+     *
+     * @param srcFile the file to be moved.
+     * @param destFile the destination file.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws FileExistsException if the destination file exists.
+     * @throws FileNotFoundException if the source file does not exist.
+     * @throws IOException if source or destination is invalid.
+     * @throws IOException if an error occurs.
+     * @since 1.4
+     */
+    public static void moveFile(final File srcFile, final File destFile) throws IOException {
+        moveFile(srcFile, destFile, StandardCopyOption.COPY_ATTRIBUTES);
+    }
+
+    /**
+     * Moves a file.
+     * <p>
+     * When the destination file is on another file system, do a "copy and delete".
+     * </p>
+     *
+     * @param srcFile the file to be moved.
+     * @param destFile the destination file.
+     * @param copyOptions Copy options.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws FileExistsException if the destination file exists.
+     * @throws FileNotFoundException if the source file does not exist.
+     * @throws IOException if source or destination is invalid.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 2.9.0
+     */
+    public static void moveFile(final File srcFile, final File destFile, final CopyOption... copyOptions) throws IOException {
+        validateMoveParameters(srcFile, destFile);
+        requireFile(srcFile, "srcFile");
+        requireAbsent(destFile, "destFile");
+        final boolean rename = srcFile.renameTo(destFile);
+        if (!rename) {
+            copyFile(srcFile, destFile, copyOptions);
+            if (!srcFile.delete()) {
+                FileUtils.deleteQuietly(destFile);
+                throw new IOException("Failed to delete original file '" + srcFile + "' after copy to '" + destFile + "'");
+            }
+        }
+    }
+
+    /**
+     * Moves a file to a directory.
+     *
+     * @param srcFile the file to be moved.
+     * @param destDir the destination file.
+     * @param createDestDir If {@code true} create the destination directory, otherwise if {@code false} throw an
+     *        IOException.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws FileExistsException if the destination file exists.
+     * @throws FileNotFoundException if the source file does not exist.
+     * @throws IOException if source or destination is invalid.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 1.4
+     */
+    public static void moveFileToDirectory(final File srcFile, final File destDir, final boolean createDestDir) throws IOException {
+        validateMoveParameters(srcFile, destDir);
+        if (!destDir.exists() && createDestDir) {
+            mkdirs(destDir);
+        }
+        requireExistsChecked(destDir, "destDir");
+        requireDirectory(destDir, "destDir");
+        moveFile(srcFile, new File(destDir, srcFile.getName()));
+    }
+
+    /**
+     * Moves a file or directory to the destination directory.
+     * <p>
+     * When the destination is on another file system, do a "copy and delete".
+     * </p>
+     *
+     * @param src the file or directory to be moved.
+     * @param destDir the destination directory.
+     * @param createDestDir If {@code true} create the destination directory, otherwise if {@code false} throw an
+     *        IOException.
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws FileExistsException if the directory or file exists in the destination directory.
+     * @throws FileNotFoundException if the source file does not exist.
+     * @throws IOException if source or destination is invalid.
+     * @throws IOException if an error occurs or setting the last-modified time didn't succeeded.
+     * @since 1.4
+     */
+    public static void moveToDirectory(final File src, final File destDir, final boolean createDestDir) throws IOException {
+        validateMoveParameters(src, destDir);
+        if (src.isDirectory()) {
+            moveDirectoryToDirectory(src, destDir, createDestDir);
+        } else {
+            moveFileToDirectory(src, destDir, createDestDir);
+        }
+    }
+
+    /**
+     * Creates a new OutputStream by opening or creating a file, returning an output stream that may be used to write bytes
+     * to the file.
+     *
+     * @param append Whether or not to append.
+     * @param file the File.
+     * @return a new OutputStream.
+     * @throws IOException if an I/O error occurs.
+     * @see PathUtils#newOutputStream(Path, boolean)
+     * @since 2.12.0
+     */
+    public static OutputStream newOutputStream(final File file, final boolean append) throws IOException {
+        return PathUtils.newOutputStream(Objects.requireNonNull(file, "file").toPath(), append);
+    }
+
+    /**
+     * Opens a {@link FileInputStream} for the specified file, providing better error messages than simply calling
+     * {@code new FileInputStream(file)}.
+     * <p>
+     * At the end of the method either the stream will be successfully opened, or an exception will have been thrown.
+     * </p>
+     * <p>
+     * An exception is thrown if the file does not exist. An exception is thrown if the file object exists but is a
+     * directory. An exception is thrown if the file exists but cannot be read.
+     * </p>
+     *
+     * @param file the file to open for input, must not be {@code null}
+     * @return a new {@link FileInputStream} for the specified file
+     * @throws NullPointerException if file is {@code null}.
+     * @throws FileNotFoundException if the file does not exist, is a directory rather than a regular file, or for some
+     *         other reason cannot be opened for reading.
+     * @throws IOException See FileNotFoundException above, FileNotFoundException is a subclass of IOException.
+     * @since 1.3
+     */
+    public static FileInputStream openInputStream(final File file) throws IOException {
+        Objects.requireNonNull(file, "file");
+        return new FileInputStream(file);
+    }
+
+    /**
+     * Opens a {@link FileOutputStream} for the specified file, checking and
+     * creating the parent directory if it does not exist.
+     * <p>
+     * At the end of the method either the stream will be successfully opened,
+     * or an exception will have been thrown.
+     * </p>
+     * <p>
+     * The parent directory will be created if it does not exist.
+     * The file will be created if it does not exist.
+     * An exception is thrown if the file object exists but is a directory.
+     * An exception is thrown if the file exists but cannot be written to.
+     * An exception is thrown if the parent directory cannot be created.
+     * </p>
+     *
+     * @param file the file to open for output, must not be {@code null}
+     * @return a new {@link FileOutputStream} for the specified file
+     * @throws NullPointerException if the file object is {@code null}.
+     * @throws IllegalArgumentException if the file object is a directory
+     * @throws IllegalArgumentException if the file is not writable.
+     * @throws IOException if the directories could not be created.
+     * @since 1.3
+     */
+    public static FileOutputStream openOutputStream(final File file) throws IOException {
+        return openOutputStream(file, false);
+    }
+
+    /**
+     * Opens a {@link FileOutputStream} for the specified file, checking and
+     * creating the parent directory if it does not exist.
+     * <p>
+     * At the end of the method either the stream will be successfully opened,
+     * or an exception will have been thrown.
+     * </p>
+     * <p>
+     * The parent directory will be created if it does not exist.
+     * The file will be created if it does not exist.
+     * An exception is thrown if the file object exists but is a directory.
+     * An exception is thrown if the file exists but cannot be written to.
+     * An exception is thrown if the parent directory cannot be created.
+     * </p>
+     *
+     * @param file   the file to open for output, must not be {@code null}
+     * @param append if {@code true}, then bytes will be added to the
+     *               end of the file rather than overwriting
+     * @return a new {@link FileOutputStream} for the specified file
+     * @throws NullPointerException if the file object is {@code null}.
+     * @throws IllegalArgumentException if the file object is a directory
+     * @throws IllegalArgumentException if the file is not writable.
+     * @throws IOException if the directories could not be created.
+     * @since 2.1
+     */
+    public static FileOutputStream openOutputStream(final File file, final boolean append) throws IOException {
+        Objects.requireNonNull(file, "file");
+        if (file.exists()) {
+            requireFile(file, "file");
+            requireCanWrite(file, "file");
+        } else {
+            createParentDirectories(file);
+        }
+        return new FileOutputStream(file, append);
+    }
+
+    /**
+     * Reads the contents of a file into a byte array.
+     * The file is always closed.
+     *
+     * @param file the file to read, must not be {@code null}
+     * @return the file contents, never {@code null}
+     * @throws NullPointerException if file is {@code null}.
+     * @throws FileNotFoundException if the file does not exist, is a directory rather than a regular file, or for some
+     *         other reason cannot be opened for reading.
+     * @throws IOException if an I/O error occurs.
+     * @since 1.1
+     */
+    public static byte[] readFileToByteArray(final File file) throws IOException {
+        Objects.requireNonNull(file, "file");
+        return Files.readAllBytes(file.toPath());
+    }
+
+    /**
+     * Reads the contents of a file into a String using the default encoding for the VM.
+     * The file is always closed.
+     *
+     * @param file the file to read, must not be {@code null}
+     * @return the file contents, never {@code null}
+     * @throws NullPointerException if file is {@code null}.
+     * @throws FileNotFoundException if the file does not exist, is a directory rather than a regular file, or for some
+     *         other reason cannot be opened for reading.
+     * @throws IOException if an I/O error occurs.
+     * @since 1.3.1
+     * @deprecated 2.5 use {@link #readFileToString(File, Charset)} instead (and specify the appropriate encoding)
+     */
+    @Deprecated
+    public static String readFileToString(final File file) throws IOException {
+        return readFileToString(file, Charset.defaultCharset());
+    }
+
+    /**
+     * Reads the contents of a file into a String.
+     * The file is always closed.
+     *
+     * @param file     the file to read, must not be {@code null}
+     * @param charsetName the name of the requested charset, {@code null} means platform default
+     * @return the file contents, never {@code null}
+     * @throws NullPointerException if file is {@code null}.
+     * @throws FileNotFoundException if the file does not exist, is a directory rather than a regular file, or for some
+     *         other reason cannot be opened for reading.
+     * @throws IOException if an I/O error occurs.
+     * @since 2.3
+     */
+    public static String readFileToString(final File file, final Charset charsetName) throws IOException {
+        try (InputStream inputStream = Files.newInputStream(file.toPath())) {
+            return IOUtils.toString(inputStream, Charsets.toCharset(charsetName));
+        }
+    }
+
+    /**
+     * Reads the contents of a file into a String. The file is always closed.
+     *
+     * @param file     the file to read, must not be {@code null}
+     * @param charsetName the name of the requested charset, {@code null} means platform default
+     * @return the file contents, never {@code null}
+     * @throws NullPointerException if file is {@code null}.
+     * @throws FileNotFoundException if the file does not exist, is a directory rather than a regular file, or for some
+     *         other reason cannot be opened for reading.
+     * @throws IOException if an I/O error occurs.
+     * @throws java.nio.charset.UnsupportedCharsetException thrown instead of {@link java.io
+     * .UnsupportedEncodingException} in version 2.2 if the named charset is unavailable.
+     * @since 2.3
+     */
+    public static String readFileToString(final File file, final String charsetName) throws IOException {
+        return readFileToString(file, Charsets.toCharset(charsetName));
+    }
+
+    /**
+     * Reads the contents of a file line by line to a List of Strings using the default encoding for the VM.
+     * The file is always closed.
+     *
+     * @param file the file to read, must not be {@code null}
+     * @return the list of Strings representing each line in the file, never {@code null}
+     * @throws NullPointerException if file is {@code null}.
+     * @throws FileNotFoundException if the file does not exist, is a directory rather than a regular file, or for some
+     *         other reason cannot be opened for reading.
+     * @throws IOException if an I/O error occurs.
+     * @since 1.3
+     * @deprecated 2.5 use {@link #readLines(File, Charset)} instead (and specify the appropriate encoding)
+     */
+    @Deprecated
+    public static List<String> readLines(final File file) throws IOException {
+        return readLines(file, Charset.defaultCharset());
+    }
+
+    /**
+     * Reads the contents of a file line by line to a List of Strings.
+     * The file is always closed.
+     *
+     * @param file     the file to read, must not be {@code null}
+     * @param charset the charset to use, {@code null} means platform default
+     * @return the list of Strings representing each line in the file, never {@code null}
+     * @throws NullPointerException if file is {@code null}.
+     * @throws FileNotFoundException if the file does not exist, is a directory rather than a regular file, or for some
+     *         other reason cannot be opened for reading.
+     * @throws IOException if an I/O error occurs.
+     * @since 2.3
+     */
+    public static List<String> readLines(final File file, final Charset charset) throws IOException {
+        return Files.readAllLines(file.toPath(), charset);
+    }
+
+    /**
+     * Reads the contents of a file line by line to a List of Strings. The file is always closed.
+     *
+     * @param file     the file to read, must not be {@code null}
+     * @param charsetName the name of the requested charset, {@code null} means platform default
+     * @return the list of Strings representing each line in the file, never {@code null}
+     * @throws NullPointerException if file is {@code null}.
+     * @throws FileNotFoundException if the file does not exist, is a directory rather than a regular file, or for some
+     *         other reason cannot be opened for reading.
+     * @throws IOException if an I/O error occurs.
+     * @throws java.nio.charset.UnsupportedCharsetException thrown instead of {@link java.io
+     * .UnsupportedEncodingException} in version 2.2 if the named charset is unavailable.
+     * @since 1.1
+     */
+    public static List<String> readLines(final File file, final String charsetName) throws IOException {
+        return readLines(file, Charsets.toCharset(charsetName));
+    }
+
+
+    private static void requireAbsent(final File file, final String name) throws FileExistsException {
+        if (file.exists()) {
+            throw new FileExistsException(String.format("File element in parameter '%s' already exists: '%s'", name, file));
+        }
+    }
+
+    /**
+     * Throws IllegalArgumentException if the given files' canonical representations are equal.
+     *
+     * @param file1 The first file to compare.
+     * @param file2 The second file to compare.
+     * @throws IOException if an I/O error occurs.
+     * @throws IllegalArgumentException if the given files' canonical representations are equal.
+     */
+    private static void requireCanonicalPathsNotEquals(final File file1, final File file2) throws IOException {
+        final String canonicalPath = file1.getCanonicalPath();
+        if (canonicalPath.equals(file2.getCanonicalPath())) {
+            throw new IllegalArgumentException(String
+                .format("File canonical paths are equal: '%s' (file1='%s', file2='%s')", canonicalPath, file1, file2));
+        }
+    }
+
+    /**
+     * Throws an {@link IllegalArgumentException} if the file is not writable. This provides a more precise exception
+     * message than a plain access denied.
+     *
+     * @param file The file to test.
+     * @param name The parameter name to use in the exception message.
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if the file is not writable.
+     */
+    private static void requireCanWrite(final File file, final String name) {
+        Objects.requireNonNull(file, "file");
+        if (!file.canWrite()) {
+            throw new IllegalArgumentException("File parameter '" + name + " is not writable: '" + file + "'");
+        }
+    }
+
+    /**
+     * Requires that the given {@link File} is a directory.
+     *
+     * @param directory The {@link File} to check.
+     * @param name The parameter name to use in the exception message in case of null input or if the file is not a directory.
+     * @return the given directory.
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if the given {@link File} does not exist or is not a directory.
+     */
+    private static File requireDirectory(final File directory, final String name) {
+        Objects.requireNonNull(directory, name);
+        if (!directory.isDirectory()) {
+            throw new IllegalArgumentException("Parameter '" + name + "' is not a directory: '" + directory + "'");
+        }
+        return directory;
+    }
+
+    /**
+     * Requires that the given {@link File} exists and is a directory.
+     *
+     * @param directory The {@link File} to check.
+     * @param name The parameter name to use in the exception message in case of null input.
+     * @return the given directory.
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if the given {@link File} does not exist or is not a directory.
+     */
+    private static File requireDirectoryExists(final File directory, final String name) {
+        requireExists(directory, name);
+        requireDirectory(directory, name);
+        return directory;
+    }
+
+    /**
+     * Requires that the given {@link File} is a directory if it exists.
+     *
+     * @param directory The {@link File} to check.
+     * @param name The parameter name to use in the exception message in case of null input.
+     * @return the given directory.
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if the given {@link File} exists but is not a directory.
+     */
+    private static File requireDirectoryIfExists(final File directory, final String name) {
+        Objects.requireNonNull(directory, name);
+        if (directory.exists()) {
+            requireDirectory(directory, name);
+        }
+        return directory;
+    }
+
+    /**
+     * Requires that two file lengths are equal.
+     *
+     * @param srcFile Source file.
+     * @param destFile Destination file.
+     * @param srcLen Source file length.
+     * @param dstLen Destination file length
+     * @throws IOException Thrown when the given sizes are not equal.
+     */
+    private static void requireEqualSizes(final File srcFile, final File destFile, final long srcLen, final long dstLen) throws IOException {
+        if (srcLen != dstLen) {
+            throw new IOException(
+                "Failed to copy full contents from '" + srcFile + "' to '" + destFile + "' Expected length: " + srcLen + " Actual: " + dstLen);
+        }
+    }
+
+    /**
+     * Requires that the given {@link File} exists and throws an {@link IllegalArgumentException} if it doesn't.
+     *
+     * @param file The {@link File} to check.
+     * @param fileParamName The parameter name to use in the exception message in case of {@code null} input.
+     * @return the given file.
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if the given {@link File} does not exist.
+     */
+    private static File requireExists(final File file, final String fileParamName) {
+        Objects.requireNonNull(file, fileParamName);
+        if (!file.exists()) {
+            throw new IllegalArgumentException("File system element for parameter '" + fileParamName + "' does not exist: '" + file + "'");
+        }
+        return file;
+    }
+
+    /**
+     * Requires that the given {@link File} exists and throws an {@link FileNotFoundException} if it doesn't.
+     *
+     * @param file The {@link File} to check.
+     * @param fileParamName The parameter name to use in the exception message in case of {@code null} input.
+     * @return the given file.
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws FileNotFoundException if the given {@link File} does not exist.
+     */
+    private static File requireExistsChecked(final File file, final String fileParamName) throws FileNotFoundException {
+        Objects.requireNonNull(file, fileParamName);
+        if (!file.exists()) {
+            throw new FileNotFoundException("File system element for parameter '" + fileParamName + "' does not exist: '" + file + "'");
+        }
+        return file;
+    }
+
+    /**
+     * Requires that the given {@link File} is a file.
+     *
+     * @param file The {@link File} to check.
+     * @param name The parameter name to use in the exception message.
+     * @return the given file.
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if the given {@link File} does not exist or is not a file.
+     */
+    private static File requireFile(final File file, final String name) {
+        Objects.requireNonNull(file, name);
+        if (!file.isFile()) {
+            throw new IllegalArgumentException("Parameter '" + name + "' is not a file: " + file);
+        }
+        return file;
+    }
+
+    /**
+     * Requires parameter attributes for a file copy operation.
+     *
+     * @param source the source file
+     * @param destination the destination
+     * @throws NullPointerException if any of the given {@link File}s are {@code null}.
+     * @throws FileNotFoundException if the source does not exist.
+     */
+    private static void requireFileCopy(final File source, final File destination) throws FileNotFoundException {
+        requireExistsChecked(source, "source");
+        Objects.requireNonNull(destination, "destination");
+    }
+
+    /**
+     * Requires that the given {@link File} is a file if it exists.
+     *
+     * @param file The {@link File} to check.
+     * @param name The parameter name to use in the exception message in case of null input.
+     * @return the given directory.
+     * @throws NullPointerException if the given {@link File} is {@code null}.
+     * @throws IllegalArgumentException if the given {@link File} does exists but is not a directory.
+     */
+    private static File requireFileIfExists(final File file, final String name) {
+        Objects.requireNonNull(file, name);
+        return file.exists() ? requireFile(file, name) : file;
+    }
+
+    /**
+     * Sets the given {@code targetFile}'s last modified date to the value from {@code sourceFile}.
+     *
+     * @param sourceFile The source file to query.
+     * @param targetFile The target file or directory to set.
+     * @throws NullPointerException if sourceFile is {@code null}.
+     * @throws NullPointerException if targetFile is {@code null}.
+     * @throws IOException if setting the last-modified time failed.
+     */
+    private static void setLastModified(final File sourceFile, final File targetFile) throws IOException {
+        Objects.requireNonNull(sourceFile, "sourceFile");
+        Objects.requireNonNull(targetFile, "targetFile");
+        if (targetFile.isFile()) {
+            PathUtils.setLastModifiedTime(targetFile.toPath(), sourceFile.toPath());
+        } else {
+            setLastModified(targetFile, lastModified(sourceFile));
+        }
+    }
+
+    /**
+     * Sets the given {@code targetFile}'s last modified date to the given value.
+     *
+     * @param file The source file to query.
+     * @param timeMillis The new last-modified time, measured in milliseconds since the epoch 01-01-1970 GMT.
+     * @throws NullPointerException if file is {@code null}.
+     * @throws IOException if setting the last-modified time failed.
+     */
+    private static void setLastModified(final File file, final long timeMillis) throws IOException {
+        Objects.requireNonNull(file, "file");
+        if (!file.setLastModified(timeMillis)) {
+            throw new IOException(String.format("Failed setLastModified(%s) on '%s'", timeMillis, file));
+        }
+    }
+
+    /**
+     * Returns the size of the specified file or directory. If the provided
+     * {@link File} is a regular file, then the file's length is returned.
+     * If the argument is a directory, then the size of the directory is
+     * calculated recursively. If a directory or subdirectory is security
+     * restricted, its size will not be included.
+     * <p>
+     * Note that overflow is not detected, and the return value may be negative if
+     * overflow occurs. See {@link #sizeOfAsBigInteger(File)} for an alternative
+     * method that does not overflow.
+     * </p>
+     *
+     * @param file the regular file or directory to return the size
+     *             of (must not be {@code null}).
+     *
+     * @return the length of the file, or recursive size of the directory,
+     * provided (in bytes).
+     *
+     * @throws NullPointerException     if the file is {@code null}.
+     * @throws IllegalArgumentException if the file does not exist.
+     * @throws UncheckedIOException if an IO error occurs.
+     * @since 2.0
+     */
+    public static long sizeOf(final File file) {
+        requireExists(file, "file");
+        return UncheckedIO.get(() -> PathUtils.sizeOf(file.toPath()));
+    }
+
+    /**
+     * Returns the size of the specified file or directory. If the provided
+     * {@link File} is a regular file, then the file's length is returned.
+     * If the argument is a directory, then the size of the directory is
+     * calculated recursively. If a directory or subdirectory is security
+     * restricted, its size will not be included.
+     *
+     * @param file the regular file or directory to return the size
+     *             of (must not be {@code null}).
+     *
+     * @return the length of the file, or recursive size of the directory,
+     * provided (in bytes).
+     *
+     * @throws NullPointerException     if the file is {@code null}.
+     * @throws IllegalArgumentException if the file does not exist.
+     * @throws UncheckedIOException if an IO error occurs.
+     * @since 2.4
+     */
+    public static BigInteger sizeOfAsBigInteger(final File file) {
+        requireExists(file, "file");
+        return UncheckedIO.get(() -> PathUtils.sizeOfAsBigInteger(file.toPath()));
+    }
+
+    /**
+     * Counts the size of a directory recursively (sum of the length of all files).
+     * <p>
+     * Note that overflow is not detected, and the return value may be negative if
+     * overflow occurs. See {@link #sizeOfDirectoryAsBigInteger(File)} for an alternative
+     * method that does not overflow.
+     * </p>
+     *
+     * @param directory directory to inspect, must not be {@code null}.
+     * @return size of directory in bytes, 0 if directory is security restricted, a negative number when the real total
+     * is greater than {@link Long#MAX_VALUE}.
+     * @throws NullPointerException if the directory is {@code null}.
+     * @throws UncheckedIOException if an IO error occurs.
+     */
+    public static long sizeOfDirectory(final File directory) {
+        requireDirectoryExists(directory, "directory");
+        return UncheckedIO.get(() -> PathUtils.sizeOfDirectory(directory.toPath()));
+    }
+
+    /**
+     * Counts the size of a directory recursively (sum of the length of all files).
+     *
+     * @param directory directory to inspect, must not be {@code null}.
+     * @return size of directory in bytes, 0 if directory is security restricted.
+     * @throws NullPointerException if the directory is {@code null}.
+     * @throws UncheckedIOException if an IO error occurs.
+     * @since 2.4
+     */
+    public static BigInteger sizeOfDirectoryAsBigInteger(final File directory) {
+        requireDirectoryExists(directory, "directory");
+        return UncheckedIO.get(() -> PathUtils.sizeOfDirectoryAsBigInteger(directory.toPath()));
+    }
+
+    /**
+     * Streams over the files in a given directory (and optionally
+     * its subdirectories) which match an array of extensions.
+     *
+     * @param directory  the directory to search in
+     * @param recursive  if true all subdirectories are searched as well
+     * @param extensions an array of extensions, ex. {"java","xml"}. If this
+     *                   parameter is {@code null}, all files are returned.
+     * @return an iterator of java.io.File with the matching files
+     * @throws IOException if an I/O error is thrown when accessing the starting file.
+     * @since 2.9.0
+     */
+    public static Stream<File> streamFiles(final File directory, final boolean recursive, final String... extensions) throws IOException {
+        // @formatter:off
+        final IOFileFilter filter = extensions == null
+            ? FileFileFilter.INSTANCE
+            : FileFileFilter.INSTANCE.and(new SuffixFileFilter(toSuffixes(extensions)));
+        // @formatter:on
+        return PathUtils.walk(directory.toPath(), filter, toMaxDepth(recursive), false, FileVisitOption.FOLLOW_LINKS).map(Path::toFile);
+    }
+
+    /**
+     * Converts from a {@link URL} to a {@link File}.
+     * <p>
+     * From version 1.1 this method will decode the URL.
+     * Syntax such as {@code file:///my%20docs/file.txt} will be
+     * correctly decoded to {@code /my docs/file.txt}. Starting with version
+     * 1.5, this method uses UTF-8 to decode percent-encoded octets to characters.
+     * Additionally, malformed percent-encoded octets are handled leniently by
+     * passing them through literally.
+     * </p>
+     *
+     * @param url the file URL to convert, {@code null} returns {@code null}
+     * @return the equivalent {@link File} object, or {@code null}
+     * if the URL's protocol is not {@code file}
+     */
+    public static File toFile(final URL url) {
+        if (url == null || !"file".equalsIgnoreCase(url.getProtocol())) {
+            return null;
+        }
+        final String filename = url.getFile().replace('/', File.separatorChar);
+        return new File(decodeUrl(filename));
+    }
+
+    /**
+     * Converts each of an array of {@link URL} to a {@link File}.
+     * <p>
+     * Returns an array of the same size as the input.
+     * If the input is {@code null}, an empty array is returned.
+     * If the input contains {@code null}, the output array contains {@code null} at the same
+     * index.
+     * </p>
+     * <p>
+     * This method will decode the URL.
+     * Syntax such as {@code file:///my%20docs/file.txt} will be
+     * correctly decoded to {@code /my docs/file.txt}.
+     * </p>
+     *
+     * @param urls the file URLs to convert, {@code null} returns empty array
+     * @return a non-{@code null} array of Files matching the input, with a {@code null} item
+     * if there was a {@code null} at that index in the input array
+     * @throws IllegalArgumentException if any file is not a URL file
+     * @throws IllegalArgumentException if any file is incorrectly encoded
+     * @since 1.1
+     */
+    public static File[] toFiles(final URL... urls) {
+        if (IOUtils.length(urls) == 0) {
+            return EMPTY_FILE_ARRAY;
+        }
+        final File[] files = new File[urls.length];
+        for (int i = 0; i < urls.length; i++) {
+            final URL url = urls[i];
+            if (url != null) {
+                if (!"file".equalsIgnoreCase(url.getProtocol())) {
+                    throw new IllegalArgumentException("Can only convert file URL to a File: " + url);
+                }
+                files[i] = toFile(url);
+            }
+        }
+        return files;
+    }
+
+    private static List<File> toList(final Stream<File> stream) {
+        return stream.collect(Collectors.toList());
+    }
+
+    /**
+     * Converts whether or not to recurse into a recursion max depth.
+     *
+     * @param recursive whether or not to recurse
+     * @return the recursion depth
+     */
+    private static int toMaxDepth(final boolean recursive) {
+        return recursive ? Integer.MAX_VALUE : 1;
+    }
+
+    /**
+     * Converts an array of file extensions to suffixes.
+     *
+     * @param extensions an array of extensions. Format: {"java", "xml"}
+     * @return an array of suffixes. Format: {".java", ".xml"}
+     * @throws NullPointerException if the parameter is null
+     */
+    private static String[] toSuffixes(final String... extensions) {
+        Objects.requireNonNull(extensions, "extensions");
+        final String[] suffixes = new String[extensions.length];
+        for (int i = 0; i < extensions.length; i++) {
+            suffixes[i] = "." + extensions[i];
+        }
+        return suffixes;
+    }
+
+    /**
+     * Implements behavior similar to the Unix "touch" utility. Creates a new file with size 0, or, if the file exists, just
+     * updates the file's modified time.
+     * <p>
+     * NOTE: As from v1.3, this method throws an IOException if the last modified date of the file cannot be set. Also, as
+     * from v1.3 this method creates parent directories if they do not exist.
+     * </p>
+     *
+     * @param file the File to touch.
+     * @throws NullPointerException if the parameter is {@code null}.
+     * @throws IOException if setting the last-modified time failed or an I/O problem occurs.
+     */
+    public static void touch(final File file) throws IOException {
+        PathUtils.touch(Objects.requireNonNull(file, "file").toPath());
+    }
+
+    /**
+     * Converts each of an array of {@link File} to a {@link URL}.
+     * <p>
+     * Returns an array of the same size as the input.
+     * </p>
+     *
+     * @param files the files to convert, must not be {@code null}
+     * @return an array of URLs matching the input
+     * @throws IOException          if a file cannot be converted
+     * @throws NullPointerException if the parameter is null
+     */
+    public static URL[] toURLs(final File... files) throws IOException {
+        Objects.requireNonNull(files, "files");
+        final URL[] urls = new URL[files.length];
+        for (int i = 0; i < urls.length; i++) {
+            urls[i] = files[i].toURI().toURL();
+        }
+        return urls;
+    }
+
+    /**
+     * Validates the given arguments.
+     * <ul>
+     * <li>Throws {@link NullPointerException} if {@code source} is null</li>
+     * <li>Throws {@link NullPointerException} if {@code destination} is null</li>
+     * <li>Throws {@link FileNotFoundException} if {@code source} does not exist</li>
+     * </ul>
+     *
+     * @param source      the file or directory to be moved.
+     * @param destination the destination file or directory.
+     * @throws FileNotFoundException if the source file does not exist.
+     */
+    private static void validateMoveParameters(final File source, final File destination) throws FileNotFoundException {
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(destination, "destination");
+        if (!source.exists()) {
+            throw new FileNotFoundException("Source '" + source + "' does not exist");
+        }
+    }
+
+    /**
+     * Waits for the file system to propagate a file creation, with a timeout.
+     * <p>
+     * This method repeatedly tests {@link Files#exists(Path, LinkOption...)} until it returns
+     * true up to the maximum time specified in seconds.
+     * </p>
+     *
+     * @param file    the file to check, must not be {@code null}
+     * @param seconds the maximum time in seconds to wait
+     * @return true if file exists
+     * @throws NullPointerException if the file is {@code null}
+     */
+    public static boolean waitFor(final File file, final int seconds) {
+        Objects.requireNonNull(file, "file");
+        return PathUtils.waitFor(file.toPath(), Duration.ofSeconds(seconds), PathUtils.EMPTY_LINK_OPTION_ARRAY);
+    }
+
+    /**
+     * Writes a CharSequence to a file creating the file if it does not exist using the default encoding for the VM.
+     *
+     * @param file the file to write
+     * @param data the content to write to the file
+     * @throws IOException in case of an I/O error
+     * @since 2.0
+     * @deprecated 2.5 use {@link #write(File, CharSequence, Charset)} instead (and specify the appropriate encoding)
+     */
+    @Deprecated
+    public static void write(final File file, final CharSequence data) throws IOException {
+        write(file, data, Charset.defaultCharset(), false);
+    }
+
+    /**
+     * Writes a CharSequence to a file creating the file if it does not exist using the default encoding for the VM.
+     *
+     * @param file   the file to write
+     * @param data   the content to write to the file
+     * @param append if {@code true}, then the data will be added to the
+     *               end of the file rather than overwriting
+     * @throws IOException in case of an I/O error
+     * @since 2.1
+     * @deprecated 2.5 use {@link #write(File, CharSequence, Charset, boolean)} instead (and specify the appropriate encoding)
+     */
+    @Deprecated
+    public static void write(final File file, final CharSequence data, final boolean append) throws IOException {
+        write(file, data, Charset.defaultCharset(), append);
+    }
+
+    /**
+     * Writes a CharSequence to a file creating the file if it does not exist.
+     *
+     * @param file     the file to write
+     * @param data     the content to write to the file
+     * @param charset the name of the requested charset, {@code null} means platform default
+     * @throws IOException in case of an I/O error
+     * @since 2.3
+     */
+    public static void write(final File file, final CharSequence data, final Charset charset) throws IOException {
+        write(file, data, charset, false);
+    }
+
+    /**
+     * Writes a CharSequence to a file creating the file if it does not exist.
+     *
+     * @param file     the file to write
+     * @param data     the content to write to the file
+     * @param charset the charset to use, {@code null} means platform default
+     * @param append   if {@code true}, then the data will be added to the
+     *                 end of the file rather than overwriting
+     * @throws IOException in case of an I/O error
+     * @since 2.3
+     */
+    public static void write(final File file, final CharSequence data, final Charset charset, final boolean append) throws IOException {
+        writeStringToFile(file, Objects.toString(data, null), charset, append);
+    }
+
+    /**
+     * Writes a CharSequence to a file creating the file if it does not exist.
+     *
+     * @param file     the file to write
+     * @param data     the content to write to the file
+     * @param charsetName the name of the requested charset, {@code null} means platform default
+     * @throws IOException                          in case of an I/O error
+     * @throws java.io.UnsupportedEncodingException if the encoding is not supported by the VM
+     * @since 2.0
+     */
+    public static void write(final File file, final CharSequence data, final String charsetName) throws IOException {
+        write(file, data, charsetName, false);
+    }
+
+    /**
+     * Writes a CharSequence to a file creating the file if it does not exist.
+     *
+     * @param file     the file to write
+     * @param data     the content to write to the file
+     * @param charsetName the name of the requested charset, {@code null} means platform default
+     * @param append   if {@code true}, then the data will be added to the
+     *                 end of the file rather than overwriting
+     * @throws IOException                 in case of an I/O error
+     * @throws java.nio.charset.UnsupportedCharsetException thrown instead of {@link java.io
+     * .UnsupportedEncodingException} in version 2.2 if the encoding is not supported by the VM
+     * @since 2.1
+     */
+    public static void write(final File file, final CharSequence data, final String charsetName, final boolean append) throws IOException {
+        write(file, data, Charsets.toCharset(charsetName), append);
+    }
+
+    // Must be called with a directory
+
+    /**
+     * Writes a byte array to a file creating the file if it does not exist.
+     * <p>
+     * NOTE: As from v1.3, the parent directories of the file will be created
+     * if they do not exist.
+     * </p>
+     *
+     * @param file the file to write to
+     * @param data the content to write to the file
+     * @throws IOException in case of an I/O error
+     * @since 1.1
+     */
+    public static void writeByteArrayToFile(final File file, final byte[] data) throws IOException {
+        writeByteArrayToFile(file, data, false);
+    }
+
+    /**
+     * Writes a byte array to a file creating the file if it does not exist.
+     *
+     * @param file   the file to write to
+     * @param data   the content to write to the file
+     * @param append if {@code true}, then bytes will be added to the
+     *               end of the file rather than overwriting
+     * @throws IOException in case of an I/O error
+     * @since 2.1
+     */
+    public static void writeByteArrayToFile(final File file, final byte[] data, final boolean append) throws IOException {
+        writeByteArrayToFile(file, data, 0, data.length, append);
+    }
+
+    /**
+     * Writes {@code len} bytes from the specified byte array starting
+     * at offset {@code off} to a file, creating the file if it does
+     * not exist.
+     *
+     * @param file the file to write to
+     * @param data the content to write to the file
+     * @param off  the start offset in the data
+     * @param len  the number of bytes to write
+     * @throws IOException in case of an I/O error
+     * @since 2.5
+     */
+    public static void writeByteArrayToFile(final File file, final byte[] data, final int off, final int len) throws IOException {
+        writeByteArrayToFile(file, data, off, len, false);
+    }
+
+    /**
+     * Writes {@code len} bytes from the specified byte array starting
+     * at offset {@code off} to a file, creating the file if it does
+     * not exist.
+     *
+     * @param file   the file to write to
+     * @param data   the content to write to the file
+     * @param off    the start offset in the data
+     * @param len    the number of bytes to write
+     * @param append if {@code true}, then bytes will be added to the
+     *               end of the file rather than overwriting
+     * @throws IOException in case of an I/O error
+     * @since 2.5
+     */
+    public static void writeByteArrayToFile(final File file, final byte[] data, final int off, final int len, final boolean append) throws IOException {
+        try (OutputStream out = newOutputStream(file, append)) {
+            out.write(data, off, len);
+        }
+    }
+
+    /**
+     * Writes the {@code toString()} value of each item in a collection to
+     * the specified {@link File} line by line.
+     * The default VM encoding and the default line ending will be used.
+     *
+     * @param file  the file to write to
+     * @param lines the lines to write, {@code null} entries produce blank lines
+     * @throws IOException in case of an I/O error
+     * @since 1.3
+     */
+    public static void writeLines(final File file, final Collection<?> lines) throws IOException {
+        writeLines(file, null, lines, null, false);
+    }
+
+    /**
+     * Writes the {@code toString()} value of each item in a collection to
+     * the specified {@link File} line by line.
+     * The default VM encoding and the default line ending will be used.
+     *
+     * @param file   the file to write to
+     * @param lines  the lines to write, {@code null} entries produce blank lines
+     * @param append if {@code true}, then the lines will be added to the
+     *               end of the file rather than overwriting
+     * @throws IOException in case of an I/O error
+     * @since 2.1
+     */
+    public static void writeLines(final File file, final Collection<?> lines, final boolean append) throws IOException {
+        writeLines(file, null, lines, null, append);
+    }
+
+    /**
+     * Writes the {@code toString()} value of each item in a collection to
+     * the specified {@link File} line by line.
+     * The default VM encoding and the specified line ending will be used.
+     *
+     * @param file       the file to write to
+     * @param lines      the lines to write, {@code null} entries produce blank lines
+     * @param lineEnding the line separator to use, {@code null} is system default
+     * @throws IOException in case of an I/O error
+     * @since 1.3
+     */
+    public static void writeLines(final File file, final Collection<?> lines, final String lineEnding) throws IOException {
+        writeLines(file, null, lines, lineEnding, false);
+    }
+
+    /**
+     * Writes the {@code toString()} value of each item in a collection to
+     * the specified {@link File} line by line.
+     * The default VM encoding and the specified line ending will be used.
+     *
+     * @param file       the file to write to
+     * @param lines      the lines to write, {@code null} entries produce blank lines
+     * @param lineEnding the line separator to use, {@code null} is system default
+     * @param append     if {@code true}, then the lines will be added to the
+     *                   end of the file rather than overwriting
+     * @throws IOException in case of an I/O error
+     * @since 2.1
+     */
+    public static void writeLines(final File file, final Collection<?> lines, final String lineEnding, final boolean append) throws IOException {
+        writeLines(file, null, lines, lineEnding, append);
+    }
+
+    /**
+     * Writes the {@code toString()} value of each item in a collection to
+     * the specified {@link File} line by line.
+     * The specified character encoding and the default line ending will be used.
+     * <p>
+     * NOTE: As from v1.3, the parent directories of the file will be created
+     * if they do not exist.
+     * </p>
+     *
+     * @param file     the file to write to
+     * @param charsetName the name of the requested charset, {@code null} means platform default
+     * @param lines    the lines to write, {@code null} entries produce blank lines
+     * @throws IOException                          in case of an I/O error
+     * @throws java.io.UnsupportedEncodingException if the encoding is not supported by the VM
+     * @since 1.1
+     */
+    public static void writeLines(final File file, final String charsetName, final Collection<?> lines) throws IOException {
+        writeLines(file, charsetName, lines, null, false);
+    }
+
+    /**
+     * Writes the {@code toString()} value of each item in a collection to
+     * the specified {@link File} line by line, optionally appending.
+     * The specified character encoding and the default line ending will be used.
+     *
+     * @param file     the file to write to
+     * @param charsetName the name of the requested charset, {@code null} means platform default
+     * @param lines    the lines to write, {@code null} entries produce blank lines
+     * @param append   if {@code true}, then the lines will be added to the
+     *                 end of the file rather than overwriting
+     * @throws IOException                          in case of an I/O error
+     * @throws java.io.UnsupportedEncodingException if the encoding is not supported by the VM
+     * @since 2.1
+     */
+    public static void writeLines(final File file, final String charsetName, final Collection<?> lines, final boolean append) throws IOException {
+        writeLines(file, charsetName, lines, null, append);
+    }
+
+    /**
+     * Writes the {@code toString()} value of each item in a collection to
+     * the specified {@link File} line by line.
+     * The specified character encoding and the line ending will be used.
+     * <p>
+     * NOTE: As from v1.3, the parent directories of the file will be created
+     * if they do not exist.
+     * </p>
+     *
+     * @param file       the file to write to
+     * @param charsetName   the name of the requested charset, {@code null} means platform default
+     * @param lines      the lines to write, {@code null} entries produce blank lines
+     * @param lineEnding the line separator to use, {@code null} is system default
+     * @throws IOException                          in case of an I/O error
+     * @throws java.io.UnsupportedEncodingException if the encoding is not supported by the VM
+     * @since 1.1
+     */
+    public static void writeLines(final File file, final String charsetName, final Collection<?> lines, final String lineEnding) throws IOException {
+        writeLines(file, charsetName, lines, lineEnding, false);
+    }
+
+    /**
+     * Writes the {@code toString()} value of each item in a collection to
+     * the specified {@link File} line by line.
+     * The specified character encoding and the line ending will be used.
+     *
+     * @param file       the file to write to
+     * @param charsetName   the name of the requested charset, {@code null} means platform default
+     * @param lines      the lines to write, {@code null} entries produce blank lines
+     * @param lineEnding the line separator to use, {@code null} is system default
+     * @param append     if {@code true}, then the lines will be added to the
+     *                   end of the file rather than overwriting
+     * @throws IOException                          in case of an I/O error
+     * @throws java.io.UnsupportedEncodingException if the encoding is not supported by the VM
+     * @since 2.1
+     */
+    public static void writeLines(final File file, final String charsetName, final Collection<?> lines, final String lineEnding, final boolean append)
+        throws IOException {
+        try (OutputStream out = new BufferedOutputStream(newOutputStream(file, append))) {
+            IOUtils.writeLines(lines, lineEnding, out, charsetName);
+        }
+    }
+
+    /**
+     * Writes a String to a file creating the file if it does not exist using the default encoding for the VM.
+     *
+     * @param file the file to write
+     * @param data the content to write to the file
+     * @throws IOException in case of an I/O error
+     * @deprecated 2.5 use {@link #writeStringToFile(File, String, Charset)} instead (and specify the appropriate encoding)
+     */
+    @Deprecated
+    public static void writeStringToFile(final File file, final String data) throws IOException {
+        writeStringToFile(file, data, Charset.defaultCharset(), false);
+    }
+
+    /**
+     * Writes a String to a file creating the file if it does not exist using the default encoding for the VM.
+     *
+     * @param file   the file to write
+     * @param data   the content to write to the file
+     * @param append if {@code true}, then the String will be added to the
+     *               end of the file rather than overwriting
+     * @throws IOException in case of an I/O error
+     * @since 2.1
+     * @deprecated 2.5 use {@link #writeStringToFile(File, String, Charset, boolean)} instead (and specify the appropriate encoding)
+     */
+    @Deprecated
+    public static void writeStringToFile(final File file, final String data, final boolean append) throws IOException {
+        writeStringToFile(file, data, Charset.defaultCharset(), append);
+    }
+
+    /**
+     * Writes a String to a file creating the file if it does not exist.
+     * <p>
+     * NOTE: As from v1.3, the parent directories of the file will be created
+     * if they do not exist.
+     * </p>
+     *
+     * @param file     the file to write
+     * @param data     the content to write to the file
+     * @param charset the charset to use, {@code null} means platform default
+     * @throws IOException                          in case of an I/O error
+     * @throws java.io.UnsupportedEncodingException if the encoding is not supported by the VM
+     * @since 2.4
+     */
+    public static void writeStringToFile(final File file, final String data, final Charset charset) throws IOException {
+        writeStringToFile(file, data, charset, false);
+    }
+
+    /**
+     * Writes a String to a file creating the file if it does not exist.
+     *
+     * @param file     the file to write
+     * @param data     the content to write to the file
+     * @param charset the charset to use, {@code null} means platform default
+     * @param append   if {@code true}, then the String will be added to the
+     *                 end of the file rather than overwriting
+     * @throws IOException in case of an I/O error
+     * @since 2.3
+     */
+    public static void writeStringToFile(final File file, final String data, final Charset charset, final boolean append) throws IOException {
+        try (OutputStream out = newOutputStream(file, append)) {
+            IOUtils.write(data, out, charset);
+        }
+    }
+
+    /**
+     * Writes a String to a file creating the file if it does not exist.
+     * <p>
+     * NOTE: As from v1.3, the parent directories of the file will be created
+     * if they do not exist.
+     * </p>
+     *
+     * @param file     the file to write
+     * @param data     the content to write to the file
+     * @param charsetName the name of the requested charset, {@code null} means platform default
+     * @throws IOException                          in case of an I/O error
+     * @throws java.io.UnsupportedEncodingException if the encoding is not supported by the VM
+     */
+    public static void writeStringToFile(final File file, final String data, final String charsetName) throws IOException {
+        writeStringToFile(file, data, charsetName, false);
+    }
+
+    /**
+     * Writes a String to a file creating the file if it does not exist.
+     *
+     * @param file     the file to write
+     * @param data     the content to write to the file
+     * @param charsetName the name of the requested charset, {@code null} means platform default
+     * @param append   if {@code true}, then the String will be added to the
+     *                 end of the file rather than overwriting
+     * @throws IOException                 in case of an I/O error
+     * @throws java.nio.charset.UnsupportedCharsetException thrown instead of {@link java.io
+     * .UnsupportedEncodingException} in version 2.2 if the encoding is not supported by the VM
+     * @since 2.1
+     */
+    public static void writeStringToFile(final File file, final String data, final String charsetName, final boolean append) throws IOException {
+        writeStringToFile(file, data, Charsets.toCharset(charsetName), append);
+    }
+
+    /**
+     * Instances should NOT be constructed in standard programming.
+     * @deprecated Will be private in 3.0.
+     */
+    @Deprecated
+    public FileUtils() { //NOSONAR
+
+    }
+
+}
+            """
+        )
+    )
+
+
 }

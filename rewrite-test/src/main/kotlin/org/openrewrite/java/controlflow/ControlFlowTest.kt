@@ -32,35 +32,92 @@ interface ControlFlowTest : RewriteTest {
         spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
 
+                fun getPredsandSuccs(leadersToNodes : Map<J, ControlFlowNode>,
+                                     blockNumbers : MutableMap<ControlFlowNode, Int>, leader: J) : String {
+                    if (leader is J.ControlParentheses<*>) {
+                        val block = leadersToNodes[leader.tree] ?: error("No block for $leader")
+                        val preds = block.predecessors.map { blockNumbers[it] }
+//                        val succs = block.successors.map { blockNumbers[it] }
+                        return "Predecessors: ${preds.joinToString(", ")}"
+                    }
+
+                    val block = leadersToNodes[leader] ?: error("No block for $leader")
+                    val preds = block.predecessors.map { blockNumbers[it] }
+                    val succs = block.successors.map { blockNumbers[it] }
+                    return "Predecessors: ${preds.joinToString(", ")}"
+
+                }
+
                 override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                     val methodDeclaration = cursor.firstEnclosing(J.MethodDeclaration::class.java)
                     val isTestMethod = methodDeclaration?.body == block && methodDeclaration.name.simpleName == "test"
                     val isStaticOrInitBlock = J.Block.isStaticOrInitBlock(cursor)
                     if (isTestMethod || isStaticOrInitBlock) {
                         return ControlFlow.startingAt(cursor).findControlFlow().map { controlFlow ->
-                            val basicBlocks = controlFlow.basicBlocks
-                            val leaders = basicBlocks.map { it.leader }.toSet()
+                            // maps basic block and condititon nodes to the first statement in the node (the node leader)
+                            val leadersToBlocks = controlFlow.basicBlocks.map {
+                                    block -> block.leader
+                            }.zip(controlFlow.basicBlocks).toMap()
+                            val conditionToConditionNodes = controlFlow.conditionNodes.map {
+                                node -> node.condition
+                            }.zip(controlFlow.conditionNodes).toMap()
+                            val leadersToNodes = leadersToBlocks + conditionToConditionNodes
+
+                            // get the key set of leadersToBlocks, which is the set of leaders
+                            val leaders = leadersToNodes.keys
+
+                            var nodeNumber = 0
+                            val nodeNumbers = mutableMapOf<ControlFlowNode, Int>()
                             doAfterVisit(object : JavaIsoVisitor<ExecutionContext>() {
+
+//                                override fun <T : J?> visitControlParentheses(
+//                                    controlParens: J.ControlParentheses<T>,
+//                                    p: ExecutionContext
+//                                ): J.ControlParentheses<T> {
+//                                    return if (leaders.contains(controlParens.tree)) {
+//                                        val b = leadersToNodes[controlParens.tree] ?: error("No block for $controlParens")
+//                                        nodeNumbers[b] = ++nodeNumber
+//                                        val s = getPredsandSuccs(leadersToNodes, nodeNumbers, controlParens)
+//                                        println("Block ${nodeNumber}: ${s}")
+//                                        controlParens.withMarkers(controlParens.markers.searchResult("" + nodeNumber + "L"))
+//                                    } else {
+//                                        controlParens
+//                                    }
+//                                }
 
                                 override fun visitStatement(statement: Statement, p: ExecutionContext): Statement {
                                     return if (leaders.contains(statement)) {
                                         val searchResult =
                                             statement.markers.markers.filterIsInstance<SearchResult>().getOrNull(0)
                                         if (searchResult != null) {
+                                            // get the block from the leader
+                                            val b = leadersToNodes[statement] ?: error("No block for $statement")
+                                            nodeNumbers[b] = ++nodeNumber
+                                            val s = getPredsandSuccs(leadersToNodes, nodeNumbers, statement)
+                                            println("Block ${nodeNumber}: ${s}")
                                             statement.withMarkers(
                                                 statement.markers.removeByType(SearchResult::class.java).add(
-                                                    searchResult.withDescription(searchResult.description?.plus(" | L"))
+                                                    searchResult.withDescription(searchResult.description?.plus(" | " + nodeNumber + "L"))
                                                 )
                                             )
                                         } else {
-                                            statement.withMarkers(statement.markers.searchResult("L"))
+                                            val b = leadersToNodes[statement] ?: error("No block for $statement")
+                                            nodeNumbers[b] = ++nodeNumber
+                                            val s = getPredsandSuccs(leadersToNodes, nodeNumbers, statement)
+                                            println("Block ${nodeNumber}: ${s}")
+                                            statement.withMarkers(statement.markers.searchResult("" + nodeNumber + "L"))
                                         }
                                     } else statement
                                 }
 
                                 override fun visitExpression(expression: Expression, p: ExecutionContext): Expression {
-                                    return if (leaders.contains(expression))
-                                        expression.withMarkers(expression.markers.searchResult(expression.leaderDescription()))
+                                    return if (leaders.contains(expression)) {
+                                        val b = leadersToNodes[expression] ?: error("No block for $expression")
+                                        nodeNumbers[b] = ++nodeNumber
+                                        val s = getPredsandSuccs(leadersToNodes, nodeNumbers, expression)
+                                        println("Block ${nodeNumber}: ${s}")
+                                        expression.withMarkers(expression.markers.searchResult("" + nodeNumber + expression.leaderDescription()))
+                                    }
                                     else expression
                                 }
 
@@ -95,9 +152,12 @@ interface ControlFlowTest : RewriteTest {
                                     }
                                 }
                             })
+//                            ControlFlowVisualizer.printCFG(controlFlow, nodeNumbers)
+                            ControlFlowVisualizer.printCFG(controlFlow)
+
                             block.withMarkers(
                                 block.markers.searchResult(
-                                    "BB: ${basicBlocks.size} CN: ${controlFlow.conditionNodeCount} EX: ${controlFlow.exitCount}"
+                                    "BB: ${controlFlow.basicBlocks.size} CN: ${controlFlow.conditionNodeCount} EX: ${controlFlow.exitCount}"
                                 )
                             )
                         }.orElseGet { super.visitBlock(block, p) }

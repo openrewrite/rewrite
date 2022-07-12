@@ -19,10 +19,13 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.*;
@@ -63,12 +66,26 @@ public abstract class ControlFlowNode {
         throw new IllegalStateException("Can only add a condition node to a basic block");
     }
 
+    public List<J> getNodeValues() {
+        return Collections.emptyList();
+    }
+
+    @NotNull
+    private String getSubStatements(String blockStmts, J.Block j) {
+        StringBuilder blockStmtsBuilder = new StringBuilder(blockStmts);
+        for (Statement s : j.getStatements()) {
+            blockStmtsBuilder.append(s).append("\n");
+        }
+        blockStmts = blockStmtsBuilder.toString();
+        return blockStmts;
+    }
+
     /**
      * A control flow node that represents a branching point in the code.
      */
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     static class ConditionNode extends ControlFlowNode {
-        @Getter
+
         private final Cursor condition;
         private final boolean truthFirst;
         /**
@@ -81,6 +98,10 @@ public abstract class ControlFlowNode {
          */
         @Getter
         private ControlFlowNode falsySuccessor;
+
+        public J getCondition() {
+            return condition.getValue();
+        }
 
         @Override
         protected void _addSuccessorInternal(ControlFlowNode successor) {
@@ -119,6 +140,14 @@ public abstract class ControlFlowNode {
 
         private boolean isAlwaysFalse() {
             return asBooleanLiteral().map(l -> !((Boolean) l.getValue())).orElse(false);
+        }
+
+
+        @Override
+        public List<J> getNodeValues() {
+            List<J> l = new LinkedList<>();
+            l.add(condition.getValue());
+            return l;
         }
 
         @Override
@@ -201,6 +230,28 @@ public abstract class ControlFlowNode {
             return Collections.unmodifiableList(node);
         }
 
+        String getStatementsWithinBlock() {
+            ControlFlowJavaPrinter.ControlFlowPrintOutputCapture<Integer> capture
+                    = new ControlFlowJavaPrinter.ControlFlowPrintOutputCapture<>(0);
+            ControlFlowJavaPrinter<Integer> printer = new ControlFlowJavaPrinter<>(getNodeValues());
+            Cursor commonBlock = getCommonBlock();
+            printer.visit(commonBlock.getValue(), capture, commonBlock.getParentOrThrow());
+            return StringUtils.trimIndentPreserveCRLF(capture.getOut());
+        }
+
+        /**
+         * The highest common {@link J.Block} that contains all the statements in this basic block.
+         */
+        Cursor getCommonBlock() {
+            List<Cursor> shortestList = node.stream().map(BasicBlock::computeBlockList).min(Comparator.comparingInt(List::size))
+                    .orElseThrow(() -> new IllegalStateException("Could not find common block for basic block"));
+            if (shortestList.isEmpty()) {
+                throw new IllegalStateException("Could not find common block for basic block");
+            }
+            return shortestList.get(shortestList.size() - 1);
+        }
+
+        @Override
         public List<J> getNodeValues() {
             return node.stream().map(Cursor::<J>getValue).collect(Collectors.toList());
         }
@@ -239,7 +290,11 @@ public abstract class ControlFlowNode {
                 return;
             }
             if (this.successor != null) {
-                throw new IllegalStateException("Basic block already has a successor");
+//                if (successor.getNodeValues().isEmpty()) throw new IllegalStateException("sdfsadfadfa");
+                throw new IllegalStateException("Basic block already has a successor ");
+//                + this.getStatementsWithinBlock()
+//                        + " succeeded by " + this.successor.getStatementsWithinBlock() + " " +
+//                        " but attempting to add " + successor.getStatementsWithinBlock());
             }
             this.successor = successor;
         }
@@ -247,7 +302,7 @@ public abstract class ControlFlowNode {
         @Override
         Set<ControlFlowNode> getSuccessors() {
             if (successor == null) {
-                throw new IllegalStateException("Basic block has no successor");
+                throw new IllegalStateException("Basic block " + this.getStatementsWithinBlock() + " has no successor ");
             }
             return Collections.singleton(successor);
         }
@@ -259,6 +314,14 @@ public abstract class ControlFlowNode {
             } else {
                 return "BasicBlock { leader=" + getLeader() + " }";
             }
+        }
+
+        private static List<Cursor> computeBlockList(Cursor cursor) {
+            List<Cursor> blocks = new ArrayList<>();
+            cursor.getPathAsCursors(c -> c.getValue() instanceof J.Block)
+                    .forEachRemaining(blocks::add);
+            Collections.reverse(blocks);
+            return blocks;
         }
     }
 
