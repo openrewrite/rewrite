@@ -28,6 +28,7 @@ import org.openrewrite.cobol.internal.params.CobolParserParams;
 import org.openrewrite.cobol.internal.params.impl.CobolParserParamsImpl;
 import org.openrewrite.cobol.internal.preprocessor.CobolPreprocessor;
 import org.openrewrite.cobol.internal.preprocessor.impl.CobolPreprocessorImpl;
+import org.openrewrite.cobol.internal.runner.impl.CobolTokenFactory;
 import org.openrewrite.cobol.tree.Cobol;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
@@ -69,6 +70,8 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                         /////////////////
 
                         CobolLexer lexer = new CobolLexer(CharStreams.fromString(preProcessedInput.preprocessedText));
+                        lexer.setTokenFactory(new CobolTokenFactory(preProcessedInput));
+
                         CobolTokenStream tokens = new CobolTokenStream(preProcessedInput.preprocessedText, lexer);
 
                         org.openrewrite.cobol.internal.grammar.CobolParser parser = new org.openrewrite.cobol.internal.grammar.CobolParser(tokens);
@@ -85,6 +88,8 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                                 is.getCharset(),
                                 is.isCharsetBomMarked()
                         ).visitStartRule(start);
+
+                        tokens.removeTrailingWhitespace();
 
                         String test = compilationUnit.print(new Cursor(null, compilationUnit));
                         System.out.println("source= " + StringWithOriginalPositions.quote(sourceStr));

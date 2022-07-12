@@ -15,8 +15,14 @@ public class CobolTokenStream extends CommonTokenStream {
         this.input = input;
     }
 
+    /**
+     * Line breaks are significant in Cobol and must be part of some tokens for lexing. However they are a problem
+     * when building ASTs, where we need line breaks to belong to whitespace. This method removes trailing whitespace
+     * from tokens but adjusting their stop index. Subsequent processing will pick the correct amount of whitespace
+     * by referring to this adjusted stop index.
+     */
     public void removeTrailingWhitespace() {
-        for(Token t : tokens) {
+        for(Token t : getTokens()) {
             CobolToken ct = (CobolToken) t;
             while(isWhiteSpace(input.charAt(ct.getStopIndex())) && ct.getStopIndex() > ct.getStartIndex()) {
                 ct.setStopIndex(ct.getStopIndex()-1);
