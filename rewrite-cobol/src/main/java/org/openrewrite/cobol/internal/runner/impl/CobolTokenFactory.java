@@ -9,6 +9,7 @@
 package org.openrewrite.cobol.internal.runner.impl;
 
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenFactory;
 import org.antlr.v4.runtime.TokenSource;
 import org.antlr.v4.runtime.misc.Pair;
@@ -32,13 +33,12 @@ public class CobolTokenFactory implements TokenFactory<CobolToken> {
 
         assert text == null;
 
-//		String originalText = preprocessedInput.getText(start,stop);
-//		String preprocessedText = source.b.getText(Interval.of(start,stop));
-
-        //String originalText =  preprocessedInput.getOriginalText(start, stop);
         String preprocessedText = preprocessedInput.getPreprocessedText(start, stop);
         t.setText(preprocessedText);
 
+        if(t.getChannel() == 0) {
+            removeTrailingWhitespace(t);
+        }
         return t;
     }
 
@@ -47,4 +47,21 @@ public class CobolTokenFactory implements TokenFactory<CobolToken> {
         return new CobolToken(type, text);
     }
 
+
+    /**
+     * Line breaks are significant in Cobol and must be part of some tokens for lexing. However they are a problem
+     * when building ASTs, where we need line breaks to belong to whitespace. This method removes trailing whitespace
+     * from tokens but adjusting their stop index. Subsequent processing will pick the correct amount of whitespace
+     * by referring to this adjusted stop index.
+     */
+    private void removeTrailingWhitespace(CobolToken t) {
+        while(isWhiteSpace(preprocessedInput.preprocessedText.charAt(t.getStopIndex())) && t.getStopIndex() > t.getStartIndex()) {
+            t.setStopIndex(t.getStopIndex()-1);
+            t.setText(t.getText().substring(0, t.getText().length()-1));
+        }
+    }
+
+    private boolean isWhiteSpace(char c) {
+        return c == '\r' | c == '\n' | c == '\f' | c == '\t' | c == ' ';
+    }
 }

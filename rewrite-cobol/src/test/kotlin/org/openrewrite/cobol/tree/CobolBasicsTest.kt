@@ -39,7 +39,7 @@ class CobolBasicsTest : RewriteTest {
         """
                 |000010  IDENTIFICATION  DIVISION .                                      Comment starting column 72           
                 |000020  PROGRAM-ID    . HELLO     .
-                |000030  PROCEDURE DIVISION. 
+                |000030  PROCEDURE DIVISION.   
                 |000040  DISPLAY   'Hello world!'.
                 |000050  STOP RUN.
             """.trimMargin("|")
