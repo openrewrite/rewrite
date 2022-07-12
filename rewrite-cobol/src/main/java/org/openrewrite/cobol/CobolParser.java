@@ -89,8 +89,6 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                                 is.isCharsetBomMarked()
                         ).visitStartRule(start);
 
-                        tokens.removeTrailingWhitespace();
-
                         String test = compilationUnit.print(new Cursor(null, compilationUnit));
                         System.out.println("source= " + StringWithOriginalPositions.quote(sourceStr));
                         System.out.println("parsed= " + StringWithOriginalPositions.quote(test));

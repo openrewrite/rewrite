@@ -107,9 +107,6 @@ public class CobolParserRunnerImpl {
         // get a list of matched tokens
         tokens = new CobolTokenStream(preProcessedInput.preprocessedText, lexer);
 
-        // remove trailing whitespace from tokens
-        tokens.removeTrailingWhitespace();
-
         // pass the tokens to the parser
         parser = new CobolParser(tokens);
 
