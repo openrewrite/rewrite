@@ -21,7 +21,6 @@ import java.util.List;
 
 public class StringWithOriginalPositions {
     public final List<CobolLine> lines;
-    public int lineNumber;
 
     public final String originalText;
     //public final String[] originalFileName;
@@ -30,15 +29,37 @@ public class StringWithOriginalPositions {
     // or originalPositions[i] == -1 if preprocessedText[i] does not correspond to an original
     public int[] originalPositions;
 
+    // lineBreakPositions[i] = position of the final line break of line i in original text
+    public int[] lineNumbers;
+
     public String preprocessedText;
 
     public StringWithOriginalPositions(List<CobolLine> lines, String text, String originalText, int[] originalPositions) {
         assert text.length() == originalPositions.length;
         this.lines = lines;
-        this.lineNumber = 0;
         this.preprocessedText = text;
         this.originalText = originalText;
         this.originalPositions = originalPositions;
+
+        lineNumbers = new int[text.length()];
+        int currentLine = 0;
+        int index=0;
+        while(index<lineNumbers.length) {
+            if (text.charAt(index) == '\r' && index + 1 < text.length() && text.charAt(index + 1) == '\n') {
+                lineNumbers[index++] = currentLine;
+                lineNumbers[index++] = currentLine;
+                currentLine++;
+                break;
+            } else if (text.charAt(index) == '\n') {
+                lineNumbers[index++] = currentLine;
+                currentLine++;
+            } else if (text.charAt(index) == '\r') {
+                lineNumbers[index++] = currentLine;
+                currentLine++;
+            } else {
+                lineNumbers[index++] = currentLine;
+            }
+        }
 
         // preprocessedText[i] == originalText[originalPositions[i]]
         // or originalPositions[i] == -1 if preprocessedText[i] does not correspond to an original

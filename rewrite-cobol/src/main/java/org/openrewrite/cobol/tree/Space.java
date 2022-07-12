@@ -68,6 +68,7 @@ public class Space {
 //            System.out.println();
 //        }
 
+        int lineNumber = input.lineNumbers[stop];
         int current = 0;
         for(int i=0; i<rawText.length(); i++) {
             int from;
@@ -87,8 +88,8 @@ public class Space {
 
             String whitespace = rawText.substring(current, from);
             String lineBreak = rawText.substring(from, from+length);
-            String comment = input.lines.get(input.lineNumber).getCommentArea();
-            String sequence = input.lines.get(input.lineNumber+1).getSequenceArea();
+            String comment = input.lines.get(lineNumber).getCommentArea();
+            String sequence = input.lines.get(lineNumber+1).getSequenceArea();
 
             whitespaces.add(whitespace);
             lineBreaks.add(lineBreak);
@@ -96,7 +97,7 @@ public class Space {
             sequences.add(sequence);
 
             current = from+length;
-            input.lineNumber++;
+            lineNumber++;
         }
         lastWhiteSpace = rawText.substring(current);
 
