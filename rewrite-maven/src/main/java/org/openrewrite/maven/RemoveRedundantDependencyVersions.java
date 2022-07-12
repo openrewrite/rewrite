@@ -22,6 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
@@ -85,11 +86,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             private boolean matchesGroup(ResolvedDependency d) {
-                return groupPattern == null || matchesGlob(d.getGroupId(), groupPattern);
+                return StringUtils.isNullOrEmpty(groupPattern) || matchesGlob(d.getGroupId(), groupPattern);
             }
 
             private boolean matchesArtifact(ResolvedDependency d) {
-                return artifactPattern == null || matchesGlob(d.getArtifactId(), artifactPattern);
+                return StringUtils.isNullOrEmpty(artifactPattern) || matchesGlob(d.getArtifactId(), artifactPattern);
             }
 
             private boolean matchesVersion(ResolvedDependency d) {
