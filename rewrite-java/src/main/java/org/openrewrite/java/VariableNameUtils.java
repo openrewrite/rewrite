@@ -71,8 +71,6 @@ public class VariableNameUtils {
      * A JavaSourceFile must be available in the Cursor path to account for all names
      * available in the cursor scope.
      *
-     * Known issue: all names of static imports are imported.
-     *
      * @param scope The cursor position of a JavaVisitor, {@link org.openrewrite.java.JavaVisitor#getCursor()}.
      * @return Variable names available in the name scope of the cursor.
      */
@@ -86,6 +84,34 @@ public class VariableNameUtils {
         VariableNameScopeVisitor variableNameScopeVisitor = new VariableNameScopeVisitor(scope);
         variableNameScopeVisitor.visit(compilationUnit, names);
         return names;
+    }
+
+    /**
+     * Collects class field names inherited from super classes.
+     *
+     * Note: Does not currently account for {@link JavaType.Unknown}.
+     */
+    public static Set<String> findInheritedNames(J.ClassDeclaration classDeclaration) {
+        Set<String> names = new HashSet<>();
+        if (classDeclaration.getType() != null) {
+            addInheritedClassFields(classDeclaration, classDeclaration.getType().getSupertype(), names);
+        }
+        return names;
+    }
+
+    private static void addInheritedClassFields(J.ClassDeclaration classDeclaration, @Nullable JavaType.FullyQualified superClass, Set<String> names) {
+        if (superClass != null) {
+            boolean isSamePackage = classDeclaration.getType() != null && classDeclaration.getType().getPackageName().equals(superClass.getPackageName());
+            superClass.getMembers().forEach(m -> {
+                if ((Flag.hasFlags(m.getFlagsBitMap(), Flag.Public) ||
+                        Flag.hasFlags(m.getFlagsBitMap(), Flag.Protected)) ||
+                        // Member is accessible as package-private.
+                        !Flag.hasFlags(m.getFlagsBitMap(), Flag.Private) && isSamePackage) {
+                    names.add(m.getName());
+                }
+            });
+            addInheritedClassFields(classDeclaration, superClass.getSupertype(), names);
+        }
     }
 
     public enum GenerationStrategy {
@@ -186,7 +212,7 @@ public class VariableNameUtils {
 
             addImportedStaticFieldNames(getCursor().firstEnclosing(J.CompilationUnit.class), getCursor());
             if (classDecl.getType() != null) {
-                addInheritedClassFields(classDecl.getType().getSupertype(), getCursor());
+                namesInScope.addAll(findInheritedNames(classDecl));
             }
             return super.visitClassDeclaration(classDecl, namesInScope);
         }
@@ -218,23 +244,6 @@ public class VariableNameUtils {
         private boolean isValidImportName(@Nullable JavaType targetType, String name) {
             // Consider the id a valid field if the type is null since it is indistinguishable from a method name or class name.
             return targetType == null || (targetType instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) targetType).getMembers().stream().anyMatch(o -> o.getName().equals(name)));
-        }
-
-        private void addInheritedClassFields(@Nullable JavaType.FullyQualified fq, Cursor classCursor) {
-            if (fq != null) {
-                J.ClassDeclaration cd = classCursor.getValue();
-                boolean isSamePackage = cd.getType() != null && cd.getType().getPackageName().equals(fq.getPackageName());
-                fq.getMembers().forEach(m -> {
-                    if ((Flag.hasFlags(m.getFlagsBitMap(), Flag.Public) ||
-                            Flag.hasFlags(m.getFlagsBitMap(), Flag.Protected)) ||
-                            // Member is accessible as package-private.
-                            !Flag.hasFlags(m.getFlagsBitMap(), Flag.Private) && isSamePackage) {
-                        Set<String> namesAtCursor = nameScopes.computeIfAbsent(classCursor, k -> new HashSet<>());
-                        namesAtCursor.add(m.getName());
-                    }
-                });
-                addInheritedClassFields(fq.getSupertype(), classCursor);
-            }
         }
     }
 }
