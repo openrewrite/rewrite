@@ -51,7 +51,8 @@ public class CobolLineIndicatorProcessorImpl implements CobolLineIndicatorProces
      */
     @Override
     public CobolLine processLine(final CobolLine line) {
-        final String conditionalRightTrimmedContentArea = conditionalRightTrimContentArea(line);
+        // final String conditionalRightTrimmedContentArea = conditionalRightTrimContentArea(line);
+        final String conditionalRightTrimmedContentArea = line.getContentArea();
         final CobolLine result;
 
         switch (line.getType()) {
