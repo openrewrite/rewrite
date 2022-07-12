@@ -15,9 +15,16 @@
  */
 package org.openrewrite.cobol.internal;
 
+import org.openrewrite.cobol.internal.preprocessor.sub.CobolLine;
+
+import java.util.List;
+
 public class StringWithOriginalPositions {
-    public String originalText;
-    public String[] originalFileName;
+    public final List<CobolLine> lines;
+    public int lineNumber;
+
+    public final String originalText;
+    //public final String[] originalFileName;
 
     // preprocessedText[i] == originalText[originalPositions[i]]
     // or originalPositions[i] == -1 if preprocessedText[i] does not correspond to an original
@@ -25,14 +32,18 @@ public class StringWithOriginalPositions {
 
     public String preprocessedText;
 
-    public StringWithOriginalPositions(String text, String originalText, int[] originalPositions) {
+    public StringWithOriginalPositions(List<CobolLine> lines, String text, String originalText, int[] originalPositions) {
         assert text.length() == originalPositions.length;
+        this.lines = lines;
+        this.lineNumber = 0;
         this.preprocessedText = text;
         this.originalText = originalText;
         this.originalPositions = originalPositions;
 
         // preprocessedText[i] == originalText[originalPositions[i]]
         // or originalPositions[i] == -1 if preprocessedText[i] does not correspond to an original
+
+        // Check if the original positions look correct
 
         StringBuffer sb = new StringBuffer();
         for(int i=0; i<preprocessedText.length(); i++) {
@@ -54,6 +65,7 @@ public class StringWithOriginalPositions {
 
     // Scaffolding, to be removed.
     public StringWithOriginalPositions(StringWithOriginalPositions code, String expandedText) {
+        this.lines = null; // ???
         this.preprocessedText = expandedText;
         this.originalText = code.originalText;
         this.originalPositions = code.originalPositions; // XXX

@@ -15,27 +15,32 @@
  */
 package org.openrewrite.cobol.internal;
 
+import org.openrewrite.cobol.internal.preprocessor.sub.CobolLine;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class StringBufferWithOriginalPositions {
-    StringWithOriginalPositions originalCodeWithPositions;
+    //StringWithOriginalPositions originalCodeWithPositions;
     String originalCode;
+    List<CobolLine> lines;
 
     StringBuffer sb;
     List<Integer> originalPositions;
     int currentPositionInOriginalFile;
 
-    public StringBufferWithOriginalPositions(String originalCode) {
-        this.originalCodeWithPositions = null;
+    public StringBufferWithOriginalPositions(String originalCode, List<CobolLine> lines) {
+        //this.originalCodeWithPositions = null;
         this.originalCode = originalCode;
+        this.lines = lines;
+
         this.sb = new StringBuffer();
         this.originalPositions = new ArrayList<>();
         this.currentPositionInOriginalFile = 0;
     }
 
     public StringBufferWithOriginalPositions(StringWithOriginalPositions originalCodeWithPositions) {
-        this.originalCodeWithPositions = originalCodeWithPositions;
+        //this.originalCodeWithPositions = originalCodeWithPositions;
         // This original text is the previous string's preprocessed text
         this.originalCode = originalCodeWithPositions.preprocessedText;
 
@@ -52,8 +57,17 @@ public class StringBufferWithOriginalPositions {
         }
     }
 
-    public StringWithOriginalPositions toStringWithMarkers() {
-        return new StringWithOriginalPositions(sb.toString(), originalCode, originalPositions.stream().mapToInt(Integer::intValue).toArray());
+    public StringWithOriginalPositions toStringWithMarkers(int lineNumber) {
+        return new StringWithOriginalPositions(lines, sb.toString(), originalCode, toIntArray(originalPositions));
+    }
+
+    private int[] toIntArray(List<Integer> list) {
+        int size = list.size();
+        int[] result = new int[size];
+        for(int i=0; i<size; i++) {
+            result[i] = list.get(i);
+        }
+        return result;
     }
 
     public void skip(String s) {

@@ -21,9 +21,10 @@ public class CobolLineWriterImpl implements CobolLineWriter {
 
     @Override
     public StringWithOriginalPositions serialize(final String originalCode, final List<CobolLine> lines) {
-        final StringBufferWithOriginalPositions sb = new StringBufferWithOriginalPositions(originalCode);
+        final StringBufferWithOriginalPositions sb = new StringBufferWithOriginalPositions(originalCode, lines);
 
         String previousNewLine = null;
+        int lineNumber = 0;
         for (final CobolLine line : lines) {
             final boolean notContinuationLine = !CobolLineTypeEnum.CONTINUATION.equals(line.getType());
 
@@ -58,9 +59,10 @@ public class CobolLineWriterImpl implements CobolLineWriter {
             sb.skip(line.getCommentAreaOriginal().length() - line.getCommentArea().length());
 
             previousNewLine = line.getNewLine();
+            lineNumber++;
 
         }
 
-        return sb.toStringWithMarkers();
+        return sb.toStringWithMarkers(lineNumber);
     }
 }
