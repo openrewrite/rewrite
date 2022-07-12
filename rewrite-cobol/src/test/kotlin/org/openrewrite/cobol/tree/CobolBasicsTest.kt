@@ -25,7 +25,7 @@ class CobolBasicsTest : RewriteTest {
         cobol(
             """
                 |        IDENTIFICATION  DIVISION .
-                |        PROGRAM-ID    . HELLO     .
+                |        PROGRAM-ID    . HELLO     .  
                 |        PROCEDURE DIVISION.
                 |        DISPLAY 'Hello world!'.
                 |        STOP RUN.
@@ -34,13 +34,13 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
-    fun columns() = rewriteRun(
+    fun helloWithSequenceAndCommentAreas() = rewriteRun(
         cobol(
         """
                 |000010  IDENTIFICATION  DIVISION .                                      Comment starting column 72           
                 |000020  PROGRAM-ID    . HELLO     .
-                |000030  PROCEDURE DIVISION.
-                |000040  DISPLAY 'Hello world!'.
+                |000030  PROCEDURE DIVISION. 
+                |000040  DISPLAY   'Hello world!'.
                 |000050  STOP RUN.
             """.trimMargin("|")
         )
