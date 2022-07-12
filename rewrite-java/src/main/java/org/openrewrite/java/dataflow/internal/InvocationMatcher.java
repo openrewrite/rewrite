@@ -103,7 +103,7 @@ public interface InvocationMatcher {
                 if (doesMethodHaveVarargs(call)) {
                     // The varargs parameter is the last one, so we need to check if the expression is the last
                     // parameter or any further argument
-                    final int finalParameterIndex = getType(call).getParameterTypes().size() - 1;
+                    final int finalParameterIndex = getType(call).map(v -> v.getParameterTypes().size() - 1).orElse(-1);
                     if (finalParameterIndex == parameterIndex) {
                         List<Expression> varargs = arguments.subList(finalParameterIndex, arguments.size());
                         return varargs.contains(expression) &&
@@ -116,10 +116,10 @@ public interface InvocationMatcher {
         }
 
         private static boolean doesMethodHaveVarargs(Expression expression) {
-            return getType(expression).hasFlags(Flag.Varargs);
+            return getType(expression).map(v -> v.hasFlags(Flag.Varargs)).orElse(false);
         }
 
-        private static JavaType.Method getType(Expression expression) {
+        private static Optional<JavaType.Method> getType(Expression expression) {
             final JavaType.Method type;
             if (expression instanceof J.MethodInvocation) {
                 type = ((J.MethodInvocation) expression).getMethodType();
@@ -129,9 +129,9 @@ public interface InvocationMatcher {
                 throw new IllegalArgumentException("Expression is not a method invocation or new class");
             }
             if (type == null) {
-                throw new IllegalArgumentException("Type information is missing for " + expression);
+                return Optional.empty();
             }
-            return type;
+            return Optional.of(type);
         }
 
         private static List<Expression> getCallArguments(Expression call) {
