@@ -23,6 +23,7 @@ public class CobolLineWriterImpl implements CobolLineWriter {
     public StringWithOriginalPositions serialize(final String originalCode, final List<CobolLine> lines) {
         final StringBufferWithOriginalPositions sb = new StringBufferWithOriginalPositions(originalCode);
 
+        String previousNewLine = null;
         for (final CobolLine line : lines) {
             final boolean notContinuationLine = !CobolLineTypeEnum.CONTINUATION.equals(line.getType());
 
@@ -36,17 +37,17 @@ public class CobolLineWriterImpl implements CobolLineWriter {
 			 */
 
             if (notContinuationLine) {
-                if (line.getNumber() > 0) {
-                    sb.append(line.getNewLine());
+                if (previousNewLine != null) {
+                    sb.append(previousNewLine);
                     //sb.skip(line.getNewLine().length());
                 }
 
                 sb.append(line.getBlankSequenceArea());
-                sb.skip(line.getSequenceAreaOriginal().length() - line.getBlankSequenceArea().length());
+                //sb.skip(line.getSequenceAreaOriginal().length() - line.getBlankSequenceArea().length());
                 sb.append(line.getIndicatorArea());
             } else {
                 sb.skip(line.getSequenceArea());
-                sb.skip(line.getSequenceAreaOriginal().length() - line.getSequenceArea().length());
+                //sb.skip(line.getSequenceAreaOriginal().length() - line.getSequenceArea().length());
                 sb.skip(line.getIndicatorArea());
             }
 
@@ -55,6 +56,9 @@ public class CobolLineWriterImpl implements CobolLineWriter {
 
             sb.skip(line.getCommentArea());
             sb.skip(line.getCommentAreaOriginal().length() - line.getCommentArea().length());
+
+            previousNewLine = line.getNewLine();
+
         }
 
         return sb.toStringWithMarkers();
