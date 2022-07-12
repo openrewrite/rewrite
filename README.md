@@ -11,7 +11,7 @@ This project delivers scalable automated code maintenance, best practices, vulne
 
 Start with our [quickstart guide](https://docs.openrewrite.org/getting-started/getting-started) and let OpenRewrite start handling the boring parts of software development for you. Full documentation available at [docs.openrewrite.org](https://docs.openrewrite.org/).
 
-Feel free to join us on [Slack](https://join.slack.com/t/rewriteoss/shared_invite/zt-nj42n3ea-b~62rIHzb3Vo0E1APKCXEA)! We're happy to answer your questions directly.
+Feel free to join us on [Slack](https://join.slack.com/t/rewriteoss/shared_invite/zt-nj42n3ea-b~62rIHzb3Vo0E1APKCXEA) or [Discord](https://discord.gg/xk3ZKrhWAb)! We're happy to answer your questions directly.
 
 Follow us on [Twitter](https://twitter.com/moderneinc) and [LinkedIn](https://www.linkedin.com/company/moderneinc).
 
