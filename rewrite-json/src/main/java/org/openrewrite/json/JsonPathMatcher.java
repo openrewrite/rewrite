@@ -63,8 +63,10 @@ public class JsonPathMatcher {
         } else {
             start = cursorPath.peekFirst();
         }
-        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, false);
         JsonPathParser.JsonPathContext ctx = jsonPath().jsonPath();
+        // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
+        JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
+        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, stop, false);
         Object result = v.visit(ctx);
 
         //noinspection unchecked
@@ -93,11 +95,13 @@ public class JsonPathMatcher {
 
         private final List<Tree> cursorPath;
         protected Object scope;
+        private final JsonPathParser.ExpressionContext stop;
         private final boolean isRecursiveDescent;
 
-        public JsonPathParserJsonVisitor(List<Tree> cursorPath, Object scope, boolean isRecursiveDescent) {
+        public JsonPathParserJsonVisitor(List<Tree> cursorPath, Object scope, JsonPathParser.ExpressionContext stop, boolean isRecursiveDescent) {
             this.cursorPath = cursorPath;
             this.scope = scope;
+            this.stop = stop;
             this.isRecursiveDescent = isRecursiveDescent;
         }
 
@@ -126,6 +130,13 @@ public class JsonPathMatcher {
             return super.visitJsonPath(ctx);
         }
 
+        private JsonPathParser.ExpressionContext getExpressionContext(ParserRuleContext ctx) {
+            if (ctx == null || ctx instanceof JsonPathParser.ExpressionContext) {
+                return (JsonPathParser.ExpressionContext) ctx;
+            }
+            return getExpressionContext(ctx.getParent());
+        }
+
         @Override
         public Object visitRecursiveDecent(JsonPathParser.RecursiveDecentContext ctx) {
             if (scope == null) {
@@ -140,7 +151,7 @@ public class JsonPathMatcher {
             if (previous.indexOf(current) - 1 < 0 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
-                    JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, path, false);
+                    JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, path, null, false);
                     for (int i = 1; i < ctx.getChildCount(); i++) {
                         result = v.visit(ctx.getChild(i));
                         if (result != null) {
@@ -151,7 +162,7 @@ public class JsonPathMatcher {
                 return results;
                 // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
             } else {
-                JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, scope, true);
+                JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, scope, null, true);
                 for (int i = 1; i < ctx.getChildCount(); i++) {
                     result = v.visit(ctx.getChild(i));
                     if (result != null) {
@@ -334,13 +345,30 @@ public class JsonPathMatcher {
                 Json.Member member = (Json.Member) scope;
                 return member.getValue();
             } else if (scope instanceof List) {
-                return ((List<Object>) scope).stream()
+                List<Object> results = ((List<Object>) scope).stream()
                         .map(o -> {
                             scope = o;
                             return visitWildcard(ctx);
                         })
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList());
+
+                List<Object> matches = new ArrayList<>();
+                if (stop != null && stop == getExpressionContext(ctx)) {
+                    // Return the values of each result when the JsonPath ends with a wildcard.
+                    results.forEach(o -> matches.add(getValue(o)));
+                } else {
+                    // Unwrap lists of results from visitProperty to match the position of the cursor.
+                    for (Object result : results) {
+                        if (result instanceof List) {
+                            matches.addAll(((List<Object>) result));
+                        } else {
+                            matches.add(result);
+                        }
+                    }
+                }
+
+                return getResultFromList(matches);
             } else if (scope instanceof Json.JsonObject) {
                 Json.JsonObject jsonObject = (Json.JsonObject) scope;
                 return jsonObject.getMembers();

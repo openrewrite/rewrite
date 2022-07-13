@@ -18,7 +18,6 @@ package org.openrewrite.yaml
 
 import org.assertj.core.api.Assertions.assertThat
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
@@ -96,7 +95,6 @@ class JsonPathMatcherTest {
         before = simple
     )
 
-    @Disabled("Requires tracking if the scope is set to a List from a Yaml.Mapping.Entry.")
     @Test
     fun findScopeOfObject() = assertMatched(
         jsonPath = "$.root.object[?(@.literal == '$.root.object.literal')]",
@@ -135,21 +133,31 @@ class JsonPathMatcherTest {
         )
     )
 
-    @Disabled("Matches include false positives.")
     @Test
     fun multipleWildcards() = assertMatched(
         jsonPath = "$.*.*",
         before = simple,
-        after = arrayOf("literal: $.object.literal", "- literal: $.object.list[0]")
+        after = arrayOf(
+            "literal: $.root.literal",
+            """
+                object:
+                    literal: $.root.object.literal
+                    list:
+                      - literal: $.root.object.list[0]
+            """.trimIndent(),
+            """
+                list:
+                    - literal: $.root.list[0]
+            """.trimIndent()
+        )
     )
 
-    @Disabled("Matches include false positives.")
     @Test
     fun allPropertiesInKeyFromRoot() = assertMatched(
         // This produces two false positives from $.literal and $.list.literal.
         jsonPath = "$.*.literal",
         before = simple,
-        after = arrayOf("literal: $.object.literal")
+        after = arrayOf("literal: $.root.literal")
     )
 
     @Test

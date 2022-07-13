@@ -17,7 +17,6 @@ package org.openrewrite.json
 
 import org.assertj.core.api.Assertions.assertThat
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
@@ -171,30 +170,33 @@ class JsonPathMatcherTest {
         )
     )
 
-    @Disabled("Matches include false positives.")
     @Test
     fun multipleWildcards() = assertMatched(
         jsonPath = "$.*.*",
         before = simple,
         after = arrayOf(
+            "\"literal\": \"$.root.literal\"",
             """
-                {
-                  "literal": "$.object.literal"
+                "object": {
+                  "literal": "$.root.object.literal",
+                  "list": [{
+                    "literal": "$.root.object.list[0]"
+                  }]
                 }
-            """.trimIndent(), """
-                [{
-                  "literal": "$.object.list[0]"
+            """.trimIndent(),
+            """
+                "list": [{
+                  "literal": "$.root.list[0]"
                 }]
             """.trimIndent())
     )
 
-    @Disabled("Matches include false positives.")
     @Test
     fun allPropertiesInKeyFromRoot() = assertMatched(
         // This produces two false positives from $.literal and $.list.literal.
         jsonPath = "$.*.literal",
         before = simple,
-        after = arrayOf("\"literal\": \"$.object.literal\"")
+        after = arrayOf("\"literal\": \"$.root.literal\"")
     )
 
     @Test
@@ -670,7 +672,7 @@ class JsonPathMatcherTest {
         val results = ArrayList<String>()
         documents.forEach {
             object : JsonVisitor<MutableList<String>>() {
-                override fun visitMember(member: Json.Member, p: MutableList<String>): Json? {
+                override fun visitMember(member: Json.Member, p: MutableList<String>): Json {
                     val e = super.visitMember(member, p)
                     if (matcher.matches(cursor)) {
                         val match = e.printTrimmed(cursor)

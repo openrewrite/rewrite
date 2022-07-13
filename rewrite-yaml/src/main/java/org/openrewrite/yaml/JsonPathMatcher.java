@@ -67,8 +67,10 @@ public class JsonPathMatcher {
         } else {
             start = cursorPath.peekFirst();
         }
-        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, start, false);
         JsonPathParser.JsonPathContext ctx = jsonPath().jsonPath();
+        // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
+        JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
+        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, start, stop, false);
         Object result = v.visit(ctx);
 
         //noinspection unchecked
@@ -97,11 +99,13 @@ public class JsonPathMatcher {
 
         private final List<Tree> cursorPath;
         protected Object scope;
+        private final JsonPathParser.ExpressionContext stop;
         private final boolean isRecursiveDescent;
 
-        public JsonPathYamlVisitor(List<Tree> cursorPath, Object scope, boolean isRecursiveDescent) {
+        public JsonPathYamlVisitor(List<Tree> cursorPath, Object scope, JsonPathParser.ExpressionContext stop, boolean isRecursiveDescent) {
             this.cursorPath = cursorPath;
             this.scope = scope;
+            this.stop = stop;
             this.isRecursiveDescent = isRecursiveDescent;
         }
 
@@ -130,6 +134,13 @@ public class JsonPathMatcher {
             return super.visitJsonPath(ctx);
         }
 
+        private JsonPathParser.ExpressionContext getExpressionContext(ParserRuleContext ctx) {
+            if (ctx == null || ctx instanceof JsonPathParser.ExpressionContext) {
+                return (JsonPathParser.ExpressionContext) ctx;
+            }
+            return getExpressionContext(ctx.getParent());
+        }
+
         @Override
         public Object visitRecursiveDecent(JsonPathParser.RecursiveDecentContext ctx) {
             if (scope == null) {
@@ -144,7 +155,7 @@ public class JsonPathMatcher {
             if (previous.indexOf(current) - 1 < 0 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
-                    JsonPathMatcher.JsonPathYamlVisitor v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, path, false);
+                    JsonPathMatcher.JsonPathYamlVisitor v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, path, null, false);
                     for (int i = 1; i < ctx.getChildCount(); i++) {
                         result = v.visit(ctx.getChild(i));
                         if (result != null) {
@@ -155,7 +166,7 @@ public class JsonPathMatcher {
                 return results;
                 // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
             } else {
-                JsonPathMatcher.JsonPathYamlVisitor v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, scope, true);
+                JsonPathMatcher.JsonPathYamlVisitor v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, scope, null, true);
                 for (int i = 1; i < ctx.getChildCount(); i++) {
                     result = v.visit(ctx.getChild(i));
                     if (result != null) {
@@ -367,13 +378,18 @@ public class JsonPathMatcher {
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList());
 
-                // Unwrap lists of results from visitProperty to match the position of the cursor.
                 List<Object> matches = new ArrayList<>();
-                for (Object result : results) {
-                    if (result instanceof List) {
-                        matches.addAll(((List<Object>) result));
-                    } else {
-                        matches.add(result);
+                if (stop != null && stop == getExpressionContext(ctx)) {
+                    // Return the values of each result when the JsonPath ends with a wildcard.
+                    results.forEach(o -> matches.add(getValue(o)));
+                } else {
+                    // Unwrap lists of results from visitProperty to match the position of the cursor.
+                    for (Object result : results) {
+                        if (result instanceof List) {
+                            matches.addAll(((List<Object>) result));
+                        } else {
+                            matches.add(result);
+                        }
                     }
                 }
 
@@ -589,6 +605,10 @@ public class JsonPathMatcher {
                         if (result != null) {
                             matches.add(result);
                         }
+                    }
+                    // The filterExpression matched a result inside a Mapping. I.E. originalScope[?(filterExpression)]
+                    if (originalScope instanceof Yaml.Mapping.Entry && ((Yaml.Mapping.Entry) originalScope).getValue() instanceof Yaml.Mapping) {
+                        return originalScope;
                     }
                     return matches;
                 } else {
