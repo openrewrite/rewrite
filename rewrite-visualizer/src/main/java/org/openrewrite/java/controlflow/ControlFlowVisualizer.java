@@ -22,13 +22,12 @@ import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
 import org.graphstream.ui.swing_viewer.DefaultView;
+import org.graphstream.ui.swing_viewer.util.MouseOverMouseManager;
 import org.graphstream.ui.view.Viewer;
+import org.graphstream.ui.view.util.InteractiveElement;
 
 import java.awt.*;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Stream;
 
 public class ControlFlowVisualizer {
@@ -76,6 +75,7 @@ public class ControlFlowVisualizer {
 
     private static void showVisual(Map<ControlFlowNode, Integer> nodeToIndex) {
         System.setProperty("org.graphstream.ui", "swing");
+        System.setProperty("sun.java2d.uiScale", "1.0");
 
         String cssUrl;
         try (ScanResult scanResult = new ClassGraph().acceptPaths("rewrite-visualizer").enableMemoryMapping().scan()) {
@@ -136,7 +136,9 @@ public class ControlFlowVisualizer {
 
         Viewer viewer = graph.display();
         viewer.setCloseFramePolicy(Viewer.CloseFramePolicy.CLOSE_VIEWER);
+//        viewer.addDefaultView(true);
 
+//        viewer.getDefaultView().enableMouseOptions();
 
         while (Stream.of(Frame.getFrames()).anyMatch(Frame::isVisible)) {
             try {
@@ -145,8 +147,6 @@ public class ControlFlowVisualizer {
                 e.printStackTrace();
             }
         }
-//        viewer.getDefaultID()
-//        while (true) {}
 
 
 
