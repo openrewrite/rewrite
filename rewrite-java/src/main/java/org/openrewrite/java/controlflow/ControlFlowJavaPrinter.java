@@ -164,6 +164,15 @@ public class ControlFlowJavaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     public J visitIdentifier(J.Identifier ident, PrintOutputCapture<P> p) {
+        // If the variable side of an assignment is not a flow step, so we don't need to do anything
+        J.Assignment parentAssignment = getCursor().firstEnclosing(J.Assignment.class);
+        if (parentAssignment != null && parentAssignment.getVariable().unwrap() == ident) {
+            return super.visitIdentifier(ident, p);
+        }
+        J.VariableDeclarations.NamedVariable parentNamedVariable = getCursor().firstEnclosing(J.VariableDeclarations.NamedVariable.class);
+        if (parentNamedVariable != null && parentNamedVariable.getName() == ident) {
+            return super.visitIdentifier(ident, p);
+        }
         // If the identifier is a field access, don't modify the printer state
         J.FieldAccess parentFieldAccess = getCursor().firstEnclosing(J.FieldAccess.class);
         if (parentFieldAccess != null && parentFieldAccess.getName() == ident) {
