@@ -28,61 +28,82 @@ To compile and run tests invoke `./gradlew build`. To publish a snapshot build t
 OpenRewrite typically accesses the Maven Central artifact repository to download necessary dependencies.
 If organizational security policy or network configuration forbids this, then you can use a Gradle [init script](https://docs.gradle.org/current/userguide/init_scripts.html) to forcibly reconfigure the OpenRewrite build to use a different repository.
 
-Copy this script to a file named `init.gradle` into the <user home>/.gradle directory.
+Copy this script to a file named `init.gradle.kts` into the <user home>/.gradle directory.
 Modify the `enterpriseRepository` value as appropriate for your situation.
-```groovy
+```kotlin
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository
+import org.gradle.api.internal.artifacts.repositories.DefaultMavenLocalArtifactRepository
 
-// Replace with your company's artifact repository
-String enterpriseRepository = "https://repo.maven.apache.org/maven2/"
+// Replace with your organization's artifact repository which mirrors the contents of Maven Central
+val mavenCentralMirror = "https://repo.maven.apache.org/maven2/"
+// Replace with your organization's artifact repository which mirrors the contents of the Gradle Plugin portal
+val gradlePluginPortalMirror = "https://plugins.gradle.org/m2"
+// Replace with your organization's artifact repository which mirrors the contents of Gradle's 
+// This one is required only for building the rewrite-gradle project
+val gradleLibsRelease = "https://repo.gradle.org/gradle/libs-releases-local/"
 
-// Fill out as appropritae if your repository requires authentication
-String user = null; 
-String pass = null;
+val allowedRepos = listOf(mavenCentralMirror, gradlePluginPortalMirror, gradleLibsRelease)
 
-boolean isAcceptable(MavenArtifactRepository repo) {
-    return repo instanceof MavenArtifactRepository
-        || repo.getUrl().toString().contains(enterpriseRepository)
-}
+// Fill out as appropriate if your repository requires authentication
+// Consider using system properties to fill these in for better security
+val user: String? = null; 
+val pass: String? = null;
 
-beforeSettings { settings ->
-    settings.pluginManagement.repositories {
-        all { newRepository ->
-            if (!isAcceptable(newRepository)) {
-                remove newRepository
+fun repoIsAcceptable(repo: ArtifactRepository): Boolean = 
+    repo is DefaultMavenLocalArtifactRepository || 
+    (repo is MavenArtifactRepository && allowedRepos.find { it == (repo as MavenArtifactRepository).getUrl().toString() } != null)
+
+beforeSettings {
+    pluginManagement.repositories {
+        all { 
+            if (!repoIsAcceptable(this)) {
+                remove(this)
             }
         }
         mavenLocal()
-        maven { 
-            url(enterpriseRepository)
-            if(username != null && password != null)  {
-                credentials {
-                    username = user
-                    password = pass
+        allowedRepos.forEach { enterpriseRepository ->
+            maven { 
+                url = uri(enterpriseRepository)
+                if(user != null && pass != null)  {
+                    authentication {
+                        create<BasicAuthentication>("basic")
+                    }
+                    
+                    credentials {
+                        username = user
+                        password = pass
+                    }
                 }
             }
         }
     }
 }
-beforeProject { project ->
-    project.repositories {
-        all { newRepository ->
-            if (!isAcceptable(newRepository)) {
-                remove newRepository
+allprojects {
+    repositories {
+        all { 
+            if (!repoIsAcceptable(this)) {
+                remove(this)
             }
         }
         mavenLocal()
-        maven { 
-            url(enterpriseRepository)
-            if(username != null && password != null)  {
-                credentials {
-                    username = user
-                    password = pass
+        allowedRepos.forEach { enterpriseRepository ->
+            maven { 
+                url = uri(enterpriseRepository)
+                if(user != null && pass != null)  {
+                    authentication {
+                        create<BasicAuthentication>("basic")
+                    }
+                    
+                    credentials {
+                        username = user
+                        password = pass
+                    }
                 }
             }
         }
     }
 }
+
 ```
 
 With this file placed, all of your gradle builds will prefer to use your corporate repository instead of whatever repositories they would normally be configured with.
