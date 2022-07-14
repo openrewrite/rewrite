@@ -15,12 +15,47 @@
  */
 package org.openrewrite.hcl.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
+import org.openrewrite.hcl.HclVisitor
+import org.openrewrite.test.RewriteTest
+import org.openrewrite.test.RewriteTest.toRecipe
 
-class HclAttributeTest : HclTreeTest {
+class HclAttributeTest : HclTreeTest, RewriteTest {
 
     @Test
     fun attribute() = assertParsePrintAndProcess(
         "a = true"
+    )
+
+    @Test
+    fun attributeValue() = rewriteRun(
+        { spec ->
+            spec
+                .cycles(1)
+                .expectedCyclesThatMakeChanges(1)
+                .recipe(toRecipe {
+                object : HclVisitor<ExecutionContext>() {
+                    override fun visitBlock(block: Hcl.Block, ctx: ExecutionContext): Hcl {
+                        assertThat(block.getAttributeValue<String>("key"))
+                            .isEqualTo("hello")
+                        return block.withAttributeValue("key", "goodbye")
+                    }
+                }
+            })
+        },
+        hcl(
+            """
+                provider {
+                    key = "hello"
+                }
+            """,
+            """
+                provider {
+                    key = "goodbye"
+                }
+            """
+        )
     )
 }

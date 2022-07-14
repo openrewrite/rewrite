@@ -20,8 +20,10 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
+import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
@@ -32,6 +34,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+
+import static java.util.Collections.singletonList;
 
 @SuppressWarnings("unused")
 public interface Hcl extends Tree {
@@ -362,6 +366,75 @@ public interface Hcl extends Tree {
 
         @With
         List<BodyContent> body;
+
+        @Incubating(since = "7.27.0")
+        @Nullable
+        public Attribute getAttribute(String attrName) {
+            for (BodyContent t : body) {
+                if (t instanceof Attribute) {
+                    Attribute attribute = (Attribute) t;
+                    if (attribute.getSimpleName().equals(attrName)) {
+                        return attribute;
+                    }
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Locate an attribute with the given name and set its value.
+         *
+         * @param attrName The attribute to locate. This assumes there is one and only one.
+         * @param value    The value to set.
+         * @return This block.
+         */
+        @Incubating(since = "7.27.0")
+        public Hcl.Block withAttributeValue(String attrName, Object value) {
+            Attribute attr = getAttribute(attrName);
+            if (attr == null || getAttributeValue(attrName).equals(value)) {
+                return this;
+            }
+
+            return withBody(ListUtils.map(body, b -> {
+                if (b == attr) {
+                    if (attr.getValue() instanceof Literal) {
+                        Literal l = (Literal) attr.getValue();
+                        return attr.withValue(l.withValue(value.toString()).withValueSource("\"" + value + "\""));
+                    } else if (attr.getValue() instanceof QuotedTemplate) {
+                        QuotedTemplate q = (QuotedTemplate) attr.getValue();
+                        return attr.withValue(q.withExpressions(singletonList(new Literal(Tree.randomId(),
+                                Space.EMPTY, Markers.EMPTY, value, value.toString()))));
+                    }
+                }
+                return b;
+            }));
+        }
+
+        /**
+         * @param attrName The name of the attribute to look for.
+         * @return The text value of the attribute matching the provided name, if any.
+         */
+        @Incubating(since = "7.27.0")
+        @Nullable
+        public <T> T getAttributeValue(String attrName) {
+            Attribute attr = getAttribute(attrName);
+            if (attr == null) {
+                return null;
+            }
+
+            Object value = attr.getValue() instanceof Literal ?
+                    ((Literal) attr.getValue()).getValueSource() : null;
+            if (attr.getValue() instanceof QuotedTemplate) {
+                Cursor root = new Cursor(null, HclParser.builder().build().parse("").get(0));
+                StringBuilder valueBuilder = new StringBuilder();
+                for (Expression expr : ((QuotedTemplate) attr.getValue()).getExpressions()) {
+                    valueBuilder.append(expr.print(root));
+                }
+                value = valueBuilder.toString();
+            }
+            //noinspection unchecked
+            return (T) value;
+        }
 
         @With
         Space end;
