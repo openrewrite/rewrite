@@ -15,6 +15,58 @@ Feel free to join us on [Slack](https://join.slack.com/t/rewriteoss/shared_invit
 
 Follow us on [Twitter](https://twitter.com/moderneinc) and [LinkedIn](https://www.linkedin.com/company/moderneinc).
 
+## Building this project
+
+OpenRewrite is built with [Gradle](https://gradle.org/). It is not typically necessary to manually install gradle, as invoking the `./gradlew` (Linux and Mac) or `gradlew.bat` (Windows) shell scripts will download the appropriate version of Gradle to your user directory.
+
+OpenRewrite requires several JDK versions to be installed on your system. If you are able to access [Adoptium](https://adoptium.net/) then Gradle will automatically download and install any needed JDKs which you may be missing. If your network configuration or security policies do not permit this, then you must manually install JDK versions 8, 11, and 17.
+
+To compile and run tests invoke `./gradlew build`. To publish a snapshot build to your maven local repository, run `./gradlew publishToMavenLocal`. 
+
+### Building within Secure/Isolated environments
+
+OpenRewrite typically accesses the Maven Central artifact repository to download necessary dependencies.
+If organizational security policy or network configuration forbids this, then you can use a Gradle [init script](https://docs.gradle.org/current/userguide/init_scripts.html) to forcibly reconfigure the OpenRewrite build to use a different repository.
+
+Copy this script to a file named `init.gradle` into the <user home>/.gradle directory.
+Modify the `enterpriseRepository` value as appropriate for your situation.
+```groovy
+import org.gradle.api.internal.artifacts.repositories.MavenLocalArtifactRepository
+
+// Replace with your company's artifact repository
+String enterpriseRepository = "https://repo.maven.apache.org/maven2/" 
+
+boolean isAcceptable(MavenArtifactRepository repo) {
+    return repo instanceof MavenLocalArtifactRepository
+        || repo.getUrl().toString().contains(enterpriseRepository)
+}
+
+beforeSettings { settings ->
+    settings.pluginManagement.repositories {
+    all { newRepository ->
+        if (!isAcceptable(newRepository)) {
+            remove newRepository
+        }
+    }
+    mavenLocal()
+    maven { url enterpriseRepository }
+    }
+}
+beforeProject { project ->
+    project.repositories {
+    all { newRepository ->
+        if (!isAcceptable(newRepository)) {
+            remove newRepository
+        }
+    }
+    mavenLocal()
+    maven { url enterpriseRepository }
+    }
+}
+```
+
+With this file placed, all of your gradle builds will prefer to use your corporate repository instead of whatever repositories they would normally be configured with.
+  
 ## Refactoring at Scale
 
 [![Moderne](./doc/video_preview.png)](https://www.youtube.com/watch?v=ndU2GKXQAH0)
