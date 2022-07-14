@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class MoveContentToFile extends Recipe {
     @Option(
             displayName = "Content path",
-            description = "A JSONPath expression specifying the block to delete.",
+            description = "A JSONPath expression specifying the block to move.",
             example = "$.provider"
     )
     String contentPath;
