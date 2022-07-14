@@ -34,7 +34,11 @@ Modify the `enterpriseRepository` value as appropriate for your situation.
 import org.gradle.api.internal.artifacts.repositories.MavenLocalArtifactRepository
 
 // Replace with your company's artifact repository
-String enterpriseRepository = "https://repo.maven.apache.org/maven2/" 
+String enterpriseRepository = "https://repo.maven.apache.org/maven2/"
+
+// Fill out as appropritae if your repository requires authentication
+String user = null; 
+String pass = null;
 
 boolean isAcceptable(MavenArtifactRepository repo) {
     return repo instanceof MavenLocalArtifactRepository
@@ -43,24 +47,40 @@ boolean isAcceptable(MavenArtifactRepository repo) {
 
 beforeSettings { settings ->
     settings.pluginManagement.repositories {
-    all { newRepository ->
-        if (!isAcceptable(newRepository)) {
-            remove newRepository
+        all { newRepository ->
+            if (!isAcceptable(newRepository)) {
+                remove newRepository
+            }
         }
-    }
-    mavenLocal()
-    maven { url enterpriseRepository }
+        mavenLocal()
+        maven { 
+            url(enterpriseRepository)
+            if(username != null && password != null)  {
+                credentials {
+                    username = user
+                    password = pass
+                }
+            }
+        }
     }
 }
 beforeProject { project ->
     project.repositories {
-    all { newRepository ->
-        if (!isAcceptable(newRepository)) {
-            remove newRepository
+        all { newRepository ->
+            if (!isAcceptable(newRepository)) {
+                remove newRepository
+            }
         }
-    }
-    mavenLocal()
-    maven { url enterpriseRepository }
+        mavenLocal()
+        maven { 
+            url(enterpriseRepository)
+            if(username != null && password != null)  {
+                credentials {
+                    username = user
+                    password = pass
+                }
+            }
+        }
     }
 }
 ```
