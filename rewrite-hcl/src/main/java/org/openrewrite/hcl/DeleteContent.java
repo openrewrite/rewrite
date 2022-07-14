@@ -30,7 +30,7 @@ public class DeleteContent extends Recipe {
             description = "A JSONPath expression specifying the block to delete.",
             example = "$.provider"
     )
-    String path;
+    String contentPath;
 
     @Override
     public String getDisplayName() {
@@ -43,8 +43,8 @@ public class DeleteContent extends Recipe {
     }
 
     @Override
-    protected HclVisitor<ExecutionContext> getVisitor() {
-        JsonPathMatcher pathMatcher = new JsonPathMatcher(path);
+    public HclVisitor<ExecutionContext> getVisitor() {
+        JsonPathMatcher pathMatcher = new JsonPathMatcher(contentPath);
         return new HclIsoVisitor<ExecutionContext>() {
             @Override
             public BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {

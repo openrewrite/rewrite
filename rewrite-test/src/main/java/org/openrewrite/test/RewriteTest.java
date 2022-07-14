@@ -26,6 +26,7 @@ import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.TypeValidation;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -75,6 +76,15 @@ public interface RewriteTest extends SourceSpecs {
                 .scanRuntimeClasspath()
                 .build()
                 .activateRecipes(recipe);
+    }
+
+    /**
+     * @return always null, a method that better documents in code that a source file does not exist either
+     * before or after a recipe run.
+     */
+    @Nullable
+    default String doesNotExist() {
+        return null;
     }
 
     default void defaults(RecipeSpec spec) {
@@ -354,7 +364,6 @@ public interface RewriteTest extends SourceSpecs {
             for (Result result : results) {
 
                 if (result.getBefore() == specForSourceFile.getKey()) {
-
                     if (expectedAfter != null && result.getAfter() != null) {
                         String actual = result.getAfter().printAll();
                         String expected = trimIndentPreserveCRLF(expectedAfter);
@@ -387,7 +396,7 @@ public interface RewriteTest extends SourceSpecs {
                 }
             }
 
-            //If we get here, there was no result.
+            // if we get here, there was no result.
             if (expectedAfter != null) {
                 String before = trimIndentPreserveCRLF(specForSourceFile.getKey().printAll());
                 String expected = trimIndentPreserveCRLF(expectedAfter);
@@ -396,6 +405,7 @@ public interface RewriteTest extends SourceSpecs {
                         .as("The recipe should have made the following change.")
                         .isEqualTo(expected);
             }
+
             //noinspection unchecked
             ((Consumer<SourceFile>) specForSourceFile.getValue().afterRecipe).accept(specForSourceFile.getKey());
         }
