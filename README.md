@@ -31,7 +31,7 @@ If organizational security policy or network configuration forbids this, then yo
 Copy this script to a file named `init.gradle` into the <user home>/.gradle directory.
 Modify the `enterpriseRepository` value as appropriate for your situation.
 ```groovy
-import org.gradle.api.internal.artifacts.repositories.MavenLocalArtifactRepository
+import org.gradle.api.artifacts.repositories.MavenArtifactRepository
 
 // Replace with your company's artifact repository
 String enterpriseRepository = "https://repo.maven.apache.org/maven2/"
@@ -41,7 +41,7 @@ String user = null;
 String pass = null;
 
 boolean isAcceptable(MavenArtifactRepository repo) {
-    return repo instanceof MavenLocalArtifactRepository
+    return repo instanceof MavenArtifactRepository
         || repo.getUrl().toString().contains(enterpriseRepository)
 }
 
