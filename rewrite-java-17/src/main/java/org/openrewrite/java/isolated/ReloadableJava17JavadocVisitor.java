@@ -335,16 +335,25 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             body.add((Javadoc) scan(blockTag, body));
         }
 
+        // The javadoc ends with trailing whitespace.
         if (cursor < source.length() && source.substring(cursor).contains(" ")) {
             String trailingWhitespace = source.substring(cursor);
-            // The last line of the javadoc was a new line that only contained whitespace.
             if (trailingWhitespace.contains("\n")) {
-                int pos = Collections.min(lineBreaks.keySet());
-                body.add(lineBreaks.get(pos));
-                lineBreaks.remove(pos);
-                trailingWhitespace = trailingWhitespace.replace("\n", "");
+                // 1 or more newlines.
+                String[] parts = trailingWhitespace.split("\n");
+                for (String part : parts) {
+                    // Add trailing whitespace for each new line.
+                    if (!part.isEmpty()) {
+                        body.add(new Javadoc.Text(randomId(), Markers.EMPTY, part));
+                    }
+                    int pos = Collections.min(lineBreaks.keySet());
+                    body.add(lineBreaks.get(pos));
+                    lineBreaks.remove(pos);
+                }
+            } else {
+                // The Javadoc ends with trailing whitespace.
+                body.add(new Javadoc.Text(randomId(), Markers.EMPTY, trailingWhitespace));
             }
-            body.add(new Javadoc.Text(randomId(), Markers.EMPTY, trailingWhitespace));
         }
 
         if (!lineBreaks.isEmpty()) {

@@ -1259,6 +1259,23 @@ interface JavadocTest : JavaTreeTest {
         """.trimIndent()
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2046")
+    @Test
+    fun trailingWhitespaceAndMultilineMargin(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            interface Test {
+                /**
+                 * Text followed by whitespace, and multiple new lines with/without whitespace.        
+                 *
+                 * 
+                 */
+                void method();
+            }
+        """.trimIndent()
+    )
+
     // CRLF
     @Issue("https://github.com/openrewrite/rewrite/issues/980")
     @Test
