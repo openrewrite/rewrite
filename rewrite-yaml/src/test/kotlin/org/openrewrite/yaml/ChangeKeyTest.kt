@@ -139,4 +139,42 @@ class ChangeKeyTest : YamlRecipeTest {
         assertChanged(recipe = recipe, before = matchingFile, after = "newDescription: desc")
         assertUnchanged(recipe = recipe, before = nonMatchingFile)
     }
+
+
+    @Test
+    fun relocatesPropertyWithVariableInfix() = assertChanged(
+        recipe = ChangeKey(
+            "\$.spring.security.saml2.relyingparty.registration.*[?(@.identityprovider)]",
+            "assertingparty",
+            null
+        ),
+        before = """
+            spring:
+              security:
+                saml2:
+                  relyingparty:
+                    registration:
+                      idpone:
+                        identityprovider:
+                          entity-id: https://idpone.com
+                          sso-url: https://idpone.com
+                          verification:
+                            credentials:
+                              - certificate-location: "classpath:saml/idpone.crt"
+        """,
+        after = """
+            spring:
+              security:
+                saml2:
+                  relyingparty:
+                    registration:
+                      idpone:
+                        assertingparty:
+                          entity-id: https://idpone.com
+                          sso-url: https://idpone.com
+                          verification:
+                            credentials:
+                              - certificate-location: "classpath:saml/idpone.crt"
+        """
+    )
 }
