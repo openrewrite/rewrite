@@ -17,18 +17,28 @@ package org.openrewrite.java.controlflow;
 
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
+import lombok.Builder;
 import org.graphstream.graph.Edge;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
+import org.graphstream.ui.spriteManager.Sprite;
+import org.graphstream.ui.spriteManager.SpriteManager;
 import org.graphstream.ui.swing_viewer.DefaultView;
+import org.graphstream.ui.swing_viewer.SwingViewer;
+import org.graphstream.ui.swing_viewer.ViewPanel;
 import org.graphstream.ui.swing_viewer.util.MouseOverMouseManager;
 import org.graphstream.ui.view.Viewer;
+import org.graphstream.ui.view.ViewerListener;
+import org.graphstream.ui.view.ViewerPipe;
 import org.graphstream.ui.view.util.InteractiveElement;
 
+import javax.swing.*;
 import java.awt.*;
 import java.util.*;
 import java.util.stream.Stream;
+
+
 
 public class ControlFlowVisualizer {
 
@@ -66,89 +76,101 @@ public class ControlFlowVisualizer {
         }
         System.out.println("}");
 
-        showVisual(nodeToIndex);
+        GraphShower shower = new GraphShower(nodeToIndex);
+        shower.runGraph();
 
         System.out.println("Graph displayed.");
 
 
     }
 
-    private static void showVisual(Map<ControlFlowNode, Integer> nodeToIndex) {
-        System.setProperty("org.graphstream.ui", "swing");
-        System.setProperty("sun.java2d.uiScale", "1.0");
-
-        String cssUrl;
-        try (ScanResult scanResult = new ClassGraph().acceptPaths("rewrite-visualizer").enableMemoryMapping().scan()) {
-            cssUrl = scanResult.getResourcesWithLeafName("styleCFG.css").getURLs().get(0).toString();
-        }
-        Graph graph = new SingleGraph("CFG");
-        graph.setAttribute("ui.stylesheet", "url('" + cssUrl + "')");
-
-        for (ControlFlowNode node : nodeToIndex.keySet()) {
-            if (node instanceof ControlFlowNode.BasicBlock) {
-                ControlFlowNode.BasicBlock basicBlock = (ControlFlowNode.BasicBlock) node;
-                Node n = graph.addNode(String.valueOf(nodeToIndex.get(node)));
-                n.setAttribute("ui.class", "BasicBlock");
-//                n.setAttribute("ui.label", nodeToIndex.get(node));
-                n.setAttribute("ui.label", basicBlock.getStatementsWithinBlock());
-
-            } else if (node instanceof ControlFlowNode.ConditionNode) {
-                ControlFlowNode.ConditionNode conditionNode = (ControlFlowNode.ConditionNode) node;
-                Node n = graph.addNode(String.valueOf(nodeToIndex.get(node)));
-                n.setAttribute("ui.class", "ConditionNode");
-//                n.setAttribute("ui.label", nodeToIndex.get(node));
-                n.setAttribute("ui.label", conditionNode.getCondition());
-            } else {
-                Node n = graph.addNode(String.valueOf(nodeToIndex.get(node)));
-                n.setAttribute("ui.class", "StartEnd");
-                n.setAttribute("ui.label", node.toString());
-            }
-        }
-
-        for (ControlFlowNode node : nodeToIndex.keySet()) {
-            if (node instanceof ControlFlowNode.ConditionNode) {
-                ControlFlowNode.ConditionNode conditionNode = (ControlFlowNode.ConditionNode) node;
-                ControlFlowNode trueSuccessor = conditionNode.getTruthySuccessor();
-                ControlFlowNode falseSuccessor = conditionNode.getFalsySuccessor();
-                Edge trueEdge = graph.addEdge(String.valueOf(nodeToIndex.get(node)) + "->" + String.valueOf(nodeToIndex.get(trueSuccessor)),
-                        String.valueOf(nodeToIndex.get(node)),
-                        String.valueOf(nodeToIndex.get(trueSuccessor)),
-                        true);
-                trueEdge.setAttribute("ui.class", "BranchTrue");
-                trueEdge.setAttribute("ui.label", "True");
-
-                Edge falseEdge = graph.addEdge(String.valueOf(nodeToIndex.get(node)) + "->" + String.valueOf(nodeToIndex.get(falseSuccessor)),
-                        String.valueOf(nodeToIndex.get(node)),
-                        String.valueOf(nodeToIndex.get(falseSuccessor)),
-                        true);
-                falseEdge.setAttribute("ui.class", "BranchFalse");
-                falseEdge.setAttribute("ui.label", "False");
-            } else {
-                for (ControlFlowNode successor : node.getSuccessors()) {
-                    graph.addEdge(String.valueOf(nodeToIndex.get(node)) + "->" + String.valueOf(nodeToIndex.get(successor)),
-                            String.valueOf(nodeToIndex.get(node)),
-                            String.valueOf(nodeToIndex.get(successor)),
-                            true);
-                }
-            }
-
-        }
-
-        Viewer viewer = graph.display();
-        viewer.setCloseFramePolicy(Viewer.CloseFramePolicy.CLOSE_VIEWER);
-//        viewer.addDefaultView(true);
-
-//        viewer.getDefaultView().enableMouseOptions();
-
-        while (Stream.of(Frame.getFrames()).anyMatch(Frame::isVisible)) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
 
 
 
-    }
+
+
+//    private static void showVisual(Map<ControlFlowNode, Integer> nodeToIndex) {
+//        System.setProperty("org.graphstream.ui", "swing");
+//        System.setProperty("sun.java2d.uiScale", "1.0");
+//
+//        graph = ControlFlowGraph.buildGraph(nodeToIndex);
+//
+////        Viewer viewer = graph.display();
+////        viewer.setCloseFramePolicy(Viewer.CloseFramePolicy.CLOSE_VIEWER);
+////        viewer.addViewerListener(new ClickHandler);
+////        viewer.addDefaultView(true);
+//
+////        viewer.getDefaultView().enableMouseOptions();
+//
+//        runGraph();
+//
+////        while (Stream.of(Frame.getFrames()).anyMatch(Frame::isVisible)) {
+////            try {
+////                Thread.sleep(100);
+////            } catch (InterruptedException e) {
+////                e.printStackTrace();
+////            }
+////        }
+//
+//        return graph;
+//
+//
+//    }
+//
+//
+//    private void runGraph () {
+//
+//            mainFrame = new JFrame();
+//            JFrame frame = mainFrame;
+//            mainPanel = new JPanel(){
+//                @Override
+//                public Dimension getPreferredSize() {
+//                    return new Dimension(640, 480);
+//                }
+//            };
+//            mainPanel.setLayout(new BorderLayout());
+//            JPanel panel = mainPanel;
+//            codeArea = new JTextArea();
+//            codeArea.setEditable(false);
+//
+//            viewer.setCloseFramePolicy(Viewer.CloseFramePolicy.CLOSE_VIEWER);
+//            panel.setBorder(BorderFactory.createLineBorder(Color.blue, 5));
+//            mainFrame.add(panel);
+//
+//            graph = new SingleGraph("Clicks");
+//            Node a = graph.addNode("A");
+//            a.setAttribute("ui.style", "shape:circle; text-size:10px;");
+//            a.setAttribute("ui.label", "abc A");
+//            graph.addNode("B");
+//            graph.addNode("C");
+//            graph.addEdge("AB", "A", "B");
+//            graph.addEdge("BC", "B", "C");
+//            graph.addEdge("CA", "C", "A");
+////          graph.display();
+//
+//            Viewer viewer = new SwingViewer(graph, Viewer.ThreadingModel.GRAPH_IN_GUI_THREAD);
+//
+//
+//            ViewPanel viewPanel = (ViewPanel) viewer.addDefaultView(false);
+//            viewer.getDefaultView().enableMouseOptions();
+//            viewer.enableAutoLayout();
+//
+//            panel.add(viewPanel, BorderLayout.CENTER);
+//            panel.add(codeArea, BorderLayout.SOUTH);
+//            frame.pack();
+//            frame.setLocationRelativeTo(null);
+//            frame.setVisible(true);
+//
+//            ViewerPipe fromViewer = viewer.newViewerPipe();
+//            fromViewer.addViewerListener(new Clicks.MouseOptions());
+//            fromViewer.addSink(graph);
+//
+//            while(true) {
+//                fromViewer.pump();
+//            }
+//        }
+//
+//    }
+
+
 }

@@ -236,18 +236,24 @@ public abstract class ControlFlowNode {
             ControlFlowJavaPrinter<Integer> printer = new ControlFlowJavaPrinter<>(getNodeValues());
             Cursor commonBlock = getCommonBlock();
             printer.visit(commonBlock.getValue(), capture, commonBlock.getParentOrThrow());
-            return StringUtils.trimIndentPreserveCRLF(capture.getOut()).trim();
+//            return StringUtils.trimIndentPreserveCRLF(capture.getOut()).trim();
+            return capture.getOut();
         }
 
         /**
          * The highest common {@link J.Block} that contains all the statements in this basic block.
          */
         Cursor getCommonBlock() {
+            // For each cursor in the block, computes the list of J.Blocks the cursor belongs in.
+            // Then, gets the list of J.Blocks that appear in all the basic block's cursors' cursor paths
+            // (by taking the smallest list)
             List<Cursor> shortestList = node.stream().map(BasicBlock::computeBlockList).min(Comparator.comparingInt(List::size))
                     .orElseThrow(() -> new IllegalStateException("Could not find common block for basic block"));
             if (shortestList.isEmpty()) {
                 throw new IllegalStateException("Could not find common block for basic block");
             }
+            // Obtains the deepest J.Block cursor in the AST which
+            // encompasses all the cursors in the basic block.
             return shortestList.get(shortestList.size() - 1);
         }
 
