@@ -62,8 +62,20 @@ public class ControlFlowJavaPrinter<P> extends JavaPrinter<P> {
     @Override
     public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
         maybeEnableOrDisable(block, p);
-        J j = super.visitBlock(block, p);
-        return j;
+        visitSpace(block.getEnd(), Space.Location.BLOCK_PREFIX, p);
+        visitMarkers(block.getMarkers(), p);
+
+
+        if (block.isStatic()) {
+            p.append("static");
+            visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
+        }
+
+        p.append('{');
+        visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
+        visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
+        p.append('}');
+        return block;
     }
 
     @Override
