@@ -85,12 +85,12 @@ public class ReloadableJava17Parser implements JavaParser {
     private final Collection<NamedStyles> styles;
 
     private ReloadableJava17Parser(boolean logCompilationWarningsAndErrors,
-                                   @Nullable Collection<Path> classpath,
-                                   Collection<byte[]> classBytesClasspath,
-                                   @Nullable Collection<Input> dependsOn,
-                                   Charset charset,
-                                   Collection<NamedStyles> styles,
-                                   JavaTypeCache typeCache) {
+                                    @Nullable Collection<Path> classpath,
+                                    Collection<byte[]> classBytesClasspath,
+                                    @Nullable Collection<Input> dependsOn,
+                                    Charset charset,
+                                    Collection<NamedStyles> styles,
+                                    JavaTypeCache typeCache) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -176,19 +176,19 @@ public class ReloadableJava17Parser implements JavaParser {
 
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
                         sample.stop(MetricsHelper.successTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(3) Map to Rewrite AST"))
+                                Timer.builder("rewrite.parse")
+                                        .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                        .tag("file.type", "Java")
+                                        .tag("step", "(3) Map to Rewrite AST"))
                                 .register(Metrics.globalRegistry));
                         parsingListener.parsed(input, cu);
                         return cu;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(3) Map to Rewrite AST"), t)
+                                Timer.builder("rewrite.parse")
+                                        .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                        .tag("file.type", "Java")
+                                        .tag("step", "(3) Map to Rewrite AST"), t)
                                 .register(Metrics.globalRegistry));
 
                         ctx.getOnError().accept(t);
@@ -231,10 +231,10 @@ public class ReloadableJava17Parser implements JavaParser {
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
         for (Input input1 : acceptedInputs(sourceFiles)) {
             cus.put(input1, MetricsHelper.successTags(
-                            Timer.builder("rewrite.parse")
-                                    .description("The time spent by the JDK in parsing and tokenizing the source file")
-                                    .tag("file.type", "Java")
-                                    .tag("step", "(1) JDK parsing"))
+                    Timer.builder("rewrite.parse")
+                            .description("The time spent by the JDK in parsing and tokenizing the source file")
+                            .tag("file.type", "Java")
+                            .tag("step", "(1) JDK parsing"))
                     .register(Metrics.globalRegistry)
                     .record(() -> {
                         try {
@@ -357,10 +357,10 @@ public class ReloadableJava17Parser implements JavaParser {
         public boolean isEmpty() {
             if (sample != null) {
                 sample.stop(MetricsHelper.successTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent by the JDK in type attributing the source file")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(2) Type attribution"))
+                        Timer.builder("rewrite.parse")
+                                .description("The time spent by the JDK in type attributing the source file")
+                                .tag("file.type", "Java")
+                                .tag("step", "(2) Type attribution"))
                         .register(Metrics.globalRegistry));
             }
             return super.isEmpty();
@@ -384,9 +384,9 @@ public class ReloadableJava17Parser implements JavaParser {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
 
         public ByteArrayCapableJavacFileManager(Context context,
-                                                boolean register,
-                                                Charset charset,
-                                                Collection<byte[]> classByteClasspath) {
+                                                 boolean register,
+                                                 Charset charset,
+                                                 Collection<byte[]> classByteClasspath) {
             super(context, register, charset);
             this.classByteClasspath = classByteClasspath.stream()
                     .map(PackageAwareJavaFileObject::new)

@@ -57,7 +57,7 @@ public class WrappingAndBraces extends Recipe {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
             WrappingAndBracesStyle style = ((SourceFile) cu).getStyle(WrappingAndBracesStyle.class);
-            if(style == null) {
+            if (style == null) {
                 style = IntelliJ.wrappingAndBraces();
             }
             doAfterVisit(new WrappingAndBracesVisitor<>(style));

@@ -57,7 +57,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
         return new TreeScanner<String, Integer>() {
             @Override
             public String visitVariable(VariableTree node, Integer integer) {
-                if(node.getName().toString().equals(field)) {
+                if (node.getName().toString().equals(field)) {
                     return signatureBuilder().variableSignature(((JCTree.JCVariableDecl) node).sym);
                 }
                 //noinspection ConstantConditions
@@ -78,7 +78,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             @Override
             public String visitMethod(MethodTree node, Integer p) {
                 JCTree.JCMethodDecl method = (JCTree.JCMethodDecl) node;
-                if(method.getName().toString().equals(methodName)) {
+                if (method.getName().toString().equals(methodName)) {
                     return signatureBuilder().methodSignature(method.type, method.sym);
                 }
                 //noinspection ConstantConditions
@@ -99,7 +99,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             @Override
             public String visitMethod(MethodTree node, Integer p) {
                 JCTree.JCMethodDecl method = (JCTree.JCMethodDecl) node;
-                if(method.name.toString().equals("<init>")) {
+                if (method.name.toString().equals("<init>")) {
                     return signatureBuilder().methodSignature(method.type, method.sym);
                 }
                 //noinspection ConstantConditions
@@ -120,7 +120,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             @Override
             public Type visitMethod(MethodTree node, Integer p) {
                 JCTree.JCMethodDecl method = (JCTree.JCMethodDecl) node;
-                if(method.getName().toString().equals(methodName)) {
+                if (method.getName().toString().equals(methodName)) {
                     List<JCTree.JCVariableDecl> params = method.getParameters();
                     return params.iterator().next().type;
                 }
@@ -142,7 +142,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             @Override
             public Type visitClass(ClassTree node, Integer integer) {
                 JCTree.JCClassDecl clazz = (JCTree.JCClassDecl) node;
-                if(innerClassSimpleName.equals(clazz.getSimpleName().toString())) {
+                if (innerClassSimpleName.equals(clazz.getSimpleName().toString())) {
                     return clazz.type;
                 }
                 return super.visitClass(node, integer);

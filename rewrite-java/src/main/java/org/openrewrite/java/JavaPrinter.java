@@ -40,7 +40,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     protected void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location,
-                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+                                   String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
         if (container == null) {
             return;
         }

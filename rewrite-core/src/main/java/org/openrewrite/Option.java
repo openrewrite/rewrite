@@ -25,9 +25,15 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Option {
-    @Language("markdown") String displayName() default "";
-    @Language("markdown") String description() default "";
+    @Language("markdown")
+    String displayName() default "";
+
+    @Language("markdown")
+    String description() default "";
+
     String example() default "";
+
     String[] valid() default "";
+
     boolean required() default true;
 }

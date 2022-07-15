@@ -73,7 +73,7 @@ public class ChangePackaging extends Recipe {
                     return document;
                 }
                 document = document.withMarkers(document.getMarkers().withMarkers(ListUtils.map(document.getMarkers().getMarkers(), m -> {
-                    if(m instanceof MavenResolutionResult) {
+                    if (m instanceof MavenResolutionResult) {
                         return getResolutionResult().withPom(pom.withRequested(pom.getRequested().withPackaging(packaging)));
                     }
                     return m;

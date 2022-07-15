@@ -161,7 +161,7 @@ public class FindTypes extends Recipe {
     }
 
     private static boolean typeMatches(boolean checkAssignability, Pattern pattern,
-                                       @Nullable JavaType.FullyQualified test) {
+                                        @Nullable JavaType.FullyQualified test) {
         return test != null && (checkAssignability ?
                 test.isAssignableFrom(pattern) :
                 pattern.matcher(test.getFullyQualifiedName()).matches()

@@ -64,7 +64,7 @@ public class AddDelegatesToGradleApi extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext context) {
                 J.MethodDeclaration md = super.visitMethodDeclaration(method, context);
-                if(!hasClosureParameter(md) || commentSuggestsNoDelegate(md)) {
+                if (!hasClosureParameter(md) || commentSuggestsNoDelegate(md)) {
                     return md;
                 }
                 md = md.withParameters(ListUtils.map(md.getParameters(), it -> {
@@ -105,7 +105,7 @@ public class AddDelegatesToGradleApi extends Recipe {
                     if (delegateType == null) {
                         return param;
                     }
-                    String simpleName =  delegateType.getFullyQualifiedName().substring( delegateType.getFullyQualifiedName().lastIndexOf('.') + 1);
+                    String simpleName =  delegateType.getFullyQualifiedName().substring(delegateType.getFullyQualifiedName().lastIndexOf('.') + 1);
                     param = param.withTemplate(
                             JavaTemplate.builder(this::getCursor, "@DelegatesTo(#{}.class)")
                                     .imports(delegateType.getFullyQualifiedName(), DELEGATES_TO_TYPE.getFullyQualifiedName())
@@ -126,7 +126,7 @@ public class AddDelegatesToGradleApi extends Recipe {
     @Nullable
     private static JavaType.FullyQualified unwrapGenericTypeVariable(JavaType type) {
         if (type instanceof JavaType.GenericTypeVariable) {
-            JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable)type;
+            JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
             if (genericType.getBounds().size() == 1) {
                 return unwrapGenericTypeVariable(genericType.getBounds().get(0));
             } else {
@@ -137,6 +137,7 @@ public class AddDelegatesToGradleApi extends Recipe {
     }
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("(?<!also)[\\s*]++passed[\\s*]+to[\\s*]+the[\\s*]+closure[^.]+parameter", Pattern.DOTALL);
+
     private static boolean commentSuggestsNoDelegate(J.MethodDeclaration methodDeclaration) {
         return methodDeclaration.getComments().stream()
                 .anyMatch(comment -> COMMENT_PATTERN.matcher(comment.printComment()).find());
@@ -144,6 +145,6 @@ public class AddDelegatesToGradleApi extends Recipe {
 
     private static boolean hasClosureParameter(J.MethodDeclaration methodDeclaration) {
         return methodDeclaration.getParameters().stream()
-                .anyMatch(param -> param instanceof J.VariableDeclarations && TypeUtils.isOfClassType(((J.VariableDeclarations)param).getType(), CLOSURE_TYPE.getFullyQualifiedName()));
+                .anyMatch(param -> param instanceof J.VariableDeclarations && TypeUtils.isOfClassType(((J.VariableDeclarations) param).getType(), CLOSURE_TYPE.getFullyQualifiedName()));
     }
 }

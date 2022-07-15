@@ -292,8 +292,8 @@ public class Autodetect extends NamedStyles {
                     .max(Comparator
                             .<List<Block>, Integer>comparing(List::size)
                             .thenComparing(blocks -> blocks.stream()
-                                    .filter(b -> "all other imports".equals(b.pattern))
-                                    .count()
+                                            .filter(b -> "all other imports".equals(b.pattern))
+                                            .count()
                             )
                     )
                     .map(longestBlocks -> {

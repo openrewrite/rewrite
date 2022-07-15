@@ -55,7 +55,7 @@ public class LowercasePackage extends Recipe {
             public J.Package visitPackage(J.Package pkg, ExecutionContext executionContext) {
                 String packageText = pkg.getExpression().print(getCursor()).replaceAll("\\s", "");
                 String lowerCase = packageText.toLowerCase();
-                if(!packageText.equals(lowerCase)) {
+                if (!packageText.equals(lowerCase)) {
                     doNext(new ChangePackage(packageText, lowerCase, true));
                 }
                 return pkg;

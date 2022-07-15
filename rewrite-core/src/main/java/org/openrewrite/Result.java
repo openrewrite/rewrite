@@ -80,7 +80,7 @@ public class Result {
 
         for (Stack<Recipe> currentStack : recipes) {
             Recipe root;
-            if(currentStack.size() > 1) {
+            if (currentStack.size() > 1) {
                 // The first recipe is typically an Environment.CompositeRecipe and should not be included in the list of RecipeDescriptors
                 root = currentStack.get(1);
             } else {
@@ -117,7 +117,7 @@ public class Result {
         Duration timeSavings = null;
         for (Stack<Recipe> recipesStack : recipes) {
             Duration perOccurrence = recipesStack.peek().getEstimatedEffortPerOccurrence();
-            if(perOccurrence != null) {
+            if (perOccurrence != null) {
                 timeSavings = timeSavings == null ? perOccurrence : timeSavings.plus(perOccurrence);
             }
         }
@@ -188,7 +188,7 @@ public class Result {
         private final Set<Recipe> recipesThatMadeChanges;
 
         InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
-                          String newSource, Set<Recipe> recipesThatMadeChanges) {
+                           String newSource, Set<Recipe> recipesThatMadeChanges) {
 
             this.recipesThatMadeChanges = recipesThatMadeChanges;
 

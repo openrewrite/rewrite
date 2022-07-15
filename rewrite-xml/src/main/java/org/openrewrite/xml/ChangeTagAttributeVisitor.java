@@ -36,19 +36,19 @@ public class ChangeTagAttributeVisitor<P> extends XmlVisitor<P> {
     public Xml visitTag(Xml.Tag tag, P p) {
         Xml.Tag t = (Xml.Tag) super.visitTag(tag, p);
         if (elementName.matches(getCursor())) {
-            t = t.withAttributes(ListUtils.map(t.getAttributes(), a -> (Xml.Attribute)this.visitChosenElementAttribute(a)));
+            t = t.withAttributes(ListUtils.map(t.getAttributes(), a -> (Xml.Attribute) this.visitChosenElementAttribute(a)));
         }
         return t;
     }
 
     public Xml visitChosenElementAttribute(Xml.Attribute attribute) {
-        if(!attribute.getKeyAsString().equals(attributeName)) {
+        if (!attribute.getKeyAsString().equals(attributeName)) {
             return attribute;
         }
-        if(oldValue!= null && !attribute.getValueAsString().startsWith(oldValue)) {
+        if (oldValue != null && !attribute.getValueAsString().startsWith(oldValue)) {
             return attribute;
         }
-        String changedValue = (oldValue != null) ? attribute.getValueAsString().replace(oldValue, newValue): newValue;
+        String changedValue = (oldValue != null) ? attribute.getValueAsString().replace(oldValue, newValue) : newValue;
         return attribute.withValue(
                 new Xml.Attribute.Value(attribute.getId(),
                         "",

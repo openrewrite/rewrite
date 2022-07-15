@@ -64,7 +64,7 @@ public class JavaTemplateParser {
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
     public JavaTemplateParser(Supplier<JavaParser> parser, Consumer<String> onAfterVariableSubstitution,
-                              Consumer<String> onBeforeParseTemplate, Set<String> imports) {
+                               Consumer<String> onBeforeParseTemplate, Set<String> imports) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.onBeforeParseTemplate = onBeforeParseTemplate;
@@ -74,7 +74,8 @@ public class JavaTemplateParser {
     }
 
     public List<Statement> parseParameters(String template) {
-        @Language("java") String stub = addImports(substitute(PARAMETER_STUB, template));
+        @Language("java")
+        String stub = addImports(substitute(PARAMETER_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
             JavaSourceFile cu = compileTemplate(stub);
@@ -84,7 +85,8 @@ public class JavaTemplateParser {
     }
 
     public J.Lambda.Parameters parseLambdaParameters(String template) {
-        @Language("java") String stub = addImports(substitute(LAMBDA_PARAMETER_STUB, template));
+        @Language("java")
+        String stub = addImports(substitute(LAMBDA_PARAMETER_STUB, template));
         onBeforeParseTemplate.accept(stub);
 
         return (J.Lambda.Parameters) cache(stub, () -> {
@@ -98,7 +100,8 @@ public class JavaTemplateParser {
     }
 
     public J parseExpression(String template) {
-        @Language("java") String stub = addImports(substitute(EXPRESSION_STUB, template));
+        @Language("java")
+        String stub = addImports(substitute(EXPRESSION_STUB, template));
         onBeforeParseTemplate.accept(stub);
 
         return cache(stub, () -> {
@@ -110,7 +113,8 @@ public class JavaTemplateParser {
     }
 
     public TypeTree parseExtends(String template) {
-        @Language("java") String stub = addImports(substitute(EXTENDS_STUB, template));
+        @Language("java")
+        String stub = addImports(substitute(EXTENDS_STUB, template));
         onBeforeParseTemplate.accept(stub);
 
         return (TypeTree) cache(stub, () -> {
@@ -122,7 +126,8 @@ public class JavaTemplateParser {
     }
 
     public List<TypeTree> parseImplements(String template) {
-        @Language("java") String stub = addImports(substitute(IMPLEMENTS_STUB, template));
+        @Language("java")
+        String stub = addImports(substitute(IMPLEMENTS_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
             JavaSourceFile cu = compileTemplate(stub);
@@ -133,7 +138,8 @@ public class JavaTemplateParser {
     }
 
     public List<NameTree> parseThrows(String template) {
-        @Language("java") String stub = addImports(substitute(THROWS_STUB, template));
+        @Language("java")
+        String stub = addImports(substitute(THROWS_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
             JavaSourceFile cu = compileTemplate(stub);
@@ -145,7 +151,8 @@ public class JavaTemplateParser {
     }
 
     public List<J.TypeParameter> parseTypeParameters(String template) {
-        @Language("java") String stub = addImports(substitute(TYPE_PARAMS_STUB, template));
+        @Language("java")
+        String stub = addImports(substitute(TYPE_PARAMS_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(stub, () -> {
             JavaSourceFile cu = compileTemplate(stub);
@@ -156,12 +163,13 @@ public class JavaTemplateParser {
     }
 
     public <J2 extends J> List<J2> parseBlockStatements(Cursor cursor, Class<J2> expected,
-                                                        String template,
-                                                        Space.Location location) {
+                                                         String template,
+                                                         Space.Location location) {
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
         //       a safe, reusable key, we can consider using the cache for block statements.
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location);
+        @Language("java")
+        String stub = statementTemplateGenerator.template(cursor, template, location);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(stub);
         return statementTemplateGenerator.listTemplatedTrees(cu, expected);
@@ -178,7 +186,8 @@ public class JavaTemplateParser {
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
         //       a safe, reusable key, we can consider using the cache for block statements.
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, location);
+        @Language("java")
+        String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, location);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(stub);
         return (J.MethodInvocation) statementTemplateGenerator
@@ -192,7 +201,8 @@ public class JavaTemplateParser {
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
         //       a safe, reusable key, we can consider using the cache for block statements.
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
+        @Language("java")
+        String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(stub);
         return (J.MethodInvocation) statementTemplateGenerator
@@ -202,7 +212,8 @@ public class JavaTemplateParser {
     public List<J.Annotation> parseAnnotations(Cursor cursor, String template) {
         String cacheKey = addImports(annotationTemplateGenerator.cacheKey(cursor, template));
         return cache(cacheKey, () -> {
-            @Language("java") String stub = annotationTemplateGenerator.template(cursor, template);
+            @Language("java")
+            String stub = annotationTemplateGenerator.template(cursor, template);
             onBeforeParseTemplate.accept(stub);
             JavaSourceFile cu = compileTemplate(stub);
             return annotationTemplateGenerator.listAnnotations(cu);
@@ -210,12 +221,14 @@ public class JavaTemplateParser {
     }
 
     public Expression parsePackage(String template) {
-        @Language("java") String stub = substitute(PACKAGE_STUB, template);
+        @Language("java")
+        String stub = substitute(PACKAGE_STUB, template);
         onBeforeParseTemplate.accept(stub);
 
         return (Expression) cache(stub, () -> {
             JavaSourceFile cu = compileTemplate(stub);
-            @SuppressWarnings("ConstantConditions") Expression expression = cu.getPackageDeclaration()
+            @SuppressWarnings("ConstantConditions")
+            Expression expression = cu.getPackageDeclaration()
                     .getExpression();
             return singletonList(expression);
         }).get(0);

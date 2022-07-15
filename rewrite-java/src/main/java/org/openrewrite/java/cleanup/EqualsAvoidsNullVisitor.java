@@ -41,7 +41,7 @@ public class EqualsAvoidsNullVisitor<P> extends JavaIsoVisitor<P> {
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         J.MethodInvocation m = super.visitMethodInvocation(method, p);
 
-        if(m.getSelect() == null) {
+        if (m.getSelect() == null) {
             return m;
         }
 
@@ -85,7 +85,7 @@ public class EqualsAvoidsNullVisitor<P> extends JavaIsoVisitor<P> {
         @Override
         public J visitBinary(J.Binary binary, P p) {
             J parens = getCursor().dropParentUntil(J.class::isInstance).getValue();
-            if(parens instanceof J.Parentheses) {
+            if (parens instanceof J.Parentheses) {
                 doAfterVisit(new UnwrapParentheses<>((J.Parentheses<?>) parens));
             }
 

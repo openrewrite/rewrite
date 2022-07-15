@@ -84,7 +84,7 @@ public class HclTemplateParser {
         List<H> hs;
         synchronized (templateCacheLock) {
             hs = (List<H>) templateCache.get(stub);
-            if(hs == null) {
+            if (hs == null) {
                 hs = (List<H>) ifAbsent.get();
                 templateCache.put(stub, hs);
             }

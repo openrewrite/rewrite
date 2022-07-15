@@ -42,7 +42,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
     private final HclTemplateParser templateParser;
 
     private HclTemplate(Supplier<Cursor> parentScopeGetter, String code,
-                        Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+                         Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.parentScopeGetter = parentScopeGetter;
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;

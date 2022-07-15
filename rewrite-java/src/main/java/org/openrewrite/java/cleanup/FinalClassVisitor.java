@@ -33,31 +33,31 @@ import static org.openrewrite.java.tree.J.ClassDeclaration.Kind.Type.Interface;
 public class FinalClassVisitor extends JavaIsoVisitor<ExecutionContext> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDeclaration, ExecutionContext executionContext) {
-        if(classDeclaration.getKind() == Interface || classDeclaration.hasModifier(J.Modifier.Type.Abstract)) {
+        if (classDeclaration.getKind() == Interface || classDeclaration.hasModifier(J.Modifier.Type.Abstract)) {
             return classDeclaration;
         }
         J.ClassDeclaration cd = super.visitClassDeclaration(classDeclaration, executionContext);
 
-        if(cd.hasModifier(J.Modifier.Type.Final) || cd.getKind() != J.ClassDeclaration.Kind.Type.Class) {
+        if (cd.hasModifier(J.Modifier.Type.Final) || cd.getKind() != J.ClassDeclaration.Kind.Type.Class) {
             return cd;
         }
 
         boolean allPrivate = true;
         int constructorCount = 0;
-        for(Statement s : cd.getBody().getStatements()) {
-            if(s instanceof J.MethodDeclaration && ((J.MethodDeclaration)s).isConstructor()) {
-                J.MethodDeclaration constructor = (J.MethodDeclaration)s;
+        for (Statement s : cd.getBody().getStatements()) {
+            if (s instanceof J.MethodDeclaration && ((J.MethodDeclaration) s).isConstructor()) {
+                J.MethodDeclaration constructor = (J.MethodDeclaration) s;
                 constructorCount++;
-                if(!constructor.hasModifier(J.Modifier.Type.Private)) {
+                if (!constructor.hasModifier(J.Modifier.Type.Private)) {
                     allPrivate = false;
                 }
             }
-            if(constructorCount > 0 && !allPrivate) {
+            if (constructorCount > 0 && !allPrivate) {
                 return cd;
             }
         }
 
-        if(constructorCount > 0) {
+        if (constructorCount > 0) {
             List<J.Modifier> modifiers = new ArrayList<>(cd.getModifiers());
             modifiers.add(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY,  J.Modifier.Type.Final, emptyList()));
             modifiers = sortModifiers(modifiers);

@@ -142,7 +142,8 @@ public class YamlResourceLoader implements ResourceLoader {
         Yaml yaml = new Yaml(new SafeConstructor());
         for (Object resource : yaml.loadAll(yamlSource)) {
             if (resource instanceof Map) {
-                @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
+                @SuppressWarnings("unchecked")
+                Map<String, Object> resourceMap = (Map<String, Object>) resource;
                 if (resourceType.equals(ResourceType.fromSpec((String) resourceMap.get("type")))) {
                     resources.add(resourceMap);
                 }
@@ -172,7 +173,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
                     String estimatedEffortPerOccurrenceStr = (String) r.get("estimatedEffortPerOccurrence");
                     Duration estimatedEffortPerOccurrence = null;
-                    if(estimatedEffortPerOccurrenceStr != null) {
+                    if (estimatedEffortPerOccurrenceStr != null) {
                         estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
                     }
                     DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags,
@@ -197,7 +198,7 @@ public class YamlResourceLoader implements ResourceLoader {
                                         if (e.getCause() instanceof InvalidTypeIdException) {
                                             recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
                                                     nameAndConfig.getValue(), "Recipe class " +
-                                                            nameAndConfig.getKey() + " cannot be found"));
+                                                    nameAndConfig.getKey() + " cannot be found"));
                                         } else {
                                             recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
                                                     "Unable to load Recipe: " + e));
@@ -330,11 +331,11 @@ public class YamlResourceLoader implements ResourceLoader {
     public Collection<RecipeExample> listRecipeExamples() {
         return loadResources(ResourceType.Example).stream()
                 .map(c -> new RecipeExample(
-                        (String) c.get("name"),
-                        (String) c.get("description"),
-                        (String) c.get("recipe"),
-                        (String) c.get("before"),
-                        (String) c.get("after"))
+                                (String) c.get("name"),
+                                (String) c.get("description"),
+                                (String) c.get("recipe"),
+                                (String) c.get("before"),
+                                (String) c.get("after"))
                 ).collect(toList());
     }
 }

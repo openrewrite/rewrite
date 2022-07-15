@@ -79,7 +79,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
 
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext context) {
-                if(TypeUtils.isOfClassType(classDecl.getType(), oldClassName)) {
+                if (TypeUtils.isOfClassType(classDecl.getType(), oldClassName)) {
                     // Don't modify the class that declares the static field being replaced
                     return classDecl;
                 }
@@ -135,7 +135,8 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 String simpleClassName = StringUtils.substringAfterLast(newClass, ".");
                 String methodInvocationTemplate = "{" + simpleClassName + (newTarget != null ? "." + newTarget + "." : ".") + newMethodName + "();}";
 
-                @Language("java") String methodStub;
+                @Language("java")
+                String methodStub;
                 if (newTarget == null) {
                     methodStub = "package " + packageName + ";" +
                             " public class " + simpleClassName + " {" +

@@ -141,7 +141,7 @@ public class MethodMatcher {
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
         boolean matchesTargetType = "[^.]*".equals(targetTypePattern.toString()) || matchesTargetType(enclosing.getType());
-        if(!matchesTargetType) {
+        if (!matchesTargetType) {
             return false;
         }
 
@@ -175,7 +175,7 @@ public class MethodMatcher {
     }
 
     public boolean matches(@Nullable J.MethodInvocation method) {
-        if(method == null) {
+        if (method == null) {
             return false;
         }
 

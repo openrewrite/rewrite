@@ -41,8 +41,9 @@ public interface JavaTreeTest {
     }
 
     default void assertParsePrintAndProcess(JavaParser parser, NestingLevel nestingLevel, @Language("java") String code,
-                                            String... imports) {
-        @Language("java") String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
+                                             String... imports) {
+        @Language("java")
+        String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
 
         switch (nestingLevel) {
             case Block:

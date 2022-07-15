@@ -488,7 +488,8 @@ public class RawPom {
         if (configuration == null || configuration.isEmpty()) {
             return emptyMap();
         }
-        return MavenXmlMapper.readMapper().convertValue(configuration, new TypeReference<Map<String, Object>>(){});
+        return MavenXmlMapper.readMapper().convertValue(configuration, new TypeReference<Map<String, Object>>(){
+        });
     }
 
     private List<org.openrewrite.maven.tree.Plugin.Execution> mapPluginExecutions(@Nullable List<Execution> rawExecutions) {

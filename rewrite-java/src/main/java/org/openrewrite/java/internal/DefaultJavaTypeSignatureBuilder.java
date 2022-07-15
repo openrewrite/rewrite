@@ -46,9 +46,9 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
             return genericSignature(type);
         } else if (type instanceof JavaType.Primitive) {
             return primitiveSignature(type);
-        } else if(type instanceof JavaType.Method) {
+        } else if (type instanceof JavaType.Method) {
             return methodSignature((JavaType.Method) type);
-        } else if(type instanceof JavaType.Variable) {
+        } else if (type instanceof JavaType.Variable) {
             return variableSignature((JavaType.Variable) type);
         }
 
@@ -94,7 +94,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
 
         StringJoiner bounds = new StringJoiner(" & ");
         for (JavaType bound : gtv.getBounds()) {
-            if(parameterizedStack == null || !parameterizedStack.contains(bound)) {
+            if (parameterizedStack == null || !parameterizedStack.contains(bound)) {
                 bounds.add(signature(bound));
             }
         }
@@ -109,7 +109,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
     public String parameterizedSignature(Object type) {
         JavaType.Parameterized pt = (JavaType.Parameterized) type;
 
-        if(parameterizedStack == null) {
+        if (parameterizedStack == null) {
             parameterizedStack = Collections.newSetFromMap(new IdentityHashMap<>());
         }
         parameterizedStack.add(pt);

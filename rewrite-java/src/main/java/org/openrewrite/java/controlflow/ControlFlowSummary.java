@@ -45,6 +45,7 @@ public final class ControlFlowSummary {
         recurseGetAllControlFlowNodes(start, all);
         return all;
     }
+
     private static void recurseGetAllControlFlowNodes(ControlFlowNode current, Set<ControlFlowNode> visited) {
         visited.add(current);
         Queue<ControlFlowNode> toVisit = new LinkedList<>(current.getSuccessors());

@@ -176,8 +176,8 @@ public class CombineSemanticallyEqualCatchBlocks extends Recipe {
             private final Map<J.Try.Catch, Set<J.Identifier>> childClassesToExclude;
 
             CombineCatches(J.Try.Catch scope,
-                           List<J.Try.Catch> equivalentCatches,
-                           Map<J.Try.Catch, Set<J.Identifier>> childClassesToExclude) {
+                            List<J.Try.Catch> equivalentCatches,
+                            Map<J.Try.Catch, Set<J.Identifier>> childClassesToExclude) {
                 this.scope = scope;
                 this.equivalentCatches = equivalentCatches;
                 this.childClassesToExclude = childClassesToExclude;

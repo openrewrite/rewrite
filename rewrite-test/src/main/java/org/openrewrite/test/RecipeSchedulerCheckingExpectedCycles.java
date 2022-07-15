@@ -46,7 +46,7 @@ class RecipeSchedulerCheckingExpectedCycles implements RecipeScheduler {
 
     @Override
     public <S extends SourceFile> List<S> scheduleVisit(Stack<Recipe> recipeStack, List<S> before,
-                                                        ExecutionContext ctx, Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile) {
+                                                                       ExecutionContext ctx, Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile) {
         ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges);
         List<S> afterList = delegate.scheduleVisit(recipeStack, before, ctx, recipeThatDeletedSourceFile);
         if (afterList != before) {
@@ -55,7 +55,7 @@ class RecipeSchedulerCheckingExpectedCycles implements RecipeScheduler {
                     !before.isEmpty() && !afterList.isEmpty()) {
                 for (int i = 0; i < before.size(); i++) {
                     S s1 = before.get(i);
-                    if(!(afterList.get(i) instanceof Quark)) {
+                    if (!(afterList.get(i) instanceof Quark)) {
                         assertThat(afterList.get(i).printAllTrimmed())
                                 .as(
                                         "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +

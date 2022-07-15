@@ -48,18 +48,21 @@ public class FindFlowBetweenMethods extends Recipe {
     String startMethodPattern;
 
     @Option(displayName = "Match start method on overrides", description = "When enabled, find methods that are overrides of the method pattern.", required = false)
-    @Nullable Boolean startMatchOverrides;
+    @Nullable
+    Boolean startMatchOverrides;
     @Option(displayName = "End method pattern", description = "A method pattern that is used to find matching the end point's method invocations.", example = "java.util.List add(..)")
     String endMethodPattern;
 
     @Option(displayName = "Match end method on overrides", description = "When enabled, find methods that are overrides of the method pattern.", required = false)
-    @Nullable Boolean endMatchOverrides;
+    @Nullable
+    Boolean endMatchOverrides;
 
     @Option(displayName = "To target", description = "The part of the method flow should traverse to", required = true, valid = {"Select", "Arguments", "Both"})
     String target;
 
     @Option(displayName = "Show flow", description = "When enabled, show the data or taint flow of the method invocation.", valid = {"Data", "Taint"}, required = true)
-    @Nullable String flow;
+    @Nullable
+    String flow;
 
 
     @Override

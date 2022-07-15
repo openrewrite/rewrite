@@ -49,9 +49,9 @@ public class GradleWrapper {
     DistributionType distributionType;
 
     public static Validated validate(ExecutionContext ctx,
-                                     String version,
-                                     @Nullable String distribution,
-                                     @Nullable Validated cachedValidation) {
+                                      String version,
+                                      @Nullable String distribution,
+                                      @Nullable Validated cachedValidation) {
         if (cachedValidation != null) {
             return cachedValidation;
         }

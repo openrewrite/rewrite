@@ -170,20 +170,20 @@ public class AddManagedDependency extends Recipe {
         }
 
         return ListUtils.map(before, s -> s.getMarkers().findFirst(MavenResolutionResult.class)
-                .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
-                    @Override
-                    public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                        Xml maven = super.visitDocument(document, executionContext);
+                        .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
+                            @Override
+                            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                                Xml maven = super.visitDocument(document, executionContext);
 
-                        if (!Boolean.TRUE.equals(addToRootPom) || rootPoms.contains(document)) {
-                            doAfterVisit(new AddManagedDependencyVisitor(groupId,artifactId,version,versionPattern,scope,releasesOnly,type,classifier));
-                        }
+                                if (!Boolean.TRUE.equals(addToRootPom) || rootPoms.contains(document)) {
+                                    doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId, version, versionPattern, scope, releasesOnly, type, classifier));
+                                }
 
-                        return maven;
-                    }
-                }.visit(s, ctx))
-                .map(SourceFile.class::cast)
-                .orElse(s)
+                                return maven;
+                            }
+                        }.visit(s, ctx))
+                        .map(SourceFile.class::cast)
+                        .orElse(s)
         );
     }
 }

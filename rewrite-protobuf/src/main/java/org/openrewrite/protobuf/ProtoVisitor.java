@@ -267,7 +267,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
     }
 
     public <P2 extends Proto> ProtoContainer<P2> visitContainer(@Nullable ProtoContainer<P2> container, P p) {
-        if(container == null) {
+        if (container == null) {
             //noinspection ConstantConditions
             return null;
         }

@@ -21,9 +21,11 @@ import org.openrewrite.marker.Markers;
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface Comment {
     Markers getMarkers();
+
     <C extends Comment> C withMarkers(Markers markers);
 
     String getSuffix();
+
     <C extends Comment> C withSuffix(String margin);
 
     boolean isMultiline();

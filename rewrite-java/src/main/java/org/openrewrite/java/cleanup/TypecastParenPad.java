@@ -54,14 +54,14 @@ public class TypecastParenPad extends Recipe {
 
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
-            SourceFile cu = (SourceFile)javaSourceFile;
+            SourceFile cu = (SourceFile) javaSourceFile;
             spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
             typecastParenPadStyle = cu.getStyle(TypecastParenPadStyle.class) == null ? Checkstyle.typecastParenPadStyle() : cu.getStyle(TypecastParenPadStyle.class);
             emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
             emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
 
             spacesStyle = spacesStyle.withWithin(spacesStyle.getWithin().withTypeCastParentheses(typecastParenPadStyle.getSpace()));
-            return super.visitJavaSourceFile((JavaSourceFile)cu, ctx);
+            return super.visitJavaSourceFile((JavaSourceFile) cu, ctx);
         }
 
         @Override

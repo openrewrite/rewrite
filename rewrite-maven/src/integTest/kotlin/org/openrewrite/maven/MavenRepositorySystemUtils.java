@@ -55,7 +55,7 @@ public final class MavenRepositorySystemUtils {
     }
 
     public static DefaultRepositorySystemSession getRepositorySystemSession(RepositorySystem system,
-                                                                            @Nullable File localRepositoryDir) {
+                                                                             @Nullable File localRepositoryDir) {
         DefaultRepositorySystemSession repositorySystemSession = org.apache.maven.repository.internal.MavenRepositorySystemUtils
                 .newSession();
 

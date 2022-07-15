@@ -61,9 +61,9 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     public InMemoryMavenPomCache(Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache,
-                                 Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
-                                 Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
-                                 Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
+                                  Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
+                                  Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
+                                  Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
         this.pomCache = pomCache;
         this.mavenMetadataCache = mavenMetadataCache;
         this.repositoryCache = repositoryCache;

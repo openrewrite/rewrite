@@ -42,7 +42,7 @@ public class BlankLines extends Recipe {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
             BlankLinesStyle style = ((SourceFile) cu).getStyle(BlankLinesStyle.class);
-            if(style == null) {
+            if (style == null) {
                 style = IntelliJ.blankLines();
             }
             doAfterVisit(new BlankLinesVisitor<>(style));

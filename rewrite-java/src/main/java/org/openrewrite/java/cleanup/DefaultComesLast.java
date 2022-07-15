@@ -58,7 +58,7 @@ public class DefaultComesLast extends Recipe {
     private static class DefaultComesLastFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            DefaultComesLastStyle style = ((SourceFile)cu).getStyle(DefaultComesLastStyle.class);
+            DefaultComesLastStyle style = ((SourceFile) cu).getStyle(DefaultComesLastStyle.class);
             if (style == null) {
                 style = Checkstyle.defaultComesLast();
             }

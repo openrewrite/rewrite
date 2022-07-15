@@ -34,12 +34,12 @@ public class ExactVersion extends LatestRelease {
     public static Validated build(String pattern) {
         String versionOnly;
         int hyphenIndex = pattern.indexOf('-');
-        if(hyphenIndex == -1) {
+        if (hyphenIndex == -1) {
             versionOnly = pattern;
         } else {
             versionOnly = pattern.substring(0, hyphenIndex);
         }
-        if(versionOnly.startsWith("latest") ||
+        if (versionOnly.startsWith("latest") ||
                 versionOnly.contains("x") ||
                 versionOnly.contains("^") ||
                 versionOnly.contains("~") ||

@@ -50,14 +50,13 @@ public class RemoveObjectsIsNull extends Recipe {
     private static final MethodMatcher nonNullmatcher = new MethodMatcher("java.util.Objects nonNull(..)");
 
 
-
     private class TransformCallsToObjectsIsNullVisitor extends JavaVisitor<ExecutionContext> {
         @Override
         public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
-            if(isNullmatcher.matches(m)) {
+            if (isNullmatcher.matches(m)) {
                 return replace(executionContext, m, "(#{any(boolean)}) == null");
-            } else if(nonNullmatcher.matches(m)) {
+            } else if (nonNullmatcher.matches(m)) {
                 return replace(executionContext, m, "(#{any(boolean)}) != null");
             }
             return m;

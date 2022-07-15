@@ -58,7 +58,7 @@ public class ExplicitInitialization extends Recipe {
     private static class ExplicitInitializationFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            ExplicitInitializationStyle style = ((SourceFile)cu).getStyle(ExplicitInitializationStyle.class);
+            ExplicitInitializationStyle style = ((SourceFile) cu).getStyle(ExplicitInitializationStyle.class);
             if (style == null) {
                 style = Checkstyle.explicitInitialization();
             }

@@ -71,7 +71,7 @@ public class SimplifyCompoundVisitor<P> extends JavaVisitor<P> {
     @SuppressWarnings("unchecked")
     private <E extends Expression> E cleanupBooleanExpression(
             E expression, P context
-    ) {
+            ) {
         final E ex1 =
                 (E) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
                         .visitNonNull(expression, context, getCursor().getParentOrThrow());

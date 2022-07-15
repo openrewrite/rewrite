@@ -72,7 +72,7 @@ public class MavenTagInsertionComparator implements Comparator<Content> {
     }
 
     @Override
-    public int compare(Content c1,Content c2) {
+    public int compare(Content c1, Content c2) {
         if (!(c1 instanceof Xml.Tag) || !(c2 instanceof Xml.Tag)) {
             return 1;
         }

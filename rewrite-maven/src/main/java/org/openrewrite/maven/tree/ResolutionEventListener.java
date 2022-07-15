@@ -47,10 +47,16 @@ public interface ResolutionEventListener {
     };
 
     void clear();
+
     void downloadError(GroupArtifactVersion gav, Pom containing);
+
     void parent(Pom parent, Pom containing);
+
     void dependency(Scope scope, ResolvedDependency resolvedDependency, ResolvedPom containing);
+
     void bomImport(ResolvedGroupArtifactVersion gav, Pom containing);
+
     void property(String key, String value, Pom containing);
+
     void dependencyManagement(ManagedDependency dependencyManagement, Pom containing);
 }

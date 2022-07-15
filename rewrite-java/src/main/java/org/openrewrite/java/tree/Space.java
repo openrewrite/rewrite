@@ -190,7 +190,7 @@ public class Space {
             last = c;
         }
         // If a file ends with a single-line comment there may be no terminating newline
-        if(!comment.toString().isEmpty()) {
+        if (!comment.toString().isEmpty()) {
             comments.add(new TextComment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
         }
 
@@ -212,7 +212,7 @@ public class Space {
 
     @SuppressWarnings("ConstantConditions")
     public static <J2 extends J> List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,
-                                                                         Space suffix) {
+                                                                                                                      Space suffix) {
         if (trees == null) {
             return null;
         }

@@ -41,7 +41,8 @@ import static org.openrewrite.Tree.randomId;
 
 public interface RecipeScheduler {
     default <T> List<T> mapAsync(List<T> input, UnaryOperator<T> mapFn) {
-        @SuppressWarnings("unchecked") CompletableFuture<T>[] futures =
+        @SuppressWarnings("unchecked")
+        CompletableFuture<T>[] futures =
                 new CompletableFuture[input.size()];
 
         int i = 0;
@@ -55,10 +56,10 @@ public interface RecipeScheduler {
     }
 
     default List<Result> scheduleRun(Recipe recipe,
-                                     List<? extends SourceFile> before,
-                                     ExecutionContext ctx,
-                                     int maxCycles,
-                                     int minCycles) {
+                                      List<? extends SourceFile> before,
+                                      ExecutionContext ctx,
+                                      int maxCycles,
+                                      int minCycles) {
         Set<UUID> sourceFileIds = new HashSet<>();
         before = ListUtils.map(before, sourceFile -> {
             if (!sourceFileIds.add(sourceFile.getId())) {
@@ -167,9 +168,9 @@ public interface RecipeScheduler {
     }
 
     default <S extends SourceFile> List<S> scheduleVisit(Stack<Recipe> recipeStack,
-                                                         List<S> before,
-                                                         ExecutionContext ctx,
-                                                         Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile) {
+                                                          List<S> before,
+                                                          ExecutionContext ctx,
+                                                          Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile) {
         long startTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         Recipe recipe = recipeStack.peek();

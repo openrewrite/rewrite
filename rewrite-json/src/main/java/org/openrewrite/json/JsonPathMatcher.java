@@ -63,7 +63,8 @@ public class JsonPathMatcher {
         } else {
             start = cursorPath.peekFirst();
         }
-        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, false);
+        @SuppressWarnings("ConstantConditions")
+        JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, false);
         JsonPathParser.JsonPathContext ctx = jsonPath().jsonPath();
         Object result = v.visit(ctx);
 
@@ -521,7 +522,7 @@ public class JsonPathMatcher {
 
             if (ctx.LOGICAL_OPERATOR() != null) {
                 String operator;
-                switch( ctx.LOGICAL_OPERATOR().getText()) {
+                switch (ctx.LOGICAL_OPERATOR().getText()) {
                     case ("&&"):
                         operator = "&&";
                         break;
@@ -724,4 +725,5 @@ public class JsonPathMatcher {
             }
             return "null".equals(literal) ? null : literal;
         }
-    }}
+    }
+}

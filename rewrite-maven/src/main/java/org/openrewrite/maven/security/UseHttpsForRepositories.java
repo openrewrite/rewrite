@@ -69,7 +69,7 @@ public class UseHttpsForRepositories extends Recipe {
                     } else if (tag.getValue().map(v -> v.startsWith("$")).orElse(false)) {
                         String repositoryUrlProperty = tag.getValue().get();
                         doAfterVisit(new UpdateMavenPropertyToHttpsVisitor(
-                            repositoryUrlProperty.substring(2, repositoryUrlProperty.length() - 1)
+                                repositoryUrlProperty.substring(2, repositoryUrlProperty.length() - 1)
                         ));
                     }
                 }
@@ -79,9 +79,9 @@ public class UseHttpsForRepositories extends Recipe {
 
             private boolean isRepositoryUrlTag() {
                 return REPOSITORY_URL_MATCHER.matches(getCursor()) ||
-                    PLUGIN_REPOSITORY_URL_MATCHER.matches(getCursor()) ||
-                    DISTRIBUTION_MANAGEMENT_REPOSITORY_URL_MATCHER.matches(getCursor()) ||
-                    DISTRIBUTION_MANAGEMENT_SNAPSHOT_REPOSITORY_URL_MATCHER.matches(getCursor());
+                        PLUGIN_REPOSITORY_URL_MATCHER.matches(getCursor()) ||
+                        DISTRIBUTION_MANAGEMENT_REPOSITORY_URL_MATCHER.matches(getCursor()) ||
+                        DISTRIBUTION_MANAGEMENT_SNAPSHOT_REPOSITORY_URL_MATCHER.matches(getCursor());
             }
         };
     }
@@ -112,6 +112,6 @@ public class UseHttpsForRepositories extends Recipe {
 
     private static String replaceInsecure(String value) {
         return value.replaceAll("^http://(.*)", "https://$1")
-            .replaceAll("^ftp://(.*)", "ftps://$1");
+                .replaceAll("^ftp://(.*)", "ftps://$1");
     }
 }

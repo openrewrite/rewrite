@@ -53,7 +53,7 @@ public class JavaSourceSet implements Marker {
      *                            when true a much more memory-intensive, time-consuming approach will extract full type information
      */
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath,
-                                      JavaTypeCache typeCache, boolean fullTypeInformation) {
+                                                                                                                                                                                                                                                                                                                                                                                                   JavaTypeCache typeCache, boolean fullTypeInformation) {
         List<JavaType.FullyQualified> types;
         // Load JRE-provided types
         try (ScanResult scanResult = new ClassGraph()
@@ -115,7 +115,7 @@ public class JavaSourceSet implements Marker {
             JavaTypeCache typeCache,
             Collection<Path> classpath,
             boolean fullTypeInformation
-    ) {
+            ) {
         List<JavaType.FullyQualified> types = new ArrayList<>();
         if (fullTypeInformation) {
 
@@ -161,7 +161,7 @@ public class JavaSourceSet implements Marker {
         for (Map.Entry<String, List<String>> packageToTypes : packagesToTypeNames.entrySet()) {
             boolean isJreType = packageToTypes.getKey().startsWith("java.");
             StringBuilder sb = new StringBuilder("package ");
-            if(isJreType) {
+            if (isJreType) {
                 // Avoid java compiler complaints that we're redefining java.lang, etc.
                 // Only apply to java provided types because this limits our ability to get type information from package-private classes
                 sb.append("rewrite.");
@@ -197,7 +197,7 @@ public class JavaSourceSet implements Marker {
     @Nullable
     private static String declarableFullyQualifiedName(ClassInfo classInfo) {
         String name;
-        if(classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
+        if (classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
             // Because we put java-supplied types into another package, we cannot access package-private types
             return null;
         }
@@ -210,7 +210,7 @@ public class JavaSourceSet implements Marker {
                 if (outerClass.isPrivate() || outerClass.isAnonymousInnerClass() || outerClass.isSynthetic()) {
                     return null;
                 }
-                if(i == outerClasses.size() - 1) {
+                if (i == outerClasses.size() - 1) {
                     sb.append(outerClass.getName()).append(".");
                 } else {
                     sb.append(outerClass.getName().substring(sb.length())).append(".");

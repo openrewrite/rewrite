@@ -30,7 +30,7 @@ public abstract class LocalTaintFlowSpec<Source extends Expression, Sink extends
             Cursor srcCursor,
             Expression sinkExpression,
             Cursor sinkCursor
-    ) {
+            ) {
         return ExternalFlowModels.instance().isAdditionalTaintStep(
                 srcExpression,
                 srcCursor,
@@ -54,7 +54,7 @@ public abstract class LocalTaintFlowSpec<Source extends Expression, Sink extends
             Cursor srcCursor,
             Expression sinkExpression,
             Cursor sinkCursor
-    ) {
+            ) {
         return false;
     }
 

@@ -157,7 +157,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     protected void visitContainer(String before, @Nullable JContainer<? extends J> container, GContainer.Location location,
-                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+                                   String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
         if (container == null) {
             return;
         }

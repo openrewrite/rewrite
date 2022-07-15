@@ -121,7 +121,8 @@ public enum Scope {
      *
      * @return Scope with the higher precedence.
      */
-    @Nullable public static Scope maxPrecedence(@Nullable Scope scope1, @Nullable Scope scope2) {
+    @Nullable
+    public static Scope maxPrecedence(@Nullable Scope scope1, @Nullable Scope scope2) {
         if (scope1 == null) {
             return scope2;
         } else if (scope2 == null) {

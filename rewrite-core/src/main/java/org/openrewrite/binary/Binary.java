@@ -83,6 +83,6 @@ public class Binary implements SourceFile, Tree {
     @SuppressWarnings("unchecked")
     @Override
     public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) ((BinaryVisitor<P>)v).visitBinary(this, p);
+        return (R) ((BinaryVisitor<P>) v).visitBinary(this, p);
     }
 }

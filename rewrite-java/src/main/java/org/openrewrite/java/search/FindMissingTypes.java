@@ -65,7 +65,7 @@ public class FindMissingTypes extends Recipe {
                         } else {
                             printedTree = String.valueOf(j);
                         }
-                        missingTypeResults.add(new MissingTypeResult(message,path, printedTree, j));
+                        missingTypeResults.add(new MissingTypeResult(message, path, printedTree, j));
                     }
                     return super.visitMarker(marker, missingTypeResults);
                 }

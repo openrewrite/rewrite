@@ -31,7 +31,7 @@ import static org.openrewrite.Tree.randomId;
 public class PlainTextParser implements Parser<PlainText> {
     @Override
     public List<PlainText> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
-                                       ExecutionContext ctx) {
+                                                     ExecutionContext ctx) {
         List<PlainText> plainTexts = new ArrayList<>();
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         for (Input source : sources) {

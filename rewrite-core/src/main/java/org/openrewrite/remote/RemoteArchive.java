@@ -79,7 +79,7 @@ public class RemoteArchive implements Remote {
         String pathBeforeBang;
         String pathAfterBang = null;
         int bangIndex = path.indexOf('!');
-        if(bangIndex == -1) {
+        if (bangIndex == -1) {
             pathBeforeBang = path;
         } else {
             pathBeforeBang = path.substring(0, bangIndex);
@@ -92,7 +92,7 @@ public class RemoteArchive implements Remote {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 if (PathUtils.equalIgnoringSeparators(entry.getName(), pathBeforeBang)) {
-                    if(pathAfterBang == null) {
+                    if (pathAfterBang == null) {
                         return new InputStream() {
                             @Override
                             public int read() throws IOException {

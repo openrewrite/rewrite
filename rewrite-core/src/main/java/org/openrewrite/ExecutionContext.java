@@ -45,7 +45,8 @@ public interface ExecutionContext {
 
     void putMessage(String key, Object value);
 
-    @Nullable <T> T getMessage(String key);
+    @Nullable
+ <T> T getMessage(String key);
 
     default <V, T> T computeMessage(String key, V value, T defaultValue, BiFunction<V, ? super T, ? extends T> remappingFunction) {
         T oldMessage = getMessage(key);
@@ -75,7 +76,8 @@ public interface ExecutionContext {
         return t == null ? defaultValue : t;
     }
 
-    @Nullable <T> T pollMessage(String key);
+    @Nullable
+ <T> T pollMessage(String key);
 
     default <T> T pollMessage(String key, T defaultValue) {
         T t = pollMessage(key);

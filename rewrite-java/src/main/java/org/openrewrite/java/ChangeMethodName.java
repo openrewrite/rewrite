@@ -68,9 +68,9 @@ public class ChangeMethodName extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                if(Boolean.TRUE.equals(ignoreDefinition)) {
+                if (Boolean.TRUE.equals(ignoreDefinition)) {
                     J j = new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, executionContext);
-                    if(cu != j) {
+                    if (cu != j) {
                         return cu;
                     }
                 }

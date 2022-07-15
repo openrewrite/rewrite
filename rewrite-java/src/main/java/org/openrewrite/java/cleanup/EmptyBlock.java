@@ -58,7 +58,7 @@ public class EmptyBlock extends Recipe {
     private static class EmptyBlockFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            EmptyBlockStyle style = ((SourceFile)cu).getStyle(EmptyBlockStyle.class);
+            EmptyBlockStyle style = ((SourceFile) cu).getStyle(EmptyBlockStyle.class);
             if (style == null) {
                 style = Checkstyle.emptyBlock();
             }

@@ -90,9 +90,9 @@ public class GroovyParserVisitor {
             }
         }
         String shebang = null;
-        if(source.startsWith("#!")) {
+        if (source.startsWith("#!")) {
             int i = 0;
-            while(i < source.length() && source.charAt(i) != '\n' && source.charAt(i) != '\r') {
+            while (i < source.length() && source.charAt(i) != '\n' && source.charAt(i) != '\r') {
                 i++;
             }
             shebang = source.substring(0, i);
@@ -433,7 +433,7 @@ public class GroovyParserVisitor {
                         .collect(Collectors.toList());
 
                 TypeTree paramType;
-                if(param.isDynamicTyped()) {
+                if (param.isDynamicTyped()) {
                     paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "", JavaType.ShallowClass.build("java.lang.Object"), null);
                 } else {
                     paramType = visitTypeTree(param.getOriginType());
@@ -446,7 +446,7 @@ public class GroovyParserVisitor {
                 cursor += param.getName().length();
 
                 org.codehaus.groovy.ast.expr.Expression defaultValue = param.getDefaultValue();
-                if(defaultValue != null) {
+                if (defaultValue != null) {
                     paramName = paramName.withElement(paramName.getElement().getPadding()
                             .withInitializer(new JLeftPadded<>(
                                     sourceBefore("="),
@@ -516,17 +516,18 @@ public class GroovyParserVisitor {
             List<JRightPadded<T>> ts = new ArrayList<>(nodes.length);
             for (int i = 0; i < nodes.length; i++) {
                 ASTNode node = nodes[i];
-                @SuppressWarnings("unchecked") JRightPadded<T> converted = JRightPadded.build(
+                @SuppressWarnings("unchecked")
+                JRightPadded<T> converted = JRightPadded.build(
                         node instanceof ClassNode ? (T) visitTypeTree((ClassNode) node) : visit(node));
                 if (i == nodes.length - 1) {
                     converted = converted.withAfter(whitespace());
-                    if(',' == source.charAt(cursor)) {
+                    if (',' == source.charAt(cursor)) {
                         // In Groovy trailing "," are allowed
                         cursor += 1;
                         converted = converted.withMarkers(Markers.EMPTY.add(new TrailingComma(randomId(), whitespace())));
                     }
                     ts.add(converted);
-                    if(afterLast != null && source.startsWith(afterLast, cursor)) {
+                    if (afterLast != null && source.startsWith(afterLast, cursor)) {
                         cursor += afterLast.length();
                     }
                 } else {
@@ -565,8 +566,8 @@ public class GroovyParserVisitor {
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
                 unparsedArgs =
                         Stream.concat(
-                                        namedArgExpressions.getMapEntryExpressions().stream(),
-                                        unparsedArgs.subList(1, unparsedArgs.size()).stream())
+                                namedArgExpressions.getMapEntryExpressions().stream(),
+                                unparsedArgs.subList(1, unparsedArgs.size()).stream())
                                 .sorted(Comparator.comparing(ASTNode::getLastLineNumber)
                                         .thenComparing(ASTNode::getLastColumnNumber))
                                 .collect(Collectors.toList());
@@ -577,13 +578,13 @@ public class GroovyParserVisitor {
                 whitespace();
                 boolean isOpeningBracketPresent = '[' == source.charAt(cursor);
                 cursor = saveCursor;
-                if(!isOpeningBracketPresent) {
+                if (!isOpeningBracketPresent) {
                     // Bring named parameters out of their containing MapExpression so that they can be parsed correctly
                     MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
                     unparsedArgs =
                             Stream.concat(
-                                            namedArgExpressions.getMapEntryExpressions().stream(),
-                                            unparsedArgs.subList(1, unparsedArgs.size()).stream())
+                                    namedArgExpressions.getMapEntryExpressions().stream(),
+                                    unparsedArgs.subList(1, unparsedArgs.size()).stream())
                                     .collect(Collectors.toList());
                 }
             }
@@ -769,7 +770,7 @@ public class GroovyParserVisitor {
                         right, typeMapping.type(binary.getType())));
             } else if (gBinaryOp != null) {
                 Space after = EMPTY;
-                if(gBinaryOp == G.Binary.Type.Access) {
+                if (gBinaryOp == G.Binary.Type.Access) {
                     after = sourceBefore("]");
                 }
                 queue.add(new G.Binary(randomId(), fmt, Markers.EMPTY,
@@ -833,7 +834,7 @@ public class GroovyParserVisitor {
             Space paramPrefix = whitespace();
             // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
             // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
-            if("java.lang.Exception".equals(param.getType().getName())
+            if ("java.lang.Exception".equals(param.getType().getName())
                     && !source.startsWith("Exception", cursor)
                     && !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, "",
@@ -856,7 +857,7 @@ public class GroovyParserVisitor {
                     singletonList(paramName))
             ).withAfter(rightPad);
 
-            J.ControlParentheses<J.VariableDeclarations> catchControl = new J.ControlParentheses<>(randomId(), parenPrefix, Markers.EMPTY,variable);
+            J.ControlParentheses<J.VariableDeclarations> catchControl = new J.ControlParentheses<>(randomId(), parenPrefix, Markers.EMPTY, variable);
             queue.add(new J.Try.Catch(randomId(), prefix, Markers.EMPTY, catchControl, visit(node.getCode())));
         }
 
@@ -1087,7 +1088,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitExpressionStatement(ExpressionStatement statement) {
             super.visitExpressionStatement(statement);
-            if(queue.peek() instanceof Expression && !(queue.peek() instanceof Statement)) {
+            if (queue.peek() instanceof Expression && !(queue.peek() instanceof Statement)) {
                 queue.add(new G.ExpressionStatement((Expression) queue.poll()));
             }
         }
@@ -1170,7 +1171,7 @@ public class GroovyParserVisitor {
             int valueIndex = 0;
             for (ConstantExpression string : gstring.getStrings()) {
                 if (string.getValue().equals("")) {
-                    if(source.charAt(cursor) != '$') {
+                    if (source.charAt(cursor) != '$') {
                         // Sometimes there are empty constant expressions which do not, apparently, correspond to anything
                         continue;
                     }
@@ -1263,7 +1264,7 @@ public class GroovyParserVisitor {
             }
             // Method invocations may have type information that can enrich the type information of its parameters
             Markers markers = Markers.EMPTY;
-            if(call.getArguments() instanceof ArgumentListExpression) {
+            if (call.getArguments() instanceof ArgumentListExpression) {
                 ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
                 if (call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
                     for (org.codehaus.groovy.ast.expr.Expression arg : args.getExpressions()) {
@@ -1294,7 +1295,7 @@ public class GroovyParserVisitor {
                     if (source.charAt(cursor) == '(') {
                         cursor += 1;
                         Space infix = whitespace();
-                        if(source.charAt(cursor) == ')') {
+                        if (source.charAt(cursor) == ')') {
                             cursor += 1;
                             markers = markers.add(new EmptyArgumentListPrecedesArgument(randomId(), prefix, infix));
                         } else {
@@ -1379,7 +1380,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitReturnStatement(ReturnStatement retn) {
             Space fmt = sourceBefore("return");
-            if(retn.getExpression() instanceof ConstantExpression && (((ConstantExpression) retn.getExpression()).getValue() == null)) {
+            if (retn.getExpression() instanceof ConstantExpression && (((ConstantExpression) retn.getExpression()).getValue() == null)) {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
             } else {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(retn.getExpression())));
@@ -1478,11 +1479,11 @@ public class GroovyParserVisitor {
             JContainer<J.Try.Resource> resources = null;
             J.Block body = visit(node.getTryStatement());
             List<J.Try.Catch> catches;
-            if(node.getCatchStatements().isEmpty()) {
+            if (node.getCatchStatements().isEmpty()) {
                 catches = null;
             } else {
                 catches = new ArrayList<>(node.getCatchStatements().size());
-                for(CatchStatement catchStatement : node.getCatchStatements()) {
+                for (CatchStatement catchStatement : node.getCatchStatements()) {
                     visitCatchStatement(catchStatement);
                     catches.add((J.Try.Catch) queue.poll());
                 }
@@ -1493,7 +1494,7 @@ public class GroovyParserVisitor {
             JLeftPadded<J.Block> finallyy = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
                     padLeft(sourceBefore("finally"), visit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0)));
 
-            queue.add(new J.Try(randomId(),prefix, Markers.EMPTY, resources, body, catches, finallyy));
+            queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finallyy));
 
         }
 

@@ -57,15 +57,15 @@ public class MavenArtifactDownloader {
     private final CheckedFunction1<HttpSender.Request, HttpSender.Response> sendRequest;
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
-                                   @Nullable MavenSettings settings,
-                                   Consumer<Throwable> onError) {
+                                    @Nullable MavenSettings settings,
+                                    Consumer<Throwable> onError) {
         this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError);
     }
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
-                                   @Nullable MavenSettings settings,
-                                   HttpSender httpSender,
-                                   Consumer<Throwable> onError) {
+                                    @Nullable MavenSettings settings,
+                                    HttpSender httpSender,
+                                    Consumer<Throwable> onError) {
         this.httpSender = httpSender;
         this.sendRequest = Retry.decorateCheckedFunction(mavenDownloaderRetry, httpSender::send);
         this.mavenArtifactCache = mavenArtifactCache;

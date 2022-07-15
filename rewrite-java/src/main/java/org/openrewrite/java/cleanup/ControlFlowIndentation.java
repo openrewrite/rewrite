@@ -63,7 +63,7 @@ public class ControlFlowIndentation extends Recipe {
 
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                TabsAndIndentsStyle style = ((SourceFile)cu).getStyle(TabsAndIndentsStyle.class);
+                TabsAndIndentsStyle style = ((SourceFile) cu).getStyle(TabsAndIndentsStyle.class);
                 if (style == null) {
                     style = IntelliJ.tabsAndIndents();
                 }

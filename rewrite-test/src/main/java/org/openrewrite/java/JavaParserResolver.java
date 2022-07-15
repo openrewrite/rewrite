@@ -37,7 +37,8 @@ public class JavaParserResolver implements ParameterResolver {
     @Nullable
     @Override
     public Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext) throws ParameterResolutionException {
-        @SuppressWarnings("OptionalGetWithoutIsPresent") Object o = extensionContext.getTestInstance().get();
+        @SuppressWarnings("OptionalGetWithoutIsPresent")
+        Object o = extensionContext.getTestInstance().get();
         try {
             // support arbitrarily nested tests in the TCK
             Class<?> clazz = o.getClass();

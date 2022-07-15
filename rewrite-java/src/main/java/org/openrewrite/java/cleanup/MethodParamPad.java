@@ -54,7 +54,7 @@ public class MethodParamPad extends Recipe {
 
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
-            SourceFile cu = (SourceFile)javaSourceFile;
+            SourceFile cu = (SourceFile) javaSourceFile;
             spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
             methodParamPadStyle = cu.getStyle(MethodParamPadStyle.class) == null ? Checkstyle.methodParamPadStyle() : cu.getStyle(MethodParamPadStyle.class);
             emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
@@ -78,7 +78,7 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            md = (J.MethodDeclaration)new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, md).visitNonNull(md, ctx);
+            md = (J.MethodDeclaration) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, md).visitNonNull(md, ctx);
             return md;
         }
 
@@ -92,7 +92,7 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            mi = (J.MethodInvocation)new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, mi).visitNonNull(mi, ctx);
+            mi = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, mi).visitNonNull(mi, ctx);
             return mi;
         }
 
@@ -106,7 +106,7 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            nc = (J.NewClass)new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, nc).visitNonNull(nc, ctx);
+            nc = (J.NewClass) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, nc).visitNonNull(nc, ctx);
             return nc;
         }
     }

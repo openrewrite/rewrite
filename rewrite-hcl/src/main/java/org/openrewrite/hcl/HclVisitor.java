@@ -432,7 +432,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
     }
 
     public <H extends Hcl> HclContainer<H> visitContainer(HclContainer<H> container,
-                                                          HclContainer.Location loc, P p) {
+                                                           HclContainer.Location loc, P p) {
         setCursor(new Cursor(getCursor(), container));
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);

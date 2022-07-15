@@ -337,7 +337,7 @@ public interface G extends J {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             J j = v.visit(getExpression(), p);
-            if(j instanceof ExpressionStatement) {
+            if (j instanceof ExpressionStatement) {
                 return j;
             } else if (j instanceof Expression) {
                 return withExpression((Expression) j);

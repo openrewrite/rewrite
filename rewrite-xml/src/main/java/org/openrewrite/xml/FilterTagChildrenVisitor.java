@@ -94,7 +94,7 @@ public class FilterTagChildrenVisitor<T> extends XmlVisitor<T> {
      */
     public static Xml.Tag filterTagChildren(Xml.Tag parentScope, Xml.Tag parent, Predicate<Xml.Tag> childTest) {
         return filterChildren(parentScope, parent, child -> {
-            if(child instanceof Xml.Tag) {
+            if (child instanceof Xml.Tag) {
                 return childTest.test((Xml.Tag) child);
             }
             return true;

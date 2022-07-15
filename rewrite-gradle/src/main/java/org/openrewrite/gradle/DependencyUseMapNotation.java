@@ -100,7 +100,7 @@ public class DependencyUseMapNotation extends Recipe {
                 if (!(e instanceof G.GString)) {
                     return m;
                 }
-                G.GString g = (G.GString)e;
+                G.GString g = (G.GString) e;
                 // Supporting all possible GString interpolations is impossible
                 // Supporting all probable GString interpolations is difficult
                 // This focuses on the most common case: When only the version number is interpolated
@@ -108,7 +108,7 @@ public class DependencyUseMapNotation extends Recipe {
                         || !(g.getStrings().get(1) instanceof G.GString.Value)) {
                     return m;
                 }
-                J.Literal arg1 = (J.Literal)g.getStrings().get(0);
+                J.Literal arg1 = (J.Literal) g.getStrings().get(0);
                 if (arg1.getType() != JavaType.Primitive.String || arg1.getValue() == null) {
                     return m;
                 }
@@ -116,7 +116,7 @@ public class DependencyUseMapNotation extends Recipe {
                 if (ga.length != 2) {
                     return m;
                 }
-                G.GString.Value arg2 = (G.GString.Value)g.getStrings().get(1);
+                G.GString.Value arg2 = (G.GString.Value) g.getStrings().get(1);
                 if (!(arg2.getTree() instanceof Expression)) {
                     return m;
                 }

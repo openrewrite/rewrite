@@ -48,9 +48,9 @@ public class ParentModelResolver extends ProjectModelResolver {
     private static final Logger logger = LoggerFactory.getLogger(ParentModelResolver.class);
 
     public ParentModelResolver(RepositorySystemSession session,
-                               RepositorySystem resolver,
-                               RemoteRepositoryManager remoteRepositoryManager,
-                               List<RemoteRepository> repositories) {
+                                RepositorySystem resolver,
+                                RemoteRepositoryManager remoteRepositoryManager,
+                                List<RemoteRepository> repositories) {
         super(session,
                 new RequestTrace(null),
                 resolver,
@@ -76,9 +76,9 @@ public class ParentModelResolver extends ProjectModelResolver {
                     HttpURLConnection httpConnection = (HttpURLConnection) connection;
                     httpConnection.setRequestMethod("HEAD");
                     if (httpConnection.getResponseCode() == 403) {
-                      result = new RemoteRepository.Builder(repository)
-                              .setUrl(repository.getUrl().replace("http:", "https:"))
-                              .build();
+                        result = new RemoteRepository.Builder(repository)
+                                .setUrl(repository.getUrl().replace("http:", "https:"))
+                                .build();
                     }
                 }
             }

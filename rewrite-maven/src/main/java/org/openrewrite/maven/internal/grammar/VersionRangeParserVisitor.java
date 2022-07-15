@@ -15,6 +15,7 @@
  */
 // Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.3
 package org.openrewrite.maven.internal.grammar;
+
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
 /**
@@ -25,46 +26,52 @@ import org.antlr.v4.runtime.tree.ParseTreeVisitor;
  * operations with no return type.
  */
 public interface VersionRangeParserVisitor<T> extends ParseTreeVisitor<T> {
-	/**
-	 * Visit a parse tree produced by {@link VersionRangeParser#versionRequirement}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link VersionRangeParser#range}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitRange(VersionRangeParser.RangeContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link VersionRangeParser#bounds}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitBounds(VersionRangeParser.BoundsContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link VersionRangeParser#exactly}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitExactly(VersionRangeParser.ExactlyContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link VersionRangeParser#boundedLower}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitBoundedLower(VersionRangeParser.BoundedLowerContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link VersionRangeParser#unboundedLower}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitUnboundedLower(VersionRangeParser.UnboundedLowerContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link VersionRangeParser#version}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitVersion(VersionRangeParser.VersionContext ctx);
+    /**
+     * Visit a parse tree produced by {@link VersionRangeParser#versionRequirement}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link VersionRangeParser#range}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitRange(VersionRangeParser.RangeContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link VersionRangeParser#bounds}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitBounds(VersionRangeParser.BoundsContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link VersionRangeParser#exactly}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitExactly(VersionRangeParser.ExactlyContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link VersionRangeParser#boundedLower}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitBoundedLower(VersionRangeParser.BoundedLowerContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link VersionRangeParser#unboundedLower}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitUnboundedLower(VersionRangeParser.UnboundedLowerContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link VersionRangeParser#version}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitVersion(VersionRangeParser.VersionContext ctx);
 }

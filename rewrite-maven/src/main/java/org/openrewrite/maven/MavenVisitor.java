@@ -162,7 +162,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     public void maybeUpdateModel() {
         for (TreeVisitor<Xml, P> afterVisit : getAfterVisit()) {
-            if(afterVisit instanceof UpdateMavenModel) {
+            if (afterVisit instanceof UpdateMavenModel) {
                 return;
             }
         }

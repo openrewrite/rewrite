@@ -42,8 +42,9 @@ public class InMemoryExecutionContext implements ExecutionContext {
     }
 
     public InMemoryExecutionContext(Consumer<Throwable> onError,
-                                    Function<Integer, Duration> runTimeout) {
-        this(onError, runTimeout, (throwable, ctx) -> {});
+                                     Function<Integer, Duration> runTimeout) {
+        this(onError, runTimeout, (throwable, ctx) -> {
+        });
     }
 
     public InMemoryExecutionContext(Consumer<Throwable> onError, Function<Integer, Duration> runTimeout, BiConsumer<Throwable, ExecutionContext> onTimeout) {

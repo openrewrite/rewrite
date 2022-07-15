@@ -50,7 +50,7 @@ public class ProfileActivation {
     }
 
     public static boolean isActive(@Nullable String id, Iterable<String> activeProfiles,
-                                   @Nullable ProfileActivation activation) {
+                                    @Nullable ProfileActivation activation) {
         if (id != null) {
             for (String activeProfile : activeProfiles) {
                 if (activeProfile.trim().equals(id)) {

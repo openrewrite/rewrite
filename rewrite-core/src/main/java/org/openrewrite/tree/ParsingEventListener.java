@@ -19,7 +19,8 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 
 public interface ParsingEventListener {
-    ParsingEventListener NOOP = (input, sourceFile) -> {};
+    ParsingEventListener NOOP = (input, sourceFile) -> {
+    };
 
     void parsed(Parser.Input input, SourceFile sourceFile);
 }

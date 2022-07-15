@@ -62,22 +62,22 @@ public class CheckstyleConfigLoader {
 
         return new Checkstyle(
                 Stream.of(
-                                defaultComesLast(conf),
-                                emptyBlock(conf),
-                                emptyForInitializerPadStyle(conf),
-                                emptyForIteratorPadStyle(conf),
-                                equalsAvoidsNull(conf),
-                                explicitInitialization(conf),
-                                fallThrough(conf),
-                                hiddenFieldStyle(conf),
-                                hideUtilityClassConstructorStyle(conf),
-                                methodParamPadStyle(conf),
-                                needBracesStyle(conf),
-                                noWhitespaceAfterStyle(conf),
-                                noWhitespaceBeforeStyle(conf),
-                                operatorWrapStyle(conf),
-                                typecastParenPadStyle(conf),
-                                unnecessaryParentheses(conf))
+                        defaultComesLast(conf),
+                        emptyBlock(conf),
+                        emptyForInitializerPadStyle(conf),
+                        emptyForIteratorPadStyle(conf),
+                        equalsAvoidsNull(conf),
+                        explicitInitialization(conf),
+                        fallThrough(conf),
+                        hiddenFieldStyle(conf),
+                        hideUtilityClassConstructorStyle(conf),
+                        methodParamPadStyle(conf),
+                        needBracesStyle(conf),
+                        noWhitespaceAfterStyle(conf),
+                        noWhitespaceBeforeStyle(conf),
+                        operatorWrapStyle(conf),
+                        typecastParenPadStyle(conf),
+                        unnecessaryParentheses(conf))
                         .filter(Objects::nonNull)
                         .flatMap(Set::stream)
                         .collect(toSet()));

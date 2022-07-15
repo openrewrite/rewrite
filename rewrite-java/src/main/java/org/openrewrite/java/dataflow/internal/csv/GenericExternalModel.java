@@ -26,9 +26,13 @@ import java.util.regex.Pattern;
 public interface GenericExternalModel {
 
     String getNamespace();
+
     String getType();
+
     boolean isSubtypes();
+
     String getName();
+
     String getSignature();
 
     String getArguments();

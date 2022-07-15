@@ -47,19 +47,19 @@ public class UnnecessaryExplicitTypeArguments extends Recipe {
                     Object enclosing = getCursor().dropParentUntil(J.class::isInstance).getValue();
                     JavaType enclosingType = null;
 
-                    if(enclosing instanceof J.MethodInvocation) {
+                    if (enclosing instanceof J.MethodInvocation) {
                         // Cannot remove type parameters if it would introduce ambiguity about which method should be called
                         J.MethodInvocation enclosingMethod = (J.MethodInvocation) enclosing;
-                        if(enclosingMethod.getMethodType() == null) {
+                        if (enclosingMethod.getMethodType() == null) {
                             return m;
                         }
-                        if(!(enclosingMethod.getMethodType().getDeclaringType() instanceof JavaType.Class)) {
+                        if (!(enclosingMethod.getMethodType().getDeclaringType() instanceof JavaType.Class)) {
                             return m;
                         }
                         JavaType.Class declaringClass = (JavaType.Class) enclosingMethod.getMethodType().getDeclaringType();
                         // If there's another method on the class with the same name, skip removing type parameters
                         // More nuanced detection of ambiguity introduction is possible
-                        if(declaringClass.getMethods().stream()
+                        if (declaringClass.getMethods().stream()
                                 .filter(it -> it.getName().equals(enclosingMethod.getSimpleName()))
                                 .count() > 1) {
                             return m;

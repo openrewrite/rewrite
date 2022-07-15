@@ -64,13 +64,13 @@ public class ClasspathScanningLoader implements ResourceLoader {
      */
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
         scanClasses(new ClassGraph()
-                 .ignoreParentClassLoaders()
-                 .overrideClassLoaders(classLoader), classLoader);
+                .ignoreParentClassLoaders()
+                .overrideClassLoaders(classLoader), classLoader);
 
         scanYaml(new ClassGraph()
-                 .ignoreParentClassLoaders()
-                 .overrideClassLoaders(classLoader)
-                 .acceptPaths("META-INF/rewrite"), properties, classLoader);
+                .ignoreParentClassLoaders()
+                .overrideClassLoaders(classLoader)
+                .acceptPaths("META-INF/rewrite"), properties, classLoader);
     }
 
     public ClasspathScanningLoader(Path jar, Properties properties, ClassLoader classLoader) {
@@ -101,13 +101,13 @@ public class ClasspathScanningLoader implements ResourceLoader {
             });
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
-            for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
+            for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
                 recipes.addAll(resourceLoader.listRecipes());
                 categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
                 recipeExamples.addAll(resourceLoader.listRecipeExamples());
             }
-            for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
+            for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
                 recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes));
             }
         }
@@ -136,7 +136,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 Class<?> styleClass = classInfo.loadClass();
                 try {
                     Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
-                    if(constructor != null) {
+                    if (constructor != null) {
                         constructor.setAccessible(true);
                         styles.add((NamedStyles) constructor.newInstance());
                     }

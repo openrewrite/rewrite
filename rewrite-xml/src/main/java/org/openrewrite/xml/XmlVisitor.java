@@ -63,7 +63,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         //noinspection unchecked
         return (X) new AutoFormatVisitor<>(stopAfter).visitNonNull(j, p, cursor);
     }
-    
+
     public Xml visitDocument(Xml.Document document, P p) {
         Xml.Document d = document;
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));

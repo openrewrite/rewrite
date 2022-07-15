@@ -130,12 +130,14 @@ public class Plugin {
             current = current.iterator().next();
         }
         if (current.isValueNode()) {
-            return Collections.singletonList(MavenXmlMapper.readMapper().convertValue(current, new TypeReference<T>() {}));
+            return Collections.singletonList(MavenXmlMapper.readMapper().convertValue(current, new TypeReference<T>() {
+            }));
         }
         if (!current.isArray()) {
             return Collections.emptyList();
         }
-        return MavenXmlMapper.readMapper().convertValue(current, new TypeReference<List<T>>() {});
+        return MavenXmlMapper.readMapper().convertValue(current, new TypeReference<List<T>>() {
+        });
     }
 }
 

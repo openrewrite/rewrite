@@ -39,5 +39,7 @@ public interface Style {
         return this;
     }
 
-    default Style applyDefaults() { return this; }
+    default Style applyDefaults() {
+        return this;
+    }
 }

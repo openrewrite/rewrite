@@ -36,7 +36,7 @@ final class DefaultFlowModels {
             Cursor srcCursor,
             Expression sinkExpression,
             Cursor sinkCursor
-    ) {
+            ) {
         return isLocalAdditionalTaintStep(
                 srcExpression,
                 srcCursor,
@@ -50,7 +50,7 @@ final class DefaultFlowModels {
             Cursor srcCursor,
             Expression sinkExpression,
             Cursor sinkCursor
-    ) {
+            ) {
         return AdditionalLocalTaint.isStringAddTaintStep(
                 srcExpression,
                 srcCursor,
@@ -66,7 +66,7 @@ final class DefaultFlowModels {
                 Cursor srcCursor,
                 Expression sinkExpression,
                 Cursor sinkCursor
-        ) {
+                ) {
             if (sinkExpression instanceof J.Binary) {
                 J.Binary binary = (J.Binary) sinkExpression;
                 return J.Binary.Type.Addition.equals(binary.getOperator()) &&

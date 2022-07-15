@@ -124,11 +124,11 @@ public class AddGradleWrapper extends Recipe {
         if (needsGradleWrapperProperties) {
             //noinspection UnusedProperty
             Properties.File gradleWrapperProperties = new PropertiesParser().parse(
-                            "distributionBase=GRADLE_USER_HOME\n" +
-                                    "distributionPath=wrapper/dists\n" +
-                                    "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
-                                    "zipStoreBase=GRADLE_USER_HOME\n" +
-                                    "zipStorePath=wrapper/dists").get(0)
+                    "distributionBase=GRADLE_USER_HOME\n" +
+                            "distributionPath=wrapper/dists\n" +
+                            "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
+                            "zipStoreBase=GRADLE_USER_HOME\n" +
+                            "zipStorePath=wrapper/dists").get(0)
                     .withSourcePath(WRAPPER_PROPERTIES_LOCATION);
             gradleWrapperFiles.add(gradleWrapperProperties);
         }

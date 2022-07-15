@@ -70,12 +70,12 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
         @SuppressWarnings("unchecked")
         private <E extends Expression> E cleanupBooleanExpression(
                 E expression, ExecutionContext context
-        ) {
+                ) {
             final E ex1 =
                     (E) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
                             .visitNonNull(expression, context, getCursor().getParentOrThrow());
             return (E) new SimplifyBooleanExpressionVisitor<>()
-                            .visitNonNull(ex1, context, getCursor().getParentOrThrow());
+                    .visitNonNull(ex1, context, getCursor().getParentOrThrow());
         }
 
         @Override

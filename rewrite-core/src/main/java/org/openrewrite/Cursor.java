@@ -86,7 +86,7 @@ public class Cursor {
         public Cursor next() {
             Cursor next = cursor;
             cursor = cursor.parent;
-            if(next == null) {
+            if (next == null) {
                 throw new NoSuchElementException();
             }
             return next;
@@ -241,7 +241,8 @@ public class Cursor {
         if (messages == null) {
             messages = new HashMap<>();
         }
-        @SuppressWarnings("unchecked") T t = (T) messages.computeIfAbsent(key, mappingFunction);
+        @SuppressWarnings("unchecked")
+        T t = (T) messages.computeIfAbsent(key, mappingFunction);
         return t;
     }
 
@@ -254,14 +255,16 @@ public class Cursor {
      */
     @Nullable
     public <T> T getNearestMessage(String key) {
-        @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
+        @SuppressWarnings("unchecked")
+        T t = messages == null ? null : (T) messages.get(key);
         return t == null && parent != null ? parent.getNearestMessage(key) : t;
     }
 
     public <T> T getNearestMessage(String key, T defaultValue) {
-        @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
-        if(t == null) {
-            if(parent != null) {
+        @SuppressWarnings("unchecked")
+        T t = messages == null ? null : (T) messages.get(key);
+        if (t == null) {
+            if (parent != null) {
                 return parent.getNearestMessage(key, defaultValue);
             }
             return defaultValue;
@@ -278,7 +281,8 @@ public class Cursor {
      */
     @Nullable
     public <T> T pollNearestMessage(String key) {
-        @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.remove(key);
+        @SuppressWarnings("unchecked")
+        T t = messages == null ? null : (T) messages.remove(key);
         return t == null && parent != null ? parent.pollNearestMessage(key) : t;
     }
 

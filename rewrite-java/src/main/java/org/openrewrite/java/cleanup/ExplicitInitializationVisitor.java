@@ -45,7 +45,7 @@ public class ExplicitInitializationVisitor<P> extends JavaIsoVisitor<P> {
                     .dropParentUntil(J.class::isInstance) // maybe J.ClassDecl
                     .getValue();
             if (!(maybeClassDecl instanceof J.ClassDeclaration) ||
-                    J.ClassDeclaration.Kind.Type.Class != ((J.ClassDeclaration)maybeClassDecl).getKind()) {
+                    J.ClassDeclaration.Kind.Type.Class != ((J.ClassDeclaration) maybeClassDecl).getKind()) {
                 return v;
             }
         }
@@ -54,7 +54,7 @@ public class ExplicitInitializationVisitor<P> extends JavaIsoVisitor<P> {
         JavaType.Array array = TypeUtils.asArray(variable.getType());
 
         J tree = variableDeclsCursor.getValue();
-        if(!(tree instanceof J.VariableDeclarations)) {
+        if (!(tree instanceof J.VariableDeclarations)) {
             return v;
         }
 

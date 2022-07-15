@@ -176,10 +176,10 @@ public interface JavaType {
             private Iterator<E> interfaceE;
 
             private FullyQualifiedIterator(FullyQualified fq,
-                                           String visibleFromPackage,
-                                           Function<E, Long> flags,
-                                           Function<FullyQualified, List<E>> base,
-                                           Function<FullyQualified, Iterator<E>> recursive) {
+                                            String visibleFromPackage,
+                                            Function<E, Long> flags,
+                                            Function<FullyQualified, List<E>> base,
+                                            Function<FullyQualified, Iterator<E>> recursive) {
                 this.fq = fq;
                 this.rec = fq;
                 this.visibleFromPackage = visibleFromPackage;
@@ -314,9 +314,9 @@ public interface JavaType {
         List<FullyQualified> annotations;
 
         public Class(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName,
-                     Kind kind, @Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
-                     @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
-                     @Nullable List<Variable> members, @Nullable List<Method> methods) {
+                      Kind kind, @Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+                      @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
+                      @Nullable List<Variable> members, @Nullable List<Method> methods) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_CLASS_FLAGS;
             this.fullyQualifiedName = fullyQualifiedName;
@@ -444,8 +444,8 @@ public interface JavaType {
         }
 
         public Class unsafeSet(@Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
-                               @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
-                               @Nullable List<Variable> members, @Nullable List<Method> methods) {
+                                @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
+                                @Nullable List<Variable> members, @Nullable List<Method> methods) {
             this.typeParameters = nullIfEmpty(typeParameters);
             this.supertype = supertype;
             this.owningClass = owningClass;
@@ -529,7 +529,7 @@ public interface JavaType {
         List<JavaType> typeParameters;
 
         public Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type,
-                             @Nullable List<JavaType> typeParameters) {
+                              @Nullable List<JavaType> typeParameters) {
             this.managedReference = managedReference;
             this.type = type;
             this.typeParameters = nullIfEmpty(typeParameters);
@@ -925,9 +925,9 @@ public interface JavaType {
         List<FullyQualified> annotations;
 
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
-                      @Nullable JavaType returnType, @Nullable List<String> parameterNames,
-                      @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
-                      @Nullable List<FullyQualified> annotations) {
+                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
+                       @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
+                       @Nullable List<FullyQualified> annotations) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = declaringType;
@@ -946,10 +946,10 @@ public interface JavaType {
         }
 
         public Method unsafeSet(FullyQualified declaringType,
-                                JavaType returnType,
-                                @Nullable List<JavaType> parameterTypes,
-                                @Nullable List<FullyQualified> thrownExceptions,
-                                @Nullable List<FullyQualified> annotations) {
+                                 JavaType returnType,
+                                 @Nullable List<JavaType> parameterTypes,
+                                 @Nullable List<FullyQualified> thrownExceptions,
+                                 @Nullable List<FullyQualified> annotations) {
             this.declaringType = declaringType;
             this.returnType = returnType;
             this.parameterTypes = nullIfEmpty(parameterTypes);
@@ -1126,7 +1126,7 @@ public interface JavaType {
         List<FullyQualified> annotations;
 
         public Variable(@Nullable Integer managedReference, long flagsBitMap, String name, @Nullable JavaType owner,
-                        @Nullable JavaType type, @Nullable List<FullyQualified> annotations) {
+                         @Nullable JavaType type, @Nullable List<FullyQualified> annotations) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.name = name;
@@ -1169,7 +1169,7 @@ public interface JavaType {
         }
 
         public Variable unsafeSet(JavaType owner, @Nullable JavaType type,
-                                  @Nullable List<FullyQualified> annotations) {
+                                   @Nullable List<FullyQualified> annotations) {
             this.owner = owner;
             this.type = type;
             this.annotations = nullIfEmpty(annotations);

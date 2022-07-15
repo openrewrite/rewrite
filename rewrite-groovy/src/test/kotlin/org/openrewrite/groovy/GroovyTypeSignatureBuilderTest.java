@@ -77,9 +77,9 @@ public class GroovyTypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
     @Override
     public Object innerClassSignature(String innerClassSimpleName) {
         Iterator<InnerClassNode> innerClasses = cu.getModule().getClasses().get(0).getInnerClasses();
-        while(innerClasses.hasNext()) {
+        while (innerClasses.hasNext()) {
             InnerClassNode clazz = innerClasses.next();
-            if(clazz.getNameWithoutPackage().equals(innerClassSimpleName)) {
+            if (clazz.getNameWithoutPackage().equals(innerClassSimpleName)) {
                 return clazz.getGenericsTypes()[0];
             }
         }

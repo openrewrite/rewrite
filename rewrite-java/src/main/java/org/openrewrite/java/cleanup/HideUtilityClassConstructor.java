@@ -56,7 +56,7 @@ public class HideUtilityClassConstructor extends Recipe {
     private static class HideUtilityClassConstructorFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            HideUtilityClassConstructorStyle style = ((SourceFile)cu).getStyle(HideUtilityClassConstructorStyle.class);
+            HideUtilityClassConstructorStyle style = ((SourceFile) cu).getStyle(HideUtilityClassConstructorStyle.class);
             if (style == null) {
                 style = Checkstyle.hideUtilityClassConstructorStyle();
             }

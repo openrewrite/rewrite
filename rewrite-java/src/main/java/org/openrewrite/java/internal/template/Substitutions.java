@@ -92,7 +92,7 @@ public class Substitutions {
                         String fqn;
 
                         if (params.size() == 1) {
-                            if(params.get(0).Identifier() != null) {
+                            if (params.get(0).Identifier() != null) {
                                 fqn = params.get(0).Identifier().getText();
                             } else {
                                 fqn = params.get(0).FullyQualifiedName().getText();
@@ -167,7 +167,7 @@ public class Substitutions {
     }
 
     private static String typeHintFor(Object j) {
-        if(j instanceof TypedTree) {
+        if (j instanceof TypedTree) {
             return typeHintFor(((TypedTree) j).getType());
         }
         return "";
@@ -273,7 +273,7 @@ public class Substitutions {
     private static class ThrowingErrorListener extends BaseErrorListener {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                int line, int charPositionInLine, String msg, RecognitionException e) {
+                                                  int line, int charPositionInLine, String msg, RecognitionException e) {
             throw new IllegalArgumentException(
                     String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
         }

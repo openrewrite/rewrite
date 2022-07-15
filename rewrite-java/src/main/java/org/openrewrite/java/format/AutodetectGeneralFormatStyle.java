@@ -29,7 +29,7 @@ public class AutodetectGeneralFormatStyle extends JavaIsoVisitor<LineEndingsCoun
     public static GeneralFormatStyle autodetectGeneralFormatStyle(JavaSourceFile j) {
         LineEndingsCount count = new LineEndingsCount();
         new AutodetectGeneralFormatStyle().visit(j, count);
-        if(count.lf >= count.crlf) {
+        if (count.lf >= count.crlf) {
             return new GeneralFormatStyle(false);
         } else {
             return new GeneralFormatStyle(true);
@@ -42,7 +42,7 @@ public class AutodetectGeneralFormatStyle extends JavaIsoVisitor<LineEndingsCoun
         for (int i = 0; i < s.length(); i++) {
             char current = s.charAt(i);
             char next = '\0';
-            if(i < s.length() - 1) {
+            if (i < s.length() - 1) {
                 next = s.charAt(i + 1);
             }
             if (current == '\r' && next == '\n') {

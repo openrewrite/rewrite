@@ -140,8 +140,8 @@ public class ReferentialEqualityToObjectEquals extends Recipe {
         }
 
         private boolean hasThisIdentifier(J.Binary binary) {
-            return ((binary.getRight() instanceof J.Identifier && "this".equals(((J.Identifier)binary.getRight()).getSimpleName()))
-                    || ((binary.getLeft() instanceof J.Identifier && "this".equals(((J.Identifier)binary.getLeft()).getSimpleName()))));
+            return ((binary.getRight() instanceof J.Identifier && "this".equals(((J.Identifier) binary.getRight()).getSimpleName()))
+                    || ((binary.getLeft() instanceof J.Identifier && "this".equals(((J.Identifier) binary.getLeft()).getSimpleName()))));
         }
 
         private boolean isBoxedTypeComparison(J.Binary binary) {
@@ -152,16 +152,17 @@ public class ReferentialEqualityToObjectEquals extends Recipe {
             }
             return false;
         }
+
         private boolean isBoxed(JavaType type) {
             return type instanceof JavaType.Primitive
-                    || TypeUtils.isOfClassType(type,"java.lang.Byte")
-                    || TypeUtils.isOfClassType(type,"java.lang.Character")
-                    || TypeUtils.isOfClassType(type,"java.lang.Short")
-                    || TypeUtils.isOfClassType(type,"java.lang.Integer")
-                    || TypeUtils.isOfClassType(type,"java.lang.Long")
-                    || TypeUtils.isOfClassType(type,"java.lang.Float")
-                    || TypeUtils.isOfClassType(type,"java.lang.Double")
-                    || TypeUtils.isOfClassType(type,"java.lang.Boolean");
+                    || TypeUtils.isOfClassType(type, "java.lang.Byte")
+                    || TypeUtils.isOfClassType(type, "java.lang.Character")
+                    || TypeUtils.isOfClassType(type, "java.lang.Short")
+                    || TypeUtils.isOfClassType(type, "java.lang.Integer")
+                    || TypeUtils.isOfClassType(type, "java.lang.Long")
+                    || TypeUtils.isOfClassType(type, "java.lang.Float")
+                    || TypeUtils.isOfClassType(type, "java.lang.Double")
+                    || TypeUtils.isOfClassType(type, "java.lang.Boolean");
         }
 
     }

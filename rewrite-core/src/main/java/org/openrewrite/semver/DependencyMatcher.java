@@ -48,26 +48,26 @@ public class DependencyMatcher {
 
     public static Validated build(String pattern) {
         String[] patternPieces = pattern.split(":");
-        if(patternPieces.length < 2) {
+        if (patternPieces.length < 2) {
             return Validated.invalid("pattern", pattern, "missing required components. Must specify at least groupId:artifactId");
-        } else if(patternPieces.length > 3) {
+        } else if (patternPieces.length > 3) {
             return Validated.invalid("pattern", pattern, "not a valid pattern. Valid patterns take the form groupId:artifactId, groupId:artifactId:version, or groupId:artifactId:version/versionPattern");
         }
-        if(patternPieces.length < 3) {
+        if (patternPieces.length < 3) {
             return Validated.valid("pattern", new DependencyMatcher(patternPieces[0], patternPieces[1], null));
         }
         Validated validatedVersion;
 
         if (patternPieces[2].contains("/")) {
             String[] versionPieces = patternPieces[2].split("/");
-            if(versionPieces.length != 2) {
+            if (versionPieces.length != 2) {
                 return Validated.invalid("pattern", pattern, "unable to parse version \"" + patternPieces[2] + "\"");
             }
             validatedVersion = Semver.validate(versionPieces[0], versionPieces[1]);
         } else {
             validatedVersion = Semver.validate(patternPieces[2], null);
         }
-        if(validatedVersion.isInvalid()) {
+        if (validatedVersion.isInvalid()) {
             return validatedVersion;
         }
         return Validated.valid("pattern", new DependencyMatcher(patternPieces[0], patternPieces[1], validatedVersion.getValue()));
@@ -88,7 +88,7 @@ public class DependencyMatcher {
     }
 
     public Optional<String> upgrade(String currentVersion, Collection<String> availableVersions) {
-        if(versionComparator == null) {
+        if (versionComparator == null) {
             return Optional.empty();
         }
         return versionComparator.upgrade(currentVersion, availableVersions);

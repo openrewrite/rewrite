@@ -94,12 +94,12 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava8ParserVisitor(Path sourcePath,
-                                        @Nullable FileAttributes fileAttributes,
-                                        EncodingDetectingInputStream source,
-                                        Collection<NamedStyles> styles,
-                                        JavaTypeCache typeCache,
-                                        ExecutionContext ctx,
-                                        Context context) {
+                                         @Nullable FileAttributes fileAttributes,
+                                         EncodingDetectingInputStream source,
+                                         Collection<NamedStyles> styles,
+                                         JavaTypeCache typeCache,
+                                         ExecutionContext ctx,
+                                         Context context) {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
         this.source = source.readFully();
@@ -180,7 +180,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         TypeTree elemType = convert(typeIdent);
 
         List<JRightPadded<Space>> dimensions = emptyList();
-        if(dimCount > 0) {
+        if (dimCount > 0) {
             dimensions = new ArrayList<>(dimCount);
             for (int n = 0; n < dimCount; n++) {
                 dimensions.add(padRight(sourceBefore("["), sourceBefore("]")));
@@ -1457,7 +1457,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         try {
             String prefix = source.substring(cursor, max(((JCTree) t).getStartPosition(), cursor));
             cursor += prefix.length();
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
+            @SuppressWarnings("unchecked")
+            J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
             return j;
         } catch (Throwable ex) {
             // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
@@ -1487,7 +1488,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     private <J2 extends J> JRightPadded<J2> convert(Tree t, Function<Tree, Space> suffix) {
         J2 j = convert(t);
-        @SuppressWarnings("ConstantConditions") JRightPadded<J2> rightPadded = j == null ? null :
+        @SuppressWarnings("ConstantConditions")
+        JRightPadded<J2> rightPadded = j == null ? null :
                 new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
         cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
         return rightPadded;
@@ -1516,9 +1518,9 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Tree> trees,
-                                                             Function<Tree, Space> innerSuffix,
-                                                             Function<Tree, Space> suffix) {
-        if(trees.isEmpty()) {
+                                                              Function<Tree, Space> innerSuffix,
+                                                              Function<Tree, Space> suffix) {
+        if (trees.isEmpty()) {
             return emptyList();
         }
         List<JRightPadded<J2>> converted = new ArrayList<>(trees.size());
@@ -1582,7 +1584,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     @SuppressWarnings("unchecked")
     private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees,
-                                                            Function<Tree, Space> suffix) {
+                                                                                                Function<Tree, Space> suffix) {
         if (trees == null || trees.isEmpty()) {
             return emptyList();
         }

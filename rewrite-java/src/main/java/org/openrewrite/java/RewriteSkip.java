@@ -23,5 +23,6 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.CLASS)
 public @interface RewriteSkip {
     String[] recipes() default {};
+
     Class<? extends Recipe>[] recipeClasses() default {};
 }

@@ -99,50 +99,50 @@ public class ManageDependencies extends Recipe {
         }
 
         return ListUtils.map(before, s -> s.getMarkers().findFirst(MavenResolutionResult.class)
-                .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
-                    @Override
-                    public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                        Xml maven = super.visitDocument(document, executionContext);
+                        .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
+                            @Override
+                            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                                Xml maven = super.visitDocument(document, executionContext);
 
-                        Collection<ResolvedDependency> manageableDependencies;
-                        if (Boolean.TRUE.equals(addToRootPom)) {
-                            ResolvedPom pom = getResolutionResult().getPom();
-                            GroupArtifactVersion gav = new GroupArtifactVersion(pom.getGav().getGroupId(), pom.getGav().getArtifactId(), pom.getGav().getVersion());
-                            manageableDependencies = rootGavToDependencies.get(gav);
-                        } else {
-                            manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
-                        }
-
-                        if (manageableDependencies != null) {
-                            Map<GroupArtifact, GroupArtifactVersion> dependenciesToManage = new HashMap<>();
-                            String selectedVersion = version;
-
-                            for (ResolvedDependency rmd : manageableDependencies) {
-                                if (version != null) {
-                                    dependenciesToManage.putIfAbsent(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()), new GroupArtifactVersion(rmd.getGroupId(), rmd.getArtifactId(), version));
+                                Collection<ResolvedDependency> manageableDependencies;
+                                if (Boolean.TRUE.equals(addToRootPom)) {
+                                    ResolvedPom pom = getResolutionResult().getPom();
+                                    GroupArtifactVersion gav = new GroupArtifactVersion(pom.getGav().getGroupId(), pom.getGav().getArtifactId(), pom.getGav().getVersion());
+                                    manageableDependencies = rootGavToDependencies.get(gav);
                                 } else {
-                                    if (selectedVersion == null) {
-                                        selectedVersion = rmd.getVersion();
-                                    } else {
-                                        if (new Version(rmd.getVersion()).compareTo(new Version(selectedVersion)) > 0) {
-                                            selectedVersion = rmd.getVersion();
+                                    manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
+                                }
+
+                                if (manageableDependencies != null) {
+                                    Map<GroupArtifact, GroupArtifactVersion> dependenciesToManage = new HashMap<>();
+                                    String selectedVersion = version;
+
+                                    for (ResolvedDependency rmd : manageableDependencies) {
+                                        if (version != null) {
+                                            dependenciesToManage.putIfAbsent(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()), new GroupArtifactVersion(rmd.getGroupId(), rmd.getArtifactId(), version));
+                                        } else {
+                                            if (selectedVersion == null) {
+                                                selectedVersion = rmd.getVersion();
+                                            } else {
+                                                if (new Version(rmd.getVersion()).compareTo(new Version(selectedVersion)) > 0) {
+                                                    selectedVersion = rmd.getVersion();
+                                                }
+                                            }
+                                            dependenciesToManage.put(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()), new GroupArtifactVersion(rmd.getGroupId(), rmd.getArtifactId(), selectedVersion));
                                         }
                                     }
-                                    dependenciesToManage.put(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()), new GroupArtifactVersion(rmd.getGroupId(), rmd.getArtifactId(), selectedVersion));
+
+                                    for (GroupArtifactVersion gav : dependenciesToManage.values()) {
+                                        doAfterVisit(new AddManagedDependencyVisitor(gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null, null, null, null, null));
+                                    }
                                 }
-                            }
 
-                            for (GroupArtifactVersion gav : dependenciesToManage.values()) {
-                                doAfterVisit(new AddManagedDependencyVisitor(gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null, null, null, null, null));
+                                doAfterVisit(new RemoveVersionTagVisitor(groupPattern, artifactPattern != null ? artifactPattern : "*"));
+                                return maven;
                             }
-                        }
-
-                        doAfterVisit(new RemoveVersionTagVisitor(groupPattern, artifactPattern != null ? artifactPattern : "*"));
-                        return maven;
-                    }
-                }.visit(s, ctx))
-                .map(SourceFile.class::cast)
-                .orElse(s)
+                        }.visit(s, ctx))
+                        .map(SourceFile.class::cast)
+                        .orElse(s)
         );
     }
 

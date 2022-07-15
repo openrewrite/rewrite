@@ -46,7 +46,7 @@ public class Checksum {
     }
 
     public static Checksum fromHex(String algorithm, String hex) {
-        if(hex.length() % 2 != 0) {
+        if (hex.length() % 2 != 0) {
             throw new IllegalArgumentException("Hex string must contain a set of hex pairs (length divisible by 2).");
         }
 
@@ -65,20 +65,20 @@ public class Checksum {
      * checksum. The ending of the URL is used to determine the algorithm that should be used.
      */
     public static Checksum fromUri(HttpSender httpSender, URI uri) {
-       String uriStr = uri.toString();
-       if(uriStr.endsWith(".sha256")) {
-           return fromUri(httpSender, uri, "SHA-256");
-       } else if(uriStr.endsWith(".md5")) {
-           return fromUri(httpSender, uri, "MD5");
-       }
-       throw new IllegalArgumentException("Unable to automatically determine checksum type from URI: " + uriStr);
+        String uriStr = uri.toString();
+        if (uriStr.endsWith(".sha256")) {
+            return fromUri(httpSender, uri, "SHA-256");
+        } else if (uriStr.endsWith(".md5")) {
+            return fromUri(httpSender, uri, "MD5");
+        }
+        throw new IllegalArgumentException("Unable to automatically determine checksum type from URI: " + uriStr);
     }
 
     public static Checksum fromUri(HttpSender httpSender, URI uri, String algorithm) {
         HttpSender.Request request = HttpSender.Request.build(uri.toString(), httpSender)
                 .withMethod(HttpSender.Method.GET)
                 .build();
-        try(HttpSender.Response response = httpSender.send(request)) {
+        try (HttpSender.Response response = httpSender.send(request)) {
             String hexString = new String(response.getBodyAsBytes(), StandardCharsets.UTF_8);
             return Checksum.fromHex(algorithm, hexString);
         }
@@ -93,7 +93,7 @@ public class Checksum {
     }
 
     public static SourceFile checksum(SourceFile sourceFile, @Nullable String algorithm) {
-        if(algorithm == null) {
+        if (algorithm == null) {
             return sourceFile;
         }
 

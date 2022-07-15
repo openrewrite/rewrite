@@ -50,11 +50,11 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     @Override
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, PrintOutputCapture<P> p) {
         p.out.append(entry.getPrefix());
-        if(entry.isDash()) {
+        if (entry.isDash()) {
             p.out.append('-');
         }
         visit(entry.getBlock(), p);
-        if(entry.getTrailingCommaPrefix() != null) {
+        if (entry.getTrailingCommaPrefix() != null) {
             p.out.append(entry.getTrailingCommaPrefix()).append(',');
         }
         return entry;
@@ -63,11 +63,11 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     @Override
     public Yaml visitSequence(Yaml.Sequence sequence, PrintOutputCapture<P> p) {
         visitMarkers(sequence.getMarkers(), p);
-        if(sequence.getOpeningBracketPrefix() != null) {
+        if (sequence.getOpeningBracketPrefix() != null) {
             p.out.append(sequence.getOpeningBracketPrefix()).append('[');
         }
         Yaml result = super.visitSequence(sequence, p);
-        if(sequence.getClosingBracketPrefix() != null) {
+        if (sequence.getClosingBracketPrefix() != null) {
             p.out.append(sequence.getClosingBracketPrefix()).append(']');
         }
 
@@ -150,7 +150,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-        if(marker instanceof SearchResult) {
+        if (marker instanceof SearchResult) {
             String description = ((SearchResult) marker).getDescription();
             p.out.append("~~")
                     .append(description == null ? "" : "(" + description + ")~~")

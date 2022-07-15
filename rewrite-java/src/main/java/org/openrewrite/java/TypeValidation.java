@@ -37,7 +37,7 @@ public class TypeValidation {
     private boolean methodInvocations = true;
 
     public static TypeValidation none() {
-        return new TypeValidation(false,false,false,false);
+        return new TypeValidation(false, false, false, false);
     }
 
     private boolean enabled() {

@@ -223,6 +223,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         private final Options options;
         private final WriteOptions writeOptions;
         private final String cacheFolder;
+
         RocksCache(String pomCacheDir) {
             try {
                 options = new Options();

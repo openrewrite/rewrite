@@ -186,9 +186,9 @@ public class MavenPomDownloader {
     }
 
     public Pom download(GroupArtifactVersion gav,
-                        @Nullable String relativePath,
-                        @Nullable ResolvedPom containingPom,
-                        List<MavenRepository> repositories) throws MavenDownloadingException {
+                         @Nullable String relativePath,
+                         @Nullable ResolvedPom containingPom,
+                         List<MavenRepository> repositories) throws MavenDownloadingException {
         if (gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
             String errorText = "Unable to download dependency " + gav;
             if (containingPom != null) {
@@ -344,8 +344,8 @@ public class MavenPomDownloader {
     }
 
     private Collection<MavenRepository> distinctNormalizedRepositories(List<MavenRepository> repositories,
-                                                                       @Nullable ResolvedPom containingPom,
-                                                                       @Nullable String acceptsVersion) {
+                                                                        @Nullable ResolvedPom containingPom,
+                                                                        @Nullable String acceptsVersion) {
         Set<MavenRepository> normalizedRepositories = new LinkedHashSet<>();
         normalizedRepositories.add(ctx.getLocalRepository());
 

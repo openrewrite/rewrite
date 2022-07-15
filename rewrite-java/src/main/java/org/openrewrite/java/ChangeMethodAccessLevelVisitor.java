@@ -70,11 +70,11 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                 J.Modifier mod = new J.Modifier(Tree.randomId(), Space.build(" ", emptyList()), Markers.EMPTY, newAccessLevel, Collections.emptyList());
                 m = m.withModifiers(ListUtils.concat(mod, m.getModifiers()));
 
-                if(method.getModifiers().isEmpty()) {
+                if (method.getModifiers().isEmpty()) {
                     J.TypeParameters typeParams = m.getPadding().getTypeParameters();
-                    if(typeParams == null) {
+                    if (typeParams == null) {
                         TypeTree returnExpr = m.getReturnTypeExpression();
-                        if(returnExpr == null) {
+                        if (returnExpr == null) {
                             m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), m.getName().getPrefix()));
                             m = m.withName(m.getName().withPrefix(Space.format(" ")));
                         } else {

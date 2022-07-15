@@ -69,19 +69,19 @@ public class ChangePluginDependencies extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         Xml.Tag dependenciesTag;
-        if(dependencies == null) {
+        if (dependencies == null) {
             dependenciesTag = null;
         } else {
             dependenciesTag = Xml.Tag.build(
                     "<dependencies>\n" +
-                    Arrays.stream(dependencies.split(","))
-                    .map(String::trim)
-                    .map(gav -> {
-                        String[] gavs = gav.split(":");
-                        return "<dependency>\n<groupId>" + gavs[0] + "</groupId>\n<artifactId>" + gavs[1] +
-                                "</artifactId>\n<version>" + gavs[2] + "</version>\n</dependency>";
-                    }).collect(Collectors.joining("\n")) +
-                    "\n</dependencies>\n");
+                            Arrays.stream(dependencies.split(","))
+                                    .map(String::trim)
+                                    .map(gav -> {
+                                        String[] gavs = gav.split(":");
+                                        return "<dependency>\n<groupId>" + gavs[0] + "</groupId>\n<artifactId>" + gavs[1] +
+                                                "</artifactId>\n<version>" + gavs[2] + "</version>\n</dependency>";
+                                    }).collect(Collectors.joining("\n")) +
+                            "\n</dependencies>\n");
         }
         return new MavenVisitor<ExecutionContext>() {
             @Override

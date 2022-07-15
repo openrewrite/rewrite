@@ -106,7 +106,7 @@ public final class ExternalSinkModels {
         private SinkNodePredicate sinkNodePredicateForArgumentIndex(
                 int argumentIndex,
                 Collection<MethodMatcher> methodMatchers
-        ) {
+                ) {
             InvocationMatcher invocationMatcher = InvocationMatcher.fromMethodMatchers(methodMatchers);
             return argumentIndex == -1 ?
                     ((expression, cursor) -> invocationMatcher.advanced().isSelect(cursor)) :
@@ -198,8 +198,8 @@ public final class ExternalSinkModels {
                                     Collections.emptyList()
                             ).stream()
                     ).forEach(sinkModel -> {
-                        sinkModels.computeIfAbsent(sinkModel.kind, k -> new HashSet<>(1)).add(sinkModel);
-                    });
+                sinkModels.computeIfAbsent(sinkModel.kind, k -> new HashSet<>(1)).add(sinkModel);
+            });
             return new SinkModels(sinkModels);
         }
 

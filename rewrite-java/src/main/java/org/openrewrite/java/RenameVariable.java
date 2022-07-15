@@ -171,9 +171,10 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
     }
 
     private static final class JavaKeywords {
-        JavaKeywords() {}
+        JavaKeywords() {
+        }
 
-        private static final String[] RESERVED_WORDS = new String[] {
+        private static final String[] RESERVED_WORDS = new String[]{
                 "abstract",
                 "assert",
                 "boolean",

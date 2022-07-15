@@ -158,8 +158,8 @@ public class AddDependency extends Recipe {
                     source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
                         if (source != new UsesType<>(onlyIfUsing).visit(source, ctx)) {
                             scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
-                                    scope /* a compile scope dependency will also be available in test source set */ :
-                                    "test".equals(sourceSet.getName()) ? "test" : "compile"
+                                            scope /* a compile scope dependency will also be available in test source set */ :
+                                            "test".equals(sourceSet.getName()) ? "test" : "compile"
                             );
                         }
                     }));
@@ -172,38 +172,38 @@ public class AddDependency extends Recipe {
         Pattern familyPatternCompiled = this.familyPattern == null ? null : Pattern.compile(this.familyPattern.replace("*", ".*"));
 
         return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
-                .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
-                    @Override
-                    public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                        Xml maven = super.visitDocument(document, executionContext);
+                        .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
+                            @Override
+                            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                                Xml maven = super.visitDocument(document, executionContext);
 
-                        String resolvedScope = scope == null ? scopeByProject.get(javaProject) : scope;
-                        if (resolvedScope == null) {
-                            return maven;
-                        }
-
-                        //If the dependency is already in scope, no need to continue.
-                        for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
-                            if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
-                                return maven;
-                            }
-                        }
-
-                        if ("test".equals(resolvedScope)) {
-                            for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Test)) {
-                                if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                String resolvedScope = scope == null ? scopeByProject.get(javaProject) : scope;
+                                if (resolvedScope == null) {
                                     return maven;
                                 }
-                            }
-                        }
 
-                        return new AddDependencyVisitor(
-                                groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
-                                type, classifier, optional, familyPatternCompiled).visitNonNull(s, ctx);
-                    }
-                }.visit(s, ctx))
-                .map(SourceFile.class::cast)
-                .orElse(s)
+                                //If the dependency is already in scope, no need to continue.
+                                for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
+                                    if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                        return maven;
+                                    }
+                                }
+
+                                if ("test".equals(resolvedScope)) {
+                                    for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Test)) {
+                                        if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                            return maven;
+                                        }
+                                    }
+                                }
+
+                                return new AddDependencyVisitor(
+                                        groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
+                                        type, classifier, optional, familyPatternCompiled).visitNonNull(s, ctx);
+                            }
+                        }.visit(s, ctx))
+                        .map(SourceFile.class::cast)
+                        .orElse(s)
         );
     }
 }

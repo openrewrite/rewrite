@@ -51,7 +51,7 @@ public class RemoteArchiveTest {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             int count;
             byte[] buf = new byte[4096];
-            while((count = is.read(buf)) != -1) {
+            while ((count = is.read(buf)) != -1) {
                 baos.write(buf, 0, count);
             }
             return baos.toByteArray();

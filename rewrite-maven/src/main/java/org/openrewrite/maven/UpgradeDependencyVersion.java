@@ -142,7 +142,7 @@ public class UpgradeDependencyVersion extends Recipe {
                             Optional<Xml.Tag> version = t.getChild("version");
                             if (version.isPresent()) {
                                 String requestedVersion = d.getRequested().getVersion();
-                                if(requestedVersion != null && requestedVersion.startsWith("${")) {
+                                if (requestedVersion != null && requestedVersion.startsWith("${")) {
                                     doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, false));
                                     return t;
                                 }
@@ -164,16 +164,16 @@ public class UpgradeDependencyVersion extends Recipe {
                             if (requestedVersion.startsWith("${")) {
                                 doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, false));
                                 return t;
-                            } else if (newerVersion != null){
+                            } else if (newerVersion != null) {
                                 t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(t.getChild("version").get(), newerVersion).visitNonNull(t, 0, getCursor());
                             }
-                        } else if(dm.getBomGav() != null) {
+                        } else if (dm.getBomGav() != null) {
                             ResolvedGroupArtifactVersion bom = dm.getBomGav();
                             if (matchesGlob(bom.getGroupId(), groupId) && matchesGlob(bom.getArtifactId(), artifactId)) {
                                 //noinspection ConstantConditions
                                 String requestedVersion = dm.getRequestedBom().getVersion();
                                 String newerVersion = findNewerVersion(bom.getGroupId(), bom.getArtifactId(), bom.getVersion(), ctx);
-                                if(newerVersion != null) {
+                                if (newerVersion != null) {
                                     if (requestedVersion.startsWith("${")) {
                                         doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, false));
                                         return t;

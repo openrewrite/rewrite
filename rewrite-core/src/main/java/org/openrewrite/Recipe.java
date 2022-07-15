@@ -280,17 +280,17 @@ public abstract class Recipe {
 
     @Incubating(since = "7.3.0")
     public final List<Result> run(List<? extends SourceFile> before,
-                                  ExecutionContext ctx,
-                                  RecipeScheduler recipeScheduler,
-                                  int maxCycles,
-                                  int minCycles) {
+                                                                    ExecutionContext ctx,
+                                                                    RecipeScheduler recipeScheduler,
+                                                                    int maxCycles,
+                                                                    int minCycles) {
         return recipeScheduler.scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
     public Validated validate(ExecutionContext ctx) {
         Validated validated = validate();
 
-        for(Recipe recipe : recipeList) {
+        for (Recipe recipe : recipeList) {
             validated = validated.and(recipe.validate(ctx));
         }
         return validated;
@@ -313,7 +313,7 @@ public abstract class Recipe {
                 logger.warn("Unable to validate the field [{}] on the class [{}]", field.getName(), this.getClass().getName());
             }
         }
-        for(Recipe recipe : recipeList) {
+        for (Recipe recipe : recipeList) {
             validated = validated.and(recipe.validate());
         }
         return validated;

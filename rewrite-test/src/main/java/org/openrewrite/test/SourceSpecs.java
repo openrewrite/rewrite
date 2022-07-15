@@ -60,7 +60,7 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs java(@Language("java") @Nullable String before, @Language("java") String after,
-                             Consumer<SourceSpec<J.CompilationUnit>> spec) {
+                              Consumer<SourceSpec<J.CompilationUnit>> spec) {
         SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, before, after);
         spec.accept(java);
         return java;
@@ -106,7 +106,7 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs pomXml(@Language("xml") @Nullable String before, @Language("xml") String after,
-                               Consumer<SourceSpec<Xml.Document>> spec) {
+                                Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", before, after);
         maven.path("pom.xml");
         spec.accept(maven);
@@ -131,7 +131,7 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs buildGradle(@Language("gradle") @Nullable String before, @Language("gradle") String after,
-                                    Consumer<SourceSpec<G.CompilationUnit>> spec) {
+                                     Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", before, after);
         gradle.path("build.gradle");
         spec.accept(gradle);
@@ -178,7 +178,7 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs yaml(@Language("yml") @Nullable String before, @Language("yml") String after,
-                             Consumer<SourceSpec<Yaml.Documents>> spec) {
+                              Consumer<SourceSpec<Yaml.Documents>> spec) {
         SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, before, after);
         spec.accept(yaml);
         return yaml;
@@ -201,7 +201,7 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs properties(@Language("properties") @Nullable String before, @Language("properties") String after,
-                                   Consumer<SourceSpec<Properties.File>> spec) {
+                                    Consumer<SourceSpec<Properties.File>> spec) {
         SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, before, after);
         spec.accept(properties);
         return properties;
@@ -224,7 +224,7 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs json(@Language("json") @Nullable String before, @Language("json") String after,
-                             Consumer<SourceSpec<Json.Document>> spec) {
+                              Consumer<SourceSpec<Json.Document>> spec) {
         SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, before, after);
         spec.accept(json);
         return json;
@@ -247,7 +247,7 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs proto(@Language("protobuf") @Nullable String before, @Language("protobuf") String after,
-                              Consumer<SourceSpec<Proto.Document>> spec) {
+                               Consumer<SourceSpec<Proto.Document>> spec) {
         SourceSpec<Proto.Document> proto = new SourceSpec<>(Proto.Document.class, null, before, after);
         spec.accept(proto);
         return proto;
@@ -270,7 +270,7 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs groovy(@Language("groovy") @Nullable String before, @Language("groovy") String after,
-                               Consumer<SourceSpec<G.CompilationUnit>> spec) {
+                                Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, before, after);
         spec.accept(groovy);
         return groovy;
@@ -326,7 +326,7 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     default SourceSpecs text(@Nullable String before, String after,
-                             Consumer<SourceSpec<PlainText>> spec) {
+                              Consumer<SourceSpec<PlainText>> spec) {
         SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, before, after);
         spec.accept(text);
         return text;

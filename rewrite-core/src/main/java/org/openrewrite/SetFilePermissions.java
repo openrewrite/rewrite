@@ -65,7 +65,7 @@ public class SetFilePermissions extends Recipe {
                     SourceFile sourceFile = (SourceFile) tree;
                     Path sourcePath = sourceFile.getSourcePath();
                     PathMatcher pathMatcher = sourcePath.getFileSystem().getPathMatcher("glob:" + fileMatcher);
-                    if(pathMatcher.matches(sourcePath)) {
+                    if (pathMatcher.matches(sourcePath)) {
                         if (sourceFile.getFileAttributes() == null) {
                             sourceFile = sourceFile.withFileAttributes(new FileAttributes(null, null, null, isReadable, isWritable, isExecutable, 0));
                         } else {

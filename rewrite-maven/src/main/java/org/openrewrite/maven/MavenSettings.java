@@ -69,8 +69,8 @@ public class MavenSettings {
 
     @JsonCreator
     public MavenSettings(@Nullable String localRepository, @Nullable Profiles profiles,
-                         @Nullable ActiveProfiles activeProfiles, @Nullable Mirrors mirrors,
-                         @Nullable Servers servers) {
+                                           @Nullable ActiveProfiles activeProfiles, @Nullable Mirrors mirrors,
+                                           @Nullable Servers servers) {
         this.localRepository = localRepository;
         this.profiles = profiles;
         this.activeProfiles = activeProfiles;

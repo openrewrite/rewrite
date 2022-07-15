@@ -51,7 +51,7 @@ public class PadEmptyForLoopComponents extends Recipe {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext executionContext) {
                 SourceFile cu = (SourceFile) javaSourceFile;
-                if(cu.getStyle(EmptyForIteratorPadStyle.class) != null || cu.getStyle(EmptyForInitializerPadStyle.class) != null) {
+                if (cu.getStyle(EmptyForIteratorPadStyle.class) != null || cu.getStyle(EmptyForInitializerPadStyle.class) != null) {
                     return cu.withMarkers(cu.getMarkers().add(new SearchResult(randomId(), null)));
                 }
                 return (JavaSourceFile) cu;
@@ -71,31 +71,31 @@ public class PadEmptyForLoopComponents extends Recipe {
 
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext executionContext) {
-                SourceFile cu = (SourceFile)javaSourceFile;
+                SourceFile cu = (SourceFile) javaSourceFile;
                 emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
                 emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
-                return super.visitJavaSourceFile((JavaSourceFile)cu, executionContext);
+                return super.visitJavaSourceFile((JavaSourceFile) cu, executionContext);
             }
 
             @Override
             public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext executionContext) {
                 J.ForLoop fl = super.visitForLoop(forLoop, executionContext);
                 List<Statement> updates = forLoop.getControl().getUpdate();
-                if(emptyForIteratorPadStyle != null && updates.size() == 1 && updates.get(0) instanceof J.Empty) {
+                if (emptyForIteratorPadStyle != null && updates.size() == 1 && updates.get(0) instanceof J.Empty) {
                     Statement update = updates.get(0);
-                    if(emptyForIteratorPadStyle.getSpace() && update.getPrefix().getWhitespace().isEmpty()) {
+                    if (emptyForIteratorPadStyle.getSpace() && update.getPrefix().getWhitespace().isEmpty()) {
                         update = update.withPrefix(update.getPrefix().withWhitespace(" "));
-                    } else if(!emptyForIteratorPadStyle.getSpace() && !update.getPrefix().getWhitespace().isEmpty()) {
+                    } else if (!emptyForIteratorPadStyle.getSpace() && !update.getPrefix().getWhitespace().isEmpty()) {
                         update = update.withPrefix(update.getPrefix().withWhitespace(""));
                     }
                     fl = fl.withControl(fl.getControl().withUpdate(singletonList(update)));
                 }
 
                 List<Statement> init = forLoop.getControl().getInit();
-                if(emptyForInitializerPadStyle != null && init.get(0) instanceof J.Empty) {
-                    if(emptyForInitializerPadStyle.getSpace() && init.get(0).getPrefix().getWhitespace().isEmpty()) {
+                if (emptyForInitializerPadStyle != null && init.get(0) instanceof J.Empty) {
+                    if (emptyForInitializerPadStyle.getSpace() && init.get(0).getPrefix().getWhitespace().isEmpty()) {
                         init = ListUtils.mapFirst(init, i -> i.withPrefix(i.getPrefix().withWhitespace(" ")));
-                    } else if(!emptyForInitializerPadStyle.getSpace() && !init.get(0).getPrefix().getWhitespace().isEmpty()) {
+                    } else if (!emptyForInitializerPadStyle.getSpace() && !init.get(0).getPrefix().getWhitespace().isEmpty()) {
                         init = ListUtils.mapFirst(init, i -> i.withPrefix(i.getPrefix().withWhitespace("")));
                     }
                     fl = fl.withControl(fl.getControl().withInit(init));

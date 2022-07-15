@@ -111,8 +111,8 @@ public class EmptyBlockVisitor<P> extends JavaIsoVisitor<P> {
         J.If i = super.visitIf(iff, p);
 
         if (Boolean.TRUE.equals(emptyBlockStyle.getLiteralElse()) &&
-            i.getElsePart() != null &&
-            isEmptyBlock(i.getElsePart().getBody())) {
+                i.getElsePart() != null &&
+                isEmptyBlock(i.getElsePart().getBody())) {
             i = i.withElsePart(null);
         }
 
@@ -210,7 +210,7 @@ public class EmptyBlockVisitor<P> extends JavaIsoVisitor<P> {
 
     private boolean isEmptyBlock(Statement blockNode) {
         if (blockNode instanceof J.Block) {
-            J.Block block = (J.Block)blockNode;
+            J.Block block = (J.Block) blockNode;
             if (EmptyBlockStyle.BlockPolicy.STATEMENT.equals(emptyBlockStyle.getBlockPolicy())) {
                 return block.getStatements().isEmpty();
             } else if (EmptyBlockStyle.BlockPolicy.TEXT.equals(emptyBlockStyle.getBlockPolicy())) {

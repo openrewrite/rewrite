@@ -57,7 +57,7 @@ public class Dependency {
     }
 
     public Dependency withGav(GroupArtifactVersion gav) {
-        if(gav == this.gav) {
+        if (gav == this.gav) {
             return this;
         }
         return new Dependency(gav, classifier, type, scope, exclusions, optional);

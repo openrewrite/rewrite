@@ -185,7 +185,7 @@ public class UseAsBuilder extends Recipe {
             }
 
             private J.VariableDeclarations consolidateBuilder(J.VariableDeclarations consolidatedBuilder,
-                                                              J.MethodInvocation builderCall) {
+                                                               J.MethodInvocation builderCall) {
                 J.VariableDeclarations cb = consolidatedBuilder.withVariables(
                         ListUtils.map(consolidatedBuilder.getVariables(), nv -> {
                             Expression init = nv.getInitializer();

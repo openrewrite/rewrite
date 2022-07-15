@@ -55,7 +55,7 @@ public class HiddenField extends Recipe {
     private static class HiddenFieldFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            HiddenFieldStyle style = ((SourceFile)cu).getStyle(HiddenFieldStyle.class);
+            HiddenFieldStyle style = ((SourceFile) cu).getStyle(HiddenFieldStyle.class);
             if (style == null) {
                 style = Checkstyle.hiddenFieldStyle();
             }

@@ -42,7 +42,7 @@ public class SingleLineComments extends Recipe {
                 return space.withComments(ListUtils.map(space.getComments(), c -> {
                     if (!c.isMultiline()) {
                         TextComment tc = (TextComment) c;
-                        if(!tc.getText().startsWith(" ")) {
+                        if (!tc.getText().startsWith(" ")) {
                             return tc.withText(" " + tc.getText());
                         }
                     }

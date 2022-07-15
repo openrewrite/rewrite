@@ -126,7 +126,7 @@ public class MinimumSwitchCases extends Recipe {
                             generatedIf = switzh.withTemplate(ifElseIfString, switzh.getCoordinates().replace(),
                                     cases[0].getPattern(), tree, cases[1].getPattern(), tree);
                         }
-                    } else if(switchesOnEnum(switzh)) {
+                    } else if (switchesOnEnum(switzh)) {
                         if (cases[1] == null) {
                             generatedIf = switzh.withTemplate(ifEnum, switzh.getCoordinates().replace(),
                                     tree, enumIdentToFieldAccessString(cases[0].getPattern()));
@@ -189,13 +189,13 @@ public class MinimumSwitchCases extends Recipe {
             private boolean switchesOnEnum(J.Switch switzh) {
                 JavaType selectorType = switzh.getSelector().getTree().getType();
                 return selectorType instanceof JavaType.Class
-                        && ((JavaType.Class)selectorType).getKind() == JavaType.Class.Kind.Enum;
+                        && ((JavaType.Class) selectorType).getKind() == JavaType.Class.Kind.Enum;
             }
 
             private String enumIdentToFieldAccessString(Expression casePattern) {
                 J.Identifier ident = (J.Identifier) casePattern;
                 //noinspection ConstantConditions
-                return ((JavaType.Class)ident.getType()).getClassName() + "." + ident.getSimpleName();
+                return ((JavaType.Class) ident.getType()).getClassName() + "." + ident.getSimpleName();
             }
 
         };

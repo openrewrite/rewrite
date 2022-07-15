@@ -50,6 +50,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected JavadocVisitor<P> getJavadocVisitor() {
         return new JavadocVisitor<>(this);
     }
+
     @Incubating(since = "7.24.0")
     public Dataflow dataflow() {
         return Dataflow.startingAt(getCursor());
@@ -156,7 +157,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     public Space visitSpace(Space space, Space.Location loc, P p) {
         Space s = space;
         s = s.withComments(ListUtils.map(s.getComments(), comment -> {
-            if(comment instanceof Javadoc) {
+            if (comment instanceof Javadoc) {
                 if (javadocVisitor == null) {
                     javadocVisitor = getJavadocVisitor();
                 }
@@ -191,7 +192,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (nameTrees == null) {
             return null;
         }
-        @SuppressWarnings("unchecked") List<JRightPadded<J2>> js = ListUtils.map(nameTrees.getPadding().getElements(),
+        @SuppressWarnings("unchecked")
+        List<JRightPadded<J2>> js = ListUtils.map(nameTrees.getPadding().getElements(),
                 t -> t.getElement() instanceof NameTree ? (JRightPadded<J2>) visitTypeName((JRightPadded<NameTree>) t, p) : t);
         return js == nameTrees.getPadding().getElements() ? nameTrees : JContainer.build(nameTrees.getBefore(), js, Markers.EMPTY);
     }
@@ -289,7 +291,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             a = (J.Assert) temp;
         }
         a = a.withCondition(visitAndCast(a.getCondition(), p));
-        if(a.getDetail() != null) {
+        if (a.getDetail() != null) {
             a = a.withDetail(visitLeftPadded(a.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p));
         }
         return a;
@@ -654,6 +656,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         e = e.getPadding().withBody(visitRightPadded(e.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p));
         return e;
     }
+
     public J visitIf(J.If iff, P p) {
         J.If i = iff;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IF_PREFIX, p));
@@ -1271,7 +1274,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
-                                                        JContainer.Location loc, P p) {
+                                                         JContainer.Location loc, P p) {
         setCursor(new Cursor(getCursor(), container));
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);

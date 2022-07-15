@@ -42,9 +42,9 @@ public class ContainerImage {
     String digest;
 
     public ContainerImage(@Nullable String repository,
-                          @Nullable String image,
-                          @Nullable String tag,
-                          @Nullable String digest) {
+                           @Nullable String image,
+                           @Nullable String tag,
+                           @Nullable String digest) {
         this.repository = repository;
         this.image = image;
         this.tag = tag;

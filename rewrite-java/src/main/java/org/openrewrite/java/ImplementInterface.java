@@ -41,12 +41,12 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
         if (c.isScope(scope) && (c.getImplements() == null || c.getImplements().stream()
                 .noneMatch(f -> TypeUtils.isAssignableTo(f.getType(), interfaceType)))) {
 
-            if(!classDecl.getSimpleName().equals(interfaceType.getClassName())) {
+            if (!classDecl.getSimpleName().equals(interfaceType.getClassName())) {
                 maybeAddImport(interfaceType);
             }
 
             TypeTree impl = TypeTree.build(classDecl.getSimpleName().equals(interfaceType.getClassName()) ?
-                            interfaceType.getFullyQualifiedName() : interfaceType.getClassName())
+                    interfaceType.getFullyQualifiedName() : interfaceType.getClassName())
                     .withType(interfaceType)
                     .withPrefix(format(" "));
 

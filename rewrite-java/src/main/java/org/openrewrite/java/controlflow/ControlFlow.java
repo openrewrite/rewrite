@@ -302,7 +302,8 @@ public class ControlFlow {
 
             J getTruePart();
 
-            @Nullable J getFalsePart();
+            @Nullable
+            J getFalsePart();
 
             static BranchingAdapter of(J.If ifStatement) {
                 return new BranchingAdapter() {

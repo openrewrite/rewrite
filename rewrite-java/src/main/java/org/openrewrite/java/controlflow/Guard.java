@@ -61,9 +61,9 @@ public class Guard {
         J.ControlParentheses<?> parentControlParentheses;
         if (parent instanceof J.If) {
             parentControlParentheses = ((J.If) parent).getIfCondition();
-        } else if (parent instanceof J.WhileLoop){
+        } else if (parent instanceof J.WhileLoop) {
             parentControlParentheses = ((J.WhileLoop) parent).getCondition();
-        } else if (parent instanceof J.DoWhileLoop){
+        } else if (parent instanceof J.DoWhileLoop) {
             parentControlParentheses = ((J.DoWhileLoop) parent).getWhileCondition();
         } else {
             parentControlParentheses = null;

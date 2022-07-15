@@ -139,15 +139,17 @@ public class NoDoubleBraceInitialization extends Recipe {
 
         private static class AddSelectVisitor extends JavaIsoVisitor<ExecutionContext> {
             private  final J.Identifier identifier;
+
             public AddSelectVisitor(J.Identifier identifier) {
                 this.identifier = identifier;
             }
+
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
                 if (mi.getMethodType() != null && TypeUtils.isAssignableTo(identifier.getFieldType(), mi.getMethodType().getDeclaringType())) {
                     if (mi.getSelect() == null
-                        || (mi.getSelect() instanceof J.Identifier && "this".equals(((J.Identifier)mi.getSelect()).getSimpleName()))) {
+                            || (mi.getSelect() instanceof J.Identifier && "this".equals(((J.Identifier) mi.getSelect()).getSimpleName()))) {
                         return mi.withSelect(identifier);
                     }
                 }

@@ -55,7 +55,7 @@ public class RenameFile extends Recipe {
                     SourceFile sourceFile = (SourceFile) tree;
                     Path sourcePath = sourceFile.getSourcePath();
                     PathMatcher pathMatcher = sourcePath.getFileSystem().getPathMatcher("glob:" + fileMatcher);
-                    if(pathMatcher.matches(sourcePath)) {
+                    if (pathMatcher.matches(sourcePath)) {
                         return ((SourceFile) tree).withSourcePath(sourcePath.resolveSibling(fileName).normalize());
                     }
                 }

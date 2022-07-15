@@ -137,7 +137,7 @@ public class ChangeParentPom extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
                 Xml.Document m = super.visitDocument(document, executionContext);
-                if(m != document) {
+                if (m != document) {
                     maybeUpdateModel();
                 }
                 return m;
@@ -180,7 +180,7 @@ public class ChangeParentPom extends Recipe {
             }
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
-                                                                ExecutionContext ctx) {
+                                                                 ExecutionContext ctx) {
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()

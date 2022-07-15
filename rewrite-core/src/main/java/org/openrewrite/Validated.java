@@ -90,7 +90,7 @@ public interface Validated extends Iterable<Validated> {
     }
 
     static Invalid invalid(String property, @Nullable Object value, String message,
-                           @Nullable Throwable exception) {
+                            @Nullable Throwable exception) {
         return new Invalid(property, value, message, exception);
     }
 
@@ -108,7 +108,8 @@ public interface Validated extends Iterable<Validated> {
         return new Either(this, validated);
     }
 
-    @Nullable <T> T getValue();
+    @Nullable
+ <T> T getValue();
 
     /**
      * Indicates that no validation has occurred. None is considered "valid", effectively a no-op validation.

@@ -32,7 +32,7 @@ public class NoMissingTypes extends JavaVisitor<ExecutionContext> {
     @Override
     public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext context) {
         JavaSourceFile cu2 = (JavaSourceFile) new FindMissingTypes().getVisitor().visit(cu, context);
-        if(cu2 == cu) {
+        if (cu2 == cu) {
             return cu.withMarkers(cu.getMarkers().searchResult("All AST elements have type information"));
         }
         return cu;

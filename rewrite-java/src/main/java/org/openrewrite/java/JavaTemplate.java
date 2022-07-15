@@ -51,7 +51,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final JavaTemplateParser templateParser;
 
     private JavaTemplate(Supplier<Cursor> parentScopeGetter, Supplier<JavaParser> parser, String code, Set<String> imports,
-                         Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.parentScopeGetter = parentScopeGetter;
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;

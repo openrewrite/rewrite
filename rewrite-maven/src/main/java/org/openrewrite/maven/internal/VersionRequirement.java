@@ -267,7 +267,7 @@ public class VersionRequirement {
     private static class LoggingErrorListener extends BaseErrorListener {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                int line, int charPositionInLine, String msg, RecognitionException e) {
+                                                  int line, int charPositionInLine, String msg, RecognitionException e) {
             logger.warn("Syntax error at line {}:{} {}", line, charPositionInLine, msg);
         }
     }

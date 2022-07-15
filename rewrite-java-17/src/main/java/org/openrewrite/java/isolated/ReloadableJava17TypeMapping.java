@@ -321,7 +321,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
     @Nullable
     private JavaType.Variable variableType(@Nullable Symbol symbol,
-                                           @Nullable JavaType.FullyQualified owner) {
+                                                          @Nullable JavaType.FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
         }
@@ -596,7 +596,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     continue;
                 }
                 Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if(retention != null && retention.value() == RetentionPolicy.SOURCE) {
+                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
                     continue;
                 }
                 annotations.add(annotType);

@@ -48,7 +48,7 @@ public class OperatorWrap extends Recipe {
 
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
-            SourceFile cu = (SourceFile)javaSourceFile;
+            SourceFile cu = (SourceFile) javaSourceFile;
             operatorWrapStyle = cu.getStyle(OperatorWrapStyle.class) == null ? Checkstyle.operatorWrapStyle() : cu.getStyle(OperatorWrapStyle.class);
             return super.visitJavaSourceFile((JavaSourceFile) cu, ctx);
         }

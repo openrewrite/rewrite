@@ -106,7 +106,8 @@ public class BlockStatementTemplateGenerator {
                 }
 
                 if (expected.isInstance(tree)) {
-                    @SuppressWarnings("unchecked") J2 t = (J2) tree;
+                    @SuppressWarnings("unchecked")
+                    J2 t = (J2) tree;
 
                     if (blockEnclosingTemplateComment != null) {
                         js.add(t);
@@ -241,38 +242,38 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim());
         } else if (j instanceof J.VariableDeclarations) {
             before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
-        } else if(j instanceof J.MethodInvocation) {
+        } else if (j instanceof J.MethodInvocation) {
             // If prior is an argument, wrap in __M__.any(prior)
             // If prior is a type parameter, wrap in __M__.anyT<prior>()
             // For anything else, ignore the invocation
             J.MethodInvocation m = (J.MethodInvocation) j;
-            if(m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
+            if (m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 before.insert(0, "__M__.any(");
-                if(cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
                     after.append(");");
                 } else {
                     after.append(")");
                 }
-            } else if(m.getTypeParameters() != null && m.getTypeParameters().stream().anyMatch(tp -> referToSameElement(prior, tp))) {
+            } else if (m.getTypeParameters() != null && m.getTypeParameters().stream().anyMatch(tp -> referToSameElement(prior, tp))) {
                 before.insert(0, "__M__.anyT<");
-                if(cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
                     after.append(">();");
                 } else {
                     after.append(">()");
                 }
             }
-        } else if(j instanceof J.Return) {
+        } else if (j instanceof J.Return) {
             before.insert(0, "return ");
             after.append(";");
-        } else if(j instanceof J.If) {
-            J.If iff = (J.If)j;
-            if(referToSameElement(prior, iff.getIfCondition())) {
+        } else if (j instanceof J.If) {
+            J.If iff = (J.If) j;
+            if (referToSameElement(prior, iff.getIfCondition())) {
                 before.insert(0, "boolean __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");
             }
-        } else if(j instanceof J.Assignment) {
-            J.Assignment as = (J.Assignment)j;
-            if(referToSameElement(prior, as.getAssignment())) {
+        } else if (j instanceof J.Assignment) {
+            J.Assignment as = (J.Assignment) j;
+            if (referToSameElement(prior, as.getAssignment())) {
                 before.insert(0, as.getVariable() + " = ");
                 after.append(";");
             }

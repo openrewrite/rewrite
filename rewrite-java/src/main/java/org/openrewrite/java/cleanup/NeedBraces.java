@@ -76,9 +76,9 @@ public class NeedBraces extends Recipe {
 
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
-            SourceFile cu = (SourceFile)javaSourceFile;
+            SourceFile cu = (SourceFile) javaSourceFile;
             needBracesStyle = cu.getStyle(NeedBracesStyle.class) == null ? Checkstyle.needBracesStyle() : cu.getStyle(NeedBracesStyle.class);
-            return super.visitJavaSourceFile((JavaSourceFile)cu, ctx);
+            return super.visitJavaSourceFile((JavaSourceFile) cu, ctx);
         }
 
         @Override

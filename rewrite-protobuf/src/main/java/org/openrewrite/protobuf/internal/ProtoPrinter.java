@@ -325,7 +325,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     }
 
     protected void visitContainer(String before, @Nullable ProtoContainer<? extends Proto> container,
-                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+                                   String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
         if (container == null) {
             return;
         }

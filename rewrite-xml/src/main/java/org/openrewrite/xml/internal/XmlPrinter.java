@@ -170,7 +170,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-        if(marker instanceof SearchResult) {
+        if (marker instanceof SearchResult) {
             String description = ((SearchResult) marker).getDescription();
             p.out.append("<!--~~")
                     .append(description == null ? "" : "(" + description + ")~~")

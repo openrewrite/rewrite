@@ -20,13 +20,13 @@ import org.openrewrite.ExecutionContext;
 
 public class ParsingExecutionContextView extends DelegatingExecutionContext {
     private static final String PARSING_LISTENER = "org.openrewrite.core.parsingListener";
-    
+
     public ParsingExecutionContextView(ExecutionContext delegate) {
         super(delegate);
     }
 
     public static ParsingExecutionContextView view(ExecutionContext ctx) {
-        if(ctx instanceof ParsingExecutionContextView) {
+        if (ctx instanceof ParsingExecutionContextView) {
             return (ParsingExecutionContextView) ctx;
         }
         return new ParsingExecutionContextView(ctx);

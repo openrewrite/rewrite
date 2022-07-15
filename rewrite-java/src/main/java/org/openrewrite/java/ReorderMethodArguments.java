@@ -94,9 +94,9 @@ public class ReorderMethodArguments extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                if(Boolean.TRUE.equals(ignoreDefinition)) {
+                if (Boolean.TRUE.equals(ignoreDefinition)) {
                     J j = new DeclaresMethod<>(methodPattern, true).visitNonNull(cu, ctx);
-                    if(cu != j) {
+                    if (cu != j) {
                         return cu;
                     }
                 }
@@ -122,7 +122,8 @@ public class ReorderMethodArguments extends Recipe {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
             if (methodMatcher.matches(m) && m.getMethodType() != null) {
-                @SuppressWarnings("ConstantConditions") List<String> paramNames =
+                @SuppressWarnings("ConstantConditions")
+                List<String> paramNames =
                         oldParameterNames == null || oldParameterNames.length == 0 ?
                                 m.getMethodType().getParameterNames() :
                                 asList(oldParameterNames);

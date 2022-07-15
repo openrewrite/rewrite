@@ -18,6 +18,7 @@ package org.openrewrite.java.isolated;
 import org.openrewrite.java.tree.J;
 
 import java.util.List;
+
 public final class ReloadableJava17ModifierResults {
 
     private final List<J.Annotation> leadingAnnotations;

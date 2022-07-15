@@ -103,7 +103,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                 source.isCharsetBomMarked(),
                 FileAttributes.fromPath(sourceFile),
                 null
-                );
+        );
     }
 
     @Nullable

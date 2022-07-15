@@ -52,7 +52,7 @@ public class NullUtils {
             "NonNull",
             "Nonnull",
             "NotNull"
-            );
+    );
 
     /**
      * A list of field-level annotation names that indicate a field is Nullable. The matching logic is not
@@ -94,7 +94,7 @@ public class NullUtils {
         List<Field> nonNullFields = new ArrayList<>(fields.length);
         for (Field field : fields) {
             field.setAccessible(true);
-            if(fieldHasNonNullableAnnotation(field) ||
+            if (fieldHasNonNullableAnnotation(field) ||
                     (defaultNonNull && !fieldHasNullableAnnotation(field))) {
                 nonNullFields.add(field);
             }
@@ -108,6 +108,7 @@ public class NullUtils {
                 .map(a -> a.annotationType().getSimpleName())
                 .anyMatch(FIELD_LEVEL_NON_NULL_ANNOTATIONS::contains);
     }
+
     private static boolean fieldHasNullableAnnotation(Field field) {
         return Arrays.stream(field.getDeclaredAnnotations())
                 .map(a -> a.annotationType().getSimpleName())

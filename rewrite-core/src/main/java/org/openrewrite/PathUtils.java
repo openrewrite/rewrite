@@ -19,7 +19,8 @@ import java.nio.file.FileSystems;
 import java.nio.file.Path;
 
 public class PathUtils {
-    private PathUtils() {}
+    private PathUtils() {
+    }
 
     private static final String UNIX_SEPARATOR = "/";
 
@@ -39,7 +40,7 @@ public class PathUtils {
     /**
      * Compare two strings representing file paths, returning true if they indicate the same path regardless of separators
      */
-    public static boolean equalIgnoringSeparators(String a , String b) {
+    public static boolean equalIgnoringSeparators(String a, String b) {
         return separatorsToSystem(a).equals(separatorsToSystem(b));
     }
 
@@ -52,7 +53,7 @@ public class PathUtils {
     }
 
     public static String separatorsToSystem(String path) {
-        if(FileSystems.getDefault().getSeparator().equals(WINDOWS_SEPARATOR)) {
+        if (FileSystems.getDefault().getSeparator().equals(WINDOWS_SEPARATOR)) {
             return separatorsToWindows(path);
         }
         return separatorsToUnix(path);

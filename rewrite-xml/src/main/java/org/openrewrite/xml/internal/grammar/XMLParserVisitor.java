@@ -15,6 +15,7 @@
  */
 // Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.9.3
 package org.openrewrite.xml.internal.grammar;
+
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
 /**
@@ -25,94 +26,108 @@ import org.antlr.v4.runtime.tree.ParseTreeVisitor;
  * operations with no return type.
  */
 public interface XMLParserVisitor<T> extends ParseTreeVisitor<T> {
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#document}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitDocument(XMLParser.DocumentContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#prolog}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitProlog(XMLParser.PrologContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#xmldecl}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitXmldecl(XMLParser.XmldeclContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#misc}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitMisc(XMLParser.MiscContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#doctypedecl}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitDoctypedecl(XMLParser.DoctypedeclContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#intsubset}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitIntsubset(XMLParser.IntsubsetContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#markupdecl}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitMarkupdecl(XMLParser.MarkupdeclContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#declSep}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitDeclSep(XMLParser.DeclSepContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#externalid}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitExternalid(XMLParser.ExternalidContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#processinginstruction}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitProcessinginstruction(XMLParser.ProcessinginstructionContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#content}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitContent(XMLParser.ContentContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#element}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitElement(XMLParser.ElementContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#reference}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitReference(XMLParser.ReferenceContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#attribute}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitAttribute(XMLParser.AttributeContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link XMLParser#chardata}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitChardata(XMLParser.ChardataContext ctx);
+    /**
+     * Visit a parse tree produced by {@link XMLParser#document}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitDocument(XMLParser.DocumentContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#prolog}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitProlog(XMLParser.PrologContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#xmldecl}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitXmldecl(XMLParser.XmldeclContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#misc}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitMisc(XMLParser.MiscContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#doctypedecl}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitDoctypedecl(XMLParser.DoctypedeclContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#intsubset}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitIntsubset(XMLParser.IntsubsetContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#markupdecl}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitMarkupdecl(XMLParser.MarkupdeclContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#declSep}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitDeclSep(XMLParser.DeclSepContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#externalid}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitExternalid(XMLParser.ExternalidContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#processinginstruction}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitProcessinginstruction(XMLParser.ProcessinginstructionContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#content}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitContent(XMLParser.ContentContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#element}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitElement(XMLParser.ElementContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#reference}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitReference(XMLParser.ReferenceContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#attribute}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitAttribute(XMLParser.AttributeContext ctx);
+
+    /**
+     * Visit a parse tree produced by {@link XMLParser#chardata}.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitChardata(XMLParser.ChardataContext ctx);
 }

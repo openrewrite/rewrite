@@ -142,7 +142,7 @@ public class TypeUtils {
             return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type).getFullyQualifiedName(), (fqn));
         } else if (type instanceof JavaType.Variable) {
             return isOfClassType(((JavaType.Variable) type).getType(), fqn);
-        } else if(type instanceof JavaType.Method) {
+        } else if (type instanceof JavaType.Method) {
             return isOfClassType(((JavaType.Method) type).getReturnType(), fqn);
         } else if (type instanceof JavaType.Array) {
             return isOfClassType(((JavaType.Array) type).getElemType(), fqn);

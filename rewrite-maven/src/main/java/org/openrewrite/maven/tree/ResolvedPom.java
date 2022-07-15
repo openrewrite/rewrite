@@ -500,7 +500,7 @@ public class ResolvedPom {
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
-                                                        MavenPomDownloader downloader, ExecutionContext ctx) {
+                                                         MavenPomDownloader downloader, ExecutionContext ctx) {
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
         List<DependencyAndDependent> dependenciesAtDepth = new ArrayList<>();
@@ -630,7 +630,7 @@ public class ResolvedPom {
             //noinspection ConstantConditions
             Scope s = getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
                     getValue(d2.getClassifier()));
-            if(s == null) {
+            if (s == null) {
                 //noinspection ConstantConditions
                 s = containingPom.getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
                         getValue(d2.getClassifier()));

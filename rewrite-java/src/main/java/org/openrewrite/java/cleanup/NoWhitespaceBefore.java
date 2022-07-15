@@ -57,7 +57,7 @@ public class NoWhitespaceBefore extends Recipe {
 
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
-            SourceFile cu = (SourceFile)javaSourceFile;
+            SourceFile cu = (SourceFile) javaSourceFile;
             spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
             noWhitespaceBeforeStyle = cu.getStyle(NoWhitespaceBeforeStyle.class) == null ? Checkstyle.noWhitespaceBeforeStyle() : cu.getStyle(NoWhitespaceBeforeStyle.class);
             emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);

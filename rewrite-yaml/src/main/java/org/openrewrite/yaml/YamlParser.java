@@ -169,7 +169,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             startBracePrefix = fullPrefix.substring(startIndex, openingBraceIndex);
                             lastEnd = event.getEndMark().getIndex();
                         }
-                        blockStack.push(new MappingBuilder(fmt,startBracePrefix));
+                        blockStack.push(new MappingBuilder(fmt, startBracePrefix));
                         break;
                     }
                     case Scalar: {

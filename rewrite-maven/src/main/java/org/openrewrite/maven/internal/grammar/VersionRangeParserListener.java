@@ -15,6 +15,7 @@
  */
 // Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.3
 package org.openrewrite.maven.internal.grammar;
+
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
 /**
@@ -22,74 +23,87 @@ import org.antlr.v4.runtime.tree.ParseTreeListener;
  * {@link VersionRangeParser}.
  */
 public interface VersionRangeParserListener extends ParseTreeListener {
-	/**
-	 * Enter a parse tree produced by {@link VersionRangeParser#versionRequirement}.
-	 * @param ctx the parse tree
-	 */
-	void enterVersionRequirement(VersionRangeParser.VersionRequirementContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link VersionRangeParser#versionRequirement}.
-	 * @param ctx the parse tree
-	 */
-	void exitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link VersionRangeParser#range}.
-	 * @param ctx the parse tree
-	 */
-	void enterRange(VersionRangeParser.RangeContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link VersionRangeParser#range}.
-	 * @param ctx the parse tree
-	 */
-	void exitRange(VersionRangeParser.RangeContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link VersionRangeParser#bounds}.
-	 * @param ctx the parse tree
-	 */
-	void enterBounds(VersionRangeParser.BoundsContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link VersionRangeParser#bounds}.
-	 * @param ctx the parse tree
-	 */
-	void exitBounds(VersionRangeParser.BoundsContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link VersionRangeParser#exactly}.
-	 * @param ctx the parse tree
-	 */
-	void enterExactly(VersionRangeParser.ExactlyContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link VersionRangeParser#exactly}.
-	 * @param ctx the parse tree
-	 */
-	void exitExactly(VersionRangeParser.ExactlyContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link VersionRangeParser#boundedLower}.
-	 * @param ctx the parse tree
-	 */
-	void enterBoundedLower(VersionRangeParser.BoundedLowerContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link VersionRangeParser#boundedLower}.
-	 * @param ctx the parse tree
-	 */
-	void exitBoundedLower(VersionRangeParser.BoundedLowerContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link VersionRangeParser#unboundedLower}.
-	 * @param ctx the parse tree
-	 */
-	void enterUnboundedLower(VersionRangeParser.UnboundedLowerContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link VersionRangeParser#unboundedLower}.
-	 * @param ctx the parse tree
-	 */
-	void exitUnboundedLower(VersionRangeParser.UnboundedLowerContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link VersionRangeParser#version}.
-	 * @param ctx the parse tree
-	 */
-	void enterVersion(VersionRangeParser.VersionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link VersionRangeParser#version}.
-	 * @param ctx the parse tree
-	 */
-	void exitVersion(VersionRangeParser.VersionContext ctx);
+    /**
+     * Enter a parse tree produced by {@link VersionRangeParser#versionRequirement}.
+     * @param ctx the parse tree
+     */
+    void enterVersionRequirement(VersionRangeParser.VersionRequirementContext ctx);
+
+    /**
+     * Exit a parse tree produced by {@link VersionRangeParser#versionRequirement}.
+     * @param ctx the parse tree
+     */
+    void exitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx);
+
+    /**
+     * Enter a parse tree produced by {@link VersionRangeParser#range}.
+     * @param ctx the parse tree
+     */
+    void enterRange(VersionRangeParser.RangeContext ctx);
+
+    /**
+     * Exit a parse tree produced by {@link VersionRangeParser#range}.
+     * @param ctx the parse tree
+     */
+    void exitRange(VersionRangeParser.RangeContext ctx);
+
+    /**
+     * Enter a parse tree produced by {@link VersionRangeParser#bounds}.
+     * @param ctx the parse tree
+     */
+    void enterBounds(VersionRangeParser.BoundsContext ctx);
+
+    /**
+     * Exit a parse tree produced by {@link VersionRangeParser#bounds}.
+     * @param ctx the parse tree
+     */
+    void exitBounds(VersionRangeParser.BoundsContext ctx);
+
+    /**
+     * Enter a parse tree produced by {@link VersionRangeParser#exactly}.
+     * @param ctx the parse tree
+     */
+    void enterExactly(VersionRangeParser.ExactlyContext ctx);
+
+    /**
+     * Exit a parse tree produced by {@link VersionRangeParser#exactly}.
+     * @param ctx the parse tree
+     */
+    void exitExactly(VersionRangeParser.ExactlyContext ctx);
+
+    /**
+     * Enter a parse tree produced by {@link VersionRangeParser#boundedLower}.
+     * @param ctx the parse tree
+     */
+    void enterBoundedLower(VersionRangeParser.BoundedLowerContext ctx);
+
+    /**
+     * Exit a parse tree produced by {@link VersionRangeParser#boundedLower}.
+     * @param ctx the parse tree
+     */
+    void exitBoundedLower(VersionRangeParser.BoundedLowerContext ctx);
+
+    /**
+     * Enter a parse tree produced by {@link VersionRangeParser#unboundedLower}.
+     * @param ctx the parse tree
+     */
+    void enterUnboundedLower(VersionRangeParser.UnboundedLowerContext ctx);
+
+    /**
+     * Exit a parse tree produced by {@link VersionRangeParser#unboundedLower}.
+     * @param ctx the parse tree
+     */
+    void exitUnboundedLower(VersionRangeParser.UnboundedLowerContext ctx);
+
+    /**
+     * Enter a parse tree produced by {@link VersionRangeParser#version}.
+     * @param ctx the parse tree
+     */
+    void enterVersion(VersionRangeParser.VersionContext ctx);
+
+    /**
+     * Exit a parse tree produced by {@link VersionRangeParser#version}.
+     * @param ctx the parse tree
+     */
+    void exitVersion(VersionRangeParser.VersionContext ctx);
 }

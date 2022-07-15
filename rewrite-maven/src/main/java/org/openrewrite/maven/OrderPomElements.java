@@ -219,7 +219,7 @@ public class OrderPomElements extends Recipe {
                         List<Content> orderedContents = new ArrayList<>();
                         for (String type : new String[]{"groupId", "artifactId", "version"}) {
                             List<Content> gavContents = gavGroups.get(type);
-                            if(gavContents != null) {
+                            if (gavContents != null) {
                                 orderedContents.addAll(gavContents);
                             }
                         }

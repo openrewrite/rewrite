@@ -122,7 +122,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 } else {
                     // Handle consecutive new lines.
                     if ((sourceArr[i - 1] == '\n' ||
-                            sourceArr[i - 1] == '\r' && sourceArr[i -2] == '\n')) {
+                            sourceArr[i - 1] == '\r' && sourceArr[i - 2] == '\n')) {
                         String prevLineLine = sourceArr[i - 1] == '\n' ? "\n" : "\r\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
                     } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.

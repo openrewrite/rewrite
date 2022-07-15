@@ -122,6 +122,7 @@ public final class PrintMavenAsCycloneDxBom {
         }
         bom.append("    </components>\n");
     }
+
     private static void writeDependencies(List<ResolvedDependency> dependencies, StringBuilder bom) {
         if (dependencies.isEmpty()) {
             return;
@@ -150,7 +151,7 @@ public final class PrintMavenAsCycloneDxBom {
     }
 
     private static void writeComponent(Scope scope, String groupId, String artifactId, String version,
-                                       String packaging, List<License> licenses, StringBuilder bom) {
+                                        String packaging, List<License> licenses, StringBuilder bom) {
 
         String indent = "        ";
         String bomReference = getBomReference(groupId, artifactId, version);

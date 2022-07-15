@@ -67,7 +67,8 @@ public class JsonPathMatcher {
         } else {
             start = cursorPath.peekFirst();
         }
-        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, start, false);
+        @SuppressWarnings("ConstantConditions")
+        JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, start, false);
         JsonPathParser.JsonPathContext ctx = jsonPath().jsonPath();
         Object result = v.visit(ctx);
 

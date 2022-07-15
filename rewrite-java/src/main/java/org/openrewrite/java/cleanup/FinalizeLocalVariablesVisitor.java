@@ -63,7 +63,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
             return mv;
         }
 
-        if(isDeclaredInForLoopControl()) {
+        if (isDeclaredInForLoopControl()) {
             return mv;
         }
 
@@ -82,7 +82,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
 
         return mv;
     }
-    
+
     private boolean isDeclaredInForLoopControl() {
         return getCursor()
                 .dropParentUntil(J.class::isInstance)

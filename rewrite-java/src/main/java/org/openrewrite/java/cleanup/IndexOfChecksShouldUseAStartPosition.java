@@ -71,7 +71,7 @@ public class IndexOfChecksShouldUseAStartPosition extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             private boolean isValueNotCompliant(J.Literal literal) {
-                return !(literal.getValue() instanceof Integer && ((Integer)(literal.getValue()) <= 0));
+                return !(literal.getValue() instanceof Integer && ((Integer) (literal.getValue()) <= 0));
             }
 
             @Override
@@ -79,7 +79,7 @@ public class IndexOfChecksShouldUseAStartPosition extends Recipe {
                 J.Binary b = super.visitBinary(binary, ctx);
                 if (b.getLeft() instanceof J.MethodInvocation && STRING_INDEX_MATCHER.matches(b.getLeft()) &&
                         b.getOperator() == J.Binary.Type.GreaterThan &&
-                        b.getRight() instanceof J.Literal && isValueNotCompliant((J.Literal)b.getRight())) {
+                        b.getRight() instanceof J.Literal && isValueNotCompliant((J.Literal) b.getRight())) {
 
                     J.MethodInvocation m = (J.MethodInvocation) b.getLeft();
                     b = b.withLeft(m.withTemplate(JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}, #{any(int)}").build(),

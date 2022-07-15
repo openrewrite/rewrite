@@ -61,7 +61,8 @@ public class FileAttributes {
                         Files.isWritable(path),
                         Files.isExecutable(path),
                         basicFileAttributes.size());
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         }
         return null;
     }

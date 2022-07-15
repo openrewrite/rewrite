@@ -56,6 +56,7 @@ public class SemanticallyEqual {
         private final boolean compareMethodArguments;
 
         AtomicBoolean isEqual = new AtomicBoolean(true);
+
         public SemanticallyEqualVisitor(boolean compareMethodArguments) {
             this.compareMethodArguments = compareMethodArguments;
         }

@@ -103,7 +103,7 @@ public class QuarkParser implements Parser<Quark> {
 
     @Override
     public List<Quark> parseInputs(Iterable<Parser.Input> sources, @Nullable Path relativeTo,
-                                   ExecutionContext ctx) {
+                                                  ExecutionContext ctx) {
         List<Quark> quarks = new ArrayList<>();
         for (Parser.Input source : sources) {
             quarks.add(new Quark(randomId(),

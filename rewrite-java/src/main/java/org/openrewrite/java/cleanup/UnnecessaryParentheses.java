@@ -56,7 +56,7 @@ public class UnnecessaryParentheses extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                UnnecessaryParenthesesStyle style = ((SourceFile)cu).getStyle(UnnecessaryParenthesesStyle.class);
+                UnnecessaryParenthesesStyle style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class);
                 if (style == null) {
                     style = Checkstyle.unnecessaryParentheses();
                 }

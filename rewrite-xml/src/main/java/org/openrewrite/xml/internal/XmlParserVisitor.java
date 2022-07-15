@@ -61,28 +61,28 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
         return convert(ctx, (c, prefix) -> new Xml.Document(
-                randomId(),
-                path,
-                prefix,
-                Markers.EMPTY,
-                charset.name(),
-                charsetBomMarked,
-                null,
-                fileAttributes,
-                visitProlog(ctx.prolog()),
-                visitElement(ctx.element()),
-                source.substring(cursor))
+                        randomId(),
+                        path,
+                        prefix,
+                        Markers.EMPTY,
+                        charset.name(),
+                        charsetBomMarked,
+                        null,
+                        fileAttributes,
+                        visitProlog(ctx.prolog()),
+                        visitElement(ctx.element()),
+                        source.substring(cursor))
         );
     }
 
     @Override
     public Xml.Prolog visitProlog(XMLParser.PrologContext ctx) {
         return convert(ctx, (c, prefix) -> new Xml.Prolog(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                visitXmldecl(ctx.xmldecl()),
-                ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()))
+                        randomId(),
+                        prefix,
+                        Markers.EMPTY,
+                        visitXmldecl(ctx.xmldecl()),
+                        ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()))
         );
     }
 

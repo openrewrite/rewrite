@@ -67,7 +67,7 @@ public class RemoveExclusion extends Recipe {
                     Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                     if (maybeExclusions.isPresent()) {
                         return tag.withContent(ListUtils.map(tag.getChildren(), child -> {
-                            if("exclusions".equals(child.getName())) {
+                            if ("exclusions".equals(child.getName())) {
                                 Xml.Tag e = child;
                                 if (e.getContent() != null) {
                                     e = e.withContent(ListUtils.map(e.getChildren(), exclusion -> {

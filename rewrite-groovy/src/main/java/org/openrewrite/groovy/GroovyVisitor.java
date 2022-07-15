@@ -151,7 +151,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
     }
 
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
-                                                        GContainer.Location loc, P p) {
+                                                         GContainer.Location loc, P p) {
         return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
     }
 }

@@ -57,7 +57,7 @@ public class FallThrough extends Recipe {
     private static class FallThroughFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            FallThroughStyle style = ((SourceFile)cu).getStyle(FallThroughStyle.class);
+            FallThroughStyle style = ((SourceFile) cu).getStyle(FallThroughStyle.class);
             if (style == null) {
                 style = Checkstyle.fallThrough();
             }

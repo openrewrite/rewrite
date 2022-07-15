@@ -80,7 +80,7 @@ final class ExternalFlowModels {
             Cursor srcCursor,
             Expression sinkExpression,
             Cursor sinkCursor
-    ) {
+            ) {
         return getOrComputeOptimizedFlowModels(srcCursor).value.stream().anyMatch(
                 value -> value.isAdditionalFlowStep(srcExpression, srcCursor, sinkExpression, sinkCursor)
         );
@@ -91,7 +91,7 @@ final class ExternalFlowModels {
             Cursor srcCursor,
             Expression sinkExpression,
             Cursor sinkCursor
-    ) {
+            ) {
         return getOrComputeOptimizedFlowModels(srcCursor).taint.stream().anyMatch(
                 taint -> taint.isAdditionalFlowStep(srcExpression, srcCursor, sinkExpression, sinkCursor)
         );
@@ -130,7 +130,7 @@ final class ExternalFlowModels {
         private AdditionalFlowStepPredicate forFlowFromArgumentIndexToReturn(
                 int argumentIndex,
                 Collection<MethodMatcher> methodMatchers
-        ) {
+                ) {
             InvocationMatcher callMatcher = InvocationMatcher.fromMethodMatchers(methodMatchers);
             if (argumentIndex == -1) {
                 // Argument[-1] is the 'select' or 'qualifier' of a method call

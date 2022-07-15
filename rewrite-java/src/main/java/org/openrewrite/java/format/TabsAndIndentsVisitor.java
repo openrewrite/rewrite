@@ -417,7 +417,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 if (hasFileLeadingComment || whitespace.contains("\n") &&
                         // Do not shift single line comments at col 0.
                         !(!s.getComments().isEmpty() && s.getComments().get(0) instanceof TextComment &&
-                        !s.getComments().get(0).isMultiline() && getLengthOfWhitespace(s.getWhitespace()) == 0)) {
+                                !s.getComments().get(0).isMultiline() && getLengthOfWhitespace(s.getWhitespace()) == 0)) {
                     int shift = finalColumn - indent;
                     s = s.withWhitespace(whitespace.substring(0, whitespace.lastIndexOf('\n') + 1) +
                             indent(lastIndent, shift));
@@ -511,12 +511,12 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         } else if (comment instanceof Javadoc.DocComment) {
             final Javadoc.DocComment docComment = (Javadoc.DocComment) comment;
             return docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
-                if(!(jdoc instanceof Javadoc.LineBreak)) {
+                if (!(jdoc instanceof Javadoc.LineBreak)) {
                     return jdoc;
                 }
                 Javadoc.LineBreak lineBreak = (Javadoc.LineBreak) jdoc;
                 String linebreak;
-                if(lineBreak.getMargin().charAt(0) == '\r') {
+                if (lineBreak.getMargin().charAt(0) == '\r') {
                     linebreak = "\r\n";
                 } else {
                     linebreak = "\n";
@@ -585,7 +585,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         Cursor forCursor = getCursor().dropParentUntil(J.ForLoop.class::isInstance);
         J.ForLoop forLoop = forCursor.getValue();
         Object parent = forCursor.getParentOrThrow().getValue();
-        @SuppressWarnings("ConstantConditions") J alignTo = parent instanceof J.Label ?
+        @SuppressWarnings("ConstantConditions")
+        J alignTo = parent instanceof J.Label ?
                 ((J.Label) parent).withStatement(forLoop.withBody(null)) :
                 forLoop.withBody(null);
 

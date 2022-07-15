@@ -77,7 +77,7 @@ public class DeclarativeRecipe extends Recipe {
     void initialize(Collection<Recipe> availableRecipes) {
         for (int i = 0; i < uninitializedRecipes.size(); i++) {
             Recipe recipe = uninitializedRecipes.get(i);
-            if(recipe instanceof LazyLoadedRecipe) {
+            if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
                 Optional<Recipe> next = availableRecipes.stream()
                         .filter(r -> r.getName().equals(recipeFqn)).findAny();

@@ -34,7 +34,7 @@ public class PrintOutputCapture<P> {
     }
 
     public PrintOutputCapture<P> append(@Nullable String text) {
-        if(text == null) {
+        if (text == null) {
             return this;
         }
         out.append(text);

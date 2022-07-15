@@ -70,7 +70,7 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
             Cursor srcCursor,
             Expression sinkExpression,
             Cursor sinkCursor
-    ) {
+            ) {
         return ExternalFlowModels.instance().isAdditionalFlowStep(
                 srcExpression,
                 srcCursor,
@@ -99,7 +99,7 @@ public abstract class LocalFlowSpec<Source extends Expression, Sink extends J> {
             Cursor srcCursor,
             Expression sinkExpression,
             Cursor sinkCursor
-    ) {
+            ) {
         return false;
     }
 

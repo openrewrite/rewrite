@@ -90,7 +90,7 @@ public class SimplifyConsecutiveAssignments extends Recipe {
                     }));
                 } while (combined != b);
 
-                if(b != block) {
+                if (b != block) {
                     b = (J.Block) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
                             .visitNonNull(b, ctx, getCursor());
                 }

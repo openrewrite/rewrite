@@ -77,7 +77,7 @@ public class MavenParser implements Parser<Xml.Document> {
 
     @Override
     public List<Xml.Document> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
-                                          ExecutionContext ctx) {
+                                                         ExecutionContext ctx) {
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
         Map<Path, Pom> projectPomsByPath = new HashMap<>();
         for (Input source : sources) {
@@ -100,7 +100,7 @@ public class MavenParser implements Parser<Xml.Document> {
 
         List<Xml.Document> parsed = new ArrayList<>();
 
-        if(httpSender != null) {
+        if (httpSender != null) {
             ctx = HttpSenderExecutionContextView.view(ctx).setHttpSender(httpSender);
         }
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);

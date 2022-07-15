@@ -610,7 +610,7 @@ public class StringUtils {
         int delimIndex = cursor;
         for (; delimIndex < source.length(); delimIndex++) {
             if (inSingleLineComment) {
-                if(source.charAt(delimIndex) == '\n') {
+                if (source.charAt(delimIndex) == '\n') {
                     inSingleLineComment = false;
                 }
             } else {

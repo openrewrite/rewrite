@@ -415,7 +415,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         String level = ctx.stringLiteral().StringLiteral().getText();
         return new Proto.Syntax(randomId(), sourceBefore("syntax"), Markers.EMPTY, sourceBefore("="),
                 ProtoRightPadded.build(new Proto.Constant(randomId(), sourceBefore(level), Markers.EMPTY,
-                                level.substring(1, level.length() - 1), level))
+                        level.substring(1, level.length() - 1), level))
                         .withAfter(sourceBefore(";")));
     }
 

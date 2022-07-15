@@ -27,5 +27,5 @@ interface AdditionalFlowStepPredicate {
             Cursor srcCursor,
             Expression sinkExpression,
             Cursor sinkCursor
-    );
+            );
 }

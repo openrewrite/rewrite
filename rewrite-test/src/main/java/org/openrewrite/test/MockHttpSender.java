@@ -32,6 +32,7 @@ public class MockHttpSender implements HttpSender {
 
     @Override
     public Response send(Request request) {
-        return new Response(200, is.get(), () -> {});
+        return new Response(200, is.get(), () -> {
+        });
     }
 }

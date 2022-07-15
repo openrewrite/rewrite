@@ -207,9 +207,9 @@ public class CategoryTree<G> {
     public Collection<RecipeDescriptor> getRecipes() {
         synchronized (lock) {
             return Stream.concat(
-                            recipesByGroup.values().stream().flatMap(Collection::stream),
-                            subtrees.stream().flatMap(it -> it.getRecipes().stream())
-                    )
+                    recipesByGroup.values().stream().flatMap(Collection::stream),
+                    subtrees.stream().flatMap(it -> it.getRecipes().stream())
+            )
                     .distinct()
                     .collect(toList());
         }

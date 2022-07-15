@@ -105,7 +105,7 @@ public class AddPlugin extends Recipe {
             if (BUILD_MATCHER.matches(getCursor())) {
                 Optional<Xml.Tag> maybePlugins = t.getChild("plugins");
                 Xml.Tag plugins;
-                if(maybePlugins.isPresent()) {
+                if (maybePlugins.isPresent()) {
                     plugins = maybePlugins.get();
                 } else {
                     t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build("<plugins/>")).visitNonNull(t, ctx, getCursor().getParentOrThrow());

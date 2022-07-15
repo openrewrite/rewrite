@@ -48,7 +48,7 @@ public class NamedStyles implements Marker {
     @SuppressWarnings("unchecked")
     @Nullable
     public static <S extends Style> S merge(Class<S> styleClass,
-                                            Iterable<? extends NamedStyles> namedStyles) {
+                                                                                              Iterable<? extends NamedStyles> namedStyles) {
         S merged = null;
         for (NamedStyles namedStyle : namedStyles) {
             for (Style style : namedStyle.styles) {
