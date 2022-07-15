@@ -56,14 +56,14 @@ public class ControlFlowVisualizer {
         for (ControlFlowNode node : all) {
             if (node instanceof ControlFlowNode.BasicBlock) {
                 ControlFlowNode.BasicBlock basicBlock = (ControlFlowNode.BasicBlock) node;
-                System.out.println("  " + nodeToIndex.get(node) + " [label=\"" + basicBlock.getStatementsWithinBlock() + "\"];");
+                System.out.println("  " + nodeToIndex.get(node) + " [label=\"\n" + basicBlock.getStatementsWithinBlock() + "\"\n];");
                 for (ControlFlowNode successor : node.getSuccessors()) {
                     System.out.println(String.format("  %d -> %d;", nodeToIndex.get(node), nodeToIndex.get(successor)));
                 }
                 continue;
             } else if (node instanceof ControlFlowNode.ConditionNode) {
                 ControlFlowNode.ConditionNode conditionNode = (ControlFlowNode.ConditionNode) node;
-                System.out.println("  " + nodeToIndex.get(node) + " [label=\"" + conditionNode.getCondition() + "\"];");
+                System.out.println("  " + nodeToIndex.get(node) + " [label=\"\n" + conditionNode.getCondition() + "\"\n];");
                 for (ControlFlowNode successor : node.getSuccessors()) {
                     System.out.println(String.format("  %d -> %d;", nodeToIndex.get(node), nodeToIndex.get(successor)));
                 }

@@ -21,6 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Marker;
 
