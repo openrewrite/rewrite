@@ -237,7 +237,7 @@ public abstract class ControlFlowNode {
             Cursor commonBlock = getCommonBlock();
             printer.visit(commonBlock.getValue(), capture, commonBlock.getParentOrThrow());
 //            return StringUtils.trimIndentPreserveCRLF(capture.getOut());
-            return capture.getOut();
+            return capture.getOut().replaceAll("(?m)^[ \t]*\r?\n", "");
         }
 
         /**
