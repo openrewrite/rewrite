@@ -215,10 +215,12 @@ final class ExternalFlowModels {
         FlowModels forTypesInUse(TypesInUse typesInUse) {
             Set<FlowModel> value = new HashSet<>();
             Set<FlowModel> taint = new HashSet<>();
+            //noinspection ConstantConditions
             typesInUse
                     .getUsedMethods()
                     .stream()
                     .map(JavaType.Method::getDeclaringType)
+                    .filter(o -> o != null && !(o instanceof JavaType.Unknown))
                     .map(JavaType.FullyQualified::getFullyQualifiedName)
                     .distinct()
                     .forEach(fqn -> {
