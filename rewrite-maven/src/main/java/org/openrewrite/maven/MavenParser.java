@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -112,6 +113,7 @@ public class MavenParser implements Parser<Xml.Document> {
             parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
         }
 
+        PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper("${", "}", null);
         for (int i = 0; i < parsed.size(); i++) {
             Xml.Document maven = parsed.get(i);
             MavenResolutionResult resolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class)
@@ -128,7 +130,9 @@ public class MavenParser implements Parser<Xml.Document> {
                 if (parent != null &&
                         parent.getGroupId().equals(resolutionResult.getPom().getGroupId()) &&
                         parent.getArtifactId().equals(resolutionResult.getPom().getArtifactId()) &&
-                        parent.getVersion().equals(resolutionResult.getPom().getVersion())) {
+                        propertyPlaceholderHelper.replacePlaceholders(
+                                        parent.getVersion(), resolutionResult.getPom().getProperties()::get)
+                                .equals(resolutionResult.getPom().getVersion())) {
                     moduleResolutionResult.unsafeSetParent(resolutionResult);
                     modules.add(moduleResolutionResult);
                 }
