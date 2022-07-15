@@ -187,10 +187,12 @@ public final class ExternalSinkModels {
          */
         SinkModels forTypesInUse(TypesInUse typesInUse) {
             Map<String, Set<SinkModel>> sinkModels = new HashMap<>();
+            //noinspection ConstantConditions
             typesInUse
                     .getUsedMethods()
                     .stream()
                     .map(JavaType.Method::getDeclaringType)
+                    .filter(o -> o != null && !(o instanceof JavaType.Unknown))
                     .map(JavaType.FullyQualified::getFullyQualifiedName)
                     .distinct()
                     .flatMap(fqn -> fqnToSinkModels.getOrDefault(
