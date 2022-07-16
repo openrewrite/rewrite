@@ -18,8 +18,6 @@ package org.openrewrite.java.dataflow;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.openrewrite.Cursor;
-import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.dataflow.internal.InvocationMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;

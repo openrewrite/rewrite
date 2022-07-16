@@ -20,7 +20,6 @@ import lombok.Getter;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
-import org.openrewrite.java.controlflow.Guard;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 

@@ -25,7 +25,7 @@ import org.openrewrite.marker.SearchResult
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
-@Suppress("FunctionName")
+@Suppress("FunctionName", "UnusedAssignment", "UnnecessaryLocalVariable", "ConstantConditions")
 interface ControlFlowTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(RewriteTest.toRecipe {
@@ -433,7 +433,7 @@ interface ControlFlowTest : RewriteTest {
     )
 
     @Test
-    fun `if statement with || in control`() = rewriteRun(
+    fun `if statement with OR in control`() = rewriteRun(
         java(
             """
             abstract class Test {
@@ -464,6 +464,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("ConditionCoveredByFurtherCondition", "ExcessiveRangeCheck")
     @Test
     fun `if statement with multiple && in control`() = rewriteRun(
         java(
@@ -530,12 +531,14 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("ConditionCoveredByFurtherCondition")
     @Test
     fun `if statement with && for boolean variable in control`() = rewriteRun(
         java(
             """
             abstract class Test {
                 abstract int start();
+                @SuppressWarnings({"ExcessiveRangeCheck", "RedundantSuppression"})
                 int test() {
                     int x = start();
                     x++;
@@ -550,6 +553,7 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
+                @SuppressWarnings({"ExcessiveRangeCheck", "RedundantSuppression"})
                 int test() /*~~(BB: 6 CN: 3 EX: 2 | L)~~>*/{
                     int x = start();
                     x++;
@@ -942,6 +946,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("InfiniteLoopStatement")
     @Test
     fun `for i loop forever`() = rewriteRun(
         java(
@@ -1088,6 +1093,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("ConstantConditions", "MismatchedReadAndWriteOfArray")
     @Test
     fun typecast() = rewriteRun(
         java(
@@ -1278,6 +1284,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("TryFinallyCanBeTryWithResources")
     @Test
     fun `control flow for try`() = rewriteRun(
         java(
@@ -1312,6 +1319,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("TryFinallyCanBeTryWithResources")
     @Test
     fun `control flow for try with return`() = rewriteRun(
         java(
@@ -1346,6 +1354,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("ClassInitializerMayBeStatic")
     @Test
     fun `control flow for init block`() = rewriteRun(
         java(
@@ -1406,6 +1415,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("StringBufferMayBeStringBuilder")
     @Test
     fun `decode url`() = rewriteRun(
         java(

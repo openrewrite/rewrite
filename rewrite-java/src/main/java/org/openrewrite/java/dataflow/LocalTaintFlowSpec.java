@@ -49,7 +49,7 @@ public abstract class LocalTaintFlowSpec<Source extends Expression, Sink extends
         );
     }
 
-    public final boolean isAdditionalTaintStep(
+    public boolean isAdditionalTaintStep(
             Expression srcExpression,
             Cursor srcCursor,
             Expression sinkExpression,
