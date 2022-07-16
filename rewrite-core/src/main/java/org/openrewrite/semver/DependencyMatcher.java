@@ -37,6 +37,7 @@ public class DependencyMatcher {
 
     private final String groupPattern;
     private final String artifactPattern;
+
     @Nullable
     private final VersionComparator versionComparator;
 

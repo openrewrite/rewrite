@@ -17,10 +17,7 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
@@ -37,14 +34,14 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyVersion extends Recipe {
     @Option(displayName = "Dependency pattern",
-            description = "A dependency pattern specifying which dependencies should have their groupId updated. " +
+            description = "A dependency pattern specifying which dependencies should have their group id updated. " +
                     DependencyMatcher.STANDARD_OPTION_DESCRIPTION,
             example = "com.fasterxml.jackson*:*"
     )
     String dependencyPattern;
 
-    @Option(displayName = "New Version",
-            description = "The version number to update the dependency to",
+    @Option(displayName = "New version",
+            description = "The version number to update the dependency to.",
             example = "1.0")
     String newVersion;
 
@@ -63,6 +60,11 @@ public class ChangeDependencyVersion extends Recipe {
     @Override
     public String getDescription() {
         return "Finds dependencies declared in `build.gradle` files.";
+    }
+
+    @Override
+    public Validated validate() {
+        return super.validate().and(DependencyMatcher.build(dependencyPattern));
     }
 
     @Override
