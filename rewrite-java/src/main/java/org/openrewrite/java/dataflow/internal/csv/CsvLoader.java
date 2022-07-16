@@ -38,7 +38,7 @@ public class CsvLoader {
     private static <R extends Mergeable<R>, E> R loadCvs(InputStream input, URI source, Function<Iterable<E>, R> merger, Function<String[], E> csvMapper) {
         BufferedReader reader = new BufferedReader(new InputStreamReader(input));
         try {
-            List<E> models = new ArrayList<E>();
+            List<E> models = new ArrayList<>();
             //noinspection UnusedAssignment skip the header line
             String line = reader.readLine();
             while ((line = reader.readLine()) != null) {

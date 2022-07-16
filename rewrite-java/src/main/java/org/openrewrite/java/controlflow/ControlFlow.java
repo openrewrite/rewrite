@@ -74,7 +74,7 @@ public class ControlFlow {
 
     private static class ControlFlowAnalysis<P> extends JavaIsoVisitor<P> {
         /**
-         * @implNote This MUST be 'protected' or package-private. This is set by annonymous inner classes.
+         * @implNote This MUST be 'protected' or package-private. This is set by anonymous inner classes.
          */
         protected Set<? extends ControlFlowNode> current;
 
@@ -121,10 +121,9 @@ public class ControlFlow {
             return basicBlock;
         }
 
-        <C extends ControlFlowNode> C addSuccessorToCurrent(C node) {
+        <C extends ControlFlowNode> void addSuccessorToCurrent(C node) {
             current.forEach(c -> c.addSuccessor(node));
             current = Collections.singleton(node);
-            return node;
         }
 
         private void addCursorToBasicBlock() {

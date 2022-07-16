@@ -18,7 +18,6 @@ package org.openrewrite.java.dataflow.internal.csv;
 import lombok.Data;
 import lombok.Getter;
 
-import java.util.ArrayList;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

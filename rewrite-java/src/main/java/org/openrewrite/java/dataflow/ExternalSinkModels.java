@@ -199,9 +199,9 @@ public final class ExternalSinkModels {
                                     fqn,
                                     Collections.emptyList()
                             ).stream()
-                    ).forEach(sinkModel -> {
-                        sinkModels.computeIfAbsent(sinkModel.kind, k -> new HashSet<>(1)).add(sinkModel);
-                    });
+                    ).forEach(sinkModel ->
+                            sinkModels.computeIfAbsent(sinkModel.kind, k -> new HashSet<>(1)).add(sinkModel)
+                    );
             return new SinkModels(sinkModels);
         }
 

@@ -59,7 +59,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             HashMap<String, FlowGraph> initialFlow = new HashMap<>();
             initialFlow.put(variableNameToFlowGraph.nextVariableName, variableNameToFlowGraph.nextFlowGraph);
             Analysis analysis = new Analysis(root.getSpec(), initialFlow);
-
+            assert taintStmtCursorParent != null: "taintStmtCursorParent is null";
             if (taintStmt instanceof J.WhileLoop ||
                     taintStmt instanceof J.DoWhileLoop ||
                     taintStmt instanceof J.ForLoop) {
@@ -79,6 +79,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                 analysis.visit(_try.getFinally(), 0, taintStmtCursorParent);
             } else {
                 // This is when assignment occurs within the body of a block
+                assert taintStmt != null : "taintStmt is null";
                 visitBlocksRecursive(root.getCursor().dropParentUntil(J.Block.class::isInstance), taintStmt, analysis);
             }
         }
