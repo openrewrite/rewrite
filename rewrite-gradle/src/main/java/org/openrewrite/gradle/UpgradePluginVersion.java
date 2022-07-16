@@ -15,57 +15,31 @@
  */
 package org.openrewrite.gradle;
 
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryConfig;
-import io.github.resilience4j.retry.RetryRegistry;
-import io.vavr.CheckedFunction1;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import okhttp3.ConnectionSpec;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
-import java.net.SocketTimeoutException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradePluginVersion extends Recipe {
-    private static final RetryConfig retryConfig = RetryConfig.custom()
-            .retryOnException(throwable -> throwable instanceof SocketTimeoutException ||
-                    throwable instanceof TimeoutException)
-            .build();
-
-    private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
-
-    private static final OkHttpClient httpClient = new OkHttpClient.Builder()
-            .connectionSpecs(Arrays.asList(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))
-            .build();
-
-    private static final Retry gradlePluginPortalRetry = retryRegistry.retry("GradlePluginPortal");
-
-    private static final CheckedFunction1<Request, Response> sendRequest = Retry.decorateCheckedFunction(
-            gradlePluginPortalRetry,
-            request -> httpClient.newCall(request).execute());
-
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`, as a glob expression.",
             example = "com.jfrog.bintray")
@@ -96,11 +70,7 @@ public class UpgradePluginVersion extends Recipe {
 
     @Override
     public Validated validate() {
-        Validated validated = super.validate();
-        if (newVersion != null) {
-            validated = validated.and(Semver.validate(newVersion, versionPattern));
-        }
-        return validated;
+        return super.validate().and(Semver.validate(newVersion, versionPattern));
     }
 
     @Override
@@ -117,7 +87,7 @@ public class UpgradePluginVersion extends Recipe {
         MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
         return new GroovyVisitor<ExecutionContext>() {
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (versionMatcher.matches(method) &&
                         method.getSelect() instanceof J.MethodInvocation &&
                         pluginMatcher.matches(method.getSelect())) {
@@ -130,7 +100,7 @@ public class UpgradePluginVersion extends Recipe {
                             if (versionArgs.get(0) instanceof J.Literal) {
                                 String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
                                 if (currentVersion != null) {
-                                    return versionComparator.upgrade(currentVersion, availablePluginVersions(pluginId))
+                                    return versionComparator.upgrade(currentVersion, availablePluginVersions(pluginId, ctx))
                                             .map(upgradeVersion -> method.withArguments(ListUtils.map(versionArgs, v -> {
                                                 J.Literal versionLiteral = (J.Literal) v;
                                                 assert versionLiteral.getValueSource() != null;
@@ -144,20 +114,19 @@ public class UpgradePluginVersion extends Recipe {
                         }
                     }
                 }
-                return super.visitMethodInvocation(method, executionContext);
+                return super.visitMethodInvocation(method, ctx);
             }
         };
     }
 
-    public static List<String> availablePluginVersions(String pluginId) {
+    public static List<String> availablePluginVersions(String pluginId, ExecutionContext ctx) {
         String uri = "https://plugins.gradle.org/plugin/" + pluginId;
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
 
-        Request.Builder request = new Request.Builder().url(uri).get();
-        try (Response response = sendRequest.apply(request.build())) {
-            if (response.isSuccessful() && response.body() != null) {
-                @SuppressWarnings("ConstantConditions")
+        try (HttpSender.Response response = httpSender.send(httpSender.get(uri).build())) {
+            if (response.isSuccessful()) {
                 @Language("xml")
-                String responseBody = response.body().string();
+                String responseBody = StringUtils.readFully(response.getBody());
 
                 List<String> versions = new ArrayList<>();
                 Matcher matcher = Pattern.compile("href=\"/plugin/" + pluginId + "/([^\"]+)\"").matcher(responseBody);
@@ -167,16 +136,15 @@ public class UpgradePluginVersion extends Recipe {
                     lastFind = matcher.end();
                 }
 
-                matcher = Pattern.compile("Version ([^\\s]+) \\(latest\\)").matcher(responseBody);
+                matcher = Pattern.compile("Version (\\S+) \\(latest\\)").matcher(responseBody);
                 if (matcher.find()) {
                     versions.add(matcher.group(1));
                 }
 
                 return versions;
             }
-        } catch (Throwable throwable) {
-            return Collections.emptyList();
+        } catch (Throwable ignored) {
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 }

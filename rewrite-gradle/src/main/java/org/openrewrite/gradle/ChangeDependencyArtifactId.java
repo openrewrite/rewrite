@@ -30,19 +30,24 @@ import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
+
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class ChangeDependencyArtifactId extends Recipe {
-    @Option(displayName = "Dependency pattern",
-            description = "A dependency pattern specifying which dependencies should have their artifactId updated. " +
-                    DependencyMatcher.STANDARD_OPTION_DESCRIPTION,
-            example = "com.fasterxml.jackson*:jackson-module*"
-    )
-    String dependencyPattern;
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
+            example = "com.fasterxml.jackson*")
+    String groupId;
+
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
+            example = "jackson-module*")
+    String artifactId;
 
     @Option(displayName = "New artifactId",
             description = "The new artifactId to use.",
-            example = "rewrite-core")
+            example = "jackson-custom")
     String newArtifactId;
 
     @Option(displayName = "Dependency configuration",
@@ -69,17 +74,13 @@ public class ChangeDependencyArtifactId extends Recipe {
 
     @Override
     public Validated validate() {
-        Validated validated = super.validate();
-        if (dependencyPattern != null) {
-            validated = validated.and(DependencyMatcher.build(dependencyPattern));
-        }
-        return validated;
+        return super.validate().and(DependencyMatcher.build(groupId + ":" + artifactId));
     }
 
     @Override
     public GroovyVisitor<ExecutionContext> getVisitor() {
         return new GroovyVisitor<ExecutionContext>() {
-            final DependencyMatcher depMatcher = DependencyMatcher.build(dependencyPattern).getValue();
+            final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             @Override

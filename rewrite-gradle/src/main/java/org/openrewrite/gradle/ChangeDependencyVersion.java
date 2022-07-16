@@ -33,17 +33,28 @@ import java.util.List;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyVersion extends Recipe {
-    @Option(displayName = "Dependency pattern",
-            description = "A dependency pattern specifying which dependencies should have their group id updated. " +
-                    DependencyMatcher.STANDARD_OPTION_DESCRIPTION,
-            example = "com.fasterxml.jackson*:*"
-    )
-    String dependencyPattern;
+    @Option(displayName = "Group",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
+            example = "com.fasterxml.jackson*")
+    String groupId;
+
+    @Option(displayName = "Artifact",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
+            example = "jackson-module*")
+    String artifactId;
 
     @Option(displayName = "New version",
-            description = "The version number to update the dependency to.",
-            example = "1.0")
+            description = "An exact version number.",
+            example = "29.0")
     String newVersion;
+
+    @Option(displayName = "Version pattern",
+            description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+            example = "-jre",
+            required = false)
+    @Nullable
+    String versionPattern;
 
     @Option(displayName = "Dependency configuration",
             description = "The dependency configuration to search for dependencies in.",
@@ -64,7 +75,7 @@ public class ChangeDependencyVersion extends Recipe {
 
     @Override
     public Validated validate() {
-        return super.validate().and(DependencyMatcher.build(dependencyPattern));
+        return super.validate().and(DependencyMatcher.build(groupId + ":" + artifactId));
     }
 
     @Override
@@ -75,7 +86,7 @@ public class ChangeDependencyVersion extends Recipe {
     @Override
     public GroovyVisitor<ExecutionContext> getVisitor() {
         return new GroovyVisitor<ExecutionContext>() {
-            final DependencyMatcher depMatcher = DependencyMatcher.build(dependencyPattern).getValue();
+            final DependencyMatcher depMatcher = DependencyMatcher.build(groupId + ":" + artifactId).getValue();
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             @Override

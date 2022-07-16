@@ -32,12 +32,6 @@ dependencies {
     compileOnly("org.gradle:gradle-testing-base:latest.release")
     compileOnly("org.gradle:gradle-testing-jvm:latest.release")
 
-    implementation("com.squareup.okhttp3:okhttp:4.9.3")
-
-    // FIXME: switch to `latest.release`
-    // when https://github.com/resilience4j/resilience4j/issues/1472 is resolved
-    implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
-
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
