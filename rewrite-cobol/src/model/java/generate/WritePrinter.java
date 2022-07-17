@@ -23,10 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.List;
 import java.util.StringJoiner;
@@ -62,16 +59,14 @@ public class WritePrinter extends Recipe {
                 for (J.ClassDeclaration modelClass : missingVisitorMethods(c)) {
                     String modelTypeName = modelClass.getSimpleName();
                     String paramName = modelTypeName.substring(0, 1).toLowerCase() + modelTypeName.substring(1);
-                    String varName = paramName.substring(0, 1);
-                    if (varName.equals("p")) {
-                        varName = "pp";
-                    }
 
                     StringJoiner fields = new StringJoiner("\n    ");
                     for (Statement statement : modelClass.getBody().getStatements()) {
                         if (statement instanceof J.VariableDeclarations) {
                             J.VariableDeclarations varDec = (J.VariableDeclarations) statement;
-                            String name = varDec.getVariables().get(0).getSimpleName();
+                            J.VariableDeclarations.NamedVariable namedVariable = varDec.getVariables().get(0);
+                            String name = namedVariable.getSimpleName();
+                            String elemTypeName = requireNonNull(varDec.getTypeExpression()).printTrimmed(getCursor());
                             String capitalizedName = name.substring(0, 1).toUpperCase() + name.substring(1);
 
                             JavaType.FullyQualified elemType = requireNonNull(TypeUtils.asFullyQualified(varDec.getType()));
@@ -83,15 +78,17 @@ public class WritePrinter extends Recipe {
                                     fields.add("visitRightPadded(" + paramName + ".getPadding().get" + capitalizedName + "(), p);");
                                     break;
                                 case "CobolContainer":
-                                    throw new UnsupportedOperationException("Implement me!");
+                                    fields.add("visitContainer(\"\", " + paramName + ".getPadding().get" + capitalizedName + "(), \" \", \"\", p);");
+                                    break;
                                 case "List":
-//                                    J.ParameterizedType parameterizedType = requireNonNull((J.ParameterizedType) varDec.getTypeExpression());
-//                                    String elemListType = requireNonNull(TypeUtils.asFullyQualified(requireNonNull(parameterizedType.getTypeParameters()).get(0).getType()))
-//                                            .getClassName();
-//                                    fields.add(varName + " = " + varName + ".getPadding().with" + capitalizedName + "(ListUtils.map(" +
-//                                            paramName + ".getPadding().get" + capitalizedName + "(), t -> (" + elemListType +
-//                                            ") visit(t, p)));");
-                                    fields.add("// List");
+                                    String loopVar = paramName.substring(0, 1);
+                                    if (loopVar.equals("p")) {
+                                        loopVar = "pp";
+                                    }
+                                    String typeParam = ((J.Identifier) ((J.ParameterizedType) varDec.getTypeExpression()).getTypeParameters().get(0)).getSimpleName();
+                                    fields.add("for(Cobol." + typeParam + " " + loopVar + " : " + paramName + ".get" + capitalizedName + "()) {\n" +
+                                            "    // TODO print each element\n" +
+                                            "}");
                                     break;
                                 default:
                                     if(elemType.getClassName().startsWith("Cobol")) {

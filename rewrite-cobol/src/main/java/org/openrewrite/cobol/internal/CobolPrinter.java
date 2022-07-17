@@ -20,6 +20,8 @@ import org.openrewrite.cobol.CobolVisitor;
 import org.openrewrite.cobol.tree.*;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.List;
+
 public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
 
     @Override
@@ -46,6 +48,37 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         }
         //noinspection ConstantConditions
         return right;
+    }
+
+    protected void visitRightPadded(List<? extends CobolRightPadded<? extends Cobol>> nodes, String suffixBetween, PrintOutputCapture<P> p) {
+        for (int i = 0; i < nodes.size(); i++) {
+            CobolRightPadded<? extends Cobol> node = nodes.get(i);
+            visit(node.getElement(), p);
+            visitSpace(node.getAfter(), p);
+            visitMarkers(node.getMarkers(), p);
+            if (i < nodes.size() - 1) {
+                p.append(suffixBetween);
+            }
+        }
+    }
+
+    protected void visitContainer(String before, @Nullable CobolContainer<? extends Cobol> container,
+                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+        if (container == null) {
+            return;
+        }
+        visitSpace(container.getBefore(), p);
+        p.append(before);
+        visitRightPadded(container.getPadding().getElements(), suffixBetween, p);
+        p.append(after == null ? "" : after);
+    }
+
+    public Cobol visitDisplay(Cobol.Display display, PrintOutputCapture<P> p) {
+        visitSpace(display.getPrefix(), p);
+        for (Name d : display.getOperands()) {
+            // TODO print each element
+        }
+        return display;
     }
 
     public Cobol visitIdentifier(Cobol.Identifier identifier, PrintOutputCapture<P> p) {
@@ -76,6 +109,20 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(procedureDivisionBody.getPrefix(), p);
         visit(procedureDivisionBody.getParagraphs(), p);
         return procedureDivisionBody;
+    }
+
+    public Cobol visitParagraphs(Cobol.Paragraphs paragraphs, PrintOutputCapture<P> p) {
+        visitSpace(paragraphs.getPrefix(), p);
+        for (Cobol.Sentence pp : paragraphs.getSentences()) {
+            // TODO print each element
+        }
+        return paragraphs;
+    }
+
+    public Cobol visitSentence(Cobol.Sentence sentence, PrintOutputCapture<P> p) {
+        visitSpace(sentence.getPrefix(), p);
+        visitContainer("", sentence.getPadding().getStatements(), " ", ".", p);
+        return sentence;
     }
 
     public Cobol visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, PrintOutputCapture<P> p) {

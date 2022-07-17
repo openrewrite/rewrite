@@ -23,10 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.List;
 import java.util.StringJoiner;
@@ -102,7 +99,8 @@ public class WriteVisitorMethods extends Recipe {
                                         varName + ".getPadding().get" + capitalizedName + "(), p));");
                                 break;
                             case "CobolContainer":
-                                throw new UnsupportedOperationException("Implement me!");
+                                fields.add(varName + " = " + varName + ".getPadding().with" + capitalizedName + "(visitContainer(" + varName + ".getPadding().get" + capitalizedName + "(), p));");
+                                break;
                             case "List":
                                 J.ParameterizedType parameterizedType = requireNonNull((J.ParameterizedType) varDec.getTypeExpression());
                                 String elemListType = requireNonNull(TypeUtils.asFullyQualified(requireNonNull(parameterizedType.getTypeParameters()).get(0).getType()))
