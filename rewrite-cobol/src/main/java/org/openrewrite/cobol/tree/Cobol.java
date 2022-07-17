@@ -173,7 +173,7 @@ public interface Cobol extends Tree {
         /**
          * Either an {@link Identifier} or {@link Literal}.
          */
-        List<CobolLeftPadded<String>> operands;
+        List<Name> operands;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -235,18 +235,18 @@ public interface Cobol extends Tree {
         @Getter
         @With
         Markers markers;
-        CobolRightPadded<String> identification;
-        CobolRightPadded<String> division;
+        String identification;
+        CobolLeftPadded<String> division;
         @Getter
         @With
-        String dot;
+        CobolLeftPadded<String> dot;
         @Getter
         @With
         ProgramIdParagraph programIdParagraph;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitIdentificationDivision(this, p);
+            return this;
         }
 
         public Padding getPadding() {
@@ -264,41 +264,24 @@ public interface Cobol extends Tree {
             return p;
         }
 
-        public String getIdentification() {
-            return identification.getElement();
-        }
-
-        public IdentificationDivision withIdentification(String identification) {
-            //noinspection ConstantConditions
-            return getPadding().withIdentification(CobolRightPadded.withElement(this.identification, identification));
-        }
-
         public String getDivision() {
             return division.getElement();
         }
 
         public IdentificationDivision withDivision(String division) {
             //noinspection ConstantConditions
-            return getPadding().withDivision(CobolRightPadded.withElement(this.division, division));
+            return getPadding().withDivision(CobolLeftPadded.withElement(this.division, division));
         }
 
         @RequiredArgsConstructor
         public static class Padding {
             private final IdentificationDivision t;
 
-            public CobolRightPadded<String> getIdentification() {
-                return t.identification;
-            }
-
-            public IdentificationDivision withIdentification(CobolRightPadded<String> identification) {
-                return t.identification == identification ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, identification, t.division, t.dot, t.programIdParagraph);
-            }
-
-            public CobolRightPadded<String> getDivision() {
+            public CobolLeftPadded<String> getDivision() {
                 return t.division;
             }
 
-            public IdentificationDivision withDivision(CobolRightPadded<String> division) {
+            public IdentificationDivision withDivision(CobolLeftPadded<String> division) {
                 return t.division == division ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, division, t.dot, t.programIdParagraph);
             }
         }
@@ -325,11 +308,11 @@ public interface Cobol extends Tree {
         @Getter
         @With
         Markers markers;
-        CobolRightPadded<String> procedure;
-        CobolRightPadded<String> division;
+        String rocedure;
+        CobolLeftPadded<String> division;
         @Getter
         @With
-        String dot;
+        CobolLeftPadded<String> dot;
         @Getter
         @With
         ProcedureDivisionBody body;
@@ -354,42 +337,25 @@ public interface Cobol extends Tree {
             return p;
         }
 
-        public String getProcedure() {
-            return procedure.getElement();
-        }
-
-        public ProcedureDivision withProcedure(String procedure) {
-            //noinspection ConstantConditions
-            return getPadding().withProcedure(CobolRightPadded.withElement(this.procedure, procedure));
-        }
-
         public String getDivision() {
             return division.getElement();
         }
 
         public ProcedureDivision withDivision(String division) {
             //noinspection ConstantConditions
-            return getPadding().withDivision(CobolRightPadded.withElement(this.division, division));
+            return getPadding().withDivision(CobolLeftPadded.withElement(this.division, division));
         }
 
         @RequiredArgsConstructor
         public static class Padding {
             private final ProcedureDivision t;
 
-            public CobolRightPadded<String> getProcedure() {
-                return t.procedure;
-            }
-
-            public ProcedureDivision withProcedure(CobolRightPadded<String> procedure) {
-                return t.procedure == procedure ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, procedure, t.division, t.dot, t.body);
-            }
-
-            public CobolRightPadded<String> getDivision() {
+            public CobolLeftPadded<String> getDivision() {
                 return t.division;
             }
 
-            public ProcedureDivision withDivision(CobolRightPadded<String> division) {
-                return t.division == division ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.procedure, division, t.dot, t.body);
+            public ProcedureDivision withDivision(CobolLeftPadded<String> division) {
+                return t;
             }
         }
     }
@@ -516,16 +482,16 @@ public interface Cobol extends Tree {
         @Getter
         @With
         Markers markers;
-        CobolRightPadded<String> programId;
-        CobolRightPadded<String> dot1;
+        String programId;
+        CobolLeftPadded<String> dot1;
         @Getter
         @With
-        String programName;
+        CobolLeftPadded<String> programName;
         CobolLeftPadded<String> dot2;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitProgramIdParagraph(this, p);
+            return this;
         }
 
         public Padding getPadding() {
@@ -543,22 +509,13 @@ public interface Cobol extends Tree {
             return p;
         }
 
-        public String getProgramId() {
-            return programId.getElement();
-        }
-
-        public ProgramIdParagraph withProgramId(String programId) {
-            //noinspection ConstantConditions
-            return getPadding().withProgramId(CobolRightPadded.withElement(this.programId, programId));
-        }
-
         public String getDot1() {
             return dot1.getElement();
         }
 
         public ProgramIdParagraph withDot1(String dot1) {
             //noinspection ConstantConditions
-            return getPadding().withDot1(CobolRightPadded.withElement(this.dot1, dot1));
+            return getPadding().withDot1(CobolLeftPadded.withElement(this.dot1, dot1));
         }
 
         public String getDot2() {
@@ -574,19 +531,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final ProgramIdParagraph t;
 
-            public CobolRightPadded<String> getProgramId() {
-                return t.programId;
-            }
-
-            public ProgramIdParagraph withProgramId(CobolRightPadded<String> programId) {
-                return t.programId == programId ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, programId, t.dot1, t.programName, t.dot2);
-            }
-
-            public CobolRightPadded<String> getDot1() {
+            public CobolLeftPadded<String> getDot1() {
                 return t.dot1;
             }
 
-            public ProgramIdParagraph withDot1(CobolRightPadded<String> dot1) {
+            public ProgramIdParagraph withDot1(CobolLeftPadded<String> dot1) {
                 return t.dot1 == dot1 ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, dot1, t.programName, t.dot2);
             }
 

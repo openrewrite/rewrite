@@ -16,7 +16,6 @@
 package org.openrewrite.cobol;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.cobol.tree.*;
 import org.openrewrite.internal.ListUtils;
@@ -36,10 +35,6 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
 
     public Space visitSpace(Space space, P p) {
         return space;
-    }
-
-    public String visitString(String s, P p) {
-        return s;
     }
 
     public <P2 extends Cobol> CobolContainer<P2> visitContainer(@Nullable CobolContainer<P2> container, P p) {
@@ -108,7 +103,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Display d = display;
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
-        d = d.withOperands(ListUtils.map(d.getOperands(), t -> visitLeftPadded(t, p)));
+        d = d.withOperands(ListUtils.map(d.getOperands(), t -> (Name) visit(t, p)));
         return d;
     }
 
@@ -126,28 +121,10 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return l;
     }
 
-    public Cobol visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, P p) {
-        Cobol.IdentificationDivision i = identificationDivision;
-        i = i.withPrefix(visitSpace(i.getPrefix(), p));
-        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
-        i = i.getPadding().withIdentification(visitRightPadded(i.getPadding().getIdentification(), p));
-        i = i.getPadding().withDivision(visitRightPadded(i.getPadding().getDivision(), p));
-        i = i.withProgramIdParagraph((Cobol.ProgramIdParagraph) visit(i.getProgramIdParagraph(), p));
-        return i;
-    }
-
     public Cobol visitProcedureDivision(Cobol.ProcedureDivision procedureDivision, P p) {
         Cobol.ProcedureDivision pp = procedureDivision;
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
-        return pp;
-    }
-
-    public Cobol visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, P p) {
-        Cobol.ProgramIdParagraph pp = programIdParagraph;
-        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
-        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
-        pp = pp.getPadding().withProgramId(visitRightPadded(pp.getPadding().getProgramId(), p));
         return pp;
     }
 

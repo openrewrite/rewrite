@@ -23,32 +23,34 @@ import java.util.List;
 
 public interface Cobol {
     class Display implements Statement {
-        /**
-         * Either an {@link Identifier} or {@link Literal}.
-         */
-        List<CobolLeftPadded<String>> operands;
+        List<Name> operands;
     }
 
-    class Identifier implements Cobol {
+    class Identifier implements Name {
         String simpleName;
     }
 
-    class Literal implements Cobol {
+    class Literal implements Name {
         Object value;
         String valueSource;
+
+        @Override
+        public String getSimpleName() {
+            return value.toString();
+        }
     }
 
     class IdentificationDivision implements Cobol {
-        CobolRightPadded<String> identification;
-        CobolRightPadded<String> division;
-        String dot;
+        String identification;
+        CobolLeftPadded<String> division;
+        CobolLeftPadded<String> dot;
         ProgramIdParagraph programIdParagraph;
     }
 
     class ProcedureDivision implements Cobol {
-        CobolRightPadded<String> procedure;
-        CobolRightPadded<String> division;
-        String dot;
+        String procedure;
+        CobolLeftPadded<String> division;
+        CobolLeftPadded<String> dot;
         ProcedureDivisionBody body;
     }
 
@@ -66,9 +68,11 @@ public interface Cobol {
     }
 
     class ProgramIdParagraph implements Cobol {
-        CobolRightPadded<String> programId;
-        CobolRightPadded<String> dot1;
+        String programId;
+        CobolLeftPadded<String> dot1;
         String programName;
+
+        @Nullable
         CobolLeftPadded<String> dot2;
     }
 

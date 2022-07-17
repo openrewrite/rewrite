@@ -24,10 +24,7 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.FindAnnotations;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.Comparator;
 import java.util.List;
@@ -64,7 +61,7 @@ public class WriteModel extends Recipe {
                 "@AllArgsConstructor(access = AccessLevel.PRIVATE)").javaParser(parser).build();
 
         final JavaTemplate idField = JavaTemplate.builder(this::getCursor, "@EqualsAndHashCode.Include UUID id;").javaParser(parser).build();
-        final JavaTemplate prefixField = JavaTemplate.builder(this::getCursor, "String prefix;").javaParser(parser).build();
+        final JavaTemplate prefixField = JavaTemplate.builder(this::getCursor, "Space prefix;").javaParser(parser).build();
         final JavaTemplate markersField = JavaTemplate.builder(this::getCursor, "Markers markers;").javaParser(parser).build();
         final JavaTemplate paddingField = JavaTemplate.builder(this::getCursor, "@Nullable @NonFinal transient WeakReference<Padding> padding;").javaParser(parser).build();
 
@@ -135,14 +132,6 @@ public class WriteModel extends Recipe {
             c = c.withTemplate(idField, c.getBody().getCoordinates().firstStatement());
             c = c.withTemplate(acceptMethod, c.getBody().getCoordinates().lastStatement(), classDecl.getSimpleName());
 
-            if (padded) {
-                c = c.withTemplate(paddingField, c.getBody().getCoordinates().firstStatement());
-                c = c.withTemplate(getPadding, c.getBody().getCoordinates().lastStatement());
-                c = c.withTemplate(paddedModel, c.getCoordinates().replaceAnnotations());
-            } else {
-                c = c.withTemplate(valueModel, c.getCoordinates().replaceAnnotations());
-            }
-
             for (Statement statement : c.getBody().getStatements()) {
                 if (statement instanceof J.VariableDeclarations) {
                     J.VariableDeclarations varDec = (J.VariableDeclarations) statement;
@@ -178,8 +167,25 @@ public class WriteModel extends Recipe {
             }
 
             if (padded) {
+                c = c.withTemplate(paddedModel, c.getCoordinates().replaceAnnotations());
+                c = c.withTemplate(paddingField, c.getBody().getCoordinates().firstStatement());
+                c = c.withTemplate(getPadding, c.getBody().getCoordinates().lastStatement());
                 c = c.withTemplate(paddingClass, c.getBody().getCoordinates().lastStatement(), c.getSimpleName());
+            } else {
+                c = c.withTemplate(valueModel, c.getCoordinates().replaceAnnotations());
             }
+
+            List<Statement> statements = c.getBody().getStatements();
+            c = c.withBody(c.getBody().withStatements(ListUtils.map(statements, (i, statement) -> {
+                if (statement instanceof J.VariableDeclarations && i > 0) {
+                    Statement previous = statements.get(i - 1);
+                    if (!((J.VariableDeclarations) statement).getAllAnnotations().isEmpty() ||
+                            (previous instanceof J.VariableDeclarations) && !((J.VariableDeclarations) previous).getAllAnnotations().isEmpty()) {
+                        return statement.withPrefix(Space.format("\n\n"));
+                    }
+                }
+                return statement;
+            })));
 
             return c;
         }

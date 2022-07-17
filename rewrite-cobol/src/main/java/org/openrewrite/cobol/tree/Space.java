@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.cobol.internal.StringWithOriginalPositions;
-import org.openrewrite.cobol.internal.preprocessor.sub.CobolLine;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
@@ -29,23 +27,20 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.cobol.internal.StringWithOriginalPositions.quote;
 
 /**
- *
+ * Wherever whitespace can occur in HCL, so can comments (at least block and javadoc style comments).
+ * So whitespace and comments are like peanut butter and jelly.
  */
 @EqualsAndHashCode
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public class Space {
-    public static final Space EMPTY = new Space("");
+    public static final Space EMPTY = new Space("", emptyList());
 
-    private final String rawText;
+    private final List<Comment> comments;
 
-    List<String> whitespaces = new ArrayList<>();
-    List<String> lineBreaks = new ArrayList<>();
-    List<String> comments = new ArrayList<>();
-    List<String> sequences = new ArrayList<>();
-    String lastWhiteSpace;
+    @Nullable
+    private final String whitespace;
 
     /*
      * Most occurrences of spaces will have no comments or markers and will be repeated frequently throughout a source file.
@@ -54,64 +49,28 @@ public class Space {
      */
     private static final Map<String, Space> flyweights = new WeakHashMap<>();
 
-    private Space(String rawText) {
-        this.rawText = rawText;
-    }
-
-    private Space(StringWithOriginalPositions input, int stop, int start) {
-        String rawText = input.preprocessedText.substring(stop, start);
-
-//        int ostop = input.originalPositions[stop];
-//        int ostart = input.originalPositions[start];
-//        String w = input.originalText.substring(ostop, ostart);
-//        if(!whitespace.trim().equals("")) {
-//            System.out.println();
-//        }
-
-        int lineNumber = input.lineNumbers[stop];
-        int current = 0;
-        for(int i=0; i<rawText.length(); i++) {
-            int from;
-            int length;
-            if(rawText.charAt(i)=='\r' && i+1 < rawText.length() && rawText.charAt(i+1)=='\n') {
-                from = i;
-                length = 2;
-            } else if(rawText.charAt(i)=='\n') {
-                from = i;
-                length = 1;
-            } else if(rawText.charAt(i)=='\r') {
-                from = i;
-                length = 1;
-            } else {
-                continue;
-            }
-
-            String whitespace = rawText.substring(current, from);
-            String lineBreak = rawText.substring(from, from+length);
-            String comment = input.lines.get(lineNumber).getCommentArea();
-            String sequence = input.lines.get(lineNumber+1).getSequenceArea();
-
-            whitespaces.add(whitespace);
-            lineBreaks.add(lineBreak);
-            comments.add(comment);
-            sequences.add(sequence);
-
-            current = from+length;
-            lineNumber++;
-        }
-        lastWhiteSpace = rawText.substring(current);
-
-        this.rawText = rawText;
+    private Space(@Nullable String whitespace, List<Comment> comments) {
+        this.comments = comments;
+        this.whitespace = whitespace == null || whitespace.isEmpty() ? null : whitespace;
     }
 
     @JsonCreator
-    public static Space build(StringWithOriginalPositions input, int stop, int start) {
-        //return flyweights.computeIfAbsent(whitespace, k -> new Space(whitespace));
-        return new Space(input, stop, start);
+    public static Space build(@Nullable String whitespace, List<Comment> comments) {
+        if (comments.isEmpty()) {
+            if (whitespace == null || whitespace.isEmpty()) {
+                return Space.EMPTY;
+            }
+            return flyweights.computeIfAbsent(whitespace, k -> new Space(whitespace, comments));
+        }
+        return new Space(whitespace, comments);
     }
 
-    public boolean isEmpty() {
-        return this == EMPTY;
+    public String getIndent() {
+        return getWhitespaceIndent(whitespace);
+    }
+
+    public String getLastWhitespace() {
+        return whitespace == null ? "" : whitespace;
     }
 
     private String getWhitespaceIndent(@Nullable String whitespace) {
@@ -127,48 +86,50 @@ public class Space {
         return whitespace;
     }
 
-    public String getRawText() {
-        return rawText;
+    public List<Comment> getComments() {
+        return comments;
     }
 
     public String getWhitespace() {
-        StringBuilder sb = new StringBuilder();
-        for(int i=0; i<whitespaces.size(); i++) {
-            sb.append(whitespaces.get(i));
-            sb.append(comments.get(i));
-            sb.append(lineBreaks.get(i));
-            sb.append(sequences.get(i));
+        return whitespace == null ? "" : whitespace;
+    }
+
+    public Space withComments(List<Comment> comments) {
+        if (comments == this.comments) {
+            return this;
         }
-        sb.append(lastWhiteSpace);
-        return sb.toString();
+        if (comments.isEmpty() && (whitespace == null || whitespace.isEmpty())) {
+            return Space.EMPTY;
+        }
+        return build(whitespace, comments);
+    }
+
+    public Space withWhitespace(String whitespace) {
+        if (comments.isEmpty() && whitespace.isEmpty()) {
+            return Space.EMPTY;
+        }
+
+        if ((whitespace.isEmpty() && this.whitespace == null) || whitespace.equals(this.whitespace)) {
+            return this;
+        }
+        return build(whitespace, comments);
+    }
+
+    public boolean isEmpty() {
+        return this == EMPTY;
+    }
+
+    public static Space firstPrefix(@Nullable List<? extends Cobol> trees) {
+        return trees == null || trees.isEmpty() ? Space.EMPTY : trees.iterator().next().getPrefix();
     }
 
     public static Space format(String formatting) {
-        throw new UnsupportedOperationException("Implement me!");
+        return Space.build(formatting, emptyList());
     }
 
-    @SuppressWarnings("ConstantConditions")
-    public static <P extends Cobol> List<CobolRightPadded<P>> formatLastSuffix(@Nullable List<CobolRightPadded<P>> trees,
-                                                                               Space suffix) {
-        if (trees == null) {
-            return null;
-        }
-
-        if (!trees.isEmpty() && !trees.get(trees.size() - 1).getAfter().equals(suffix)) {
-            List<CobolRightPadded<P>> formattedTrees = new ArrayList<>(trees);
-            formattedTrees.set(
-                    formattedTrees.size() - 1,
-                    formattedTrees.get(formattedTrees.size() - 1).withAfter(suffix)
-            );
-            return formattedTrees;
-        }
-
-        return trees;
-    }
-
-    public static <P extends Cobol> List<P> formatFirstPrefix(List<P> trees, Space prefix) {
+    public static <C extends Cobol> List<C> formatFirstPrefix(List<C> trees, Space prefix) {
         if (!trees.isEmpty() && !trees.get(0).getPrefix().equals(prefix)) {
-            List<P> formattedTrees = new ArrayList<>(trees);
+            List<C> formattedTrees = new ArrayList<>(trees);
             formattedTrees.set(0, formattedTrees.get(0).withPrefix(prefix));
             return formattedTrees;
         }
@@ -186,16 +147,28 @@ public class Space {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Space(");
-        for(int i=0; i<whitespaces.size(); i++) {
-            sb.append("ws[" + i + "]=" + quote(whitespaces.get(i)) + "," );
-            sb.append("comment[" + i + "]=" + quote(comments.get(i)) + "," );
-            sb.append("break[" + i + "]=" + quote(lineBreaks.get(i)) + "," );
-            sb.append("sequence[" + i + "]=" + quote(sequences.get(i)) + "," );
+        StringBuilder printedWs = new StringBuilder();
+        int lastNewline = 0;
+        if (whitespace != null) {
+            char[] charArray = whitespace.toCharArray();
+            for (int i = 0; i < charArray.length; i++) {
+                char c = charArray[i];
+                if (c == '\n') {
+                    printedWs.append("\\n");
+                    lastNewline = i + 1;
+                } else if (c == '\r') {
+                    printedWs.append("\\r");
+                    lastNewline = i + 1;
+                } else if (c == ' ') {
+                    printedWs.append(spaces[(i - lastNewline) % 10]);
+                } else if (c == '\t') {
+                    printedWs.append(tabs[(i - lastNewline) % 10]);
+                }
+            }
         }
-        sb.append("last=" + quote(lastWhiteSpace));
-        sb.append(")");
-        return sb.toString();
+
+        return "Space(" +
+                "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") +
+                ">, whitespace='" + printedWs + "')";
     }
 }
