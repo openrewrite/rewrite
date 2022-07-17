@@ -20,7 +20,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -101,7 +100,7 @@ public class MavenParser implements Parser<Xml.Document> {
 
         List<Xml.Document> parsed = new ArrayList<>();
 
-        if(httpSender != null) {
+        if (httpSender != null) {
             ctx = HttpSenderExecutionContextView.view(ctx).setHttpSender(httpSender);
         }
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
@@ -113,7 +112,6 @@ public class MavenParser implements Parser<Xml.Document> {
             parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
         }
 
-        PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper("${", "}", null);
         for (int i = 0; i < parsed.size(); i++) {
             Xml.Document maven = parsed.get(i);
             MavenResolutionResult resolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class)
@@ -128,11 +126,9 @@ public class MavenParser implements Parser<Xml.Document> {
                         .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
                 Parent parent = moduleResolutionResult.getPom().getRequested().getParent();
                 if (parent != null &&
-                        parent.getGroupId().equals(resolutionResult.getPom().getGroupId()) &&
-                        parent.getArtifactId().equals(resolutionResult.getPom().getArtifactId()) &&
-                        propertyPlaceholderHelper.replacePlaceholders(
-                                        parent.getVersion(), resolutionResult.getPom().getProperties()::get)
-                                .equals(resolutionResult.getPom().getVersion())) {
+                        resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
+                        resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
+                        resolutionResult.getPom().getVersion().equals(resolutionResult.getPom().getValue(parent.getVersion()))) {
                     moduleResolutionResult.unsafeSetParent(resolutionResult);
                     modules.add(moduleResolutionResult);
                 }
