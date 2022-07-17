@@ -61,7 +61,7 @@ public interface Cobol {
     }
 
     class Sentence implements Cobol {
-        List<Statement> statements;
+        CobolContainer<Statement> statements;
     }
 
     class ProgramIdParagraph implements Cobol {

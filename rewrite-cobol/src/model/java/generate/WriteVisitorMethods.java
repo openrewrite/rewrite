@@ -107,8 +107,8 @@ public class WriteVisitorMethods extends Recipe {
                                 J.ParameterizedType parameterizedType = requireNonNull((J.ParameterizedType) varDec.getTypeExpression());
                                 String elemListType = requireNonNull(TypeUtils.asFullyQualified(requireNonNull(parameterizedType.getTypeParameters()).get(0).getType()))
                                         .getClassName();
-                                fields.add(varName + " = " + varName + ".getPadding().with" + capitalizedName + "(ListUtils.map(" +
-                                        varName + ".getPadding().get" + capitalizedName + "(), t -> (" + elemListType +
+                                fields.add(varName + " = " + varName + ".with" + capitalizedName + "(ListUtils.map(" +
+                                        varName + ".get" + capitalizedName + "(), t -> (" + elemListType +
                                         ") visit(t, p)));");
                                 break;
                             default:

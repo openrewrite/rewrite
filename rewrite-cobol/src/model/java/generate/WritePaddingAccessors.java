@@ -53,10 +53,10 @@ public class WritePaddingAccessors extends Recipe {
          */
         final JavaTemplate paddedGetterWither = JavaTemplate.builder(this::getCursor, "" +
                 "#{}" +
-                "public Cobol#{}Padded<#{}> get#{}() {" +
+                "public Cobol#{}<#{}> get#{}() {" +
                 "    return t.#{};" +
                 "}" +
-                "public #{} with#{}(#{}Cobol#{}Padded<#{}> #{}) {" +
+                "public #{} with#{}(#{}Cobol#{}<#{}> #{}) {" +
                 "    return t.#{} == #{} ? t : new #{}(#{});" +
                 "}").javaParser(parser).build();
 
@@ -81,13 +81,13 @@ public class WritePaddingAccessors extends Recipe {
                         if (fqn != null && elementType != null) {
                             switch (fqn.getClassName()) {
                                 case "CobolContainer":
-                                    c = writeContainerGetterWithers(c, varDec, elementType);
+                                    c = writePaddedGetterWithers(c, varDec, elementType, "Container");
                                     break;
                                 case "CobolLeftPadded":
-                                    c = writePaddedGetterWithers(c, varDec, elementType, "Left");
+                                    c = writePaddedGetterWithers(c, varDec, elementType, "LeftPadded");
                                     break;
                                 case "CobolRightPadded":
-                                    c = writePaddedGetterWithers(c, varDec, elementType, "Right");
+                                    c = writePaddedGetterWithers(c, varDec, elementType, "RightPadded");
                                     break;
                             }
                         }
@@ -98,10 +98,6 @@ public class WritePaddingAccessors extends Recipe {
             }
 
             return super.visitClassDeclaration(classDecl, ctx);
-        }
-
-        private J.ClassDeclaration writeContainerGetterWithers(J.ClassDeclaration c, J.VariableDeclarations statement, JavaType.FullyQualified elementType) {
-            return c;
         }
 
         private J.ClassDeclaration writePaddedGetterWithers(J.ClassDeclaration c, J.VariableDeclarations varDec, JavaType.FullyQualified elementType,

@@ -118,6 +118,18 @@ public class WriteModel extends Recipe {
                 "    return getPadding().with#{}(Cobol#{}Padded.withElement(this.#{}, #{}));" +
                 "}").javaParser(parser).build();
 
+        /**
+         * The accessors in the model class that skips the padding and return the contained elements.
+         */
+        final JavaTemplate unwrappedContainerGetterWither = JavaTemplate.builder(this::getCursor, "" +
+                "public List<#{}> get#{}() {" +
+                "    return #{}.getElements();" +
+                "}" +
+                "public #{} with#{}(List<#{}> #{}) {\n" +
+                "    return getPadding().with#{}(this.#{}.getPadding().withElements(CobolRightPadded.withElements(\n" +
+                "        this.#{}.getPadding().getElements(), #{}));" +
+                "}").javaParser(parser).build();
+
         final JavaTemplate withGetterAnnotations = JavaTemplate.builder(this::getCursor, "@With @Getter")
                 .javaParser(parser).build();
 
@@ -190,8 +202,20 @@ public class WriteModel extends Recipe {
             return c;
         }
 
-        private J.ClassDeclaration writeContainerGetterWithers(J.ClassDeclaration c, J.VariableDeclarations statement, JavaType.FullyQualified elementType) {
-            throw new UnsupportedOperationException("Implement me!");
+        private J.ClassDeclaration writeContainerGetterWithers(J.ClassDeclaration c, J.VariableDeclarations varDec, JavaType.FullyQualified elementType) {
+            String name = varDec.getVariables().get(0).getSimpleName();
+            String capitalizedName = name.substring(0, 1).toUpperCase() + name.substring(1);
+            String elementTypeName = elementType.getClassName();
+            String modelTypeName = c.getSimpleName();
+
+            c = c.withTemplate(unwrappedContainerGetterWither, c.getBody().getCoordinates().lastStatement(),
+                    elementTypeName, capitalizedName,
+                    name,
+                    modelTypeName, capitalizedName, elementTypeName, name,
+                    capitalizedName, name,
+                    name, name);
+
+            return c;
         }
 
         private J.ClassDeclaration writePaddedGetterWithers(J.ClassDeclaration c, J.VariableDeclarations varDec, JavaType.FullyQualified elementType,
