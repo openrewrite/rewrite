@@ -15,8 +15,8 @@
  */
 package model;
 
+import org.openrewrite.cobol.tree.CobolContainer;
 import org.openrewrite.cobol.tree.CobolLeftPadded;
-import org.openrewrite.cobol.tree.CobolRightPadded;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
@@ -43,15 +43,13 @@ public interface Cobol {
     class IdentificationDivision implements Cobol {
         String identification;
         CobolLeftPadded<String> division;
-        CobolLeftPadded<String> dot;
-        ProgramIdParagraph programIdParagraph;
+        CobolLeftPadded<ProgramIdParagraph> programIdParagraph;
     }
 
     class ProcedureDivision implements Cobol {
         String procedure;
         CobolLeftPadded<String> division;
-        CobolLeftPadded<String> dot;
-        ProcedureDivisionBody body;
+        CobolLeftPadded<ProcedureDivisionBody> body;
     }
 
     class ProcedureDivisionBody implements Cobol {
@@ -64,16 +62,11 @@ public interface Cobol {
 
     class Sentence implements Cobol {
         List<Statement> statements;
-        CobolLeftPadded<String> dot;
     }
 
     class ProgramIdParagraph implements Cobol {
         String programId;
-        CobolLeftPadded<String> dot1;
-        String programName;
-
-        @Nullable
-        CobolLeftPadded<String> dot2;
+        CobolLeftPadded<Name> programName;
     }
 
     class ProgramUnit implements Cobol {

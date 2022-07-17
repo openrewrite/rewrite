@@ -18,12 +18,6 @@ package org.openrewrite.cobol;
 import org.openrewrite.cobol.tree.Cobol;
 
 public class CobolIsoVisitor<P> extends CobolVisitor<P> {
-
-    @Override
-    public Cobol.CompilationUnit visitDocument(Cobol.CompilationUnit compilationUnit, P p) {
-        return (Cobol.CompilationUnit) super.visitDocument(compilationUnit, p);
-    }
-
     @Override
     public Cobol.Display visitDisplay(Cobol.Display display, P p) {
         return (Cobol.Display) super.visitDisplay(display, p);
@@ -50,21 +44,6 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
-    public Cobol.ProgramIdParagraph visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, P p) {
-        return (Cobol.ProgramIdParagraph) super.visitProgramIdParagraph(programIdParagraph, p);
-    }
-
-    @Override
-    public Cobol.ProgramUnit visitProgramUnit(Cobol.ProgramUnit programUnit, P p) {
-        return (Cobol.ProgramUnit) super.visitProgramUnit(programUnit, p);
-    }
-
-    @Override
-    public Cobol.Stop visitStop(Cobol.Stop stop, P p) {
-        return (Cobol.Stop) super.visitStop(stop, p);
-    }
-
-    @Override
     public Cobol.ProcedureDivisionBody visitProcedureDivisionBody(Cobol.ProcedureDivisionBody procedureDivisionBody, P p) {
         return (Cobol.ProcedureDivisionBody) super.visitProcedureDivisionBody(procedureDivisionBody, p);
     }
@@ -79,4 +58,18 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
         return (Cobol.Sentence) super.visitSentence(sentence, p);
     }
 
+    @Override
+    public Cobol.ProgramIdParagraph visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, P p) {
+        return (Cobol.ProgramIdParagraph) super.visitProgramIdParagraph(programIdParagraph, p);
+    }
+
+    @Override
+    public Cobol.ProgramUnit visitProgramUnit(Cobol.ProgramUnit programUnit, P p) {
+        return (Cobol.ProgramUnit) super.visitProgramUnit(programUnit, p);
+    }
+
+    @Override
+    public Cobol.Stop visitStop(Cobol.Stop stop, P p) {
+        return (Cobol.Stop) super.visitStop(stop, p);
+    }
 }

@@ -168,11 +168,9 @@ public interface Cobol extends Tree {
     class Display implements Statement {
         @EqualsAndHashCode.Include
         UUID id;
+
         Space prefix;
         Markers markers;
-        /**
-         * Either an {@link Identifier} or {@link Literal}.
-         */
         List<Name> operands;
 
         @Override
@@ -184,9 +182,10 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class Identifier implements Cobol {
+    class Identifier implements Name {
         @EqualsAndHashCode.Include
         UUID id;
+
         Space prefix;
         Markers markers;
         String simpleName;
@@ -200,13 +199,19 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class Literal implements Cobol {
+    class Literal implements Name {
         @EqualsAndHashCode.Include
         UUID id;
+
         Space prefix;
         Markers markers;
         Object value;
         String valueSource;
+
+        @Override
+        public String getSimpleName() {
+            return value.toString();
+        }
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -220,48 +225,33 @@ public interface Cobol extends Tree {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class IdentificationDivision implements Cobol {
-        @Getter
         @Nullable
-        @With
         @NonFinal
         transient WeakReference<Padding> padding;
+
         @Getter
         @EqualsAndHashCode.Include
         @With
         UUID id;
+
         @Getter
         @With
         Space prefix;
+
         @Getter
         @With
         Markers markers;
+
+        @Getter
+        @With
         String identification;
+
         CobolLeftPadded<String> division;
-        @Getter
-        @With
-        CobolLeftPadded<String> dot;
-        @Getter
-        @With
-        ProgramIdParagraph programIdParagraph;
+        CobolLeftPadded<ProgramIdParagraph> programIdParagraph;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return this;
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
+            return v.visitIdentificationDivision(this, p);
         }
 
         public String getDivision() {
@@ -273,53 +263,13 @@ public interface Cobol extends Tree {
             return getPadding().withDivision(CobolLeftPadded.withElement(this.division, division));
         }
 
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final IdentificationDivision t;
-
-            public CobolLeftPadded<String> getDivision() {
-                return t.division;
-            }
-
-            public IdentificationDivision withDivision(CobolLeftPadded<String> division) {
-                return t.division == division ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, division, t.dot, t.programIdParagraph);
-            }
+        public Cobol.ProgramIdParagraph getProgramIdParagraph() {
+            return programIdParagraph.getElement();
         }
-    }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class ProcedureDivision implements Cobol {
-        @Getter
-        @Nullable
-        @With
-        @NonFinal
-        transient WeakReference<Padding> padding;
-        @Getter
-        @EqualsAndHashCode.Include
-        @With
-        UUID id;
-        @Getter
-        @With
-        Space prefix;
-        @Getter
-        @With
-        Markers markers;
-        String rocedure;
-        CobolLeftPadded<String> division;
-        @Getter
-        @With
-        CobolLeftPadded<String> dot;
-        @Getter
-        @With
-        ProcedureDivisionBody body;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitProcedureDivision(this, p);
+        public IdentificationDivision withProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph) {
+            //noinspection ConstantConditions
+            return getPadding().withProgramIdParagraph(CobolLeftPadded.withElement(this.programIdParagraph, programIdParagraph));
         }
 
         public Padding getPadding() {
@@ -337,6 +287,63 @@ public interface Cobol extends Tree {
             return p;
         }
 
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final IdentificationDivision t;
+
+            public CobolLeftPadded<String> getDivision() {
+                return t.division;
+            }
+
+            public IdentificationDivision withDivision(CobolLeftPadded<String> division) {
+                return t.division == division ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, division, t.programIdParagraph);
+            }
+
+            public CobolLeftPadded<Cobol.ProgramIdParagraph> getProgramIdParagraph() {
+                return t.programIdParagraph;
+            }
+
+            public IdentificationDivision withProgramIdParagraph(CobolLeftPadded<Cobol.ProgramIdParagraph> programIdParagraph) {
+                return t.programIdParagraph == programIdParagraph ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.identification, t.division, programIdParagraph);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ProcedureDivision implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String procedure;
+
+        CobolLeftPadded<String> division;
+        CobolLeftPadded<ProcedureDivisionBody> body;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureDivision(this, p);
+        }
+
         public String getDivision() {
             return division.getElement();
         }
@@ -344,6 +351,30 @@ public interface Cobol extends Tree {
         public ProcedureDivision withDivision(String division) {
             //noinspection ConstantConditions
             return getPadding().withDivision(CobolLeftPadded.withElement(this.division, division));
+        }
+
+        public Cobol.ProcedureDivisionBody getBody() {
+            return body.getElement();
+        }
+
+        public ProcedureDivision withBody(Cobol.ProcedureDivisionBody body) {
+            //noinspection ConstantConditions
+            return getPadding().withBody(CobolLeftPadded.withElement(this.body, body));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -355,7 +386,15 @@ public interface Cobol extends Tree {
             }
 
             public ProcedureDivision withDivision(CobolLeftPadded<String> division) {
-                return t;
+                return t.division == division ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.procedure, division, t.body);
+            }
+
+            public CobolLeftPadded<Cobol.ProcedureDivisionBody> getBody() {
+                return t.body;
+            }
+
+            public ProcedureDivision withBody(CobolLeftPadded<Cobol.ProcedureDivisionBody> body) {
+                return t.body == body ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.procedure, t.division, body);
             }
         }
     }
@@ -366,6 +405,7 @@ public interface Cobol extends Tree {
     class ProcedureDivisionBody implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
+
         Space prefix;
         Markers markers;
         Paragraphs paragraphs;
@@ -382,6 +422,7 @@ public interface Cobol extends Tree {
     class Paragraphs implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
+
         Space prefix;
         Markers markers;
         List<Sentence> sentences;
@@ -392,72 +433,20 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Sentence implements Cobol {
-        @Getter
-        @Nullable
-        @With
-        @NonFinal
-        transient WeakReference<Padding> padding;
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
-        @Getter
-        @With
+
         Space prefix;
-        @Getter
-        @With
         Markers markers;
-        @Getter
-        @With
         List<Statement> statements;
-        CobolLeftPadded<String> dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitSentence(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public Sentence withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Sentence t;
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public Sentence withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new Sentence(t.padding, t.id, t.prefix, t.markers, t.statements, dot);
-            }
         }
     }
 
@@ -467,31 +456,41 @@ public interface Cobol extends Tree {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class ProgramIdParagraph implements Cobol {
-        @Getter
         @Nullable
-        @With
         @NonFinal
         transient WeakReference<Padding> padding;
+
         @Getter
         @EqualsAndHashCode.Include
         @With
         UUID id;
+
         @Getter
         @With
         Space prefix;
+
         @Getter
         @With
         Markers markers;
-        String programId;
-        CobolLeftPadded<String> dot1;
+
         @Getter
         @With
-        CobolLeftPadded<String> programName;
-        CobolLeftPadded<String> dot2;
+        String programId;
+
+        CobolLeftPadded<Name> programName;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return this;
+            return v.visitProgramIdParagraph(this, p);
+        }
+
+        public Name getProgramName() {
+            return programName.getElement();
+        }
+
+        public ProgramIdParagraph withProgramName(Name programName) {
+            //noinspection ConstantConditions
+            return getPadding().withProgramName(CobolLeftPadded.withElement(this.programName, programName));
         }
 
         public Padding getPadding() {
@@ -509,42 +508,16 @@ public interface Cobol extends Tree {
             return p;
         }
 
-        public String getDot1() {
-            return dot1.getElement();
-        }
-
-        public ProgramIdParagraph withDot1(String dot1) {
-            //noinspection ConstantConditions
-            return getPadding().withDot1(CobolLeftPadded.withElement(this.dot1, dot1));
-        }
-
-        public String getDot2() {
-            return dot2.getElement();
-        }
-
-        public ProgramIdParagraph withDot2(String dot2) {
-            //noinspection ConstantConditions
-            return getPadding().withDot2(CobolLeftPadded.withElement(this.dot2, dot2));
-        }
-
         @RequiredArgsConstructor
         public static class Padding {
             private final ProgramIdParagraph t;
 
-            public CobolLeftPadded<String> getDot1() {
-                return t.dot1;
+            public CobolLeftPadded<Name> getProgramName() {
+                return t.programName;
             }
 
-            public ProgramIdParagraph withDot1(CobolLeftPadded<String> dot1) {
-                return t.dot1 == dot1 ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, dot1, t.programName, t.dot2);
-            }
-
-            public CobolLeftPadded<String> getDot2() {
-                return t.dot2;
-            }
-
-            public ProgramIdParagraph withDot2(CobolLeftPadded<String> dot2) {
-                return t.dot2 == dot2 ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, t.dot1, t.programName, dot2);
+            public ProgramIdParagraph withProgramName(CobolLeftPadded<Name> programName) {
+                return t.programName == programName ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, programName);
             }
         }
     }
@@ -555,6 +528,7 @@ public interface Cobol extends Tree {
     class ProgramUnit implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
+
         Space prefix;
         Markers markers;
         IdentificationDivision identificationDivision;
@@ -568,21 +542,79 @@ public interface Cobol extends Tree {
         }
     }
 
-    @Value
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Stop implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
         @EqualsAndHashCode.Include
+        @With
         UUID id;
+
+        @Getter
+        @With
         Space prefix;
+
+        @Getter
+        @With
         Markers markers;
+
+        @Getter
+        @With
         String stop;
+
         CobolLeftPadded<String> run;
+
+        @Getter
+        @With
         Cobol statement;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitStop(this, p);
+        }
+
+        public String getRun() {
+            return run.getElement();
+        }
+
+        public Stop withRun(String run) {
+            //noinspection ConstantConditions
+            return getPadding().withRun(CobolLeftPadded.withElement(this.run, run));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Stop t;
+
+            public CobolLeftPadded<String> getRun() {
+                return t.run;
+            }
+
+            public Stop withRun(CobolLeftPadded<String> run) {
+                return t.run == run ? t : new Stop(t.padding, t.id, t.prefix, t.markers, t.stop, run, t.statement);
+            }
         }
     }
 }

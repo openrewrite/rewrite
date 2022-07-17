@@ -29,12 +29,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public String visitString(String s, PrintOutputCapture<P> p) {
-        p.append(s);
-        return s;
-    }
-
-    @Override
     public <T> CobolLeftPadded<T> visitLeftPadded(@Nullable CobolLeftPadded<T> left, PrintOutputCapture<P> p) {
         if (left != null) {
             p.append(left.getBefore().getWhitespace());
@@ -54,26 +48,8 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return right;
     }
 
-    public Cobol visitDisplay(Cobol.Display display, PrintOutputCapture<P> p) {
-        visitSpace(display.getPrefix(), p);
-        p.append("DISPLAY");
-        for (Name operand : display.getOperands()) {
-            visit(operand, p);
-        }
-        return display;
-    }
-
-    @Override
-    public Cobol visitDocument(Cobol.CompilationUnit compilationUnit, PrintOutputCapture<P> p) {
-        for (Cobol.ProgramUnit pu : compilationUnit.getProgramUnits()) {
-            visitProgramUnit(pu, p);
-        }
-        return compilationUnit;
-    }
-
     public Cobol visitIdentifier(Cobol.Identifier identifier, PrintOutputCapture<P> p) {
         visitSpace(identifier.getPrefix(), p);
-        p.append(identifier.getSimpleName());
         return identifier;
     }
 
@@ -82,43 +58,43 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return literal;
     }
 
+    public Cobol visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, PrintOutputCapture<P> p) {
+        visitSpace(identificationDivision.getPrefix(), p);
+        visitLeftPadded(identificationDivision.getPadding().getDivision(), p);
+        visitLeftPadded(identificationDivision.getPadding().getProgramIdParagraph(), p);
+        return identificationDivision;
+    }
+
+    public Cobol visitProcedureDivision(Cobol.ProcedureDivision procedureDivision, PrintOutputCapture<P> p) {
+        visitSpace(procedureDivision.getPrefix(), p);
+        visitLeftPadded(procedureDivision.getPadding().getDivision(), p);
+        visitLeftPadded(procedureDivision.getPadding().getBody(), p);
+        return procedureDivision;
+    }
+
     public Cobol visitProcedureDivisionBody(Cobol.ProcedureDivisionBody procedureDivisionBody, PrintOutputCapture<P> p) {
         visitSpace(procedureDivisionBody.getPrefix(), p);
-        visitParagraphs(procedureDivisionBody.getParagraphs(), p);
+        visit(procedureDivisionBody.getParagraphs(), p);
         return procedureDivisionBody;
+    }
+
+    public Cobol visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, PrintOutputCapture<P> p) {
+        visitSpace(programIdParagraph.getPrefix(), p);
+        visitLeftPadded(programIdParagraph.getPadding().getProgramName(), p);
+        return programIdParagraph;
     }
 
     public Cobol visitProgramUnit(Cobol.ProgramUnit programUnit, PrintOutputCapture<P> p) {
         visitSpace(programUnit.getPrefix(), p);
-        visitIdentificationDivision(programUnit.getIdentificationDivision(), p);
-        if (programUnit.getProcedureDivision() != null) {
-            visitProcedureDivision(programUnit.getProcedureDivision(), p);
-        }
+        visit(programUnit.getIdentificationDivision(), p);
+        visit(programUnit.getProcedureDivision(), p);
         return programUnit;
     }
 
     public Cobol visitStop(Cobol.Stop stop, PrintOutputCapture<P> p) {
         visitSpace(stop.getPrefix(), p);
-        visitString(stop.getStop(), p);
-        if (stop.getRun() != null) visitLeftPadded(stop.getRun(), p);
+        visitLeftPadded(stop.getPadding().getRun(), p);
+        visit(stop.getStatement(), p);
         return stop;
     }
-
-    public Cobol visitParagraphs(Cobol.Paragraphs paragraphs, PrintOutputCapture<P> p) {
-        visitSpace(paragraphs.getPrefix(), p);
-        for (Cobol.Sentence sentence : paragraphs.getSentences()) {
-            visitSentence(sentence, p);
-        }
-        return paragraphs;
-    }
-
-    public Cobol visitSentence(Cobol.Sentence sentence, PrintOutputCapture<P> p) {
-        visitSpace(sentence.getPrefix(), p);
-        for (Statement statement : sentence.getStatements()) {
-            visit(statement, p);
-        }
-        visitLeftPadded(sentence.getPadding().getDot(), p);
-        return sentence;
-    }
-
 }

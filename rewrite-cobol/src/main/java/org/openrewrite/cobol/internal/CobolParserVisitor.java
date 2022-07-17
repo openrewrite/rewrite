@@ -127,8 +127,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
                 Markers.EMPTY,
                 ctx.PROCEDURE().getText(),
                 padLeft(ctx.DIVISION()),
-                padLeft(ctx.DOT_FS()),
-                visitProcedureDivisionBody(ctx.procedureDivisionBody())
+                padLeft(sourceBefore("."), visitProcedureDivisionBody(ctx.procedureDivisionBody()))
         );
     }
 
@@ -174,8 +173,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                statements,
-                padLeft(ctx.DOT_FS())
+                statements
         );
     }
 
@@ -228,22 +226,34 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
                 Markers.EMPTY,
                 (ctx.IDENTIFICATION() == null ? ctx.ID() : ctx.IDENTIFICATION()).getText(),
                 padLeft(ctx.DIVISION()),
-                padLeft(ctx.DOT_FS()),
-                programIdParagraph
+                padLeft(sourceBefore("."), programIdParagraph)
         );
     }
 
     @Override
     public Cobol visitProgramIdParagraph(CobolParser.ProgramIdParagraphContext ctx) {
         CobolLeftPadded<String> dot2 = null;
+        Space prefix = prefix(ctx);
+        String programId = ctx.PROGRAM_ID().getText();
+
+        Space programNamePrefix = sourceBefore(".");
+        CobolLeftPadded<Name> programName;
+        if(ctx.programName().NONNUMERICLITERAL() != null) {
+            programName = padLeft(programNamePrefix, new Cobol.Literal(randomId(),
+                    sourceBefore(ctx.programName().getText()), Markers.EMPTY,
+                    ctx.programName().getText(), ctx.programName().getText()));
+        } else {
+            programName = padLeft(programNamePrefix, new Cobol.Identifier(randomId(),
+                    sourceBefore(ctx.programName().getText()), Markers.EMPTY,
+                    ctx.programName().getText()));
+        }
+
         return new Cobol.ProgramIdParagraph(
                 randomId(),
-                prefix(ctx),
+                prefix,
                 Markers.EMPTY,
-                ctx.PROGRAM_ID().getText(),
-                padLeft(ctx.DOT_FS(0)),
-                padLeft(sourceBefore(ctx.programName().getText()), ctx.programName().getText()),
-                ctx.DOT_FS().size() > 1 ? padLeft(ctx.DOT_FS().get(1)) : null
+                programId,
+                programName
         );
     }
 

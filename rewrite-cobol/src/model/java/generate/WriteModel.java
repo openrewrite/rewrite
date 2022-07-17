@@ -225,6 +225,9 @@ public class WriteModel extends Recipe {
         }
 
         boolean isPadded(Statement statement) {
+            if (!(statement instanceof J.VariableDeclarations)) {
+                return false;
+            }
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(((J.VariableDeclarations) statement).getType());
             assert type != null;
             return type.getClassName().contains("Padded") || type.getClassName().equals("CobolContainer");

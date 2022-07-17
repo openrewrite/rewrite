@@ -121,27 +121,22 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return l;
     }
 
+    public Cobol visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, P p) {
+        Cobol.IdentificationDivision i = identificationDivision;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withDivision(visitLeftPadded(i.getPadding().getDivision(), p));
+        i = i.getPadding().withProgramIdParagraph(visitLeftPadded(i.getPadding().getProgramIdParagraph(), p));
+        return i;
+    }
+
     public Cobol visitProcedureDivision(Cobol.ProcedureDivision procedureDivision, P p) {
         Cobol.ProcedureDivision pp = procedureDivision;
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.getPadding().withDivision(visitLeftPadded(pp.getPadding().getDivision(), p));
+        pp = pp.getPadding().withBody(visitLeftPadded(pp.getPadding().getBody(), p));
         return pp;
-    }
-
-    public Cobol visitProgramUnit(Cobol.ProgramUnit programUnit, P p) {
-        Cobol.ProgramUnit pp = programUnit;
-        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
-        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
-        pp = pp.withIdentificationDivision((Cobol.IdentificationDivision) visit(pp.getIdentificationDivision(), p));
-        return pp;
-    }
-
-    public Cobol visitStop(Cobol.Stop stop, P p) {
-        Cobol.Stop s = stop;
-        s = s.withPrefix(visitSpace(s.getPrefix(), p));
-        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        s = s.withStatement(visit(s.getStatement(), p));
-        return s;
     }
 
     public Cobol visitProcedureDivisionBody(Cobol.ProcedureDivisionBody procedureDivisionBody, P p) {
@@ -156,7 +151,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Paragraphs pp = paragraphs;
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
-        //pp = pp.getPadding().withSentences(ListUtils.map(pp.getPadding().getSentences(), t -> (Cobol.Sentence) visit(t, p)));
+        pp = pp.withSentences(ListUtils.map(pp.getSentences(), t -> (Cobol.Sentence) visit(t, p)));
         return pp;
     }
 
@@ -164,7 +159,33 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Sentence s = sentence;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        //s = s.getPadding().withStatements(ListUtils.map(s.getPadding().getStatements(), t -> (Statement) visit(t, p)));
+        s = s.withStatements(ListUtils.map(s.getStatements(), t -> (Statement) visit(t, p)));
+        return s;
+    }
+
+    public Cobol visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, P p) {
+        Cobol.ProgramIdParagraph pp = programIdParagraph;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.getPadding().withProgramName(visitLeftPadded(pp.getPadding().getProgramName(), p));
+        return pp;
+    }
+
+    public Cobol visitProgramUnit(Cobol.ProgramUnit programUnit, P p) {
+        Cobol.ProgramUnit pp = programUnit;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withIdentificationDivision((Cobol.IdentificationDivision) visit(pp.getIdentificationDivision(), p));
+        pp = pp.withProcedureDivision((Cobol.ProcedureDivision) visit(pp.getProcedureDivision(), p));
+        return pp;
+    }
+
+    public Cobol visitStop(Cobol.Stop stop, P p) {
+        Cobol.Stop s = stop;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withRun(visitLeftPadded(s.getPadding().getRun(), p));
+        s = s.withStatement(visit(s.getStatement(), p));
         return s;
     }
 }
