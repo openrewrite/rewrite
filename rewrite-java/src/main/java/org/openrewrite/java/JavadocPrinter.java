@@ -146,7 +146,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         visitMarkers(link.getMarkers(), p);
         p.append(link.isPlain() ? "{@linkplain" : "{@link");
         visit(link.getSpaceBeforeTree(), p);
-        visit(link.getTree(), p);
+        visit(link.getTreeReference(), p);
         visit(link.getLabel(), p);
         visit(link.getEndBrace(), p);
         return link;
@@ -166,7 +166,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         visitMarkers(parameter.getMarkers(), p);
         p.append("@param");
         visit(parameter.getSpaceBeforeName(), p);
-        visit(parameter.getName(), p);
+        visit(parameter.getNameReference(), p);
         visit(parameter.getDescription(), p);
         return parameter;
     }
@@ -194,7 +194,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         visitMarkers(see.getMarkers(), p);
         p.append("@see");
         visit(see.getSpaceBeforeTree(), p);
-        visit(see.getTree(), p);
+        visit(see.getTreeReference(), p);
         visit(see.getReference(), p);
         return see;
     }
@@ -317,8 +317,8 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Javadoc visitReference(Javadoc.Reference reference, PrintOutputCapture<P> p) {
-        getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "LINE_BREAKS", reference.getLineBreaks());
-        getCursor().putMessage("INDEX", 0);
+        getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAKS", reference.getLineBreaks());
+        getCursor().putMessage("JAVADOC_LINE_BREAK_INDEX", 0);
         javaVisitor.visit(reference.getTree(), p, getCursor());
         return reference;
     }
@@ -384,8 +384,8 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
         @Override
         public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
-            List<Javadoc.LineBreak> lineBreaks = getCursor().getNearestMessage("LINE_BREAKS");
-            Integer index = getCursor().getNearestMessage("INDEX");
+            List<Javadoc.LineBreak> lineBreaks = getCursor().getNearestMessage("JAVADOC_LINE_BREAKS");
+            Integer index = getCursor().getNearestMessage("JAVADOC_LINE_BREAK_INDEX");
 
             if (lineBreaks != null && index != null && space.getWhitespace().contains("\n")) {
                 for (char c : space.getWhitespace().toCharArray()) {
@@ -399,7 +399,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
                         p.append(c);
                     }
                 }
-                getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "INDEX", index);
+                getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAK_INDEX", index);
             } else {
                 p.append(space.getWhitespace());
             }

@@ -485,6 +485,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 Markers.EMPTY,
                 node.getKind() != DocTree.Kind.LINK,
                 spaceBeforeRef,
+                null,
                 reference,
                 label,
                 endBrace()
@@ -541,6 +542,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 randomId(),
                 Markers.EMPTY,
                 spaceBefore,
+                null,
                 reference,
                 convertMultiline(param.getDescription())
         );
@@ -753,7 +755,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             docs = convertMultiline(node.getReference());
         }
 
-        return new Javadoc.See(randomId(), Markers.EMPTY, spaceBeforeTree, reference, docs);
+        return new Javadoc.See(randomId(), Markers.EMPTY, spaceBeforeTree, null, reference, docs);
     }
 
     @Override

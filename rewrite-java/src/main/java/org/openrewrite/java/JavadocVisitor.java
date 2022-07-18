@@ -119,9 +119,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.Link l = link;
         l = l.withMarkers(visitMarkers(l.getMarkers(), p));
         l = l.withSpaceBeforeTree(ListUtils.map(l.getSpaceBeforeTree(), s -> visit(s, p)));
-        if (l.getTree() != null) {
-            l = l.withTree((Javadoc.Reference) visitReference(l.getTree(), p));
-        }
+        l = l.withTreeReference(visitAndCast(l.getTreeReference() , p));
         l = l.withLabel(ListUtils.map(l.getLabel(), la -> visit(la, p)));
         l = l.withEndBrace(ListUtils.map(l.getEndBrace(), s -> visit(s, p)));
         return l;
@@ -138,9 +136,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.Parameter pa = parameter;
         pa = pa.withMarkers(visitMarkers(pa.getMarkers(), p));
         pa = pa.withSpaceBeforeName(ListUtils.map(pa.getSpaceBeforeName(), b -> visit(b, p)));
-        if (pa.getName() != null) {
-            pa = pa.withName((Javadoc.Reference) visit(pa.getName(), p));
-        }
+        pa = pa.withNameReference(visitAndCast(pa.getNameReference(), p));
         pa = pa.withDescription(ListUtils.map(pa.getDescription(), desc -> visit(desc, p)));
         return pa;
     }
@@ -164,9 +160,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.See s = see;
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         s = s.withSpaceBeforeTree(ListUtils.map(s.getSpaceBeforeTree(), sb -> visit(sb, p)));
-        if (s.getTree() != null) {
-            s = s.withTree((Javadoc.Reference) visitReference(s.getTree(), p));
-        }
+        s = s.withTreeReference(visitAndCast(s.getTreeReference() , p));
         s = s.withReference(ListUtils.map(s.getReference(), desc -> visit(desc, p)));
         return s;
     }

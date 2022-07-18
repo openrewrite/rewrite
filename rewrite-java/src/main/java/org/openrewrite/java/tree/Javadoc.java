@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
@@ -330,7 +331,20 @@ public interface Javadoc extends Tree {
         List<Javadoc> spaceBeforeTree;
 
         @Nullable
-        Reference tree;
+        J tree;
+
+        @Nullable
+        public Reference getTreeReference() {
+            if (tree != null && treeReference == null) {
+                treeReference = new Reference(Tree.randomId(), tree, null);
+            }
+            return treeReference;
+        }
+
+        // This is non-final to maintain backwards compatibility.
+        @NonFinal
+        @Nullable
+        Reference treeReference;
 
         List<Javadoc> label;
 
@@ -369,7 +383,23 @@ public interface Javadoc extends Tree {
 
         Markers markers;
         List<Javadoc> spaceBeforeName;
-        Reference name;
+
+        @Nullable
+        J name;
+
+        @Nullable
+        public Reference getNameReference() {
+            if (name != null && nameReference == null) {
+                nameReference = new Reference(Tree.randomId(), name, null);
+            }
+            return nameReference;
+        }
+
+        // This is non-final to maintain backwards compatibility.
+        @NonFinal
+        @Nullable
+        Reference nameReference;
+
         List<Javadoc> description;
 
         @Override
@@ -423,7 +453,20 @@ public interface Javadoc extends Tree {
         List<Javadoc> spaceBeforeTree;
 
         @Nullable
-        Reference tree;
+        J tree;
+
+        @Nullable
+        public Reference getTreeReference() {
+            if (tree != null && treeReference == null) {
+                treeReference = new Reference(Tree.randomId(), tree, null);
+            }
+            return treeReference;
+        }
+
+        // This is non-final to maintain backwards compatibility.
+        @NonFinal
+        @Nullable
+        Reference treeReference;
 
         List<Javadoc> reference;
 
