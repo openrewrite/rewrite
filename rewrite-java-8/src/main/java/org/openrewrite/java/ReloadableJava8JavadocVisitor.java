@@ -991,7 +991,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
         @Override
         public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
-            J.Identifier id = (J.Identifier) javaVisitor.scan(node.getType(), Space.EMPTY);
+            NameTree id = (NameTree) javaVisitor.scan(node.getType(), Space.EMPTY);
             List<JRightPadded<Expression>> expressions = new ArrayList<>(node.getTypeArguments().size());
             cursor += 1; // skip '<', JavaDocVisitor does not interpret List <Integer> as Parameterized.
             int argsSize = node.getTypeArguments().size();
