@@ -138,7 +138,9 @@ public class ChangeParentPom extends Recipe {
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
                 Xml.Document m = super.visitDocument(document, executionContext);
                 if(m != document) {
+                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
                     maybeUpdateModel();
+                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
                 }
                 return m;
             }
@@ -172,7 +174,6 @@ public class ChangeParentPom extends Recipe {
                             if (!oldVersion.equals(targetVersion.get())) {
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()).visitNonNull(t, ctx);
                             }
-                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
                         }
                     }
                 }
