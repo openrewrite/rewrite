@@ -101,12 +101,14 @@ public class WritePrinter extends Recipe {
                     final JavaTemplate visitMethod = JavaTemplate.builder(this::getCursor, "" +
                             "public Cobol visit#{}(Cobol.#{} #{}, PrintOutputCapture<P> p) {" +
                             "    visitSpace(#{}.getPrefix(), p);" +
+                            "    visitMarkers(#{}.getMarkers(), p);" +
                             "    #{}" +
                             "    return #{};" +
                             "}").javaParser(parser).build();
 
                     c = c.withTemplate(visitMethod, c.getBody().getCoordinates().lastStatement(),
                             modelTypeName, modelTypeName, paramName,
+                            paramName,
                             paramName,
                             fields,
                             paramName);
