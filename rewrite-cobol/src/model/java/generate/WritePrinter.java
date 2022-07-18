@@ -72,10 +72,10 @@ public class WritePrinter extends Recipe {
                             JavaType.FullyQualified elemType = requireNonNull(TypeUtils.asFullyQualified(varDec.getType()));
                             switch (elemType.getClassName()) {
                                 case "CobolLeftPadded":
-                                    fields.add("visitLeftPadded(" + paramName + ".getPadding().get" + capitalizedName + "(), p);");
+                                    fields.add("visitLeftPadded(\"\"," + paramName + ".getPadding().get" + capitalizedName + "(), p);");
                                     break;
                                 case "CobolRightPadded":
-                                    fields.add("visitRightPadded(" + paramName + ".getPadding().get" + capitalizedName + "(), p);");
+                                    fields.add("visitRightPadded(" + paramName + ".getPadding().get" + capitalizedName + "(), \"\", p);");
                                     break;
                                 case "CobolContainer":
                                     fields.add("visitContainer(\"\", " + paramName + ".getPadding().get" + capitalizedName + "(), \" \", \"\", p);");
@@ -89,6 +89,9 @@ public class WritePrinter extends Recipe {
                                     fields.add("for(Cobol." + typeParam + " " + loopVar + " : " + paramName + ".get" + capitalizedName + "()) {\n" +
                                             "    // TODO print each element\n" +
                                             "}");
+                                    break;
+                                case "String":
+                                    fields.add("p.out.append(" + paramName + ".get" + capitalizedName + "())");
                                     break;
                                 default:
                                     if(elemType.getClassName().startsWith("Cobol")) {

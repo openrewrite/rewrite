@@ -75,44 +75,35 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol.CompilationUnit visitCompilationUnit(CobolParser.CompilationUnitContext ctx) {
-
+        Space prefix = prefix(ctx);
         List<CobolParser.ProgramUnitContext> puCtxs = ctx.programUnit();
         List<CobolRightPadded<Cobol.ProgramUnit>> programUnits = new ArrayList<>(puCtxs.size());
         for (CobolParser.ProgramUnitContext puCtx : puCtxs) {
-            Cobol.ProgramUnit pu = (Cobol.ProgramUnit) visitProgramUnit(puCtx);
-            CobolRightPadded<Cobol.ProgramUnit> ppu = CobolRightPadded.build(pu);
-            programUnits.add(ppu);
+            programUnits.add(CobolRightPadded.build((Cobol.ProgramUnit) visitProgramUnit(puCtx)));
         }
 
         return new Cobol.CompilationUnit(
                 randomId(),
                 path,
                 fileAttributes,
-                prefix(ctx),
+                prefix,
                 Markers.EMPTY,
                 charset.name(),
                 charsetBomMarked,
                 null,
                 programUnits,
-                ""
+                source.substring(cursor)
         );
     }
 
     @Override
     public Cobol visitProgramUnit(CobolParser.ProgramUnitContext ctx) {
-        Cobol.IdentificationDivision identificationDivision = (Cobol.IdentificationDivision) visitIdentificationDivision(ctx.identificationDivision());
-        Cobol.ProcedureDivision procedureDivision;
-        if (ctx.procedureDivision() == null) {
-            procedureDivision = null;
-        } else {
-            procedureDivision = (Cobol.ProcedureDivision) visitProcedureDivision(ctx.procedureDivision());
-        }
         return new Cobol.ProgramUnit(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                identificationDivision,
-                procedureDivision
+                (Cobol.IdentificationDivision) visitIdentificationDivision(ctx.identificationDivision()),
+                ctx.procedureDivision() == null ? null : (Cobol.ProcedureDivision) visitProcedureDivision(ctx.procedureDivision())
         );
     }
 
@@ -221,14 +212,14 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         if (ctx.identificationDivisionBody() != null && ctx.identificationDivisionBody().size() != 0) {
             throw new UnsupportedOperationException("Implement me");
         }
-        Cobol.ProgramIdParagraph programIdParagraph = (Cobol.ProgramIdParagraph) visitProgramIdParagraph(ctx.programIdParagraph());
+        String id = (ctx.IDENTIFICATION() == null ? ctx.ID() : ctx.IDENTIFICATION()).getText();
         return new Cobol.IdentificationDivision(
                 randomId(),
-                prefix(ctx),
+                sourceBefore(id),
                 Markers.EMPTY,
-                (ctx.IDENTIFICATION() == null ? ctx.ID() : ctx.IDENTIFICATION()).getText(),
+                id,
                 padLeft(ctx.DIVISION()),
-                padLeft(sourceBefore("."), programIdParagraph)
+                padLeft(sourceBefore("."), (Cobol.ProgramIdParagraph) visitProgramIdParagraph(ctx.programIdParagraph()))
         );
     }
 
@@ -240,7 +231,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
         Space programNamePrefix = sourceBefore(".");
         CobolLeftPadded<Name> programName;
-        if(ctx.programName().NONNUMERICLITERAL() != null) {
+        if (ctx.programName().NONNUMERICLITERAL() != null) {
             programName = padLeft(programNamePrefix, new Cobol.Literal(randomId(),
                     sourceBefore(ctx.programName().getText()), Markers.EMPTY,
                     ctx.programName().getText(), ctx.programName().getText()));
