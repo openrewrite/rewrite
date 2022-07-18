@@ -139,7 +139,7 @@ public class ChangeParentPom extends Recipe {
                 Xml.Document m = super.visitDocument(document, executionContext);
                 if(m != document) {
                     doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
-                    doAfterVisit(new UpdateMavenModel<>());
+                    maybeUpdateModel();
                     doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
                 }
                 return m;
