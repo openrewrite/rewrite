@@ -170,6 +170,7 @@ class Display implements Statement {
 
 Space prefix;
         Markers markers;
+        String display;
         List<Name> operands;
 
         @Override
@@ -415,29 +416,12 @@ Space prefix;
         }
     }
 
-@Value
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@With
-class Paragraphs implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-Space prefix;
-        Markers markers;
-        List<Sentence> sentences;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitParagraphs(this, p);
-        }
-    }
-
 @ToString
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @RequiredArgsConstructor
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-class Sentence implements Cobol {
+class Paragraphs implements Cobol {
     @Nullable
     @NonFinal
     transient WeakReference<Padding> padding;
@@ -455,20 +439,20 @@ class Sentence implements Cobol {
         @With
         Markers markers;
 
-CobolContainer<Statement> statements;
+CobolContainer<Sentence> sentences;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitSentence(this, p);
+            return v.visitParagraphs(this, p);
         }
 
-        public List<Statement> getStatements() {
-            return statements.getElements();
+        public List<Cobol.Sentence> getSentences() {
+            return sentences.getElements();
         }
 
-        public Sentence withStatements(List<Statement> statements) {
-            return getPadding().withStatements(this.statements.getPadding().withElements(CobolRightPadded.withElements(
-                    this.statements.getPadding().getElements(), statements)));
+        public Paragraphs withSentences(List<Cobol.Sentence> sentences) {
+            return getPadding().withSentences(this.sentences.getPadding().withElements(CobolRightPadded.withElements(
+                    this.sentences.getPadding().getElements(), sentences)));
         }
 
     public Padding getPadding() {
@@ -488,16 +472,33 @@ CobolContainer<Statement> statements;
 
     @RequiredArgsConstructor
     public static class Padding {
-        private final Sentence t;
+        private final Paragraphs t;
 
-        public CobolContainer<Statement> getStatements() {
-            return t.statements;
+        public CobolContainer<Cobol.Sentence> getSentences() {
+            return t.sentences;
         }
 
-        public Sentence withStatements(CobolContainer<Statement> statements) {
-            return t.statements == statements ? t : new Sentence(t.padding, t.id, t.prefix, t.markers, statements);
+        public Paragraphs withSentences(CobolContainer<Cobol.Sentence> sentences) {
+            return t.sentences == sentences ? t : new Paragraphs(t.padding, t.id, t.prefix, t.markers, sentences);
         }
     }
+    }
+
+@Value
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+@With
+class Sentence implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+Space prefix;
+        Markers markers;
+        List<Statement> statements;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSentence(this, p);
+        }
     }
 
 @ToString

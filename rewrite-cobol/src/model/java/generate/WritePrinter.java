@@ -91,7 +91,7 @@ public class WritePrinter extends Recipe {
                                             "}");
                                     break;
                                 case "String":
-                                    fields.add("p.out.append(" + paramName + ".get" + capitalizedName + "())");
+                                    fields.add("p.append(" + paramName + ".get" + capitalizedName + "())");
                                     break;
                                 default:
                                     if(elemType.getClassName().startsWith("Cobol")) {

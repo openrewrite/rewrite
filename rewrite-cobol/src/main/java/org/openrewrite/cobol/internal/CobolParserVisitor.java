@@ -115,7 +115,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         }
         return new Cobol.ProcedureDivision(
                 randomId(),
-                prefix(ctx),
+                sourceBefore(ctx.PROCEDURE().getText()),
                 Markers.EMPTY,
                 ctx.PROCEDURE().getText(),
                 padLeft(ctx.DIVISION()),
@@ -142,43 +142,42 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
         if (ctx.paragraph() != null && !ctx.paragraph().isEmpty()) {
             throw new UnsupportedOperationException("Implement me");
         }
-        List<Cobol.Sentence> sentences = new ArrayList<>(ctx.sentence().size());
+        List<CobolRightPadded<Cobol.Sentence>> sentences = new ArrayList<>(ctx.sentence().size());
         for (int i = 0; i < ctx.sentence().size(); i++) {
-            sentences.add(visitSentence(ctx.sentence(i)));
+            Cobol.Sentence unpadded = visitSentence(ctx.sentence(i));
+            sentences.add(padRight(unpadded, sourceBefore(".")));
         }
         return new Cobol.Paragraphs(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                sentences
+                CobolContainer.build(sentences)
         );
     }
 
     @Override
     public Cobol.Sentence visitSentence(CobolParser.SentenceContext ctx) {
         Space prefix = prefix(ctx);
-        List<CobolRightPadded<Statement>> statements = new ArrayList<>(ctx.statement().size());
+        List<Statement> statements = new ArrayList<>(ctx.statement().size());
         for (int i = 0; i < ctx.statement().size(); i++) {
-            statements.add(padRight((Statement) visit(ctx.statement(i)), Space.EMPTY));
+            statements.add((Statement) visit(ctx.statement(i)));
         }
         return new Cobol.Sentence(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                CobolContainer.build(Space.EMPTY, ListUtils.mapLast(statements, stat ->
-                        stat.withAfter(sourceBefore("."))), Markers.EMPTY)
+                statements
         );
     }
 
     @Override
     public Cobol visitStopStatement(CobolParser.StopStatementContext ctx) {
-        Space prefix = prefix(ctx);
         if (ctx.literal() != null || ctx.stopStatementGiving() != null) {
             throw new UnsupportedOperationException("Implement me");
         }
         return new Cobol.Stop(
                 randomId(),
-                prefix,
+                sourceBefore(ctx.STOP().getText()),
                 Markers.EMPTY,
                 ctx.STOP().getText(),
                 ctx.RUN() == null ? null : padLeft(sourceBefore(ctx.RUN().getText()), ctx.RUN().getText()),
@@ -188,21 +187,23 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
 
     @Override
     public Cobol visitDisplayStatement(CobolParser.DisplayStatementContext ctx) {
-        Space prefix = prefix(ctx);
         if (ctx.displayAt() != null || ctx.displayUpon() != null || ctx.displayWith() != null ||
                 ctx.onExceptionClause() != null || ctx.notOnExceptionClause() != null ||
                 ctx.END_DISPLAY() != null) {
             throw new UnsupportedOperationException("Implement me");
         }
+
+        Space prefix = sourceBefore(ctx.DISPLAY().getText());
         List<Name> operands = new ArrayList<>(ctx.displayOperand().size());
-        ParseTree previousCtx = ctx.DISPLAY();
         for (int i = 0; i < ctx.displayOperand().size(); i++) {
             operands.add((Name) visit(ctx.displayOperand(i)));
         }
+
         return new Cobol.Display(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
+                ctx.DISPLAY().getText(),
                 operands
         );
     }
@@ -224,29 +225,33 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     }
 
     @Override
+    public Cobol visitLiteral(CobolParser.LiteralContext ctx) {
+        return new Cobol.Literal(
+                randomId(),
+                sourceBefore(ctx.getText()),
+                Markers.EMPTY,
+                ctx.getText(), // TODO extract literal values from various literal types
+                ctx.getText()
+        );
+    }
+
+    @Override
     public Cobol visitProgramIdParagraph(CobolParser.ProgramIdParagraphContext ctx) {
-        CobolLeftPadded<String> dot2 = null;
-        Space prefix = prefix(ctx);
-        String programId = ctx.PROGRAM_ID().getText();
-
-        Space programNamePrefix = sourceBefore(".");
-        CobolLeftPadded<Name> programName;
-        if (ctx.programName().NONNUMERICLITERAL() != null) {
-            programName = padLeft(programNamePrefix, new Cobol.Literal(randomId(),
-                    sourceBefore(ctx.programName().getText()), Markers.EMPTY,
-                    ctx.programName().getText(), ctx.programName().getText()));
-        } else {
-            programName = padLeft(programNamePrefix, new Cobol.Identifier(randomId(),
-                    sourceBefore(ctx.programName().getText()), Markers.EMPTY,
-                    ctx.programName().getText()));
-        }
-
         return new Cobol.ProgramIdParagraph(
                 randomId(),
-                prefix,
+                sourceBefore(ctx.PROGRAM_ID().getText()),
                 Markers.EMPTY,
-                programId,
-                programName
+                ctx.PROGRAM_ID().getText(),
+                padLeft(
+                        sourceBefore("."),
+                        ctx.programName().NONNUMERICLITERAL() == null ?
+                                new Cobol.Identifier(randomId(),
+                                        sourceBefore(ctx.programName().getText()), Markers.EMPTY,
+                                        ctx.programName().getText()) :
+                                new Cobol.Literal(randomId(),
+                                        sourceBefore(ctx.programName().getText()), Markers.EMPTY,
+                                        ctx.programName().getText(), ctx.programName().getText())
+                )
         );
     }
 

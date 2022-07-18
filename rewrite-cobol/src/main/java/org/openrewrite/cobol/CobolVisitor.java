@@ -151,7 +151,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Paragraphs pp = paragraphs;
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
-        pp = pp.withSentences(ListUtils.map(pp.getSentences(), t -> (Cobol.Sentence) visit(t, p)));
+        pp = pp.getPadding().withSentences(visitContainer(pp.getPadding().getSentences(), p));
         return pp;
     }
 

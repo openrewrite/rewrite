@@ -23,6 +23,7 @@ import java.util.List;
 
 public interface Cobol {
     class Display implements Statement {
+        String display;
         List<Name> operands;
     }
 
@@ -57,11 +58,11 @@ public interface Cobol {
     }
 
     class Paragraphs implements Cobol {
-        List<Sentence> sentences;
+        CobolContainer<Sentence> sentences;
     }
 
     class Sentence implements Cobol {
-        CobolContainer<Statement> statements;
+        List<Statement> statements;
     }
 
     class ProgramIdParagraph implements Cobol {
