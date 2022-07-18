@@ -516,6 +516,20 @@ interface JavadocTest : JavaTreeTest {
     )
 
     @Test
+    fun fullyQualifiedParameterizedTypeLink(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            /**
+             * {@link java.util.List<String>}
+             */
+            public class A {
+                void method() {}
+            }
+        """.trimIndent()
+    )
+
+    @Test
     fun fullyQualifiedMethodLink(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
