@@ -171,75 +171,80 @@ public interface RecipeScheduler {
                                                          ExecutionContext ctx,
                                                          Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile) {
         long startTime = System.nanoTime();
-        AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         Recipe recipe = recipeStack.peek();
         ctx.putCurrentRecipe(recipe);
         if (ctx instanceof WatchableExecutionContext) {
             ((WatchableExecutionContext) ctx).resetHasNewMessages();
         }
-
-        if (recipe.getApplicableTest() != null) {
-            boolean applicable = false;
-            for (S s : before) {
-                if (recipe.getApplicableTest().visit(s, ctx) != s) {
-                    applicable = true;
-                    break;
-                }
-
-                for (TreeVisitor<?, ExecutionContext> applicableTest : recipe.getApplicableTests()) {
-                    if (applicableTest.visit(s, ctx) != s) {
+        try {
+            if (recipe.getApplicableTest() != null) {
+                boolean applicable = false;
+                for (S s : before) {
+                    if (recipe.getApplicableTest().visit(s, ctx) != s) {
                         applicable = true;
                         break;
                     }
+
+                    for (TreeVisitor<?, ExecutionContext> applicableTest : recipe.getApplicableTests()) {
+                        if (applicableTest.visit(s, ctx) != s) {
+                            applicable = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!applicable) {
+                    return before;
                 }
             }
-
-            if (!applicable) {
-                return before;
-            }
+        } catch (Throwable t) {
+            ctx.getOnError().accept(t);
+            return before;
         }
 
+        AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         List<S> after = !recipe.validate(ctx).isValid() ?
                 before :
                 mapAsync(before, s -> {
                     Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", recipe.getDisplayName());
                     Timer.Sample sample = Timer.start();
 
-                    if (recipe.getSingleSourceApplicableTest() != null) {
-                        if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
-                            sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
-                            return s;
-                        }
-                    }
-
-                    for (TreeVisitor<?, ExecutionContext> singleSourceApplicableTest : recipe.getSingleSourceApplicableTests()) {
-                        if (singleSourceApplicableTest.visit(s, ctx) == s) {
-                            sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
-                            return s;
-                        }
-                    }
-
-                    Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
-                    if (duration.compareTo(ctx.getRunTimeout(before.size())) > 0) {
-                        if (thrownErrorOnTimeout.compareAndSet(false, true)) {
-                            RecipeTimeoutException t = new RecipeTimeoutException(recipe);
-                            ctx.getOnError().accept(t);
-                            ctx.getOnTimeout().accept(t, ctx);
-                        }
-                        sample.stop(MetricsHelper.successTags(timer, "timeout").register(Metrics.globalRegistry));
-                        return s;
-                    }
-
-                    if (ctx.getMessage(PANIC) != null) {
-                        return s;
-                    }
-
-                    TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
-
-                    //noinspection unchecked
-                    S afterFile = (S) visitor.visitSourceFile(s, ctx);
-
                     try {
+                        if (recipe.getSingleSourceApplicableTest() != null) {
+                            if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
+                                sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
+                                return s;
+                            }
+                        }
+
+                        for (TreeVisitor<?, ExecutionContext> singleSourceApplicableTest : recipe.getSingleSourceApplicableTests()) {
+                            if (singleSourceApplicableTest.visit(s, ctx) == s) {
+                                sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
+                                return s;
+                            }
+                        }
+
+                        Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
+                        if (duration.compareTo(ctx.getRunTimeout(before.size())) > 0) {
+                            if (thrownErrorOnTimeout.compareAndSet(false, true)) {
+                                RecipeTimeoutException t = new RecipeTimeoutException(recipe);
+                                ctx.getOnError().accept(t);
+                                ctx.getOnTimeout().accept(t, ctx);
+                            }
+                            sample.stop(MetricsHelper.successTags(timer, "timeout").register(Metrics.globalRegistry));
+                            return s;
+                        }
+
+                        if (ctx.getMessage(PANIC) != null) {
+                            sample.stop(MetricsHelper.successTags(timer, "panic").register(Metrics.globalRegistry));
+                            return s;
+                        }
+
+                        TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
+
+                        //noinspection unchecked
+                        S afterFile = (S) visitor.visitSourceFile(s, ctx);
+
                         if (visitor.isAcceptable(s, ctx)) {
                             //noinspection unchecked
                             afterFile = (S) visitor.visit(afterFile, ctx);
@@ -272,8 +277,14 @@ public interface RecipeScheduler {
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).
 
-        //noinspection unchecked
-        List<SourceFile> afterWidened = recipe.visit((List<SourceFile>) after, ctx);
+        List<SourceFile> afterWidened;
+        try {
+            //noinspection unchecked
+            afterWidened = recipe.visit((List<SourceFile>) after, ctx);
+        } catch (Throwable t) {
+            ctx.getOnError().accept(t);
+            return before;
+        }
 
         if (afterWidened != after) {
             Map<UUID, SourceFile> originalMap = new HashMap<>(after.size());
