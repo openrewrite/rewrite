@@ -181,4 +181,48 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         }
         return sentence;
     }
+
+    public Cobol visitDataDivision(Cobol.DataDivision dataDivision, PrintOutputCapture<P> p) {
+        visitSpace(dataDivision.getPrefix(), p);
+        visitMarkers(dataDivision.getMarkers(), p);
+        p.append(dataDivision.getData());
+        visitLeftPadded("", dataDivision.getPadding().getDivision(), p);
+        visitContainer("", dataDivision.getPadding().getSections(), " ", "", p);
+        return dataDivision;
+    }
+
+    public Cobol visitDataPictureClause(Cobol.DataPictureClause dataPictureClause, PrintOutputCapture<P> p) {
+        visitSpace(dataPictureClause.getPrefix(), p);
+        visitMarkers(dataPictureClause.getMarkers(), p);
+        p.append(dataPictureClause.getPic());
+        visitLeftPadded("", dataPictureClause.getPadding().getIs(), p);
+        visitContainer("", dataPictureClause.getPadding().getPictures(), " ", "", p);
+        return dataPictureClause;
+    }
+
+    public Cobol visitWorkingStorageSection(Cobol.WorkingStorageSection workingStorageSection, PrintOutputCapture<P> p) {
+        visitSpace(workingStorageSection.getPrefix(), p);
+        visitMarkers(workingStorageSection.getMarkers(), p);
+        p.append(workingStorageSection.getWorkingStorage());
+        visitLeftPadded("", workingStorageSection.getPadding().getSection(), p);
+        visitContainer("", workingStorageSection.getPadding().getDataDescriptions(), " ", "", p);
+        return workingStorageSection;
+    }
+
+    public Cobol visitPicture(Cobol.Picture picture, PrintOutputCapture<P> p) {
+        visitSpace(picture.getPrefix(), p);
+        visitMarkers(picture.getMarkers(), p);
+        p.append(picture.getChars());
+        visitLeftPadded("", picture.getPadding().getCardinalitySource(), p);
+        return picture;
+    }
+
+    public Cobol visitDataDescriptionEntry(Cobol.DataDescriptionEntry dataDescriptionEntry, PrintOutputCapture<P> p) {
+        visitSpace(dataDescriptionEntry.getPrefix(), p);
+        visitMarkers(dataDescriptionEntry.getMarkers(), p);
+        p.append(dataDescriptionEntry.getLevel().toString());
+        visitLeftPadded("", dataDescriptionEntry.getPadding().getName(), p);
+        visitContainer("", dataDescriptionEntry.getPadding().getClauses(), ".", ".", p);
+        return dataDescriptionEntry;
+    }
 }

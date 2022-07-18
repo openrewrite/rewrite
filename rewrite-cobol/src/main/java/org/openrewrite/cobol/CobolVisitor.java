@@ -38,7 +38,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
     }
 
     public <P2 extends Cobol> CobolContainer<P2> visitContainer(@Nullable CobolContainer<P2> container, P p) {
-        if(container == null) {
+        if (container == null) {
             //noinspection ConstantConditions
             return null;
         }
@@ -97,6 +97,15 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         }
         Space after = visitSpace(right.getAfter(), p);
         return (after == right.getAfter() && t == right.getElement()) ? right : new CobolRightPadded<>(t, after, right.getMarkers());
+    }
+
+    public Cobol visitDataDivision(Cobol.DataDivision dataDivision, P p) {
+        Cobol.DataDivision d = dataDivision;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.getPadding().withDivision(visitLeftPadded(d.getPadding().getDivision(), p));
+        d = d.getPadding().withSections(visitContainer(d.getPadding().getSections(), p));
+        return d;
     }
 
     public Cobol visitDisplay(Cobol.Display display, P p) {
@@ -187,5 +196,46 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         s = s.getPadding().withRun(visitLeftPadded(s.getPadding().getRun(), p));
         s = s.withStatement(visit(s.getStatement(), p));
         return s;
+    }
+
+    public Cobol visitWorkingStorageSection(Cobol.WorkingStorageSection workingStorageSection, P p) {
+        Cobol.WorkingStorageSection w = workingStorageSection;
+        w = w.withPrefix(visitSpace(w.getPrefix(), p));
+        w = w.withMarkers(visitMarkers(w.getMarkers(), p));
+        w = w.getPadding().withSection(visitLeftPadded(w.getPadding().getSection(), p));
+        w = w.getPadding().withDataDescriptions(visitContainer(w.getPadding().getDataDescriptions(), p));
+        return w;
+    }
+
+    public Cobol visitDataPictureClause(Cobol.DataPictureClause dataPictureClause, P p) {
+        Cobol.DataPictureClause d = dataPictureClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        if (d.getPadding().getIs() != null) {
+            d = d.getPadding().withIs(visitLeftPadded(d.getPadding().getIs(), p));
+        }
+        d = d.getPadding().withPictures(visitContainer(d.getPadding().getPictures(), p));
+        return d;
+    }
+
+    public Cobol visitPicture(Cobol.Picture picture, P p) {
+        Cobol.Picture pp = picture;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        if (pp.getPadding().getCardinalitySource() != null) {
+            pp = pp.getPadding().withCardinalitySource(visitLeftPadded(pp.getPadding().getCardinalitySource(), p));
+        }
+        return pp;
+    }
+
+    public Cobol visitDataDescriptionEntry(Cobol.DataDescriptionEntry dataDescriptionEntry, P p) {
+        Cobol.DataDescriptionEntry d = dataDescriptionEntry;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        if (d.getPadding().getName() != null) {
+            d = d.getPadding().withName(visitLeftPadded(d.getPadding().getName(), p));
+        }
+        d = d.getPadding().withClauses(visitContainer(d.getPadding().getClauses(), p));
+        return d;
     }
 }

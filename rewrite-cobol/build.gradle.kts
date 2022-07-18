@@ -39,6 +39,7 @@ dependencies {
 
     modelImplementation(project(":rewrite-java-11"))
     modelImplementation("org.projectlombok:lombok:1.18.24")
+    modelImplementation("ch.qos.logback:logback-classic:latest.release")
 
     testImplementation(project(":rewrite-test"))
     testImplementation("io.github.classgraph:classgraph:latest.release")

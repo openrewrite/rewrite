@@ -22,6 +22,46 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 
 public interface Cobol {
+    class DataDivision implements Statement {
+        String data;
+        CobolLeftPadded<String> division;
+        CobolContainer<DataDivisionSection> sections;
+    }
+
+    class DataDescriptionEntry implements Cobol {
+        Integer level;
+
+        @Nullable
+        CobolLeftPadded<String> name;
+
+        CobolContainer<Cobol> clauses;
+    }
+
+    class DataPictureClause implements Cobol {
+        String pic;
+
+        @Nullable
+        CobolLeftPadded<String> is;
+
+        CobolContainer<Picture> pictures;
+    }
+
+    class Picture implements Cobol {
+        String chars;
+
+        @Nullable
+        CobolLeftPadded<String> cardinalitySource;
+
+        @Nullable
+        public String getCardinality() {
+            return cardinalitySource == null ? null : cardinalitySource
+                    .getElement()
+                    .replace("(", "")
+                    .replace(")", "")
+                    .trim();
+        }
+    }
+
     class Display implements Statement {
         String display;
         List<Name> operands;
@@ -81,5 +121,11 @@ public interface Cobol {
         String stop;
         CobolLeftPadded<String> run;
         Cobol statement;
+    }
+
+    class WorkingStorageSection implements DataDivisionSection {
+        String workingStorage;
+        CobolLeftPadded<String> section;
+        CobolContainer<DataDescriptionEntry> dataDescriptions;
     }
 }

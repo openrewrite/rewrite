@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.*;
 
 import java.util.List;
@@ -85,18 +86,31 @@ public class WriteVisitorMethods extends Recipe {
                 for (Statement statement : modelClass.getBody().getStatements()) {
                     if (statement instanceof J.VariableDeclarations) {
                         J.VariableDeclarations varDec = (J.VariableDeclarations) statement;
+                        boolean nullable = !FindAnnotations.find(varDec, "@org.openrewrite.internal.lang.Nullable").isEmpty();
                         String name = varDec.getVariables().get(0).getSimpleName();
                         String capitalizedName = name.substring(0, 1).toUpperCase() + name.substring(1);
 
                         JavaType.FullyQualified elemType = requireNonNull(TypeUtils.asFullyQualified(varDec.getType()));
                         switch (elemType.getClassName()) {
                             case "CobolLeftPadded":
+                                if(nullable) {
+                                    fields.add("if(" + varName + ".getPadding().get" + capitalizedName + "() != null) {");
+                                }
                                 fields.add(varName + " = " + varName + ".getPadding().with" + capitalizedName + "(visitLeftPadded(" +
                                         varName + ".getPadding().get" + capitalizedName + "(), p));");
+                                if(nullable) {
+                                    fields.add("}");
+                                }
                                 break;
                             case "CobolRightPadded":
+                                if(nullable) {
+                                    fields.add("if(" + varName + ".getPadding().get" + capitalizedName + "() != null) {");
+                                }
                                 fields.add(varName + " = " + varName + ".getPadding().with" + capitalizedName + "(visitRightPadded(" +
                                         varName + ".getPadding().get" + capitalizedName + "(), p));");
+                                if(nullable) {
+                                    fields.add("}");
+                                }
                                 break;
                             case "CobolContainer":
                                 fields.add(varName + " = " + varName + ".getPadding().with" + capitalizedName + "(visitContainer(" + varName + ".getPadding().get" + capitalizedName + "(), p));");

@@ -72,4 +72,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.Stop visitStop(Cobol.Stop stop, P p) {
         return (Cobol.Stop) super.visitStop(stop, p);
     }
+
+    @Override
+    public Cobol.DataDivision visitDataDivision(Cobol.DataDivision dataDivision, P p) {
+        return (Cobol.DataDivision) super.visitDataDivision(dataDivision, p);
+    }
+
+    @Override
+    public Cobol.DataDescriptionEntry visitDataDescriptionEntry(Cobol.DataDescriptionEntry dataDescriptionEntry, P p) {
+        return (Cobol.DataDescriptionEntry) super.visitDataDescriptionEntry(dataDescriptionEntry, p);
+    }
+
+    @Override
+    public Cobol.DataPictureClause visitDataPictureClause(Cobol.DataPictureClause dataPictureClause, P p) {
+        return (Cobol.DataPictureClause) super.visitDataPictureClause(dataPictureClause, p);
+    }
+
+    @Override
+    public Cobol.Picture visitPicture(Cobol.Picture picture, P p) {
+        return (Cobol.Picture) super.visitPicture(picture, p);
+    }
+
+    @Override
+    public Cobol.WorkingStorageSection visitWorkingStorageSection(Cobol.WorkingStorageSection workingStorageSection, P p) {
+        return (Cobol.WorkingStorageSection) super.visitWorkingStorageSection(workingStorageSection, p);
+    }
 }

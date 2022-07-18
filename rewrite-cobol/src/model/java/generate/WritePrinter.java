@@ -91,30 +91,45 @@ public class WritePrinter extends Recipe {
                                             "}");
                                     break;
                                 case "String":
-                                    fields.add("p.append(" + paramName + ".get" + capitalizedName + "())");
+                                    fields.add("p.append(" + paramName + ".get" + capitalizedName + "());");
+                                    break;
+                                case "Integer":
+                                    fields.add("p.append(" + paramName + ".get" + capitalizedName + "().toString());");
                                     break;
                                 default:
-                                    if(elemType.getClassName().startsWith("Cobol")) {
+                                    if (elemType.getClassName().startsWith("Cobol")) {
                                         fields.add("visit(" + paramName + ".get" + capitalizedName + "(), p);");
                                     }
                             }
                         }
                     }
 
-                    final JavaTemplate visitMethod = JavaTemplate.builder(this::getCursor, "" +
-                            "public Cobol visit#{}(Cobol.#{} #{}, PrintOutputCapture<P> p) {" +
-                            "    visitSpace(#{}.getPrefix(), p);" +
-                            "    visitMarkers(#{}.getMarkers(), p);" +
-                            "    #{}" +
-                            "    return #{};" +
-                            "}").javaParser(parser).build();
+                    StringBuilder template = new StringBuilder();
 
-                    c = c.withTemplate(visitMethod, c.getBody().getCoordinates().lastStatement(),
-                            modelTypeName, modelTypeName, paramName,
-                            paramName,
-                            paramName,
-                            fields,
-                            paramName);
+                    JavaTemplate visitMethod = JavaTemplate.builder(this::getCursor, "" +
+                                    "public Cobol visit#{}(Cobol.#{} #{}, PrintOutputCapture<P> p) {" +
+                                    "    visitSpace(#{}.getPrefix(), p);" +
+                                    "    visitMarkers(#{}.getMarkers(), p);" +
+                                    "    #{}" +
+                                    "    return #{};" +
+                                    "}"
+                            )
+                            .javaParser(parser)
+//                            .doAfterVariableSubstitution(System.out::println)
+                            .doBeforeParseTemplate(template::append)
+                            .build();
+
+                    try {
+                        c = c.withTemplate(visitMethod, c.getBody().getCoordinates().lastStatement(),
+                                modelTypeName, modelTypeName, paramName,
+                                paramName,
+                                paramName,
+                                fields,
+                                paramName);
+                    } catch(Throwable t) {
+                        System.out.println(template);
+                        throw t;
+                    }
                 }
 
                 return c;
@@ -132,11 +147,6 @@ public class WritePrinter extends Recipe {
                     }
                     return modelClass;
                 });
-            }
-
-            @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                return super.visitCompilationUnit(cu, executionContext);
             }
         };
     }

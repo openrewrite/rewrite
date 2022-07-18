@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Result;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
 
@@ -74,7 +75,16 @@ public class GenerateModel {
 
         Path cobolTreePath = Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/tree/Cobol.java");
 
-        results.addAll(new WriteModel(modelClasses).run(jp().parse(Collections.singletonList(cobolTreePath), null, ctx), ctx));
+        List<Path> deps = Arrays.asList(
+                Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/CobolVisitor.java"),
+                Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/CobolIsoVisitor.java"),
+                Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/tree/CobolContainer.java"),
+                Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/tree/CobolLeftPadded.java"),
+                Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/tree/CobolRightPadded.java")
+        );
+
+        results.addAll(new WriteModel(modelClasses).run(Collections.singletonList(jp().parse(
+                ListUtils.concat(cobolTreePath, deps), null, ctx).get(0)), ctx));
         results.addAll(new WriteVisitorMethods(modelClasses).run(jp().parse(
                 Arrays.asList(
                         Paths.get("./rewrite-cobol/src/main/java/org/openrewrite/cobol/CobolVisitor.java"),

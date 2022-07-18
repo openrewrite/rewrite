@@ -949,7 +949,11 @@ dataDescriptionEntry
    ;
 
 dataDescriptionEntryFormat1
-   : (INTEGERLITERAL | LEVEL_NUMBER_77) (FILLER | dataName)? (dataRedefinesClause | dataIntegerStringClause | dataExternalClause | dataGlobalClause | dataTypeDefClause | dataThreadLocalClause | dataPictureClause | dataCommonOwnLocalClause | dataTypeClause | dataUsingClause | dataUsageClause | dataValueClause | dataReceivedByClause | dataOccursClause | dataSignClause | dataSynchronizedClause | dataJustifiedClause | dataBlankWhenZeroClause | dataWithLowerBoundsClause | dataAlignedClause | dataRecordAreaClause)* DOT_FS
+   : (INTEGERLITERAL | LEVEL_NUMBER_77) (FILLER | dataName)? dataDescriptionEntryFormat1Clause* DOT_FS
+   ;
+
+dataDescriptionEntryFormat1Clause
+   : dataRedefinesClause | dataIntegerStringClause | dataExternalClause | dataGlobalClause | dataTypeDefClause | dataThreadLocalClause | dataPictureClause | dataCommonOwnLocalClause | dataTypeClause | dataUsingClause | dataUsageClause | dataValueClause | dataReceivedByClause | dataOccursClause | dataSignClause | dataSynchronizedClause | dataJustifiedClause | dataBlankWhenZeroClause | dataWithLowerBoundsClause | dataAlignedClause | dataRecordAreaClause
    ;
 
 dataDescriptionEntryFormat2
@@ -1017,7 +1021,11 @@ dataPictureClause
    ;
 
 pictureString
-   : (pictureChars+ pictureCardinality?)+
+   : picture+
+   ;
+
+picture
+   : (pictureChars+ pictureCardinality?)
    ;
 
 pictureChars

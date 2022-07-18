@@ -1,18 +1,3 @@
-/*
- * Copyright 2022 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 // Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-cobol/src/main/antlr/Cobol.g4 by ANTLR 4.9.3
 package org.openrewrite.cobol.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
@@ -2213,6 +2198,16 @@ public interface CobolListener extends ParseTreeListener {
 	 */
 	void exitDataDescriptionEntryFormat1(CobolParser.DataDescriptionEntryFormat1Context ctx);
 	/**
+	 * Enter a parse tree produced by {@link CobolParser#dataDescriptionEntryFormat1Clause}.
+	 * @param ctx the parse tree
+	 */
+	void enterDataDescriptionEntryFormat1Clause(CobolParser.DataDescriptionEntryFormat1ClauseContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link CobolParser#dataDescriptionEntryFormat1Clause}.
+	 * @param ctx the parse tree
+	 */
+	void exitDataDescriptionEntryFormat1Clause(CobolParser.DataDescriptionEntryFormat1ClauseContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link CobolParser#dataDescriptionEntryFormat2}.
 	 * @param ctx the parse tree
 	 */
@@ -2382,6 +2377,16 @@ public interface CobolListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitPictureString(CobolParser.PictureStringContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link CobolParser#picture}.
+	 * @param ctx the parse tree
+	 */
+	void enterPicture(CobolParser.PictureContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link CobolParser#picture}.
+	 * @param ctx the parse tree
+	 */
+	void exitPicture(CobolParser.PictureContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link CobolParser#pictureChars}.
 	 * @param ctx the parse tree

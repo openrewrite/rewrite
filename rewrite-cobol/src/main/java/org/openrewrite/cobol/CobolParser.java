@@ -54,7 +54,7 @@ public class CobolParser implements Parser<Cobol.CompilationUnit> {
                         String sourceStr = is.readFully();
                         org.openrewrite.cobol.internal.grammar.CobolParser parser = new org.openrewrite.cobol.internal.grammar.CobolParser(new CommonTokenStream(new CobolLexer(
                                 CharStreams.fromString(sourceStr))));
-                        Cobol.CompilationUnit compilationUnit = new CobolParserVisitor(
+                        Cobol.CompilationUnit compilationUnit = (Cobol.CompilationUnit) new CobolParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
                                 sourceFile.getFileAttributes(),
                                 sourceStr,
