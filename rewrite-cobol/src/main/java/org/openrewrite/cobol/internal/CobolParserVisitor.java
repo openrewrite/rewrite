@@ -23,6 +23,7 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.cobol.internal.grammar.CobolBaseVisitor;
 import org.openrewrite.cobol.internal.grammar.CobolParser;
 import org.openrewrite.cobol.tree.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -165,15 +166,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Cobol> {
     @Override
     public Cobol.Sentence visitSentence(CobolParser.SentenceContext ctx) {
         Space prefix = prefix(ctx);
-        List<Statement> statements = new ArrayList<>(ctx.statement().size());
+        List<CobolRightPadded<Statement>> statements = new ArrayList<>(ctx.statement().size());
         for (int i = 0; i < ctx.statement().size(); i++) {
-            statements.add((Statement) visit(ctx.statement(i)));
+            statements.add(padRight((Statement) visit(ctx.statement(i)), Space.EMPTY));
         }
         return new Cobol.Sentence(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                statements
+                CobolContainer.build(Space.EMPTY, ListUtils.mapLast(statements, stat ->
+                        stat.withAfter(sourceBefore("."))), Markers.EMPTY)
         );
     }
 
