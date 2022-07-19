@@ -149,14 +149,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return programIdParagraph;
     }
 
-    public Cobol visitProgramUnit(Cobol.ProgramUnit programUnit, PrintOutputCapture<P> p) {
-        visitSpace(programUnit.getPrefix(), p);
-        visitMarkers(programUnit.getMarkers(), p);
-        visit(programUnit.getIdentificationDivision(), p);
-        visit(programUnit.getProcedureDivision(), p);
-        return programUnit;
-    }
-
     public Cobol visitStop(Cobol.Stop stop, PrintOutputCapture<P> p) {
         visitSpace(stop.getPrefix(), p);
         visitMarkers(stop.getMarkers(), p);
@@ -224,5 +216,34 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitLeftPadded("", dataDescriptionEntry.getPadding().getName(), p);
         visitContainer("", dataDescriptionEntry.getPadding().getClauses(), ".", ".", p);
         return dataDescriptionEntry;
+    }
+
+    public Cobol visitEnvironmentDivision(Cobol.EnvironmentDivision environmentDivision, PrintOutputCapture<P> p) {
+        visitSpace(environmentDivision.getPrefix(), p);
+        visitMarkers(environmentDivision.getMarkers(), p);
+        p.append(environmentDivision.getEnvironment());
+        visitLeftPadded("", environmentDivision.getPadding().getDivision(), p);
+        visitContainer("", environmentDivision.getPadding().getBody(), " ", "", p);
+        return environmentDivision;
+    }
+
+    public Cobol visitProgramUnit(Cobol.ProgramUnit programUnit, PrintOutputCapture<P> p) {
+        visitSpace(programUnit.getPrefix(), p);
+        visitMarkers(programUnit.getMarkers(), p);
+        visit(programUnit.getIdentificationDivision(), p);
+        visit(programUnit.getDataDivision(), p);
+        visit(programUnit.getEnvironmentDivision(), p);
+        visit(programUnit.getProcedureDivision(), p);
+        visitContainer("", programUnit.getPadding().getProgramUnits(), " ", "", p);
+        visitRightPadded(programUnit.getPadding().getEndProgram(), ".", p);
+        return programUnit;
+    }
+
+    public Cobol visitEndProgram(Cobol.EndProgram endProgram, PrintOutputCapture<P> p) {
+        visitSpace(endProgram.getPrefix(), p);
+        visitMarkers(endProgram.getMarkers(), p);
+        p.append(endProgram.getEnd());
+        visitLeftPadded("", endProgram.getPadding().getProgram(), p);
+        return endProgram;
     }
 }

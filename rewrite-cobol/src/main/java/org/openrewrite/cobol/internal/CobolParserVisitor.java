@@ -124,8 +124,30 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 (Cobol.IdentificationDivision) visitIdentificationDivision(ctx.identificationDivision()),
-                ctx.procedureDivision() == null ? null : visitProcedureDivision(ctx.procedureDivision())
+                ctx.environmentDivision() == null ? null : visitEnvironmentDivision(ctx.environmentDivision()),
+                ctx.dataDivision() == null ? null : visitDataDivision(ctx.dataDivision()),
+                ctx.procedureDivision() == null ? null : visitProcedureDivision(ctx.procedureDivision()),
+                convertAllContainer(ctx.programUnit()),
+                ctx.endProgramStatement() == null ? null : padRight(visitEndProgramStatement(ctx.endProgramStatement()),
+                        sourceBefore("."))
         );
+    }
+
+    @Override
+    public Cobol.EndProgram visitEndProgramStatement(CobolParser.EndProgramStatementContext ctx) {
+        return new Cobol.EndProgram(
+                randomId(),
+                sourceBefore(ctx.END().getText()),
+                Markers.EMPTY,
+                ctx.END().getText(),
+                padLeft(ctx.PROGRAM()),
+                visitProgramName(ctx.programName())
+        );
+    }
+
+    @Override
+    public Cobol.EnvironmentDivision visitEnvironmentDivision(CobolParser.EnvironmentDivisionContext ctx) {
+        return (Cobol.EnvironmentDivision) super.visitEnvironmentDivision(ctx);
     }
 
     @Override
@@ -258,17 +280,19 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 sourceBefore(ctx.PROGRAM_ID().getText()),
                 Markers.EMPTY,
                 ctx.PROGRAM_ID().getText(),
-                padLeft(
-                        sourceBefore("."),
-                        ctx.programName().NONNUMERICLITERAL() == null ?
-                                new Cobol.Identifier(randomId(),
-                                        sourceBefore(ctx.programName().getText()), Markers.EMPTY,
-                                        ctx.programName().getText()) :
-                                new Cobol.Literal(randomId(),
-                                        sourceBefore(ctx.programName().getText()), Markers.EMPTY,
-                                        ctx.programName().getText(), ctx.programName().getText())
-                )
+                padLeft(sourceBefore("."), visitProgramName(ctx.programName()))
         );
+    }
+
+    @Override
+    public Name visitProgramName(CobolParser.ProgramNameContext ctx) {
+        return ctx.NONNUMERICLITERAL() == null ?
+                new Cobol.Identifier(randomId(),
+                        sourceBefore(ctx.getText()), Markers.EMPTY,
+                        ctx.getText()) :
+                new Cobol.Literal(randomId(),
+                        sourceBefore(ctx.getText()), Markers.EMPTY,
+                        ctx.getText(), ctx.getText());
     }
 
     private <C, T extends ParseTree> List<C> convertAll(List<T> trees, Function<T, C> convert) {

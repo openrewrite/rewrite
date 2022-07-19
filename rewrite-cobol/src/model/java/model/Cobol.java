@@ -17,6 +17,7 @@ package model;
 
 import org.openrewrite.cobol.tree.CobolContainer;
 import org.openrewrite.cobol.tree.CobolLeftPadded;
+import org.openrewrite.cobol.tree.CobolRightPadded;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
@@ -67,6 +68,18 @@ public interface Cobol {
         List<Name> operands;
     }
 
+    class EndProgram implements Statement {
+        String end;
+        CobolLeftPadded<String> program;
+        Name programName;
+    }
+
+    class EnvironmentDivision implements Cobol {
+        String environment;
+        CobolLeftPadded<String> division;
+        CobolContainer<Cobol> body;
+    }
+
     class Identifier implements Name {
         String simpleName;
     }
@@ -114,7 +127,18 @@ public interface Cobol {
         IdentificationDivision identificationDivision;
 
         @Nullable
+        EnvironmentDivision environmentDivision;
+
+        @Nullable
+        DataDivision dataDivision;
+
+        @Nullable
         ProcedureDivision procedureDivision;
+
+        CobolContainer<ProgramUnit> programUnits;
+
+        @Nullable
+        CobolRightPadded<EndProgram> endProgram;
     }
 
     class Stop implements Statement {

@@ -97,4 +97,14 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.WorkingStorageSection visitWorkingStorageSection(Cobol.WorkingStorageSection workingStorageSection, P p) {
         return (Cobol.WorkingStorageSection) super.visitWorkingStorageSection(workingStorageSection, p);
     }
+
+    @Override
+    public Cobol.EndProgram visitEndProgram(Cobol.EndProgram endProgram, P p) {
+        return (Cobol.EndProgram) super.visitEndProgram(endProgram, p);
+    }
+
+    @Override
+    public Cobol.EnvironmentDivision visitEnvironmentDivision(Cobol.EnvironmentDivision environmentDivision, P p) {
+        return (Cobol.EnvironmentDivision) super.visitEnvironmentDivision(environmentDivision, p);
+    }
 }
