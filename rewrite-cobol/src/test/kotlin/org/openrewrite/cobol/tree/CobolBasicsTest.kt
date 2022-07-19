@@ -31,8 +31,7 @@ class CobolBasicsTest : RewriteTest {
             object : CobolVisitor<ExecutionContext>() {
                 override fun visitSpace(space: Space, p: ExecutionContext): Space {
                     if (space.whitespace.trim().isNotEmpty()) {
-                        fail("Space has non-whitespace characters: '${space.whitespace}'.\nCursor:" +
-                                cursor.pathAsStream.toList().joinToString("\n    ", prefix = "\n    ", postfix = "\n\n") { it.toString() })
+                        return space.withWhitespace("(~~>${space.whitespace}<~~)")
                     }
                     return space
                 }

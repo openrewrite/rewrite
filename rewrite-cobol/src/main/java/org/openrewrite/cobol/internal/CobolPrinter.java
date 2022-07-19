@@ -77,6 +77,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
             return;
         }
         visitSpace(container.getBefore(), p);
+        visitLeftPadded("", container.getPreposition(), p);
         p.append(before);
         visitRightPadded(container.getPadding().getElements(), suffixBetween, p);
         p.append(after == null ? "" : after);
@@ -166,9 +167,8 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitDataPictureClause(Cobol.DataPictureClause dataPictureClause, PrintOutputCapture<P> p) {
         visitSpace(dataPictureClause.getPrefix(), p);
         visitMarkers(dataPictureClause.getMarkers(), p);
-        p.append(dataPictureClause.getPic());
-        visitLeftPadded("", dataPictureClause.getPadding().getIs(), p);
-        visitContainer("", dataPictureClause.getPadding().getPictures(), " ", "", p);
+        p.append(dataPictureClause.getWords());
+        visitContainer("", dataPictureClause.getPadding().getPictures(), "", "", p);
         return dataPictureClause;
     }
 
@@ -176,7 +176,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(workingStorageSection.getPrefix(), p);
         visitMarkers(workingStorageSection.getMarkers(), p);
         p.append(workingStorageSection.getWords());
-        visitContainer("", workingStorageSection.getPadding().getDataDescriptions(), " ", "", p);
+        visitContainer(".", workingStorageSection.getPadding().getDataDescriptions(), "", "", p);
         return workingStorageSection;
     }
 
@@ -201,7 +201,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(environmentDivision.getPrefix(), p);
         visitMarkers(environmentDivision.getMarkers(), p);
         p.append(environmentDivision.getWords());
-        visitContainer("", environmentDivision.getPadding().getBody(), " ", "", p);
+        visitContainer("", environmentDivision.getPadding().getBody(), "", "", p);
         return environmentDivision;
     }
 
@@ -212,7 +212,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(programUnit.getDataDivision(), p);
         visit(programUnit.getEnvironmentDivision(), p);
         visit(programUnit.getProcedureDivision(), p);
-        visitContainer("", programUnit.getPadding().getProgramUnits(), " ", "", p);
+        visitContainer("", programUnit.getPadding().getProgramUnits(), "", "", p);
         visitRightPadded(programUnit.getPadding().getEndProgram(), ".", p);
         return programUnit;
     }
@@ -221,7 +221,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(setTo.getPrefix(), p);
         visitMarkers(setTo.getMarkers(), p);
         visitContainer("", setTo.getPadding().getTo(), "", "", p);
-        visitContainer("TO", setTo.getPadding().getValues(), "", "", p);
+        visitContainer("", setTo.getPadding().getValues(), "", "", p);
         return setTo;
     }
 
@@ -256,7 +256,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(dataDivision.getPrefix(), p);
         visitMarkers(dataDivision.getMarkers(), p);
         p.append(dataDivision.getWords());
-        visitContainer("", dataDivision.getPadding().getSections(), " ", "", p);
+        visitContainer(".", dataDivision.getPadding().getSections(), "", "", p);
         return dataDivision;
     }
 
@@ -271,16 +271,16 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(statementPhrase.getPrefix(), p);
         visitMarkers(statementPhrase.getMarkers(), p);
         p.append(statementPhrase.getPhrase());
-        visitContainer("", statementPhrase.getPadding().getStatement(), " ", "", p);
+        visitContainer("", statementPhrase.getPadding().getStatement(), "", "", p);
         return statementPhrase;
     }
 
     public Cobol visitAddTo(Cobol.AddTo addTo, PrintOutputCapture<P> p) {
         visitSpace(addTo.getPrefix(), p);
         visitMarkers(addTo.getMarkers(), p);
-        visitContainer("", addTo.getPadding().getFrom(), " ", "", p);
-        visitContainer("", addTo.getPadding().getTo(), " ", "", p);
-        visitContainer("", addTo.getPadding().getGiving(), " ", "", p);
+        visitContainer("", addTo.getPadding().getFrom(), "", "", p);
+        visitContainer("", addTo.getPadding().getTo(), "", "", p);
+        visitContainer("", addTo.getPadding().getGiving(), "", "", p);
         return addTo;
     }
 

@@ -548,28 +548,13 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String pic;
-
-        @Nullable
-        CobolLeftPadded<String> is;
+        String words;
 
         CobolContainer<Picture> pictures;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitDataPictureClause(this, p);
-        }
-
-        @Nullable
-        public String getIs() {
-            return is == null ? null : is.getElement();
-        }
-
-        public DataPictureClause withIs(@Nullable String is) {
-            if (is == null) {
-                return this.is == null ? this : new DataPictureClause(id, prefix, markers, pic, null, pictures);
-            }
-            return getPadding().withIs(CobolLeftPadded.withElement(this.is, is));
         }
 
         public List<Cobol.Picture> getPictures() {
@@ -600,21 +585,12 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final DataPictureClause t;
 
-            @Nullable
-            public CobolLeftPadded<String> getIs() {
-                return t.is;
-            }
-
-            public DataPictureClause withIs(@Nullable CobolLeftPadded<String> is) {
-                return t.is == is ? t : new DataPictureClause(t.padding, t.id, t.prefix, t.markers, t.pic, is, t.pictures);
-            }
-
             public CobolContainer<Cobol.Picture> getPictures() {
                 return t.pictures;
             }
 
             public DataPictureClause withPictures(CobolContainer<Cobol.Picture> pictures) {
-                return t.pictures == pictures ? t : new DataPictureClause(t.padding, t.id, t.prefix, t.markers, t.pic, t.is, pictures);
+                return t.pictures == pictures ? t : new DataPictureClause(t.padding, t.id, t.prefix, t.markers, t.words, pictures);
             }
         }
     }

@@ -121,15 +121,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Cobol.AddTo visitAddToStatement(CobolParser.AddToStatementContext ctx) {
-        CobolContainer<Name> from = convertAllContainer(ctx.addFrom());
-        Space beforeTo = sourceBefore("TO");
         return new Cobol.AddTo(
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                from,
-                this.<Name, CobolParser.AddToContext>convertAllContainer(ctx.addTo())
-                        .withBefore(beforeTo),
+                convertAllContainer(ctx.addFrom()),
+                convertAllContainer(sourceBefore("TO"), ctx.addTo()),
                 null
         );
     }
@@ -148,16 +145,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Cobol.SetTo visitSetToStatement(CobolParser.SetToStatementContext ctx) {
-        Space prefix = prefix(ctx);
-        CobolContainer<Cobol.Identifier> to = convertAllContainer(ctx.setTo());
-        Space beforeValues = sourceBefore("TO");
         return new Cobol.SetTo(
                 randomId(),
-                prefix,
+                prefix(ctx),
                 Markers.EMPTY,
-                to,
-                this.<Name, CobolParser.SetToValueContext>convertAllContainer(ctx.setToValue())
-                        .withBefore(beforeValues)
+                convertAllContainer(ctx.setTo()),
+                convertAllContainer(padLeft(ctx.TO()), ctx.setToValue())
         );
     }
 
@@ -174,13 +167,34 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.Identifier visitIdentifier(CobolParser.IdentifierContext ctx) {
+        return new Cobol.Identifier(
+                randomId(),
+                sourceBefore(ctx.getText()),
+                Markers.EMPTY,
+                ctx.getText()
+        );
+    }
+
+    @Override
+    public Cobol.DataPictureClause visitDataPictureClause(CobolParser.DataPictureClauseContext ctx) {
+        return new Cobol.DataPictureClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PICTURE(), ctx.PIC(), ctx.IS()),
+                convertAllContainer(ctx.pictureString().picture())
+        );
+    }
+
+    @Override
     public Cobol.DataDivision visitDataDivision(CobolParser.DataDivisionContext ctx) {
         return new Cobol.DataDivision(
                 randomId(),
                 sourceBefore(ctx.DATA().getText()),
                 Markers.EMPTY,
                 words(ctx.DATA(), ctx.DIVISION()),
-                convertAllContainer(ctx.dataDivisionSection())
+                convertAllContainer(sourceBefore("."), ctx.dataDivisionSection())
         );
     }
 
@@ -191,7 +205,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 sourceBefore(ctx.WORKING_STORAGE().getText()),
                 Markers.EMPTY,
                 words(ctx.WORKING_STORAGE(), ctx.SECTION()),
-                convertAllContainer(ctx.dataDescriptionEntry())
+                convertAllContainer(sourceBefore("."), ctx.dataDescriptionEntry())
         );
     }
 
@@ -206,7 +220,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 ctx.FILLER() == null ?
                         (ctx.dataName() == null ? null : padLeft(ctx.dataName())) :
                         padLeft(ctx.FILLER()),
-                convertAllContainer(ctx.dataDescriptionEntryFormat1Clause())
+                convertAllContainer(ctx.dataDescriptionEntryFormat1Clause()).withLastSpace(sourceBefore("."))
         );
     }
 
@@ -357,6 +371,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 ctx.pictureChars().stream()
                         .map(RuleContext::getText)
+                        .map(this::skip)
                         .collect(Collectors.joining("")),
                 padLeft(ctx.pictureCardinality())
         );
@@ -397,6 +412,14 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     private <C extends Cobol, T extends ParseTree> List<C> convertAll(List<T> trees) {
         //noinspection unchecked
         return convertAll(trees, t -> (C) visit(t));
+    }
+
+    private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(CobolLeftPadded<String> preposition, List<T> trees) {
+        return this.<C, T>convertAllContainer(trees, () -> Space.EMPTY).withPreposition(preposition);
+    }
+
+    private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(Space before, List<T> trees) {
+        return this.<C, T>convertAllContainer(trees, () -> Space.EMPTY).withBefore(before);
     }
 
     private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(List<T> trees) {
@@ -487,5 +510,10 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
         String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
         cursor += prefix.length();
         return format(prefix);
+    }
+
+    private String skip(String string) {
+        cursor += string.length();
+        return string;
     }
 }

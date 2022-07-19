@@ -20,6 +20,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.cobol.tree.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 
 import java.util.List;
 
@@ -46,16 +47,24 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         setCursor(new Cursor(getCursor(), container));
 
         Space before = visitSpace(container.getBefore(), p);
+        CobolLeftPadded<String> preposition = visitLeftPadded(container.getPreposition(), p);
         List<CobolRightPadded<P2>> ps = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, p));
+        Markers markers = visitMarkers(container.getMarkers(), p);
 
         setCursor(getCursor().getParent());
 
-        return ps == container.getPadding().getElements() && before == container.getBefore() ?
+        return (ps == container.getPadding().getElements() && before == container.getBefore() && preposition == container.getPreposition() &&
+                markers == container.getMarkers()) ?
                 container :
-                CobolContainer.build(before, ps, container.getMarkers());
+                CobolContainer.build(before, preposition, ps, markers);
     }
 
-    public <T> CobolLeftPadded<T> visitLeftPadded(CobolLeftPadded<T> left, P p) {
+    public <T> CobolLeftPadded<T> visitLeftPadded(@Nullable CobolLeftPadded<T> left, P p) {
+        if (left == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
         setCursor(new Cursor(getCursor(), left));
 
         Space before = visitSpace(left.getBefore(), p);
@@ -103,7 +112,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Add a = add;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        a = a.withOperation((Cobol) visit(a.getOperation(), p));
+        a = a.withOperation(visit(a.getOperation(), p));
         a = a.withOnSizeError((Cobol.StatementPhrase) visit(a.getOnSizeError(), p));
         if (a.getPadding().getEndAdd() != null) {
             a = a.getPadding().withEndAdd(visitLeftPadded(a.getPadding().getEndAdd(), p));
@@ -144,9 +153,6 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.DataPictureClause d = dataPictureClause;
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
-        if (d.getPadding().getIs() != null) {
-            d = d.getPadding().withIs(visitLeftPadded(d.getPadding().getIs(), p));
-        }
         d = d.getPadding().withPictures(visitContainer(d.getPadding().getPictures(), p));
         return d;
     }
@@ -306,7 +312,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Stop s = stop;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        s = s.withStatement((Cobol) visit(s.getStatement(), p));
+        s = s.withStatement(visit(s.getStatement(), p));
         return s;
     }
 

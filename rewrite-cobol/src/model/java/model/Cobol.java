@@ -57,11 +57,7 @@ public interface Cobol {
     }
 
     class DataPictureClause implements Cobol {
-        String pic;
-
-        @Nullable
-        CobolLeftPadded<String> is;
-
+        String words;
         CobolContainer<Picture> pictures;
     }
 

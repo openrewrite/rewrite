@@ -34,28 +34,35 @@ import static java.util.Collections.emptyList;
 public class CobolContainer<T> {
     private transient Padding<T> padding;
 
-    private static final CobolContainer<?> EMPTY = new CobolContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);
+    private static final CobolContainer<?> EMPTY = new CobolContainer<>(Space.EMPTY, null, emptyList(), Markers.EMPTY);
 
     private final Space before;
+
+    @Nullable
+    private final CobolLeftPadded<String> preposition;
+
     private final List<CobolRightPadded<T>> elements;
     private final Markers markers;
 
-    private CobolContainer(Space before, List<CobolRightPadded<T>> elements, Markers markers) {
+    private CobolContainer(Space before, @Nullable CobolLeftPadded<String> preposition,
+                           List<CobolRightPadded<T>> elements, Markers markers) {
         this.before = before;
+        this.preposition = preposition;
         this.elements = elements;
         this.markers = markers;
     }
 
     public static <T> CobolContainer<T> build(List<CobolRightPadded<T>> elements) {
-        return build(Space.EMPTY, elements, Markers.EMPTY);
+        return build(Space.EMPTY, null, elements, Markers.EMPTY);
     }
 
     @JsonCreator
-    public static <T> CobolContainer<T> build(Space before, List<CobolRightPadded<T>> elements, Markers markers) {
+    public static <T> CobolContainer<T> build(Space before, @Nullable CobolLeftPadded<String> preposition,
+                                              List<CobolRightPadded<T>> elements, Markers markers) {
         if (before.isEmpty() && elements.isEmpty()) {
             return empty();
         }
-        return new CobolContainer<>(before, elements, markers);
+        return new CobolContainer<>(before, preposition, elements, markers);
     }
 
     @SuppressWarnings("unchecked")
@@ -63,12 +70,25 @@ public class CobolContainer<T> {
         return (CobolContainer<T>) EMPTY;
     }
 
+    public CobolContainer<T> withPreposition(CobolLeftPadded<String> preposition) {
+        return this.preposition == preposition ? this : build(before, preposition, elements, markers);
+    }
+
     public CobolContainer<T> withBefore(Space before) {
-        return getBefore() == before ? this : build(before, elements, markers);
+        return this.before == before ? this : build(before, preposition, elements, markers);
+    }
+
+    public CobolContainer<T> withElements(List<CobolRightPadded<T>> elements) {
+        return this.elements == elements ? this : build(before, preposition, elements, markers);
     }
 
     public CobolContainer<T> withMarkers(Markers markers) {
-        return getMarkers() == markers ? this : build(before, elements, markers);
+        return this.markers == markers ? this : build(before, preposition, elements, markers);
+    }
+
+    @Nullable
+    public CobolLeftPadded<String> getPreposition() {
+        return preposition;
     }
 
     public Markers getMarkers() {
@@ -91,6 +111,10 @@ public class CobolContainer<T> {
         return elements.isEmpty() ? Space.EMPTY : elements.get(elements.size() - 1).getAfter();
     }
 
+    public CobolContainer<T> withLastSpace(Space after) {
+        return withElements(ListUtils.mapLast(elements, elem -> elem.withAfter(after)));
+    }
+
     public Padding<T> getPadding() {
         if (padding == null) {
             this.padding = new Padding<>(this);
@@ -107,7 +131,7 @@ public class CobolContainer<T> {
         }
 
         public CobolContainer<T> withElements(List<CobolRightPadded<T>> elements) {
-            return c.elements == elements ? c : build(c.before, elements, c.markers);
+            return c.elements == elements ? c : build(c.before, c.preposition, elements, c.markers);
         }
     }
 
@@ -117,7 +141,7 @@ public class CobolContainer<T> {
             if (elements == null || elements.isEmpty()) {
                 return null;
             }
-            return CobolContainer.build(Space.EMPTY, CobolRightPadded.withElements(emptyList(), elements), Markers.EMPTY);
+            return CobolContainer.build(Space.EMPTY, null, CobolRightPadded.withElements(emptyList(), elements), Markers.EMPTY);
         }
         if (elements == null || elements.isEmpty()) {
             return null;
