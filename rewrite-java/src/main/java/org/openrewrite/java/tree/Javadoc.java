@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
@@ -27,6 +28,7 @@ import org.openrewrite.java.JavadocPrinter;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -331,6 +333,19 @@ public interface Javadoc extends Tree {
         @Nullable
         J tree;
 
+        @Nullable
+        public Reference getTreeReference() {
+            if (tree != null && treeReference == null) {
+                treeReference = new Reference(Tree.randomId(), tree, null);
+            }
+            return treeReference;
+        }
+
+        // This is non-final to maintain backwards compatibility.
+        @NonFinal
+        @Nullable
+        Reference treeReference;
+
         List<Javadoc> label;
 
         List<Javadoc> endBrace;
@@ -368,7 +383,23 @@ public interface Javadoc extends Tree {
 
         Markers markers;
         List<Javadoc> spaceBeforeName;
+
+        @Nullable
         J name;
+
+        @Nullable
+        public Reference getNameReference() {
+            if (name != null && nameReference == null) {
+                nameReference = new Reference(Tree.randomId(), name, null);
+            }
+            return nameReference;
+        }
+
+        // This is non-final to maintain backwards compatibility.
+        @NonFinal
+        @Nullable
+        Reference nameReference;
+
         List<Javadoc> description;
 
         @Override
@@ -423,6 +454,19 @@ public interface Javadoc extends Tree {
 
         @Nullable
         J tree;
+
+        @Nullable
+        public Reference getTreeReference() {
+            if (tree != null && treeReference == null) {
+                treeReference = new Reference(Tree.randomId(), tree, null);
+            }
+            return treeReference;
+        }
+
+        // This is non-final to maintain backwards compatibility.
+        @NonFinal
+        @Nullable
+        Reference treeReference;
 
         List<Javadoc> reference;
 
@@ -640,6 +684,29 @@ public interface Javadoc extends Tree {
         @Override
         public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
             return v.visitVersion(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Reference implements Javadoc {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Nullable
+        J tree;
+
+        @Nullable
+        List<Javadoc> lineBreaks;
+
+        public List<Javadoc> getLineBreaks() {
+            return lineBreaks == null ? Collections.emptyList() : lineBreaks;
+        }
+
+        @Override
+        public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
+            return v.visitReference(this, p);
         }
     }
 }

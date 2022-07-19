@@ -119,7 +119,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.Link l = link;
         l = l.withMarkers(visitMarkers(l.getMarkers(), p));
         l = l.withSpaceBeforeTree(ListUtils.map(l.getSpaceBeforeTree(), s -> visit(s, p)));
-        l = l.withTree(javaVisitor.visit(l.getTree(), p));
+        l = l.withTreeReference(visitAndCast(l.getTreeReference() , p));
         l = l.withLabel(ListUtils.map(l.getLabel(), la -> visit(la, p)));
         l = l.withEndBrace(ListUtils.map(l.getEndBrace(), s -> visit(s, p)));
         return l;
@@ -136,7 +136,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.Parameter pa = parameter;
         pa = pa.withMarkers(visitMarkers(pa.getMarkers(), p));
         pa = pa.withSpaceBeforeName(ListUtils.map(pa.getSpaceBeforeName(), b -> visit(b, p)));
-        pa = pa.withName(javaVisitor.visit(pa.getName(), p));
+        pa = pa.withNameReference(visitAndCast(pa.getNameReference(), p));
         pa = pa.withDescription(ListUtils.map(pa.getDescription(), desc -> visit(desc, p)));
         return pa;
     }
@@ -160,7 +160,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.See s = see;
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         s = s.withSpaceBeforeTree(ListUtils.map(s.getSpaceBeforeTree(), sb -> visit(sb, p)));
-        s = s.withTree(javaVisitor.visit(s.getTree(), p));
+        s = s.withTreeReference(visitAndCast(s.getTreeReference() , p));
         s = s.withReference(ListUtils.map(s.getReference(), desc -> visit(desc, p)));
         return s;
     }
@@ -250,5 +250,12 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         v = v.withMarkers(visitMarkers(v.getMarkers(), p));
         v = v.withBody(ListUtils.map(v.getBody(), b -> visit(b, p)));
         return v;
+    }
+
+    public Javadoc visitReference(Javadoc.Reference reference, P p) {
+        Javadoc.Reference r = reference;
+        r = r.withTree(javaVisitor.visit(r.getTree(), p));
+        r = r.withLineBreaks(ListUtils.map(r.getLineBreaks(), l -> visit(l, p)));
+        return r;
     }
 }
