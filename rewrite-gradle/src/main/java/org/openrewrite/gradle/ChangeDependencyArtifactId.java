@@ -86,7 +86,7 @@ public class ChangeDependencyArtifactId extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
-                if (!dependencyDsl.matches(m) || !(configuration == null || m.getSimpleName().equals(configuration))) {
+                if (!dependencyDsl.matches(m) || !(configuration == null || configuration.isEmpty() || m.getSimpleName().equals(configuration))) {
                     return m;
                 }
 
