@@ -252,6 +252,9 @@ public interface RewriteTest extends SourceSpecs {
             //noinspection unchecked,rawtypes
             List<SourceFile> sourceFiles = (List) sourceSpecsForParser.getKey().get()
                     .parseInputs(inputs.values(), relativeTo, executionContext);
+            assertThat(sourceFiles.size())
+                    .as("Every input should be parsed into a SourceFile.")
+                    .isEqualTo(inputs.size());
 
             for (int i = 0; i < sourceFiles.size(); i++) {
                 SourceFile sourceFile = sourceFiles.get(i);
