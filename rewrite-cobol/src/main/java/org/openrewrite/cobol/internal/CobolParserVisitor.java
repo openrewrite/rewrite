@@ -32,9 +32,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.cobol.tree.Space.format;
+import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 
 public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     private final Path path;
@@ -74,6 +77,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
         }
         //noinspection unchecked
         return (T) super.visit(tree);
+    }
+
+    @Override
+    public Cobol.CompilationUnit visitStartRule(CobolParser.StartRuleContext ctx) {
+        return visitCompilationUnit(ctx.compilationUnit());
     }
 
     @Override
@@ -271,7 +279,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                convertAllContainer(ctx.sentence())
+                convertAllContainer(ctx.sentence(), () -> sourceBefore("."))
         );
     }
 
@@ -361,7 +369,9 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 sourceBefore(ctx.PROGRAM_ID().getText()),
                 Markers.EMPTY,
                 ctx.PROGRAM_ID().getText(),
-                padLeft(sourceBefore("."), visitProgramName(ctx.programName()))
+                padLeft(sourceBefore("."), visitProgramName(ctx.programName())),
+                padLeft(whitespace(), words(ctx.IS(), ctx.COMMON(), ctx.INITIAL(), ctx.LIBRARY(), ctx.DEFINITION(), ctx.RECURSIVE(), ctx.PROGRAM())),
+                ctx.DOT_FS().size() > 1 ? padLeft(ctx.DOT_FS(1)) : null
         );
     }
 
@@ -390,8 +400,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(List<T> trees) {
+        return convertAllContainer(trees, () -> Space.EMPTY);
+    }
+
+    private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(List<T> trees, Supplier<Space> sourceBefore) {
         //noinspection unchecked
-        return CobolContainer.build(convertAll(trees, t -> padRight((C) visit(t), Space.EMPTY)));
+        return CobolContainer.build(convertAll(trees, t -> padRight((C) visit(t), sourceBefore.get())));
     }
 
     private Space prefix(ParserRuleContext ctx) {
@@ -401,11 +415,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     private Space prefix(Token token) {
         int start = token.getStartIndex();
         if (start < cursor) {
-            return Space.format("");
+            return format("");
         }
         String prefix = source.substring(cursor, start);
         cursor = start;
-        return Space.format(prefix);
+        return format(prefix);
     }
 
     private Space sourceBefore(String untilDelim) {
@@ -425,7 +439,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
         String prefix = source.substring(cursor, delimIndex);
         cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
-        return Space.format(prefix);
+        return format(prefix);
     }
 
     private <T> CobolRightPadded<T> padRight(T tree, Space right) {
@@ -461,11 +475,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     private String words(TerminalNode... wordNodes) {
         StringBuilder words = new StringBuilder();
         for (TerminalNode wordNode : wordNodes) {
-            if(wordNode != null) {
+            if (wordNode != null) {
                 words.append(sourceBefore(wordNode.getText()).getWhitespace());
                 words.append(wordNode.getText());
             }
         }
         return words.toString();
+    }
+
+    private Space whitespace() {
+        String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
+        cursor += prefix.length();
+        return format(prefix);
     }
 }

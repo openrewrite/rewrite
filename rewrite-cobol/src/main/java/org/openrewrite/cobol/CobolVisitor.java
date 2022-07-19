@@ -243,6 +243,12 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
         pp = pp.getPadding().withProgramName(visitLeftPadded(pp.getPadding().getProgramName(), p));
+        if (pp.getPadding().getProgramAttributes() != null) {
+            pp = pp.getPadding().withProgramAttributes(visitLeftPadded(pp.getPadding().getProgramAttributes(), p));
+        }
+        if (pp.getPadding().getDot() != null) {
+            pp = pp.getPadding().withDot(visitLeftPadded(pp.getPadding().getDot(), p));
+        }
         return pp;
     }
 

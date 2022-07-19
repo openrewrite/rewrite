@@ -139,14 +139,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return procedureDivisionBody;
     }
 
-    public Cobol visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, PrintOutputCapture<P> p) {
-        visitSpace(programIdParagraph.getPrefix(), p);
-        visitMarkers(programIdParagraph.getMarkers(), p);
-        p.append(programIdParagraph.getProgramId());
-        visitLeftPadded(".", programIdParagraph.getPadding().getProgramName(), p);
-        return programIdParagraph;
-    }
-
     public Cobol visitStop(Cobol.Stop stop, PrintOutputCapture<P> p) {
         visitSpace(stop.getPrefix(), p);
         visitMarkers(stop.getMarkers(), p);
@@ -290,5 +282,15 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", addTo.getPadding().getTo(), " ", "", p);
         visitContainer("", addTo.getPadding().getGiving(), " ", "", p);
         return addTo;
+    }
+
+    public Cobol visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, PrintOutputCapture<P> p) {
+        visitSpace(programIdParagraph.getPrefix(), p);
+        visitMarkers(programIdParagraph.getMarkers(), p);
+        p.append(programIdParagraph.getProgramId());
+        visitLeftPadded(".", programIdParagraph.getPadding().getProgramName(), p);
+        visitLeftPadded("", programIdParagraph.getPadding().getProgramAttributes(), p);
+        visitLeftPadded("", programIdParagraph.getPadding().getDot(), p);
+        return programIdParagraph;
     }
 }

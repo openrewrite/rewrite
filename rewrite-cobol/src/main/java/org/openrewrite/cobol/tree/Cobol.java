@@ -1128,6 +1128,12 @@ public interface Cobol extends Tree {
 
         CobolLeftPadded<Name> programName;
 
+        @Nullable
+        CobolLeftPadded<String> programAttributes;
+
+        @Nullable
+        CobolLeftPadded<String> dot;
+
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitProgramIdParagraph(this, p);
@@ -1140,6 +1146,30 @@ public interface Cobol extends Tree {
         public ProgramIdParagraph withProgramName(Name programName) {
             //noinspection ConstantConditions
             return getPadding().withProgramName(CobolLeftPadded.withElement(this.programName, programName));
+        }
+
+        @Nullable
+        public String getProgramAttributes() {
+            return programAttributes == null ? null : programAttributes.getElement();
+        }
+
+        public ProgramIdParagraph withProgramAttributes(@Nullable String programAttributes) {
+            if (programAttributes == null) {
+                return this.programAttributes == null ? this : new ProgramIdParagraph(id, prefix, markers, programId, programName, null, dot);
+            }
+            return getPadding().withProgramAttributes(CobolLeftPadded.withElement(this.programAttributes, programAttributes));
+        }
+
+        @Nullable
+        public String getDot() {
+            return dot == null ? null : dot.getElement();
+        }
+
+        public ProgramIdParagraph withDot(@Nullable String dot) {
+            if (dot == null) {
+                return this.dot == null ? this : new ProgramIdParagraph(id, prefix, markers, programId, programName, programAttributes, null);
+            }
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
         }
 
         public Padding getPadding() {
@@ -1166,7 +1196,25 @@ public interface Cobol extends Tree {
             }
 
             public ProgramIdParagraph withProgramName(CobolLeftPadded<Name> programName) {
-                return t.programName == programName ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, programName);
+                return t.programName == programName ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, programName, t.programAttributes, t.dot);
+            }
+
+            @Nullable
+            public CobolLeftPadded<String> getProgramAttributes() {
+                return t.programAttributes;
+            }
+
+            public ProgramIdParagraph withProgramAttributes(@Nullable CobolLeftPadded<String> programAttributes) {
+                return t.programAttributes == programAttributes ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, t.programName, programAttributes, t.dot);
+            }
+
+            @Nullable
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public ProgramIdParagraph withDot(@Nullable CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, t.programName, t.programAttributes, dot);
             }
         }
     }

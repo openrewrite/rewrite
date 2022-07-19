@@ -22,6 +22,7 @@ import org.openrewrite.cobol.CobolVisitor
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.RewriteTest.toRecipe
+import kotlin.streams.toList
 
 class CobolBasicsTest : RewriteTest {
 
@@ -30,7 +31,8 @@ class CobolBasicsTest : RewriteTest {
             object : CobolVisitor<ExecutionContext>() {
                 override fun visitSpace(space: Space, p: ExecutionContext): Space {
                     if (space.whitespace.trim().isNotEmpty()) {
-                        fail("Space has non-whitespace characters: '${space.whitespace}'")
+                        fail("Space has non-whitespace characters: '${space.whitespace}'.\nCursor:" +
+                                cursor.pathAsStream.toList().joinToString("\n    ", prefix = "\n    ", postfix = "\n\n") { it.toString() })
                     }
                     return space
                 }

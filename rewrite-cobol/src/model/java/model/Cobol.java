@@ -135,6 +135,12 @@ public interface Cobol {
     class ProgramIdParagraph implements Cobol {
         String programId;
         CobolLeftPadded<Name> programName;
+
+        @Nullable
+        CobolLeftPadded<String> programAttributes;
+
+        @Nullable
+        CobolLeftPadded<String> dot;
     }
 
     class ProgramUnit implements Cobol {

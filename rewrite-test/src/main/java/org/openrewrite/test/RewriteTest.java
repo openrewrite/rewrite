@@ -226,7 +226,7 @@ public interface RewriteTest extends SourceSpecs {
                 sourceSpecsByParser.computeIfAbsent(
                         new ParserSupplier(Properties.File.class, sourceSpec.dsl, PropertiesParser::new),
                         p -> new ArrayList<>()).add(sourceSpec);
-            } else if(Cobol.CompilationUnit.class.equals(sourceSpec.sourceFileType)) {
+            } else if (Cobol.CompilationUnit.class.equals(sourceSpec.sourceFileType)) {
                 sourceSpecsByParser.computeIfAbsent(
                         new ParserSupplier(Cobol.CompilationUnit.class, sourceSpec.dsl, CobolParser::new),
                         p -> new ArrayList<>()).add(sourceSpec);
@@ -240,20 +240,10 @@ public interface RewriteTest extends SourceSpecs {
                 if (sourceSpec.before == null) {
                     continue;
                 }
-                String beforeTrimmed;
-                if(sourceSpec.sourceFileType == Cobol.CompilationUnit.class) {
-                    // do not trim source code of column-based languages
-                    beforeTrimmed = sourceSpec.before;
-                } else {
-                    beforeTrimmed = trimIndentPreserveCRLF(sourceSpec.before);
-                }
-                Path sourcePath;
-                if (sourceSpec.sourcePath != null) {
-                    sourcePath = sourceSpec.dir.resolve(sourceSpec.sourcePath);
-                } else {
-                    sourcePath = sourceSpecsForParser.getKey().get()
-                            .sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
-                }
+                String beforeTrimmed = trimIndentPreserveCRLF(sourceSpec.before);
+                Path sourcePath = sourceSpec.sourcePath != null ?
+                        sourceSpec.dir.resolve(sourceSpec.sourcePath) :
+                        sourceSpecsForParser.getKey().get().sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
                 inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(StandardCharsets.UTF_8))));
             }
 
