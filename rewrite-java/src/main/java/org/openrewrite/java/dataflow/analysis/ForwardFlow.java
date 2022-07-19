@@ -17,6 +17,7 @@ package org.openrewrite.java.dataflow.analysis;
 
 import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -29,6 +30,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@Incubating(since = "7.24.0")
 public class ForwardFlow extends JavaVisitor<Integer> {
 
     public static void findSinks(SinkFlow<?, ?> root) {

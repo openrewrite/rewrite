@@ -18,10 +18,12 @@ package org.openrewrite.java.dataflow;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
+@Incubating(since = "7.24.2")
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class DefaultFlowModels {
 

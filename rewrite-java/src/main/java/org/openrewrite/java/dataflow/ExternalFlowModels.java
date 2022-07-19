@@ -20,6 +20,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.internal.InvocationMatcher;
 import org.openrewrite.java.dataflow.internal.csv.CsvLoader;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 /**
  * Loads and stores models from the `model.csv` file to be used for data flow and taint tracking analysis.
  */
+@Incubating(since = "7.24.1")
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ExternalFlowModels {
     private static final String CURSOR_MESSAGE_KEY = "OPTIMIZED_FLOW_MODELS";

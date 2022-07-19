@@ -18,6 +18,7 @@ package org.openrewrite.java.dataflow.analysis;
 import lombok.AccessLevel;
 import lombok.Getter;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.tree.Expression;
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
+@Incubating(since = "7.24.0")
 public class SinkFlow<Source extends Expression, Sink extends J> extends FlowGraph {
     @Nullable
     private final Cursor source;

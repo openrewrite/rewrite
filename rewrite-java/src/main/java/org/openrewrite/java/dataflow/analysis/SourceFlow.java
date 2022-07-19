@@ -16,10 +16,12 @@
 package org.openrewrite.java.dataflow.analysis;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.Expression;
 
 import java.util.List;
 
+@Incubating(since = "7.24.0")
 public class SourceFlow<Source extends Expression> extends FlowGraph {
     public SourceFlow(Cursor cursor) {
         super(cursor);

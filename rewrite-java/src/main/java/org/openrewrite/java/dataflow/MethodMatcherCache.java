@@ -17,11 +17,13 @@ package org.openrewrite.java.dataflow;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.internal.csv.GenericExternalModel;
 
 import java.util.*;
 
+@Incubating(since = "7.26.0")
 @NoArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
 final class MethodMatcherCache {
     private final Map<GenericExternalModel.MethodMatcherKey, MethodMatcher> methodMapperCache =

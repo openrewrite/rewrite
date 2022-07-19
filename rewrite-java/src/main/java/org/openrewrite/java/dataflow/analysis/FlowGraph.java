@@ -20,6 +20,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 
 import javax.annotation.CheckReturnValue;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 
+@Incubating(since = "7.24.0")
 @Data
 @RequiredArgsConstructor(access = AccessLevel.PROTECTED)
 @Setter(AccessLevel.PACKAGE)
