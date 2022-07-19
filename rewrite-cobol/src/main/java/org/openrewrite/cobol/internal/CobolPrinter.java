@@ -275,6 +275,16 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return statementPhrase;
     }
 
+    public Cobol visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, PrintOutputCapture<P> p) {
+        visitSpace(programIdParagraph.getPrefix(), p);
+        visitMarkers(programIdParagraph.getMarkers(), p);
+        p.append(programIdParagraph.getProgramId());
+        visitLeftPadded(".", programIdParagraph.getPadding().getProgramName(), p);
+        visitLeftPadded("", programIdParagraph.getPadding().getProgramAttributes(), p);
+        visitLeftPadded("", programIdParagraph.getPadding().getDot(), p);
+        return programIdParagraph;
+    }
+
     public Cobol visitAddTo(Cobol.AddTo addTo, PrintOutputCapture<P> p) {
         visitSpace(addTo.getPrefix(), p);
         visitMarkers(addTo.getMarkers(), p);
@@ -284,13 +294,11 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return addTo;
     }
 
-    public Cobol visitProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph, PrintOutputCapture<P> p) {
-        visitSpace(programIdParagraph.getPrefix(), p);
-        visitMarkers(programIdParagraph.getMarkers(), p);
-        p.append(programIdParagraph.getProgramId());
-        visitLeftPadded(".", programIdParagraph.getPadding().getProgramName(), p);
-        visitLeftPadded("", programIdParagraph.getPadding().getProgramAttributes(), p);
-        visitLeftPadded("", programIdParagraph.getPadding().getDot(), p);
-        return programIdParagraph;
+    public Cobol visitRoundable(Cobol.Roundable roundable, PrintOutputCapture<P> p) {
+        visitSpace(roundable.getPrefix(), p);
+        visitMarkers(roundable.getMarkers(), p);
+        visit(roundable.getIdentifier(), p);
+        visitLeftPadded("", roundable.getPadding().getRounded(), p);
+        return roundable;
     }
 }

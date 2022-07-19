@@ -112,7 +112,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Add a = add;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        a = a.withOperation(visit(a.getOperation(), p));
+        a = a.withOperation((Cobol) visit(a.getOperation(), p));
         a = a.withOnSizeError((Cobol.StatementPhrase) visit(a.getOnSizeError(), p));
         if (a.getPadding().getEndAdd() != null) {
             a = a.getPadding().withEndAdd(visitLeftPadded(a.getPadding().getEndAdd(), p));
@@ -236,6 +236,17 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return pp;
     }
 
+    public Cobol visitRoundable(Cobol.Roundable roundable, P p) {
+        Cobol.Roundable r = roundable;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIdentifier((Cobol.Identifier) visit(r.getIdentifier(), p));
+        if (r.getPadding().getRounded() != null) {
+            r = r.getPadding().withRounded(visitLeftPadded(r.getPadding().getRounded(), p));
+        }
+        return r;
+    }
+
     public Cobol visitSentence(Cobol.Sentence sentence, P p) {
         Cobol.Sentence s = sentence;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
@@ -312,7 +323,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Stop s = stop;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        s = s.withStatement(visit(s.getStatement(), p));
+        s = s.withStatement((Cobol) visit(s.getStatement(), p));
         return s;
     }
 

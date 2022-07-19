@@ -1194,6 +1194,10 @@ acceptMessageCountStatement
    : MESSAGE? COUNT
    ;
 
+roundable
+   : identifier ROUNDED?
+   ;
+
 // add statement
 
 addStatement
@@ -1202,6 +1206,10 @@ addStatement
 
 addToStatement
    : addFrom+ TO addTo+
+   ;
+
+addTo
+   : roundable
    ;
 
 addToGivingStatement
@@ -1216,16 +1224,12 @@ addFrom
    : identifier | literal
    ;
 
-addTo
-   : identifier ROUNDED?
-   ;
-
 addToGiving
    : identifier | literal
    ;
 
 addGiving
-   : identifier ROUNDED?
+   : roundable
    ;
 
 // altered go to statement
@@ -1341,7 +1345,7 @@ computeStatement
    ;
 
 computeStore
-   : identifier ROUNDED?
+   : roundable
    ;
 
 // continue statement
@@ -1407,11 +1411,11 @@ divideGivingPhrase
    ;
 
 divideInto
-   : identifier ROUNDED?
+   : roundable
    ;
 
 divideGiving
-   : identifier ROUNDED?
+   : roundable
    ;
 
 divideRemainder
@@ -1703,7 +1707,7 @@ multiplyRegular
    ;
 
 multiplyRegularOperand
-   : identifier ROUNDED?
+   : roundable
    ;
 
 multiplyGiving
@@ -1715,7 +1719,7 @@ multiplyGivingOperand
    ;
 
 multiplyGivingResult
-   : identifier ROUNDED?
+   : roundable
    ;
 
 // next sentence
@@ -2113,7 +2117,7 @@ subtractSubtrahend
    ;
 
 subtractMinuend
-   : identifier ROUNDED?
+   : roundable
    ;
 
 subtractMinuendGiving
@@ -2121,7 +2125,7 @@ subtractMinuendGiving
    ;
 
 subtractGiving
-   : identifier ROUNDED?
+   : roundable
    ;
 
 subtractMinuendCorresponding

@@ -1679,6 +1679,12 @@ public interface CobolVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitAcceptMessageCountStatement(CobolParser.AcceptMessageCountStatementContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link CobolParser#roundable}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitRoundable(CobolParser.RoundableContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link CobolParser#addStatement}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -1690,6 +1696,12 @@ public interface CobolVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitAddToStatement(CobolParser.AddToStatementContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link CobolParser#addTo}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitAddTo(CobolParser.AddToContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link CobolParser#addToGivingStatement}.
 	 * @param ctx the parse tree
@@ -1708,12 +1720,6 @@ public interface CobolVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitAddFrom(CobolParser.AddFromContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link CobolParser#addTo}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitAddTo(CobolParser.AddToContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link CobolParser#addToGiving}.
 	 * @param ctx the parse tree

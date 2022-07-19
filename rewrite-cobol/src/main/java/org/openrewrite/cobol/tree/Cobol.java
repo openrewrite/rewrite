@@ -272,6 +272,8 @@ public interface Cobol extends Tree {
         Markers markers;
 
         CobolContainer<Name> from;
+
+        @Nullable
         CobolContainer<Name> to;
 
         @Nullable
@@ -336,11 +338,12 @@ public interface Cobol extends Tree {
                 return t.from == from ? t : new AddTo(t.padding, t.id, t.prefix, t.markers, from, t.to, t.giving);
             }
 
+            @Nullable
             public CobolContainer<Name> getTo() {
                 return t.to;
             }
 
-            public AddTo withTo(CobolContainer<Name> to) {
+            public AddTo withTo(@Nullable CobolContainer<Name> to) {
                 return t.to == to ? t : new AddTo(t.padding, t.id, t.prefix, t.markers, t.from, to, t.giving);
             }
 
@@ -1054,6 +1057,88 @@ public interface Cobol extends Tree {
 
             public Paragraphs withSentences(CobolContainer<Cobol.Sentence> sentences) {
                 return t.sentences == sentences ? t : new Paragraphs(t.padding, t.id, t.prefix, t.markers, sentences);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Roundable implements Name {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Identifier identifier;
+
+        @Nullable
+        CobolLeftPadded<String> rounded;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRoundable(this, p);
+        }
+
+        @Nullable
+        public String getRounded() {
+            return rounded == null ? null : rounded.getElement();
+        }
+
+        @Override
+        public String getSimpleName() {
+            return identifier.getSimpleName();
+        }
+
+        public Roundable withRounded(@Nullable String rounded) {
+            if (rounded == null) {
+                return this.rounded == null ? this : new Roundable(id, prefix, markers, identifier, null);
+            }
+            return getPadding().withRounded(CobolLeftPadded.withElement(this.rounded, rounded));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Roundable t;
+
+            @Nullable
+            public CobolLeftPadded<String> getRounded() {
+                return t.rounded;
+            }
+
+            public Roundable withRounded(@Nullable CobolLeftPadded<String> rounded) {
+                return t.rounded == rounded ? t : new Roundable(t.padding, t.id, t.prefix, t.markers, t.identifier, rounded);
             }
         }
     }

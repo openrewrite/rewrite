@@ -126,8 +126,31 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Space.EMPTY,
                 Markers.EMPTY,
                 convertAllContainer(ctx.addFrom()),
-                convertAllContainer(sourceBefore("TO"), ctx.addTo()),
+                convertAllContainer(padLeft(ctx.TO()), ctx.addTo()),
                 null
+        );
+    }
+
+    @Override
+    public Cobol.AddTo visitAddToGivingStatement(CobolParser.AddToGivingStatementContext ctx) {
+        return new Cobol.AddTo(
+                randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                convertAllContainer(ctx.addFrom()),
+                convertAllContainer(padLeft(ctx.TO()), ctx.addToGiving()),
+                convertAllContainer(padLeft(ctx.GIVING()), ctx.addGiving())
+        );
+    }
+
+    @Override
+    public Cobol.Roundable visitRoundable(CobolParser.RoundableContext ctx) {
+        return new Cobol.Roundable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visitIdentifier(ctx.identifier()),
+                padLeft(ctx.ROUNDED())
         );
     }
 

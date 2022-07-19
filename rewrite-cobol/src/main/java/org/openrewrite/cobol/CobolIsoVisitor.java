@@ -137,4 +137,9 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.StatementPhrase visitStatementPhrase(Cobol.StatementPhrase statementPhrase, P p) {
         return (Cobol.StatementPhrase) super.visitStatementPhrase(statementPhrase, p);
     }
+
+    @Override
+    public Cobol.Roundable visitRoundable(Cobol.Roundable roundable, P p) {
+        return (Cobol.Roundable) super.visitRoundable(roundable, p);
+    }
 }

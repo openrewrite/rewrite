@@ -36,6 +36,8 @@ public interface Cobol {
 
     class AddTo implements Cobol {
         CobolContainer<Name> from;
+
+        @Nullable
         CobolContainer<Name> to;
 
         @Nullable
@@ -122,6 +124,18 @@ public interface Cobol {
 
     class Paragraphs implements Cobol {
         CobolContainer<Sentence> sentences;
+    }
+
+    class Roundable implements Name {
+        Identifier identifier;
+
+        @Nullable
+        CobolLeftPadded<String> rounded;
+
+        @Override
+        public String getSimpleName() {
+            return identifier.getSimpleName();
+        }
     }
 
     class Sentence implements Cobol {
