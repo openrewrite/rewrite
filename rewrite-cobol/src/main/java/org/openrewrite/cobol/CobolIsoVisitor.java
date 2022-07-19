@@ -122,4 +122,19 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.SetUpDown visitSetUpDown(Cobol.SetUpDown setUpDown, P p) {
         return (Cobol.SetUpDown) super.visitSetUpDown(setUpDown, p);
     }
+
+    @Override
+    public Cobol.Add visitAdd(Cobol.Add add, P p) {
+        return (Cobol.Add) super.visitAdd(add, p);
+    }
+
+    @Override
+    public Cobol.AddTo visitAddTo(Cobol.AddTo addTo, P p) {
+        return (Cobol.AddTo) super.visitAddTo(addTo, p);
+    }
+
+    @Override
+    public Cobol.StatementPhrase visitStatementPhrase(Cobol.StatementPhrase statementPhrase, P p) {
+        return (Cobol.StatementPhrase) super.visitStatementPhrase(statementPhrase, p);
+    }
 }

@@ -119,8 +119,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, PrintOutputCapture<P> p) {
         visitSpace(identificationDivision.getPrefix(), p);
         visitMarkers(identificationDivision.getMarkers(), p);
-        p.append(identificationDivision.getIdentification());
-        visitLeftPadded("", identificationDivision.getPadding().getDivision(), p);
+        p.append(identificationDivision.getWords());
         visitLeftPadded(".", identificationDivision.getPadding().getProgramIdParagraph(), p);
         return identificationDivision;
     }
@@ -128,8 +127,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitProcedureDivision(Cobol.ProcedureDivision procedureDivision, PrintOutputCapture<P> p) {
         visitSpace(procedureDivision.getPrefix(), p);
         visitMarkers(procedureDivision.getMarkers(), p);
-        p.append(procedureDivision.getProcedure());
-        visitLeftPadded("", procedureDivision.getPadding().getDivision(), p);
+        p.append(procedureDivision.getWords());
         visitLeftPadded(".", procedureDivision.getPadding().getBody(), p);
         return procedureDivision;
     }
@@ -152,8 +150,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitStop(Cobol.Stop stop, PrintOutputCapture<P> p) {
         visitSpace(stop.getPrefix(), p);
         visitMarkers(stop.getMarkers(), p);
-        p.append(stop.getStop());
-        visitLeftPadded("", stop.getPadding().getRun(), p);
+        p.append(stop.getWords());
         visit(stop.getStatement(), p);
         return stop;
     }
@@ -174,15 +171,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return sentence;
     }
 
-    public Cobol visitDataDivision(Cobol.DataDivision dataDivision, PrintOutputCapture<P> p) {
-        visitSpace(dataDivision.getPrefix(), p);
-        visitMarkers(dataDivision.getMarkers(), p);
-        p.append(dataDivision.getData());
-        visitLeftPadded("", dataDivision.getPadding().getDivision(), p);
-        visitContainer("", dataDivision.getPadding().getSections(), " ", "", p);
-        return dataDivision;
-    }
-
     public Cobol visitDataPictureClause(Cobol.DataPictureClause dataPictureClause, PrintOutputCapture<P> p) {
         visitSpace(dataPictureClause.getPrefix(), p);
         visitMarkers(dataPictureClause.getMarkers(), p);
@@ -195,8 +183,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitWorkingStorageSection(Cobol.WorkingStorageSection workingStorageSection, PrintOutputCapture<P> p) {
         visitSpace(workingStorageSection.getPrefix(), p);
         visitMarkers(workingStorageSection.getMarkers(), p);
-        p.append(workingStorageSection.getWorkingStorage());
-        visitLeftPadded("", workingStorageSection.getPadding().getSection(), p);
+        p.append(workingStorageSection.getWords());
         visitContainer("", workingStorageSection.getPadding().getDataDescriptions(), " ", "", p);
         return workingStorageSection;
     }
@@ -221,8 +208,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitEnvironmentDivision(Cobol.EnvironmentDivision environmentDivision, PrintOutputCapture<P> p) {
         visitSpace(environmentDivision.getPrefix(), p);
         visitMarkers(environmentDivision.getMarkers(), p);
-        p.append(environmentDivision.getEnvironment());
-        visitLeftPadded("", environmentDivision.getPadding().getDivision(), p);
+        p.append(environmentDivision.getWords());
         visitContainer("", environmentDivision.getPadding().getBody(), " ", "", p);
         return environmentDivision;
     }
@@ -237,14 +223,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", programUnit.getPadding().getProgramUnits(), " ", "", p);
         visitRightPadded(programUnit.getPadding().getEndProgram(), ".", p);
         return programUnit;
-    }
-
-    public Cobol visitEndProgram(Cobol.EndProgram endProgram, PrintOutputCapture<P> p) {
-        visitSpace(endProgram.getPrefix(), p);
-        visitMarkers(endProgram.getMarkers(), p);
-        p.append(endProgram.getEnd());
-        visitLeftPadded("", endProgram.getPadding().getProgram(), p);
-        return endProgram;
     }
 
     public Cobol visitSetTo(Cobol.SetTo setTo, PrintOutputCapture<P> p) {
@@ -270,5 +248,46 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", set.getPadding().getTo(), "", "", p);
         visit(set.getUpDown(), p);
         return set;
+    }
+
+    public Cobol visitAdd(Cobol.Add add, PrintOutputCapture<P> p) {
+        visitSpace(add.getPrefix(), p);
+        visitMarkers(add.getMarkers(), p);
+        p.append(add.getAdd());
+        visit(add.getOperation(), p);
+        visit(add.getOnSizeError(), p);
+        visitLeftPadded("", add.getPadding().getEndAdd(), p);
+        return add;
+    }
+
+    public Cobol visitAddTo(Cobol.AddTo addTo, PrintOutputCapture<P> p) {
+        visitSpace(addTo.getPrefix(), p);
+        visitMarkers(addTo.getMarkers(), p);
+        visitContainer("", addTo.getPadding().getFrom(), " ", "", p);
+        visitContainer("", addTo.getPadding().getTo(), " ", "", p);
+        return addTo;
+    }
+
+    public Cobol visitDataDivision(Cobol.DataDivision dataDivision, PrintOutputCapture<P> p) {
+        visitSpace(dataDivision.getPrefix(), p);
+        visitMarkers(dataDivision.getMarkers(), p);
+        p.append(dataDivision.getWords());
+        visitContainer("", dataDivision.getPadding().getSections(), " ", "", p);
+        return dataDivision;
+    }
+
+    public Cobol visitEndProgram(Cobol.EndProgram endProgram, PrintOutputCapture<P> p) {
+        visitSpace(endProgram.getPrefix(), p);
+        visitMarkers(endProgram.getMarkers(), p);
+        p.append(endProgram.getWords());
+        return endProgram;
+    }
+
+    public Cobol visitStatementPhrase(Cobol.StatementPhrase statementPhrase, PrintOutputCapture<P> p) {
+        visitSpace(statementPhrase.getPrefix(), p);
+        visitMarkers(statementPhrase.getMarkers(), p);
+        p.append(statementPhrase.getPhrase());
+        visitContainer("", statementPhrase.getPadding().getStatement(), " ", "", p);
+        return statementPhrase;
     }
 }

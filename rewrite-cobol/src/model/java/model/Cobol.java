@@ -23,9 +23,27 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 
 public interface Cobol {
+    class Add implements Statement {
+        String add;
+        Cobol operation;
+
+        /**
+         * Includes ON SIZE ERROR and NOT ON SIZE ERROR phrases
+         */
+        @Nullable
+        StatementPhrase onSizeError;
+
+        @Nullable
+        CobolLeftPadded<String> endAdd;
+    }
+
+    class AddTo implements Cobol {
+        CobolContainer<Name> from;
+        CobolContainer<Name> to;
+    }
+
     class DataDivision implements Statement {
-        String data;
-        CobolLeftPadded<String> division;
+        String words;
         CobolContainer<DataDivisionSection> sections;
     }
 
@@ -69,14 +87,12 @@ public interface Cobol {
     }
 
     class EndProgram implements Statement {
-        String end;
-        CobolLeftPadded<String> program;
+        String words;
         Name programName;
     }
 
     class EnvironmentDivision implements Cobol {
-        String environment;
-        CobolLeftPadded<String> division;
+        String words;
         CobolContainer<Cobol> body;
     }
 
@@ -95,14 +111,12 @@ public interface Cobol {
     }
 
     class IdentificationDivision implements Cobol {
-        String identification;
-        CobolLeftPadded<String> division;
+        String words;
         CobolLeftPadded<ProgramIdParagraph> programIdParagraph;
     }
 
     class ProcedureDivision implements Cobol {
-        String procedure;
-        CobolLeftPadded<String> division;
+        String words;
         CobolLeftPadded<ProcedureDivisionBody> body;
     }
 
@@ -162,15 +176,18 @@ public interface Cobol {
         Name value;
     }
 
+    class StatementPhrase implements Cobol {
+        String phrase;
+        CobolContainer<Statement> statement;
+    }
+
     class Stop implements Statement {
-        String stop;
-        CobolLeftPadded<String> run;
+        String words;
         Cobol statement;
     }
 
     class WorkingStorageSection implements DataDivisionSection {
-        String workingStorage;
-        CobolLeftPadded<String> section;
+        String words;
         CobolContainer<DataDescriptionEntry> dataDescriptions;
     }
 }
