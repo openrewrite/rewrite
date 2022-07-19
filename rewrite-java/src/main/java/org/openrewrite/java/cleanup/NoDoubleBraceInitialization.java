@@ -175,17 +175,17 @@ public class NoDoubleBraceInitialization extends Recipe {
                     Object statement = objectListEntry.getKey();
                     int statementIndex = bl.getStatements().indexOf(statement);
                     if (statementIndex > -1) {
-                        JRightPadded<Boolean> padding;
+                        JRightPadded<Boolean> isStatic;
                         if (objectListEntry.getKey() instanceof J.VariableDeclarations && J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Static)) {
-                            padding = JRightPadded.build(true).withAfter(Space.format(" "));
+                            isStatic = JRightPadded.build(true).withAfter(Space.format(" "));
                         } else {
-                            padding = JRightPadded.build(false);
+                            isStatic = JRightPadded.build(false);
                         }
                         J.Block initBlock = new J.Block(
                                 Tree.randomId(),
                                 Space.EMPTY,
                                 Markers.EMPTY,
-                                padding,
+                                isStatic,
                                 objectListEntry.getValue().stream().map(JRightPadded::build).collect(Collectors.toList()),
                                 Space.EMPTY
                         );

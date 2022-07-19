@@ -17,14 +17,12 @@ package org.openrewrite.java;
 
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.FindReferencedTypes;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.Space.EMPTY;
 
 /**
  * Deletes standalone statements. Does not include deletion of control statements present in for loops.
@@ -96,7 +94,7 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
         return new J.Block(randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                null,
+                JRightPadded.build(false),
                 emptyList(),
                 Space.EMPTY
         );
