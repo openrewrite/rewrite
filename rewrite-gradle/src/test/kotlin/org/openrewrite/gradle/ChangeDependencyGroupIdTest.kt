@@ -15,11 +15,37 @@
  */
 package org.openrewrite.gradle
 
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class ChangeDependencyGroupIdTest : GradleRecipeTest {
+
+    @Test
+    fun worksWithEmptyStringConfig() = assertChanged(
+        recipe = ChangeDependencyGroupId("org.springframework.boot", "spring-boot-starter", "org.newboot", ""),
+        before = """
+            dependencies {
+                rewrite 'org.openrewrite:rewrite-gradle:latest.integration'
+                implementation 'org.springframework.cloud:spring-cloud-starter-sleuth:3.0.3'
+                implementation 'org.springframework.integration:spring-integration-ftp:5.5.1'
+                implementation 'org.springframework.boot:spring-boot-starter:2.5.4'
+                implementation 'commons-lang:commons-lang:2.6'
+                testImplementation 'org.springframework.boot:spring-boot-starter-test'
+            }
+        """,
+        after = """
+            dependencies {
+                rewrite 'org.openrewrite:rewrite-gradle:latest.integration'
+                implementation 'org.springframework.cloud:spring-cloud-starter-sleuth:3.0.3'
+                implementation 'org.springframework.integration:spring-integration-ftp:5.5.1'
+                implementation 'org.newboot:spring-boot-starter:2.5.4'
+                implementation 'commons-lang:commons-lang:2.6'
+                testImplementation 'org.springframework.boot:spring-boot-starter-test'
+            }
+        """
+    )
 
     @ParameterizedTest
     @CsvSource(value = ["org.openrewrite:rewrite-core", "*:*"], delimiterString = ":")
