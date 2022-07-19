@@ -244,12 +244,39 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return pp;
     }
 
+    public Cobol visitSet(Cobol.Set set, P p) {
+        Cobol.Set s = set;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withTo(visitContainer(s.getPadding().getTo(), p));
+        s = s.withUpDown((Cobol.SetUpDown) visit(s.getUpDown(), p));
+        return s;
+    }
+
+    public Cobol visitSetTo(Cobol.SetTo setTo, P p) {
+        Cobol.SetTo s = setTo;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withTo(visitContainer(s.getPadding().getTo(), p));
+        s = s.getPadding().withValues(visitContainer(s.getPadding().getValues(), p));
+        return s;
+    }
+
+    public Cobol visitSetUpDown(Cobol.SetUpDown setUpDown, P p) {
+        Cobol.SetUpDown s = setUpDown;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withTo(visitContainer(s.getPadding().getTo(), p));
+        s = s.getPadding().withOperation(visitLeftPadded(s.getPadding().getOperation(), p));
+        return s;
+    }
+
     public Cobol visitStop(Cobol.Stop stop, P p) {
         Cobol.Stop s = stop;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         s = s.getPadding().withRun(visitLeftPadded(s.getPadding().getRun(), p));
-        s = s.withStatement((Cobol) visit(s.getStatement(), p));
+        s = s.withStatement(visit(s.getStatement(), p));
         return s;
     }
 

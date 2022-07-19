@@ -57,6 +57,15 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
         this.charsetBomMarked = charsetBomMarked;
     }
 
+    public <T> T visitNullable(@Nullable ParseTree tree) {
+        if (tree == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+        //noinspection unchecked
+        return (T) super.visit(tree);
+    }
+
     @Override
     public Cobol.CompilationUnit visitCompilationUnit(CobolParser.CompilationUnitContext ctx) {
         Space prefix = prefix(ctx);
@@ -75,6 +84,45 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 null,
                 programUnits,
                 source.substring(cursor)
+        );
+    }
+
+    @Override
+    public Cobol.Set visitSetStatement(CobolParser.SetStatementContext ctx) {
+        return new Cobol.Set(
+                randomId(),
+                sourceBefore(ctx.SET().getText()),
+                Markers.EMPTY,
+                ctx.SET().getText(),
+                convertAllContainer(ctx.setToStatement()),
+                visitNullable(ctx.setUpDownByStatement())
+        );
+    }
+
+    @Override
+    public Cobol.SetTo visitSetToStatement(CobolParser.SetToStatementContext ctx) {
+        Space prefix = prefix(ctx);
+        CobolContainer<Cobol.Identifier> to = convertAllContainer(ctx.setTo());
+        Space beforeValues = sourceBefore("TO");
+        return new Cobol.SetTo(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                to,
+                this.<Name, CobolParser.SetToValueContext>convertAllContainer(ctx.setToValue())
+                        .withBefore(beforeValues)
+        );
+    }
+
+    @Override
+    public Cobol.SetUpDown visitSetUpDownByStatement(CobolParser.SetUpDownByStatementContext ctx) {
+        return new Cobol.SetUpDown(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.setTo()),
+                padLeft(ctx.UP() == null ? ctx.DOWN() : ctx.UP()),
+                (Name) visit(ctx.setByValue())
         );
     }
 
@@ -124,9 +172,9 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 (Cobol.IdentificationDivision) visitIdentificationDivision(ctx.identificationDivision()),
-                ctx.environmentDivision() == null ? null : visitEnvironmentDivision(ctx.environmentDivision()),
-                ctx.dataDivision() == null ? null : visitDataDivision(ctx.dataDivision()),
-                ctx.procedureDivision() == null ? null : visitProcedureDivision(ctx.procedureDivision()),
+                visitNullable(ctx.environmentDivision()),
+                visitNullable(ctx.dataDivision()),
+                visitNullable(ctx.procedureDivision()),
                 convertAllContainer(ctx.programUnit()),
                 ctx.endProgramStatement() == null ? null : padRight(visitEndProgramStatement(ctx.endProgramStatement()),
                         sourceBefore("."))
@@ -212,7 +260,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 sourceBefore(ctx.STOP().getText()),
                 Markers.EMPTY,
                 ctx.STOP().getText(),
-                ctx.RUN() == null ? null : padLeft(sourceBefore(ctx.RUN().getText()), ctx.RUN().getText()),
+                padLeft(ctx.RUN()),
                 null
         );
     }

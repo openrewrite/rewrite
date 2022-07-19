@@ -246,4 +246,29 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitLeftPadded("", endProgram.getPadding().getProgram(), p);
         return endProgram;
     }
+
+    public Cobol visitSetTo(Cobol.SetTo setTo, PrintOutputCapture<P> p) {
+        visitSpace(setTo.getPrefix(), p);
+        visitMarkers(setTo.getMarkers(), p);
+        visitContainer("", setTo.getPadding().getTo(), "", "", p);
+        visitContainer("TO", setTo.getPadding().getValues(), "", "", p);
+        return setTo;
+    }
+
+    public Cobol visitSetUpDown(Cobol.SetUpDown setUpDown, PrintOutputCapture<P> p) {
+        visitSpace(setUpDown.getPrefix(), p);
+        visitMarkers(setUpDown.getMarkers(), p);
+        visitContainer("", setUpDown.getPadding().getTo(), "", "", p);
+        visitLeftPadded("", setUpDown.getPadding().getOperation(), p);
+        return setUpDown;
+    }
+
+    public Cobol visitSet(Cobol.Set set, PrintOutputCapture<P> p) {
+        visitSpace(set.getPrefix(), p);
+        visitMarkers(set.getMarkers(), p);
+        p.append(set.getSet());
+        visitContainer("", set.getPadding().getTo(), "", "", p);
+        visit(set.getUpDown(), p);
+        return set;
+    }
 }

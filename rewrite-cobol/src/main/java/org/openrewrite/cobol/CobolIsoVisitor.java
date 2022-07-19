@@ -107,4 +107,19 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.EnvironmentDivision visitEnvironmentDivision(Cobol.EnvironmentDivision environmentDivision, P p) {
         return (Cobol.EnvironmentDivision) super.visitEnvironmentDivision(environmentDivision, p);
     }
+
+    @Override
+    public Cobol.Set visitSet(Cobol.Set set, P p) {
+        return (Cobol.Set) super.visitSet(set, p);
+    }
+
+    @Override
+    public Cobol.SetTo visitSetTo(Cobol.SetTo setTo, P p) {
+        return (Cobol.SetTo) super.visitSetTo(setTo, p);
+    }
+
+    @Override
+    public Cobol.SetUpDown visitSetUpDown(Cobol.SetUpDown setUpDown, P p) {
+        return (Cobol.SetUpDown) super.visitSetUpDown(setUpDown, p);
+    }
 }

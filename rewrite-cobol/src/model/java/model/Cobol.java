@@ -141,6 +141,27 @@ public interface Cobol {
         CobolRightPadded<EndProgram> endProgram;
     }
 
+    class Set implements Statement {
+        String set;
+
+        @Nullable
+        CobolContainer<SetTo> to;
+
+        @Nullable
+        SetUpDown upDown;
+    }
+
+    class SetTo implements Cobol {
+        CobolContainer<Identifier> to;
+        CobolContainer<Name> values;
+    }
+
+    class SetUpDown implements Cobol {
+        CobolContainer<Identifier> to;
+        CobolLeftPadded<String> operation;
+        Name value;
+    }
+
     class Stop implements Statement {
         String stop;
         CobolLeftPadded<String> run;

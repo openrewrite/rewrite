@@ -78,7 +78,7 @@ public class WritePrinter extends Recipe {
                                     fields.add("visitRightPadded(" + paramName + ".getPadding().get" + capitalizedName + "(), \"\", p);");
                                     break;
                                 case "CobolContainer":
-                                    fields.add("visitContainer(\"\", " + paramName + ".getPadding().get" + capitalizedName + "(), \" \", \"\", p);");
+                                    fields.add("visitContainer(\"\", " + paramName + ".getPadding().get" + capitalizedName + "(), \"\", \"\", p);");
                                     break;
                                 case "List":
                                     String loopVar = paramName.substring(0, 1);
