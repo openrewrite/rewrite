@@ -60,6 +60,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     public <T> T visit(@Nullable ParseTree... trees) {
         for (ParseTree tree : trees) {
             if (tree != null) {
+                //noinspection unchecked
                 return (T) visit(tree);
             }
         }
@@ -120,7 +121,8 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 from,
                 this.<Name, CobolParser.AddToContext>convertAllContainer(ctx.addTo())
-                        .withBefore(beforeTo)
+                        .withBefore(beforeTo),
+                null
         );
     }
 
@@ -459,8 +461,10 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     private String words(TerminalNode... wordNodes) {
         StringBuilder words = new StringBuilder();
         for (TerminalNode wordNode : wordNodes) {
-            words.append(sourceBefore(wordNode.getText()).getWhitespace());
-            words.append(wordNode.getText());
+            if(wordNode != null) {
+                words.append(sourceBefore(wordNode.getText()).getWhitespace());
+                words.append(wordNode.getText());
+            }
         }
         return words.toString();
     }

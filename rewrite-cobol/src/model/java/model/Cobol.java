@@ -27,9 +27,6 @@ public interface Cobol {
         String add;
         Cobol operation;
 
-        /**
-         * Includes ON SIZE ERROR and NOT ON SIZE ERROR phrases
-         */
         @Nullable
         StatementPhrase onSizeError;
 
@@ -40,6 +37,9 @@ public interface Cobol {
     class AddTo implements Cobol {
         CobolContainer<Name> from;
         CobolContainer<Name> to;
+
+        @Nullable
+        CobolContainer<Name> giving;
     }
 
     class DataDivision implements Statement {

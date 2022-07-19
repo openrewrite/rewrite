@@ -117,6 +117,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         a = a.getPadding().withFrom(visitContainer(a.getPadding().getFrom(), p));
         a = a.getPadding().withTo(visitContainer(a.getPadding().getTo(), p));
+        a = a.getPadding().withGiving(visitContainer(a.getPadding().getGiving(), p));
         return a;
     }
 

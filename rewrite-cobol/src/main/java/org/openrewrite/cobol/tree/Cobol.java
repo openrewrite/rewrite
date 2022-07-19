@@ -274,6 +274,9 @@ public interface Cobol extends Tree {
         CobolContainer<Name> from;
         CobolContainer<Name> to;
 
+        @Nullable
+        CobolContainer<Name> giving;
+
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitAddTo(this, p);
@@ -295,6 +298,15 @@ public interface Cobol extends Tree {
         public AddTo withTo(List<Name> to) {
             return getPadding().withTo(this.to.getPadding().withElements(CobolRightPadded.withElements(
                     this.to.getPadding().getElements(), to)));
+        }
+
+        public List<Name> getGiving() {
+            return giving.getElements();
+        }
+
+        public AddTo withGiving(List<Name> giving) {
+            return getPadding().withGiving(this.giving.getPadding().withElements(CobolRightPadded.withElements(
+                    this.giving.getPadding().getElements(), giving)));
         }
 
         public Padding getPadding() {
@@ -321,7 +333,7 @@ public interface Cobol extends Tree {
             }
 
             public AddTo withFrom(CobolContainer<Name> from) {
-                return t.from == from ? t : new AddTo(t.padding, t.id, t.prefix, t.markers, from, t.to);
+                return t.from == from ? t : new AddTo(t.padding, t.id, t.prefix, t.markers, from, t.to, t.giving);
             }
 
             public CobolContainer<Name> getTo() {
@@ -329,7 +341,16 @@ public interface Cobol extends Tree {
             }
 
             public AddTo withTo(CobolContainer<Name> to) {
-                return t.to == to ? t : new AddTo(t.padding, t.id, t.prefix, t.markers, t.from, to);
+                return t.to == to ? t : new AddTo(t.padding, t.id, t.prefix, t.markers, t.from, to, t.giving);
+            }
+
+            @Nullable
+            public CobolContainer<Name> getGiving() {
+                return t.giving;
+            }
+
+            public AddTo withGiving(@Nullable CobolContainer<Name> giving) {
+                return t.giving == giving ? t : new AddTo(t.padding, t.id, t.prefix, t.markers, t.from, t.to, giving);
             }
         }
     }

@@ -260,14 +260,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return add;
     }
 
-    public Cobol visitAddTo(Cobol.AddTo addTo, PrintOutputCapture<P> p) {
-        visitSpace(addTo.getPrefix(), p);
-        visitMarkers(addTo.getMarkers(), p);
-        visitContainer("", addTo.getPadding().getFrom(), " ", "", p);
-        visitContainer("", addTo.getPadding().getTo(), " ", "", p);
-        return addTo;
-    }
-
     public Cobol visitDataDivision(Cobol.DataDivision dataDivision, PrintOutputCapture<P> p) {
         visitSpace(dataDivision.getPrefix(), p);
         visitMarkers(dataDivision.getMarkers(), p);
@@ -289,5 +281,14 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(statementPhrase.getPhrase());
         visitContainer("", statementPhrase.getPadding().getStatement(), " ", "", p);
         return statementPhrase;
+    }
+
+    public Cobol visitAddTo(Cobol.AddTo addTo, PrintOutputCapture<P> p) {
+        visitSpace(addTo.getPrefix(), p);
+        visitMarkers(addTo.getMarkers(), p);
+        visitContainer("", addTo.getPadding().getFrom(), " ", "", p);
+        visitContainer("", addTo.getPadding().getTo(), " ", "", p);
+        visitContainer("", addTo.getPadding().getGiving(), " ", "", p);
+        return addTo;
     }
 }
