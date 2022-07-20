@@ -106,6 +106,41 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.CollatingSequenceClause visitCollatingSequenceClause(CobolParser.CollatingSequenceClauseContext ctx) {
+        return new Cobol.CollatingSequenceClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PROGRAM(), ctx.COLLATING(), ctx.SEQUENCE()),
+                convertAllContainer(padLeft(ctx.IS()), ctx.alphabetName()),
+                visitNullable(ctx.collatingSequenceClauseAlphanumeric()),
+                visitNullable(ctx.collatingSequenceClauseNational())
+        );
+    }
+
+    @Override
+    public Cobol.CollatingSequenceAlphabet visitCollatingSequenceClauseAlphanumeric(CobolParser.CollatingSequenceClauseAlphanumericContext ctx) {
+        return new Cobol.CollatingSequenceAlphabet(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOR(), ctx.ALPHANUMERIC(), ctx.IS()),
+                (Cobol.Identifier) visit(ctx.alphabetName())
+        );
+    }
+
+    @Override
+    public Object visitCollatingSequenceClauseNational(CobolParser.CollatingSequenceClauseNationalContext ctx) {
+        return new Cobol.CollatingSequenceAlphabet(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOR(), ctx.NATIONAL(), ctx.IS()),
+                (Cobol.Identifier) visit(ctx.alphabetName())
+        );
+    }
+
+    @Override
     public Cobol.ConfigurationSection visitConfigurationSection(CobolParser.ConfigurationSectionContext ctx) {
         return new Cobol.ConfigurationSection(
                 randomId(),
@@ -290,6 +325,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 convertAllContainer(ctx.setTo()),
                 padLeft(ctx.UP() == null ? ctx.DOWN() : ctx.UP()),
                 (Name) visit(ctx.setByValue())
+        );
+    }
+
+    @Override
+    public Cobol.Identifier visitCobolWord(CobolParser.CobolWordContext ctx) {
+        return new Cobol.Identifier(
+                randomId(),
+                sourceBefore(ctx.getText()),
+                Markers.EMPTY,
+                ctx.getText()
         );
     }
 

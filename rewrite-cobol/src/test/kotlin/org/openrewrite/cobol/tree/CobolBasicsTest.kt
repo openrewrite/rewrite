@@ -83,12 +83,11 @@ class CobolBasicsTest : RewriteTest {
                 ENVIRONMENT DIVISION.                                          
                 CONFIGURATION SECTION.                                         
                 SOURCE-COMPUTER.                                               
-                    XXXXX082.                                                  
-                OBJECT-COMPUTER.                                               
+                    XXXXX082.
+                OBJECT-COMPUTER.
                     XXXXX083
-                    MEMORY SIZE
-                    XXXXX068
-                    CHARACTERS.                                                  
+                    MEMORY SIZE XXXXX068 CHARACTERS
+                    PROGRAM COLLATING SEQUENCE IS COLLATING-SEQ-1.
             """
         )
     )
