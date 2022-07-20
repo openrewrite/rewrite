@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.marker;
+package org.openrewrite;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 
-import java.util.UUID;
-
-@RequiredArgsConstructor
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Getter
-@With
-public class SearchResult implements Marker {
-    UUID id;
-
-    @Nullable
-    String description;
+public class UncaughtVisitorExceptionResult extends SearchResult {
+    public UncaughtVisitorExceptionResult(UncaughtVisitorException exception) {
+        super(exception.getId(), exception.getSanitizedStackTrace());
+    }
 }

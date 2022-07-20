@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 
 import java.util.UUID;
 

@@ -24,8 +24,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.RecipesThatMadeChanges;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -35,6 +37,7 @@ import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.Tree.randomId;
@@ -209,6 +212,8 @@ public interface RecipeScheduler {
                     Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", recipe.getDisplayName());
                     Timer.Sample sample = Timer.start();
 
+                    S afterFile = s;
+
                     try {
                         if (recipe.getSingleSourceApplicableTest() != null) {
                             if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
@@ -243,34 +248,56 @@ public interface RecipeScheduler {
                         TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
 
                         //noinspection unchecked
-                        S afterFile = (S) visitor.visitSourceFile(s, ctx);
+                        afterFile = (S) visitor.visitSourceFile(s, ctx);
 
                         if (visitor.isAcceptable(s, ctx)) {
                             //noinspection unchecked
                             afterFile = (S) visitor.visit(afterFile, ctx);
                         }
-                        if (afterFile != null && afterFile != s) {
-                            List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
-                            recipeStackList.add(recipeStack);
-                            afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
-                                    new RecipesThatMadeChanges(randomId(), recipeStackList),
-                                    (r1, r2) -> {
-                                        r1.getRecipes().addAll(r2.getRecipes());
-                                        return r1;
-                                    }));
-                            sample.stop(MetricsHelper.successTags(timer, "changed").register(Metrics.globalRegistry));
-                        } else if (afterFile == null) {
-                            recipeThatDeletedSourceFile.put(s.getId(), recipeStack);
-                            sample.stop(MetricsHelper.successTags(timer, "deleted").register(Metrics.globalRegistry));
-                        } else {
-                            sample.stop(MetricsHelper.successTags(timer, "unchanged").register(Metrics.globalRegistry));
-                        }
-                        return afterFile;
                     } catch (Throwable t) {
+                        if (t instanceof UncaughtVisitorException) {
+                            UncaughtVisitorException vt = (UncaughtVisitorException) t;
+                            Tree nearestTree = (Tree) vt.getCursor().getPath(Tree.class::isInstance).next();
+
+                            //noinspection unchecked
+                            afterFile = (S) new TreeVisitor<Tree, Integer>() {
+                                @Override
+                                public @Nullable Tree visit(@Nullable Tree tree, Integer integer) {
+                                    if (tree == nearestTree && tree != null) {
+                                        try {
+                                            Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
+                                            Method withMarkers = tree.getClass().getDeclaredMethod("withMarkers", Markers.class);
+                                            Markers markers = (Markers) getMarkers.invoke(tree);
+                                            return (Tree) withMarkers.invoke(tree, markers
+                                                    .computeByType(new UncaughtVisitorExceptionResult(vt), (s1, s2) -> s1 == null ? s2 : s1));
+                                        } catch (Throwable ignored) {
+                                        }
+                                    }
+                                    return super.visit(tree, integer);
+                                }
+                            }.visitNonNull(requireNonNull(afterFile), 0);
+                        }
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ctx.getOnError().accept(t);
-                        return s;
                     }
+
+                    if (afterFile != null && afterFile != s) {
+                        List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
+                        recipeStackList.add(recipeStack);
+                        afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
+                                new RecipesThatMadeChanges(randomId(), recipeStackList),
+                                (r1, r2) -> {
+                                    r1.getRecipes().addAll(r2.getRecipes());
+                                    return r1;
+                                }));
+                        sample.stop(MetricsHelper.successTags(timer, "changed").register(Metrics.globalRegistry));
+                    } else if (afterFile == null) {
+                        recipeThatDeletedSourceFile.put(requireNonNull(s).getId(), recipeStack);
+                        sample.stop(MetricsHelper.successTags(timer, "deleted").register(Metrics.globalRegistry));
+                    } else {
+                        sample.stop(MetricsHelper.successTags(timer, "unchanged").register(Metrics.globalRegistry));
+                    }
+                    return afterFile;
                 });
 
         // The type of the list is widened at this point, since a source file type may be generated that isn't

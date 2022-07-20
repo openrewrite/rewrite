@@ -16,7 +16,6 @@
 package org.openrewrite;
 
 import de.danielbechler.diff.ObjectDifferBuilder;
-import de.danielbechler.diff.differ.DifferDispatcher;
 import de.danielbechler.diff.node.DiffNode;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
@@ -25,17 +24,12 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 import java.lang.management.ManagementFactory;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
-import java.util.logging.Logger;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -207,56 +201,61 @@ public abstract class TreeVisitor<T extends Tree, P> {
         T t = null;
         // Do you visitor take tree and do you tree take visitor?
         boolean isAcceptable = tree.isAcceptable(this, p) && (!(tree instanceof SourceFile) || isAcceptable((SourceFile) tree, p));
-        if (isAcceptable) {
-            //noinspection unchecked
-            t = preVisit((T) tree, p);
-            if (t != null) {
-                t = t.accept(this, p);
-            }
-            if (t != null) {
-                t = postVisit(t, p);
-            }
-            if (t != tree && t != null && p instanceof ExecutionContext) {
-                ExecutionContext ctx = (ExecutionContext) p;
-                for (TreeObserver.Subscription observer : ctx.getObservers()) {
-                    if (observer.isSubscribed(tree)) {
-                        observer.getObserver().treeChanged(getCursor(), t);
-                        AtomicReference<T> t2 = new AtomicReference<>(t);
-                        DiffNode diff = ObjectDifferBuilder.buildDefault().compare(t, tree);
-                        diff.visit((node, visit) -> {
-                            if (!node.hasChildren() && node.getPropertyName() != null) {
-                                //noinspection unchecked
-                                t2.set((T) observer.getObserver().propertyChanged(node.getPropertyName(),
-                                        getCursor(), t2.get(), node.canonicalGet(tree), node.canonicalGet(t2.get())));
-                            }
-                        });
-                        t = t2.get();
-                    }
+
+        try {
+            if (isAcceptable) {
+                //noinspection unchecked
+                t = preVisit((T) tree, p);
+                if (t != null) {
+                    t = t.accept(this, p);
                 }
-            }
-        }
-
-        setCursor(cursor.getParent());
-
-        if (topLevel) {
-            sample.stop(Timer.builder("rewrite.visitor.visit")
-                    .tag("visitor.class", getClass().getName())
-                    .register(Metrics.globalRegistry));
-            visitCountSummary.record(visitCount);
-
-            if (t != null) {
-                for (TreeVisitor<T, P> v : afterVisit) {
-                    if (v != null) {
-                        v.setCursor(getCursor());
-                        t = v.visit(t, p);
+                if (t != null) {
+                    t = postVisit(t, p);
+                }
+                if (t != tree && t != null && p instanceof ExecutionContext) {
+                    ExecutionContext ctx = (ExecutionContext) p;
+                    for (TreeObserver.Subscription observer : ctx.getObservers()) {
+                        if (observer.isSubscribed(tree)) {
+                            observer.getObserver().treeChanged(getCursor(), t);
+                            AtomicReference<T> t2 = new AtomicReference<>(t);
+                            DiffNode diff = ObjectDifferBuilder.buildDefault().compare(t, tree);
+                            diff.visit((node, visit) -> {
+                                if (!node.hasChildren() && node.getPropertyName() != null) {
+                                    //noinspection unchecked
+                                    t2.set((T) observer.getObserver().propertyChanged(node.getPropertyName(),
+                                            getCursor(), t2.get(), node.canonicalGet(tree), node.canonicalGet(t2.get())));
+                                }
+                            });
+                            t = t2.get();
+                        }
                     }
                 }
             }
 
-            sample.stop(Timer.builder("rewrite.visitor.visit.cumulative")
-                    .tag("visitor.class", getClass().getName())
-                    .register(Metrics.globalRegistry));
-            afterVisit = null;
+            setCursor(cursor.getParent());
+
+            if (topLevel) {
+                sample.stop(Timer.builder("rewrite.visitor.visit")
+                        .tag("visitor.class", getClass().getName())
+                        .register(Metrics.globalRegistry));
+                visitCountSummary.record(visitCount);
+
+                if (t != null) {
+                    for (TreeVisitor<T, P> v : afterVisit) {
+                        if (v != null) {
+                            v.setCursor(getCursor());
+                            t = v.visit(t, p);
+                        }
+                    }
+                }
+
+                sample.stop(Timer.builder("rewrite.visitor.visit.cumulative")
+                        .tag("visitor.class", getClass().getName())
+                        .register(Metrics.globalRegistry));
+                afterVisit = null;
+            }
+        } catch (Throwable e) {
+            throw new UncaughtVisitorException(e, getCursor());
         }
 
         //noinspection unchecked
