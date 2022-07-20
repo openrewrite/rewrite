@@ -44,6 +44,11 @@ public interface Cobol {
         CobolContainer<Name> giving;
     }
 
+    class ConfigurationSection implements Cobol {
+        String words;
+        CobolContainer<Cobol> paragraphs;
+    }
+
     class DataDivision implements Statement {
         String words;
         CobolContainer<DataDivisionSection> sections;
@@ -190,6 +195,63 @@ public interface Cobol {
         CobolContainer<Identifier> to;
         CobolLeftPadded<String> operation;
         Name value;
+    }
+
+    class SourceComputer implements Cobol {
+        CobolRightPadded<String> words;
+
+        @Nullable
+        CobolRightPadded<SourceComputerDefinition> computer;
+    }
+
+    class SourceComputerDefinition implements Cobol {
+        String computerName;
+
+        @Nullable
+        CobolLeftPadded<String> debuggingMode;
+    }
+
+    class ObjectComputer implements Cobol {
+        CobolRightPadded<String> words;
+
+        @Nullable
+        CobolRightPadded<ObjectComputerDefinition> computer;
+    }
+
+    class ObjectComputerDefinition implements Cobol {
+        String computerName;
+        CobolContainer<Cobol> specifications;
+    }
+
+    class ValuedObjectComputerClause implements Cobol {
+        String words;
+        Cobol value;
+
+        @Nullable
+        CobolLeftPadded<String> units;
+
+        public enum Type {
+            Memory,
+            Disk,
+            SegmentLimit,
+            CharacterSet
+        }
+    }
+
+    class CollatingSequenceClause implements Cobol {
+        String words;
+        CobolContainer<Identifier> alphabetName;
+
+        @Nullable
+        CollatingSequenceAlphabet alphanumeric;
+
+        @Nullable
+        CollatingSequenceAlphabet national;
+    }
+
+    class CollatingSequenceAlphabet implements Cobol {
+        String words;
+        Identifier alphabetName;
     }
 
     class StatementPhrase implements Cobol {

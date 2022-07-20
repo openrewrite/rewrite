@@ -26,7 +26,7 @@ import java.util.List;
 
 public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
 
-    public Cobol visitDocument(Cobol.CompilationUnit compilationUnit, P p) {
+    public Cobol visitCompilationUnit(Cobol.CompilationUnit compilationUnit, P p) {
         Cobol.CompilationUnit d = compilationUnit;
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
@@ -112,7 +112,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Add a = add;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        a = a.withOperation((Cobol) visit(a.getOperation(), p));
+        a = a.withOperation(visit(a.getOperation(), p));
         a = a.withOnSizeError((Cobol.StatementPhrase) visit(a.getOnSizeError(), p));
         if (a.getPadding().getEndAdd() != null) {
             a = a.getPadding().withEndAdd(visitLeftPadded(a.getPadding().getEndAdd(), p));
@@ -128,6 +128,14 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         a = a.getPadding().withTo(visitContainer(a.getPadding().getTo(), p));
         a = a.getPadding().withGiving(visitContainer(a.getPadding().getGiving(), p));
         return a;
+    }
+
+    public Cobol visitConfigurationSection(Cobol.ConfigurationSection configurationSection, P p) {
+        Cobol.ConfigurationSection c = configurationSection;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.getPadding().withParagraphs(visitContainer(c.getPadding().getParagraphs(), p));
+        return c;
     }
 
     public Cobol visitDataDivision(Cobol.DataDivision dataDivision, P p) {
@@ -311,6 +319,64 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return s;
     }
 
+    public Cobol visitSourceComputerDefinition(Cobol.SourceComputerDefinition sourceComputerDefinition, P p) {
+        Cobol.SourceComputerDefinition s = sourceComputerDefinition;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        if (s.getPadding().getDebuggingMode() != null) {
+            s = s.getPadding().withDebuggingMode(visitLeftPadded(s.getPadding().getDebuggingMode(), p));
+        }
+        return s;
+    }
+
+    public Cobol visitObjectComputer(Cobol.ObjectComputer objectComputer, P p) {
+        Cobol.ObjectComputer o = objectComputer;
+        o = o.withPrefix(visitSpace(o.getPrefix(), p));
+        o = o.withMarkers(visitMarkers(o.getMarkers(), p));
+        o = o.getPadding().withWords(visitRightPadded(o.getPadding().getWords(), p));
+        if (o.getPadding().getComputer() != null) {
+            o = o.getPadding().withComputer(visitRightPadded(o.getPadding().getComputer(), p));
+        }
+        return o;
+    }
+
+    public Cobol visitObjectComputerDefinition(Cobol.ObjectComputerDefinition objectComputerDefinition, P p) {
+        Cobol.ObjectComputerDefinition o = objectComputerDefinition;
+        o = o.withPrefix(visitSpace(o.getPrefix(), p));
+        o = o.withMarkers(visitMarkers(o.getMarkers(), p));
+        o = o.getPadding().withSpecifications(visitContainer(o.getPadding().getSpecifications(), p));
+        return o;
+    }
+
+    public Cobol visitValuedObjectComputerClause(Cobol.ValuedObjectComputerClause valuedObjectComputerClause, P p) {
+        Cobol.ValuedObjectComputerClause v = valuedObjectComputerClause;
+        v = v.withPrefix(visitSpace(v.getPrefix(), p));
+        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        v = v.withValue(visit(v.getValue(), p));
+        if (v.getPadding().getUnits() != null) {
+            v = v.getPadding().withUnits(visitLeftPadded(v.getPadding().getUnits(), p));
+        }
+        return v;
+    }
+
+    public Cobol visitCollatingSequenceClause(Cobol.CollatingSequenceClause collatingSequenceClause, P p) {
+        Cobol.CollatingSequenceClause c = collatingSequenceClause;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.getPadding().withAlphabetName(visitContainer(c.getPadding().getAlphabetName(), p));
+        c = c.withAlphanumeric((Cobol.CollatingSequenceAlphabet) visit(c.getAlphanumeric(), p));
+        c = c.withNational((Cobol.CollatingSequenceAlphabet) visit(c.getNational(), p));
+        return c;
+    }
+
+    public Cobol visitCollatingSequenceAlphabet(Cobol.CollatingSequenceAlphabet collatingSequenceAlphabet, P p) {
+        Cobol.CollatingSequenceAlphabet c = collatingSequenceAlphabet;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withAlphabetName((Cobol.Identifier) visit(c.getAlphabetName(), p));
+        return c;
+    }
+
     public Cobol visitStatementPhrase(Cobol.StatementPhrase statementPhrase, P p) {
         Cobol.StatementPhrase s = statementPhrase;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
@@ -323,7 +389,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Stop s = stop;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        s = s.withStatement((Cobol) visit(s.getStatement(), p));
+        s = s.withStatement(visit(s.getStatement(), p));
         return s;
     }
 
@@ -333,5 +399,16 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         w = w.withMarkers(visitMarkers(w.getMarkers(), p));
         w = w.getPadding().withDataDescriptions(visitContainer(w.getPadding().getDataDescriptions(), p));
         return w;
+    }
+
+    public Cobol visitSourceComputer(Cobol.SourceComputer sourceComputer, P p) {
+        Cobol.SourceComputer s = sourceComputer;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withWords(visitRightPadded(s.getPadding().getWords(), p));
+        if (s.getPadding().getComputer() != null) {
+            s = s.getPadding().withComputer(visitRightPadded(s.getPadding().getComputer(), p));
+        }
+        return s;
     }
 }

@@ -106,6 +106,34 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.ConfigurationSection visitConfigurationSection(CobolParser.ConfigurationSectionContext ctx) {
+        return new Cobol.ConfigurationSection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CONFIGURATION(), ctx.SECTION()),
+                convertAllContainer(sourceBefore("."), ctx.configurationSectionParagraph())
+        );
+    }
+
+    @Override
+    public Cobol.SourceComputer visitSourceComputerParagraph(CobolParser.SourceComputerParagraphContext ctx) {
+        return new Cobol.SourceComputer(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                padRight(words(ctx.SOURCE_COMPUTER()), sourceBefore(".")),
+                ctx.computerName() == null ? null : padRight(new Cobol.SourceComputerDefinition(
+                        randomId(),
+                        prefix(ctx.computerName()),
+                        Markers.EMPTY,
+                        skip(ctx.computerName().getText()),
+                        padLeft(whitespace(), words(ctx.WITH(), ctx.DEBUGGING(), ctx.MODE()))
+                ), sourceBefore("."))
+        );
+    }
+
+    @Override
     public Cobol.Add visitAddStatement(CobolParser.AddStatementContext ctx) {
         return new Cobol.Add(
                 randomId(),
@@ -276,7 +304,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Cobol.EnvironmentDivision visitEnvironmentDivision(CobolParser.EnvironmentDivisionContext ctx) {
-        return (Cobol.EnvironmentDivision) super.visitEnvironmentDivision(ctx);
+        return new Cobol.EnvironmentDivision(
+                randomId(),
+                sourceBefore(ctx.ENVIRONMENT().getText()),
+                Markers.EMPTY,
+                words(ctx.ENVIRONMENT(), ctx.DIVISION()),
+                convertAllContainer(sourceBefore("."), ctx.environmentDivisionBody())
+        );
     }
 
     @Override

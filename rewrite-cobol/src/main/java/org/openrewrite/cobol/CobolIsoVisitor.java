@@ -142,4 +142,44 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.Roundable visitRoundable(Cobol.Roundable roundable, P p) {
         return (Cobol.Roundable) super.visitRoundable(roundable, p);
     }
+
+    @Override
+    public Cobol.ConfigurationSection visitConfigurationSection(Cobol.ConfigurationSection configurationSection, P p) {
+        return (Cobol.ConfigurationSection) super.visitConfigurationSection(configurationSection, p);
+    }
+
+    @Override
+    public Cobol.SourceComputer visitSourceComputer(Cobol.SourceComputer sourceComputer, P p) {
+        return (Cobol.SourceComputer) super.visitSourceComputer(sourceComputer, p);
+    }
+
+    @Override
+    public Cobol.SourceComputerDefinition visitSourceComputerDefinition(Cobol.SourceComputerDefinition sourceComputerDefinition, P p) {
+        return (Cobol.SourceComputerDefinition) super.visitSourceComputerDefinition(sourceComputerDefinition, p);
+    }
+
+    @Override
+    public Cobol.ObjectComputer visitObjectComputer(Cobol.ObjectComputer objectComputer, P p) {
+        return (Cobol.ObjectComputer) super.visitObjectComputer(objectComputer, p);
+    }
+
+    @Override
+    public Cobol.ObjectComputerDefinition visitObjectComputerDefinition(Cobol.ObjectComputerDefinition objectComputerDefinition, P p) {
+        return (Cobol.ObjectComputerDefinition) super.visitObjectComputerDefinition(objectComputerDefinition, p);
+    }
+
+    @Override
+    public Cobol.ValuedObjectComputerClause visitValuedObjectComputerClause(Cobol.ValuedObjectComputerClause valuedObjectComputerClause, P p) {
+        return (Cobol.ValuedObjectComputerClause) super.visitValuedObjectComputerClause(valuedObjectComputerClause, p);
+    }
+
+    @Override
+    public Cobol.CollatingSequenceClause visitCollatingSequenceClause(Cobol.CollatingSequenceClause collatingSequenceClause, P p) {
+        return (Cobol.CollatingSequenceClause) super.visitCollatingSequenceClause(collatingSequenceClause, p);
+    }
+
+    @Override
+    public Cobol.CollatingSequenceAlphabet visitCollatingSequenceAlphabet(Cobol.CollatingSequenceAlphabet collatingSequenceAlphabet, P p) {
+        return (Cobol.CollatingSequenceAlphabet) super.visitCollatingSequenceAlphabet(collatingSequenceAlphabet, p);
+    }
 }

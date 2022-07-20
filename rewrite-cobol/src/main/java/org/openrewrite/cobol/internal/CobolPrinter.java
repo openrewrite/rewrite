@@ -84,12 +84,13 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public Cobol visitDocument(Cobol.CompilationUnit compilationUnit, PrintOutputCapture<P> p) {
+    public Cobol visitCompilationUnit(Cobol.CompilationUnit compilationUnit, PrintOutputCapture<P> p) {
         visitSpace(compilationUnit.getPrefix(), p);
         visitMarkers(compilationUnit.getMarkers(), p);
         for (Cobol.ProgramUnit programUnit : compilationUnit.getProgramUnits()) {
             visit(programUnit, p);
         }
+        p.append(compilationUnit.getEof());
         return compilationUnit;
     }
 
@@ -201,7 +202,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(environmentDivision.getPrefix(), p);
         visitMarkers(environmentDivision.getMarkers(), p);
         p.append(environmentDivision.getWords());
-        visitContainer("", environmentDivision.getPadding().getBody(), "", "", p);
+        visitContainer(".", environmentDivision.getPadding().getBody(), "", "", p);
         return environmentDivision;
     }
 
@@ -300,5 +301,72 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(roundable.getIdentifier(), p);
         visitLeftPadded("", roundable.getPadding().getRounded(), p);
         return roundable;
+    }
+
+    public Cobol visitConfigurationSection(Cobol.ConfigurationSection configurationSection, PrintOutputCapture<P> p) {
+        visitSpace(configurationSection.getPrefix(), p);
+        visitMarkers(configurationSection.getMarkers(), p);
+        p.append(configurationSection.getWords());
+        visitContainer(".", configurationSection.getPadding().getParagraphs(), "", "", p);
+        return configurationSection;
+    }
+
+    public Cobol visitSourceComputerDefinition(Cobol.SourceComputerDefinition sourceComputerDefinition, PrintOutputCapture<P> p) {
+        visitSpace(sourceComputerDefinition.getPrefix(), p);
+        visitMarkers(sourceComputerDefinition.getMarkers(), p);
+        p.append(sourceComputerDefinition.getComputerName());
+        visitLeftPadded("", sourceComputerDefinition.getPadding().getDebuggingMode(), p);
+        return sourceComputerDefinition;
+    }
+
+    public Cobol visitObjectComputer(Cobol.ObjectComputer objectComputer, PrintOutputCapture<P> p) {
+        visitSpace(objectComputer.getPrefix(), p);
+        visitMarkers(objectComputer.getMarkers(), p);
+        visitRightPadded(objectComputer.getPadding().getWords(), "", p);
+        visitRightPadded(objectComputer.getPadding().getComputer(), "", p);
+        return objectComputer;
+    }
+
+    public Cobol visitObjectComputerDefinition(Cobol.ObjectComputerDefinition objectComputerDefinition, PrintOutputCapture<P> p) {
+        visitSpace(objectComputerDefinition.getPrefix(), p);
+        visitMarkers(objectComputerDefinition.getMarkers(), p);
+        p.append(objectComputerDefinition.getComputerName());
+        visitContainer("", objectComputerDefinition.getPadding().getSpecifications(), "", "", p);
+        return objectComputerDefinition;
+    }
+
+    public Cobol visitValuedObjectComputerClause(Cobol.ValuedObjectComputerClause valuedObjectComputerClause, PrintOutputCapture<P> p) {
+        visitSpace(valuedObjectComputerClause.getPrefix(), p);
+        visitMarkers(valuedObjectComputerClause.getMarkers(), p);
+        p.append(valuedObjectComputerClause.getWords());
+        visit(valuedObjectComputerClause.getValue(), p);
+        visitLeftPadded("", valuedObjectComputerClause.getPadding().getUnits(), p);
+        return valuedObjectComputerClause;
+    }
+
+    public Cobol visitCollatingSequenceClause(Cobol.CollatingSequenceClause collatingSequenceClause, PrintOutputCapture<P> p) {
+        visitSpace(collatingSequenceClause.getPrefix(), p);
+        visitMarkers(collatingSequenceClause.getMarkers(), p);
+        p.append(collatingSequenceClause.getWords());
+        visitContainer("", collatingSequenceClause.getPadding().getAlphabetName(), "", "", p);
+        visit(collatingSequenceClause.getAlphanumeric(), p);
+        visit(collatingSequenceClause.getNational(), p);
+        return collatingSequenceClause;
+    }
+
+    public Cobol visitCollatingSequenceAlphabet(Cobol.CollatingSequenceAlphabet collatingSequenceAlphabet, PrintOutputCapture<P> p) {
+        visitSpace(collatingSequenceAlphabet.getPrefix(), p);
+        visitMarkers(collatingSequenceAlphabet.getMarkers(), p);
+        p.append(collatingSequenceAlphabet.getWords());
+        visit(collatingSequenceAlphabet.getAlphabetName(), p);
+        return collatingSequenceAlphabet;
+    }
+
+    public Cobol visitSourceComputer(Cobol.SourceComputer sourceComputer, PrintOutputCapture<P> p) {
+        visitSpace(sourceComputer.getPrefix(), p);
+        visitMarkers(sourceComputer.getMarkers(), p);
+        visitRightPadded(sourceComputer.getPadding().getWords(), ".", p);
+        visitRightPadded(sourceComputer.getPadding().getComputer(), ".", p);
+        return sourceComputer;
     }
 }

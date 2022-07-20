@@ -74,10 +74,24 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
+    fun ic109aPart() = rewriteRun(
+        cobol(
+            """
+                IDENTIFICATION DIVISION.                                       
+                PROGRAM-ID.                                                    
+                    IC109A.                                                    
+                ENVIRONMENT DIVISION.                                          
+                CONFIGURATION SECTION.                                         
+                SOURCE-COMPUTER.                                               
+                    XXXXX082.                                                  
+            """
+        )
+    )
+
+    @Test
     fun ic109a() = rewriteRun(
         cobol(
             """
-                HEADER,COBOL,IC108A,SUBRTN,IC109A                              
                 IDENTIFICATION DIVISION.                                       
                 PROGRAM-ID.                                                    
                     IC109A.                                                    
@@ -122,7 +136,7 @@ class CobolBasicsTest : RewriteTest {
                     MOVE WS1 TO DN9.                                           
                 EXIT-IC109.                                                    
                     EXIT PROGRAM.                                              
-                END-OF,IC109A                                                  
+                END-OF
             """
         )
     )
