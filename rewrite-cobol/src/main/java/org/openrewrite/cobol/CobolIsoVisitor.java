@@ -207,4 +207,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.SpecialNames visitSpecialNames(Cobol.SpecialNames specialNames, P p) {
         return (Cobol.SpecialNames) super.visitSpecialNames(specialNames, p);
     }
+
+    @Override
+    public Cobol.ChannelClause visitChannelClause(Cobol.ChannelClause channelClause, P p) {
+        return (Cobol.ChannelClause) super.visitChannelClause(channelClause, p);
+    }
+
+    @Override
+    public Cobol.CurrencyClause visitCurrencyClause(Cobol.CurrencyClause currencyClause, P p) {
+        return (Cobol.CurrencyClause) super.visitCurrencyClause(currencyClause, p);
+    }
+
+    @Override
+    public Cobol.DecimalPointClause visitDecimalPointClause(Cobol.DecimalPointClause decimalPointClause, P p) {
+        return (Cobol.DecimalPointClause) super.visitDecimalPointClause(decimalPointClause, p);
+    }
+
+    @Override
+    public Cobol.DefaultComputationalSignClause visitDefaultComputationalSignClause(Cobol.DefaultComputationalSignClause defaultComputationalSignClause, P p) {
+        return (Cobol.DefaultComputationalSignClause) super.visitDefaultComputationalSignClause(defaultComputationalSignClause, p);
+    }
+
+    @Override
+    public Cobol.DefaultDisplaySignClause visitDefaultDisplaySignClause(Cobol.DefaultDisplaySignClause defaultDisplaySignClause, P p) {
+        return (Cobol.DefaultDisplaySignClause) super.visitDefaultDisplaySignClause(defaultDisplaySignClause, p);
+    }
 }

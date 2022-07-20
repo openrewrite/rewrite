@@ -108,6 +108,64 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.ChannelClause visitChannelClause(CobolParser.ChannelClauseContext ctx) {
+        return new Cobol.ChannelClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CHANNEL()),
+                (Cobol.Literal) visit(ctx.integerLiteral()),
+                padLeft(ctx.IS()),
+                (Cobol.Identifier) visit(ctx.mnemonicName())
+        );
+    }
+
+    @Override
+    public Cobol.CurrencyClause visitCurrencySignClause(CobolParser.CurrencySignClauseContext ctx) {
+        return new Cobol.CurrencyClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CURRENCY(), ctx.SIGN(), ctx.IS()),
+                (Cobol.Literal) visit(ctx.literal(0)),
+                ctx.literal().size() > 1 ? padLeft(whitespace(), words(ctx.WITH(), ctx.PICTURE(), ctx.SYMBOL())) : null,
+                ctx.literal().size() > 1 ? (Cobol.Literal) visit(ctx.literal(1)) : null
+        );
+    }
+
+    @Override
+    public Cobol.DecimalPointClause visitDecimalPointClause(CobolParser.DecimalPointClauseContext ctx) {
+        return new Cobol.DecimalPointClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DECIMAL_POINT(), ctx.IS(), ctx.COMMA())
+        );
+    }
+
+    @Override
+    public Cobol.DefaultComputationalSignClause visitDefaultComputationalSignClause(CobolParser.DefaultComputationalSignClauseContext ctx) {
+        return new Cobol.DefaultComputationalSignClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DEFAULT(), ctx.COMPUTATIONAL(), ctx.COMP(), ctx.SIGN(), ctx.IS(),
+                        ctx.LEADING(), ctx.TRAILING(), ctx.SEPARATE(), ctx.CHARACTER())
+        );
+    }
+
+    @Override
+    public Cobol.DefaultDisplaySignClause visitDefaultDisplaySignClause(CobolParser.DefaultDisplaySignClauseContext ctx) {
+        return new Cobol.DefaultDisplaySignClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DEFAULT_DISPLAY(), ctx.SIGN(), ctx.IS(), ctx.LEADING(), ctx.TRAILING(),
+                        ctx.SEPARATE(), ctx.CHARACTER())
+        );
+    }
+
+    @Override
     public Cobol.SpecialNames visitSpecialNamesParagraph(CobolParser.SpecialNamesParagraphContext ctx) {
         return new Cobol.SpecialNames(
                 randomId(),

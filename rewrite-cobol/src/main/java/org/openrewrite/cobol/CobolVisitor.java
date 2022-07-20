@@ -457,4 +457,49 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         s = s.getPadding().withClauses(visitContainer(s.getPadding().getClauses(), p));
         return s;
     }
+
+    public Cobol visitChannelClause(Cobol.ChannelClause channelClause, P p) {
+        Cobol.ChannelClause c = channelClause;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withLiteral((Cobol.Literal) visit(c.getLiteral(), p));
+        if (c.getPadding().getIs() != null) {
+            c = c.getPadding().withIs(visitLeftPadded(c.getPadding().getIs(), p));
+        }
+        c = c.withMnemonicName((Cobol.Identifier) visit(c.getMnemonicName(), p));
+        return c;
+    }
+
+    public Cobol visitCurrencyClause(Cobol.CurrencyClause currencyClause, P p) {
+        Cobol.CurrencyClause c = currencyClause;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withLiteral((Cobol.Literal) visit(c.getLiteral(), p));
+        if (c.getPadding().getPictureSymbol() != null) {
+            c = c.getPadding().withPictureSymbol(visitLeftPadded(c.getPadding().getPictureSymbol(), p));
+        }
+        c = c.withPictureSymbolLiteral((Cobol.Literal) visit(c.getPictureSymbolLiteral(), p));
+        return c;
+    }
+
+    public Cobol visitDecimalPointClause(Cobol.DecimalPointClause decimalPointClause, P p) {
+        Cobol.DecimalPointClause d = decimalPointClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDefaultComputationalSignClause(Cobol.DefaultComputationalSignClause defaultComputationalSignClause, P p) {
+        Cobol.DefaultComputationalSignClause d = defaultComputationalSignClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDefaultDisplaySignClause(Cobol.DefaultDisplaySignClause defaultDisplaySignClause, P p) {
+        Cobol.DefaultDisplaySignClause d = defaultDisplaySignClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
 }

@@ -415,4 +415,45 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         }
         return specialNames;
     }
+
+    public Cobol visitChannelClause(Cobol.ChannelClause channelClause, PrintOutputCapture<P> p) {
+        visitSpace(channelClause.getPrefix(), p);
+        visitMarkers(channelClause.getMarkers(), p);
+        p.append(channelClause.getWords());
+        visit(channelClause.getLiteral(), p);
+        visitLeftPadded("", channelClause.getPadding().getIs(), p);
+        visit(channelClause.getMnemonicName(), p);
+        return channelClause;
+    }
+
+    public Cobol visitCurrencyClause(Cobol.CurrencyClause currencyClause, PrintOutputCapture<P> p) {
+        visitSpace(currencyClause.getPrefix(), p);
+        visitMarkers(currencyClause.getMarkers(), p);
+        p.append(currencyClause.getWords());
+        visit(currencyClause.getLiteral(), p);
+        visitLeftPadded("", currencyClause.getPadding().getPictureSymbol(), p);
+        visit(currencyClause.getPictureSymbolLiteral(), p);
+        return currencyClause;
+    }
+
+    public Cobol visitDecimalPointClause(Cobol.DecimalPointClause decimalPointClause, PrintOutputCapture<P> p) {
+        visitSpace(decimalPointClause.getPrefix(), p);
+        visitMarkers(decimalPointClause.getMarkers(), p);
+        p.append(decimalPointClause.getWords());
+        return decimalPointClause;
+    }
+
+    public Cobol visitDefaultComputationalSignClause(Cobol.DefaultComputationalSignClause defaultComputationalSignClause, PrintOutputCapture<P> p) {
+        visitSpace(defaultComputationalSignClause.getPrefix(), p);
+        visitMarkers(defaultComputationalSignClause.getMarkers(), p);
+        p.append(defaultComputationalSignClause.getWords());
+        return defaultComputationalSignClause;
+    }
+
+    public Cobol visitDefaultDisplaySignClause(Cobol.DefaultDisplaySignClause defaultDisplaySignClause, PrintOutputCapture<P> p) {
+        visitSpace(defaultDisplaySignClause.getPrefix(), p);
+        visitMarkers(defaultDisplaySignClause.getMarkers(), p);
+        p.append(defaultDisplaySignClause.getWords());
+        return defaultDisplaySignClause;
+    }
 }

@@ -82,6 +82,16 @@ public interface Cobol {
         CobolContainer<Literal> literals;
     }
 
+    class ChannelClause implements Cobol {
+        String words;
+        Literal literal;
+
+        @Nullable
+        CobolLeftPadded<String> is;
+
+        Identifier mnemonicName;
+    }
+
     class CollatingSequenceClause implements Cobol {
         String words;
         CobolContainer<Identifier> alphabetName;
@@ -103,6 +113,17 @@ public interface Cobol {
         CobolContainer<Cobol> paragraphs;
     }
 
+    class CurrencyClause implements Cobol {
+        String words;
+        Literal literal;
+
+        @Nullable
+        CobolLeftPadded<String> pictureSymbol;
+
+        @Nullable
+        Literal pictureSymbolLiteral;
+    }
+
     class DataDivision implements Statement {
         String words;
         CobolContainer<DataDivisionSection> sections;
@@ -122,20 +143,16 @@ public interface Cobol {
         CobolContainer<Picture> pictures;
     }
 
-    class Picture implements Cobol {
-        String chars;
+    class DecimalPointClause implements Cobol {
+        String words;
+    }
 
-        @Nullable
-        CobolLeftPadded<String> cardinalitySource;
+    class DefaultComputationalSignClause implements Cobol {
+        String words;
+    }
 
-        @Nullable
-        public String getCardinality() {
-            return cardinalitySource == null ? null : cardinalitySource
-                    .getElement()
-                    .replace("(", "")
-                    .replace(")", "")
-                    .trim();
-        }
+    class DefaultDisplaySignClause implements Cobol {
+        String words;
     }
 
     class Display implements Statement {
@@ -195,6 +212,22 @@ public interface Cobol {
 
     class Paragraphs implements Cobol {
         CobolContainer<Sentence> sentences;
+    }
+
+    class Picture implements Cobol {
+        String chars;
+
+        @Nullable
+        CobolLeftPadded<String> cardinalitySource;
+
+        @Nullable
+        public String getCardinality() {
+            return cardinalitySource == null ? null : cardinalitySource
+                    .getElement()
+                    .replace("(", "")
+                    .replace(")", "")
+                    .trim();
+        }
     }
 
     class ProgramIdParagraph implements Cobol {
