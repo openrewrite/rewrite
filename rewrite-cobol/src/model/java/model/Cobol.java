@@ -44,6 +44,22 @@ public interface Cobol {
         CobolContainer<Name> giving;
     }
 
+    class CollatingSequenceClause implements Cobol {
+        String words;
+        CobolContainer<Identifier> alphabetName;
+
+        @Nullable
+        CollatingSequenceAlphabet alphanumeric;
+
+        @Nullable
+        CollatingSequenceAlphabet national;
+    }
+
+    class CollatingSequenceAlphabet implements Cobol {
+        String words;
+        Identifier alphabetName;
+    }
+
     class ConfigurationSection implements Cobol {
         String words;
         CobolContainer<Cobol> paragraphs;
@@ -118,6 +134,18 @@ public interface Cobol {
         CobolLeftPadded<ProgramIdParagraph> programIdParagraph;
     }
 
+    class ObjectComputer implements Cobol {
+        CobolRightPadded<String> words;
+
+        @Nullable
+        CobolRightPadded<ObjectComputerDefinition> computer;
+    }
+
+    class ObjectComputerDefinition implements Cobol {
+        String computerName;
+        CobolContainer<Cobol> specifications;
+    }
+
     class ProcedureDivision implements Cobol {
         String words;
         CobolLeftPadded<ProcedureDivisionBody> body;
@@ -129,22 +157,6 @@ public interface Cobol {
 
     class Paragraphs implements Cobol {
         CobolContainer<Sentence> sentences;
-    }
-
-    class Roundable implements Name {
-        Identifier identifier;
-
-        @Nullable
-        CobolLeftPadded<String> rounded;
-
-        @Override
-        public String getSimpleName() {
-            return identifier.getSimpleName();
-        }
-    }
-
-    class Sentence implements Cobol {
-        List<Statement> statements;
     }
 
     class ProgramIdParagraph implements Cobol {
@@ -174,6 +186,22 @@ public interface Cobol {
 
         @Nullable
         CobolRightPadded<EndProgram> endProgram;
+    }
+
+    class Roundable implements Name {
+        Identifier identifier;
+
+        @Nullable
+        CobolLeftPadded<String> rounded;
+
+        @Override
+        public String getSimpleName() {
+            return identifier.getSimpleName();
+        }
+    }
+
+    class Sentence implements Cobol {
+        List<Statement> statements;
     }
 
     class Set implements Statement {
@@ -211,16 +239,14 @@ public interface Cobol {
         CobolLeftPadded<String> debuggingMode;
     }
 
-    class ObjectComputer implements Cobol {
-        CobolRightPadded<String> words;
-
-        @Nullable
-        CobolRightPadded<ObjectComputerDefinition> computer;
+    class StatementPhrase implements Cobol {
+        String phrase;
+        CobolContainer<Statement> statement;
     }
 
-    class ObjectComputerDefinition implements Cobol {
-        String computerName;
-        CobolContainer<Cobol> specifications;
+    class Stop implements Statement {
+        String words;
+        Cobol statement;
     }
 
     class ValuedObjectComputerClause implements Cobol {
@@ -239,32 +265,6 @@ public interface Cobol {
             SegmentLimit,
             CharacterSet
         }
-    }
-
-    class CollatingSequenceClause implements Cobol {
-        String words;
-        CobolContainer<Identifier> alphabetName;
-
-        @Nullable
-        CollatingSequenceAlphabet alphanumeric;
-
-        @Nullable
-        CollatingSequenceAlphabet national;
-    }
-
-    class CollatingSequenceAlphabet implements Cobol {
-        String words;
-        Identifier alphabetName;
-    }
-
-    class StatementPhrase implements Cobol {
-        String phrase;
-        CobolContainer<Statement> statement;
-    }
-
-    class Stop implements Statement {
-        String words;
-        Cobol statement;
     }
 
     class WorkingStorageSection implements DataDivisionSection {
