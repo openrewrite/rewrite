@@ -33,3 +33,9 @@ edge.BranchFalse {
     text-color: red;
     text-size: 15;
 }
+
+sprite {
+    fill-mode: none;
+    text-size:12;
+    size-mode: fit;
+}

@@ -1,9 +1,7 @@
 package org.openrewrite.java.controlflow;
 
-import lombok.Builder;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
-import org.graphstream.graph.implementations.SingleGraph;
 import org.graphstream.ui.swing_viewer.SwingViewer;
 import org.graphstream.ui.swing_viewer.ViewPanel;
 import org.graphstream.ui.view.Viewer;
@@ -29,8 +27,15 @@ public class GraphShower {
         System.setProperty("org.graphstream.ui", "swing");
         System.setProperty("sun.java2d.uiScale", "1.0");
 
-        graph = ControlFlowGraph.buildGraph(nodeToIndex);
-        nodeToNode = ControlFlowGraph.getAbstractToVisualNodeMapping();
+        ControlFlowGraph cfg = new ControlFlowGraph.ControlFlowGraphBuilder()
+                .nodeToIndex(nodeToIndex)
+                .expanded(true)
+                .build();
+
+        graph = cfg.loadGraph();
+
+//        graph = ControlFlowGraph.buildGraph(nodeToIndex);
+        nodeToNode = cfg.getAbstractToVisualNodeMapping();
         loop = true;
     }
 

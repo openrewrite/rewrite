@@ -20,6 +20,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.dataflow.analysis.DataFlowGraph;
 import org.openrewrite.java.dataflow.analysis.SinkFlow;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -69,6 +70,10 @@ public class FindLocalFlowPaths extends JavaIsoVisitor<ExecutionContext> {
                 List<SinkFlow<?, ?>> flowGraphs = getCursor().getNearestMessage(FLOW_GRAPHS);
                 assert flowGraphs != null;
                 flowGraphs.add(flow);
+                // BFS to find all reachable nodes
+                DataFlowGraph g = new DataFlowGraph(flow);
+                g.getFlows();
+
             }
         });
         return expression;
