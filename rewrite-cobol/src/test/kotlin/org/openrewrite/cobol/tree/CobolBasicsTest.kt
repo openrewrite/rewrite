@@ -74,7 +74,7 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
-    fun ic109aPart() = rewriteRun(
+    fun environmentDivision() = rewriteRun(
         cobol(
             """
                 IDENTIFICATION DIVISION.
@@ -91,6 +91,23 @@ class CobolBasicsTest : RewriteTest {
                 SPECIAL-NAMES.
                     ALPHABET PRG-COLL-SEQ IS
                     STANDARD-2.
+            """
+        )
+    )
+
+    @Test
+    fun inputOutputSection() = rewriteRun(
+        cobol(
+            """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID.
+                    IC109A.
+                INPUT-OUTPUT SECTION.
+                FILE-CONTROL.
+                    SELECT PRINT-FILE ASSIGN TO
+                    XXXXX055.
+                    SELECT SEQ-FILE ASSIGN TO
+                    XXXXX014.
             """
         )
     )
