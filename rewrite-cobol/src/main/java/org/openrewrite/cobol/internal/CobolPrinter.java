@@ -456,4 +456,53 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(defaultDisplaySignClause.getWords());
         return defaultDisplaySignClause;
     }
+
+    public Cobol visitClassClause(Cobol.ClassClause classClause, PrintOutputCapture<P> p) {
+        visitSpace(classClause.getPrefix(), p);
+        visitMarkers(classClause.getMarkers(), p);
+        p.append(classClause.getWords());
+        visit(classClause.getClassName(), p);
+        visitContainer("", classClause.getPadding().getThroughs(), "", "", p);
+        return classClause;
+    }
+
+    public Cobol visitClassClauseThrough(Cobol.ClassClauseThrough classClauseThrough, PrintOutputCapture<P> p) {
+        visitSpace(classClauseThrough.getPrefix(), p);
+        visitMarkers(classClauseThrough.getMarkers(), p);
+        visitLeftPadded("", classClauseThrough.getPadding().getThrough(), p);
+        return classClauseThrough;
+    }
+
+    public Cobol visitOdtClause(Cobol.OdtClause odtClause, PrintOutputCapture<P> p) {
+        visitSpace(odtClause.getPrefix(), p);
+        visitMarkers(odtClause.getMarkers(), p);
+        p.append(odtClause.getWords());
+        visit(odtClause.getMnemonicName(), p);
+        return odtClause;
+    }
+
+    public Cobol visitReserveNetworkClause(Cobol.ReserveNetworkClause reserveNetworkClause, PrintOutputCapture<P> p) {
+        visitSpace(reserveNetworkClause.getPrefix(), p);
+        visitMarkers(reserveNetworkClause.getMarkers(), p);
+        p.append(reserveNetworkClause.getWords());
+        return reserveNetworkClause;
+    }
+
+    public Cobol visitSymbolicCharacter(Cobol.SymbolicCharacter symbolicCharacter, PrintOutputCapture<P> p) {
+        visitSpace(symbolicCharacter.getPrefix(), p);
+        visitMarkers(symbolicCharacter.getMarkers(), p);
+        visitContainer("", symbolicCharacter.getPadding().getSymbols(), "", "", p);
+        visitContainer("", symbolicCharacter.getPadding().getLiterals(), "", "", p);
+        return symbolicCharacter;
+    }
+
+    public Cobol visitSymbolicCharactersClause(Cobol.SymbolicCharactersClause symbolicCharactersClause, PrintOutputCapture<P> p) {
+        visitSpace(symbolicCharactersClause.getPrefix(), p);
+        visitMarkers(symbolicCharactersClause.getMarkers(), p);
+        p.append(symbolicCharactersClause.getWords());
+        visitContainer("", symbolicCharactersClause.getPadding().getSymbols(), "", "", p);
+        visitLeftPadded("", symbolicCharactersClause.getPadding().getInAlphabet(), p);
+        visit(symbolicCharactersClause.getAlphabetName(), p);
+        return symbolicCharactersClause;
+    }
 }

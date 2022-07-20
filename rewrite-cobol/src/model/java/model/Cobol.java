@@ -92,6 +92,22 @@ public interface Cobol {
         Identifier mnemonicName;
     }
 
+    class ClassClause implements Cobol {
+        String words;
+        Identifier className;
+        CobolContainer<ClassClauseThrough> throughs;
+    }
+
+    class ClassClauseThrough implements Cobol {
+        Name from;
+
+        @Nullable
+        CobolLeftPadded<String> through;
+
+        @Nullable
+        Name to;
+    }
+
     class CollatingSequenceClause implements Cobol {
         String words;
         CobolContainer<Identifier> alphabetName;
@@ -201,6 +217,11 @@ public interface Cobol {
         CobolContainer<Cobol> specifications;
     }
 
+    class OdtClause implements Cobol {
+        String words;
+        Identifier mnemonicName;
+    }
+
     class ProcedureDivision implements Cobol {
         String words;
         CobolLeftPadded<ProcedureDivisionBody> body;
@@ -257,6 +278,10 @@ public interface Cobol {
 
         @Nullable
         CobolRightPadded<EndProgram> endProgram;
+    }
+
+    class ReserveNetworkClause implements Cobol {
+        String words;
     }
 
     class Roundable implements Name {
@@ -325,6 +350,22 @@ public interface Cobol {
     class Stop implements Statement {
         String words;
         Cobol statement;
+    }
+
+    class SymbolicCharacter implements Cobol {
+        CobolContainer<Identifier> symbols;
+        CobolContainer<Literal> literals;
+    }
+
+    class SymbolicCharactersClause implements Cobol {
+        String words;
+        CobolContainer<SymbolicCharacter> symbols;
+
+        @Nullable
+        CobolLeftPadded<String> inAlphabet;
+
+        @Nullable
+        Identifier alphabetName;
     }
 
     class ValuedObjectComputerClause implements Cobol {

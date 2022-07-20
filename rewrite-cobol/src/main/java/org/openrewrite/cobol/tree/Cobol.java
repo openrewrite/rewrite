@@ -719,7 +719,7 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class CurrencyClause implements Cobol {
+    class ClassClause implements Cobol {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -743,31 +743,22 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        Literal literal;
+        Identifier className;
 
-        @Nullable
-        CobolLeftPadded<String> pictureSymbol;
-
-        @Getter
-        @Nullable
-        @With
-        Literal pictureSymbolLiteral;
+        CobolContainer<ClassClauseThrough> throughs;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitCurrencyClause(this, p);
+            return v.visitClassClause(this, p);
         }
 
-        @Nullable
-        public String getPictureSymbol() {
-            return pictureSymbol == null ? null : pictureSymbol.getElement();
+        public List<Cobol.ClassClauseThrough> getThroughs() {
+            return throughs.getElements();
         }
 
-        public CurrencyClause withPictureSymbol(@Nullable String pictureSymbol) {
-            if (pictureSymbol == null) {
-                return this.pictureSymbol == null ? this : new CurrencyClause(id, prefix, markers, words, literal, null, pictureSymbolLiteral);
-            }
-            return getPadding().withPictureSymbol(CobolLeftPadded.withElement(this.pictureSymbol, pictureSymbol));
+        public ClassClause withThroughs(List<Cobol.ClassClauseThrough> throughs) {
+            return getPadding().withThroughs(this.throughs.getPadding().withElements(CobolRightPadded.withElements(
+                    this.throughs.getPadding().getElements(), throughs)));
         }
 
         public Padding getPadding() {
@@ -787,67 +778,97 @@ public interface Cobol extends Tree {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final CurrencyClause t;
+            private final ClassClause t;
+
+            public CobolContainer<Cobol.ClassClauseThrough> getThroughs() {
+                return t.throughs;
+            }
+
+            public ClassClause withThroughs(CobolContainer<Cobol.ClassClauseThrough> throughs) {
+                return t.throughs == throughs ? t : new ClassClause(t.padding, t.id, t.prefix, t.markers, t.words, t.className, throughs);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ClassClauseThrough implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Name from;
+
+        @Nullable
+        CobolLeftPadded<String> through;
+
+        @Getter
+        @Nullable
+        @With
+        Name to;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitClassClauseThrough(this, p);
+        }
+
+        @Nullable
+        public String getThrough() {
+            return through == null ? null : through.getElement();
+        }
+
+        public ClassClauseThrough withThrough(@Nullable String through) {
+            if (through == null) {
+                return this.through == null ? this : new ClassClauseThrough(id, prefix, markers, from, null, to);
+            }
+            return getPadding().withThrough(CobolLeftPadded.withElement(this.through, through));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ClassClauseThrough t;
 
             @Nullable
-            public CobolLeftPadded<String> getPictureSymbol() {
-                return t.pictureSymbol;
+            public CobolLeftPadded<String> getThrough() {
+                return t.through;
             }
 
-            public CurrencyClause withPictureSymbol(@Nullable CobolLeftPadded<String> pictureSymbol) {
-                return t.pictureSymbol == pictureSymbol ? t : new CurrencyClause(t.padding, t.id, t.prefix, t.markers, t.words, t.literal, pictureSymbol, t.pictureSymbolLiteral);
+            public ClassClauseThrough withThrough(@Nullable CobolLeftPadded<String> through) {
+                return t.through == through ? t : new ClassClauseThrough(t.padding, t.id, t.prefix, t.markers, t.from, through, t.to);
             }
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class DecimalPointClause implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String words;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitDecimalPointClause(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class DefaultComputationalSignClause implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String words;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitDefaultComputationalSignClause(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class DefaultDisplaySignClause implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String words;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitDefaultDisplaySignClause(this, p);
         }
     }
 
@@ -1019,6 +1040,92 @@ public interface Cobol extends Tree {
 
             public ConfigurationSection withParagraphs(CobolContainer<Cobol> paragraphs) {
                 return t.paragraphs == paragraphs ? t : new ConfigurationSection(t.padding, t.id, t.prefix, t.markers, t.words, paragraphs);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class CurrencyClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        @Getter
+        @With
+        Literal literal;
+
+        @Nullable
+        CobolLeftPadded<String> pictureSymbol;
+
+        @Getter
+        @Nullable
+        @With
+        Literal pictureSymbolLiteral;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitCurrencyClause(this, p);
+        }
+
+        @Nullable
+        public String getPictureSymbol() {
+            return pictureSymbol == null ? null : pictureSymbol.getElement();
+        }
+
+        public CurrencyClause withPictureSymbol(@Nullable String pictureSymbol) {
+            if (pictureSymbol == null) {
+                return this.pictureSymbol == null ? this : new CurrencyClause(id, prefix, markers, words, literal, null, pictureSymbolLiteral);
+            }
+            return getPadding().withPictureSymbol(CobolLeftPadded.withElement(this.pictureSymbol, pictureSymbol));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final CurrencyClause t;
+
+            @Nullable
+            public CobolLeftPadded<String> getPictureSymbol() {
+                return t.pictureSymbol;
+            }
+
+            public CurrencyClause withPictureSymbol(@Nullable CobolLeftPadded<String> pictureSymbol) {
+                return t.pictureSymbol == pictureSymbol ? t : new CurrencyClause(t.padding, t.id, t.prefix, t.markers, t.words, t.literal, pictureSymbol, t.pictureSymbolLiteral);
             }
         }
     }
@@ -1263,89 +1370,54 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class Picture implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @Getter
+    @With
+    class DecimalPointClause implements Cobol {
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String chars;
-
-        @Nullable
-        CobolLeftPadded<String> cardinalitySource;
-
-        @Nullable
-        public String getCardinality() {
-            return cardinalitySource == null ? null : cardinalitySource
-                    .getElement()
-                    .replace("(", "")
-                    .replace(")", "")
-                    .trim();
-        }
+        String words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitPicture(this, p);
+            return v.visitDecimalPointClause(this, p);
         }
+    }
 
-        @Nullable
-        public String getCardinalitySource() {
-            return cardinalitySource == null ? null : cardinalitySource.getElement();
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class DefaultComputationalSignClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDefaultComputationalSignClause(this, p);
         }
+    }
 
-        public Picture withCardinalitySource(@Nullable String cardinalitySource) {
-            if (cardinalitySource == null) {
-                return this.cardinalitySource == null ? this : new Picture(id, prefix, markers, chars, null);
-            }
-            return getPadding().withCardinalitySource(CobolLeftPadded.withElement(this.cardinalitySource, cardinalitySource));
-        }
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class DefaultDisplaySignClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
 
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
+        Space prefix;
+        Markers markers;
+        String words;
 
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Picture t;
-
-            @Nullable
-            public CobolLeftPadded<String> getCardinalitySource() {
-                return t.cardinalitySource;
-            }
-
-            public Picture withCardinalitySource(@Nullable CobolLeftPadded<String> cardinalitySource) {
-                return t.cardinalitySource == cardinalitySource ? t : new Picture(t.padding, t.id, t.prefix, t.markers, t.chars, cardinalitySource);
-            }
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDefaultDisplaySignClause(this, p);
         }
     }
 
@@ -1733,6 +1805,24 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class OdtClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Identifier mnemonicName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitOdtClause(this, p);
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1886,6 +1976,92 @@ public interface Cobol extends Tree {
 
             public Paragraphs withSentences(CobolContainer<Cobol.Sentence> sentences) {
                 return t.sentences == sentences ? t : new Paragraphs(t.padding, t.id, t.prefix, t.markers, sentences);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Picture implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String chars;
+
+        @Nullable
+        CobolLeftPadded<String> cardinalitySource;
+
+        @Nullable
+        public String getCardinality() {
+            return cardinalitySource == null ? null : cardinalitySource
+                    .getElement()
+                    .replace("(", "")
+                    .replace(")", "")
+                    .trim();
+        }
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitPicture(this, p);
+        }
+
+        @Nullable
+        public String getCardinalitySource() {
+            return cardinalitySource == null ? null : cardinalitySource.getElement();
+        }
+
+        public Picture withCardinalitySource(@Nullable String cardinalitySource) {
+            if (cardinalitySource == null) {
+                return this.cardinalitySource == null ? this : new Picture(id, prefix, markers, chars, null);
+            }
+            return getPadding().withCardinalitySource(CobolLeftPadded.withElement(this.cardinalitySource, cardinalitySource));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Picture t;
+
+            @Nullable
+            public CobolLeftPadded<String> getCardinalitySource() {
+                return t.cardinalitySource;
+            }
+
+            public Picture withCardinalitySource(@Nullable CobolLeftPadded<String> cardinalitySource) {
+                return t.cardinalitySource == cardinalitySource ? t : new Picture(t.padding, t.id, t.prefix, t.markers, t.chars, cardinalitySource);
             }
         }
     }
@@ -2118,6 +2294,23 @@ public interface Cobol extends Tree {
             public ProgramUnit withEndProgram(@Nullable CobolRightPadded<Cobol.EndProgram> endProgram) {
                 return t.endProgram == endProgram ? t : new ProgramUnit(t.padding, t.id, t.prefix, t.markers, t.identificationDivision, t.environmentDivision, t.dataDivision, t.procedureDivision, t.programUnits, endProgram);
             }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReserveNetworkClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReserveNetworkClause(this, p);
         }
     }
 
@@ -2805,6 +2998,193 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitStop(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class SymbolicCharacter implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        CobolContainer<Identifier> symbols;
+        CobolContainer<Literal> literals;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSymbolicCharacter(this, p);
+        }
+
+        public List<Cobol.Identifier> getSymbols() {
+            return symbols.getElements();
+        }
+
+        public SymbolicCharacter withSymbols(List<Cobol.Identifier> symbols) {
+            return getPadding().withSymbols(this.symbols.getPadding().withElements(CobolRightPadded.withElements(
+                    this.symbols.getPadding().getElements(), symbols)));
+        }
+
+        public List<Cobol.Literal> getLiterals() {
+            return literals.getElements();
+        }
+
+        public SymbolicCharacter withLiterals(List<Cobol.Literal> literals) {
+            return getPadding().withLiterals(this.literals.getPadding().withElements(CobolRightPadded.withElements(
+                    this.literals.getPadding().getElements(), literals)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final SymbolicCharacter t;
+
+            public CobolContainer<Cobol.Identifier> getSymbols() {
+                return t.symbols;
+            }
+
+            public SymbolicCharacter withSymbols(CobolContainer<Cobol.Identifier> symbols) {
+                return t.symbols == symbols ? t : new SymbolicCharacter(t.padding, t.id, t.prefix, t.markers, symbols, t.literals);
+            }
+
+            public CobolContainer<Cobol.Literal> getLiterals() {
+                return t.literals;
+            }
+
+            public SymbolicCharacter withLiterals(CobolContainer<Cobol.Literal> literals) {
+                return t.literals == literals ? t : new SymbolicCharacter(t.padding, t.id, t.prefix, t.markers, t.symbols, literals);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class SymbolicCharactersClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<SymbolicCharacter> symbols;
+
+        @Nullable
+        CobolLeftPadded<String> inAlphabet;
+
+        @Getter
+        @Nullable
+        @With
+        Identifier alphabetName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSymbolicCharactersClause(this, p);
+        }
+
+        public List<Cobol.SymbolicCharacter> getSymbols() {
+            return symbols.getElements();
+        }
+
+        public SymbolicCharactersClause withSymbols(List<Cobol.SymbolicCharacter> symbols) {
+            return getPadding().withSymbols(this.symbols.getPadding().withElements(CobolRightPadded.withElements(
+                    this.symbols.getPadding().getElements(), symbols)));
+        }
+
+        @Nullable
+        public String getInAlphabet() {
+            return inAlphabet == null ? null : inAlphabet.getElement();
+        }
+
+        public SymbolicCharactersClause withInAlphabet(@Nullable String inAlphabet) {
+            if (inAlphabet == null) {
+                return this.inAlphabet == null ? this : new SymbolicCharactersClause(id, prefix, markers, words, symbols, null, alphabetName);
+            }
+            return getPadding().withInAlphabet(CobolLeftPadded.withElement(this.inAlphabet, inAlphabet));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final SymbolicCharactersClause t;
+
+            public CobolContainer<Cobol.SymbolicCharacter> getSymbols() {
+                return t.symbols;
+            }
+
+            public SymbolicCharactersClause withSymbols(CobolContainer<Cobol.SymbolicCharacter> symbols) {
+                return t.symbols == symbols ? t : new SymbolicCharactersClause(t.padding, t.id, t.prefix, t.markers, t.words, symbols, t.inAlphabet, t.alphabetName);
+            }
+
+            @Nullable
+            public CobolLeftPadded<String> getInAlphabet() {
+                return t.inAlphabet;
+            }
+
+            public SymbolicCharactersClause withInAlphabet(@Nullable CobolLeftPadded<String> inAlphabet) {
+                return t.inAlphabet == inAlphabet ? t : new SymbolicCharactersClause(t.padding, t.id, t.prefix, t.markers, t.words, t.symbols, inAlphabet, t.alphabetName);
+            }
         }
     }
 

@@ -232,4 +232,34 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.DefaultDisplaySignClause visitDefaultDisplaySignClause(Cobol.DefaultDisplaySignClause defaultDisplaySignClause, P p) {
         return (Cobol.DefaultDisplaySignClause) super.visitDefaultDisplaySignClause(defaultDisplaySignClause, p);
     }
+
+    @Override
+    public Cobol.ClassClause visitClassClause(Cobol.ClassClause classClause, P p) {
+        return (Cobol.ClassClause) super.visitClassClause(classClause, p);
+    }
+
+    @Override
+    public Cobol.ClassClauseThrough visitClassClauseThrough(Cobol.ClassClauseThrough classClauseThrough, P p) {
+        return (Cobol.ClassClauseThrough) super.visitClassClauseThrough(classClauseThrough, p);
+    }
+
+    @Override
+    public Cobol.OdtClause visitOdtClause(Cobol.OdtClause odtClause, P p) {
+        return (Cobol.OdtClause) super.visitOdtClause(odtClause, p);
+    }
+
+    @Override
+    public Cobol.ReserveNetworkClause visitReserveNetworkClause(Cobol.ReserveNetworkClause reserveNetworkClause, P p) {
+        return (Cobol.ReserveNetworkClause) super.visitReserveNetworkClause(reserveNetworkClause, p);
+    }
+
+    @Override
+    public Cobol.SymbolicCharacter visitSymbolicCharacter(Cobol.SymbolicCharacter symbolicCharacter, P p) {
+        return (Cobol.SymbolicCharacter) super.visitSymbolicCharacter(symbolicCharacter, p);
+    }
+
+    @Override
+    public Cobol.SymbolicCharactersClause visitSymbolicCharactersClause(Cobol.SymbolicCharactersClause symbolicCharactersClause, P p) {
+        return (Cobol.SymbolicCharactersClause) super.visitSymbolicCharactersClause(symbolicCharactersClause, p);
+    }
 }

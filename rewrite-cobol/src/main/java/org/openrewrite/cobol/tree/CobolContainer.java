@@ -70,7 +70,7 @@ public class CobolContainer<T> {
         return (CobolContainer<T>) EMPTY;
     }
 
-    public CobolContainer<T> withPreposition(CobolLeftPadded<String> preposition) {
+    public CobolContainer<T> withPreposition(@Nullable CobolLeftPadded<String> preposition) {
         return this.preposition == preposition ? this : build(before, preposition, elements, markers);
     }
 

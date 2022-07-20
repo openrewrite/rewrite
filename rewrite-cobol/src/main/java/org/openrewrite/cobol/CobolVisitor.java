@@ -502,4 +502,59 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         return d;
     }
+
+    public Cobol visitClassClause(Cobol.ClassClause classClause, P p) {
+        Cobol.ClassClause c = classClause;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withClassName((Cobol.Identifier) visit(c.getClassName(), p));
+        c = c.getPadding().withThroughs(visitContainer(c.getPadding().getThroughs(), p));
+        return c;
+    }
+
+    public Cobol visitClassClauseThrough(Cobol.ClassClauseThrough classClauseThrough, P p) {
+        Cobol.ClassClauseThrough c = classClauseThrough;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        if (c.getPadding().getThrough() != null) {
+            c = c.getPadding().withThrough(visitLeftPadded(c.getPadding().getThrough(), p));
+        }
+        return c;
+    }
+
+    public Cobol visitOdtClause(Cobol.OdtClause odtClause, P p) {
+        Cobol.OdtClause o = odtClause;
+        o = o.withPrefix(visitSpace(o.getPrefix(), p));
+        o = o.withMarkers(visitMarkers(o.getMarkers(), p));
+        o = o.withMnemonicName((Cobol.Identifier) visit(o.getMnemonicName(), p));
+        return o;
+    }
+
+    public Cobol visitReserveNetworkClause(Cobol.ReserveNetworkClause reserveNetworkClause, P p) {
+        Cobol.ReserveNetworkClause r = reserveNetworkClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitSymbolicCharacter(Cobol.SymbolicCharacter symbolicCharacter, P p) {
+        Cobol.SymbolicCharacter s = symbolicCharacter;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withSymbols(visitContainer(s.getPadding().getSymbols(), p));
+        s = s.getPadding().withLiterals(visitContainer(s.getPadding().getLiterals(), p));
+        return s;
+    }
+
+    public Cobol visitSymbolicCharactersClause(Cobol.SymbolicCharactersClause symbolicCharactersClause, P p) {
+        Cobol.SymbolicCharactersClause s = symbolicCharactersClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withSymbols(visitContainer(s.getPadding().getSymbols(), p));
+        if (s.getPadding().getInAlphabet() != null) {
+            s = s.getPadding().withInAlphabet(visitLeftPadded(s.getPadding().getInAlphabet(), p));
+        }
+        s = s.withAlphabetName((Cobol.Identifier) visit(s.getAlphabetName(), p));
+        return s;
+    }
 }

@@ -134,6 +134,55 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.OdtClause visitOdtClause(CobolParser.OdtClauseContext ctx) {
+        return new Cobol.OdtClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ODT(), ctx.IS()),
+                (Cobol.Identifier) visit(ctx.mnemonicName())
+        );
+    }
+
+    @Override
+    public Cobol.SymbolicCharactersClause visitSymbolicCharactersClause(CobolParser.SymbolicCharactersClauseContext ctx) {
+        return new Cobol.SymbolicCharactersClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SYMBOLIC(), ctx.CHARACTERS(), ctx.FOR(), ctx.ALPHANUMERIC(), ctx.NATIONAL()),
+                convertAllContainer(ctx.symbolicCharacters()),
+                padLeft(ctx.IN()),
+                visitNullable(ctx.alphabetName())
+        );
+    }
+
+    @Override
+    public Cobol.SymbolicCharacter visitSymbolicCharacters(CobolParser.SymbolicCharactersContext ctx) {
+        return new Cobol.SymbolicCharacter(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.symbolicCharacter()),
+                convertAllContainer(
+                        ctx.IS() != null || ctx.ARE() != null ?
+                                padLeft(whitespace(), words(ctx.IS(), ctx.ARE())) : null,
+                        ctx.integerLiteral()
+                )
+        );
+    }
+
+    @Override
+    public Cobol.ReserveNetworkClause visitReserveNetworkClause(CobolParser.ReserveNetworkClauseContext ctx) {
+        return new Cobol.ReserveNetworkClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RESERVE(), ctx.WORDS(), ctx.LIST(), ctx.IS(), ctx.NETWORK(), ctx.CAPABLE())
+        );
+    }
+
+    @Override
     public Cobol.DecimalPointClause visitDecimalPointClause(CobolParser.DecimalPointClauseContext ctx) {
         return new Cobol.DecimalPointClause(
                 randomId(),
@@ -735,7 +784,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
         return convertAll(trees, t -> (C) visit(t));
     }
 
-    private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(CobolLeftPadded<String> preposition, List<T> trees) {
+    private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(@Nullable CobolLeftPadded<String> preposition, List<T> trees) {
         return this.<C, T>convertAllContainer(trees, () -> Space.EMPTY).withPreposition(preposition);
     }
 
