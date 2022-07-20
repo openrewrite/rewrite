@@ -38,7 +38,8 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.+")
 
     modelImplementation(project(":rewrite-java-11"))
-    modelImplementation("org.projectlombok:lombok:1.18.24")
+    "modelAnnotationProcessor"("org.projectlombok:lombok:latest.release")
+    "modelCompileOnly"("org.projectlombok:lombok:latest.release")
     modelImplementation("ch.qos.logback:logback-classic:latest.release")
 
     testImplementation(project(":rewrite-test"))
