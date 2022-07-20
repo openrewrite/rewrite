@@ -84,6 +84,11 @@ class CobolBasicsTest : RewriteTest {
                 CONFIGURATION SECTION.                                         
                 SOURCE-COMPUTER.                                               
                     XXXXX082.                                                  
+                OBJECT-COMPUTER.                                               
+                    XXXXX083
+                    MEMORY SIZE
+                    XXXXX068
+                    CHARACTERS.                                                  
             """
         )
     )

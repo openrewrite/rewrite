@@ -2075,9 +2075,14 @@ class ValuedObjectComputerClause implements Cobol {
 
 @Getter
         @With
+        Type type;
+
+@Getter
+        @With
         String words;
 
 @Getter
+        @Nullable
         @With
         Cobol value;
 
@@ -2103,7 +2108,7 @@ class ValuedObjectComputerClause implements Cobol {
 
         public ValuedObjectComputerClause withUnits(@Nullable String units) {
             if (units == null) {
-                return this.units == null ? this : new ValuedObjectComputerClause(id, prefix, markers, words, value, null);
+                return this.units == null ? this : new ValuedObjectComputerClause(id, prefix, markers, type, words, value, null);
             }
             return getPadding().withUnits(CobolLeftPadded.withElement(this.units, units));
         }
@@ -2133,7 +2138,7 @@ class ValuedObjectComputerClause implements Cobol {
         }
 
         public ValuedObjectComputerClause withUnits(@Nullable CobolLeftPadded<String> units) {
-            return t.units == units ? t : new ValuedObjectComputerClause(t.padding, t.id, t.prefix, t.markers, t.words, t.value, units);
+            return t.units == units ? t : new ValuedObjectComputerClause(t.padding, t.id, t.prefix, t.markers, t.type, t.words, t.value, units);
         }
     }
     }

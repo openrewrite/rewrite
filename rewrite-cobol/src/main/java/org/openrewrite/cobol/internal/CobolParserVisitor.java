@@ -117,6 +117,82 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.ObjectComputer visitObjectComputerParagraph(CobolParser.ObjectComputerParagraphContext ctx) {
+        return new Cobol.ObjectComputer(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                padRight(words(ctx.OBJECT_COMPUTER()), sourceBefore(".")),
+                ctx.computerName() == null ? null : padRight(
+                        new Cobol.ObjectComputerDefinition(
+                                randomId(),
+                                sourceBefore(ctx.computerName().getText()),
+                                Markers.EMPTY,
+                                ctx.computerName().getText(),
+                                convertAllContainer(ctx.objectComputerClause())
+                        ),
+                        sourceBefore(".")
+                )
+        );
+    }
+
+    @Override
+    public Cobol.ValuedObjectComputerClause visitMemorySizeClause(CobolParser.MemorySizeClauseContext ctx) {
+        return new Cobol.ValuedObjectComputerClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                Cobol.ValuedObjectComputerClause.Type.Memory,
+                words(ctx.MEMORY(), ctx.SIZE()),
+                (Cobol) visit(ctx.integerLiteral() == null ? ctx.cobolWord() : ctx.integerLiteral()),
+                ctx.WORDS() != null || ctx.CHARACTERS() != null || ctx.MODULES() != null ?
+                        padLeft(whitespace(), words(ctx.WORDS(), ctx.CHARACTERS(), ctx.MODULES())) :
+                        null
+        );
+    }
+
+    @Override
+    public Cobol.ValuedObjectComputerClause visitDiskSizeClause(CobolParser.DiskSizeClauseContext ctx) {
+        return new Cobol.ValuedObjectComputerClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                Cobol.ValuedObjectComputerClause.Type.Disk,
+                words(ctx.DISK(), ctx.SIZE()),
+                (Cobol) visit(ctx.integerLiteral() == null ? ctx.cobolWord() : ctx.integerLiteral()),
+                ctx.WORDS() != null || ctx.MODULES() != null ?
+                        padLeft(whitespace(), words(ctx.WORDS(), ctx.MODULES())) :
+                        null
+        );
+    }
+
+    @Override
+    public Cobol.ValuedObjectComputerClause visitSegmentLimitClause(CobolParser.SegmentLimitClauseContext ctx) {
+        return new Cobol.ValuedObjectComputerClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                Cobol.ValuedObjectComputerClause.Type.SegmentLimit,
+                words(ctx.SEGMENT_LIMIT(), ctx.IS()),
+                (Cobol) visit(ctx.integerLiteral()),
+                null
+        );
+    }
+
+    @Override
+    public Cobol.ValuedObjectComputerClause visitCharacterSetClause(CobolParser.CharacterSetClauseContext ctx) {
+        return new Cobol.ValuedObjectComputerClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                Cobol.ValuedObjectComputerClause.Type.CharacterSet,
+                words(ctx.CHARACTER(), ctx.SET(), ctx.DOT_FS()),
+                null,
+                null
+        );
+    }
+
+    @Override
     public Cobol.SourceComputer visitSourceComputerParagraph(CobolParser.SourceComputerParagraphContext ctx) {
         return new Cobol.SourceComputer(
                 randomId(),

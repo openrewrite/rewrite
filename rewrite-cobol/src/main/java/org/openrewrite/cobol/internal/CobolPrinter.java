@@ -322,8 +322,8 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitObjectComputer(Cobol.ObjectComputer objectComputer, PrintOutputCapture<P> p) {
         visitSpace(objectComputer.getPrefix(), p);
         visitMarkers(objectComputer.getMarkers(), p);
-        visitRightPadded(objectComputer.getPadding().getWords(), "", p);
-        visitRightPadded(objectComputer.getPadding().getComputer(), "", p);
+        visitRightPadded(objectComputer.getPadding().getWords(), ".", p);
+        visitRightPadded(objectComputer.getPadding().getComputer(), ".", p);
         return objectComputer;
     }
 
@@ -333,15 +333,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(objectComputerDefinition.getComputerName());
         visitContainer("", objectComputerDefinition.getPadding().getSpecifications(), "", "", p);
         return objectComputerDefinition;
-    }
-
-    public Cobol visitValuedObjectComputerClause(Cobol.ValuedObjectComputerClause valuedObjectComputerClause, PrintOutputCapture<P> p) {
-        visitSpace(valuedObjectComputerClause.getPrefix(), p);
-        visitMarkers(valuedObjectComputerClause.getMarkers(), p);
-        p.append(valuedObjectComputerClause.getWords());
-        visit(valuedObjectComputerClause.getValue(), p);
-        visitLeftPadded("", valuedObjectComputerClause.getPadding().getUnits(), p);
-        return valuedObjectComputerClause;
     }
 
     public Cobol visitCollatingSequenceClause(Cobol.CollatingSequenceClause collatingSequenceClause, PrintOutputCapture<P> p) {
@@ -368,5 +359,14 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitRightPadded(sourceComputer.getPadding().getWords(), ".", p);
         visitRightPadded(sourceComputer.getPadding().getComputer(), ".", p);
         return sourceComputer;
+    }
+
+    public Cobol visitValuedObjectComputerClause(Cobol.ValuedObjectComputerClause valuedObjectComputerClause, PrintOutputCapture<P> p) {
+        visitSpace(valuedObjectComputerClause.getPrefix(), p);
+        visitMarkers(valuedObjectComputerClause.getMarkers(), p);
+        p.append(valuedObjectComputerClause.getWords());
+        visit(valuedObjectComputerClause.getValue(), p);
+        visitLeftPadded("", valuedObjectComputerClause.getPadding().getUnits(), p);
+        return valuedObjectComputerClause;
     }
 }

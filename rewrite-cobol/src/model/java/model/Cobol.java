@@ -224,7 +224,10 @@ public interface Cobol {
     }
 
     class ValuedObjectComputerClause implements Cobol {
+        Type type;
         String words;
+
+        @Nullable
         Cobol value;
 
         @Nullable
