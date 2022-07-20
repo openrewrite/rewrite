@@ -182,4 +182,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.CollatingSequenceAlphabet visitCollatingSequenceAlphabet(Cobol.CollatingSequenceAlphabet collatingSequenceAlphabet, P p) {
         return (Cobol.CollatingSequenceAlphabet) super.visitCollatingSequenceAlphabet(collatingSequenceAlphabet, p);
     }
+
+    @Override
+    public Cobol.AlphabetClause visitAlphabetClause(Cobol.AlphabetClause alphabetClause, P p) {
+        return (Cobol.AlphabetClause) super.visitAlphabetClause(alphabetClause, p);
+    }
+
+    @Override
+    public Cobol.AlphabetLiteral visitAlphabetLiteral(Cobol.AlphabetLiteral alphabetLiteral, P p) {
+        return (Cobol.AlphabetLiteral) super.visitAlphabetLiteral(alphabetLiteral, p);
+    }
+
+    @Override
+    public Cobol.AlphabetThrough visitAlphabetThrough(Cobol.AlphabetThrough alphabetThrough, P p) {
+        return (Cobol.AlphabetThrough) super.visitAlphabetThrough(alphabetThrough, p);
+    }
+
+    @Override
+    public Cobol.AlphabetAlso visitAlphabetAlso(Cobol.AlphabetAlso alphabetAlso, P p) {
+        return (Cobol.AlphabetAlso) super.visitAlphabetAlso(alphabetAlso, p);
+    }
+
+    @Override
+    public Cobol.SpecialNames visitSpecialNames(Cobol.SpecialNames specialNames, P p) {
+        return (Cobol.SpecialNames) super.visitSpecialNames(specialNames, p);
+    }
 }

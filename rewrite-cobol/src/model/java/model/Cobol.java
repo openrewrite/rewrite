@@ -44,6 +44,44 @@ public interface Cobol {
         CobolContainer<Name> giving;
     }
 
+    class AlphabetClause implements Cobol {
+        String words;
+        Identifier name;
+
+        /**
+         * At least one of this or {@link #literals} are non-null.
+         * When the standard is CCSVERSION, literals must have a single element.
+         */
+        @Nullable
+        CobolLeftPadded<String> standard;
+
+        /**
+         * At least one of {@link #standard} or this are non-null.
+         */
+        @Nullable
+        CobolContainer<AlphabetLiteral> literals;
+    }
+
+    class AlphabetLiteral implements Cobol {
+        Literal literal;
+
+        @Nullable
+        AlphabetThrough alphabetThrough;
+
+        @Nullable
+        CobolContainer<AlphabetAlso> alphabetAlso;
+    }
+
+    class AlphabetThrough implements Cobol {
+        String words;
+        Literal literal;
+    }
+
+    class AlphabetAlso implements Cobol {
+        String words;
+        CobolContainer<Literal> literals;
+    }
+
     class CollatingSequenceClause implements Cobol {
         String words;
         CobolContainer<Identifier> alphabetName;
@@ -237,6 +275,13 @@ public interface Cobol {
 
         @Nullable
         CobolLeftPadded<String> debuggingMode;
+    }
+
+    class SpecialNames implements Cobol {
+        String words;
+
+        @Nullable
+        CobolContainer<Cobol> clauses;
     }
 
     class StatementPhrase implements Cobol {

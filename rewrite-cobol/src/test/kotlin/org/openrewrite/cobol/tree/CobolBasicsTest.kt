@@ -77,17 +77,20 @@ class CobolBasicsTest : RewriteTest {
     fun ic109aPart() = rewriteRun(
         cobol(
             """
-                IDENTIFICATION DIVISION.                                       
-                PROGRAM-ID.                                                    
-                    IC109A.                                                    
-                ENVIRONMENT DIVISION.                                          
-                CONFIGURATION SECTION.                                         
-                SOURCE-COMPUTER.                                               
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID.
+                    IC109A.
+                ENVIRONMENT DIVISION.
+                CONFIGURATION SECTION.
+                SOURCE-COMPUTER.
                     XXXXX082.
                 OBJECT-COMPUTER.
                     XXXXX083
                     MEMORY SIZE XXXXX068 CHARACTERS
                     PROGRAM COLLATING SEQUENCE IS COLLATING-SEQ-1.
+                SPECIAL-NAMES.
+                    ALPHABET PRG-COLL-SEQ IS
+                    STANDARD-2.
             """
         )
     )

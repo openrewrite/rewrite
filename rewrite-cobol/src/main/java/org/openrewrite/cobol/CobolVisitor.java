@@ -411,4 +411,50 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         w = w.getPadding().withDataDescriptions(visitContainer(w.getPadding().getDataDescriptions(), p));
         return w;
     }
+
+    public Cobol visitAlphabetClause(Cobol.AlphabetClause alphabetClause, P p) {
+        Cobol.AlphabetClause a = alphabetClause;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withName((Cobol.Identifier) visit(a.getName(), p));
+        if (a.getPadding().getStandard() != null) {
+            a = a.getPadding().withStandard(visitLeftPadded(a.getPadding().getStandard(), p));
+        }
+        a = a.getPadding().withLiterals(visitContainer(a.getPadding().getLiterals(), p));
+        return a;
+    }
+
+    public Cobol visitAlphabetLiteral(Cobol.AlphabetLiteral alphabetLiteral, P p) {
+        Cobol.AlphabetLiteral a = alphabetLiteral;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withLiteral((Cobol.Literal) visit(a.getLiteral(), p));
+        a = a.withAlphabetThrough((Cobol.AlphabetThrough) visit(a.getAlphabetThrough(), p));
+        a = a.getPadding().withAlphabetAlso(visitContainer(a.getPadding().getAlphabetAlso(), p));
+        return a;
+    }
+
+    public Cobol visitAlphabetThrough(Cobol.AlphabetThrough alphabetThrough, P p) {
+        Cobol.AlphabetThrough a = alphabetThrough;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withLiteral((Cobol.Literal) visit(a.getLiteral(), p));
+        return a;
+    }
+
+    public Cobol visitAlphabetAlso(Cobol.AlphabetAlso alphabetAlso, P p) {
+        Cobol.AlphabetAlso a = alphabetAlso;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.getPadding().withLiterals(visitContainer(a.getPadding().getLiterals(), p));
+        return a;
+    }
+
+    public Cobol visitSpecialNames(Cobol.SpecialNames specialNames, P p) {
+        Cobol.SpecialNames s = specialNames;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withClauses(visitContainer(s.getPadding().getClauses(), p));
+        return s;
+    }
 }

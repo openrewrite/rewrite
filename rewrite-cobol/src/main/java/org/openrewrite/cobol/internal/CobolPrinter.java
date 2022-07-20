@@ -369,4 +369,50 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitLeftPadded("", valuedObjectComputerClause.getPadding().getUnits(), p);
         return valuedObjectComputerClause;
     }
+
+    public Cobol visitAlphabetClause(Cobol.AlphabetClause alphabetClause, PrintOutputCapture<P> p) {
+        visitSpace(alphabetClause.getPrefix(), p);
+        visitMarkers(alphabetClause.getMarkers(), p);
+        p.append(alphabetClause.getWords());
+        visit(alphabetClause.getName(), p);
+        visitLeftPadded("", alphabetClause.getPadding().getStandard(), p);
+        visitContainer("", alphabetClause.getPadding().getLiterals(), "", "", p);
+        return alphabetClause;
+    }
+
+    public Cobol visitAlphabetLiteral(Cobol.AlphabetLiteral alphabetLiteral, PrintOutputCapture<P> p) {
+        visitSpace(alphabetLiteral.getPrefix(), p);
+        visitMarkers(alphabetLiteral.getMarkers(), p);
+        visit(alphabetLiteral.getLiteral(), p);
+        visit(alphabetLiteral.getAlphabetThrough(), p);
+        visitContainer("", alphabetLiteral.getPadding().getAlphabetAlso(), "", "", p);
+        return alphabetLiteral;
+    }
+
+    public Cobol visitAlphabetThrough(Cobol.AlphabetThrough alphabetThrough, PrintOutputCapture<P> p) {
+        visitSpace(alphabetThrough.getPrefix(), p);
+        visitMarkers(alphabetThrough.getMarkers(), p);
+        p.append(alphabetThrough.getWords());
+        visit(alphabetThrough.getLiteral(), p);
+        return alphabetThrough;
+    }
+
+    public Cobol visitAlphabetAlso(Cobol.AlphabetAlso alphabetAlso, PrintOutputCapture<P> p) {
+        visitSpace(alphabetAlso.getPrefix(), p);
+        visitMarkers(alphabetAlso.getMarkers(), p);
+        p.append(alphabetAlso.getWords());
+        visitContainer("", alphabetAlso.getPadding().getLiterals(), "", "", p);
+        return alphabetAlso;
+    }
+
+    public Cobol visitSpecialNames(Cobol.SpecialNames specialNames, PrintOutputCapture<P> p) {
+        visitSpace(specialNames.getPrefix(), p);
+        visitMarkers(specialNames.getMarkers(), p);
+        p.append(specialNames.getWords());
+        visitContainer(".", specialNames.getPadding().getClauses(), "", "", p);
+        if (!specialNames.getClauses().isEmpty()) {
+            p.append('.');
+        }
+        return specialNames;
+    }
 }

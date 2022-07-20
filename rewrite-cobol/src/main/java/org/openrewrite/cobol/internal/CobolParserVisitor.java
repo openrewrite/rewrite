@@ -35,6 +35,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.cobol.tree.Space.format;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
@@ -102,6 +104,89 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 null,
                 programUnits,
                 source.substring(cursor)
+        );
+    }
+
+    @Override
+    public Cobol.SpecialNames visitSpecialNamesParagraph(CobolParser.SpecialNamesParagraphContext ctx) {
+        return new Cobol.SpecialNames(
+                randomId(),
+                sourceBefore(ctx.SPECIAL_NAMES().getText()),
+                Markers.EMPTY,
+                ctx.SPECIAL_NAMES().getText(),
+                ctx.specialNameClause() == null ?
+                        convertAllContainer(sourceBefore("."), emptyList()) :
+                        convertAllContainer(sourceBefore("."), ctx.specialNameClause())
+                                .withLastSpace(sourceBefore("."))
+        );
+    }
+
+    @Override
+    public Cobol.AlphabetClause visitAlphabetClauseFormat1(CobolParser.AlphabetClauseFormat1Context ctx) {
+        Space prefix = sourceBefore(ctx.ALPHABET().getText());
+        Cobol.Identifier name = (Cobol.Identifier) visit(ctx.alphabetName());
+        CobolLeftPadded<String> standard = padLeft(whitespace(), words(ctx.FOR(), ctx.ALPHANUMERIC(), ctx.IS(), ctx.EBCDIC(), ctx.ASCII(), ctx.STANDARD_1(), ctx.STANDARD_2(), ctx.NATIVE()));
+        if (ctx.cobolWord() != null) {
+            standard = standard.withElement(ctx.cobolWord().getText());
+        }
+        if (standard.getElement().isEmpty()) {
+            standard = null;
+        }
+        return new Cobol.AlphabetClause(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                ctx.ALPHABET().getText(),
+                name,
+                standard,
+                ctx.alphabetLiterals() == null ? null : convertAllContainer(ctx.alphabetLiterals())
+        );
+    }
+
+    @Override
+    public Cobol.AlphabetClause visitAlphabetClauseFormat2(CobolParser.AlphabetClauseFormat2Context ctx) {
+        return new Cobol.AlphabetClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ALPHABET()),
+                (Cobol.Identifier) visit(ctx.alphabetName()),
+                padLeft(whitespace(), words(ctx.FOR(), ctx.NATIONAL(), ctx.IS(), ctx.NATIVE(), ctx.CCSVERSION())),
+                ctx.CCSVERSION() == null ? null : convertAllContainer(singletonList(ctx.literal()))
+        );
+    }
+
+    @Override
+    public Cobol.AlphabetLiteral visitAlphabetLiterals(CobolParser.AlphabetLiteralsContext ctx) {
+        return new Cobol.AlphabetLiteral(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.Literal) visit(ctx.literal()),
+                visitNullable(ctx.alphabetThrough()),
+                ctx.alphabetAlso() == null ? null : convertAllContainer(ctx.alphabetAlso())
+        );
+    }
+
+    @Override
+    public Cobol.AlphabetThrough visitAlphabetThrough(CobolParser.AlphabetThroughContext ctx) {
+        return new Cobol.AlphabetThrough(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.THROUGH(), ctx.THRU()),
+                (Cobol.Literal) visit(ctx.literal())
+        );
+    }
+
+    @Override
+    public Cobol.AlphabetAlso visitAlphabetAlso(CobolParser.AlphabetAlsoContext ctx) {
+        return new Cobol.AlphabetAlso(
+                randomId(),
+                sourceBefore(ctx.ALSO().getText()),
+                Markers.EMPTY,
+                ctx.ALSO().getText(),
+                convertAllContainer(ctx.literal())
         );
     }
 
