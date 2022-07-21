@@ -333,4 +333,39 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.ScreenDescriptionUsingClause visitScreenDescriptionUsingClause(Cobol.ScreenDescriptionUsingClause screenDescriptionUsingClause, P p) {
         return (Cobol.ScreenDescriptionUsingClause) super.visitScreenDescriptionUsingClause(screenDescriptionUsingClause, p);
     }
+
+    @Override
+    public Cobol.AcceptStatement visitAcceptStatement(Cobol.AcceptStatement acceptStatement, P p) {
+        return (Cobol.AcceptStatement) super.visitAcceptStatement(acceptStatement, p);
+    }
+
+    @Override
+    public Cobol.AcceptFromDateStatement visitAcceptFromDateStatement(Cobol.AcceptFromDateStatement acceptFromDateStatement, P p) {
+        return (Cobol.AcceptFromDateStatement) super.visitAcceptFromDateStatement(acceptFromDateStatement, p);
+    }
+
+    @Override
+    public Cobol.AcceptFromMnemonicStatement visitAcceptFromMnemonicStatement(Cobol.AcceptFromMnemonicStatement acceptFromMnemonicStatement, P p) {
+        return (Cobol.AcceptFromMnemonicStatement) super.visitAcceptFromMnemonicStatement(acceptFromMnemonicStatement, p);
+    }
+
+    @Override
+    public Cobol.AcceptFromEscapeKeyStatement visitAcceptFromEscapeKeyStatement(Cobol.AcceptFromEscapeKeyStatement acceptFromEscapeKeyStatement, P p) {
+        return (Cobol.AcceptFromEscapeKeyStatement) super.visitAcceptFromEscapeKeyStatement(acceptFromEscapeKeyStatement, p);
+    }
+
+    @Override
+    public Cobol.AcceptMessageCountStatement visitAcceptMessageCountStatement(Cobol.AcceptMessageCountStatement acceptMessageCountStatement, P p) {
+        return (Cobol.AcceptMessageCountStatement) super.visitAcceptMessageCountStatement(acceptMessageCountStatement, p);
+    }
+
+    @Override
+    public Cobol.OnExceptionClause visitOnExceptionClause(Cobol.OnExceptionClause onExceptionClause, P p) {
+        return (Cobol.OnExceptionClause) super.visitOnExceptionClause(onExceptionClause, p);
+    }
+
+    @Override
+    public Cobol.NotOnExceptionClause visitNotOnExceptionClause(Cobol.NotOnExceptionClause notOnExceptionClause, P p) {
+        return (Cobol.NotOnExceptionClause) super.visitNotOnExceptionClause(notOnExceptionClause, p);
+    }
 }

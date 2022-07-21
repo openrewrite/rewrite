@@ -235,4 +235,18 @@ class CobolBasicsTest : RewriteTest {
             01 SCREEN1 BLANK LINE BELL BLINK CONTROL IS 77 SIZE IS 77 USING 77.
         """)
     )
+
+    @Test
+    fun acceptStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            PARAGRAPH_NAME.
+            ACCEPT identifier FROM DATE 20421221 END-ACCEPT
+            ACCEPT identifier FROM ESCAPE KEY
+            ACCEPT identifier FROM mnemonicName
+            ACCEPT identifier MESSAGE COUNT
+        """)
+    )
 }

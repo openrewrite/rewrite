@@ -108,6 +108,84 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitAcceptStatement(CobolParser.AcceptStatementContext ctx) {
+        return new Cobol.AcceptStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                ctx.ACCEPT().getText(),
+                visitIdentifier(ctx.identifier()),
+                visit(ctx.acceptFromDateStatement(), ctx.acceptFromEscapeKeyStatement(), ctx.acceptFromMnemonicStatement(), ctx.acceptMessageCountStatement()),
+                visitNullable(ctx.onExceptionClause()),
+                visitNullable(ctx.notOnExceptionClause()),
+                padLeft(ctx.END_ACCEPT())
+        );
+    }
+
+    @Override
+    public Object visitAcceptFromDateStatement(CobolParser.AcceptFromDateStatementContext ctx) {
+        return new Cobol.AcceptFromDateStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FROM(), ctx.DATE(), ctx.YYYYMMDD(), ctx.DAY(), ctx.YYYYDDD(), ctx.DAY_OF_WEEK(), ctx.TIME(), ctx.TIMER(), ctx.TODAYS_DATE(), ctx.MMDDYYYY(), ctx.TODAYS_NAME(), ctx.YEAR())
+        );
+    }
+
+    @Override
+    public Object visitAcceptFromMnemonicStatement(CobolParser.AcceptFromMnemonicStatementContext ctx) {
+        return new Cobol.AcceptFromMnemonicStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                ctx.FROM().getText(),
+                (Cobol.Identifier) visit(ctx.mnemonicName())
+        );
+    }
+
+    @Override
+    public Object visitAcceptFromEscapeKeyStatement(CobolParser.AcceptFromEscapeKeyStatementContext ctx) {
+        return new Cobol.AcceptFromEscapeKeyStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FROM(), ctx.ESCAPE(), ctx.KEY())
+        );
+    }
+
+    @Override
+    public Object visitAcceptMessageCountStatement(CobolParser.AcceptMessageCountStatementContext ctx) {
+        return new Cobol.AcceptMessageCountStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.MESSAGE(), ctx.COUNT())
+        );
+    }
+
+    @Override
+    public Object visitOnExceptionClause(CobolParser.OnExceptionClauseContext ctx) {
+        return new Cobol.OnExceptionClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ON(), ctx.EXCEPTION()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
+    public Object visitNotOnExceptionClause(CobolParser.NotOnExceptionClauseContext ctx) {
+        return new Cobol.NotOnExceptionClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.NOT(), ctx.ON(), ctx.EXCEPTION()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
     public Cobol.ChannelClause visitChannelClause(CobolParser.ChannelClauseContext ctx) {
         return new Cobol.ChannelClause(
                 randomId(),

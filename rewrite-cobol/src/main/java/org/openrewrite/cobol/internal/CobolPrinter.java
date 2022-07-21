@@ -617,4 +617,59 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(screenDescriptionUsingClause.getIdentifier(), p);
         return screenDescriptionUsingClause;
     }
+
+    public Cobol visitAcceptStatement(Cobol.AcceptStatement acceptStatement, PrintOutputCapture<P> p) {
+        visitSpace(acceptStatement.getPrefix(), p);
+        visitMarkers(acceptStatement.getMarkers(), p);
+        p.append(acceptStatement.getAccept());
+        visit(acceptStatement.getIdentifier(), p);
+        visit(acceptStatement.getOperation(), p);
+        visit(acceptStatement.getOnExceptionClause(), p);
+        visit(acceptStatement.getNotOnExceptionClause(), p);
+        visitLeftPadded("", acceptStatement.getPadding().getEndAccept(), p);
+        return acceptStatement;
+    }
+
+    public Cobol visitAcceptFromDateStatement(Cobol.AcceptFromDateStatement acceptFromDateStatement, PrintOutputCapture<P> p) {
+        visitSpace(acceptFromDateStatement.getPrefix(), p);
+        visitMarkers(acceptFromDateStatement.getMarkers(), p);
+        p.append(acceptFromDateStatement.getWords());
+        return acceptFromDateStatement;
+    }
+
+    public Cobol visitAcceptFromMnemonicStatement(Cobol.AcceptFromMnemonicStatement acceptFromMnemonicStatement, PrintOutputCapture<P> p) {
+        visitSpace(acceptFromMnemonicStatement.getPrefix(), p);
+        visitMarkers(acceptFromMnemonicStatement.getMarkers(), p);
+        p.append(acceptFromMnemonicStatement.getFrom());
+        visit(acceptFromMnemonicStatement.getMnemonicName(), p);
+        return acceptFromMnemonicStatement;
+    }
+
+    public Cobol visitAcceptFromEscapeKeyStatement(Cobol.AcceptFromEscapeKeyStatement acceptFromEscapeKeyStatement, PrintOutputCapture<P> p) {
+        visitSpace(acceptFromEscapeKeyStatement.getPrefix(), p);
+        visitMarkers(acceptFromEscapeKeyStatement.getMarkers(), p);
+        p.append(acceptFromEscapeKeyStatement.getWords());
+        return acceptFromEscapeKeyStatement;
+    }
+
+    public Cobol visitAcceptMessageCountStatement(Cobol.AcceptMessageCountStatement acceptMessageCountStatement, PrintOutputCapture<P> p) {
+        visitSpace(acceptMessageCountStatement.getPrefix(), p);
+        visitMarkers(acceptMessageCountStatement.getMarkers(), p);
+        p.append(acceptMessageCountStatement.getWords());
+        return acceptMessageCountStatement;
+    }
+
+    public Cobol visitOnExceptionClause(Cobol.OnExceptionClause onExceptionClause, PrintOutputCapture<P> p) {
+        visitSpace(onExceptionClause.getPrefix(), p);
+        visitMarkers(onExceptionClause.getMarkers(), p);
+        p.append(onExceptionClause.getWords());
+        return onExceptionClause;
+    }
+
+    public Cobol visitNotOnExceptionClause(Cobol.NotOnExceptionClause notOnExceptionClause, PrintOutputCapture<P> p) {
+        visitSpace(notOnExceptionClause.getPrefix(), p);
+        visitMarkers(notOnExceptionClause.getMarkers(), p);
+        p.append(notOnExceptionClause.getWords());
+        return notOnExceptionClause;
+    }
 }

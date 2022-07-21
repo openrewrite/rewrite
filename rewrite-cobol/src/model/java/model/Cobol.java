@@ -23,6 +23,50 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 
 public interface Cobol {
+
+    class AcceptStatement implements Statement {
+        String accept;
+        Identifier identifier;
+        Cobol operation;
+
+        @Nullable
+        StatementPhrase onExceptionClause;
+
+        @Nullable
+        StatementPhrase notOnExceptionClause;
+
+        @Nullable
+        CobolLeftPadded<String> endAccept;
+    }
+
+    class AcceptFromDateStatement implements Cobol {
+        String words;
+    }
+
+    class AcceptFromMnemonicStatement implements Cobol {
+        String from;
+
+        Identifier mnemonicName;
+    }
+
+    class AcceptFromEscapeKeyStatement implements Cobol {
+        String words;
+    }
+
+    class AcceptMessageCountStatement implements Cobol {
+        String words;
+    }
+
+    class OnExceptionClause implements Statement {
+        String words;
+        CobolContainer<Statement> statements;
+    }
+
+    class NotOnExceptionClause implements Statement {
+        String words;
+        CobolContainer<Statement> statements;
+    }
+
     class Add implements Statement {
         String add;
         Cobol operation;

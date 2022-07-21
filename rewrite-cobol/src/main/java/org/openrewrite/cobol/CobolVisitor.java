@@ -662,4 +662,61 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         s = s.withIdentifier((Cobol.Identifier) visit(s.getIdentifier(), p));
         return s;
     }
+
+    public Cobol visitAcceptStatement(Cobol.AcceptStatement acceptStatement, P p) {
+        Cobol.AcceptStatement a = acceptStatement;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withIdentifier((Cobol.Identifier) visit(a.getIdentifier(), p));
+        a = a.withOperation((Cobol) visit(a.getOperation(), p));
+        a = a.withOnExceptionClause((Cobol.StatementPhrase) visit(a.getOnExceptionClause(), p));
+        a = a.withNotOnExceptionClause((Cobol.StatementPhrase) visit(a.getNotOnExceptionClause(), p));
+        if (a.getPadding().getEndAccept() != null) {
+            a = a.getPadding().withEndAccept(visitLeftPadded(a.getPadding().getEndAccept(), p));
+        }
+        return a;
+    }
+
+    public Cobol visitAcceptFromDateStatement(Cobol.AcceptFromDateStatement acceptFromDateStatement, P p) {
+        Cobol.AcceptFromDateStatement a = acceptFromDateStatement;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        return a;
+    }
+
+    public Cobol visitAcceptFromMnemonicStatement(Cobol.AcceptFromMnemonicStatement acceptFromMnemonicStatement, P p) {
+        Cobol.AcceptFromMnemonicStatement a = acceptFromMnemonicStatement;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withMnemonicName((Cobol.Identifier) visit(a.getMnemonicName(), p));
+        return a;
+    }
+
+    public Cobol visitAcceptFromEscapeKeyStatement(Cobol.AcceptFromEscapeKeyStatement acceptFromEscapeKeyStatement, P p) {
+        Cobol.AcceptFromEscapeKeyStatement a = acceptFromEscapeKeyStatement;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        return a;
+    }
+
+    public Cobol visitAcceptMessageCountStatement(Cobol.AcceptMessageCountStatement acceptMessageCountStatement, P p) {
+        Cobol.AcceptMessageCountStatement a = acceptMessageCountStatement;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        return a;
+    }
+
+    public Cobol visitOnExceptionClause(Cobol.OnExceptionClause onExceptionClause, P p) {
+        Cobol.OnExceptionClause o = onExceptionClause;
+        o = o.withPrefix(visitSpace(o.getPrefix(), p));
+        o = o.withMarkers(visitMarkers(o.getMarkers(), p));
+        return o;
+    }
+
+    public Cobol visitNotOnExceptionClause(Cobol.NotOnExceptionClause notOnExceptionClause, P p) {
+        Cobol.NotOnExceptionClause n = notOnExceptionClause;
+        n = n.withPrefix(visitSpace(n.getPrefix(), p));
+        n = n.withMarkers(visitMarkers(n.getMarkers(), p));
+        return n;
+    }
 }
