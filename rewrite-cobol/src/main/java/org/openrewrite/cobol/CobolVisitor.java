@@ -587,4 +587,21 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         l = l.getPadding().withDataDescriptions(visitContainer(l.getPadding().getDataDescriptions(), p));
         return l;
     }
+
+    public Cobol visitDataBaseSection(Cobol.DataBaseSection dataBaseSection, P p) {
+        Cobol.DataBaseSection d = dataBaseSection;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.getPadding().withEntries(visitContainer(d.getPadding().getEntries(), p));
+        return d;
+    }
+
+    public Cobol visitDataBaseSectionEntry(Cobol.DataBaseSectionEntry dataBaseSectionEntry, P p) {
+        Cobol.DataBaseSectionEntry d = dataBaseSectionEntry;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withFrom((Cobol.Literal) visit(d.getFrom(), p));
+        d = d.withTo((Cobol.Literal) visit(d.getTo(), p));
+        return d;
+    }
 }

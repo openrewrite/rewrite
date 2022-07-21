@@ -552,10 +552,34 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitDataBaseSection(CobolParser.DataBaseSectionContext ctx) {
+        return new Cobol.DataBaseSection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DATA_BASE(), ctx.SECTION()),
+                convertAllContainer(sourceBefore("."), ctx.dataBaseSectionEntry())
+        );
+    }
+
+    @Override
+    public Object visitDataBaseSectionEntry(CobolParser.DataBaseSectionEntryContext ctx) {
+        return new Cobol.DataBaseSectionEntry(
+                randomId(),
+                sourceBefore(ctx.integerLiteral().getText()),
+                Markers.EMPTY,
+                ctx.integerLiteral().getText(),
+                (Cobol.Literal) visit(ctx.literal(0)),
+                words(ctx.INVOKE()),
+                (Cobol.Literal) visit(ctx.literal(1))
+        );
+    }
+
+    @Override
     public Cobol.DataDivision visitDataDivision(CobolParser.DataDivisionContext ctx) {
         return new Cobol.DataDivision(
                 randomId(),
-                sourceBefore(ctx.DATA().getText()),
+                prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.DATA(), ctx.DIVISION()),
                 convertAllContainer(sourceBefore("."), ctx.dataDivisionSection())

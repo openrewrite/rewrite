@@ -213,4 +213,15 @@ class CobolBasicsTest : RewriteTest {
             01  NUM  PIC 9(4).
         """)
     )
+
+    @Test
+    fun dataBaseSection() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. DBSection.
+            DATA DIVISION.
+            DATA-BASE SECTION.
+            01 TRUE INVOKE TRUE
+        """)
+    )
 }

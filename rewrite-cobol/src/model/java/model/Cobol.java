@@ -140,6 +140,20 @@ public interface Cobol {
         Literal pictureSymbolLiteral;
     }
 
+    class DataBaseSection implements Cobol {
+        String words;
+
+        CobolContainer<DataBaseSectionEntry> entries;
+    }
+
+    class DataBaseSectionEntry implements Cobol {
+        String db;
+
+        Literal from;
+        String invoke;
+        Literal to;
+    }
+
     class DataDivision implements Cobol {
         String words;
         CobolContainer<DataDivisionSection> sections;

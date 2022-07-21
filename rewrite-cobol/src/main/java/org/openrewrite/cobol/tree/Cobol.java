@@ -1135,6 +1135,98 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class DataBaseSection implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<DataBaseSectionEntry> entries;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDataBaseSection(this, p);
+        }
+
+        public List<Cobol.DataBaseSectionEntry> getEntries() {
+            return entries.getElements();
+        }
+
+        public DataBaseSection withEntries(List<Cobol.DataBaseSectionEntry> entries) {
+            return getPadding().withEntries(this.entries.getPadding().withElements(CobolRightPadded.withElements(
+                    this.entries.getPadding().getElements(), entries)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DataBaseSection t;
+
+            public CobolContainer<Cobol.DataBaseSectionEntry> getEntries() {
+                return t.entries;
+            }
+
+            public DataBaseSection withEntries(CobolContainer<Cobol.DataBaseSectionEntry> entries) {
+                return t.entries == entries ? t : new DataBaseSection(t.padding, t.id, t.prefix, t.markers, t.words, entries);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class DataBaseSectionEntry implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String db;
+
+        Literal from;
+        String invoke;
+        Literal to;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDataBaseSectionEntry(this, p);
+        }
+    }
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class DataDivision implements Cobol {
         @Nullable
         @NonFinal

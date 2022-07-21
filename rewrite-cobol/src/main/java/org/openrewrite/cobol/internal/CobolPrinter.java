@@ -543,4 +543,22 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer(".", localStorageSection.getPadding().getDataDescriptions(), "", "", p);
         return localStorageSection;
     }
+
+    public Cobol visitDataBaseSection(Cobol.DataBaseSection dataBaseSection, PrintOutputCapture<P> p) {
+        visitSpace(dataBaseSection.getPrefix(), p);
+        visitMarkers(dataBaseSection.getMarkers(), p);
+        p.append(dataBaseSection.getWords());
+        visitContainer(".", dataBaseSection.getPadding().getEntries(), "", "", p);
+        return dataBaseSection;
+    }
+
+    public Cobol visitDataBaseSectionEntry(Cobol.DataBaseSectionEntry dataBaseSectionEntry, PrintOutputCapture<P> p) {
+        visitSpace(dataBaseSectionEntry.getPrefix(), p);
+        visitMarkers(dataBaseSectionEntry.getMarkers(), p);
+        p.append(dataBaseSectionEntry.getDb());
+        visit(dataBaseSectionEntry.getFrom(), p);
+        p.append(dataBaseSectionEntry.getInvoke());
+        visit(dataBaseSectionEntry.getTo(), p);
+        return dataBaseSectionEntry;
+    }
 }
