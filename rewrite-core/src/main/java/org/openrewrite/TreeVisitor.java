@@ -20,16 +20,26 @@ import de.danielbechler.diff.node.DiffNode;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import net.bytebuddy.ByteBuddy;
+import net.bytebuddy.dynamic.DynamicType;
+import net.bytebuddy.implementation.FieldAccessor;
+import net.bytebuddy.implementation.MethodCall;
+import net.bytebuddy.implementation.MethodDelegation;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+
+import static java.lang.reflect.Modifier.*;
+import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -44,6 +54,8 @@ import java.util.function.BiFunction;
  * @param <P> An input object that is passed to every visit method.
  */
 public abstract class TreeVisitor<T extends Tree, P> {
+    private static final ByteBuddy byteBuddy = new ByteBuddy();
+
     private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
             ManagementFactory.getRuntimeMXBean().getInputArguments().toString().contains("-agentlib:jdwp");
 
@@ -255,6 +267,10 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 afterVisit = null;
             }
         } catch (Throwable e) {
+            if(e instanceof UncaughtVisitorException) {
+                // bubbling up from lower in the tree
+                throw e;
+            }
             throw new UncaughtVisitorException(e, getCursor());
         }
 
@@ -299,5 +315,73 @@ public abstract class TreeVisitor<T extends Tree, P> {
     public <M extends Marker> M visitMarker(Marker marker, P p) {
         //noinspection unchecked
         return (M) marker;
+    }
+
+    public <R extends Tree, V extends TreeVisitor<R, P>> boolean isAdaptableTo(Class<? extends V> adaptTo) {
+        Class<?> firstLanguageVisitorInHierarchy = getClass().getSuperclass();
+        if (firstLanguageVisitorInHierarchy.getSimpleName().endsWith("IsoVisitor")) {
+            firstLanguageVisitorInHierarchy = firstLanguageVisitorInHierarchy.getSuperclass();
+        }
+        return firstLanguageVisitorInHierarchy.equals(adaptTo) ||
+                firstLanguageVisitorInHierarchy.isAssignableFrom(adaptTo);
+    }
+
+    public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {
+        Class<?> firstLanguageVisitorInHierarchy = getClass().getSuperclass();
+        if (firstLanguageVisitorInHierarchy.getSimpleName().endsWith("IsoVisitor")) {
+            firstLanguageVisitorInHierarchy = firstLanguageVisitorInHierarchy.getSuperclass();
+        }
+
+        if (firstLanguageVisitorInHierarchy.equals(adaptTo)) {
+            //noinspection unchecked
+            return (V) this;
+        }
+
+        if (!firstLanguageVisitorInHierarchy.isAssignableFrom(adaptTo)) {
+            throw new IllegalArgumentException(adaptTo.getSimpleName() + " must be assignable to " + getClass().getName() + " in order to be adaptable.");
+        }
+
+        try {
+            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<? extends V> builder = byteBuddy
+                    .subclass(adaptTo, NO_CONSTRUCTORS)
+                    .defineField("delegate", firstLanguageVisitorInHierarchy, PRIVATE | FINAL)
+                    .defineConstructor(PUBLIC)
+                    .withParameter(firstLanguageVisitorInHierarchy)
+                    .intercept(MethodCall.invoke(adaptTo.getConstructor())
+                            .andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
+
+            for (Method adaptToVisitMethod : adaptTo.getMethods()) {
+                if (!adaptToVisitMethod.getName().startsWith("visit")) {
+                    continue;
+                }
+
+                // only delegate to visitor methods declared by the visitor being adapted
+                nextMethod:
+                for (Method delegatableMethod : getClass().getDeclaredMethods()) {
+                    if (delegatableMethod.getName().equals(adaptToVisitMethod.getName()) &&
+                            delegatableMethod.getParameterCount() == adaptToVisitMethod.getParameterCount()) {
+                        Class<?>[] parameterTypes = delegatableMethod.getParameterTypes();
+                        for (int i = 0; i < parameterTypes.length; i++) {
+                            if (!adaptToVisitMethod.getParameterTypes()[i].equals(parameterTypes[i])) {
+                                continue nextMethod;
+                            }
+                        }
+                        builder = builder.defineMethod(delegatableMethod.getName(), delegatableMethod.getReturnType())
+                                .withParameters(delegatableMethod.getGenericParameterTypes())
+                                .intercept(MethodDelegation.toField("delegate"));
+                    }
+                }
+            }
+
+            return builder
+                    .make()
+                    .load(getClass().getClassLoader())
+                    .getLoaded()
+                    .getDeclaredConstructor(firstLanguageVisitorInHierarchy)
+                    .newInstance(this);
+        } catch (InstantiationException | NoSuchMethodException | InvocationTargetException |
+                 IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

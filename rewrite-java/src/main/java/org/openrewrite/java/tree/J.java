@@ -52,12 +52,12 @@ public interface J extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) acceptJava((JavaVisitor<P>) v, p);
+        return (R) acceptJava(v.adapt(JavaVisitor.class), p);
     }
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof JavaVisitor;
+        return v.isAdaptableTo(JavaVisitor.class);
     }
 
     @Nullable

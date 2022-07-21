@@ -36,8 +36,13 @@ public class UncaughtVisitorException extends RuntimeException {
         StringJoiner sanitized = new StringJoiner("\n");
         sanitized.add(getCause().getClass().getName() + ": " + getCause().getLocalizedMessage());
 
+        int i = 0;
         for (StackTraceElement stackTraceElement : getCause().getStackTrace()) {
-            if(stackTraceElement.getClassName().equals(RecipeScheduler.class.getName())) {
+            if (stackTraceElement.getClassName().equals(RecipeScheduler.class.getName())) {
+                break;
+            }
+            if (i++ >= 8) {
+                sanitized.add("  ...");
                 break;
             }
             sanitized.add("  " + stackTraceElement);

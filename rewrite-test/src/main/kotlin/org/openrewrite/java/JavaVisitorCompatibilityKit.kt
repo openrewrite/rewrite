@@ -384,6 +384,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class PublicGetVisitorTck : PublicGetVisitorTest
 
     @Nested
+    inner class RecipeExceptionDemonstrationTck : RecipeExceptionDemonstrationTest
+
+    @Nested
     inner class RedundantFileCreationTck : RedundantFileCreationTest
 
     @Nested

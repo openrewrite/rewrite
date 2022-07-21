@@ -36,7 +36,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return sourceFile instanceof JavaSourceFile;
     }
-
     @Override
     public String getLanguage() {
         return "java";

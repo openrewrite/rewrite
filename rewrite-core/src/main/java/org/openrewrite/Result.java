@@ -23,11 +23,13 @@ import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -64,6 +66,31 @@ public class Result {
     @Nullable
     private Path relativeTo;
 
+    public List<UncaughtVisitorException> getRecipeErrors() {
+        List<UncaughtVisitorException> exceptions = new ArrayList<>();
+        new TreeVisitor<Tree, Integer>() {
+            @Nullable
+            @Override
+            public Tree visit(@Nullable Tree tree, Integer p) {
+                if (tree != null) {
+                    try {
+                        Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
+                        Markers markers = (Markers) getMarkers.invoke(tree);
+                        markers.findFirst(UncaughtVisitorExceptionResult.class)
+                                .ifPresent(e -> exceptions.add(e.getException()));
+                    } catch (Throwable ignored) {
+                    }
+                }
+                return super.visit(tree, p);
+            }
+        }.visit(after, 0);
+        return exceptions;
+    }
+
+    /**
+     * @return The list of recipe instances that made changes.
+     * @deprecated Use {@link #getRecipeDescriptorsThatMadeChanges()} instead.
+     */
     @Deprecated
     public Set<Recipe> getRecipesThatMadeChanges() {
         return recipes.stream().map(Stack::peek).collect(Collectors.toSet());
@@ -73,13 +100,12 @@ public class Result {
      * Return a list of recipes that have made changes as a hierarchy of descriptors.
      * The method transforms the flat, stack-based representation into descriptors where children are grouped under their common parents.
      */
-    @Incubating(since = "7.22.0")
     public List<RecipeDescriptor> getRecipeDescriptorsThatMadeChanges() {
         List<RecipeDescriptor> recipesToDisplay = new ArrayList<>();
 
         for (Stack<Recipe> currentStack : recipes) {
             Recipe root;
-            if(currentStack.size() > 1) {
+            if (currentStack.size() > 1) {
                 // The first recipe is typically an Environment.CompositeRecipe and should not be included in the list of RecipeDescriptors
                 root = currentStack.get(1);
             } else {
@@ -116,7 +142,7 @@ public class Result {
         Duration timeSavings = null;
         for (Stack<Recipe> recipesStack : recipes) {
             Duration perOccurrence = recipesStack.peek().getEstimatedEffortPerOccurrence();
-            if(perOccurrence != null) {
+            if (perOccurrence != null) {
                 timeSavings = timeSavings == null ? perOccurrence : timeSavings.plus(perOccurrence);
             }
         }
@@ -132,7 +158,7 @@ public class Result {
     }
 
     /**
-     * @param relativeTo  Optional relative path that is used to relativize file paths of reported differences.
+     * @param relativeTo Optional relative path that is used to relativize file paths of reported differences.
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff(@Nullable Path relativeTo) {
@@ -225,7 +251,7 @@ public class Result {
 
             if (this.oldMode == FileMode.MISSING && this.newMode != FileMode.MISSING) {
                 this.changeType = ChangeType.ADD;
-            } else if (this.oldMode != FileMode.MISSING && this.newMode == FileMode.MISSING)  {
+            } else if (this.oldMode != FileMode.MISSING && this.newMode == FileMode.MISSING) {
                 this.changeType = ChangeType.DELETE;
             } else if (!oldPath.equals(newPath)) {
                 this.changeType = ChangeType.RENAME;

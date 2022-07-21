@@ -13,6 +13,8 @@ dependencies {
 
     implementation("de.danielbechler:java-object-diff:latest.release")
 
+    implementation("net.bytebuddy:byte-buddy:latest.release")
+
     api("com.fasterxml.jackson.core:jackson-databind:latest.release")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
     api("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")

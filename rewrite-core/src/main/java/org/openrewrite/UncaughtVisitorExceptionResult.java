@@ -15,10 +15,15 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
 import org.openrewrite.marker.SearchResult;
 
 public class UncaughtVisitorExceptionResult extends SearchResult {
+    @Getter
+    private final UncaughtVisitorException exception;
+
     public UncaughtVisitorExceptionResult(UncaughtVisitorException exception) {
         super(exception.getId(), exception.getSanitizedStackTrace());
+        this.exception = exception;
     }
 }

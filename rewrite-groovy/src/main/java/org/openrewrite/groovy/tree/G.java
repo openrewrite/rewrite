@@ -43,10 +43,7 @@ public interface G extends J {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        if (v instanceof GroovyVisitor) {
-            return (R) acceptGroovy((GroovyVisitor<P>) v, p);
-        }
-        return (R) acceptJava((JavaVisitor<P>) v, p);
+        return (R) acceptGroovy(v.adapt(GroovyVisitor.class), p);
     }
 
     @Nullable
