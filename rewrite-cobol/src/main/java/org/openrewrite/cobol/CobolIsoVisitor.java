@@ -18,6 +18,12 @@ package org.openrewrite.cobol;
 import org.openrewrite.cobol.tree.Cobol;
 
 public class CobolIsoVisitor<P> extends CobolVisitor<P> {
+
+    @Override
+    public Cobol.CompilationUnit visitCompilationUnit(Cobol.CompilationUnit compilationUnit, P p) {
+        return (Cobol.CompilationUnit) super.visitCompilationUnit(compilationUnit, p);
+    }
+
     @Override
     public Cobol.Display visitDisplay(Cobol.Display display, P p) {
         return (Cobol.Display) super.visitDisplay(display, p);
