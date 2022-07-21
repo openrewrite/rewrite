@@ -394,6 +394,86 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitScreenDescriptionBlankClause(CobolParser.ScreenDescriptionBlankClauseContext ctx) {
+        return new Cobol.ScreenDescriptionBlankClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BLANK(), ctx.SCREEN(), ctx.LINE())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionControlClause(CobolParser.ScreenDescriptionControlClauseContext ctx) {
+        return new Cobol.ScreenDescriptionControlClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CONTROL(), ctx.IS()),
+                visitIdentifier(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionSizeClause(CobolParser.ScreenDescriptionSizeClauseContext ctx) {
+        return new Cobol.ScreenDescriptionSizeClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SIZE(), ctx.IS()),
+                visitIdentifier(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionToClause(CobolParser.ScreenDescriptionToClauseContext ctx) {
+        return new Cobol.ScreenDescriptionToClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TO()),
+                visitIdentifier(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionUsingClause(CobolParser.ScreenDescriptionUsingClauseContext ctx) {
+        return new Cobol.ScreenDescriptionUsingClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.USING()),
+                visitIdentifier(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionEntry(CobolParser.ScreenDescriptionEntryContext ctx) {
+        return new Cobol.ScreenDescriptionEntry(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INTEGERLITERAL()),
+                ctx.FILLER() == null ?
+                        (ctx.screenName() == null ? null : padLeft(ctx.screenName())) :
+                        padLeft(ctx.FILLER()),
+                convertAllContainer(emptyList()) // add screen clauses
+                        .withLastSpace(sourceBefore("."))
+        );
+    }
+
+    @Override
+    public Object visitScreenSection(CobolParser.ScreenSectionContext ctx) {
+        return new Cobol.ScreenSection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SCREEN(), ctx.SECTION()),
+                convertAllContainer(sourceBefore("."), ctx.screenDescriptionEntry())
+        );
+    }
+
+    @Override
     public Cobol.ValuedObjectComputerClause visitSegmentLimitClause(CobolParser.SegmentLimitClauseContext ctx) {
         return new Cobol.ValuedObjectComputerClause(
                 randomId(),

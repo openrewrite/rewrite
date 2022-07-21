@@ -604,4 +604,62 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.withTo((Cobol.Literal) visit(d.getTo(), p));
         return d;
     }
+
+    public Cobol visitScreenSection(Cobol.ScreenSection screenSection, P p) {
+        Cobol.ScreenSection s = screenSection;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withDescriptions(visitContainer(s.getPadding().getDescriptions(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionEntry(Cobol.ScreenDescriptionEntry screenDescriptionEntry, P p) {
+        Cobol.ScreenDescriptionEntry s = screenDescriptionEntry;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        if (s.getPadding().getName() != null) {
+            s = s.getPadding().withName(visitLeftPadded(s.getPadding().getName(), p));
+        }
+        s = s.getPadding().withClauses(visitContainer(s.getPadding().getClauses(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionBlankClause(Cobol.ScreenDescriptionBlankClause screenDescriptionBlankClause, P p) {
+        Cobol.ScreenDescriptionBlankClause s = screenDescriptionBlankClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionControlClause(Cobol.ScreenDescriptionControlClause screenDescriptionControlClause, P p) {
+        Cobol.ScreenDescriptionControlClause s = screenDescriptionControlClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withIdentifier((Cobol.Identifier) visit(s.getIdentifier(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionSizeClause(Cobol.ScreenDescriptionSizeClause screenDescriptionSizeClause, P p) {
+        Cobol.ScreenDescriptionSizeClause s = screenDescriptionSizeClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withIdentifier((Cobol.Identifier) visit(s.getIdentifier(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionToClause(Cobol.ScreenDescriptionToClause screenDescriptionToClause, P p) {
+        Cobol.ScreenDescriptionToClause s = screenDescriptionToClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withIdentifier((Cobol.Identifier) visit(s.getIdentifier(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionUsingClause(Cobol.ScreenDescriptionUsingClause screenDescriptionUsingClause, P p) {
+        Cobol.ScreenDescriptionUsingClause s = screenDescriptionUsingClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withIdentifier((Cobol.Identifier) visit(s.getIdentifier(), p));
+        return s;
+    }
 }

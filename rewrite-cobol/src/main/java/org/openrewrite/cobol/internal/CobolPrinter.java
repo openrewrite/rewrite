@@ -561,4 +561,60 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(dataBaseSectionEntry.getTo(), p);
         return dataBaseSectionEntry;
     }
+
+    public Cobol visitScreenSection(Cobol.ScreenSection screenSection, PrintOutputCapture<P> p) {
+        visitSpace(screenSection.getPrefix(), p);
+        visitMarkers(screenSection.getMarkers(), p);
+        p.append(screenSection.getWords());
+        visitContainer(".", screenSection.getPadding().getDescriptions(), "", "", p);
+        return screenSection;
+    }
+
+    public Cobol visitScreenDescriptionEntry(Cobol.ScreenDescriptionEntry screenDescriptionEntry, PrintOutputCapture<P> p) {
+        visitSpace(screenDescriptionEntry.getPrefix(), p);
+        visitMarkers(screenDescriptionEntry.getMarkers(), p);
+        p.append(screenDescriptionEntry.getWords());
+        visitLeftPadded("", screenDescriptionEntry.getPadding().getName(), p);
+        visitContainer("", screenDescriptionEntry.getPadding().getClauses(), "", ".", p);
+        return screenDescriptionEntry;
+    }
+
+    public Cobol visitScreenDescriptionBlankClause(Cobol.ScreenDescriptionBlankClause screenDescriptionBlankClause, PrintOutputCapture<P> p) {
+        visitSpace(screenDescriptionBlankClause.getPrefix(), p);
+        visitMarkers(screenDescriptionBlankClause.getMarkers(), p);
+        p.append(screenDescriptionBlankClause.getWords());
+        return screenDescriptionBlankClause;
+    }
+
+    public Cobol visitScreenDescriptionControlClause(Cobol.ScreenDescriptionControlClause screenDescriptionControlClause, PrintOutputCapture<P> p) {
+        visitSpace(screenDescriptionControlClause.getPrefix(), p);
+        visitMarkers(screenDescriptionControlClause.getMarkers(), p);
+        p.append(screenDescriptionControlClause.getWords());
+        visit(screenDescriptionControlClause.getIdentifier(), p);
+        return screenDescriptionControlClause;
+    }
+
+    public Cobol visitScreenDescriptionSizeClause(Cobol.ScreenDescriptionSizeClause screenDescriptionSizeClause, PrintOutputCapture<P> p) {
+        visitSpace(screenDescriptionSizeClause.getPrefix(), p);
+        visitMarkers(screenDescriptionSizeClause.getMarkers(), p);
+        p.append(screenDescriptionSizeClause.getWords());
+        visit(screenDescriptionSizeClause.getIdentifier(), p);
+        return screenDescriptionSizeClause;
+    }
+
+    public Cobol visitScreenDescriptionToClause(Cobol.ScreenDescriptionToClause screenDescriptionToClause, PrintOutputCapture<P> p) {
+        visitSpace(screenDescriptionToClause.getPrefix(), p);
+        visitMarkers(screenDescriptionToClause.getMarkers(), p);
+        p.append(screenDescriptionToClause.getWords());
+        visit(screenDescriptionToClause.getIdentifier(), p);
+        return screenDescriptionToClause;
+    }
+
+    public Cobol visitScreenDescriptionUsingClause(Cobol.ScreenDescriptionUsingClause screenDescriptionUsingClause, PrintOutputCapture<P> p) {
+        visitSpace(screenDescriptionUsingClause.getPrefix(), p);
+        visitMarkers(screenDescriptionUsingClause.getMarkers(), p);
+        p.append(screenDescriptionUsingClause.getWords());
+        visit(screenDescriptionUsingClause.getIdentifier(), p);
+        return screenDescriptionUsingClause;
+    }
 }

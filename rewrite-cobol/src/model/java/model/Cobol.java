@@ -337,6 +337,44 @@ public interface Cobol {
         }
     }
 
+    class ScreenSection implements Cobol {
+        String words;
+        CobolContainer<ScreenDescriptionEntry> descriptions;
+    }
+
+    class ScreenDescriptionEntry implements Cobol {
+        String words;
+
+        @Nullable
+        CobolLeftPadded<String> name;
+
+        CobolContainer<Cobol> clauses;
+    }
+
+    class ScreenDescriptionBlankClause implements Cobol {
+        String words;
+    }
+
+    class ScreenDescriptionControlClause implements Cobol {
+        String words;
+        Identifier identifier;
+    }
+
+    class ScreenDescriptionSizeClause implements Cobol {
+        String words;
+        Identifier identifier;
+    }
+
+    class ScreenDescriptionToClause implements Cobol {
+        String words;
+        Identifier identifier;
+    }
+
+    class ScreenDescriptionUsingClause implements Cobol {
+        String words;
+        Identifier identifier;
+    }
+
     class Sentence implements Cobol {
         List<Statement> statements;
     }

@@ -298,4 +298,39 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.DataBaseSectionEntry visitDataBaseSectionEntry(Cobol.DataBaseSectionEntry dataBaseSectionEntry, P p) {
         return (Cobol.DataBaseSectionEntry) super.visitDataBaseSectionEntry(dataBaseSectionEntry, p);
     }
+
+    @Override
+    public Cobol.ScreenSection visitScreenSection(Cobol.ScreenSection screenSection, P p) {
+        return (Cobol.ScreenSection) super.visitScreenSection(screenSection, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionEntry visitScreenDescriptionEntry(Cobol.ScreenDescriptionEntry screenDescriptionEntry, P p) {
+        return (Cobol.ScreenDescriptionEntry) super.visitScreenDescriptionEntry(screenDescriptionEntry, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionBlankClause visitScreenDescriptionBlankClause(Cobol.ScreenDescriptionBlankClause screenDescriptionBlankClause, P p) {
+        return (Cobol.ScreenDescriptionBlankClause) super.visitScreenDescriptionBlankClause(screenDescriptionBlankClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionControlClause visitScreenDescriptionControlClause(Cobol.ScreenDescriptionControlClause screenDescriptionControlClause, P p) {
+        return (Cobol.ScreenDescriptionControlClause) super.visitScreenDescriptionControlClause(screenDescriptionControlClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionSizeClause visitScreenDescriptionSizeClause(Cobol.ScreenDescriptionSizeClause screenDescriptionSizeClause, P p) {
+        return (Cobol.ScreenDescriptionSizeClause) super.visitScreenDescriptionSizeClause(screenDescriptionSizeClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionToClause visitScreenDescriptionToClause(Cobol.ScreenDescriptionToClause screenDescriptionToClause, P p) {
+        return (Cobol.ScreenDescriptionToClause) super.visitScreenDescriptionToClause(screenDescriptionToClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionUsingClause visitScreenDescriptionUsingClause(Cobol.ScreenDescriptionUsingClause screenDescriptionUsingClause, P p) {
+        return (Cobol.ScreenDescriptionUsingClause) super.visitScreenDescriptionUsingClause(screenDescriptionUsingClause, p);
+    }
 }

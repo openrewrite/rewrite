@@ -224,4 +224,15 @@ class CobolBasicsTest : RewriteTest {
             01 TRUE INVOKE TRUE
         """)
     )
+
+    @Test
+    fun screenSection() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. DBSection.
+            DATA DIVISION.
+            SCREEN SECTION.
+            01 SCREEN1 BLANK LINE BELL BLINK CONTROL IS 77 SIZE IS 77 USING 77.
+        """)
+    )
 }
