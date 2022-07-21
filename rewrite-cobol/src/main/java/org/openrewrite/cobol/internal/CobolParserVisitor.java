@@ -585,6 +585,19 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitLocalStorageSection(CobolParser.LocalStorageSectionContext ctx) {
+        return new Cobol.LocalStorageSection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LOCAL_STORAGE(), ctx.SECTION()),
+                ctx.LD() == null ? null : ctx.LD().getText(),
+                ctx.localName() == null ? null : (Name) visit(ctx.localName()),
+                convertAllContainer(sourceBefore("."), ctx.dataDescriptionEntry())
+        );
+    }
+
+    @Override
     public Cobol.DataDescriptionEntry visitDataDescriptionEntryFormat1(CobolParser.DataDescriptionEntryFormat1Context ctx) {
         TerminalNode level = ctx.INTEGERLITERAL() == null ? ctx.LEVEL_NUMBER_77() : ctx.INTEGERLITERAL();
         return new Cobol.DataDescriptionEntry(

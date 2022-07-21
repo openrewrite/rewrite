@@ -203,4 +203,14 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
+    @Test
+    fun localStorageSection() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. LocalStorage.
+            DATA DIVISION.
+            LOCAL-STORAGE Section.
+            01  NUM  PIC 9(4).
+        """)
+    )
 }

@@ -579,4 +579,12 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         l = l.getPadding().withDataDescriptions(visitContainer(l.getPadding().getDataDescriptions(), p));
         return l;
     }
+
+    public Cobol visitLocalStorageSection(Cobol.LocalStorageSection localStorageSection, P p) {
+        Cobol.LocalStorageSection l = localStorageSection;
+        l = l.withPrefix(visitSpace(l.getPrefix(), p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        l = l.getPadding().withDataDescriptions(visitContainer(l.getPadding().getDataDescriptions(), p));
+        return l;
+    }
 }

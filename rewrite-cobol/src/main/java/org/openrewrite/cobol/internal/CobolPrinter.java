@@ -192,7 +192,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitDataDescriptionEntry(Cobol.DataDescriptionEntry dataDescriptionEntry, PrintOutputCapture<P> p) {
         visitSpace(dataDescriptionEntry.getPrefix(), p);
         visitMarkers(dataDescriptionEntry.getMarkers(), p);
-        p.append(dataDescriptionEntry.getLevel().toString());
+        p.append(dataDescriptionEntry.getLevel());
         visitLeftPadded("", dataDescriptionEntry.getPadding().getName(), p);
         visitContainer("", dataDescriptionEntry.getPadding().getClauses(), ".", ".", p);
         return dataDescriptionEntry;
@@ -530,5 +530,17 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(linkageSection.getWords());
         visitContainer(".", linkageSection.getPadding().getDataDescriptions(), "", "", p);
         return linkageSection;
+    }
+
+    public Cobol visitLocalStorageSection(Cobol.LocalStorageSection localStorageSection, PrintOutputCapture<P> p) {
+        visitSpace(localStorageSection.getPrefix(), p);
+        visitMarkers(localStorageSection.getMarkers(), p);
+        p.append(localStorageSection.getWords());
+        if (localStorageSection.getLocalName() != null) {
+            p.append(localStorageSection.getLocalData());
+            p.append(localStorageSection.getLocalName().getSimpleName());
+        }
+        visitContainer(".", localStorageSection.getPadding().getDataDescriptions(), "", "", p);
+        return localStorageSection;
     }
 }

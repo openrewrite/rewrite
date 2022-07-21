@@ -277,4 +277,9 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.LinkageSection visitLinkageSection(Cobol.LinkageSection linkageSection, P p) {
         return (Cobol.LinkageSection) super.visitLinkageSection(linkageSection, p);
     }
+
+    @Override
+    public Cobol.LocalStorageSection visitLocalStorageSection(Cobol.LocalStorageSection localStorageSection, P p) {
+        return (Cobol.LocalStorageSection) super.visitLocalStorageSection(localStorageSection, p);
+    }
 }

@@ -213,6 +213,15 @@ public interface Cobol {
         }
     }
 
+    class LocalStorageSection implements Cobol {
+        String words;
+
+        String localData;
+        Name localName;
+
+        CobolContainer<DataDescriptionEntry> dataDescriptions;
+    }
+
     class IdentificationDivision implements Cobol {
         String words;
         CobolLeftPadded<ProgramIdParagraph> programIdParagraph;
