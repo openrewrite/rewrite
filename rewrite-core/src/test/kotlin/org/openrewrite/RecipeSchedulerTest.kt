@@ -28,10 +28,10 @@ class RecipeSchedulerTest : RewriteTest {
         text(
             "hello",
             "~~(java.lang.IllegalStateException: boom\n" +
-                    "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:28)\n" +
-                    "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:26)\n" +
+                    "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:43)\n" +
+                    "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:41)\n" +
                     "  org.openrewrite.text.PlainText.accept(PlainText.java:77)\n" +
-                    "  org.openrewrite.TreeVisitor.visit(TreeVisitor.java:210))~~>hello"
+                    "  org.openrewrite.TreeVisitor.visit(TreeVisitor.java:224))~~>hello"
         )
     )
 }

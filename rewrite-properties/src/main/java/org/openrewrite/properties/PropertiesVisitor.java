@@ -17,9 +17,11 @@ package org.openrewrite.properties;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.LanguageVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.properties.tree.Properties;
 
+@LanguageVisitor("properties")
 public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
 
     @Override

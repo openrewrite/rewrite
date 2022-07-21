@@ -43,14 +43,14 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 class Test {
                     void test(List<Integer> list) {
                         /*~~(java.lang.RuntimeException: Demonstrating an exception thrown on a matching method.
-                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.visitMethodInvocation(RecipeExceptionDemonstration.java:43)
-                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.visitMethodInvocation(RecipeExceptionDemonstration.java:37)
+                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.visitMethodInvocation(RecipeExceptionDemonstration.java:58)
+                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.visitMethodInvocation(RecipeExceptionDemonstration.java:52)
                   org.openrewrite.java.tree.J${'$'}MethodInvocation.acceptJava(J.java:3393)
                   org.openrewrite.java.tree.J.accept(J.java:55)
-                  org.openrewrite.TreeVisitor.visit(TreeVisitor.java:222)
-                  org.openrewrite.TreeVisitor.visitAndCast(TreeVisitor.java:306)
-                  org.openrewrite.java.JavaVisitor.visitRightPadded(JavaVisitor.java:1228)
-                  org.openrewrite.java.JavaVisitor.lambda${'$'}visitBlock${'$'}4(JavaVisitor.java:371)
+                  org.openrewrite.TreeVisitor.visit(TreeVisitor.java:224)
+                  org.openrewrite.TreeVisitor.visitAndCast(TreeVisitor.java:308)
+                  org.openrewrite.java.JavaVisitor.visitRightPadded(JavaVisitor.java:1233)
+                  org.openrewrite.java.JavaVisitor.lambda${'$'}visitBlock${'$'}4(JavaVisitor.java:375)
                   ...)~~>*/list.add(42);
                     }
                 }

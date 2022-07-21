@@ -20,11 +20,13 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.format.AutoFormatVisitor;
 import org.openrewrite.hcl.tree.*;
+import org.openrewrite.internal.LanguageVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 
+@LanguageVisitor("hcl")
 @SuppressWarnings("unused")
 public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
 

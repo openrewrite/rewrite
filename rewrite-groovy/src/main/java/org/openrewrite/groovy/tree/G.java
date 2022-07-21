@@ -21,11 +21,8 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
-import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -35,7 +32,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -44,6 +40,11 @@ public interface G extends J {
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return (R) acceptGroovy(v.adapt(GroovyVisitor.class), p);
+    }
+
+    @Override
+    default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+        return v.isAdaptableTo(GroovyVisitor.class);
     }
 
     @Nullable
@@ -156,38 +157,6 @@ public interface G extends J {
                     .collect(Collectors.toList());
         }
 
-        /**
-         * This will move all imports to the front of every other statement in the file.
-         * If the result is no change, then the original instance is returned.
-         *
-         * @param imports The imports to use.
-         * @return This compilation unit with new imports.
-         */
-        public G.CompilationUnit withImports(List<Import> imports) {
-//            List<Statement> after = ListUtils.concatAll(
-//                    imports.stream()
-//                            .map(s -> (Statement) s)
-//                            .collect(Collectors.toList()),
-//                    statements.stream()
-//                            .map(JRightPadded::getElement)
-//                            .filter(s -> !(s instanceof Import))
-//                            .collect(Collectors.toList()));
-//
-//            if (after.size() != statements.size()) {
-//                return padding.withStatements(after);
-//            }
-//
-//            for (int i = 0; i < statements.size(); i++) {
-//                Statement statement = statements.get(i);
-//                if (after.get(i) != statement) {
-//                    return withStatements(after);
-//                }
-//            }
-
-            // TODO implement me!
-            return this;
-        }
-
         public List<ClassDeclaration> getClasses() {
             return statements.stream()
                     .map(JRightPadded::getElement)
@@ -196,39 +165,9 @@ public interface G extends J {
                     .collect(Collectors.toList());
         }
 
-        /**
-         * This will move all classes to after last import. Every other statement which is neither
-         * an import or class declaration will appear last.
-         * <p>
-         * If the result is no change, then the original instance is returned.
-         *
-         * @param classes The classes to use.
-         * @return This compilation unit with new classes.
-         */
-        public G.CompilationUnit withClasses(List<ClassDeclaration> classes) {
-            // TODO implement me!
-            return this;
-        }
-
-        @Override
-        public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return new GroovyVisitor<P>() {
-                @Override
-                public J visit(@Nullable Tree tree, P p) {
-                    return tree instanceof G.CompilationUnit ?
-                            visitJavaSourceFile((JavaSourceFile) v.visitJavaSourceFile((G.CompilationUnit) tree, p), p) :
-                            v.visit(tree, p);
-                }
-            }.visit(this, p);
-        }
-
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             return v.visitJavaSourceFile(this, p);
-        }
-
-        public Set<NameTree> findType(String clazz) {
-            return FindTypes.find(this, clazz);
         }
 
         @Override
@@ -328,11 +267,6 @@ public interface G extends J {
 
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
-            return acceptJava(v, p);
-        }
-
-        @Override
-        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             J j = v.visit(getExpression(), p);
             if(j instanceof ExpressionStatement) {
                 return j;
@@ -435,13 +369,6 @@ public interface G extends J {
         }
 
         @Override
-        public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
-            G.MapEntry m = this;
-            m = m.withType(v.visitType(type, p));
-            return m;
-        }
-
-        @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -517,13 +444,6 @@ public interface G extends J {
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             return v.visitMapLiteral(this, p);
-        }
-
-        @Override
-        public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
-            G.MapLiteral m = this;
-            m = m.withType(v.visitType(type, p));
-            return m;
         }
 
         @Override
@@ -604,13 +524,6 @@ public interface G extends J {
         }
 
         @Override
-        public @Nullable <P> J acceptJava(JavaVisitor<P> v, P p) {
-            ListLiteral l = this;
-            l = l.withType(v.visitType(type, p));
-            return l;
-        }
-
-        @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -660,14 +573,6 @@ public interface G extends J {
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             return v.visitGString(this, p);
-        }
-
-        @Override
-        public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            GString g = this;
-            g = g.withStrings(ListUtils.map(strings, s -> v.visit(s, p)));
-            g = g.withType(v.visitType(type, p));
-            return g;
         }
 
         @Override
@@ -750,13 +655,6 @@ public interface G extends J {
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             return v.visitBinary(this, p);
-        }
-
-        @Override
-        public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            G.Binary b = this;
-            b = b.withType(v.visitType(type, p));
-            return b;
         }
 
         @Override

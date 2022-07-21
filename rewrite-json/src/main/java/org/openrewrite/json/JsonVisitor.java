@@ -18,6 +18,7 @@ package org.openrewrite.json;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.LanguageVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.tree.Json;
@@ -25,6 +26,7 @@ import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
 
+@LanguageVisitor("json")
 public class JsonVisitor<P> extends TreeVisitor<Json, P> {
 
     @Override

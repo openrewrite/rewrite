@@ -17,7 +17,9 @@ package org.openrewrite.text;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.LanguageVisitor;
 
+@LanguageVisitor("properties")
 public class PlainTextVisitor<P> extends TreeVisitor<PlainText, P> {
 
     @Override

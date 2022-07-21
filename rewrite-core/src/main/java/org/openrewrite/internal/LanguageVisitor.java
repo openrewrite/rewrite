@@ -13,22 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.remote;
+package org.openrewrite.internal;
 
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.binary.Binary;
-import org.openrewrite.internal.LanguageVisitor;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-@LanguageVisitor("remote")
-public class RemoteVisitor<P> extends TreeVisitor<Remote, P> {
-
-    @Override
-    public boolean isAcceptable(SourceFile sourceFile, P p) {
-        return sourceFile instanceof Remote;
-    }
-
-    public Remote visitRemote(Remote remote, P p) {
-        return remote;
-    }
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface LanguageVisitor {
+    String value();
 }
