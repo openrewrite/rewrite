@@ -16,6 +16,7 @@
 package org.openrewrite.yaml
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
@@ -124,7 +125,9 @@ class ChangePropertyKeyTest : YamlRecipeTest {
     fun `change path to one path longer`() = assertChanged(
         recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null),
         before = "a.b.c: true",
-        after = "a.b.c.d: true"
+        after = "a.b.c.d: true",
+        cycles = 1,
+        expectedCyclesThatMakeChanges = 1
     )
 
     @Test
@@ -416,4 +419,47 @@ class ChangePropertyKeyTest : YamlRecipeTest {
                   restclient.sniffer.interval: 1
         """
     )
+
+    @Nested
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/189")
+    inner class WhenOldPropertyKeyIsPrefixOfDotSeparatedKey {
+        @Test
+        fun `scalar value`() = assertChanged(
+            recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null),
+            before = """
+                spring.profiles.group.prod: proddb,prodmq,prodmetrics
+            """,
+            after = """
+                spring.config.activate.on-profile.group.prod: proddb,prodmq,prodmetrics
+            """
+        )
+
+        @Test
+        fun `mapping value`() = assertChanged(
+            recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null),
+            before = """
+                spring.profiles.group:
+                  prod: proddb,prodmq,prodmetrics
+            """,
+            after = """
+                spring.config.activate.on-profile.group:
+                  prod: proddb,prodmq,prodmetrics
+            """
+        )
+
+        @Test
+        fun `match split across parent entries`() = assertChanged(
+            recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null),
+            before = """
+                spring:
+                  profiles.group:
+                    prod: proddb,prodmq,prodmetrics
+            """,
+            after = """
+                spring:
+                  config.activate.on-profile.group:
+                    prod: proddb,prodmq,prodmetrics
+            """
+        )
+    }
 }

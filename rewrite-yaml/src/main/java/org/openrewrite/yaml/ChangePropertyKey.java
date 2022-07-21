@@ -26,7 +26,6 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Spliterators.spliteratorUnknownSize;
@@ -110,9 +109,7 @@ public class ChangePropertyKey extends Recipe {
                     .collect(Collectors.joining("."));
 
             String propertyToTest = newPropertyKey;
-            if (!Boolean.FALSE.equals(relaxedBinding) ?
-                    NameCaseConvention.matchesRelaxedBinding(prop, oldPropertyKey) :
-                    StringUtils.matchesGlob(prop, oldPropertyKey)) {
+            if (matches(prop, oldPropertyKey)) {
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
@@ -128,10 +125,36 @@ public class ChangePropertyKey extends Recipe {
                     }
                     propertyToTest = propertyToTest.substring(value.length());
                 }
+            } else {
+                String parentProp = prop.substring(0, prop.length() - e.getKey().getValue().length()).replaceAll(".$", "");
+                if (matches(prop, oldPropertyKey + ".*") &&
+                        !(matches(parentProp, oldPropertyKey + ".*") || matches(parentProp, oldPropertyKey))) {
+                    Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
+                    while (propertyEntriesLeftToRight.hasNext()) {
+                        Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
+                        String value = propertyEntry.getKey().getValue() + ".";
+
+                        if (!propertyToTest.startsWith(value ) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
+                            doAfterVisit(new InsertSubpropertyVisitor<>(
+                                    propertyEntry,
+                                    propertyToTest + prop.substring(oldPropertyKey.length()),
+                                    entry
+                            ));
+                            break;
+                        }
+                        propertyToTest = propertyToTest.substring(value.length());
+                    }
+                }
             }
 
             return e;
         }
+    }
+
+    private boolean matches(String string, String pattern) {
+        return !Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.matchesRelaxedBinding(string, pattern) :
+                StringUtils.matchesGlob(string, pattern);
     }
 
     private static class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
