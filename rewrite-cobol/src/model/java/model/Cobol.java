@@ -140,13 +140,13 @@ public interface Cobol {
         Literal pictureSymbolLiteral;
     }
 
-    class DataDivision implements Statement {
+    class DataDivision implements Cobol {
         String words;
         CobolContainer<DataDivisionSection> sections;
     }
 
     class DataDescriptionEntry implements Cobol {
-        Integer level;
+        String level;
 
         @Nullable
         CobolLeftPadded<String> name;
@@ -184,6 +184,19 @@ public interface Cobol {
     class EnvironmentDivision implements Cobol {
         String words;
         CobolContainer<Cobol> body;
+    }
+
+    class FileSection implements DataDivisionSection {
+        String words;
+
+        CobolContainer<FileDescriptionEntry> fileDescriptionEntry;
+    }
+
+    class FileDescriptionEntry implements Cobol {
+        String words;
+        Identifier name;
+        CobolContainer<Cobol> clauses;
+        CobolContainer<DataDescriptionEntry> dataDescriptions;
     }
 
     class Identifier implements Name {

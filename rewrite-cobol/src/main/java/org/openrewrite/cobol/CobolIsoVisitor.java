@@ -262,4 +262,14 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.SymbolicCharactersClause visitSymbolicCharactersClause(Cobol.SymbolicCharactersClause symbolicCharactersClause, P p) {
         return (Cobol.SymbolicCharactersClause) super.visitSymbolicCharactersClause(symbolicCharactersClause, p);
     }
+
+    @Override
+    public Cobol.FileSection visitFileSection(Cobol.FileSection fileSection, P p) {
+        return (Cobol.FileSection) super.visitFileSection(fileSection, p);
+    }
+
+    @Override
+    public Cobol.FileDescriptionEntry visitFileDescriptionEntry(Cobol.FileDescriptionEntry fileDescriptionEntry, P p) {
+        return (Cobol.FileDescriptionEntry) super.visitFileDescriptionEntry(fileDescriptionEntry, p);
+    }
 }

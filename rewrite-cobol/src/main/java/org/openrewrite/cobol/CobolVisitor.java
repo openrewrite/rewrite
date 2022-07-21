@@ -557,4 +557,18 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         s = s.withAlphabetName((Cobol.Identifier) visit(s.getAlphabetName(), p));
         return s;
     }
+
+    public Cobol visitFileSection(Cobol.FileSection fileSection, P p) {
+        Cobol.FileSection f = fileSection;
+        f = f.withPrefix(visitSpace(f.getPrefix(), p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        return f;
+    }
+
+    public Cobol visitFileDescriptionEntry(Cobol.FileDescriptionEntry fileDescriptionEntry, P p) {
+        Cobol.FileDescriptionEntry f = fileDescriptionEntry;
+        f = f.withPrefix(visitSpace(f.getPrefix(), p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        return f;
+    }
 }

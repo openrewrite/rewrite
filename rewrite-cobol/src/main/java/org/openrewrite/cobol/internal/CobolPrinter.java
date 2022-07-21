@@ -505,4 +505,22 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(symbolicCharactersClause.getAlphabetName(), p);
         return symbolicCharactersClause;
     }
+
+    public Cobol visitFileSection(Cobol.FileSection fileSection, PrintOutputCapture<P> p) {
+        visitSpace(fileSection.getPrefix(), p);
+        visitMarkers(fileSection.getMarkers(), p);
+        p.append(fileSection.getWords());
+        visitContainer(".", fileSection.getPadding().getFileDescriptionEntry(), "", "", p);
+        return fileSection;
+    }
+
+    public Cobol visitFileDescriptionEntry(Cobol.FileDescriptionEntry fileDescriptionEntry, PrintOutputCapture<P> p) {
+        visitSpace(fileDescriptionEntry.getPrefix(), p);
+        visitMarkers(fileDescriptionEntry.getMarkers(), p);
+        p.append(fileDescriptionEntry.getWords());
+        visit(fileDescriptionEntry.getName(), p);
+        visitContainer("", fileDescriptionEntry.getPadding().getClauses(), "", "", p);
+        visitContainer(".", fileDescriptionEntry.getPadding().getDataDescriptions(), "", "", p);
+        return fileDescriptionEntry;
+    }
 }

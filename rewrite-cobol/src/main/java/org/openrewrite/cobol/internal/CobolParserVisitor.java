@@ -580,7 +580,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 sourceBefore(level.getText()),
                 Markers.EMPTY,
-                Integer.parseInt(level.getText()),
+                level.getText(),
                 ctx.FILLER() == null ?
                         (ctx.dataName() == null ? null : padLeft(ctx.dataName())) :
                         padLeft(ctx.FILLER()),
@@ -623,6 +623,33 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 words(ctx.ENVIRONMENT(), ctx.DIVISION()),
                 convertAllContainer(sourceBefore("."), ctx.environmentDivisionBody())
+        );
+    }
+
+    @Override
+    public Object visitFileSection(CobolParser.FileSectionContext ctx) {
+        return new Cobol.FileSection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FILE(), ctx.SECTION()),
+                convertAllContainer(sourceBefore("."), ctx.fileDescriptionEntry())
+        );
+    }
+
+    @Override
+    public Object visitFileDescriptionEntry(CobolParser.FileDescriptionEntryContext ctx) {
+        Space prefix = prefix(ctx);
+        String words = words(ctx.FD() == null ? ctx.SD() : ctx.FD());
+        Cobol.Identifier name = (Cobol.Identifier) visit(ctx.fileName());
+        return new Cobol.FileDescriptionEntry(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                words,
+                name,
+                CobolContainer.empty(),
+                convertAllContainer(sourceBefore("."), ctx.dataDescriptionEntry())
         );
     }
 

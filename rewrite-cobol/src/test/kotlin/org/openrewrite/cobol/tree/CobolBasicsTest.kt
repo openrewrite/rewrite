@@ -16,13 +16,11 @@
 package org.openrewrite.cobol.tree
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.fail
 import org.openrewrite.ExecutionContext
 import org.openrewrite.cobol.CobolVisitor
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.RewriteTest.toRecipe
-import kotlin.streams.toList
 
 class CobolBasicsTest : RewriteTest {
 
@@ -163,5 +161,21 @@ class CobolBasicsTest : RewriteTest {
                 END-OF
             """
         )
+    )
+
+    @Test
+    fun fileSection() = rewriteRun(
+        cobol("""
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID.
+                    IC109A.
+                DATA DIVISION.
+                FILE SECTION.
+                FD  PRINT-FILE.
+                01  PRINT-REC PICTURE X(120).
+                01  DUMMY-RECORD PICTURE X(120).
+                WORKING-STORAGE SECTION.
+                77  WS1 PICTURE X.
+        """)
     )
 }

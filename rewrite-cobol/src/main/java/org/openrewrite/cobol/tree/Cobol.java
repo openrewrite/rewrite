@@ -1135,7 +1135,7 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class DataDivision implements Statement {
+    class DataDivision implements Cobol {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1201,7 +1201,6 @@ public interface Cobol extends Tree {
             }
         }
     }
-
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1227,7 +1226,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        Integer level;
+        String level;
 
         @Nullable
         CobolLeftPadded<String> name;
@@ -1439,6 +1438,171 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class FileSection implements DataDivisionSection {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<FileDescriptionEntry> fileDescriptionEntry;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitFileSection(this, p);
+        }
+
+        public List<Cobol.FileDescriptionEntry> getFileDescriptionEntry() {
+            return fileDescriptionEntry.getElements();
+        }
+
+        public FileSection withFileDescriptionEntry(List<Cobol.FileDescriptionEntry> fileDescriptionEntry) {
+            return getPadding().withFileDescriptionEntry(this.fileDescriptionEntry.getPadding().withElements(CobolRightPadded.withElements(
+                    this.fileDescriptionEntry.getPadding().getElements(), fileDescriptionEntry)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final FileSection t;
+
+            public CobolContainer<Cobol.FileDescriptionEntry> getFileDescriptionEntry() {
+                return t.fileDescriptionEntry;
+            }
+
+            public FileSection withFileDescriptionEntry(CobolContainer<Cobol.FileDescriptionEntry> fileDescriptionEntry) {
+                return t.fileDescriptionEntry == fileDescriptionEntry ? t : new FileSection(t.padding, t.id, t.prefix, t.markers, t.words, fileDescriptionEntry);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class FileDescriptionEntry implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        @Getter
+        @With
+        Identifier name;
+
+        CobolContainer<Cobol> clauses;
+        CobolContainer<DataDescriptionEntry> dataDescriptions;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitFileDescriptionEntry(this, p);
+        }
+
+        public List<Cobol> getClauses() {
+            return clauses.getElements();
+        }
+
+        public FileDescriptionEntry withClauses(List<Cobol> clauses) {
+            return getPadding().withClauses(this.clauses.getPadding().withElements(CobolRightPadded.withElements(
+                    this.clauses.getPadding().getElements(), clauses)));
+        }
+
+        public List<Cobol.DataDescriptionEntry> getDataDescriptions() {
+            return dataDescriptions.getElements();
+        }
+
+        public FileDescriptionEntry withDataDescriptions(List<Cobol.DataDescriptionEntry> dataDescriptions) {
+            return getPadding().withDataDescriptions(this.dataDescriptions.getPadding().withElements(CobolRightPadded.withElements(
+                    this.dataDescriptions.getPadding().getElements(), dataDescriptions)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final FileDescriptionEntry t;
+
+            public CobolContainer<Cobol> getClauses() {
+                return t.clauses;
+            }
+
+            public FileDescriptionEntry withClauses(CobolContainer<Cobol> clauses) {
+                return t.clauses == clauses ? t : new FileDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.words, t.name, clauses, t.dataDescriptions);
+            }
+
+            public CobolContainer<Cobol.DataDescriptionEntry> getDataDescriptions() {
+                return t.dataDescriptions;
+            }
+
+            public FileDescriptionEntry withDataDescriptions(CobolContainer<Cobol.DataDescriptionEntry> dataDescriptions) {
+                return t.dataDescriptions == dataDescriptions ? t : new FileDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.words, t.name, t.clauses, dataDescriptions);
+            }
+        }
+    }
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
