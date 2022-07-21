@@ -24,7 +24,7 @@ import java.util.List;
 
 public interface Cobol {
 
-    class AcceptStatement implements Statement {
+    class Accept implements Statement {
         String accept;
         Identifier identifier;
         Cobol operation;

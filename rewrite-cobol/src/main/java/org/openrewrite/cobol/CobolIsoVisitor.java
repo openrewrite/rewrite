@@ -335,8 +335,8 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
-    public Cobol.AcceptStatement visitAcceptStatement(Cobol.AcceptStatement acceptStatement, P p) {
-        return (Cobol.AcceptStatement) super.visitAcceptStatement(acceptStatement, p);
+    public Cobol.Accept visitAccept(Cobol.Accept accept, P p) {
+        return (Cobol.Accept) super.visitAccept(accept, p);
     }
 
     @Override

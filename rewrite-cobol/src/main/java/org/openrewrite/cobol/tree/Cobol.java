@@ -167,7 +167,7 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class AcceptStatement implements Statement {
+    class Accept implements Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -212,7 +212,7 @@ public interface Cobol extends Tree {
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitAcceptStatement(this, p);
+            return v.visitAccept(this, p);
         }
 
         @Nullable
@@ -220,9 +220,9 @@ public interface Cobol extends Tree {
             return endAccept == null ? null : endAccept.getElement();
         }
 
-        public AcceptStatement withEndAccept(@Nullable String endAccept) {
+        public Accept withEndAccept(@Nullable String endAccept) {
             if (endAccept == null) {
-                return this.endAccept == null ? this : new AcceptStatement(id, prefix, markers, accept, identifier, operation, onExceptionClause, notOnExceptionClause, null);
+                return this.endAccept == null ? this : new Accept(id, prefix, markers, accept, identifier, operation, onExceptionClause, notOnExceptionClause, null);
             }
             return getPadding().withEndAccept(CobolLeftPadded.withElement(this.endAccept, endAccept));
         }
@@ -244,15 +244,15 @@ public interface Cobol extends Tree {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final AcceptStatement t;
+            private final Accept t;
 
             @Nullable
             public CobolLeftPadded<String> getEndAccept() {
                 return t.endAccept;
             }
 
-            public AcceptStatement withEndAccept(@Nullable CobolLeftPadded<String> endAccept) {
-                return t.endAccept == endAccept ? t : new AcceptStatement(t.padding, t.id, t.prefix, t.markers, t.accept, t.identifier, t.operation, t.onExceptionClause, t.notOnExceptionClause, endAccept);
+            public Accept withEndAccept(@Nullable CobolLeftPadded<String> endAccept) {
+                return t.endAccept == endAccept ? t : new Accept(t.padding, t.id, t.prefix, t.markers, t.accept, t.identifier, t.operation, t.onExceptionClause, t.notOnExceptionClause, endAccept);
             }
         }
     }

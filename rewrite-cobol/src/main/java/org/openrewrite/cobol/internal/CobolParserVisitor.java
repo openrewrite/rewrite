@@ -109,7 +109,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitAcceptStatement(CobolParser.AcceptStatementContext ctx) {
-        return new Cobol.AcceptStatement(
+        return new Cobol.Accept(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,

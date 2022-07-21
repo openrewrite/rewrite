@@ -618,16 +618,16 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return screenDescriptionUsingClause;
     }
 
-    public Cobol visitAcceptStatement(Cobol.AcceptStatement acceptStatement, PrintOutputCapture<P> p) {
-        visitSpace(acceptStatement.getPrefix(), p);
-        visitMarkers(acceptStatement.getMarkers(), p);
-        p.append(acceptStatement.getAccept());
-        visit(acceptStatement.getIdentifier(), p);
-        visit(acceptStatement.getOperation(), p);
-        visit(acceptStatement.getOnExceptionClause(), p);
-        visit(acceptStatement.getNotOnExceptionClause(), p);
-        visitLeftPadded("", acceptStatement.getPadding().getEndAccept(), p);
-        return acceptStatement;
+    public Cobol visitAccept(Cobol.Accept accept, PrintOutputCapture<P> p) {
+        visitSpace(accept.getPrefix(), p);
+        visitMarkers(accept.getMarkers(), p);
+        p.append(accept.getAccept());
+        visit(accept.getIdentifier(), p);
+        visit(accept.getOperation(), p);
+        visit(accept.getOnExceptionClause(), p);
+        visit(accept.getNotOnExceptionClause(), p);
+        visitLeftPadded("", accept.getPadding().getEndAccept(), p);
+        return accept;
     }
 
     public Cobol visitAcceptFromDateStatement(Cobol.AcceptFromDateStatement acceptFromDateStatement, PrintOutputCapture<P> p) {

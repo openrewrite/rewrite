@@ -663,8 +663,8 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return s;
     }
 
-    public Cobol visitAcceptStatement(Cobol.AcceptStatement acceptStatement, P p) {
-        Cobol.AcceptStatement a = acceptStatement;
+    public Cobol visitAccept(Cobol.Accept acceptStatement, P p) {
+        Cobol.Accept a = acceptStatement;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         a = a.withIdentifier((Cobol.Identifier) visit(a.getIdentifier(), p));
