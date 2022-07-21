@@ -272,4 +272,9 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.FileDescriptionEntry visitFileDescriptionEntry(Cobol.FileDescriptionEntry fileDescriptionEntry, P p) {
         return (Cobol.FileDescriptionEntry) super.visitFileDescriptionEntry(fileDescriptionEntry, p);
     }
+
+    @Override
+    public Cobol.LinkageSection visitLinkageSection(Cobol.LinkageSection linkageSection, P p) {
+        return (Cobol.LinkageSection) super.visitLinkageSection(linkageSection, p);
+    }
 }

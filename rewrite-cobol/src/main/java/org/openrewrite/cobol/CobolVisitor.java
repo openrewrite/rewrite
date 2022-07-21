@@ -571,4 +571,12 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
         return f;
     }
+
+    public Cobol visitLinkageSection(Cobol.LinkageSection linkageSection, P p) {
+        Cobol.LinkageSection l = linkageSection;
+        l = l.withPrefix(visitSpace(l.getPrefix(), p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        l = l.getPadding().withDataDescriptions(visitContainer(l.getPadding().getDataDescriptions(), p));
+        return l;
+    }
 }

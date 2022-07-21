@@ -523,4 +523,12 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer(".", fileDescriptionEntry.getPadding().getDataDescriptions(), "", "", p);
         return fileDescriptionEntry;
     }
+
+    public Cobol visitLinkageSection(Cobol.LinkageSection linkageSection, PrintOutputCapture<P> p) {
+        visitSpace(linkageSection.getPrefix(), p);
+        visitMarkers(linkageSection.getMarkers(), p);
+        p.append(linkageSection.getWords());
+        visitContainer(".", linkageSection.getPadding().getDataDescriptions(), "", "", p);
+        return linkageSection;
+    }
 }

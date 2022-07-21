@@ -574,6 +574,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitLinkageSection(CobolParser.LinkageSectionContext ctx) {
+        return new Cobol.LinkageSection(
+                randomId(),
+                sourceBefore(ctx.LINKAGE().getText()),
+                Markers.EMPTY,
+                words(ctx.LINKAGE(), ctx.SECTION()),
+                convertAllContainer(sourceBefore("."), ctx.dataDescriptionEntry())
+        );
+    }
+
+    @Override
     public Cobol.DataDescriptionEntry visitDataDescriptionEntryFormat1(CobolParser.DataDescriptionEntryFormat1Context ctx) {
         TerminalNode level = ctx.INTEGERLITERAL() == null ? ctx.LEVEL_NUMBER_77() : ctx.INTEGERLITERAL();
         return new Cobol.DataDescriptionEntry(

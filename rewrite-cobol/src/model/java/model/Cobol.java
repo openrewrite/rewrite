@@ -218,6 +218,11 @@ public interface Cobol {
         CobolLeftPadded<ProgramIdParagraph> programIdParagraph;
     }
 
+    class LinkageSection implements Cobol {
+        String words;
+        CobolContainer<DataDescriptionEntry> dataDescriptions;
+    }
+
     class ObjectComputer implements Cobol {
         CobolRightPadded<String> words;
 

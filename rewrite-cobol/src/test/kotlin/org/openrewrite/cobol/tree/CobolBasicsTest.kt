@@ -178,4 +178,29 @@ class CobolBasicsTest : RewriteTest {
                 77  WS1 PICTURE X.
         """)
     )
+
+    @Test
+    fun linkageSection() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+                PROGRAM-ID.
+                    IC109A.
+                DATA DIVISION.
+                LINKAGE SECTION.                
+                01  GRP-01.                     
+                    02  SUB-CALLED.             
+                        03  DN1  PICTURE X(6).  
+                        03  DN2  PICTURE X(6).  
+                        03  DN3  PICTURE X(6).  
+                    02  TIMES-CALLED.           
+                        03  DN4  PICTURE S999.  
+                        03  DN5  PICTURE S999.  
+                        03  DN6  PICTURE S999.  
+                    02  SPECIAL-FLAGS.          
+                        03  DN7 PICTURE X.      
+                        03  DN8 PICTURE X.      
+                        03  DN9 PICTURE X.      
+        """)
+    )
+
 }
