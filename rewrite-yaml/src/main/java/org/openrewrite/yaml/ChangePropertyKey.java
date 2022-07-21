@@ -67,6 +67,12 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     String fileMatcher;
 
+    @Option(displayName = "Except",
+            description = "If any of these property keys exist as direct children of `oldPropertyKey`, then they will not be moved to `newPropertyKey`.",
+            required = false)
+    @Nullable
+    List<String> except;
+
     @Override
     public String getDisplayName() {
         return "Change property key";
@@ -115,7 +121,8 @@ public class ChangePropertyKey extends Recipe {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
                     String value = propertyEntry.getKey().getValue() + ".";
 
-                    if (!propertyToTest.startsWith(value ) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
+                    if ((!propertyToTest.startsWith(value ) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext()))
+                        && hasNonExcludedValues(propertyEntry)) {
                         doAfterVisit(new InsertSubpropertyVisitor<>(
                                 propertyEntry,
                                 propertyToTest,
@@ -128,7 +135,8 @@ public class ChangePropertyKey extends Recipe {
             } else {
                 String parentProp = prop.substring(0, prop.length() - e.getKey().getValue().length()).replaceAll(".$", "");
                 if (matches(prop, oldPropertyKey + ".*") &&
-                        !(matches(parentProp, oldPropertyKey + ".*") || matches(parentProp, oldPropertyKey))) {
+                        !(matches(parentProp, oldPropertyKey + ".*") || matches(parentProp, oldPropertyKey)) &&
+                        noneMatch(prop, oldPropertyKey, excludedSubKeys())) {
                     Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                     while (propertyEntriesLeftToRight.hasNext()) {
                         Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
@@ -151,13 +159,71 @@ public class ChangePropertyKey extends Recipe {
         }
     }
 
+    private boolean hasNonExcludedValues(Yaml.Mapping.Entry propertyEntry) {
+        if (!(propertyEntry.getValue() instanceof Yaml.Mapping)) {
+            return true;
+        } else {
+            for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) propertyEntry.getValue()).getEntries()) {
+                if (noneMatch(entry, excludedSubKeys())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private boolean hasExcludedValues(Yaml.Mapping.Entry propertyEntry) {
+        if (propertyEntry.getValue() instanceof Yaml.Mapping) {
+            for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) propertyEntry.getValue()).getEntries()) {
+                if (anyMatch(entry, excludedSubKeys())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean anyMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
+        for (String subKey : subKeys) {
+            if (entry.getKey().getValue().equals(subKey)
+                    || entry.getKey().getValue().startsWith(subKey + ".")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean noneMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
+        for (String subKey : subKeys) {
+            if (entry.getKey().getValue().equals(subKey)
+                    || entry.getKey().getValue().startsWith(subKey + ".")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean noneMatch(String key, String basePattern, List<String> excludedSubKeys) {
+        for (String subkey : excludedSubKeys) {
+            String subKeyPattern = basePattern + "." + subkey;
+            if (matches(key, subKeyPattern) || matches(key, subKeyPattern + ".*")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private boolean matches(String string, String pattern) {
         return !Boolean.FALSE.equals(relaxedBinding) ?
                 NameCaseConvention.matchesRelaxedBinding(string, pattern) :
                 StringUtils.matchesGlob(string, pattern);
     }
 
-    private static class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
+    private List<String> excludedSubKeys() {
+        return except != null ? except : Collections.emptyList();
+    }
+
+    private class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
         private final Yaml.Mapping.Entry scope;
         private final String subproperty;
         private final Yaml.Mapping.Entry entryToReplace;
@@ -179,24 +245,63 @@ public class ChangePropertyKey extends Recipe {
                         new Yaml.Scalar(randomId(), "", Markers.EMPTY,
                                 Yaml.Scalar.Style.PLAIN, null, subproperty),
                         scope.getBeforeMappingValueIndicator(),
-                        entryToReplace.getValue().copyPaste());
+                        removeExclusions(entryToReplace.getValue().copyPaste()));
 
-                if (m.getEntries().contains(entryToReplace)) {
-                    m = m.withEntries(ListUtils.map(m.getEntries(), e -> {
-                        if (e.equals(entryToReplace)) {
-                            return newEntry.withPrefix(e.getPrefix());
-                        }
-                        return e;
-                    }));
+                if (hasExcludedValues(entryToReplace)) {
+                    m = m.withEntries(ListUtils.concat(m.getEntries(), newEntry));
                 } else {
-                    m = (Yaml.Mapping) new DeletePropertyVisitor<>(entryToReplace).visitNonNull(m, p);
-                    m = maybeAutoFormat(m, m.withEntries(ListUtils.concat(m.getEntries(), newEntry)), p, getCursor().getParentOrThrow());
+                    if (m.getEntries().contains(entryToReplace)) {
+                        m = m.withEntries(ListUtils.map(m.getEntries(), e -> {
+                            if (e.equals(entryToReplace)) {
+                                return newEntry.withPrefix(e.getPrefix());
+                            }
+                            return e;
+                        }));
+                    } else {
+                        m = (Yaml.Mapping) new DeletePropertyVisitor<>(entryToReplace).visitNonNull(m, p);
+                        m = maybeAutoFormat(m, m.withEntries(ListUtils.concat(m.getEntries(), newEntry)), p, getCursor().getParentOrThrow());
+                    }
                 }
             }
 
             return m;
         }
+
+        @Override
+        public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry originalEntry, P p) {
+            final Yaml.Mapping.Entry e = super.visitMappingEntry(originalEntry, p);
+            if (e == entryToReplace && hasNonExcludedValues(entryToReplace) && e.getValue() instanceof Yaml.Mapping) {
+                return e.withValue(onlyExclusions((Yaml.Mapping) e.getValue()));
+            }
+            return e;
+        }
+
+        private Yaml.Mapping onlyExclusions(final Yaml.Mapping mapping) {
+            List<Yaml.Mapping.Entry> list = new ArrayList<>();
+            for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+                if (!noneMatch(entry, excludedSubKeys())) {
+                    list.add(entry);
+                }
+            }
+            return mapping.withEntries(list);
+        }
+
+        private Yaml.Block removeExclusions(Yaml.Block block) {
+            if (!(block instanceof Yaml.Mapping)) {
+                return block;
+            } else {
+                Yaml.Mapping mapping = (Yaml.Mapping) block;
+                List<Yaml.Mapping.Entry> list = new ArrayList<>();
+                for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+                    if (noneMatch(entry, excludedSubKeys())) {
+                        list.add(entry);
+                    }
+                }
+                return mapping.withEntries(list);
+            }
+        }
     }
+
     private static class DeletePropertyVisitor<P> extends YamlIsoVisitor<P> {
         private final Yaml.Mapping.Entry scope;
 
