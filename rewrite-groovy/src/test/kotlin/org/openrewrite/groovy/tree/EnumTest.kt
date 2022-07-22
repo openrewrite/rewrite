@@ -17,128 +17,149 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.JavaParser
+import org.openrewrite.test.RewriteTest
 
-class xEnumTest : GroovyTreeTest {
-
-    @Disabled
-    @Test
-    fun enum() = assertParsePrintAndProcess(
-        """
-            enum A {
-                B, C,
-                D;
-            }
-        """
-    )
+class EnumTest : RewriteTest {
 
     @Disabled
     @Test
-    fun innerEnum() = assertParsePrintAndProcess(
-        """
-            class A {
-                enum B {
-                    C
-                }
-            }
-        """
-    )
-
-    @Disabled
-    @Test
-    fun enumWithAnnotations() = assertParsePrintAndProcess(
-        """
-            enum Test {
-                @Deprecated(since = "now")
-                One,
-                
-                @Deprecated(since = "now")
-                Two;
-            }
-        """
-    )
-
-    @Disabled
-    @Test
-    fun anonymousClassInitializer() = assertParsePrintAndProcess(
-        """
-            enum A {
-                A1(1) {
-                    @Override
-                    void foo() {}
-                },
-
-                A2 {
-                    @Override
-                    void foo() {}
-                };
-                
-                A() {}
-                A(int n) {}
-                
-                abstract void foo();
-            }
-        """
-    )
-
-    @Disabled
-    @Test
-    fun enumConstructor() = assertParsePrintAndProcess(
-        """
-            class Outer {
+    fun enum() = rewriteRun(
+        groovy(
+            """
                 enum A {
-                    A1(1);
-    
-                    A(int n) {}
+                    B, C,
+                    D;
                 }
-                
-                private static final class ContextFailedToStart {
-                    private static Object[] combineArguments(String context, Throwable ex, Object[] arguments) {
-                        return new Object[arguments.length + 2];
+            """
+        )
+    )
+
+    @Disabled
+    @Test
+    fun innerEnum() = rewriteRun(
+        groovy(
+            """
+                class A {
+                    enum B {
+                        C
                     }
                 }
-            }
-        """
+            """
+        )
+    )
+
+    @Suppress("Since15")
+    @Disabled
+    @Test
+    fun enumWithAnnotations() = rewriteRun(
+        groovy(
+            """
+                enum Test {
+                    @Deprecated(since = "now")
+                    One,
+                    
+                    @Deprecated(since = "now")
+                    Two;
+                }
+            """
+        )
     )
 
     @Disabled
     @Test
-    fun noArguments() = assertParsePrintAndProcess(
-        """
-            enum A {
-                A1, A2();
-            }
-        """
+    fun anonymousClassInitializer() = rewriteRun(
+        groovy(
+            """
+                enum A {
+                    A1(1) {
+                        @Deprecated
+                        void foo() {}
+                    },
+    
+                    A2 {
+                        @Deprecated
+                        void foo() {}
+                    };
+                    
+                    A() {}
+                    A(int n) {}
+                    
+                    abstract void foo();
+                }
+            """
+        )
     )
 
     @Disabled
     @Test
-    fun enumWithParameters() = assertParsePrintAndProcess(
-        """
-            enum A {
-                ONE(1),
-                TWO(2);
-            
-                A(int n) {}
-            }
-        """
+    fun enumConstructor() = rewriteRun(
+        groovy(
+            """
+                class Outer {
+                    enum A {
+                        A1(1);
+        
+                        A(int n) {}
+                    }
+                    
+                    private static final class ContextFailedToStart {
+                        private static Object[] combineArguments(String context, Throwable ex, Object[] arguments) {
+                            return new Object[arguments.length + 2]
+                        }
+                    }
+                }
+            """
+        )
     )
 
     @Disabled
     @Test
-    fun enumWithoutParameters() = assertParsePrintAndProcess(
-        "enum A { ONE, TWO }"
+    fun noArguments() = rewriteRun(
+        groovy(
+            """
+                enum A {
+                    A1, A2();
+                }
+            """
+        )
     )
 
     @Disabled
     @Test
-    fun enumUnnecessarilyTerminatedWithSemicolon() = assertParsePrintAndProcess(
-        "enum A { ONE ; }"
+    fun enumWithParameters() = rewriteRun(
+        groovy(
+            """
+                enum A {
+                    ONE(1),
+                    TWO(2);
+                
+                    A(int n) {}
+                }
+            """
+        )
     )
 
     @Disabled
     @Test
-    fun enumWithEmptyParameters() = assertParsePrintAndProcess(
-        "enum A { ONE ( ), TWO ( ) }"
+    fun enumWithoutParameters() = rewriteRun(
+        groovy(
+            "enum A { ONE, TWO }"
+        )
+    )
+
+    @Disabled
+    @Test
+    fun enumUnnecessarilyTerminatedWithSemicolon() = rewriteRun(
+        groovy(
+            "enum A { ONE ; }"
+        )
+    )
+
+    @Disabled
+    @Test
+    fun enumWithEmptyParameters() = rewriteRun(
+        groovy(
+            "enum A { ONE ( ), TWO ( ) }"
+        )
     )
 }

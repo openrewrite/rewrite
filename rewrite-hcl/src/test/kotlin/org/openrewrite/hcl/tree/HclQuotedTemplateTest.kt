@@ -16,20 +16,25 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class HclQuotedTemplateTest : HclTreeTest {
+class HclQuotedTemplateTest : RewriteTest {
 
     @Test
-    fun quotedTemplate() = assertParsePrintAndProcess(
-        """
-            a = "abc${'$'}{1}"
-        """.trimIndent()
+    fun quotedTemplate() = rewriteRun(
+        hcl(
+            """
+                a = "abc${'$'}{1}"
+            """
+        )
     )
 
     @Test
-    fun nestedQuotedTemplate() = assertParsePrintAndProcess(
-        """
+    fun nestedQuotedTemplate() = rewriteRun(
+        hcl(
+            """
             a = "abc${'$'}{"a${'$'}{b}"}"
-        """.trimIndent()
+        """
+        )
     )
 }

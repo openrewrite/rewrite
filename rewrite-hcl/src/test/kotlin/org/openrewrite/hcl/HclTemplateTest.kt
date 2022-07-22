@@ -142,7 +142,7 @@ class HclTemplateTest : HclRecipeTest {
                 resource "azure_storage_volume" {
                   size = 1
                 }
-            """.trimIndent()
+            """
                 ).build()
 
                 override fun visitBlock(block: Hcl.Block, p: ExecutionContext): Hcl {

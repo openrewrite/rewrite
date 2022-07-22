@@ -14,21 +14,26 @@
  * limitations under the License.
  */
 import org.junit.jupiter.api.Test
-import org.openrewrite.groovy.tree.GroovyTreeTest
+import org.openrewrite.test.RewriteTest
 
-class WhileLoopTest : GroovyTreeTest {
+@Suppress("GroovyEmptyStatementBody", "GroovyInfiniteLoopStatement")
+class WhileLoopTest : RewriteTest {
 
     @Test
-    fun whileLoop() = assertParsePrintAndProcess(
-        """
-            while ( true ) { }
-        """
+    fun whileLoop() = rewriteRun(
+        groovy(
+            """
+                while ( true ) { }
+            """
+        )
     )
 
     @Test
-    fun statementTerminatorForSingleLineWhileLoops() = assertParsePrintAndProcess(
-        """
-            while(true) test()
-        """
+    fun statementTerminatorForSingleLineWhileLoops() = rewriteRun(
+        groovy(
+            """
+                while(true) test()
+            """
+        )
     )
 }

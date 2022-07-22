@@ -17,47 +17,60 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.test.RewriteTest
 
-class CompilationUnitTest : GroovyTreeTest {
+@Suppress("GroovyUnusedAssignment")
+class CompilationUnitTest : RewriteTest {
 
+    @Suppress("GrPackage")
     @Test
-    fun packageDecl() = assertParsePrintAndProcess(
-        """
-            package org.openrewrite
-            def a = 'hello'
-        """.trimIndent()
+    fun packageDecl() = rewriteRun(
+        groovy(
+            """
+                package org.openrewrite
+                def a = 'hello'
+            """
+        )
     )
 
     @Test
-    fun mixedImports() = assertParsePrintAndProcess(
-        """
-            def a = 'hello'
-            import java.util.List
-            List l = null
-        """.trimIndent()
+    fun mixedImports() = rewriteRun(
+        groovy(
+            """
+                def a = 'hello'
+                import java.util.List
+                List l = null
+            """
+        )
     )
 
     @Test
-    fun shellScript() = assertParsePrintAndProcess(
-        """
-           #!/usr/bin/env groovy
-           
-           def a = 'hello'
-        """.trimIndent()
+    fun shellScript() = rewriteRun(
+        groovy(
+            """
+               #!/usr/bin/env groovy
+               
+               def a = 'hello'
+            """
+        )
     )
 
     @Test
-    fun trailingComment() = assertParsePrintAndProcess(
-        """
-            // foo
-        """
+    fun trailingComment() = rewriteRun(
+        groovy(
+            """
+                // foo
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1974")
     @Test
-    fun topLevelExpression() = assertParsePrintAndProcess(
-        """
-            5
-        """
+    fun topLevelExpression() = rewriteRun(
+        groovy(
+            """
+                5
+            """
+        )
     )
 }

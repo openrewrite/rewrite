@@ -17,25 +17,36 @@ package org.openrewrite.gradle.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.test.RewriteTest
 
-class RepositoryTest: GradleTreeTest {
+class RepositoryTest : RewriteTest {
 
     @Test
-    fun builtInFunctions() = assertParsePrintAndProcess("""
-        repositories {
-            mavenCentral()
-            mavenLocal()
-        }
-    """)
+    fun builtInFunctions() = rewriteRun(
+        buildGradle(
+            """
+                repositories {
+                    mavenCentral()
+                    mavenLocal()
+                }
+            """
+        )
+    )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1253")
     @Test
-    fun customMavenRepo() = assertParsePrintAndProcess("""
-        repositories {
-            maven {
-                setUrl("https://repo.spring.io/release")
-                url "https://repo.spring.io/release"
-            }
-        }
-    """)
+    fun customMavenRepo() = rewriteRun(
+        buildGradle(
+            """
+                repositories {
+                    maven {
+                        url "https://repo.spring.io/release"
+                    }
+                    maven {
+                        setUrl("https://repo.spring.io/release")
+                    }
+                }
+            """
+        )
+    )
 }

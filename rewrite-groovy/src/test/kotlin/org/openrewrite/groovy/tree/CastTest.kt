@@ -16,19 +16,29 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class CastTest: GroovyTreeTest {
-
-    @Test
-    fun JavaStyleCast() = assertParsePrintAndProcess("""
-        String foo = ( String ) null
-        Integer i = (/**/java.lang.Integer/*
-        */)1;
-    """)
+@Suppress("UnnecessaryQualifiedReference", "GroovyUnusedAssignment", "GrUnnecessarySemicolon")
+class CastTest : RewriteTest {
 
     @Test
-    fun groovyStyleCast() = assertParsePrintAndProcess("""
-        String foo = null as String
-        String bar = foo
-    """)
+    fun javaStyleCast() = rewriteRun(
+        groovy(
+            """
+                String foo = ( String ) null
+                Integer i = (/**/java.lang.Integer/*
+                */)1;
+            """
+        )
+    )
+
+    @Test
+    fun groovyStyleCast() = rewriteRun(
+        groovy(
+            """
+                String foo = null as String
+                String bar = foo
+            """
+        )
+    )
 }

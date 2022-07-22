@@ -16,13 +16,12 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class HclIndexTest : HclTreeTest {
+class HclIndexTest : RewriteTest {
 
     @Test
-    fun index() = assertParsePrintAndProcess(
-        """
-            a = b [ 1 ]
-        """.trimIndent()
+    fun index() = rewriteRun(
+        hcl("a = b [ 1 ]")
     )
 }

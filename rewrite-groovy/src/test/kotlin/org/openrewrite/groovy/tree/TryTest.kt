@@ -18,94 +18,108 @@ package org.openrewrite.groovy.tree
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.test.RewriteTest
 
-@Suppress("GroovyUnusedCatchParameter")
-class TryTest : GroovyTreeTest {
+@Suppress("GroovyUnusedCatchParameter", "GroovyUnusedAssignment")
+class TryTest : RewriteTest {
 
     @Test
-    fun severalCatchBlocks() = assertParsePrintAndProcess(
-        """
-           try {
-
-           } catch (RuntimeException e) {
-
-           } catch (Exception e) {
-           
-           }
-        """
+    fun severalCatchBlocks() = rewriteRun(
+        groovy(
+            """
+               try {
+    
+               } catch (RuntimeException e) {
+    
+               } catch (Exception e) {
+               
+               }
+            """
+        )
     )
 
     @Test
-    fun catchOmittingType() = assertParsePrintAndProcess(
-        """
-            try {
-            
-            } catch (all) {
-            
-            }
-        """
+    fun catchOmittingType() = rewriteRun(
+        groovy(
+            """
+                try {
+                
+                } catch (all) {
+                
+                }
+            """
+        )
     )
 
     @Test
-    fun tryFinally() = assertParsePrintAndProcess(
-        """
-            try {
-            
-            } finally {
-                // some comment
-            }
-        """
+    fun tryFinally() = rewriteRun(
+        groovy(
+            """
+                try {
+                
+                } finally {
+                    // some comment
+                }
+            """
+        )
     )
 
     @Test
-    fun tryCatchFinally() = assertParsePrintAndProcess(
-        """
-           try {
-           
-           } catch (Exception e) {
-           
-           } finally {
-               def a = ""
-           }
-        """
+    fun tryCatchFinally() = rewriteRun(
+        groovy(
+            """
+               try {
+               
+               } catch (Exception e) {
+               
+               } finally {
+                   def a = ""
+               }
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1944")
     @Disabled
     @Test
-    fun multiCatch() = assertParsePrintAndProcess(
-        """
-            try {
-            
-            } catch (RuntimeException | Exception e) {
-            
-            }
-        """
+    fun multiCatch() = rewriteRun(
+        groovy(
+            """
+                try {
+                } catch (IOException | UncheckedIOException e) {
+                
+                }
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @Disabled
     @Test
-    fun tryWithResource() = assertParsePrintAndProcess(
-        """
-            try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes())) {
-            
-            } catch (Exception e) {
-            
-            }
-        """
+    fun tryWithResource() = rewriteRun(
+        groovy(
+            """
+                try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes())) {
+                
+                } catch (Exception e) {
+                
+                }
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @Disabled
     @Test
-    fun tryWithResources() = assertParsePrintAndProcess(
-        """
-            try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes()); ByteArrayInputStream b = new ByteArrayInputStream("".getBytes())) {
-            
-            } catch (Exception e) {
-            
-            }
-        """
+    fun tryWithResources() = rewriteRun(
+        groovy(
+            """
+                try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes()); ByteArrayInputStream b = new ByteArrayInputStream("".getBytes())) {
+                
+                } catch (Exception e) {
+                
+                }
+            """
+        )
     )
 }

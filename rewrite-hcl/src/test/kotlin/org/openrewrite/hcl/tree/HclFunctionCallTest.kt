@@ -16,14 +16,17 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class HclFunctionCallTest : HclTreeTest {
+class HclFunctionCallTest : RewriteTest {
 
     @Test
-    fun functionCall() = assertParsePrintAndProcess(
-        """
-            a = method (1, 2 )
-            b = method ( )
-        """.trimIndent()
+    fun functionCall() = rewriteRun(
+        hcl(
+            """
+                a = method (1, 2 )
+                b = method ( )
+            """
+        )
     )
 }

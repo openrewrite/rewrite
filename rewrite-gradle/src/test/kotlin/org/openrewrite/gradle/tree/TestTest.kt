@@ -16,24 +16,28 @@
 package org.openrewrite.gradle.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class TestTest : GradleTreeTest {
+class TestTest : RewriteTest {
 
     @Test
-    fun testDsl() = assertParsePrintAndProcess("""
-         test {
-            useJUnit()
-            useTestNG()
-            useJUnitPlatform()
-            systemProperty 'some.prop', 'value'
-            include 'org/foo/**'
-            exclude 'org/boo/**'
-            testLogging.showStandardStreams = true
-            minHeapSize = "128m"
-            maxHeapSize = "512m"
-            jvmArgs '-XX:MaxPermSize=256m'
-            failFast = true
-         }
-    """
+    fun testDsl() = rewriteRun(
+        buildGradle(
+            """
+                 test {
+                    useJUnit()
+                    useTestNG()
+                    useJUnitPlatform()
+                    systemProperty 'some.prop', 'value'
+                    include 'org/foo/**'
+                    exclude 'org/boo/**'
+                    testLogging.showStandardStreams = true
+                    minHeapSize = "128m"
+                    maxHeapSize = "512m"
+                    jvmArgs '-XX:MaxPermSize=256m'
+                    failFast = true
+                 }
+            """
+        )
     )
 }

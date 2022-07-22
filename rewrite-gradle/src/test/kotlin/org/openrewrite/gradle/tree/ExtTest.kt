@@ -17,14 +17,19 @@ package org.openrewrite.gradle.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.test.RewriteTest
 
-class ExtTest: GradleTreeTest {
+class ExtTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test
-    fun basicExt() = assertParsePrintAndProcess("""
-        ext {
-            foo = "bar"
-        }
-    """)
+    fun basicExt() = rewriteRun(
+        buildGradle(
+            """
+                ext {
+                    foo = "bar"
+                }
+            """
+        )
+    )
 }

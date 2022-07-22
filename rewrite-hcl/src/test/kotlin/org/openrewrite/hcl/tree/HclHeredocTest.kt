@@ -16,48 +16,57 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class HclHeredocTest : HclTreeTest {
+class HclHeredocTest : RewriteTest {
 
     @Test
-    fun heredoc() = assertParsePrintAndProcess(
-        """
-            user_data = <<EOF
-                #! /bin/bash
-                sudo apt-get update
-            clear
-            ${'$'}{a}
-            EOF
-        """.trimIndent()
+    fun heredoc() = rewriteRun(
+        hcl(
+            """
+                user_data = <<EOF
+                    #! /bin/bash
+                    sudo apt-get update
+                clear
+                ${'$'}{a}
+                EOF
+            """
+        )
     )
 
     @Test
-    fun heredocWithQuote() = assertParsePrintAndProcess(
-        """
-            user_data = <<EOF
-            hello
-            EOF
-            a = 1
-        """.trimIndent()
-    )
-
-    @Test
-    fun heredocInsideBlock() = assertParsePrintAndProcess(
-        """
-            resource {
-              user_data = <<EOF
+    fun heredocWithQuote() = rewriteRun(
+        hcl(
+            """
+                user_data = <<EOF
                 hello
-              EOF
-            }
-        """.trimIndent()
+                EOF
+                a = 1
+            """
+        )
     )
 
     @Test
-    fun heredocTemplateExpression() = assertParsePrintAndProcess(
-        """
-            a = <<EOF
-              ${'$'}{b}
-            EOF
-        """.trimIndent()
+    fun heredocInsideBlock() = rewriteRun(
+        hcl(
+            """
+                resource {
+                  user_data = <<EOF
+                    hello
+                  EOF
+                }
+            """
+        )
+    )
+
+    @Test
+    fun heredocTemplateExpression() = rewriteRun(
+        hcl(
+            """
+                a = <<EOF
+                  ${'$'}{b}
+                EOF
+            """
+        )
     )
 }

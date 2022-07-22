@@ -17,111 +17,139 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class ForLoopTest : GroovyTreeTest {
+class ForLoopTest : RewriteTest {
+    @Suppress("GrUnnecessarySemicolon")
     @Test
-    fun forLoopMultipleInit() = assertParsePrintAndProcess(
-        // IntelliJ's Groovy support is confused by multiple assignment in a for loop,
-        // but Groovy itself does support this construct:
-        //    https://groovy-lang.org/semantics.html#_enhanced_classic_java_style_for_loop
-        """
-            int i
-            int j
-            for(i = 0, j = 0;;) {
-            }
-        """
+    fun forLoopMultipleInit() = rewriteRun(
+        groovy(
+            // IntelliJ's Groovy support is confused by multiple assignment in a for loop,
+            // but Groovy itself does support this construct:
+            //    https://groovy-lang.org/semantics.html#_enhanced_classic_java_style_for_loop
+            """
+                int i
+                int j
+                for(i = 0, j = 0;;) {
+                }
+            """
+        )
     )
 
     @Test
-    fun forLoopMultipleUpdate() = assertParsePrintAndProcess(
-        """
-           int i = 0
-           int j = 10
-           for(; i < j; i++ , j-- ) { }
-        """
+    fun forLoopMultipleUpdate() = rewriteRun(
+        groovy(
+            """
+               int i = 0
+               int j = 10
+               for(; i < j; i++ , j-- ) { }
+            """
+        )
     )
 
     @Test
-    fun forLoop() = assertParsePrintAndProcess(
-        """
-            for(int i = 0; i < 10; i++) {
-            }
-        """
+    fun forLoop() = rewriteRun(
+        groovy(
+            """
+                for(int i = 0; i < 10; i++) {
+                }
+            """
+        )
     )
 
     @Test
-    fun infiniteLoop() = assertParsePrintAndProcess(
-        """
-            for(;;) {
-            }
-        """
+    fun infiniteLoop() = rewriteRun(
+        groovy(
+            """
+                for(;;) {
+                }
+            """
+        )
     )
 
     @Test
-    fun format() = assertParsePrintAndProcess(
-        """
-            for ( int i = 0 ; i < 10 ; i++ ) {
-            }
-        """
+    fun format() = rewriteRun(
+        groovy(
+            """
+                for ( int i = 0 ; i < 10 ; i++ ) {
+                }
+            """
+        )
     )
 
     @Test
-    fun formatInfiniteLoop() = assertParsePrintAndProcess(
-        """
-            for ( ; ; ) {}
-        """
+    fun formatInfiniteLoop() = rewriteRun(
+        groovy(
+            """
+                for ( ; ; ) {}
+            """
+        )
     )
 
     @Test
-    fun formatLoopNoInit() = assertParsePrintAndProcess(
-        """
-            for ( ; i < 10 ; i++ ) {}
-        """
+    fun formatLoopNoInit() = rewriteRun(
+        groovy(
+            """
+                for ( ; i < 10 ; i++ ) {}
+            """
+        )
     )
 
     @Test
-    fun formatLoopNoCondition() = assertParsePrintAndProcess(
-        """
-            int i = 0;
-            for(; i < 10; i++) {}
-        """
+    fun formatLoopNoCondition() = rewriteRun(
+        groovy(
+            """
+                int i = 0;
+                for(; i < 10; i++) {}
+            """
+        )
     )
 
     @Test
-    fun statementTerminatorForSingleLineForLoops() = assertParsePrintAndProcess(
-        """
-            for(;;) test()
-        """
+    fun statementTerminatorForSingleLineForLoops() = rewriteRun(
+        groovy(
+            """
+                for(;;) test()
+            """
+        )
     )
 
     @Test
-    fun initializerIsAnAssignment() = assertParsePrintAndProcess(
-        """
-            def a = [1,2]
-            int i=0
-            for(i=0; i<a.length; i++) {}
-        """
+    fun initializerIsAnAssignment() = rewriteRun(
+        groovy(
+            """
+                def a = [1,2]
+                int i=0
+                for(i=0; i<a.length; i++) {}
+            """
+        )
     )
 
     @Disabled
     @Test
-    fun multiVariableInitialization() = assertParsePrintAndProcess(
-        """
-            for(int i, j = 0;;) {}
-        """
+    fun multiVariableInitialization() = rewriteRun(
+        groovy(
+            """
+                for(int i, j = 0;;) {}
+            """
+        )
     )
 
     @Test
-    fun forEachWithColon() = assertParsePrintAndProcess(
-        """
-            for(int i : [1, 2, 3]) {}
-        """
+    fun forEachWithColon() = rewriteRun(
+        groovy(
+            """
+                for(int i : [1, 2, 3]) {}
+            """
+        )
     )
 
     @Test
-    fun forEachWithIn() = assertParsePrintAndProcess(
-        """
-            for(int i in [1, 2, 3]) {}
-        """
+    fun forEachWithIn() = rewriteRun(
+        groovy(
+            """
+                for(int i in [1, 2, 3]) {}
+            """
+        )
     )
 }

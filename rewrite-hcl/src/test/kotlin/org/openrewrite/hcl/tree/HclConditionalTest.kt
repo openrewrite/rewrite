@@ -16,13 +16,12 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class HclConditionalTest : HclTreeTest {
+class HclConditionalTest : RewriteTest {
 
     @Test
-    fun conditional() = assertParsePrintAndProcess(
-        """
-            a = isTrue() ? 1 : 2
-        """.trimIndent()
+    fun conditional() = rewriteRun(
+        hcl("a = isTrue() ? 1 : 2")
     )
 }

@@ -16,34 +16,41 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class FieldAccessTest : GroovyTreeTest {
+class FieldAccessTest : RewriteTest {
 
     @Test
-    fun starAccess() = assertParsePrintAndProcess(
-        """
-            all*.exclude group: 'com.netflix.archaius', module: 'archaius-core'
-        """
+    fun starAccess() = rewriteRun(
+        groovy(
+            """
+                all*.exclude group: 'com.netflix.archaius', module: 'archaius-core'
+            """
+        )
     )
 
     @Test
-    fun fieldAccess() = assertParsePrintAndProcess(
-        """
-            class Test {
-                public Test field = new Test();
-                Test b = new Test() . field . field;
-            }
-        """
+    fun fieldAccess() = rewriteRun(
+        groovy(
+            """
+                class Test {
+                    public Test field = new Test()
+                    Test b = new Test() . field . field
+                }
+            """
+        )
     )
 
     @Test
-    fun nullSafeDereference() = assertParsePrintAndProcess(
-        """
-            class Test {
-                Integer n
-            }
-            Test t
-            t?.n
-        """
+    fun nullSafeDereference() = rewriteRun(
+        groovy(
+            """
+                class Test {
+                    Integer n
+                }
+                Test t = new Test()
+                t?.n
+            """
+        )
     )
 }

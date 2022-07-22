@@ -17,54 +17,66 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.test.RewriteTest
 
-class AssignmentTest : GroovyTreeTest {
+@Suppress("GroovyUnusedAssignment", "GrUnnecessarySemicolon")
+class AssignmentTest : RewriteTest {
 
     @Test
-    fun concat() = assertParsePrintAndProcess(
-        """
-            android {
-                // specify the artifactId as module-name for kotlin
-                kotlinOptions.freeCompilerArgs += ["-module-name", POM_ARTIFACT_ID]
-            }
-        """.trimIndent()
+    fun concat() = rewriteRun(
+        groovy(
+            """
+                android {
+                    // specify the artifactId as module-name for kotlin
+                    kotlinOptions.freeCompilerArgs += ["-module-name", POM_ARTIFACT_ID]
+                }
+            """
+        )
     )
 
     @Test
-    fun assignment() = assertParsePrintAndProcess(
-        """
-            String s;
-            s = "foo";
-        """
+    fun assignment() = rewriteRun(
+        groovy(
+            """
+                String s;
+                s = "foo";
+            """
+        )
     )
 
     @Test
-    fun unaryMinus() = assertParsePrintAndProcess(
-        """
-            def i = -1
-            def l = -1L
-            def f = -1.0f
-            def d = -1.0d
-        """
+    fun unaryMinus() = rewriteRun(
+        groovy(
+            """
+                def i = -1
+                def l = -1L
+                def f = -1.0f
+                def d = -1.0d
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1522")
     @Test
-    fun unaryPlus() = assertParsePrintAndProcess(
-        """
-            int k = +10
-        """
+    fun unaryPlus() = rewriteRun(
+        groovy(
+            """
+                int k = +10
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1533")
     @Test
-    fun baseNConversions() = assertParsePrintAndProcess(
-        """
-            def a = 01
-            def b = 001
-            def c = 0001
-            def d = 00001
-            def e = 000001
-        """
+    fun baseNConversions() = rewriteRun(
+        groovy(
+            """
+                def a = 01
+                def b = 001
+                def c = 0001
+                def d = 00001
+                def e = 000001
+            """
+        )
     )
 }

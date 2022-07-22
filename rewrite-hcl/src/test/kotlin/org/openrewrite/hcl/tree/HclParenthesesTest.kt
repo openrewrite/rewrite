@@ -16,13 +16,12 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class HclParenthesesTest : HclTreeTest {
+class HclParenthesesTest : RewriteTest {
 
     @Test
-    fun parentheses() = assertParsePrintAndProcess(
-        """
-            a = ( 1 )
-        """.trimIndent()
+    fun parentheses() = rewriteRun(
+        hcl("a = ( 1 )")
     )
 }

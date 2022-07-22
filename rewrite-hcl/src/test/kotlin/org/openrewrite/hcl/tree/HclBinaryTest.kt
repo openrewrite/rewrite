@@ -16,15 +16,18 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class HclBinaryTest : HclTreeTest {
+class HclBinaryTest : RewriteTest {
 
     @Test
-    fun binary() = assertParsePrintAndProcess(
-        """
-            a = 1 + 2
-            b = 1 <= 2
-            c = true && false
-        """.trimIndent()
+    fun binary() = rewriteRun(
+        hcl(
+            """
+                a = 1 + 2
+                b = 1 <= 2
+                c = true && false
+            """
+        )
     )
 }

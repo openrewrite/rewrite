@@ -22,11 +22,11 @@ import org.openrewrite.hcl.HclVisitor
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.RewriteTest.toRecipe
 
-class HclAttributeTest : HclTreeTest, RewriteTest {
+class HclAttributeTest : RewriteTest {
 
     @Test
-    fun attribute() = assertParsePrintAndProcess(
-        "a = true"
+    fun attribute() = rewriteRun(
+        hcl("a = true")
     )
 
     @Test

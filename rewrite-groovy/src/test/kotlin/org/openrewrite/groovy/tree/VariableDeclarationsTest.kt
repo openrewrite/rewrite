@@ -19,74 +19,85 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.RewriteTest
 
-class VariableDeclarationsTest : GroovyTreeTest {
+@Suppress("GroovyUnusedAssignment")
+class VariableDeclarationsTest : RewriteTest {
 
     @Test
-    fun singleVariableDeclaration() = assertParsePrintAndProcess(
-        "def a = 1"
+    fun singleVariableDeclaration() = rewriteRun(
+        groovy(
+            "Integer a = 1"
+        )
     )
 
     @Test
-    fun singleVariableDeclarationStaticallyTyped() = assertParsePrintAndProcess(
-        """
-            int a = 1
-            List<String> l
-        """
+    fun singleVariableDeclarationStaticallyTyped() = rewriteRun(
+        groovy(
+            """
+                int a = 1
+                List<String> l
+            """
+        )
     )
 
     @Test
-    fun wildcardWithUpperBound() = assertParsePrintAndProcess(
-        """
+    fun wildcardWithUpperBound() = rewriteRun(
+        groovy(
+            """
             List<? extends String> l
-        """,
-        withAst = { cu ->
-            val vd = cu.statements[0] as J.VariableDeclarations
-            assertThat(vd.typeExpression).isInstanceOf(J.ParameterizedType::class.java)
-            val typeExpression = (vd.typeExpression as J.ParameterizedType).typeParameters!![0]
-            assertThat(typeExpression).isInstanceOf(J.Wildcard::class.java)
-            val wildcard = typeExpression as J.Wildcard
-            assertThat(wildcard.bound).isEqualTo(J.Wildcard.Bound.Extends)
+        """
+        ) { spec ->
+            spec.beforeRecipe { cu ->
+                val vd = cu.statements[0] as J.VariableDeclarations
+                assertThat(vd.typeExpression).isInstanceOf(J.ParameterizedType::class.java)
+                val typeExpression = (vd.typeExpression as J.ParameterizedType).typeParameters!![0]
+                assertThat(typeExpression).isInstanceOf(J.Wildcard::class.java)
+                val wildcard = typeExpression as J.Wildcard
+                assertThat(wildcard.bound).isEqualTo(J.Wildcard.Bound.Extends)
+            }
         }
     )
 
     @Test
-    fun wildcardWithLowerBound() = assertParsePrintAndProcess(
-        """
-            List<? super String> l
-        """
+    fun wildcardWithLowerBound() = rewriteRun(
+        groovy(
+            """
+                List<? super String> l
+            """
+        )
     )
 
     @Test
-    fun diamondOperator() = assertParsePrintAndProcess(
-        """
-            List<String> l = new ArrayList< /* */ >()
-        """
-    )
-
-    @Disabled
-    @Test
-    fun singleTypeMultipleVariableDeclaration() = assertParsePrintAndProcess(
-        "def a = 1, b = 1"
+    fun diamondOperator() = rewriteRun(
+        groovy("List<String> l = new ArrayList< /* */ >()")
     )
 
     @Disabled
     @Test
-    fun multipleTypeMultipleVariableDeclaration() = assertParsePrintAndProcess(
-        "def a = 1, b = 's'"
+    fun singleTypeMultipleVariableDeclaration() = rewriteRun(
+        groovy("def a = 1, b = 1")
+    )
+
+    @Disabled
+    @Test
+    fun multipleTypeMultipleVariableDeclaration() = rewriteRun(
+        groovy("def a = 1, b = 's'")
     )
 
     @Test
-    fun genericVariableDeclaration() = assertParsePrintAndProcess(
-        "def a = new HashMap<String, String>()"
+    fun genericVariableDeclaration() = rewriteRun(
+        groovy("def a = new HashMap<String, String>()")
     )
 
     @Test
-    fun anonymousClass() = assertParsePrintAndProcess(
-        """
-            def a = new Object( ) { 
-                def b = new Object() { }
-            }
-        """
+    fun anonymousClass() = rewriteRun(
+        groovy(
+            """
+                def a = new Object( ) { 
+                    def b = new Object() { }
+                }
+            """
+        )
     )
 }

@@ -16,47 +16,57 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class IfTest : GroovyTreeTest {
+@Suppress("GroovyIfStatementWithIdenticalBranches")
+class IfTest : RewriteTest {
     @Test
-    fun ifElse() = assertParsePrintAndProcess(
-        """
-            int n = 0;
-            if(n == 0) {
-            }
-            else if(n == 1) {
-            }
-            else {
-            }
-        """
+    fun ifElse() = rewriteRun(
+        groovy(
+            """
+                int n = 0
+                if(n == 0) {
+                }
+                else if(n == 1) {
+                }
+                else {
+                }
+            """
+        )
     )
 
     @Test
-    fun noElse() = assertParsePrintAndProcess(
-        """
-            int n = 0;
-            if (n == 0) {
-            }
-        """
+    fun noElse() = rewriteRun(
+        groovy(
+            """
+                int n = 0;
+                if (n == 0) {
+                }
+            """
+        )
     )
 
     @Test
-    fun singleLineIfElseStatements() = assertParsePrintAndProcess(
-        """
-            int n = 0;
-            if (n == 0) n++;
-            else if (n == 1) n++;
-            else n++;
-        """
+    fun singleLineIfElseStatements() = rewriteRun(
+        groovy(
+            """
+                int n = 0;
+                if (n == 0) n++;
+                else if (n == 1) n++;
+                else n++;
+            """
+        )
     )
 
     @Test
-    fun elseWithTrailingSpace() = assertParsePrintAndProcess(
-        """
-            if (true) {
-            }
-            else{ 
-            }
-        """
+    fun elseWithTrailingSpace() = rewriteRun(
+        groovy(
+            """
+                if (true) {
+                }
+                else{ 
+                }
+            """
+        )
     )
 }

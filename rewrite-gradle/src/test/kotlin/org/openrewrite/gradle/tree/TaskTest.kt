@@ -17,27 +17,39 @@ package org.openrewrite.gradle.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.java.TypeValidation
+import org.openrewrite.test.RewriteTest
 
-class TaskTest: GradleTreeTest {
+class TaskTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test
-    fun declareTaskOldStyle() = assertParsePrintAndProcess("""
-          task(testWithCloud, type: Test) {
-            useTestNG()
-            options.excludeGroups = [] as Set
-          }
-    """, false)
+    fun declareTaskOldStyle() = rewriteRun(
+        { spec -> spec.typeValidationOptions(TypeValidation.none()) },
+        buildGradle(
+            """
+                  task(testWithCloud, type: Test) {
+                    useTestNG()
+                    options.excludeGroups = [] as Set
+                  }
+            """
+        )
+    )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1929")
     @Test
-    fun testDsl() = assertParsePrintAndProcess("""
-        test {
-            // Ex: -PexcludeTests=com/google/cloud/healthcare/etl/runner/hl7v2tofhir/integ/*
-            if (project.hasProperty('excludeTests')) {
-                exclude project.property('excludeTests')
-            }
-            dependsOn('buildDeps')
-        }
-    """, false)
+    fun testDsl() = rewriteRun(
+        { spec -> spec.typeValidationOptions(TypeValidation.none()) },
+        buildGradle(
+            """
+                test {
+                    // Ex: -PexcludeTests=com/google/cloud/healthcare/etl/runner/hl7v2tofhir/integ/*
+                    if (project.hasProperty('excludeTests')) {
+                        exclude project.property('excludeTests') as String
+                    }
+                    dependsOn('buildDeps')
+                }
+            """
+        )
+    )
 }

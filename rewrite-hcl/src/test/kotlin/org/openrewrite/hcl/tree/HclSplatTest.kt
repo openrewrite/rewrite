@@ -16,20 +16,17 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class HclSplatTest : HclTreeTest {
+class HclSplatTest : RewriteTest {
 
     @Test
-    fun attributeSplat() = assertParsePrintAndProcess(
-        """
-            a = tuple . *.foo.bar[0]
-        """.trimIndent()
+    fun attributeSplat() = rewriteRun(
+        hcl("a = tuple . *.foo.bar[0]")
     )
 
     @Test
-    fun fullSplat() = assertParsePrintAndProcess(
-        """
-            b = tuple [ * ].foo.bar[0]
-        """.trimIndent()
+    fun fullSplat() = rewriteRun(
+        hcl("b = tuple [ * ].foo.bar[0]")
     )
 }

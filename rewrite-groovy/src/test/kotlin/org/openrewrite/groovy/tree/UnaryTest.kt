@@ -17,36 +17,47 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.test.RewriteTest
 
-class UnaryTest : GroovyTreeTest {
+@Suppress("GroovyUnusedAssignment", "GroovyUnusedIncOrDec", "GrUnnecessarySemicolon")
+class UnaryTest : RewriteTest {
     @Test
-    fun format() = assertParsePrintAndProcess(
-        """
+    fun format() = rewriteRun(
+        groovy(
+            """
             int i = 0;
             int j = ++i;
             int k = i ++;
         """
+        )
     )
 
     @Test
-    fun postfix() = assertParsePrintAndProcess(
-        """
-            int k = i ++;
-        """
+    fun postfix() = rewriteRun(
+        groovy(
+            """
+                int k = i ++;
+            """
+        )
     )
 
     @Test
-    fun prefix() = assertParsePrintAndProcess(
-        """
-            int k = ++i;
-        """
+    fun prefix() = rewriteRun(
+        groovy(
+            """
+                int k = ++i;
+            """
+        )
     )
 
+    @Suppress("GroovyPointlessBoolean")
     @Issue("https://github.com/openrewrite/rewrite/issues/1524")
     @Test
-    fun negation() = assertParsePrintAndProcess(
-        """
-            def a = !true
-        """
+    fun negation() = rewriteRun(
+        groovy(
+            """
+                def a = !true
+            """
+        )
     )
 }

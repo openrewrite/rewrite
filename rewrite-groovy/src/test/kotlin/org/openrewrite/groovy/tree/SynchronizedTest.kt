@@ -16,15 +16,18 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class SynchronizedTest : GroovyTreeTest {
+class SynchronizedTest : RewriteTest {
 
     @Test
-    fun synchronized() = assertParsePrintAndProcess(
-        """
-            Integer n = 0;
-            synchronized(n) {
-            }
-        """
+    fun synchronized() = rewriteRun(
+        groovy(
+            """
+                Integer n = 0;
+                synchronized(n) {
+                }
+            """
+        )
     )
 }

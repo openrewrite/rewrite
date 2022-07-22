@@ -16,13 +16,16 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class ListTest: GroovyTreeTest {
+class ListTest : RewriteTest {
 
     @Test
-    fun listLiteral() = assertParsePrintAndProcess(
-        """
-            def numbers = [1, 2, 3]
-        """
+    fun listLiteral() = rewriteRun(
+        groovy(
+            """
+                def numbers = [1, 2, 3]
+            """
+        )
     )
 }

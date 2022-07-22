@@ -16,19 +16,23 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class MapEntryTest : GroovyTreeTest {
-
-    @Test
-    fun mapEntryMethodArguments() = assertParsePrintAndProcess("apply plugin: 'java'")
-
-    @Test
-    fun multipleEntries() = assertParsePrintAndProcess("""
-        exclude(group: 'g', module: 'm')
-    """.trimIndent())
+@Suppress("GroovyUnusedAssignment")
+class MapEntryTest : RewriteTest {
 
     @Test
-    fun mapAccess() = assertParsePrintAndProcess("""
-        def a = someMap /*[*/ [ /*'*/ 'someKey' /*]*/ ]
-    """)
+    fun mapEntryMethodArguments() = rewriteRun(
+        groovy("apply plugin: 'java'")
+    )
+
+    @Test
+    fun multipleEntries() = rewriteRun(
+        groovy("exclude(group: 'g', module: 'm')")
+    )
+
+    @Test
+    fun mapAccess() = rewriteRun(
+        groovy("def a = someMap /*[*/ [ /*'*/ 'someKey' /*]*/ ]")
+    )
 }

@@ -16,11 +16,12 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class HclAttributeAccessTest : HclTreeTest {
+class HclAttributeAccessTest : RewriteTest {
 
     @Test
-    fun attributeAccess() = assertParsePrintAndProcess(
-        "a = b . c"
+    fun attributeAccess() = rewriteRun(
+        hcl("a = b . c")
     )
 }

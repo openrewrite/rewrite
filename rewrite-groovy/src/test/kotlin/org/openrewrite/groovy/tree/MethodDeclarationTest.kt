@@ -16,82 +16,97 @@
 package org.openrewrite.groovy.tree
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.RewriteTest
 
-class MethodDeclarationTest : GroovyTreeTest {
+class MethodDeclarationTest : RewriteTest {
 
     @Test
-    fun methodDeclarationDeclaringType() = assertParsePrintAndProcess(
-        """
-            class A {
-                void method() {}
+    fun methodDeclarationDeclaringType() = rewriteRun(
+        groovy(
+            """
+                class A {
+                    void method() {}
+                }
+            """
+        ) { spec ->
+            spec.beforeRecipe { cu ->
+                val method = (cu.classes[0].body.statements[0] as J.MethodDeclaration)
+                val methodType = method.methodType!!
+                assertThat(methodType.name).isEqualTo("method")
+                val declaring = method.methodType!!.declaringType
+                assertThat(declaring.fullyQualifiedName).isEqualTo("A")
+                assertThat(declaring.methods.find { it == methodType }).isNotNull
             }
-        """.trimIndent(),
-        withAst = { cu ->
-            val method = (cu.classes[0].body.statements[0] as J.MethodDeclaration)
-            val methodType = method.methodType!!
-            assertThat(methodType.name).isEqualTo("method")
-            val declaring = method.methodType!!.declaringType
-            assertThat(declaring.fullyQualifiedName).isEqualTo("A")
-            assertThat(declaring.methods.find { it == methodType }).isNotNull
         }
     )
 
     @Test
-    fun methodDeclaration() = assertParsePrintAndProcess(
-        """
-            def accept(Map m) {
-            }
-        """.trimIndent()
+    fun methodDeclaration() = rewriteRun(
+        groovy(
+            """
+                def accept(Map m) {
+                }
+            """
+        )
     )
 
     @Test
-    fun primitiveReturn() = assertParsePrintAndProcess(
-        """
-            static int accept(Map m) {
-                List l
-                return 0
-            }
-        """.trimIndent()
+    fun primitiveReturn() = rewriteRun(
+        groovy(
+            """
+                static int accept(Map m) {
+                    List l
+                    return 0
+                }
+            """
+        )
     )
 
     @Test
-    fun emptyArguments() = assertParsePrintAndProcess(
-        """
-            def foo( ) {}
-        """
+    fun emptyArguments() = rewriteRun(
+        groovy("def foo( ) {}")
     )
 
     @Test
-    fun methodThrows() = assertParsePrintAndProcess(
-        """
-            def foo(int a) throws Exception , RuntimeException {
-            }
-        """
+    fun methodThrows() = rewriteRun(
+        groovy(
+            """
+                def foo(int a) throws Exception , RuntimeException {
+                }
+            """
+        )
     )
 
     @Test
-    fun dynamicTypedArguments() = assertParsePrintAndProcess(
-        """
-           def foo(bar, baz) {
-           }
-        """
+    fun dynamicTypedArguments() = rewriteRun(
+        groovy(
+            """
+               def foo(bar, baz) {
+               }
+            """
+        )
     )
 
     @Test
-    fun defaultArgumentValues() = assertParsePrintAndProcess(
-        """
-            def confirmNextStepWithCredentials(String message /* = prefix */ = /* hello prefix */ "Hello" ) {
-            }
-        """
+    fun defaultArgumentValues() = rewriteRun(
+        groovy(
+            """
+                def confirmNextStepWithCredentials(String message /* = prefix */ = /* hello prefix */ "Hello" ) {
+                }
+            """
+        )
     )
 
     @Test
-    fun returnNull() = assertParsePrintAndProcess("""
-        def foo() {
-            return null
-        }
-    """)
+    fun returnNull() = rewriteRun(
+        groovy(
+            """
+                static def foo() {
+                    return null
+                }
+            """
+        )
+    )
 }

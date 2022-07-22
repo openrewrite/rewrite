@@ -16,18 +16,27 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class TernaryTest : GroovyTreeTest {
-
-    @Test
-    fun ternary() = assertParsePrintAndProcess("""
-        1 == 2 ? /no it isn't/ : /yes it is/
-    """)
+class TernaryTest : RewriteTest {
 
     @Test
-    fun elvis() = assertParsePrintAndProcess("""
-        void test() {
-            p = project.findProperty("newVersion") ?: project.findProperty("defaultVersion")
-        }
-    """)
+    fun ternary() = rewriteRun(
+        groovy(
+            """
+                1 == 2 ? /no it isn't/ : /yes it is/
+            """
+        )
+    )
+
+    @Test
+    fun elvis() = rewriteRun(
+        groovy(
+            """
+                void test() {
+                    p = project.findProperty("newVersion") ?: project.findProperty("defaultVersion")
+                }
+            """
+        )
+    )
 }

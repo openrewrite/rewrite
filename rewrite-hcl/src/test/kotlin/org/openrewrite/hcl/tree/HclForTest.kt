@@ -16,24 +16,29 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class HclForTest : HclTreeTest {
+class HclForTest : RewriteTest {
 
     @Test
-    fun forTuple() = assertParsePrintAndProcess(
-        """
-            a = [ for v in ["a", "b"] : v ]
-            b = [ for i, v in ["a", "b"] : i ]
-            c = [for i, v in ["a", "b", "c"]: v if 0]
-        """.trimIndent()
+    fun forTuple() = rewriteRun(
+        hcl(
+            """
+                a = [ for v in ["a", "b"] : v ]
+                b = [ for i, v in ["a", "b"] : i ]
+                c = [for i, v in ["a", "b", "c"]: v if 0]
+            """
+        )
     )
 
     @Test
-    fun forObject() = assertParsePrintAndProcess(
-        """
-            a = { for i, v in ["a", "b"]: v => i }
-            b = { for i, v in ["a", "a", "b"]: k => v }
-            c = { for i, v in ["a", "a", "b"]: v => i... }
-        """.trimIndent()
+    fun forObject() = rewriteRun(
+        hcl(
+            """
+                a = { for i, v in ["a", "b"]: v => i }
+                b = { for i, v in ["a", "a", "b"]: k => v }
+                c = { for i, v in ["a", "a", "b"]: v => i... }
+            """
+        )
     )
 }

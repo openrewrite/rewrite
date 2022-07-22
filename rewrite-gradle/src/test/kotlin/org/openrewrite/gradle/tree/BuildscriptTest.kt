@@ -16,18 +16,24 @@
 package org.openrewrite.gradle.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class BuildscriptTest : GradleTreeTest {
+class BuildscriptTest : RewriteTest {
+
     @Test
-    fun buildscriptWithDependencies() = assertParsePrintAndProcess("""
-        buildscript {
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                classpath 'com.netflix.nebula:nebula-dependency-recommender:9.1.1'
-                classpath 'com.netflix.nebula:gradle-netflixoss-project-plugin:9.1.0'
-            }
-        }
-    """)
+    fun buildscriptWithDependencies() = rewriteRun(
+        buildGradle(
+            """
+                buildscript {
+                    repositories {
+                        mavenCentral()
+                    }
+                    dependencies {
+                        classpath 'com.netflix.nebula:nebula-dependency-recommender:9.1.1'
+                        classpath 'com.netflix.nebula:gradle-netflixoss-project-plugin:9.1.0'
+                    }
+                }
+            """
+        )
+    )
 }

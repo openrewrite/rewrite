@@ -16,15 +16,18 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class ThrowTest : GroovyTreeTest {
+class ThrowTest : RewriteTest {
 
     @Test
-    fun throwException() = assertParsePrintAndProcess(
-        """
-            def test(int a) {
-                throw new UnsupportedOperationException()
-            }
-        """
+    fun throwException() = rewriteRun(
+        groovy(
+            """
+                static def test(int a) {
+                    throw new UnsupportedOperationException()
+                }
+            """
+        )
     )
 }

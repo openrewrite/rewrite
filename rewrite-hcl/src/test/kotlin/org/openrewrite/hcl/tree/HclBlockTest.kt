@@ -17,61 +17,72 @@ package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.test.RewriteTest
 
-class HclBlockTest : HclTreeTest {
+class HclBlockTest : RewriteTest {
 
     /**
      * Doesn't seem to be documented in HCL spec, but in use in plenty of places in terragoat.
      */
     @Test
-    fun blockExpression() = assertParsePrintAndProcess(
-        """
-          tags = {
-            git_file = "terraform/aws/ec2.tf"
-            git_repo = "terragoat"
-          }
-        """.trimIndent()
+    fun blockExpression() = rewriteRun(
+        hcl(
+            """
+              tags = {
+                git_file = "terraform/aws/ec2.tf"
+                git_repo = "terragoat"
+              }
+            """
+        )
     )
 
     @Test
-    fun blockUnquotedLabel() = assertParsePrintAndProcess(
-        """
-            resource azurerm_monitor_log_profile "logging_profile" {
-              device_name = "/dev/sdh"
-            }
-        """.trimIndent()
+    fun blockUnquotedLabel() = rewriteRun(
+        hcl(
+            """
+                resource azurerm_monitor_log_profile "logging_profile" {
+                  device_name = "/dev/sdh"
+                }
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1506")
     @Test
-    fun binaryOperator() = assertParsePrintAndProcess(
-        """
-           create_vnic_details {
-             assign_public_ip = (var.instance_visibility == "Private") ? false : true
-           }
-        """.trimIndent()
+    fun binaryOperator() = rewriteRun(
+        hcl(
+            """
+               create_vnic_details {
+                 assign_public_ip = (var.instance_visibility == "Private") ? false : true
+               }
+            """
+        )
     )
 
     @Test
-    fun block() = assertParsePrintAndProcess(
-        """
-            resource "aws_volume_attachment" "ebs_att" {
-              device_name = "/dev/sdh"
-              volume_id   = "aws_ebs_volume.web_host_storage.id"
-              instance_id = "aws_instance.web_host.id"
-            }
-            
-            resource "aws_route_table_association" "rtbassoc2" {
-              subnet_id      = aws_subnet.web_subnet2.id
-              route_table_id = aws_route_table.web_rtb.id
-            }
-        """.trimIndent()
+    fun block() = rewriteRun(
+        hcl(
+            """
+                resource "aws_volume_attachment" "ebs_att" {
+                  device_name = "/dev/sdh"
+                  volume_id   = "aws_ebs_volume.web_host_storage.id"
+                  instance_id = "aws_instance.web_host.id"
+                }
+                
+                resource "aws_route_table_association" "rtbassoc2" {
+                  subnet_id      = aws_subnet.web_subnet2.id
+                  route_table_id = aws_route_table.web_rtb.id
+                }
+            """
+        )
     )
 
     @Test
-    fun oneLineBlock() = assertParsePrintAndProcess(
-        """
-            resource "aws_volume_attachment" "ebs_att" { device_name = "/dev/sdh" }
-        """.trimIndent()
+    fun oneLineBlock() = rewriteRun(
+        hcl(
+            """
+                resource "aws_volume_attachment" "ebs_att" { device_name = "/dev/sdh" }
+            """
+        )
     )
 }

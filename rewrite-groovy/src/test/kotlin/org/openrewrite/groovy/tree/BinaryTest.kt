@@ -17,79 +17,97 @@ package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.test.RewriteTest
 
-class BinaryTest : GroovyTreeTest {
+@Suppress("GroovyUnusedAssignment", "GrUnnecessarySemicolon")
+class BinaryTest : RewriteTest {
 
     @Test
-    fun equals() = assertParsePrintAndProcess(
-        """
-            int n = 0;
-            boolean b = n == 0;
-        """
+    fun equals() = rewriteRun(
+        groovy(
+            """
+                int n = 0;
+                boolean b = n == 0;
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1531")
     @Test
-    fun regexFindOperator() = assertParsePrintAndProcess(
-        """
-            def REGEX = /\d+/
-            def text = "123"
-            def result = text =~ REGEX
-        """
+    fun regexFindOperator() = rewriteRun(
+        groovy(
+            """
+                def REGEX = /\d+/
+                def text = "123"
+                def result = text =~ REGEX
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1531")
     @Test
-    fun regexMatchOperator() = assertParsePrintAndProcess(
-        """
-            def REGEX = /\d+/
-            def text = "123"
-            def result = text ==~ REGEX
-        """
+    fun regexMatchOperator() = rewriteRun(
+        groovy(
+            """
+                def REGEX = /\d+/
+                def text = "123"
+                def result = text ==~ REGEX
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1520")
     @Test
-    fun minusEquals() = assertParsePrintAndProcess(
-        """
-            def a = 5
-            a -= 5
-        """
+    fun minusEquals() = rewriteRun(
+        groovy(
+            """
+                def a = 5
+                a -= 5
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1520")
     @Test
-    fun divisionEquals() = assertParsePrintAndProcess(
-        """
-            def a = 5
-            a /= 5
-        """
+    fun divisionEquals() = rewriteRun(
+        groovy(
+            """
+                def a = 5
+                a /= 5
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1520")
     @Test
-    fun bitwiseAnd() = assertParsePrintAndProcess(
-        """
-            def a = 4
-            a &= 1
-        """
+    fun bitwiseAnd() = rewriteRun(
+        groovy(
+            """
+                def a = 4
+                a &= 1
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1520")
     @Test
-    fun bitwiseOr() = assertParsePrintAndProcess(
-        """
-            def a = 4
-            a |= 1
-        """
+    fun bitwiseOr() = rewriteRun(
+        groovy(
+            """
+                def a = 4
+                a |= 1
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1520")
     @Test
-    fun bitwiseXOr() = assertParsePrintAndProcess(
-        """
-            def a = 4
-            a ^= 1
-        """
+    fun bitwiseXOr() = rewriteRun(
+        groovy(
+            """
+                def a = 4
+                a ^= 1
+            """
+        )
     )
 }

@@ -16,13 +16,18 @@
 package org.openrewrite.gradle.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.test.RewriteTest
 
-class PluginsTest : GradleTreeTest {
+class PluginsTest : RewriteTest {
     @Test
-    fun applySomePlugins() = assertParsePrintAndProcess("""
-        plugins {
-            id 'me.champeau.gradle.jmh' version '0.5.2'
-            id "com.github.spotbugs" version "4.6.0" apply false
-        }
-    """)
+    fun applySomePlugins() = rewriteRun(
+        buildGradle(
+            """
+                plugins {
+                    id 'me.champeau.gradle.jmh' version '0.5.2'
+                    id "com.github.spotbugs" version "4.6.0" apply false
+                }
+            """
+        )
+    )
 }
