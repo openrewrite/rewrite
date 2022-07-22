@@ -1016,7 +1016,105 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Cancel implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
 
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String cancel;
+
+        CobolContainer<CancelCall> cancelCalls;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitCancel(this, p);
+        }
+
+        public List<Cobol.CancelCall> getCancelCalls() {
+            return cancelCalls.getElements();
+        }
+
+        public Cancel withCancelCalls(List<Cobol.CancelCall> cancelCalls) {
+            return getPadding().withCancelCalls(this.cancelCalls.getPadding().withElements(CobolRightPadded.withElements(
+                    this.cancelCalls.getPadding().getElements(), cancelCalls)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Cancel t;
+
+            public CobolContainer<Cobol.CancelCall> getCancelCalls() {
+                return t.cancelCalls;
+            }
+
+            public Cancel withCancelCalls(CobolContainer<Cobol.CancelCall> cancelCalls) {
+                return t.cancelCalls == cancelCalls ? t : new Cancel(t.padding, t.id, t.prefix, t.markers, t.cancel, cancelCalls);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class CancelCall implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        Name libraryName;
+
+        @Nullable
+        String by;
+
+        @Nullable
+        Identifier identifier;
+
+        @Nullable
+        Literal literal;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitCancelCall(this, p);
+        }
+    }
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

@@ -708,4 +708,21 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(inSection.getName(), p);
         return inSection;
     }
+
+    public Cobol visitCancel(Cobol.Cancel cancel, PrintOutputCapture<P> p) {
+        visitSpace(cancel.getPrefix(), p);
+        visitMarkers(cancel.getMarkers(), p);
+        p.append(cancel.getCancel());
+        visitContainer("", cancel.getPadding().getCancelCalls(), "", "", p);
+        return cancel;
+    }
+
+    public Cobol visitCancelCall(Cobol.CancelCall cancelCall, PrintOutputCapture<P> p) {
+        visitSpace(cancelCall.getPrefix(), p);
+        visitMarkers(cancelCall.getMarkers(), p);
+        p.append(cancelCall.getBy());
+        visit(cancelCall.getIdentifier(), p);
+        visit(cancelCall.getLiteral(), p);
+        return cancelCall;
+    }
 }

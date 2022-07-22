@@ -150,6 +150,23 @@ public interface Cobol {
         Name name;
     }
 
+    class Cancel implements Statement {
+        String cancel;
+        CobolContainer<CancelCall> cancelCalls;
+    }
+
+    class CancelCall implements Cobol {
+        @Nullable
+        Name libraryName;
+        @Nullable
+        String by;
+
+        @Nullable
+        Identifier identifier;
+        @Nullable
+        Literal literal;
+    }
+
     class ChannelClause implements Cobol {
         String words;
         Literal literal;

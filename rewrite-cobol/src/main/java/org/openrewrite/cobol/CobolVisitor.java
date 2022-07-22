@@ -752,4 +752,20 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return i;
     }
 
+    public Cobol visitCancel(Cobol.Cancel cancel, P p) {
+        Cobol.Cancel c = cancel;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.getPadding().withCancelCalls(visitContainer(c.getPadding().getCancelCalls(), p));
+        return c;
+    }
+
+    public Cobol visitCancelCall(Cobol.CancelCall cancelCall, P p) {
+        Cobol.CancelCall c = cancelCall;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withIdentifier((Cobol.Identifier) visit(c.getIdentifier(), p));
+        c = c.withLiteral((Cobol.Literal) visit(c.getLiteral(), p));
+        return c;
+    }
 }

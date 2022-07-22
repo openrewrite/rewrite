@@ -254,6 +254,30 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitCancelStatement(CobolParser.CancelStatementContext ctx) {
+        return new Cobol.Cancel(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                ctx.CANCEL().getText(),
+                convertAllContainer(ctx.cancelCall())
+        );
+    }
+
+    @Override
+    public Object visitCancelCall(CobolParser.CancelCallContext ctx) {
+        return new Cobol.CancelCall(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visitNullable(ctx.libraryName()),
+                words(ctx.BYTITLE(), ctx.BYFUNCTION()),
+                visitNullable(ctx.identifier()),
+                visitNullable(ctx.literal())
+        );
+    }
+
+    @Override
     public Cobol.ChannelClause visitChannelClause(CobolParser.ChannelClauseContext ctx) {
         return new Cobol.ChannelClause(
                 randomId(),

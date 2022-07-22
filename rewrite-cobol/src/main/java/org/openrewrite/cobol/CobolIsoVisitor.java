@@ -388,4 +388,14 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.InSection visitInSection(Cobol.InSection inSection, P p) {
         return (Cobol.InSection) super.visitInSection(inSection, p);
     }
+
+    @Override
+    public Cobol.Cancel visitCancel(Cobol.Cancel cancel, P p) {
+        return (Cobol.Cancel) super.visitCancel(cancel, p);
+    }
+
+    @Override
+    public Cobol.CancelCall visitCancelCall(Cobol.CancelCall cancelCall, P p) {
+        return (Cobol.CancelCall) super.visitCancelCall(cancelCall, p);
+    }
 }

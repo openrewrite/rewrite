@@ -15,6 +15,7 @@
  */
 package org.openrewrite.cobol.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.cobol.CobolVisitor
@@ -225,6 +226,7 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
+    @Disabled("Implement Container in ScreenDescriptionEntry.")
     @Test
     fun screenSection() = rewriteRun(
         cobol("""
@@ -236,6 +238,7 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
+    @Disabled("Requires PROCEDURE DIVISION.")
     @Test
     fun acceptStatement() = rewriteRun(
         cobol("""
@@ -261,5 +264,19 @@ class CobolBasicsTest : RewriteTest {
                 ALTER PARA-23 TO PARA-24.
             """
         )
+    )
+
+    @Disabled("Requires PROCEDURE DIVISION.")
+    @Test
+    fun cancelStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            PARAGRAPH_NAME.
+            CANCEL "literal"
+            CANCEL identifier
+            CANCEL libraryName BYTITLE
+        """)
     )
 }
