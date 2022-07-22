@@ -27,28 +27,25 @@ public class AdaptabilityTest {
 
     @Test
     void typesInUse() {
-        new TypesInUse.FindTypesInUse().adapt(GroovyVisitor.class, 0);
+        new TypesInUse.FindTypesInUse().adapt(GroovyVisitor.class);
     }
 
     @Test
     void usesMethod() {
-        new UsesMethod<>("java.util.List add(..)")
-                .adapt(GroovyVisitor.class, 0);
+        new UsesMethod<>("java.util.List add(..)").adapt(GroovyVisitor.class);
     }
 
     @Test
     void isBuildGradle() {
-        new IsBuildGradle<>()
-                .adapt(GroovyVisitor.class, 0);
+        new IsBuildGradle<>().adapt(GroovyVisitor.class);
     }
 
     @Test
     void unboundedVisitor() {
-        new VisitSourceFile<>()
-                .adapt(GroovyVisitor.class, 0);
+        new VisitLiteral<>().adapt(GroovyVisitor.class);
     }
 
-    public static class VisitSourceFile<P> extends JavaIsoVisitor<P> {
+    public static class VisitLiteral<P> extends JavaIsoVisitor<P> {
         @Override
         public J.Literal visitLiteral(J.Literal literal, P p) {
             return super.visitLiteral(literal, p);

@@ -39,7 +39,7 @@ public interface G extends J {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) acceptGroovy(v.adapt(GroovyVisitor.class, p), p);
+        return (R) acceptGroovy(v.adapt(GroovyVisitor.class), p);
     }
 
     @Override

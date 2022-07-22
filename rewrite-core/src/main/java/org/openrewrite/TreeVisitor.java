@@ -42,6 +42,7 @@ import java.util.function.BiFunction;
 
 import static java.lang.reflect.Modifier.*;
 import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
+import static net.bytebuddy.matcher.ElementMatchers.named;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -324,14 +325,16 @@ public abstract class TreeVisitor<T extends Tree, P> {
         while (firstLanguageVisitorInHierarchy.getAnnotationsByType(LanguageVisitor.class).length == 0) {
             firstLanguageVisitorInHierarchy = firstLanguageVisitorInHierarchy.getSuperclass();
         }
-        return firstLanguageVisitorInHierarchy.isAssignableFrom(adaptTo);
+        return adaptTo.isAssignableFrom(firstLanguageVisitorInHierarchy) ||
+                firstLanguageVisitorInHierarchy.isAssignableFrom(adaptTo);
     }
 
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {
-        return adapt(adaptTo, null);
-    }
+        if (adaptTo.isAssignableFrom(getClass())) {
+            //noinspection unchecked
+            return (V) this;
+        }
 
-    public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo, P p) {
         Class<?> firstLanguageVisitorInHierarchy = getClass();
         while (firstLanguageVisitorInHierarchy.getAnnotationsByType(LanguageVisitor.class).length == 0) {
             firstLanguageVisitorInHierarchy = firstLanguageVisitorInHierarchy.getSuperclass();
@@ -361,20 +364,16 @@ public abstract class TreeVisitor<T extends Tree, P> {
             }
 
             DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = byteBuddy
-//                    .subclass(parameterizedType(adaptTo, p.getClass()).build(),
-//                            NO_CONSTRUCTORS)
                     .subclass(adaptTo, NO_CONSTRUCTORS)
-//                    .defineField("delegate", parameterizedType(delegateType, p.getClass()).build(), PRIVATE | FINAL)
                     .defineField("delegate", delegateType, PRIVATE | FINAL)
                     .defineConstructor(PUBLIC)
-//                    .withParameter(parameterizedType(delegateType, p.getClass()).build())
                     .withParameter(delegateType)
                     .intercept(MethodCall.invoke(adaptTo.getConstructor())
                             .andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
 
             for (Method adaptToVisitMethod : adaptTo.getMethods()) {
                 if (!adaptToVisitMethod.getName().startsWith("visit") || adaptToVisitMethod.isBridge() ||
-                        adaptToVisitMethod.isSynthetic()) {
+                        adaptToVisitMethod.isSynthetic() || adaptToVisitMethod.getName().equals("visit")) {
                     continue;
                 }
 
@@ -389,29 +388,25 @@ public abstract class TreeVisitor<T extends Tree, P> {
                                 continue nextMethod;
                             }
                         }
-                        builder = builder.defineMethod(delegatableMethod.getName(), delegatableMethod.getReturnType())
-                                .withParameters(delegatableMethod.getGenericParameterTypes())
+                        builder = builder
+                                .method(named(delegatableMethod.getName()))
                                 .intercept(MethodDelegation.toField("delegate"));
                     }
                 }
             }
 
-            try {
-                DynamicType.Unloaded<?> unloaded = builder.make();
-                Class<?> adapted = unloaded
-                        .load(getClass().getClassLoader())
-                        .getLoaded();
+            DynamicType.Unloaded<?> unloaded = builder.make();
+            Class<?> adapted = unloaded
+                    .load(getClass().getClassLoader())
+                    .getLoaded();
 
-                adaptedVisitorsCache.computeIfAbsent(getClass(), from -> new IdentityHashMap<>())
-                        .put(adaptTo, adapted);
+            adaptedVisitorsCache.computeIfAbsent(getClass(), from -> new IdentityHashMap<>())
+                    .put(adaptTo, adapted);
 
-                //noinspection unchecked
-                return (V) adapted
-                        .getDeclaredConstructor(delegateType)
-                        .newInstance(this);
-            } catch (StackOverflowError e) {
-                throw new RuntimeException("Failed to adapt " + getClass().getName() + " to " + adaptTo.getName(), e);
-            }
+            //noinspection unchecked
+            return (V) adapted
+                    .getDeclaredConstructor(delegateType)
+                    .newInstance(this);
         } catch (InstantiationException | NoSuchMethodException | InvocationTargetException |
                  IllegalAccessException e) {
             throw new RuntimeException(e);

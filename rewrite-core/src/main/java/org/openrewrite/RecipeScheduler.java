@@ -147,7 +147,7 @@ public interface RecipeScheduler {
                     if (isChanged) {
                         results.add(new Result(original, s, s.getMarkers()
                                 .findFirst(RecipesThatMadeChanges.class)
-                                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
+                                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change. Did a recipe apply a marker?"))
                                 .getRecipes()));
                     }
                 }

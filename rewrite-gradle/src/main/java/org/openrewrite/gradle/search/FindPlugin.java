@@ -44,10 +44,10 @@ public class FindPlugin extends Recipe {
         return "Find a Gradle plugin by id.";
     }
 
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
+//    @Override
+//    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+//        return new IsBuildGradle<>();
+//    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
