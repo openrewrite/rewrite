@@ -418,4 +418,44 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.CancelCall visitCancelCall(Cobol.CancelCall cancelCall, P p) {
         return (Cobol.CancelCall) super.visitCancelCall(cancelCall, p);
     }
+
+    @Override
+    public Cobol.Close visitClose(Cobol.Close close, P p) {
+        return (Cobol.Close) super.visitClose(close, p);
+    }
+
+    @Override
+    public Cobol.CloseFile visitCloseFile(Cobol.CloseFile closeFile, P p) {
+        return (Cobol.CloseFile) super.visitCloseFile(closeFile, p);
+    }
+
+    @Override
+    public Cobol.CloseReelUnitStatement visitCloseReelUnitStatement(Cobol.CloseReelUnitStatement closeReelUnitStatement, P p) {
+        return (Cobol.CloseReelUnitStatement) super.visitCloseReelUnitStatement(closeReelUnitStatement, p);
+    }
+
+    @Override
+    public Cobol.CloseRelativeStatement visitCloseRelativeStatement(Cobol.CloseRelativeStatement closeRelativeStatement, P p) {
+        return (Cobol.CloseRelativeStatement) super.visitCloseRelativeStatement(closeRelativeStatement, p);
+    }
+
+    @Override
+    public Cobol.ClosePortFileIOStatement visitClosePortFileIOStatement(Cobol.ClosePortFileIOStatement closePortFileIOStatement, P p) {
+        return (Cobol.ClosePortFileIOStatement) super.visitClosePortFileIOStatement(closePortFileIOStatement, p);
+    }
+
+    @Override
+    public Cobol.ClosePortFileIOUsingCloseDisposition visitClosePortFileIOUsingCloseDisposition(Cobol.ClosePortFileIOUsingCloseDisposition closePortFileIOUsingCloseDisposition, P p) {
+        return (Cobol.ClosePortFileIOUsingCloseDisposition) super.visitClosePortFileIOUsingCloseDisposition(closePortFileIOUsingCloseDisposition, p);
+    }
+
+    @Override
+    public Cobol.ClosePortFileIOUsingAssociatedData visitClosePortFileIOUsingAssociatedData(Cobol.ClosePortFileIOUsingAssociatedData closePortFileIOUsingAssociatedData, P p) {
+        return (Cobol.ClosePortFileIOUsingAssociatedData) super.visitClosePortFileIOUsingAssociatedData(closePortFileIOUsingAssociatedData, p);
+    }
+
+    @Override
+    public Cobol.ClosePortFileIOUsingAssociatedDataLength visitClosePortFileIOUsingAssociatedDataLength(Cobol.ClosePortFileIOUsingAssociatedDataLength closePortFileIOUsingAssociatedDataLength, P p) {
+        return (Cobol.ClosePortFileIOUsingAssociatedDataLength) super.visitClosePortFileIOUsingAssociatedDataLength(closePortFileIOUsingAssociatedDataLength, p);
+    }
 }

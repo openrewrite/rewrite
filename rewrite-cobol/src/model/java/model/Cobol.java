@@ -160,11 +160,13 @@ public interface Cobol {
     class CancelCall implements Cobol {
         @Nullable
         Name libraryName;
+
         @Nullable
         String by;
 
         @Nullable
         Identifier identifier;
+
         @Nullable
         Literal literal;
     }
@@ -193,6 +195,48 @@ public interface Cobol {
 
         @Nullable
         Name to;
+    }
+
+    class Close implements Statement {
+        String close;
+        CobolContainer<CloseFile> closeFiles;
+    }
+
+    class CloseFile implements Cobol {
+        Name fileName;
+
+        @Nullable
+        Cobol closeStatement;
+    }
+
+    class CloseReelUnitStatement implements Cobol {
+        String words;
+    }
+
+    class CloseRelativeStatement implements Cobol {
+        String words;
+    }
+
+    class ClosePortFileIOStatement implements Cobol {
+        String words;
+
+        CobolContainer<Cobol> closePortFileIOUsing;
+    }
+
+    class ClosePortFileIOUsingCloseDisposition implements Cobol {
+        String words;
+    }
+
+    class ClosePortFileIOUsingAssociatedData implements Cobol {
+        String associatedData;
+
+        Identifier identifier;
+    }
+
+    class ClosePortFileIOUsingAssociatedDataLength implements Cobol {
+        String words;
+
+        Identifier identifier;
     }
 
     class CollatingSequenceClause implements Cobol {

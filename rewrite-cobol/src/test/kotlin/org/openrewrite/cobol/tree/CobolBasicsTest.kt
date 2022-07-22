@@ -289,4 +289,20 @@ class CobolBasicsTest : RewriteTest {
             CANCEL libraryName BYTITLE
         """)
     )
+
+    @Disabled("Requires PROCEDURE DIVISION.")
+    @Test
+    fun closeStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            PARAGRAPH_NAME.
+            CLOSE fileName UNIT FOR LOCK
+            CLOSE fileName WITH NO REWIND
+            CLOSE fileName NO WAIT USING CLOSE-DISPOSITION OF ABORT
+            CLOSE fileName NO WAIT USING ASSOCIATED-DATA identifier
+            CLOSE fileName NO WAIT USING ASSOCIATED-DATA-LENGTH OF identifier
+        """)
+    )
 }

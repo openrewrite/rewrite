@@ -799,4 +799,65 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         c = c.withLiteral((Cobol.Literal) visit(c.getLiteral(), p));
         return c;
     }
+
+    public Cobol visitClose(Cobol.Close close, P p) {
+        Cobol.Close c = close;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.getPadding().withCloseFiles(visitContainer(c.getPadding().getCloseFiles(), p));
+        return c;
+    }
+
+    public Cobol visitCloseFile(Cobol.CloseFile closeFile, P p) {
+        Cobol.CloseFile c = closeFile;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withCloseStatement((Cobol) visit(c.getCloseStatement(), p));
+        return c;
+    }
+
+    public Cobol visitCloseReelUnitStatement(Cobol.CloseReelUnitStatement closeReelUnitStatement, P p) {
+        Cobol.CloseReelUnitStatement c = closeReelUnitStatement;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        return c;
+    }
+
+    public Cobol visitCloseRelativeStatement(Cobol.CloseRelativeStatement closeRelativeStatement, P p) {
+        Cobol.CloseRelativeStatement c = closeRelativeStatement;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        return c;
+    }
+
+    public Cobol visitClosePortFileIOStatement(Cobol.ClosePortFileIOStatement closePortFileIOStatement, P p) {
+        Cobol.ClosePortFileIOStatement c = closePortFileIOStatement;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.getPadding().withClosePortFileIOUsing(visitContainer(c.getPadding().getClosePortFileIOUsing(), p));
+        return c;
+    }
+
+    public Cobol visitClosePortFileIOUsingCloseDisposition(Cobol.ClosePortFileIOUsingCloseDisposition closePortFileIOUsingCloseDisposition, P p) {
+        Cobol.ClosePortFileIOUsingCloseDisposition c = closePortFileIOUsingCloseDisposition;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        return c;
+    }
+
+    public Cobol visitClosePortFileIOUsingAssociatedData(Cobol.ClosePortFileIOUsingAssociatedData closePortFileIOUsingAssociatedData, P p) {
+        Cobol.ClosePortFileIOUsingAssociatedData c = closePortFileIOUsingAssociatedData;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withIdentifier((Cobol.Identifier) visit(c.getIdentifier(), p));
+        return c;
+    }
+
+    public Cobol visitClosePortFileIOUsingAssociatedDataLength(Cobol.ClosePortFileIOUsingAssociatedDataLength closePortFileIOUsingAssociatedDataLength, P p) {
+        Cobol.ClosePortFileIOUsingAssociatedDataLength c = closePortFileIOUsingAssociatedDataLength;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withIdentifier((Cobol.Identifier) visit(c.getIdentifier(), p));
+        return c;
+    }
 }

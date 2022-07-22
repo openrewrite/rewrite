@@ -769,4 +769,64 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(cancelCall.getLiteral(), p);
         return cancelCall;
     }
+
+    public Cobol visitClose(Cobol.Close close, PrintOutputCapture<P> p) {
+        visitSpace(close.getPrefix(), p);
+        visitMarkers(close.getMarkers(), p);
+        p.append(close.getClose());
+        visitContainer("", close.getPadding().getCloseFiles(), "", "", p);
+        return close;
+    }
+
+    public Cobol visitCloseFile(Cobol.CloseFile closeFile, PrintOutputCapture<P> p) {
+        visitSpace(closeFile.getPrefix(), p);
+        visitMarkers(closeFile.getMarkers(), p);
+        visit(closeFile.getCloseStatement(), p);
+        return closeFile;
+    }
+
+    public Cobol visitCloseReelUnitStatement(Cobol.CloseReelUnitStatement closeReelUnitStatement, PrintOutputCapture<P> p) {
+        visitSpace(closeReelUnitStatement.getPrefix(), p);
+        visitMarkers(closeReelUnitStatement.getMarkers(), p);
+        p.append(closeReelUnitStatement.getWords());
+        return closeReelUnitStatement;
+    }
+
+    public Cobol visitCloseRelativeStatement(Cobol.CloseRelativeStatement closeRelativeStatement, PrintOutputCapture<P> p) {
+        visitSpace(closeRelativeStatement.getPrefix(), p);
+        visitMarkers(closeRelativeStatement.getMarkers(), p);
+        p.append(closeRelativeStatement.getWords());
+        return closeRelativeStatement;
+    }
+
+    public Cobol visitClosePortFileIOStatement(Cobol.ClosePortFileIOStatement closePortFileIOStatement, PrintOutputCapture<P> p) {
+        visitSpace(closePortFileIOStatement.getPrefix(), p);
+        visitMarkers(closePortFileIOStatement.getMarkers(), p);
+        p.append(closePortFileIOStatement.getWords());
+        visitContainer("", closePortFileIOStatement.getPadding().getClosePortFileIOUsing(), "", "", p);
+        return closePortFileIOStatement;
+    }
+
+    public Cobol visitClosePortFileIOUsingCloseDisposition(Cobol.ClosePortFileIOUsingCloseDisposition closePortFileIOUsingCloseDisposition, PrintOutputCapture<P> p) {
+        visitSpace(closePortFileIOUsingCloseDisposition.getPrefix(), p);
+        visitMarkers(closePortFileIOUsingCloseDisposition.getMarkers(), p);
+        p.append(closePortFileIOUsingCloseDisposition.getWords());
+        return closePortFileIOUsingCloseDisposition;
+    }
+
+    public Cobol visitClosePortFileIOUsingAssociatedData(Cobol.ClosePortFileIOUsingAssociatedData closePortFileIOUsingAssociatedData, PrintOutputCapture<P> p) {
+        visitSpace(closePortFileIOUsingAssociatedData.getPrefix(), p);
+        visitMarkers(closePortFileIOUsingAssociatedData.getMarkers(), p);
+        p.append(closePortFileIOUsingAssociatedData.getAssociatedData());
+        visit(closePortFileIOUsingAssociatedData.getIdentifier(), p);
+        return closePortFileIOUsingAssociatedData;
+    }
+
+    public Cobol visitClosePortFileIOUsingAssociatedDataLength(Cobol.ClosePortFileIOUsingAssociatedDataLength closePortFileIOUsingAssociatedDataLength, PrintOutputCapture<P> p) {
+        visitSpace(closePortFileIOUsingAssociatedDataLength.getPrefix(), p);
+        visitMarkers(closePortFileIOUsingAssociatedDataLength.getMarkers(), p);
+        p.append(closePortFileIOUsingAssociatedDataLength.getWords());
+        visit(closePortFileIOUsingAssociatedDataLength.getIdentifier(), p);
+        return closePortFileIOUsingAssociatedDataLength;
+    }
 }

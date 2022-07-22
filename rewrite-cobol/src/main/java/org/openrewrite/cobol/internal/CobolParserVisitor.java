@@ -21,7 +21,6 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.FileAttributes;
-import org.openrewrite.Tree;
 import org.openrewrite.cobol.internal.grammar.CobolBaseVisitor;
 import org.openrewrite.cobol.internal.grammar.CobolParser;
 import org.openrewrite.cobol.tree.*;
@@ -32,7 +31,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -267,6 +265,92 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 (Cobol.Literal) visit(ctx.integerLiteral()),
                 padLeft(ctx.IS()),
                 (Cobol.Identifier) visit(ctx.mnemonicName())
+        );
+    }
+
+    @Override
+    public Object visitCloseStatement(CobolParser.CloseStatementContext ctx) {
+        return new Cobol.Close(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                ctx.CLOSE().getText(),
+                convertAllContainer(ctx.closeFile())
+        );
+    }
+
+    @Override
+    public Object visitCloseFile(CobolParser.CloseFileContext ctx) {
+        return new Cobol.CloseFile(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.fileName()),
+                ctx.closeReelUnitStatement() != null || ctx.closeRelativeStatement() != null || ctx.closePortFileIOStatement() != null ?
+                        visit(ctx.closeReelUnitStatement(), ctx.closeRelativeStatement(), ctx.closePortFileIOStatement()) : null
+        );
+    }
+
+    @Override
+    public Object visitCloseReelUnitStatement(CobolParser.CloseReelUnitStatementContext ctx) {
+        return new Cobol.CloseReelUnitStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REEL(), ctx.UNIT(), ctx.FOR(), ctx.REMOVAL(), ctx.WITH(), ctx.NO(), ctx.REWIND(), ctx.LOCK())
+        );
+    }
+
+    @Override
+    public Object visitCloseRelativeStatement(CobolParser.CloseRelativeStatementContext ctx) {
+        return new Cobol.CloseRelativeStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.NO(), ctx.REWIND(), ctx.LOCK())
+        );
+    }
+
+    @Override
+    public Object visitClosePortFileIOStatement(CobolParser.ClosePortFileIOStatementContext ctx) {
+        return new Cobol.ClosePortFileIOStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.NO(), ctx.WAIT(), ctx.USING()),
+                convertAllContainer(ctx.closePortFileIOUsing())
+        );
+    }
+
+    @Override
+    public Object visitClosePortFileIOUsingCloseDisposition(CobolParser.ClosePortFileIOUsingCloseDispositionContext ctx) {
+        return new Cobol.ClosePortFileIOUsingCloseDisposition(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CLOSE_DISPOSITION(), ctx.OF(), ctx.ABORT(), ctx.ORDERLY())
+        );
+    }
+
+    @Override
+    public Object visitClosePortFileIOUsingAssociatedData(CobolParser.ClosePortFileIOUsingAssociatedDataContext ctx) {
+        return new Cobol.ClosePortFileIOUsingAssociatedData(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                ctx.ASSOCIATED_DATA().getText(),
+                visit(ctx.identifier(), ctx.integerLiteral())
+        );
+    }
+
+    @Override
+    public Object visitClosePortFileIOUsingAssociatedDataLength(CobolParser.ClosePortFileIOUsingAssociatedDataLengthContext ctx) {
+        return new Cobol.ClosePortFileIOUsingAssociatedDataLength(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ASSOCIATED_DATA_LENGTH(), ctx.OF()),
+                visit(ctx.identifier(), ctx.integerLiteral())
         );
     }
 
@@ -560,7 +644,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.CONTROL(), ctx.IS()),
-                visitIdentifier(ctx.identifier())
+                (Cobol.Identifier) visit(ctx.identifier())
         );
     }
 
@@ -571,7 +655,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.SIZE(), ctx.IS()),
-                visitIdentifier(ctx.identifier())
+                (Cobol.Identifier) visit(ctx.identifier())
         );
     }
 
@@ -582,7 +666,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.TO()),
-                visitIdentifier(ctx.identifier())
+                (Cobol.Identifier) visit(ctx.identifier())
         );
     }
 
@@ -593,7 +677,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.USING()),
-                visitIdentifier(ctx.identifier())
+                (Cobol.Identifier) visit(ctx.identifier())
         );
     }
 
@@ -1092,6 +1176,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 words(id, ctx.DIVISION()),
                 padLeft(sourceBefore("."), visitProgramIdParagraph(ctx.programIdParagraph()))
         );
+    }
+
+    @Override
+    public Object visitIntegerLiteral(CobolParser.IntegerLiteralContext ctx) {
+        return new Cobol.Identifier(randomId(),
+                sourceBefore(ctx.getText()), Markers.EMPTY,
+                ctx.getText());
     }
 
     @Override
