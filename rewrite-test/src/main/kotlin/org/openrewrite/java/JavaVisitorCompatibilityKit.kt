@@ -399,6 +399,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveJavaDocAuthorTagTck : RemoveJavaDocAuthorTagTest
 
     @Nested
+    inner class RemoveMethodCallVisitorTck: RemoveMethodCallVisitorTest
+
+    @Nested
     inner class RemoveObjectsIsNullTck : RemoveObjectsIsNullTest
 
     @Nested
