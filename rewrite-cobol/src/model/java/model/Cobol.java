@@ -139,8 +139,10 @@ public interface Cobol {
 
     class ProcedureName implements Cobol {
         Name paragraphName;
+
         @Nullable
         InSection inSection;
+
         @Nullable
         Name sectionName;
     }
