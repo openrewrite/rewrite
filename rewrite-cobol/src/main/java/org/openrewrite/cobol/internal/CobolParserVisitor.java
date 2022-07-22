@@ -182,9 +182,9 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                visitProcedureName(ctx.procedureName(0)),
+                (Cobol.ProcedureName) visit(ctx.procedureName(0)),
                 words(ctx.TO(0), ctx.PROCEED(), ctx.PROCEED() != null ? ctx.TO(1) : null),
-                visitProcedureName(ctx.procedureName(1))
+                (Cobol.ProcedureName) visit(ctx.procedureName(1))
         );
     }
 
@@ -194,21 +194,10 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                visitParagraphName(ctx.paragraphName()),
-                ctx.inSection() != null ? visitInSection(ctx.inSection()) : null,
-                ctx.sectionName() != null ? visitSectionName(ctx.sectionName()) : null
+                (Name) visit(ctx.paragraphName()),
+                visitNullable(ctx.inSection()),
+                visitNullable(ctx.sectionName())
         );
-    }
-
-    @Override
-    public Name visitParagraphName(CobolParser.ParagraphNameContext ctx) {
-        return ctx.cobolWord() == null ?
-                new Cobol.Identifier(randomId(),
-                        sourceBefore(ctx.getText()), Markers.EMPTY,
-                        ctx.getText()) :
-                new Cobol.Literal(randomId(),
-                        sourceBefore(ctx.getText()), Markers.EMPTY,
-                        ctx.getText(), ctx.getText());
     }
 
     @Override
@@ -218,19 +207,8 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.IN(), ctx.OF()),
-                visitSectionName(ctx.sectionName())
+                (Name) visit(ctx.sectionName())
         );
-    }
-
-    @Override
-    public Name visitSectionName(CobolParser.SectionNameContext ctx) {
-        return ctx.cobolWord() == null ?
-                new Cobol.Identifier(randomId(),
-                        sourceBefore(ctx.getText()), Markers.EMPTY,
-                        ctx.getText()) :
-                new Cobol.Literal(randomId(),
-                        sourceBefore(ctx.getText()), Markers.EMPTY,
-                        ctx.getText(), ctx.getText());
     }
 
     @Override
