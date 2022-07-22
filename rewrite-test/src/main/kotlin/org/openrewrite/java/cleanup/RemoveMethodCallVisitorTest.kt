@@ -38,7 +38,7 @@ interface RemoveMethodCallVisitorTest : RewriteTest {
 
     fun RecipeSpec.asserTrueTestVisitor() =
         testVisitor(MethodMatcher("* assertTrue(..)")) { arg, expr ->
-            arg == 0 && (expr as? J.Literal)?.value == true
+            arg == 0 && J.Literal.isLiteralValue(expr, true)
         }
 
     @Test
@@ -87,7 +87,7 @@ interface RemoveMethodCallVisitorTest : RewriteTest {
     )
 
     @Test
-    fun `asertTrue("message", true) is removed`() = rewriteRun(
+    fun `asertTrue(message, true) is removed`() = rewriteRun(
         { spec ->
             spec.testVisitor(MethodMatcher("* assertTrue(..)")) { arg, expr ->
                 (arg == 1 && (expr as? J.Literal)?.value == true) || arg != 1

@@ -408,6 +408,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveRemoveRedundantTypeCastTck : RemoveRedundantTypeCastTest
 
     @Nested
+    inner class RemoveUnneededAssertionTck: RemoveUnneededAssertionTest
+
+    @Nested
     inner class RemoveUnneededBlockTck : RemoveUnneededBlockTest
 
     @Nested

@@ -41,6 +41,10 @@ dependencies {
     implementation("com.google.auto.service:auto-service:latest.release")
 
     implementation("org.apache.hbase:hbase-shaded-client:2.4.11")
+    runtimeOnly("junit:junit:latest.release") {
+        because("Used for RemoveUnneededAssertionTest")
+    }
+
     testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
     testCompileOnly("org.projectlombok:lombok:1.18.24")
     annotationProcessor("org.projectlombok:lombok:1.18.24")
