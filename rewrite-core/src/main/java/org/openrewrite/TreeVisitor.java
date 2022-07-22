@@ -328,6 +328,10 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {
+        return adapt(adaptTo, null);
+    }
+
+    public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo, P p) {
         Class<?> firstLanguageVisitorInHierarchy = getClass();
         while (firstLanguageVisitorInHierarchy.getAnnotationsByType(LanguageVisitor.class).length == 0) {
             firstLanguageVisitorInHierarchy = firstLanguageVisitorInHierarchy.getSuperclass();
@@ -341,19 +345,30 @@ public abstract class TreeVisitor<T extends Tree, P> {
         }
 
         try {
+            Class<?> delegateType = getClass();
+            while (delegateType.getAnnotationsByType(LanguageVisitor.class).length == 0 &&
+                    !(delegateType.getName().endsWith("IsoVisitor") && delegateType.getSuperclass()
+                            .getAnnotationsByType(LanguageVisitor.class).length != 0)) {
+                delegateType = delegateType.getSuperclass();
+            }
+
             Map<Class<?>, Class<?>> adaptedFrom = adaptedVisitorsCache.get(getClass());
             if (adaptedFrom != null && adaptedFrom.containsKey(adaptTo)) {
                 //noinspection unchecked
                 return (V) adaptedFrom.get(adaptTo)
-                        .getDeclaredConstructor(firstLanguageVisitorInHierarchy)
+                        .getDeclaredConstructor(delegateType)
                         .newInstance(this);
             }
 
-            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<? extends V> builder = byteBuddy
+            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = byteBuddy
+//                    .subclass(parameterizedType(adaptTo, p.getClass()).build(),
+//                            NO_CONSTRUCTORS)
                     .subclass(adaptTo, NO_CONSTRUCTORS)
-                    .defineField("delegate", firstLanguageVisitorInHierarchy, PRIVATE | FINAL)
+//                    .defineField("delegate", parameterizedType(delegateType, p.getClass()).build(), PRIVATE | FINAL)
+                    .defineField("delegate", delegateType, PRIVATE | FINAL)
                     .defineConstructor(PUBLIC)
-                    .withParameter(firstLanguageVisitorInHierarchy)
+//                    .withParameter(parameterizedType(delegateType, p.getClass()).build())
+                    .withParameter(delegateType)
                     .intercept(MethodCall.invoke(adaptTo.getConstructor())
                             .andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
 
@@ -381,17 +396,22 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 }
             }
 
-            Class<? extends V> adapted = builder
-                    .make()
-                    .load(getClass().getClassLoader())
-                    .getLoaded();
+            try {
+                DynamicType.Unloaded<?> unloaded = builder.make();
+                Class<?> adapted = unloaded
+                        .load(getClass().getClassLoader())
+                        .getLoaded();
 
-            adaptedVisitorsCache.computeIfAbsent(getClass(), from -> new IdentityHashMap<>())
-                    .put(adaptTo, adapted);
+                adaptedVisitorsCache.computeIfAbsent(getClass(), from -> new IdentityHashMap<>())
+                        .put(adaptTo, adapted);
 
-            return adapted
-                    .getDeclaredConstructor(firstLanguageVisitorInHierarchy)
-                    .newInstance(this);
+                //noinspection unchecked
+                return (V) adapted
+                        .getDeclaredConstructor(delegateType)
+                        .newInstance(this);
+            } catch (StackOverflowError e) {
+                throw new RuntimeException("Failed to adapt " + getClass().getName() + " to " + adaptTo.getName(), e);
+            }
         } catch (InstantiationException | NoSuchMethodException | InvocationTargetException |
                  IllegalAccessException e) {
             throw new RuntimeException(e);
