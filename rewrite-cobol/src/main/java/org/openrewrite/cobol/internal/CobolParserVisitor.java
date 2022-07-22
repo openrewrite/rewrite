@@ -164,6 +164,74 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.AlterStatement visitAlterStatement(CobolParser.AlterStatementContext ctx) {
+        return new Cobol.AlterStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ALTER()),
+                convertAll(ctx.alterProceedTo())
+        );
+    }
+
+    @Override
+    public Cobol.AlterProceedTo visitAlterProceedTo(CobolParser.AlterProceedToContext ctx) {
+        return new Cobol.AlterProceedTo(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visitProcedureName(ctx.procedureName(0)),
+                words(ctx.TO(0), ctx.PROCEED(), ctx.PROCEED() != null ? ctx.TO(1) : null),
+                visitProcedureName(ctx.procedureName(1))
+        );
+    }
+
+    @Override
+    public Cobol.ProcedureName visitProcedureName(CobolParser.ProcedureNameContext ctx) {
+        return new Cobol.ProcedureName(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visitParagraphName(ctx.paragraphName()),
+                ctx.inSection() != null ? visitInSection(ctx.inSection()) : null,
+                ctx.sectionName() != null ? visitSectionName(ctx.sectionName()) : null
+        );
+    }
+
+    @Override
+    public Name visitParagraphName(CobolParser.ParagraphNameContext ctx) {
+        return ctx.cobolWord() == null ?
+                new Cobol.Identifier(randomId(),
+                        sourceBefore(ctx.getText()), Markers.EMPTY,
+                        ctx.getText()) :
+                new Cobol.Literal(randomId(),
+                        sourceBefore(ctx.getText()), Markers.EMPTY,
+                        ctx.getText(), ctx.getText());
+    }
+
+    @Override
+    public Cobol.InSection visitInSection(CobolParser.InSectionContext ctx) {
+        return new Cobol.InSection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IN(), ctx.OF()),
+                visitSectionName(ctx.sectionName())
+        );
+    }
+
+    @Override
+    public Name visitSectionName(CobolParser.SectionNameContext ctx) {
+        return ctx.cobolWord() == null ?
+                new Cobol.Identifier(randomId(),
+                        sourceBefore(ctx.getText()), Markers.EMPTY,
+                        ctx.getText()) :
+                new Cobol.Literal(randomId(),
+                        sourceBefore(ctx.getText()), Markers.EMPTY,
+                        ctx.getText(), ctx.getText());
+    }
+
+    @Override
     public Object visitOnExceptionClause(CobolParser.OnExceptionClauseContext ctx) {
         return new Cobol.OnExceptionClause(
                 randomId(),

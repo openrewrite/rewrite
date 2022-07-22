@@ -719,4 +719,37 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         n = n.withMarkers(visitMarkers(n.getMarkers(), p));
         return n;
     }
+
+    public Cobol visitAlterStatement(Cobol.AlterStatement alterStatement, P p) {
+        Cobol.AlterStatement a = alterStatement;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withAlterProceedTo(ListUtils.map(a.getAlterProceedTo(), t -> (Cobol.AlterProceedTo) visit(t, p)));
+        return a;
+    }
+
+    public Cobol visitAlterProceedTo(Cobol.AlterProceedTo alterProceedTo, P p) {
+        Cobol.AlterProceedTo a = alterProceedTo;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withFrom((Cobol.ProcedureName) visit(a.getFrom(), p));
+        a = a.withTo((Cobol.ProcedureName) visit(a.getTo(), p));
+        return a;
+    }
+
+    public Cobol visitProcedureName(Cobol.ProcedureName procedureName, P p) {
+        Cobol.ProcedureName pp = procedureName;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withInSection((Cobol.InSection) visit(pp.getInSection(), p));
+        return pp;
+    }
+
+    public Cobol visitInSection(Cobol.InSection inSection, P p) {
+        Cobol.InSection i = inSection;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        return i;
+    }
+
 }

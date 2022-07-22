@@ -672,4 +672,40 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(notOnExceptionClause.getWords());
         return notOnExceptionClause;
     }
+
+    public Cobol visitAlterStatement(Cobol.AlterStatement alterStatement, PrintOutputCapture<P> p) {
+        visitSpace(alterStatement.getPrefix(), p);
+        visitMarkers(alterStatement.getMarkers(), p);
+        p.append(alterStatement.getWords());
+        for (Cobol.AlterProceedTo a : alterStatement.getAlterProceedTo()) {
+            visitAlterProceedTo(a, p);
+        }
+        return alterStatement;
+    }
+
+    public Cobol visitAlterProceedTo(Cobol.AlterProceedTo alterProceedTo, PrintOutputCapture<P> p) {
+        visitSpace(alterProceedTo.getPrefix(), p);
+        visitMarkers(alterProceedTo.getMarkers(), p);
+        visit(alterProceedTo.getFrom(), p);
+        p.append(alterProceedTo.getWords());
+        visit(alterProceedTo.getTo(), p);
+        return alterProceedTo;
+    }
+
+    public Cobol visitProcedureName(Cobol.ProcedureName procedureName, PrintOutputCapture<P> p) {
+        visitSpace(procedureName.getPrefix(), p);
+        visitMarkers(procedureName.getMarkers(), p);
+        visit(procedureName.getParagraphName(), p);
+        visit(procedureName.getInSection(), p);
+        visit(procedureName.getSectionName(), p);
+        return procedureName;
+    }
+
+    public Cobol visitInSection(Cobol.InSection inSection, PrintOutputCapture<P> p) {
+        visitSpace(inSection.getPrefix(), p);
+        visitMarkers(inSection.getMarkers(), p);
+        p.append(inSection.getWords());
+        visit(inSection.getName(), p);
+        return inSection;
+    }
 }

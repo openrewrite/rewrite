@@ -368,4 +368,24 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.NotOnExceptionClause visitNotOnExceptionClause(Cobol.NotOnExceptionClause notOnExceptionClause, P p) {
         return (Cobol.NotOnExceptionClause) super.visitNotOnExceptionClause(notOnExceptionClause, p);
     }
+
+    @Override
+    public Cobol.AlterStatement visitAlterStatement(Cobol.AlterStatement alterStatement, P p) {
+        return (Cobol.AlterStatement) super.visitAlterStatement(alterStatement, p);
+    }
+
+    @Override
+    public Cobol.AlterProceedTo visitAlterProceedTo(Cobol.AlterProceedTo alterProceedTo, P p) {
+        return (Cobol.AlterProceedTo) super.visitAlterProceedTo(alterProceedTo, p);
+    }
+
+    @Override
+    public Cobol.ProcedureName visitProcedureName(Cobol.ProcedureName procedureName, P p) {
+        return (Cobol.ProcedureName) super.visitProcedureName(procedureName, p);
+    }
+
+    @Override
+    public Cobol.InSection visitInSection(Cobol.InSection inSection, P p) {
+        return (Cobol.InSection) super.visitInSection(inSection, p);
+    }
 }

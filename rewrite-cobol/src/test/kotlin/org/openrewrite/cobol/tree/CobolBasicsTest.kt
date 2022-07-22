@@ -249,4 +249,17 @@ class CobolBasicsTest : RewriteTest {
             ACCEPT identifier MESSAGE COUNT
         """)
     )
+
+    @Test
+    fun alterStatement() = rewriteRun(
+        cobol(
+            """
+                IDENTIFICATION DIVISION .
+                PROGRAM-ID . HELLO-WORLD .
+                PROCEDURE DIVISION .
+                ALTER PARA-54 TO PROCEED TO PARA-54B.
+                ALTER PARA-23 TO PARA-24.
+            """
+        )
+    )
 }

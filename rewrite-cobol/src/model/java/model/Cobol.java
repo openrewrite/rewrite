@@ -126,6 +126,30 @@ public interface Cobol {
         CobolContainer<Literal> literals;
     }
 
+    class AlterStatement implements Statement {
+        String words;
+        List<AlterProceedTo> alterProceedTo;
+    }
+
+    class AlterProceedTo implements Cobol {
+        ProcedureName from;
+        String words;
+        ProcedureName to;
+    }
+
+    class ProcedureName implements Cobol {
+        Name paragraphName;
+        @Nullable
+        InSection inSection;
+        @Nullable
+        Name sectionName;
+    }
+
+    class InSection implements Cobol {
+        String words;
+        Name name;
+    }
+
     class ChannelClause implements Cobol {
         String words;
         Literal literal;
