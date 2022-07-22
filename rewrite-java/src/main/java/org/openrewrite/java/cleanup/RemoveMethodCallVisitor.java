@@ -75,6 +75,9 @@ public class RemoveMethodCallVisitor<P> extends JavaIsoVisitor<P> {
                 return visitSuper.get();
             }
         }
+        if (methodCall.getMethodType() != null) {
+            maybeRemoveImport(methodCall.getMethodType().getDeclaringType());
+        }
         return null;
     }
 }

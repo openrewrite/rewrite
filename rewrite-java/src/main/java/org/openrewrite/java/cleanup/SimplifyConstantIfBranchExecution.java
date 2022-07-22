@@ -195,11 +195,11 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
         }
 
         private static boolean isLiteralTrue(@Nullable Expression expression) {
-            return expression instanceof J.Literal && ((J.Literal) expression).getValue() == Boolean.valueOf(true);
+            return J.Literal.isLiteralValue(expression, Boolean.TRUE);
         }
 
         private static boolean isLiteralFalse(@Nullable Expression expression) {
-            return expression instanceof J.Literal && ((J.Literal) expression).getValue() == Boolean.valueOf(false);
+            return J.Literal.isLiteralValue(expression, Boolean.FALSE);
         }
     }
 
