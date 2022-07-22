@@ -221,6 +221,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitNotInvalidKeyPhrase(CobolParser.NotInvalidKeyPhraseContext ctx) {
+        return new Cobol.StatementPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.NOT(), ctx.INVALID(), ctx.KEY()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
     public Object visitNotOnExceptionClause(CobolParser.NotOnExceptionClauseContext ctx) {
         return new Cobol.NotOnExceptionClause(
                 randomId(),
@@ -355,6 +366,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitContinueStatement(CobolParser.ContinueStatementContext ctx) {
+        return new Cobol.Continue(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CONTINUE())
+        );
+    }
+
+    @Override
     public Cobol.CurrencyClause visitCurrencySignClause(CobolParser.CurrencySignClauseContext ctx) {
         return new Cobol.CurrencyClause(
                 randomId(),
@@ -407,6 +428,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitReportName(CobolParser.ReportNameContext ctx) {
+        return new Cobol.ReportName(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
     public Cobol.ReserveNetworkClause visitReserveNetworkClause(CobolParser.ReserveNetworkClauseContext ctx) {
         return new Cobol.ReserveNetworkClause(
                 randomId(),
@@ -445,6 +476,36 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 words(ctx.DEFAULT_DISPLAY(), ctx.SIGN(), ctx.IS(), ctx.LEADING(), ctx.TRAILING(),
                         ctx.SEPARATE(), ctx.CHARACTER())
+        );
+    }
+
+    @Override
+    public Object visitDeleteStatement(CobolParser.DeleteStatementContext ctx) {
+        return new Cobol.Delete(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DELETE()),
+                (Name) visit(ctx.fileName()),
+                words(ctx.RECORD()),
+                (Cobol.StatementPhrase) visit(ctx.invalidKeyPhrase()),
+                (Cobol.StatementPhrase) visit(ctx.notInvalidKeyPhrase()),
+                padLeft(ctx.END_DELETE())
+        );
+    }
+
+    @Override
+    public Object visitDisableStatement(CobolParser.DisableStatementContext ctx) {
+        return new Cobol.Disable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                ctx.DISABLE().getText(),
+                words(ctx.INPUT(), ctx.I_O(), ctx.TERMINAL(), ctx.OUTPUT()),
+                (Name) visit(ctx.cdName()),
+                ctx.WITH() == null ? null : words(ctx.WITH()),
+                words(ctx.KEY()),
+                visit(ctx.identifier(), ctx.literal())
         );
     }
 
@@ -967,6 +1028,86 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitQualifiedDataNameFormat1(CobolParser.QualifiedDataNameFormat1Context ctx) {
+        return new Cobol.QualifiedDataNameFormat1(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.dataName(), ctx.conditionName()),
+                convertAllContainer(ctx.qualifiedInData()),
+                (Cobol.InFile) visit(ctx.inFile())
+        );
+    }
+
+    @Override
+    public Object visitQualifiedDataNameFormat2(CobolParser.QualifiedDataNameFormat2Context ctx) {
+        return new Cobol.QualifiedDataNameFormat2(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.paragraphName()),
+                (Cobol.InSection) visit(ctx.inSection())
+        );
+    }
+
+    @Override
+    public Object visitQualifiedDataNameFormat3(CobolParser.QualifiedDataNameFormat3Context ctx) {
+        return new Cobol.QualifiedDataNameFormat3(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.textName()),
+                (Cobol.InLibrary) visit(ctx.inLibrary())
+        );
+    }
+
+    @Override
+    public Object visitQualifiedDataNameFormat4(CobolParser.QualifiedDataNameFormat4Context ctx) {
+        return new Cobol.QualifiedDataNameFormat4(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LINAGE_COUNTER()),
+                (Cobol.InFile) visit(ctx.inFile())
+        );
+    }
+
+    @Override
+    public Object visitQualifiedDataName(CobolParser.QualifiedDataNameContext ctx) {
+        return new Cobol.QualifiedDataName(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.qualifiedDataNameFormat1(), ctx.qualifiedDataNameFormat1(), ctx.qualifiedDataNameFormat3(), ctx.qualifiedDataNameFormat4())
+        );
+    }
+
+    @Override
+    public Object visitQualifiedInData(CobolParser.QualifiedInDataContext ctx) {
+        return new Cobol.QualifiedDataName(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.inData(), ctx.inTable())
+        );
+    }
+
+    @Override
+    public Object visitEnableStatement(CobolParser.EnableStatementContext ctx) {
+        return new Cobol.Enable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                ctx.ENABLE().getText(),
+                words(ctx.INPUT(), ctx.I_O(), ctx.TERMINAL(), ctx.OUTPUT()),
+                (Name) visit(ctx.cdName()),
+                ctx.WITH() == null ? null : words(ctx.WITH()),
+                words(ctx.KEY()),
+                visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
     public Cobol.EndProgram visitEndProgramStatement(CobolParser.EndProgramStatementContext ctx) {
         return new Cobol.EndProgram(
                 randomId(),
@@ -978,6 +1119,18 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitEntryStatement(CobolParser.EntryStatementContext ctx) {
+        return new Cobol.Entry(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                ctx.ENTRY().getText(),
+                (Cobol.Literal) visit(ctx.literal()),
+                convertAllContainer(padLeft(ctx.USING()), ctx.identifier())
+        );
+    }
+
+    @Override
     public Cobol.EnvironmentDivision visitEnvironmentDivision(CobolParser.EnvironmentDivisionContext ctx) {
         return new Cobol.EnvironmentDivision(
                 randomId(),
@@ -985,6 +1138,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 words(ctx.ENVIRONMENT(), ctx.DIVISION()),
                 convertAllContainer(sourceBefore("."), ctx.environmentDivisionBody())
+        );
+    }
+
+    @Override
+    public Object visitExhibitStatement(CobolParser.ExhibitStatementContext ctx) {
+        return new Cobol.Exhibit(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.EXHIBIT(), ctx.NAMED(), ctx.CHANGED()),
+                convertAllContainer(ctx.exhibitOperand())
         );
     }
 
@@ -1001,17 +1165,25 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitFileDescriptionEntry(CobolParser.FileDescriptionEntryContext ctx) {
-        Space prefix = prefix(ctx);
-        String words = words(ctx.FD() == null ? ctx.SD() : ctx.FD());
-        Cobol.Identifier name = (Cobol.Identifier) visit(ctx.fileName());
         return new Cobol.FileDescriptionEntry(
                 randomId(),
-                prefix,
+                prefix(ctx),
                 Markers.EMPTY,
-                words,
-                name,
+                words(ctx.FD(), ctx.SD()),
+                (Cobol.Identifier) visit(ctx.fileName()),
                 CobolContainer.empty(),
                 convertAllContainer(sourceBefore("."), ctx.dataDescriptionEntry())
+        );
+    }
+
+    @Override
+    public Object visitGenerateStatement(CobolParser.GenerateStatementContext ctx) {
+        return new Cobol.Generate(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.GENERATE()),
+                (Cobol.ReportName) visit(ctx.reportName())
         );
     }
 
@@ -1179,10 +1351,76 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitInData(CobolParser.InDataContext ctx) {
+        return new Cobol.InData(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IN(), ctx.OF()),
+                (Name) visit(ctx.dataName())
+        );
+    }
+
+    @Override
+    public Object visitInFile(CobolParser.InFileContext ctx) {
+        return new Cobol.InFile(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IN(), ctx.OF()),
+                (Name) visit(ctx.fileName())
+        );
+    }
+
+    @Override
+    public Object visitInMnemonic(CobolParser.InMnemonicContext ctx) {
+        return new Cobol.InMnemonic(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IN(), ctx.OF()),
+                (Name) visit(ctx.mnemonicName())
+        );
+    }
+
+    @Override
+    public Object visitInLibrary(CobolParser.InLibraryContext ctx) {
+        return new Cobol.InLibrary(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IN(), ctx.OF()),
+                (Name) visit(ctx.libraryName())
+        );
+    }
+
+    @Override
+    public Object visitInTable(CobolParser.InTableContext ctx) {
+        return new Cobol.InLibrary(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IN(), ctx.OF()),
+                (Name) visit(ctx.tableCall())
+        );
+    }
+
+    @Override
     public Object visitIntegerLiteral(CobolParser.IntegerLiteralContext ctx) {
         return new Cobol.Identifier(randomId(),
                 sourceBefore(ctx.getText()), Markers.EMPTY,
                 ctx.getText());
+    }
+
+    @Override
+    public Object visitInvalidKeyPhrase(CobolParser.InvalidKeyPhraseContext ctx) {
+        return new Cobol.StatementPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INVALID(), ctx.KEY()),
+                convertAllContainer(ctx.statement())
+        );
     }
 
     @Override

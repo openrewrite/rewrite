@@ -458,4 +458,104 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.ClosePortFileIOUsingAssociatedDataLength visitClosePortFileIOUsingAssociatedDataLength(Cobol.ClosePortFileIOUsingAssociatedDataLength closePortFileIOUsingAssociatedDataLength, P p) {
         return (Cobol.ClosePortFileIOUsingAssociatedDataLength) super.visitClosePortFileIOUsingAssociatedDataLength(closePortFileIOUsingAssociatedDataLength, p);
     }
+
+    @Override
+    public Cobol.InData visitInData(Cobol.InData inData, P p) {
+        return (Cobol.InData) super.visitInData(inData, p);
+    }
+
+    @Override
+    public Cobol.InFile visitInFile(Cobol.InFile inFile, P p) {
+        return (Cobol.InFile) super.visitInFile(inFile, p);
+    }
+
+    @Override
+    public Cobol.InMnemonic visitInMnemonic(Cobol.InMnemonic inMnemonic, P p) {
+        return (Cobol.InMnemonic) super.visitInMnemonic(inMnemonic, p);
+    }
+
+    @Override
+    public Cobol.InLibrary visitInLibrary(Cobol.InLibrary inLibrary, P p) {
+        return (Cobol.InLibrary) super.visitInLibrary(inLibrary, p);
+    }
+
+    @Override
+    public Cobol.InTable visitInTable(Cobol.InTable inTable, P p) {
+        return (Cobol.InTable) super.visitInTable(inTable, p);
+    }
+
+    @Override
+    public Cobol.Continue visitContinue(Cobol.Continue continuez, P p) {
+        return (Cobol.Continue) super.visitContinue(continuez, p);
+    }
+
+    @Override
+    public Cobol.Delete visitDelete(Cobol.Delete delete, P p) {
+        return (Cobol.Delete) super.visitDelete(delete, p);
+    }
+
+    @Override
+    public Cobol.Disable visitDisable(Cobol.Disable disable, P p) {
+        return (Cobol.Disable) super.visitDisable(disable, p);
+    }
+
+    @Override
+    public Cobol.Enable visitEnable(Cobol.Enable enable, P p) {
+        return (Cobol.Enable) super.visitEnable(enable, p);
+    }
+
+    @Override
+    public Cobol.Entry visitEntry(Cobol.Entry entry, P p) {
+        return (Cobol.Entry) super.visitEntry(entry, p);
+    }
+
+    @Override
+    public Cobol.Exhibit visitExhibit(Cobol.Exhibit exhibit, P p) {
+        return (Cobol.Exhibit) super.visitExhibit(exhibit, p);
+    }
+
+    @Override
+    public Cobol.Exit visitExit(Cobol.Exit exit, P p) {
+        return (Cobol.Exit) super.visitExit(exit, p);
+    }
+
+    @Override
+    public Cobol.Generate visitGenerate(Cobol.Generate generate, P p) {
+        return (Cobol.Generate) super.visitGenerate(generate, p);
+    }
+
+    @Override
+    public Cobol.QualifiedDataName visitQualifiedDataName(Cobol.QualifiedDataName qualifiedDataName, P p) {
+        return (Cobol.QualifiedDataName) super.visitQualifiedDataName(qualifiedDataName, p);
+    }
+
+    @Override
+    public Cobol.QualifiedDataNameFormat1 visitQualifiedDataNameFormat1(Cobol.QualifiedDataNameFormat1 qualifiedDataNameFormat1, P p) {
+        return (Cobol.QualifiedDataNameFormat1) super.visitQualifiedDataNameFormat1(qualifiedDataNameFormat1, p);
+    }
+
+    @Override
+    public Cobol.QualifiedDataNameFormat2 visitQualifiedDataNameFormat2(Cobol.QualifiedDataNameFormat2 qualifiedDataNameFormat2, P p) {
+        return (Cobol.QualifiedDataNameFormat2) super.visitQualifiedDataNameFormat2(qualifiedDataNameFormat2, p);
+    }
+
+    @Override
+    public Cobol.QualifiedDataNameFormat3 visitQualifiedDataNameFormat3(Cobol.QualifiedDataNameFormat3 qualifiedDataNameFormat3, P p) {
+        return (Cobol.QualifiedDataNameFormat3) super.visitQualifiedDataNameFormat3(qualifiedDataNameFormat3, p);
+    }
+
+    @Override
+    public Cobol.QualifiedDataNameFormat4 visitQualifiedDataNameFormat4(Cobol.QualifiedDataNameFormat4 qualifiedDataNameFormat4, P p) {
+        return (Cobol.QualifiedDataNameFormat4) super.visitQualifiedDataNameFormat4(qualifiedDataNameFormat4, p);
+    }
+
+    @Override
+    public Cobol.QualifiedInData visitQualifiedInData(Cobol.QualifiedInData qualifiedInData, P p) {
+        return (Cobol.QualifiedInData) super.visitQualifiedInData(qualifiedInData, p);
+    }
+
+    @Override
+    public Cobol.ReportName visitReportName(Cobol.ReportName reportName, P p) {
+        return (Cobol.ReportName) super.visitReportName(reportName, p);
+    }
 }

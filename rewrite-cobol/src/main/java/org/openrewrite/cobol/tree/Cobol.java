@@ -1001,6 +1001,60 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
+    class InData implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name name;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInData(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class InFile implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name name;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInFile(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class InMnemonic implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name name;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInMnemonic(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     class InSection implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
@@ -1014,6 +1068,42 @@ public interface Cobol extends Tree {
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitInSection(this, p);
         }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class InLibrary implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name name;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInLibrary(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class InTable implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInTable(this, p);
+        }
+        // TODO .. implement TableCall
     }
 
     @ToString
@@ -1115,6 +1205,7 @@ public interface Cobol extends Tree {
             return v.visitCancelCall(this, p);
         }
     }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1783,6 +1874,23 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Continue implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String word;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitContinue(this, p);
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1961,6 +2069,7 @@ public interface Cobol extends Tree {
             return v.visitDataBaseSectionEntry(this, p);
         }
     }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2032,6 +2141,7 @@ public interface Cobol extends Tree {
             }
         }
     }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2251,6 +2361,127 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Delete implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String delete;
+
+        @Getter
+        @With
+        Name fileName;
+
+        @Getter
+        @Nullable
+        @With
+        String record;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase invalidKey;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase notInvalidKey;
+
+        @Nullable
+        CobolLeftPadded<String> endDelete;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDelete(this, p);
+        }
+
+        @Nullable
+        public String getEndDelete() {
+            return endDelete == null ? null : endDelete.getElement();
+        }
+
+        public Delete withEndDelete(@Nullable String endDelete) {
+            if (endDelete == null) {
+                return this.endDelete == null ? this : new Delete(id, prefix, markers, delete, fileName, record, invalidKey, notInvalidKey, null);
+            }
+            return getPadding().withEndDelete(CobolLeftPadded.withElement(this.endDelete, endDelete));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Delete t;
+
+            @Nullable
+            public CobolLeftPadded<String> getEndDelete() {
+                return t.endDelete;
+            }
+
+            public Delete withEndDelete(@Nullable CobolLeftPadded<String> endDelete) {
+                return t.endDelete == endDelete ? t : new Delete(t.padding, t.id, t.prefix, t.markers, t.delete, t.fileName, t.record, t.invalidKey, t.notInvalidKey, endDelete);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Disable implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String disable;
+        String type;
+        Name cdName;
+
+        @Nullable
+        String with;
+
+        String key;
+        Name keyName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDisable(this, p);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
@@ -2266,6 +2497,288 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitDisplay(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Enable implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String enable;
+        String type;
+        Name cdName;
+
+        @Nullable
+        String with;
+
+        String key;
+        Name keyName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEnable(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class EndProgram implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name programName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEndProgram(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Entry implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String entry;
+
+        @Getter
+        @With
+        Literal literal;
+
+        @Nullable
+        CobolContainer<Identifier> identifiers;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEntry(this, p);
+        }
+
+        public List<Cobol.Identifier> getIdentifiers() {
+            return identifiers.getElements();
+        }
+
+        public Entry withIdentifiers(List<Cobol.Identifier> identifiers) {
+            return getPadding().withIdentifiers(this.identifiers.getPadding().withElements(CobolRightPadded.withElements(
+                    this.identifiers.getPadding().getElements(), identifiers)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Entry t;
+
+            @Nullable
+            public CobolContainer<Cobol.Identifier> getIdentifiers() {
+                return t.identifiers;
+            }
+
+            public Entry withIdentifiers(@Nullable CobolContainer<Cobol.Identifier> identifiers) {
+                return t.identifiers == identifiers ? t : new Entry(t.padding, t.id, t.prefix, t.markers, t.entry, t.literal, identifiers);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class EnvironmentDivision implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Cobol> body;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEnvironmentDivision(this, p);
+        }
+
+        public List<Cobol> getBody() {
+            return body.getElements();
+        }
+
+        public EnvironmentDivision withBody(List<Cobol> body) {
+            return getPadding().withBody(this.body.getPadding().withElements(CobolRightPadded.withElements(
+                    this.body.getPadding().getElements(), body)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final EnvironmentDivision t;
+
+            public CobolContainer<Cobol> getBody() {
+                return t.body;
+            }
+
+            public EnvironmentDivision withBody(CobolContainer<Cobol> body) {
+                return t.body == body ? t : new EnvironmentDivision(t.padding, t.id, t.prefix, t.markers, t.words, body);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Exhibit implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Identifier> operands;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitExhibit(this, p);
+        }
+
+        public List<Cobol.Identifier> getOperands() {
+            return operands.getElements();
+        }
+
+        public Exhibit withOperands(List<Cobol.Identifier> operands) {
+            return getPadding().withOperands(this.operands.getPadding().withElements(CobolRightPadded.withElements(
+                    this.operands.getPadding().getElements(), operands)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Exhibit t;
+
+            public CobolContainer<Cobol.Identifier> getOperands() {
+                return t.operands;
+            }
+
+            public Exhibit withOperands(CobolContainer<Cobol.Identifier> operands) {
+                return t.operands == operands ? t : new Exhibit(t.padding, t.id, t.prefix, t.markers, t.words, operands);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Exit implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitExit(this, p);
         }
     }
 
@@ -2338,6 +2851,24 @@ public interface Cobol extends Tree {
             public FileSection withFileDescriptionEntry(CobolContainer<Cobol.FileDescriptionEntry> fileDescriptionEntry) {
                 return t.fileDescriptionEntry == fileDescriptionEntry ? t : new FileSection(t.padding, t.id, t.prefix, t.markers, t.words, fileDescriptionEntry);
             }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Generate implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String generate;
+        ReportName reportName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitGenerate(this, p);
         }
     }
 
@@ -2434,95 +2965,6 @@ public interface Cobol extends Tree {
             }
         }
     }
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class EndProgram implements Statement {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String words;
-        Name programName;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitEndProgram(this, p);
-        }
-    }
-
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class EnvironmentDivision implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @Getter
-        @EqualsAndHashCode.Include
-        @With
-        UUID id;
-
-        @Getter
-        @With
-        Space prefix;
-
-        @Getter
-        @With
-        Markers markers;
-
-        @Getter
-        @With
-        String words;
-
-        CobolContainer<Cobol> body;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitEnvironmentDivision(this, p);
-        }
-
-        public List<Cobol> getBody() {
-            return body.getElements();
-        }
-
-        public EnvironmentDivision withBody(List<Cobol> body) {
-            return getPadding().withBody(this.body.getPadding().withElements(CobolRightPadded.withElements(
-                    this.body.getPadding().getElements(), body)));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final EnvironmentDivision t;
-
-            public CobolContainer<Cobol> getBody() {
-                return t.body;
-            }
-
-            public EnvironmentDivision withBody(CobolContainer<Cobol> body) {
-                return t.body == body ? t : new EnvironmentDivision(t.padding, t.id, t.prefix, t.markers, t.words, body);
-            }
-        }
-    }
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2561,6 +3003,86 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitLiteral(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class LocalStorageSection implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        @Getter
+        @With
+        String localData;
+
+        @Getter
+        @With
+        Name localName;
+
+        CobolContainer<DataDescriptionEntry> dataDescriptions;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLocalStorageSection(this, p);
+        }
+
+        public List<Cobol.DataDescriptionEntry> getDataDescriptions() {
+            return dataDescriptions.getElements();
+        }
+
+        public LocalStorageSection withDataDescriptions(List<Cobol.DataDescriptionEntry> dataDescriptions) {
+            return getPadding().withDataDescriptions(this.dataDescriptions.getPadding().withElements(CobolRightPadded.withElements(
+                    this.dataDescriptions.getPadding().getElements(), dataDescriptions)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final LocalStorageSection t;
+
+            public CobolContainer<Cobol.DataDescriptionEntry> getDataDescriptions() {
+                return t.dataDescriptions;
+            }
+
+            public LocalStorageSection withDataDescriptions(CobolContainer<Cobol.DataDescriptionEntry> dataDescriptions) {
+                return t.dataDescriptions == dataDescriptions ? t : new LocalStorageSection(t.padding, t.id, t.prefix, t.markers, t.words, t.localData, t.localName, dataDescriptions);
+            }
         }
     }
 
@@ -2704,86 +3226,6 @@ public interface Cobol extends Tree {
 
             public LinkageSection withDataDescriptions(CobolContainer<Cobol.DataDescriptionEntry> dataDescriptions) {
                 return t.dataDescriptions == dataDescriptions ? t : new LinkageSection(t.padding, t.id, t.prefix, t.markers, t.words, dataDescriptions);
-            }
-        }
-    }
-
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class LocalStorageSection implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @Getter
-        @EqualsAndHashCode.Include
-        @With
-        UUID id;
-
-        @Getter
-        @With
-        Space prefix;
-
-        @Getter
-        @With
-        Markers markers;
-
-        @Getter
-        @With
-        String words;
-
-        @Getter
-        @With
-        String localData;
-
-        @Getter
-        @With
-        Name localName;
-
-        CobolContainer<DataDescriptionEntry> dataDescriptions;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitLocalStorageSection(this, p);
-        }
-
-        public List<Cobol.DataDescriptionEntry> getDataDescriptions() {
-            return dataDescriptions.getElements();
-        }
-
-        public LocalStorageSection withDataDescriptions(List<Cobol.DataDescriptionEntry> dataDescriptions) {
-            return getPadding().withDataDescriptions(this.dataDescriptions.getPadding().withElements(CobolRightPadded.withElements(
-                    this.dataDescriptions.getPadding().getElements(), dataDescriptions)));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final LocalStorageSection t;
-
-            public CobolContainer<Cobol.DataDescriptionEntry> getDataDescriptions() {
-                return t.dataDescriptions;
-            }
-
-            public LocalStorageSection withDataDescriptions(CobolContainer<Cobol.DataDescriptionEntry> dataDescriptions) {
-                return t.dataDescriptions == dataDescriptions ? t : new LocalStorageSection(t.padding, t.id, t.prefix, t.markers, t.words, t.localData, t.localName, dataDescriptions);
             }
         }
     }
@@ -2998,9 +3440,9 @@ public interface Cobol extends Tree {
         String words;
 
         @Getter
-        @With
         @Nullable
-        ProcedureDivisionUsingClause using;
+        @With
+        ProcedureDivisionUsingClause procedureDivisionUsingClause;
 
         CobolLeftPadded<ProcedureDivisionBody> body;
 
@@ -3042,7 +3484,7 @@ public interface Cobol extends Tree {
             }
 
             public ProcedureDivision withBody(CobolLeftPadded<Cobol.ProcedureDivisionBody> body) {
-                return t.body == body ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.words, t.using, body);
+                return t.body == body ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.words, t.procedureDivisionUsingClause, body);
             }
         }
     }
@@ -3064,8 +3506,6 @@ public interface Cobol extends Tree {
             return v.visitProcedureDivisionUsingClause(this, p);
         }
     }
-
-    interface ProcedureDivisionUsingParameter extends Cobol {}
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -3535,6 +3975,190 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
+    class QualifiedDataName implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Cobol dataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitQualifiedDataName(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class QualifiedDataNameFormat1 implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Name name;
+
+        @Nullable
+        CobolContainer<Cobol> qualifiedInData;
+
+        @Getter
+        @Nullable
+        @With
+        InFile inFile;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitQualifiedDataNameFormat1(this, p);
+        }
+
+        public List<Cobol> getQualifiedInData() {
+            return qualifiedInData.getElements();
+        }
+
+        public QualifiedDataNameFormat1 withQualifiedInData(List<Cobol> qualifiedInData) {
+            return getPadding().withQualifiedInData(this.qualifiedInData.getPadding().withElements(CobolRightPadded.withElements(
+                    this.qualifiedInData.getPadding().getElements(), qualifiedInData)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final QualifiedDataNameFormat1 t;
+
+            @Nullable
+            public CobolContainer<Cobol> getQualifiedInData() {
+                return t.qualifiedInData;
+            }
+
+            public QualifiedDataNameFormat1 withQualifiedInData(@Nullable CobolContainer<Cobol> qualifiedInData) {
+                return t.qualifiedInData == qualifiedInData ? t : new QualifiedDataNameFormat1(t.padding, t.id, t.prefix, t.markers, t.name, qualifiedInData, t.inFile);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class QualifiedDataNameFormat2 implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Name paragraphName;
+        InSection inSection;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitQualifiedDataNameFormat2(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class QualifiedDataNameFormat3 implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Name textName;
+        InLibrary inLibrary;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitQualifiedDataNameFormat3(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class QualifiedDataNameFormat4 implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String linageCounter;
+        InFile inFile;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitQualifiedDataNameFormat4(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class QualifiedInData implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Cobol in;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitQualifiedInData(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportName implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportName(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     class ReserveNetworkClause implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
@@ -3628,6 +4252,263 @@ public interface Cobol extends Tree {
             public Roundable withRounded(@Nullable CobolLeftPadded<String> rounded) {
                 return t.rounded == rounded ? t : new Roundable(t.padding, t.id, t.prefix, t.markers, t.identifier, rounded);
             }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ScreenSection implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<ScreenDescriptionEntry> descriptions;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenSection(this, p);
+        }
+
+        public List<Cobol.ScreenDescriptionEntry> getDescriptions() {
+            return descriptions.getElements();
+        }
+
+        public ScreenSection withDescriptions(List<Cobol.ScreenDescriptionEntry> descriptions) {
+            return getPadding().withDescriptions(this.descriptions.getPadding().withElements(CobolRightPadded.withElements(
+                    this.descriptions.getPadding().getElements(), descriptions)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ScreenSection t;
+
+            public CobolContainer<Cobol.ScreenDescriptionEntry> getDescriptions() {
+                return t.descriptions;
+            }
+
+            public ScreenSection withDescriptions(CobolContainer<Cobol.ScreenDescriptionEntry> descriptions) {
+                return t.descriptions == descriptions ? t : new ScreenSection(t.padding, t.id, t.prefix, t.markers, t.words, descriptions);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ScreenDescriptionEntry implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        @Nullable
+        CobolLeftPadded<String> name;
+
+        CobolContainer<Cobol> clauses;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionEntry(this, p);
+        }
+
+        @Nullable
+        public String getName() {
+            return name == null ? null : name.getElement();
+        }
+
+        public ScreenDescriptionEntry withName(@Nullable String name) {
+            if (name == null) {
+                return this.name == null ? this : new ScreenDescriptionEntry(id, prefix, markers, words, null, clauses);
+            }
+            return getPadding().withName(CobolLeftPadded.withElement(this.name, name));
+        }
+
+        public List<Cobol> getClauses() {
+            return clauses.getElements();
+        }
+
+        public ScreenDescriptionEntry withClauses(List<Cobol> clauses) {
+            return getPadding().withClauses(this.clauses.getPadding().withElements(CobolRightPadded.withElements(
+                    this.clauses.getPadding().getElements(), clauses)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ScreenDescriptionEntry t;
+
+            @Nullable
+            public CobolLeftPadded<String> getName() {
+                return t.name;
+            }
+
+            public ScreenDescriptionEntry withName(@Nullable CobolLeftPadded<String> name) {
+                return t.name == name ? t : new ScreenDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.words, name, t.clauses);
+            }
+
+            public CobolContainer<Cobol> getClauses() {
+                return t.clauses;
+            }
+
+            public ScreenDescriptionEntry withClauses(CobolContainer<Cobol> clauses) {
+                return t.clauses == clauses ? t : new ScreenDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.words, t.name, clauses);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionBlankClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionBlankClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionControlClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Identifier identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionControlClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionSizeClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Identifier identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionSizeClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionToClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Identifier identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionToClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionUsingClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Identifier identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionUsingClause(this, p);
         }
     }
 
@@ -3900,264 +4781,6 @@ public interface Cobol extends Tree {
             public SetUpDown withOperation(CobolLeftPadded<String> operation) {
                 return t.operation == operation ? t : new SetUpDown(t.padding, t.id, t.prefix, t.markers, t.to, operation, t.value);
             }
-        }
-    }
-
-
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class ScreenSection implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @Getter
-        @EqualsAndHashCode.Include
-        @With
-        UUID id;
-
-        @Getter
-        @With
-        Space prefix;
-
-        @Getter
-        @With
-        Markers markers;
-
-        @Getter
-        @With
-        String words;
-
-        CobolContainer<ScreenDescriptionEntry> descriptions;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitScreenSection(this, p);
-        }
-
-        public List<Cobol.ScreenDescriptionEntry> getDescriptions() {
-            return descriptions.getElements();
-        }
-
-        public ScreenSection withDescriptions(List<Cobol.ScreenDescriptionEntry> descriptions) {
-            return getPadding().withDescriptions(this.descriptions.getPadding().withElements(CobolRightPadded.withElements(
-                    this.descriptions.getPadding().getElements(), descriptions)));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ScreenSection t;
-
-            public CobolContainer<Cobol.ScreenDescriptionEntry> getDescriptions() {
-                return t.descriptions;
-            }
-
-            public ScreenSection withDescriptions(CobolContainer<Cobol.ScreenDescriptionEntry> descriptions) {
-                return t.descriptions == descriptions ? t : new ScreenSection(t.padding, t.id, t.prefix, t.markers, t.words, descriptions);
-            }
-        }
-    }
-
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class ScreenDescriptionEntry implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @Getter
-        @EqualsAndHashCode.Include
-        @With
-        UUID id;
-
-        @Getter
-        @With
-        Space prefix;
-
-        @Getter
-        @With
-        Markers markers;
-
-        @Getter
-        @With
-        String words;
-
-        @Nullable
-        CobolLeftPadded<String> name;
-
-        CobolContainer<Cobol> clauses;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitScreenDescriptionEntry(this, p);
-        }
-
-        @Nullable
-        public String getName() {
-            return name == null ? null : name.getElement();
-        }
-
-        public ScreenDescriptionEntry withName(@Nullable String name) {
-            if (name == null) {
-                return this.name == null ? this : new ScreenDescriptionEntry(id, prefix, markers, words, null, clauses);
-            }
-            return getPadding().withName(CobolLeftPadded.withElement(this.name, name));
-        }
-
-        public List<Cobol> getClauses() {
-            return clauses.getElements();
-        }
-
-        public ScreenDescriptionEntry withClauses(List<Cobol> clauses) {
-            return getPadding().withClauses(this.clauses.getPadding().withElements(CobolRightPadded.withElements(
-                    this.clauses.getPadding().getElements(), clauses)));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ScreenDescriptionEntry t;
-
-            @Nullable
-            public CobolLeftPadded<String> getName() {
-                return t.name;
-            }
-
-            public ScreenDescriptionEntry withName(@Nullable CobolLeftPadded<String> name) {
-                return t.name == name ? t : new ScreenDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.words, name, t.clauses);
-            }
-
-            public CobolContainer<Cobol> getClauses() {
-                return t.clauses;
-            }
-
-            public ScreenDescriptionEntry withClauses(CobolContainer<Cobol> clauses) {
-                return t.clauses == clauses ? t : new ScreenDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.words, t.name, clauses);
-            }
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class ScreenDescriptionBlankClause implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String words;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitScreenDescriptionBlankClause(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class ScreenDescriptionControlClause implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String words;
-        Identifier identifier;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitScreenDescriptionControlClause(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class ScreenDescriptionSizeClause implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String words;
-        Identifier identifier;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitScreenDescriptionSizeClause(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class ScreenDescriptionToClause implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String words;
-        Identifier identifier;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitScreenDescriptionToClause(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class ScreenDescriptionUsingClause implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String words;
-        Identifier identifier;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitScreenDescriptionUsingClause(this, p);
         }
     }
 

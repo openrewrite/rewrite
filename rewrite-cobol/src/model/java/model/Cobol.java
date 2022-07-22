@@ -147,9 +147,34 @@ public interface Cobol {
         Name sectionName;
     }
 
+    class InData implements Cobol {
+        String words;
+        Name name;
+    }
+
+    class InFile implements Cobol {
+        String words;
+        Name name;
+    }
+
+    class InMnemonic implements Cobol {
+        String words;
+        Name name;
+    }
+
     class InSection implements Cobol {
         String words;
         Name name;
+    }
+
+    class InLibrary implements Cobol {
+        String words;
+        Name name;
+    }
+
+    class InTable implements Cobol {
+        String words;
+        // TODO .. implement TableCall
     }
 
     class Cancel implements Statement {
@@ -260,6 +285,10 @@ public interface Cobol {
         CobolContainer<Cobol> paragraphs;
     }
 
+    class Continue implements Statement {
+        String word;
+    }
+
     class CurrencyClause implements Cobol {
         String words;
         Literal literal;
@@ -316,9 +345,50 @@ public interface Cobol {
         String words;
     }
 
+    class Delete implements Statement {
+        String delete;
+        Name fileName;
+
+        @Nullable
+        String record;
+
+        @Nullable
+        StatementPhrase invalidKey;
+
+        @Nullable
+        StatementPhrase notInvalidKey;
+
+        @Nullable
+        CobolLeftPadded<String> endDelete;
+    }
+
+    class Disable implements Statement {
+        String disable;
+        String type;
+        Name cdName;
+
+        @Nullable
+        String with;
+
+        String key;
+        Name keyName;
+    }
+
     class Display implements Statement {
         String display;
         List<Name> operands;
+    }
+
+    class Enable implements Statement {
+        String enable;
+        String type;
+        Name cdName;
+
+        @Nullable
+        String with;
+
+        String key;
+        Name keyName;
     }
 
     class EndProgram implements Statement {
@@ -326,15 +396,37 @@ public interface Cobol {
         Name programName;
     }
 
+    class Entry implements Statement {
+        String entry;
+        Literal literal;
+
+        @Nullable
+        CobolContainer<Identifier> identifiers;
+    }
+
     class EnvironmentDivision implements Cobol {
         String words;
         CobolContainer<Cobol> body;
+    }
+
+    class Exhibit implements Statement {
+        String words;
+        CobolContainer<Identifier> operands;
+    }
+
+    class Exit implements Statement {
+        String words;
     }
 
     class FileSection implements DataDivisionSection {
         String words;
 
         CobolContainer<FileDescriptionEntry> fileDescriptionEntry;
+    }
+
+    class Generate implements Statement {
+        String generate;
+        ReportName reportName;
     }
 
     class FileDescriptionEntry implements Cobol {
@@ -482,6 +574,43 @@ public interface Cobol {
 
         @Nullable
         CobolRightPadded<EndProgram> endProgram;
+    }
+
+    class QualifiedDataName implements Cobol {
+        Cobol dataName;
+    }
+
+    class QualifiedDataNameFormat1 implements Cobol {
+        Name name;
+
+        @Nullable
+        CobolContainer<Cobol> qualifiedInData;
+
+        @Nullable
+        InFile inFile;
+    }
+
+    class QualifiedDataNameFormat2 implements Cobol {
+        Name paragraphName;
+        InSection inSection;
+    }
+
+    class QualifiedDataNameFormat3 implements Cobol {
+        Name textName;
+        InLibrary inLibrary;
+    }
+
+    class QualifiedDataNameFormat4 implements Cobol {
+        String linageCounter;
+        InFile inFile;
+    }
+
+    class QualifiedInData implements Cobol {
+        Cobol in;
+    }
+
+    class ReportName implements Cobol {
+        QualifiedDataName qualifiedDataName;
     }
 
     class ReserveNetworkClause implements Cobol {

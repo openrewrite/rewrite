@@ -829,4 +829,151 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(closePortFileIOUsingAssociatedDataLength.getIdentifier(), p);
         return closePortFileIOUsingAssociatedDataLength;
     }
+
+    public Cobol visitInData(Cobol.InData inData, PrintOutputCapture<P> p) {
+        visitSpace(inData.getPrefix(), p);
+        visitMarkers(inData.getMarkers(), p);
+        p.append(inData.getWords());
+        return inData;
+    }
+
+    public Cobol visitInFile(Cobol.InFile inFile, PrintOutputCapture<P> p) {
+        visitSpace(inFile.getPrefix(), p);
+        visitMarkers(inFile.getMarkers(), p);
+        p.append(inFile.getWords());
+        return inFile;
+    }
+
+    public Cobol visitInMnemonic(Cobol.InMnemonic inMnemonic, PrintOutputCapture<P> p) {
+        visitSpace(inMnemonic.getPrefix(), p);
+        visitMarkers(inMnemonic.getMarkers(), p);
+        p.append(inMnemonic.getWords());
+        return inMnemonic;
+    }
+
+    public Cobol visitInLibrary(Cobol.InLibrary inLibrary, PrintOutputCapture<P> p) {
+        visitSpace(inLibrary.getPrefix(), p);
+        visitMarkers(inLibrary.getMarkers(), p);
+        p.append(inLibrary.getWords());
+        return inLibrary;
+    }
+
+    public Cobol visitInTable(Cobol.InTable inTable, PrintOutputCapture<P> p) {
+        visitSpace(inTable.getPrefix(), p);
+        visitMarkers(inTable.getMarkers(), p);
+        p.append(inTable.getWords());
+        return inTable;
+    }
+
+    public Cobol visitContinue(Cobol.Continue continuez, PrintOutputCapture<P> p) {
+        visitSpace(continuez.getPrefix(), p);
+        visitMarkers(continuez.getMarkers(), p);
+        p.append(continuez.getWord());
+        return continuez;
+    }
+
+    public Cobol visitDelete(Cobol.Delete delete, PrintOutputCapture<P> p) {
+        visitSpace(delete.getPrefix(), p);
+        visitMarkers(delete.getMarkers(), p);
+        p.append(delete.getDelete());
+        p.append(delete.getRecord());
+        visit(delete.getInvalidKey(), p);
+        visit(delete.getNotInvalidKey(), p);
+        visitLeftPadded("", delete.getPadding().getEndDelete(), p);
+        return delete;
+    }
+
+    public Cobol visitDisable(Cobol.Disable disable, PrintOutputCapture<P> p) {
+        visitSpace(disable.getPrefix(), p);
+        visitMarkers(disable.getMarkers(), p);
+        p.append(disable.getDisable());
+        p.append(disable.getType());
+        p.append(disable.getWith());
+        p.append(disable.getKey());
+        return disable;
+    }
+
+    public Cobol visitEnable(Cobol.Enable enable, PrintOutputCapture<P> p) {
+        visitSpace(enable.getPrefix(), p);
+        visitMarkers(enable.getMarkers(), p);
+        p.append(enable.getEnable());
+        p.append(enable.getType());
+        p.append(enable.getWith());
+        p.append(enable.getKey());
+        return enable;
+    }
+
+    public Cobol visitExhibit(Cobol.Exhibit exhibit, PrintOutputCapture<P> p) {
+        visitSpace(exhibit.getPrefix(), p);
+        visitMarkers(exhibit.getMarkers(), p);
+        p.append(exhibit.getWords());
+        visitContainer("", exhibit.getPadding().getOperands(), "", "", p);
+        return exhibit;
+    }
+
+    public Cobol visitExit(Cobol.Exit exit, PrintOutputCapture<P> p) {
+        visitSpace(exit.getPrefix(), p);
+        visitMarkers(exit.getMarkers(), p);
+        p.append(exit.getWords());
+        return exit;
+    }
+
+    public Cobol visitGenerate(Cobol.Generate generate, PrintOutputCapture<P> p) {
+        visitSpace(generate.getPrefix(), p);
+        visitMarkers(generate.getMarkers(), p);
+        p.append(generate.getGenerate());
+        visit(generate.getReportName(), p);
+        return generate;
+    }
+
+    public Cobol visitQualifiedDataName(Cobol.QualifiedDataName qualifiedDataName, PrintOutputCapture<P> p) {
+        visitSpace(qualifiedDataName.getPrefix(), p);
+        visitMarkers(qualifiedDataName.getMarkers(), p);
+        visit(qualifiedDataName.getDataName(), p);
+        return qualifiedDataName;
+    }
+
+    public Cobol visitQualifiedDataNameFormat1(Cobol.QualifiedDataNameFormat1 qualifiedDataNameFormat1, PrintOutputCapture<P> p) {
+        visitSpace(qualifiedDataNameFormat1.getPrefix(), p);
+        visitMarkers(qualifiedDataNameFormat1.getMarkers(), p);
+        visitContainer("", qualifiedDataNameFormat1.getPadding().getQualifiedInData(), "", "", p);
+        visit(qualifiedDataNameFormat1.getInFile(), p);
+        return qualifiedDataNameFormat1;
+    }
+
+    public Cobol visitQualifiedDataNameFormat2(Cobol.QualifiedDataNameFormat2 qualifiedDataNameFormat2, PrintOutputCapture<P> p) {
+        visitSpace(qualifiedDataNameFormat2.getPrefix(), p);
+        visitMarkers(qualifiedDataNameFormat2.getMarkers(), p);
+        visit(qualifiedDataNameFormat2.getInSection(), p);
+        return qualifiedDataNameFormat2;
+    }
+
+    public Cobol visitQualifiedDataNameFormat3(Cobol.QualifiedDataNameFormat3 qualifiedDataNameFormat3, PrintOutputCapture<P> p) {
+        visitSpace(qualifiedDataNameFormat3.getPrefix(), p);
+        visitMarkers(qualifiedDataNameFormat3.getMarkers(), p);
+        visit(qualifiedDataNameFormat3.getInLibrary(), p);
+        return qualifiedDataNameFormat3;
+    }
+
+    public Cobol visitQualifiedDataNameFormat4(Cobol.QualifiedDataNameFormat4 qualifiedDataNameFormat4, PrintOutputCapture<P> p) {
+        visitSpace(qualifiedDataNameFormat4.getPrefix(), p);
+        visitMarkers(qualifiedDataNameFormat4.getMarkers(), p);
+        p.append(qualifiedDataNameFormat4.getLinageCounter());
+        visit(qualifiedDataNameFormat4.getInFile(), p);
+        return qualifiedDataNameFormat4;
+    }
+
+    public Cobol visitQualifiedInData(Cobol.QualifiedInData qualifiedInData, PrintOutputCapture<P> p) {
+        visitSpace(qualifiedInData.getPrefix(), p);
+        visitMarkers(qualifiedInData.getMarkers(), p);
+        visit(qualifiedInData.getIn(), p);
+        return qualifiedInData;
+    }
+
+    public Cobol visitReportName(Cobol.ReportName reportName, PrintOutputCapture<P> p) {
+        visitSpace(reportName.getPrefix(), p);
+        visitMarkers(reportName.getMarkers(), p);
+        visit(reportName.getQualifiedDataName(), p);
+        return reportName;
+    }
 }
