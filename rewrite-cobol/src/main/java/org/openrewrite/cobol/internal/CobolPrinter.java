@@ -130,8 +130,52 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(procedureDivision.getPrefix(), p);
         visitMarkers(procedureDivision.getMarkers(), p);
         p.append(procedureDivision.getWords());
+        visitProcedureDivisionUsingClause(procedureDivision.getUsing(), p);
         visitLeftPadded(".", procedureDivision.getPadding().getBody(), p);
         return procedureDivision;
+    }
+
+    @SuppressWarnings("NullableProblems")
+    @Nullable
+    public Cobol visitProcedureDivisionUsingClause(@Nullable Cobol.ProcedureDivisionUsingClause procedureDivisionUsingClause, PrintOutputCapture<P> p) {
+        if(procedureDivisionUsingClause == null) {
+            return null;
+        }
+        visitSpace(procedureDivisionUsingClause.getPrefix(), p);
+        visitMarkers(procedureDivisionUsingClause.getMarkers(), p);
+        p.append(procedureDivisionUsingClause.getWords());
+        for (Cobol.ProcedureDivisionUsingParameter pp : procedureDivisionUsingClause.getProcedureDivisionUsingParameter()) {
+            visit(pp, p);
+        }
+        return procedureDivisionUsingClause;
+    }
+
+    public Cobol visitProcedureDivisionByReferencePhrase(Cobol.ProcedureDivisionByReferencePhrase procedureDivisionByReferencePhrase, PrintOutputCapture<P> p) {
+        visitSpace(procedureDivisionByReferencePhrase.getPrefix(), p);
+        visitMarkers(procedureDivisionByReferencePhrase.getMarkers(), p);
+        p.append(procedureDivisionByReferencePhrase.getWords());
+        for (Cobol.ProcedureDivisionByReference pp : procedureDivisionByReferencePhrase.getProcedureDivisionByReference()) {
+            visit(pp, p);
+        }
+        return procedureDivisionByReferencePhrase;
+    }
+
+    public Cobol visitProcedureDivisionByReference(Cobol.ProcedureDivisionByReference procedureDivisionByReference, PrintOutputCapture<P> p) {
+        visitSpace(procedureDivisionByReference.getPrefix(), p);
+        visitMarkers(procedureDivisionByReference.getMarkers(), p);
+        p.append(procedureDivisionByReference.getWords());
+        visit(procedureDivisionByReference.getReference(), p);
+        return procedureDivisionByReference;
+    }
+
+    public Cobol visitProcedureDivisionByValuePhrase(Cobol.ProcedureDivisionByValuePhrase procedureDivisionByValuePhrase, PrintOutputCapture<P> p) {
+        visitSpace(procedureDivisionByValuePhrase.getPrefix(), p);
+        visitMarkers(procedureDivisionByValuePhrase.getMarkers(), p);
+        p.append(procedureDivisionByValuePhrase.getWords());
+        for (Name pp : procedureDivisionByValuePhrase.getPhrases()) {
+            visit(pp, p);
+        }
+        return procedureDivisionByValuePhrase;
     }
 
     public Cobol visitProcedureDivisionBody(Cobol.ProcedureDivisionBody procedureDivisionBody, PrintOutputCapture<P> p) {

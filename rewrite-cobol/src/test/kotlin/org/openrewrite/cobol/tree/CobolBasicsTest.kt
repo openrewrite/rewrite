@@ -112,6 +112,16 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
+    fun divisionUsing() = rewriteRun(
+        cobol("""
+            IDENTIFICATION  DIVISION .
+            PROGRAM-ID    . HELLO     .
+            PROCEDURE DIVISION USING GRP-01.
+            STOP RUN.
+        """)
+    )
+
+    @Test
     fun ic109a() = rewriteRun(
         cobol(
             """

@@ -21,6 +21,7 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.Tree;
 import org.openrewrite.cobol.internal.grammar.CobolBaseVisitor;
 import org.openrewrite.cobol.internal.grammar.CobolParser;
 import org.openrewrite.cobol.tree.*;
@@ -31,6 +32,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -953,8 +955,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Cobol.ProcedureDivision visitProcedureDivision(CobolParser.ProcedureDivisionContext ctx) {
-        if (ctx.procedureDivisionUsingClause() != null || ctx.procedureDivisionGivingClause() != null ||
-                ctx.procedureDeclaratives() != null) {
+        if (ctx.procedureDivisionGivingClause() != null || ctx.procedureDeclaratives() != null) {
             throw new UnsupportedOperationException("Implement me");
         }
         return new Cobol.ProcedureDivision(
@@ -962,8 +963,76 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 sourceBefore(ctx.PROCEDURE().getText()),
                 Markers.EMPTY,
                 words(ctx.PROCEDURE(), ctx.DIVISION()),
+                visitProcedureDivisionUsingClause(ctx.procedureDivisionUsingClause()),
                 padLeft(sourceBefore("."), visitProcedureDivisionBody(ctx.procedureDivisionBody()))
         );
+    }
+
+    @Override
+    @Nullable
+    public Cobol.ProcedureDivisionUsingClause visitProcedureDivisionUsingClause(@Nullable CobolParser.ProcedureDivisionUsingClauseContext ctx) {
+        if(ctx == null) {
+            return null;
+        }
+        return new Cobol.ProcedureDivisionUsingClause(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                words(ctx.USING(), ctx.CHAINING()),
+                convertAll(ctx.procedureDivisionUsingParameter())
+        );
+    }
+
+    @Override
+    public Cobol.ProcedureDivisionByReferencePhrase visitProcedureDivisionByReferencePhrase(CobolParser.ProcedureDivisionByReferencePhraseContext ctx) {
+        return new Cobol.ProcedureDivisionByReferencePhrase(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                words(ctx.BY(), ctx.REFERENCE()),
+                convertAll(ctx.procedureDivisionByReference())
+        );
+    }
+
+    @Override
+    public Cobol.ProcedureDivisionByReference visitProcedureDivisionByReference(CobolParser.ProcedureDivisionByReferenceContext ctx) {
+        if(ctx.ANY() == null) {
+            return new Cobol.ProcedureDivisionByReference(
+                    randomId(),
+                    whitespace(),
+                    Markers.EMPTY,
+                    words(ctx.OPTIONAL()),
+                    (ctx.identifier() == null) ? (Name) visit(ctx.fileName()) : (Name) visit(ctx.identifier())
+            );
+        } else {
+            return new Cobol.ProcedureDivisionByReference(
+                    randomId(),
+                    whitespace(),
+                    Markers.EMPTY,
+                    null,
+                    new Cobol.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, ctx.ANY().getText()));
+        }
+    }
+
+    @Override
+    public Cobol.ProcedureDivisionByValuePhrase visitProcedureDivisionByValuePhrase(CobolParser.ProcedureDivisionByValuePhraseContext ctx) {
+        return new Cobol.ProcedureDivisionByValuePhrase(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                words(ctx.BY(), ctx.VALUE()),
+                convertAll(ctx.procedureDivisionByValue())
+        );
+    }
+
+    @Override
+    public Name visitProcedureDivisionByValue(CobolParser.ProcedureDivisionByValueContext ctx) {
+        if(ctx.identifier() != null) {
+            return visitIdentifier(ctx.identifier());
+        } else if(ctx.literal() != null) {
+            return visitLiteral(ctx.literal());
+        }
+        return new Cobol.Identifier(randomId(), whitespace(), Markers.EMPTY, ctx.ANY().getText());
     }
 
     @Override

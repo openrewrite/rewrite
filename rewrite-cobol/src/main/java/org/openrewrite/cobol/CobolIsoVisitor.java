@@ -300,6 +300,26 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
+    public Cobol.ProcedureDivisionUsingClause visitProcedureDivisionUsingClause(Cobol.ProcedureDivisionUsingClause procedureDivisionUsingClause, P p) {
+        return (Cobol.ProcedureDivisionUsingClause) super.visitProcedureDivisionUsingClause(procedureDivisionUsingClause, p);
+    }
+
+    @Override
+    public Cobol.ProcedureDivisionByReferencePhrase visitProcedureDivisionByReferencePhrase(Cobol.ProcedureDivisionByReferencePhrase procedureDivisionByReferencePhrase, P p) {
+        return (Cobol.ProcedureDivisionByReferencePhrase) super.visitProcedureDivisionByReferencePhrase(procedureDivisionByReferencePhrase, p);
+    }
+
+    @Override
+    public Cobol.ProcedureDivisionByReference visitProcedureDivisionByReference(Cobol.ProcedureDivisionByReference procedureDivisionByReference, P p) {
+        return (Cobol.ProcedureDivisionByReference) super.visitProcedureDivisionByReference(procedureDivisionByReference, p);
+    }
+
+    @Override
+    public Cobol.ProcedureDivisionByValuePhrase visitProcedureDivisionByValuePhrase(Cobol.ProcedureDivisionByValuePhrase procedureDivisionByValuePhrase, P p) {
+        return (Cobol.ProcedureDivisionByValuePhrase) super.visitProcedureDivisionByValuePhrase(procedureDivisionByValuePhrase, p);
+    }
+
+    @Override
     public Cobol.ScreenSection visitScreenSection(Cobol.ScreenSection screenSection, P p) {
         return (Cobol.ScreenSection) super.visitScreenSection(screenSection, p);
     }

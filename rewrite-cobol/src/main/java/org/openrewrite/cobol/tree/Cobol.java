@@ -2744,6 +2744,11 @@ public interface Cobol extends Tree {
         @With
         String words;
 
+        @Getter
+        @With
+        @Nullable
+        ProcedureDivisionUsingClause using;
+
         CobolLeftPadded<ProcedureDivisionBody> body;
 
         @Override
@@ -2784,8 +2789,91 @@ public interface Cobol extends Tree {
             }
 
             public ProcedureDivision withBody(CobolLeftPadded<Cobol.ProcedureDivisionBody> body) {
-                return t.body == body ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.words, body);
+                return t.body == body ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.words, t.using, body);
             }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ProcedureDivisionUsingClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        List<ProcedureDivisionUsingParameter> procedureDivisionUsingParameter;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureDivisionUsingClause(this, p);
+        }
+    }
+
+    interface ProcedureDivisionUsingParameter extends Cobol {}
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ProcedureDivisionByReferencePhrase implements ProcedureDivisionUsingParameter {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        String words;
+
+        List<ProcedureDivisionByReference> procedureDivisionByReference;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureDivisionByReferencePhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ProcedureDivisionByReference implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        String words;
+
+        Name reference;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureDivisionByReference(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ProcedureDivisionByValuePhrase implements ProcedureDivisionUsingParameter {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        String words;
+
+        List<Name> phrases;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureDivisionByValuePhrase(this, p);
         }
     }
 

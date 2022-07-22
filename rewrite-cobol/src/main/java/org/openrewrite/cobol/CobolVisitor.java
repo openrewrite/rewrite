@@ -605,6 +605,37 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return d;
     }
 
+    public Cobol visitProcedureDivisionUsingClause(Cobol.ProcedureDivisionUsingClause procedureDivisionUsingClause, P p) {
+        Cobol.ProcedureDivisionUsingClause pp = procedureDivisionUsingClause;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withProcedureDivisionUsingParameter(ListUtils.map(pp.getProcedureDivisionUsingParameter(), t -> (Cobol.ProcedureDivisionUsingParameter) visit(t, p)));
+        return pp;
+    }
+
+    public Cobol visitProcedureDivisionByReferencePhrase(Cobol.ProcedureDivisionByReferencePhrase procedureDivisionByReferencePhrase, P p) {
+        Cobol.ProcedureDivisionByReferencePhrase pp = procedureDivisionByReferencePhrase;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withProcedureDivisionByReference(ListUtils.map(pp.getProcedureDivisionByReference(), t -> (Cobol.ProcedureDivisionByReference) visit(t, p)));
+        return pp;
+    }
+
+    public Cobol visitProcedureDivisionByReference(Cobol.ProcedureDivisionByReference procedureDivisionByReference, P p) {
+        Cobol.ProcedureDivisionByReference pp = procedureDivisionByReference;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        return pp;
+    }
+
+    public Cobol visitProcedureDivisionByValuePhrase(Cobol.ProcedureDivisionByValuePhrase procedureDivisionByValuePhrase, P p) {
+        Cobol.ProcedureDivisionByValuePhrase pp = procedureDivisionByValuePhrase;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withPhrases(ListUtils.map(pp.getPhrases(), t -> (Name) visit(t, p)));
+        return pp;
+    }
+
     public Cobol visitScreenSection(Cobol.ScreenSection screenSection, P p) {
         Cobol.ScreenSection s = screenSection;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));

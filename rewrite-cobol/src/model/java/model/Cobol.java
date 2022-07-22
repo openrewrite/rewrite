@@ -350,7 +350,39 @@ public interface Cobol {
 
     class ProcedureDivision implements Cobol {
         String words;
+
+        @Nullable
+        ProcedureDivisionUsingClause procedureDivisionUsingClause;
+
         CobolLeftPadded<ProcedureDivisionBody> body;
+    }
+
+    class ProcedureDivisionUsingClause implements Cobol {
+        String words;
+        List<ProcedureDivisionUsingParameter> procedureDivisionUsingParameter;
+    }
+
+    interface ProcedureDivisionUsingParameter extends Cobol {}
+
+    class ProcedureDivisionByReferencePhrase implements ProcedureDivisionUsingParameter {
+        @Nullable
+        String words;
+
+        List<ProcedureDivisionByReference> procedureDivisionByReference;
+    }
+
+    class ProcedureDivisionByReference implements Cobol {
+        @Nullable
+        String words;
+
+        Name reference;
+    }
+
+    class ProcedureDivisionByValuePhrase implements ProcedureDivisionUsingParameter {
+        @Nullable
+        String words;
+
+        List<Name> phrases;
     }
 
     class ProcedureDivisionBody implements Cobol {
