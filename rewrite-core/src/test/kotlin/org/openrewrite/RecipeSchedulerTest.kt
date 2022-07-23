@@ -27,11 +27,9 @@ class RecipeSchedulerTest : RewriteTest {
         { spec -> spec.executionContext(InMemoryExecutionContext()).recipe(BoomRecipe()) },
         text(
             "hello",
-            "~~(java.lang.IllegalStateException: boom\n" +
-                    "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:43)\n" +
+            "~~(org.openrewrite.BoomException: boom\n" +
                     "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:41)\n" +
-                    "  org.openrewrite.text.PlainText.accept(PlainText.java:77)\n" +
-                    "  org.openrewrite.TreeVisitor.visit(TreeVisitor.java:224))~~>hello"
+                    "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:39))~~>hello"
         )
     )
 }
@@ -40,7 +38,19 @@ class BoomRecipe : Recipe() {
     override fun getDisplayName() = "We go boom"
     override fun getVisitor() = object : PlainTextVisitor<ExecutionContext>() {
         override fun visitText(text: PlainText, p: ExecutionContext): PlainText {
-            throw IllegalStateException("boom")
+            throw BoomException()
         }
+    }
+}
+
+/**
+ * Simplified exception that only displays stack trace elements within the [BoomRecipe].
+ */
+class BoomException: RuntimeException("boom") {
+    override fun getStackTrace(): Array<StackTraceElement> {
+        val stackTrace = super.getStackTrace()
+        return stackTrace
+            .filter { it.className.startsWith(BoomRecipe::class.java.name) }
+            .toTypedArray()
     }
 }
