@@ -28,11 +28,11 @@ class MethodInvocationTest : RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation 'org.hibernate:hibernate-core:3.6.7.Final'
                     api 'com.google.guava:guava:23.0'
@@ -48,10 +48,11 @@ class MethodInvocationTest : RewriteTest {
     )
 
     @Test
+    @Suppress("GroovyVariableNotAssigned")
     fun nullSafeDereference() = rewriteRun(
         groovy(
             """
-            Map m = [:]
+            Map m
             m?.clear()
         """
         )
@@ -126,8 +127,8 @@ class MethodInvocationTest : RewriteTest {
         )
     )
 
-
     @Test
+    @Suppress("GroovyAssignabilityCheck")
     fun closureWithImplicitParameter() = rewriteRun(
         groovy(
             """
@@ -141,6 +142,7 @@ class MethodInvocationTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test
+    @Suppress("GroovyAssignabilityCheck")
     fun closureWithNamedParameter() = rewriteRun(
         groovy(
             """
