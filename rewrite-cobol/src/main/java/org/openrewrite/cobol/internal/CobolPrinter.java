@@ -130,7 +130,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(procedureDivision.getPrefix(), p);
         visitMarkers(procedureDivision.getMarkers(), p);
         p.append(procedureDivision.getWords());
-        visitProcedureDivisionUsingClause(procedureDivision.getUsing(), p);
+        visitProcedureDivisionUsingClause(procedureDivision.getProcedureDivisionUsingClause(), p);
         visitLeftPadded(".", procedureDivision.getPadding().getBody(), p);
         return procedureDivision;
     }
@@ -144,7 +144,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(procedureDivisionUsingClause.getPrefix(), p);
         visitMarkers(procedureDivisionUsingClause.getMarkers(), p);
         p.append(procedureDivisionUsingClause.getWords());
-        for (Cobol.ProcedureDivisionUsingParameter pp : procedureDivisionUsingClause.getProcedureDivisionUsingParameter()) {
+        for (Cobol pp : procedureDivisionUsingClause.getProcedureDivisionUsingParameter()) {
             visit(pp, p);
         }
         return procedureDivisionUsingClause;

@@ -3499,7 +3499,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         String words;
-        List<ProcedureDivisionUsingParameter> procedureDivisionUsingParameter;
+        List<Cobol> procedureDivisionUsingParameter;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3510,7 +3510,7 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class ProcedureDivisionByReferencePhrase implements ProcedureDivisionUsingParameter {
+    class ProcedureDivisionByReferencePhrase implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3552,7 +3552,7 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class ProcedureDivisionByValuePhrase implements ProcedureDivisionUsingParameter {
+    class ProcedureDivisionByValuePhrase implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
 

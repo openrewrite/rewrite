@@ -609,7 +609,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.ProcedureDivisionUsingClause pp = procedureDivisionUsingClause;
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
-        pp = pp.withProcedureDivisionUsingParameter(ListUtils.map(pp.getProcedureDivisionUsingParameter(), t -> (Cobol.ProcedureDivisionUsingParameter) visit(t, p)));
+        pp = pp.withProcedureDivisionUsingParameter(ListUtils.map(pp.getProcedureDivisionUsingParameter(), t -> visit(t, p)));
         return pp;
     }
 

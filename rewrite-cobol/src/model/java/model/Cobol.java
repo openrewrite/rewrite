@@ -497,12 +497,10 @@ public interface Cobol {
 
     class ProcedureDivisionUsingClause implements Cobol {
         String words;
-        List<ProcedureDivisionUsingParameter> procedureDivisionUsingParameter;
+        List<Cobol> procedureDivisionUsingParameter;
     }
 
-    interface ProcedureDivisionUsingParameter extends Cobol {}
-
-    class ProcedureDivisionByReferencePhrase implements ProcedureDivisionUsingParameter {
+    class ProcedureDivisionByReferencePhrase implements Cobol {
         @Nullable
         String words;
 
@@ -516,7 +514,7 @@ public interface Cobol {
         Name reference;
     }
 
-    class ProcedureDivisionByValuePhrase implements ProcedureDivisionUsingParameter {
+    class ProcedureDivisionByValuePhrase implements Cobol {
         @Nullable
         String words;
 
