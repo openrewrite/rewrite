@@ -60,6 +60,11 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
+    public Cobol.Paragraph visitParagraph(Cobol.Paragraph paragraph, P p) {
+        return (Cobol.Paragraph) super.visitParagraph(paragraph, p);
+    }
+
+    @Override
     public Cobol.Sentence visitSentence(Cobol.Sentence sentence, P p) {
         return (Cobol.Sentence) super.visitSentence(sentence, p);
     }
@@ -557,5 +562,60 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     @Override
     public Cobol.ReportName visitReportName(Cobol.ReportName reportName, P p) {
         return (Cobol.ReportName) super.visitReportName(reportName, p);
+    }
+
+    @Override
+    public Cobol.AlteredGoTo visitAlteredGoTo(Cobol.AlteredGoTo alteredGoTo, P p) {
+        return (Cobol.AlteredGoTo) super.visitAlteredGoTo(alteredGoTo, p);
+    }
+
+    @Override
+    public Cobol.ProcedureDeclaratives visitProcedureDeclaratives(Cobol.ProcedureDeclaratives procedureDeclaratives, P p) {
+        return (Cobol.ProcedureDeclaratives) super.visitProcedureDeclaratives(procedureDeclaratives, p);
+    }
+
+    @Override
+    public Cobol.ProcedureDeclarative visitProcedureDeclarative(Cobol.ProcedureDeclarative procedureDeclarative, P p) {
+        return (Cobol.ProcedureDeclarative) super.visitProcedureDeclarative(procedureDeclarative, p);
+    }
+
+    @Override
+    public Cobol.ProcedureSection visitProcedureSection(Cobol.ProcedureSection procedureSection, P p) {
+        return (Cobol.ProcedureSection) super.visitProcedureSection(procedureSection, p);
+    }
+
+    @Override
+    public Cobol.ProcedureSectionHeader visitProcedureSectionHeader(Cobol.ProcedureSectionHeader procedureSectionHeader, P p) {
+        return (Cobol.ProcedureSectionHeader) super.visitProcedureSectionHeader(procedureSectionHeader, p);
+    }
+
+    @Override
+    public Cobol.ProcedureDivisionGivingClause visitProcedureDivisionGivingClause(Cobol.ProcedureDivisionGivingClause procedureDivisionGivingClause, P p) {
+        return (Cobol.ProcedureDivisionGivingClause) super.visitProcedureDivisionGivingClause(procedureDivisionGivingClause, p);
+    }
+
+    @Override
+    public Cobol.UseStatement visitUseStatement(Cobol.UseStatement useStatement, P p) {
+        return (Cobol.UseStatement) super.visitUseStatement(useStatement, p);
+    }
+
+    @Override
+    public Cobol.UseAfterClause visitUseAfterClause(Cobol.UseAfterClause useAfterClause, P p) {
+        return (Cobol.UseAfterClause) super.visitUseAfterClause(useAfterClause, p);
+    }
+
+    @Override
+    public Cobol.UseAfterOn visitUseAfterOn(Cobol.UseAfterOn useAfterOn, P p) {
+        return (Cobol.UseAfterOn) super.visitUseAfterOn(useAfterOn, p);
+    }
+
+    @Override
+    public Cobol.UseDebugClause visitUseDebugClause(Cobol.UseDebugClause useDebugClause, P p) {
+        return (Cobol.UseDebugClause) super.visitUseDebugClause(useDebugClause, p);
+    }
+
+    @Override
+    public Cobol.UseDebugOn visitUseDebugOn(Cobol.UseDebugOn useDebugOn, P p) {
+        return (Cobol.UseDebugOn) super.visitUseDebugOn(useDebugOn, p);
     }
 }

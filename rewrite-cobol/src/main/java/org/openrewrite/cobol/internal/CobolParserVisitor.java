@@ -113,7 +113,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                ctx.ACCEPT().getText(),
+                words(ctx.ACCEPT()),
                 visitIdentifier(ctx.identifier()),
                 visit(ctx.acceptFromDateStatement(), ctx.acceptFromEscapeKeyStatement(), ctx.acceptFromMnemonicStatement(), ctx.acceptMessageCountStatement()),
                 visitNullable(ctx.onExceptionClause()),
@@ -138,7 +138,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                ctx.FROM().getText(),
+                words(ctx.FROM()),
                 (Cobol.Identifier) visit(ctx.mnemonicName())
         );
     }
@@ -248,7 +248,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                ctx.CANCEL().getText(),
+                words(ctx.CANCEL()),
                 convertAllContainer(ctx.cancelCall())
         );
     }
@@ -285,7 +285,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                ctx.CLOSE().getText(),
+                words(ctx.CLOSE()),
                 convertAllContainer(ctx.closeFile())
         );
     }
@@ -349,7 +349,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                ctx.ASSOCIATED_DATA().getText(),
+                words(ctx.ASSOCIATED_DATA()),
                 visit(ctx.identifier(), ctx.integerLiteral())
         );
     }
@@ -1188,32 +1188,88 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Cobol.ProcedureDivision visitProcedureDivision(CobolParser.ProcedureDivisionContext ctx) {
-        if (ctx.procedureDivisionGivingClause() != null || ctx.procedureDeclaratives() != null) {
-            throw new UnsupportedOperationException("Implement me");
-        }
-        return new Cobol.ProcedureDivision(
+    public Cobol.Paragraphs visitParagraphs(CobolParser.ParagraphsContext ctx) {
+        return new Cobol.Paragraphs(
                 randomId(),
-                sourceBefore(ctx.PROCEDURE().getText()),
+                whitespace(),
                 Markers.EMPTY,
-                words(ctx.PROCEDURE(), ctx.DIVISION()),
-                visitProcedureDivisionUsingClause(ctx.procedureDivisionUsingClause()),
-                padLeft(sourceBefore("."), visitProcedureDivisionBody(ctx.procedureDivisionBody()))
+                convertAllContainer(ctx.sentence()),
+                convertAllContainer(ctx.paragraph())
         );
     }
 
     @Override
-    @Nullable
-    public Cobol.ProcedureDivisionUsingClause visitProcedureDivisionUsingClause(@Nullable CobolParser.ProcedureDivisionUsingClauseContext ctx) {
-        if(ctx == null) {
-            return null;
-        }
+    public Object visitParagraph(CobolParser.ParagraphContext ctx) {
+        return new Cobol.Paragraph(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                (Name) visit(ctx.paragraphName()),
+                ctx.DOT_FS() == null ? null : padLeft(ctx.DOT_FS()),
+                visitNullable(ctx.alteredGoTo()),
+                convertAllContainer(ctx.sentence())
+        );
+    }
+
+    @Override
+    public Object visitProcedureDeclaratives(CobolParser.ProcedureDeclarativesContext ctx) {
+        return new Cobol.ProcedureDeclaratives(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                words(ctx.DECLARATIVES(0)),
+                convertAllContainer(sourceBefore("."), ctx.procedureDeclarative()),
+                words(ctx.END(), ctx.DECLARATIVES(1)),
+                padLeft(ctx.DOT_FS(1))
+        );
+    }
+
+    @Override
+    public Object visitProcedureDeclarative(CobolParser.ProcedureDeclarativeContext ctx) {
+        return new Cobol.ProcedureDeclarative(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                (Cobol.ProcedureSectionHeader) visit(ctx.procedureSectionHeader()),
+                padLeft(sourceBefore("."), (Cobol.UseStatement) visit(ctx.useStatement())),
+                padLeft(sourceBefore("."), (Cobol.Paragraphs) visit(ctx.paragraphs()))
+        );
+    }
+
+    @Override
+    public Cobol.ProcedureDivision visitProcedureDivision(CobolParser.ProcedureDivisionContext ctx) {
+        return new Cobol.ProcedureDivision(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                words(ctx.PROCEDURE(), ctx.DIVISION()),
+                visitNullable(ctx.procedureDivisionUsingClause()),
+                visitNullable(ctx.procedureDivisionGivingClause()),
+                padLeft(ctx.DOT_FS()),
+                visitNullable(ctx.procedureDeclaratives()),
+                padLeft(sourceBefore(""), (Cobol.ProcedureDivisionBody) visit(ctx.procedureDivisionBody()))
+        );
+    }
+
+    @Override
+    public Cobol.ProcedureDivisionUsingClause visitProcedureDivisionUsingClause(CobolParser.ProcedureDivisionUsingClauseContext ctx) {
         return new Cobol.ProcedureDivisionUsingClause(
                 randomId(),
                 whitespace(),
                 Markers.EMPTY,
                 words(ctx.USING(), ctx.CHAINING()),
                 convertAll(ctx.procedureDivisionUsingParameter())
+        );
+    }
+
+    @Override
+    public Object visitProcedureDivisionGivingClause(CobolParser.ProcedureDivisionGivingClauseContext ctx) {
+        return new Cobol.ProcedureDivisionGivingClause(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                words(ctx.GIVING(), ctx.RETURNING()),
+                (Name) visit(ctx.dataName())
         );
     }
 
@@ -1271,27 +1327,36 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Cobol.ProcedureDivisionBody visitProcedureDivisionBody(CobolParser.ProcedureDivisionBodyContext ctx) {
-        if (ctx.procedureSection() != null && !ctx.procedureSection().isEmpty()) {
-            throw new UnsupportedOperationException("Implement me");
-        }
         return new Cobol.ProcedureDivisionBody(
                 randomId(),
-                prefix(ctx),
+                whitespace(),
                 Markers.EMPTY,
-                visitParagraphs(ctx.paragraphs())
+                (Cobol.Paragraphs) visit(ctx.paragraphs()),
+                convertAllContainer(ctx.procedureSection())
         );
     }
 
     @Override
-    public Cobol.Paragraphs visitParagraphs(CobolParser.ParagraphsContext ctx) {
-        if (ctx.paragraph() != null && !ctx.paragraph().isEmpty()) {
-            throw new UnsupportedOperationException("Implement me");
-        }
-        return new Cobol.Paragraphs(
+    public Object visitProcedureSection(CobolParser.ProcedureSectionContext ctx) {
+        return new Cobol.ProcedureSection(
                 randomId(),
-                prefix(ctx),
+                whitespace(),
                 Markers.EMPTY,
-                convertAllContainer(ctx.sentence(), () -> sourceBefore("."))
+                (Cobol.ProcedureSectionHeader) visit(ctx.procedureSectionHeader()),
+                padLeft(ctx.DOT_FS()),
+                (Cobol.Paragraphs) visit(ctx.paragraphs())
+        );
+    }
+
+    @Override
+    public Object visitProcedureSectionHeader(CobolParser.ProcedureSectionHeaderContext ctx) {
+        return new Cobol.ProcedureSectionHeader(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                (Name) visit(ctx.sectionName()),
+                words(ctx.SECTION()),
+                (Name) visit(ctx.integerLiteral())
         );
     }
 
@@ -1299,9 +1364,10 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     public Cobol.Sentence visitSentence(CobolParser.SentenceContext ctx) {
         return new Cobol.Sentence(
                 randomId(),
-                prefix(ctx),
+                whitespace(),
                 Markers.EMPTY,
-                convertAll(ctx.statement())
+                convertAll(ctx.statement()),
+                padLeft(ctx.DOT_FS())
         );
     }
 

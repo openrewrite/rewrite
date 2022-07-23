@@ -130,8 +130,11 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(procedureDivision.getPrefix(), p);
         visitMarkers(procedureDivision.getMarkers(), p);
         p.append(procedureDivision.getWords());
-        visitProcedureDivisionUsingClause(procedureDivision.getProcedureDivisionUsingClause(), p);
-        visitLeftPadded(".", procedureDivision.getPadding().getBody(), p);
+        visit(procedureDivision.getProcedureDivisionUsingClause(), p);
+        visit(procedureDivision.getProcedureDivisionGivingClause(), p);
+        visitLeftPadded("", procedureDivision.getPadding().getDot(), p);
+        visit(procedureDivision.getProcedureDeclaratives(), p);
+        visitLeftPadded("", procedureDivision.getPadding().getBody(), p);
         return procedureDivision;
     }
 
@@ -182,6 +185,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(procedureDivisionBody.getPrefix(), p);
         visitMarkers(procedureDivisionBody.getMarkers(), p);
         visit(procedureDivisionBody.getParagraphs(), p);
+        visitContainer("", procedureDivisionBody.getPadding().getProcedureSection(), "", "", p);
         return procedureDivisionBody;
     }
 
@@ -196,8 +200,19 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitParagraphs(Cobol.Paragraphs paragraphs, PrintOutputCapture<P> p) {
         visitSpace(paragraphs.getPrefix(), p);
         visitMarkers(paragraphs.getMarkers(), p);
-        visitContainer("", paragraphs.getPadding().getSentences(), ".", ".", p);
+        visitContainer("", paragraphs.getPadding().getSentences(), "", "", p);
+        visitContainer("", paragraphs.getPadding().getParagraphs(), "", "", p);
         return paragraphs;
+    }
+
+    public Cobol visitParagraph(Cobol.Paragraph paragraph, PrintOutputCapture<P> p) {
+        visitSpace(paragraph.getPrefix(), p);
+        visitMarkers(paragraph.getMarkers(), p);
+        visit(paragraph.getParagraphName(), p);
+        visitLeftPadded("", paragraph.getPadding().getDot(), p);
+        visit(paragraph.getAlteredGoTo(), p);
+        visitContainer("", paragraph.getPadding().getSentences(), "", "", p);
+        return paragraph;
     }
 
     public Cobol visitSentence(Cobol.Sentence sentence, PrintOutputCapture<P> p) {
@@ -206,6 +221,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         for (Statement s : sentence.getStatements()) {
             visit(s, p);
         }
+        visitLeftPadded("", sentence.getPadding().getDot(), p);
         return sentence;
     }
 
@@ -764,6 +780,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitCancelCall(Cobol.CancelCall cancelCall, PrintOutputCapture<P> p) {
         visitSpace(cancelCall.getPrefix(), p);
         visitMarkers(cancelCall.getMarkers(), p);
+        visit(cancelCall.getLibraryName(), p);
         p.append(cancelCall.getBy());
         visit(cancelCall.getIdentifier(), p);
         visit(cancelCall.getLiteral(), p);
@@ -781,6 +798,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitCloseFile(Cobol.CloseFile closeFile, PrintOutputCapture<P> p) {
         visitSpace(closeFile.getPrefix(), p);
         visitMarkers(closeFile.getMarkers(), p);
+        visit(closeFile.getFileName(), p);
         visit(closeFile.getCloseStatement(), p);
         return closeFile;
     }
@@ -975,5 +993,97 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitMarkers(reportName.getMarkers(), p);
         visit(reportName.getQualifiedDataName(), p);
         return reportName;
+    }
+
+    public Cobol visitAlteredGoTo(Cobol.AlteredGoTo alteredGoTo, PrintOutputCapture<P> p) {
+        visitSpace(alteredGoTo.getPrefix(), p);
+        visitMarkers(alteredGoTo.getMarkers(), p);
+        p.append(alteredGoTo.getWords());
+        visitLeftPadded("", alteredGoTo.getPadding().getDot(), p);
+        return alteredGoTo;
+    }
+
+    public Cobol visitProcedureDeclaratives(Cobol.ProcedureDeclaratives procedureDeclaratives, PrintOutputCapture<P> p) {
+        visitSpace(procedureDeclaratives.getPrefix(), p);
+        visitMarkers(procedureDeclaratives.getMarkers(), p);
+        p.append(procedureDeclaratives.getDeclaratives());
+        visitContainer(".", procedureDeclaratives.getPadding().getProcedureDeclarative(), "", "", p);
+        p.append(procedureDeclaratives.getEndDeclaratives());
+        visitLeftPadded("", procedureDeclaratives.getPadding().getDot(), p);
+        return procedureDeclaratives;
+    }
+
+    public Cobol visitProcedureDeclarative(Cobol.ProcedureDeclarative procedureDeclarative, PrintOutputCapture<P> p) {
+        visitSpace(procedureDeclarative.getPrefix(), p);
+        visitMarkers(procedureDeclarative.getMarkers(), p);
+        visit(procedureDeclarative.getProcedureSectionHeader(), p);
+        visitLeftPadded(".", procedureDeclarative.getPadding().getUseStatement(), p);
+        visitLeftPadded(".", procedureDeclarative.getPadding().getParagraphs(), p);
+        return procedureDeclarative;
+    }
+
+    public Cobol visitProcedureSection(Cobol.ProcedureSection procedureSection, PrintOutputCapture<P> p) {
+        visitSpace(procedureSection.getPrefix(), p);
+        visitMarkers(procedureSection.getMarkers(), p);
+        visit(procedureSection.getProcedureSectionHeader(), p);
+        visit(procedureSection.getParagraphs(), p);
+        return procedureSection;
+    }
+
+    public Cobol visitProcedureSectionHeader(Cobol.ProcedureSectionHeader procedureSectionHeader, PrintOutputCapture<P> p) {
+        visitSpace(procedureSectionHeader.getPrefix(), p);
+        visitMarkers(procedureSectionHeader.getMarkers(), p);
+        visit(procedureSectionHeader.getSectionName(), p);
+        p.append(procedureSectionHeader.getSection());
+        visit(procedureSectionHeader.getIdentifier(), p);
+        return procedureSectionHeader;
+    }
+
+    public Cobol visitProcedureDivisionGivingClause(Cobol.ProcedureDivisionGivingClause procedureDivisionGivingClause, PrintOutputCapture<P> p) {
+        visitSpace(procedureDivisionGivingClause.getPrefix(), p);
+        visitMarkers(procedureDivisionGivingClause.getMarkers(), p);
+        p.append(procedureDivisionGivingClause.getWords());
+        visit(procedureDivisionGivingClause.getDataName(), p);
+        return procedureDivisionGivingClause;
+    }
+
+    public Cobol visitUseStatement(Cobol.UseStatement useStatement, PrintOutputCapture<P> p) {
+        visitSpace(useStatement.getPrefix(), p);
+        visitMarkers(useStatement.getMarkers(), p);
+        p.append(useStatement.getUse());
+        visit(useStatement.getClause(), p);
+        return useStatement;
+    }
+
+    public Cobol visitUseAfterClause(Cobol.UseAfterClause useAfterClause, PrintOutputCapture<P> p) {
+        visitSpace(useAfterClause.getPrefix(), p);
+        visitMarkers(useAfterClause.getMarkers(), p);
+        p.append(useAfterClause.getWords());
+        visit(useAfterClause.getUseAfterOn(), p);
+        return useAfterClause;
+    }
+
+    public Cobol visitUseAfterOn(Cobol.UseAfterOn useAfterOn, PrintOutputCapture<P> p) {
+        visitSpace(useAfterOn.getPrefix(), p);
+        visitMarkers(useAfterOn.getMarkers(), p);
+        p.append(useAfterOn.getAfterOn());
+        visitContainer("", useAfterOn.getPadding().getFileNames(), "", "", p);
+        return useAfterOn;
+    }
+
+    public Cobol visitUseDebugClause(Cobol.UseDebugClause useDebugClause, PrintOutputCapture<P> p) {
+        visitSpace(useDebugClause.getPrefix(), p);
+        visitMarkers(useDebugClause.getMarkers(), p);
+        p.append(useDebugClause.getWords());
+        visitContainer("", useDebugClause.getPadding().getUseDebugs(), "", "", p);
+        return useDebugClause;
+    }
+
+    public Cobol visitUseDebugOn(Cobol.UseDebugOn useDebugOn, PrintOutputCapture<P> p) {
+        visitSpace(useDebugOn.getPrefix(), p);
+        visitMarkers(useDebugOn.getMarkers(), p);
+        p.append(useDebugOn.getWords());
+        visit(useDebugOn.getProcedureName(), p);
+        return useDebugOn;
     }
 }

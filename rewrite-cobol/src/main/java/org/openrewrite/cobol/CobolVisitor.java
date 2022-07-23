@@ -241,6 +241,15 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
         pp = pp.getPadding().withSentences(visitContainer(pp.getPadding().getSentences(), p));
+        pp = pp.getPadding().withParagraphs(visitContainer(pp.getPadding().getParagraphs(), p));
+        return pp;
+    }
+
+    public Cobol visitParagraph(Cobol.Paragraph paragraph, P p) {
+        Cobol.Paragraph pp = paragraph;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.getPadding().withSentences(visitContainer(pp.getPadding().getSentences(), p));
         return pp;
     }
 
@@ -1014,5 +1023,93 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
         r = r.withQualifiedDataName((Cobol.QualifiedDataName) visit(r.getQualifiedDataName(), p));
         return r;
+    }
+
+    public Cobol visitAlteredGoTo(Cobol.AlteredGoTo alteredGoTo, P p) {
+        Cobol.AlteredGoTo a = alteredGoTo;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.getPadding().withDot(visitLeftPadded(a.getPadding().getDot(), p));
+        return a;
+    }
+
+    public Cobol visitProcedureDeclaratives(Cobol.ProcedureDeclaratives procedureDeclaratives, P p) {
+        Cobol.ProcedureDeclaratives pp = procedureDeclaratives;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.getPadding().withProcedureDeclarative(visitContainer(pp.getPadding().getProcedureDeclarative(), p));
+        return pp;
+    }
+
+    public Cobol visitProcedureDeclarative(Cobol.ProcedureDeclarative procedureDeclarative, P p) {
+        Cobol.ProcedureDeclarative pp = procedureDeclarative;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withProcedureSectionHeader((Cobol.ProcedureSectionHeader) visit(pp.getProcedureSectionHeader(), p));
+        pp = pp.withParagraphs((Cobol.Paragraphs) visit(pp.getParagraphs(), p));
+        return pp;
+    }
+
+    public Cobol visitProcedureSection(Cobol.ProcedureSection procedureSection, P p) {
+        Cobol.ProcedureSection pp = procedureSection;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withProcedureSectionHeader((Cobol.ProcedureSectionHeader) visit(pp.getProcedureSectionHeader(), p));
+        pp = pp.withParagraphs((Cobol.Paragraphs) visit(pp.getParagraphs(), p));
+        return pp;
+    }
+
+    public Cobol visitProcedureSectionHeader(Cobol.ProcedureSectionHeader procedureSectionHeader, P p) {
+        Cobol.ProcedureSectionHeader pp = procedureSectionHeader;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        return pp;
+    }
+
+    public Cobol visitProcedureDivisionGivingClause(Cobol.ProcedureDivisionGivingClause procedureDivisionGivingClause, P p) {
+        Cobol.ProcedureDivisionGivingClause pp = procedureDivisionGivingClause;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        return pp;
+    }
+
+    public Cobol visitUseStatement(Cobol.UseStatement useStatement, P p) {
+        Cobol.UseStatement u = useStatement;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withClause((Cobol) visit(u.getClause(), p));
+        return u;
+    }
+
+    public Cobol visitUseAfterClause(Cobol.UseAfterClause useAfterClause, P p) {
+        Cobol.UseAfterClause u = useAfterClause;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withUseAfterOn((Cobol.UseAfterOn) visit(u.getUseAfterOn(), p));
+        return u;
+    }
+
+    public Cobol visitUseAfterOn(Cobol.UseAfterOn useAfterOn, P p) {
+        Cobol.UseAfterOn u = useAfterOn;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.getPadding().withFileNames(visitContainer(u.getPadding().getFileNames(), p));
+        return u;
+    }
+
+    public Cobol visitUseDebugClause(Cobol.UseDebugClause useDebugClause, P p) {
+        Cobol.UseDebugClause u = useDebugClause;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.getPadding().withUseDebugs(visitContainer(u.getPadding().getUseDebugs(), p));
+        return u;
+    }
+
+    public Cobol visitUseDebugOn(Cobol.UseDebugOn useDebugOn, P p) {
+        Cobol.UseDebugOn u = useDebugOn;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withProcedureName((Cobol.ProcedureName) visit(u.getProcedureName(), p));
+        return u;
     }
 }

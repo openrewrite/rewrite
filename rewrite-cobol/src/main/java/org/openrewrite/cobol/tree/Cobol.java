@@ -672,6 +672,78 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class AlteredGoTo implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolLeftPadded<String> dot;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitAlteredGoTo(this, p);
+        }
+
+        public String getDot() {
+            return dot.getElement();
+        }
+
+        public AlteredGoTo withDot(String dot) {
+            //noinspection ConstantConditions
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final AlteredGoTo t;
+
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public AlteredGoTo withDot(CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new AlteredGoTo(t.padding, t.id, t.prefix, t.markers, t.words, dot);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class AlphabetClause implements Cobol {
         @Nullable
         @NonFinal
@@ -3444,11 +3516,32 @@ public interface Cobol extends Tree {
         @With
         ProcedureDivisionUsingClause procedureDivisionUsingClause;
 
+        @Getter
+        @Nullable
+        @With
+        ProcedureDivisionGivingClause procedureDivisionGivingClause;
+
+        CobolLeftPadded<String> dot;
+
+        @Getter
+        @Nullable
+        @With
+        ProcedureDeclaratives procedureDeclaratives;
+
         CobolLeftPadded<ProcedureDivisionBody> body;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitProcedureDivision(this, p);
+        }
+
+        public String getDot() {
+            return dot.getElement();
+        }
+
+        public ProcedureDivision withDot(String dot) {
+            //noinspection ConstantConditions
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
         }
 
         public Cobol.ProcedureDivisionBody getBody() {
@@ -3479,13 +3572,319 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final ProcedureDivision t;
 
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public ProcedureDivision withDot(CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.words, t.procedureDivisionUsingClause, t.procedureDivisionGivingClause, dot, t.procedureDeclaratives, t.body);
+            }
+
             public CobolLeftPadded<Cobol.ProcedureDivisionBody> getBody() {
                 return t.body;
             }
 
             public ProcedureDivision withBody(CobolLeftPadded<Cobol.ProcedureDivisionBody> body) {
-                return t.body == body ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.words, t.procedureDivisionUsingClause, body);
+                return t.body == body ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.words, t.procedureDivisionUsingClause, t.procedureDivisionGivingClause, t.dot, t.procedureDeclaratives, body);
             }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ProcedureDeclaratives implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String declaratives;
+
+        CobolContainer<ProcedureDeclarative> procedureDeclarative;
+
+        @Getter
+        @With
+        String endDeclaratives;
+
+        CobolLeftPadded<String> dot;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureDeclaratives(this, p);
+        }
+
+        public List<Cobol.ProcedureDeclarative> getProcedureDeclarative() {
+            return procedureDeclarative.getElements();
+        }
+
+        public ProcedureDeclaratives withProcedureDeclarative(List<Cobol.ProcedureDeclarative> procedureDeclarative) {
+            return getPadding().withProcedureDeclarative(this.procedureDeclarative.getPadding().withElements(CobolRightPadded.withElements(
+                    this.procedureDeclarative.getPadding().getElements(), procedureDeclarative)));
+        }
+
+        public String getDot() {
+            return dot.getElement();
+        }
+
+        public ProcedureDeclaratives withDot(String dot) {
+            //noinspection ConstantConditions
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ProcedureDeclaratives t;
+
+            public CobolContainer<Cobol.ProcedureDeclarative> getProcedureDeclarative() {
+                return t.procedureDeclarative;
+            }
+
+            public ProcedureDeclaratives withProcedureDeclarative(CobolContainer<Cobol.ProcedureDeclarative> procedureDeclarative) {
+                return t.procedureDeclarative == procedureDeclarative ? t : new ProcedureDeclaratives(t.padding, t.id, t.prefix, t.markers, t.declaratives, procedureDeclarative, t.endDeclaratives, t.dot);
+            }
+
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public ProcedureDeclaratives withDot(CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new ProcedureDeclaratives(t.padding, t.id, t.prefix, t.markers, t.declaratives, t.procedureDeclarative, t.endDeclaratives, dot);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ProcedureDeclarative implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        ProcedureSectionHeader procedureSectionHeader;
+
+        CobolLeftPadded<UseStatement> useStatement;
+        CobolLeftPadded<Paragraphs> paragraphs;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureDeclarative(this, p);
+        }
+
+        public Cobol.UseStatement getUseStatement() {
+            return useStatement.getElement();
+        }
+
+        public ProcedureDeclarative withUseStatement(Cobol.UseStatement useStatement) {
+            //noinspection ConstantConditions
+            return getPadding().withUseStatement(CobolLeftPadded.withElement(this.useStatement, useStatement));
+        }
+
+        public Cobol.Paragraphs getParagraphs() {
+            return paragraphs.getElement();
+        }
+
+        public ProcedureDeclarative withParagraphs(Cobol.Paragraphs paragraphs) {
+            //noinspection ConstantConditions
+            return getPadding().withParagraphs(CobolLeftPadded.withElement(this.paragraphs, paragraphs));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ProcedureDeclarative t;
+
+            public CobolLeftPadded<Cobol.UseStatement> getUseStatement() {
+                return t.useStatement;
+            }
+
+            public ProcedureDeclarative withUseStatement(CobolLeftPadded<Cobol.UseStatement> useStatement) {
+                return t.useStatement == useStatement ? t : new ProcedureDeclarative(t.padding, t.id, t.prefix, t.markers, t.procedureSectionHeader, useStatement, t.paragraphs);
+            }
+
+            public CobolLeftPadded<Cobol.Paragraphs> getParagraphs() {
+                return t.paragraphs;
+            }
+
+            public ProcedureDeclarative withParagraphs(CobolLeftPadded<Cobol.Paragraphs> paragraphs) {
+                return t.paragraphs == paragraphs ? t : new ProcedureDeclarative(t.padding, t.id, t.prefix, t.markers, t.procedureSectionHeader, t.useStatement, paragraphs);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ProcedureSection implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        ProcedureSectionHeader procedureSectionHeader;
+
+        CobolLeftPadded<String> dot;
+
+        @Getter
+        @With
+        Paragraphs paragraphs;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureSection(this, p);
+        }
+
+        public String getDot() {
+            return dot.getElement();
+        }
+
+        public ProcedureSection withDot(String dot) {
+            //noinspection ConstantConditions
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ProcedureSection t;
+
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public ProcedureSection withDot(CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new ProcedureSection(t.padding, t.id, t.prefix, t.markers, t.procedureSectionHeader, dot, t.paragraphs);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ProcedureSectionHeader implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Name sectionName;
+        String section;
+        Name identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureSectionHeader(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ProcedureDivisionGivingClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name dataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProcedureDivisionGivingClause(this, p);
         }
     }
 
@@ -3558,8 +3957,6 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-
-        @Nullable
         String words;
 
         List<Name> phrases;
@@ -3570,20 +3967,77 @@ public interface Cobol extends Tree {
         }
     }
 
-    @Value
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class ProcedureDivisionBody implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
         @EqualsAndHashCode.Include
+        @With
         UUID id;
 
+        @Getter
+        @With
         Space prefix;
+
+        @Getter
+        @With
         Markers markers;
+
+        @Getter
+        @With
         Paragraphs paragraphs;
+
+        @Nullable
+        CobolContainer<ProcedureSection> procedureSection;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitProcedureDivisionBody(this, p);
+        }
+
+        public List<Cobol.ProcedureSection> getProcedureSection() {
+            return procedureSection.getElements();
+        }
+
+        public ProcedureDivisionBody withProcedureSection(List<Cobol.ProcedureSection> procedureSection) {
+            return getPadding().withProcedureSection(this.procedureSection.getPadding().withElements(CobolRightPadded.withElements(
+                    this.procedureSection.getPadding().getElements(), procedureSection)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ProcedureDivisionBody t;
+
+            @Nullable
+            public CobolContainer<Cobol.ProcedureSection> getProcedureSection() {
+                return t.procedureSection;
+            }
+
+            public ProcedureDivisionBody withProcedureSection(@Nullable CobolContainer<Cobol.ProcedureSection> procedureSection) {
+                return t.procedureSection == procedureSection ? t : new ProcedureDivisionBody(t.padding, t.id, t.prefix, t.markers, t.paragraphs, procedureSection);
+            }
         }
     }
 
@@ -3612,6 +4066,8 @@ public interface Cobol extends Tree {
 
         CobolContainer<Sentence> sentences;
 
+        CobolContainer<Paragraph> paragraphs;
+
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitParagraphs(this, p);
@@ -3624,6 +4080,15 @@ public interface Cobol extends Tree {
         public Paragraphs withSentences(List<Cobol.Sentence> sentences) {
             return getPadding().withSentences(this.sentences.getPadding().withElements(CobolRightPadded.withElements(
                     this.sentences.getPadding().getElements(), sentences)));
+        }
+
+        public List<Cobol.Paragraph> getParagraphs() {
+            return paragraphs.getElements();
+        }
+
+        public Paragraphs withParagraphs(List<Cobol.Paragraph> paragraphs) {
+            return getPadding().withParagraphs(this.paragraphs.getPadding().withElements(CobolRightPadded.withElements(
+                    this.paragraphs.getPadding().getElements(), paragraphs)));
         }
 
         public Padding getPadding() {
@@ -3650,7 +4115,118 @@ public interface Cobol extends Tree {
             }
 
             public Paragraphs withSentences(CobolContainer<Cobol.Sentence> sentences) {
-                return t.sentences == sentences ? t : new Paragraphs(t.padding, t.id, t.prefix, t.markers, sentences);
+                return t.sentences == sentences ? t : new Paragraphs(t.padding, t.id, t.prefix, t.markers, sentences, t.paragraphs);
+            }
+
+            public CobolContainer<Cobol.Paragraph> getParagraphs() {
+                return t.paragraphs;
+            }
+
+            public Paragraphs withParagraphs(CobolContainer<Cobol.Paragraph> paragraphs) {
+                return t.paragraphs == paragraphs ? t : new Paragraphs(t.padding, t.id, t.prefix, t.markers, t.sentences, paragraphs);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Paragraph implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Name paragraphName;
+
+        @Nullable
+        CobolLeftPadded<String> dot;
+
+        @Getter
+        @Nullable
+        @With
+        AlteredGoTo alteredGoTo;
+
+        @Nullable
+        CobolContainer<Sentence> sentences;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitParagraph(this, p);
+        }
+
+        @Nullable
+        public String getDot() {
+            return dot == null ? null : dot.getElement();
+        }
+
+        public Paragraph withDot(@Nullable String dot) {
+            if (dot == null) {
+                return this.dot == null ? this : new Paragraph(id, prefix, markers, paragraphName, null, alteredGoTo, sentences);
+            }
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
+        }
+
+        public List<Cobol.Sentence> getSentences() {
+            return sentences.getElements();
+        }
+
+        public Paragraph withSentences(List<Cobol.Sentence> sentences) {
+            return getPadding().withSentences(this.sentences.getPadding().withElements(CobolRightPadded.withElements(
+                    this.sentences.getPadding().getElements(), sentences)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Paragraph t;
+
+            @Nullable
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public Paragraph withDot(@Nullable CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new Paragraph(t.padding, t.id, t.prefix, t.markers, t.paragraphName, dot, t.alteredGoTo, t.sentences);
+            }
+
+            @Nullable
+            public CobolContainer<Cobol.Sentence> getSentences() {
+                return t.sentences;
+            }
+
+            public Paragraph withSentences(@Nullable CobolContainer<Cobol.Sentence> sentences) {
+                return t.sentences == sentences ? t : new Paragraph(t.padding, t.id, t.prefix, t.markers, t.paragraphName, t.dot, t.alteredGoTo, sentences);
             }
         }
     }
@@ -4512,20 +5088,73 @@ public interface Cobol extends Tree {
         }
     }
 
-    @Value
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Sentence implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
         @EqualsAndHashCode.Include
+        @With
         UUID id;
 
+        @Getter
+        @With
         Space prefix;
+
+        @Getter
+        @With
         Markers markers;
+
+        @Getter
+        @With
         List<Statement> statements;
+
+        @Getter
+        @With
+        CobolLeftPadded<String> dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitSentence(this, p);
+        }
+
+        public Sentence withDot(String dot) {
+            //noinspection ConstantConditions
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Sentence t;
+
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public Sentence withDot(CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new Sentence(t.padding, t.id, t.prefix, t.markers, t.statements, dot);
+            }
         }
     }
 
@@ -5301,6 +5930,214 @@ public interface Cobol extends Tree {
             public SymbolicCharactersClause withInAlphabet(@Nullable CobolLeftPadded<String> inAlphabet) {
                 return t.inAlphabet == inAlphabet ? t : new SymbolicCharactersClause(t.padding, t.id, t.prefix, t.markers, t.words, t.symbols, inAlphabet, t.alphabetName);
             }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class UseStatement implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String use;
+        Cobol clause;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUseStatement(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class UseAfterClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        UseAfterOn useAfterOn;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUseAfterClause(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class UseAfterOn implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @Nullable
+        @With
+        String afterOn;
+
+        @Nullable
+        CobolContainer<Name> fileNames;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUseAfterOn(this, p);
+        }
+
+        public List<Name> getFileNames() {
+            return fileNames.getElements();
+        }
+
+        public UseAfterOn withFileNames(List<Name> fileNames) {
+            return getPadding().withFileNames(this.fileNames.getPadding().withElements(CobolRightPadded.withElements(
+                    this.fileNames.getPadding().getElements(), fileNames)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final UseAfterOn t;
+
+            @Nullable
+            public CobolContainer<Name> getFileNames() {
+                return t.fileNames;
+            }
+
+            public UseAfterOn withFileNames(@Nullable CobolContainer<Name> fileNames) {
+                return t.fileNames == fileNames ? t : new UseAfterOn(t.padding, t.id, t.prefix, t.markers, t.afterOn, fileNames);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class UseDebugClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<UseDebugOn> useDebugs;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUseDebugClause(this, p);
+        }
+
+        public List<Cobol.UseDebugOn> getUseDebugs() {
+            return useDebugs.getElements();
+        }
+
+        public UseDebugClause withUseDebugs(List<Cobol.UseDebugOn> useDebugs) {
+            return getPadding().withUseDebugs(this.useDebugs.getPadding().withElements(CobolRightPadded.withElements(
+                    this.useDebugs.getPadding().getElements(), useDebugs)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final UseDebugClause t;
+
+            public CobolContainer<Cobol.UseDebugOn> getUseDebugs() {
+                return t.useDebugs;
+            }
+
+            public UseDebugClause withUseDebugs(CobolContainer<Cobol.UseDebugOn> useDebugs) {
+                return t.useDebugs == useDebugs ? t : new UseDebugClause(t.padding, t.id, t.prefix, t.markers, t.words, useDebugs);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class UseDebugOn implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        String words;
+
+        @Nullable
+        Name name;
+
+        @Nullable
+        ProcedureName procedureName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUseDebugOn(this, p);
         }
     }
 

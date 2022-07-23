@@ -88,6 +88,11 @@ public interface Cobol {
         CobolContainer<Name> giving;
     }
 
+    class AlteredGoTo implements Cobol {
+        String words;
+        CobolLeftPadded<String> dot;
+    }
+
     class AlphabetClause implements Cobol {
         String words;
         Identifier name;
@@ -492,7 +497,45 @@ public interface Cobol {
         @Nullable
         ProcedureDivisionUsingClause procedureDivisionUsingClause;
 
+        @Nullable
+        ProcedureDivisionGivingClause procedureDivisionGivingClause;
+
+        CobolLeftPadded<String> dot;
+
+        @Nullable
+        ProcedureDeclaratives procedureDeclaratives;
+
         CobolLeftPadded<ProcedureDivisionBody> body;
+    }
+
+    class ProcedureDeclaratives implements Cobol {
+        String declaratives;
+        CobolContainer<ProcedureDeclarative> procedureDeclarative;
+        String endDeclaratives;
+        CobolLeftPadded<String> dot;
+    }
+
+    class ProcedureDeclarative implements Cobol {
+        ProcedureSectionHeader procedureSectionHeader;
+        CobolLeftPadded<UseStatement> useStatement;
+        CobolLeftPadded<Paragraphs> paragraphs;
+    }
+
+    class ProcedureSection implements Cobol {
+        ProcedureSectionHeader procedureSectionHeader;
+        CobolLeftPadded<String> dot;
+        Paragraphs paragraphs;
+    }
+
+    class ProcedureSectionHeader implements Cobol {
+        Name sectionName;
+        String section;
+        Name identifier;
+    }
+
+    class ProcedureDivisionGivingClause implements Cobol {
+        String words;
+        Name dataName;
     }
 
     class ProcedureDivisionUsingClause implements Cobol {
@@ -515,7 +558,6 @@ public interface Cobol {
     }
 
     class ProcedureDivisionByValuePhrase implements Cobol {
-        @Nullable
         String words;
 
         List<Name> phrases;
@@ -523,9 +565,27 @@ public interface Cobol {
 
     class ProcedureDivisionBody implements Cobol {
         Paragraphs paragraphs;
+
+        @Nullable
+        CobolContainer<ProcedureSection> procedureSection;
     }
 
     class Paragraphs implements Cobol {
+        CobolContainer<Sentence> sentences;
+
+        CobolContainer<Paragraph> paragraphs;
+    }
+
+    class Paragraph implements Cobol {
+        Name paragraphName;
+
+        @Nullable
+        CobolLeftPadded<String> dot;
+
+        @Nullable
+        AlteredGoTo alteredGoTo;
+
+        @Nullable
         CobolContainer<Sentence> sentences;
     }
 
@@ -667,6 +727,7 @@ public interface Cobol {
 
     class Sentence implements Cobol {
         List<Statement> statements;
+        CobolLeftPadded<String> dot;
     }
 
     class Set implements Statement {
@@ -735,6 +796,41 @@ public interface Cobol {
 
         @Nullable
         Identifier alphabetName;
+    }
+
+    class UseStatement implements Cobol {
+        String use;
+        Cobol clause;
+    }
+
+    class UseAfterClause implements Cobol {
+        String words;
+        UseAfterOn useAfterOn;
+    }
+
+    class UseAfterOn implements Cobol {
+        @Nullable
+        String afterOn;
+
+        @Nullable
+        CobolContainer<Name> fileNames;
+    }
+
+    class UseDebugClause implements Cobol {
+        String words;
+
+        CobolContainer<UseDebugOn> useDebugs;
+    }
+
+    class UseDebugOn implements Cobol {
+        @Nullable
+        String words;
+
+        @Nullable
+        Name name;
+
+        @Nullable
+        ProcedureName procedureName;
     }
 
     class ValuedObjectComputerClause implements Cobol {

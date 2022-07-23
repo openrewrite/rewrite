@@ -112,6 +112,19 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
+    fun procedureDivision() = rewriteRun(
+        cobol("""
+            IDENTIFICATION  DIVISION .
+            PROGRAM-ID    . HELLO     .
+            PROCEDURE DIVISION USING GRP-01 GIVING dataName.
+            DECLARATIVES.
+            sectionName SECTION 77.
+            USE GLOBAL AFTER STANDARD ERROR PROCEDURE ON INPUT.
+            END DECLARATIVES.
+        """)
+    )
+
+    @Test
     fun divisionUsing() = rewriteRun(
         cobol("""
             IDENTIFICATION  DIVISION .
@@ -248,7 +261,6 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
-    @Disabled("Requires PROCEDURE DIVISION.")
     @Test
     fun acceptStatement() = rewriteRun(
         cobol("""
@@ -256,10 +268,10 @@ class CobolBasicsTest : RewriteTest {
             PROGRAM-ID. acceptStatement.
             PROCEDURE DIVISION.
             PARAGRAPH_NAME.
-            ACCEPT identifier FROM DATE 20421221 END-ACCEPT
+            ACCEPT identifier FROM DATE YYYYMMDD END-ACCEPT
             ACCEPT identifier FROM ESCAPE KEY
             ACCEPT identifier FROM mnemonicName
-            ACCEPT identifier MESSAGE COUNT
+            ACCEPT identifier MESSAGE COUNT.
         """)
     )
 
@@ -276,7 +288,6 @@ class CobolBasicsTest : RewriteTest {
         )
     )
 
-    @Disabled("Requires PROCEDURE DIVISION.")
     @Test
     fun cancelStatement() = rewriteRun(
         cobol("""
@@ -286,11 +297,10 @@ class CobolBasicsTest : RewriteTest {
             PARAGRAPH_NAME.
             CANCEL "literal"
             CANCEL identifier
-            CANCEL libraryName BYTITLE
+            CANCEL libraryName BYTITLE.
         """)
     )
 
-    @Disabled("Requires PROCEDURE DIVISION.")
     @Test
     fun closeStatement() = rewriteRun(
         cobol("""
@@ -298,11 +308,11 @@ class CobolBasicsTest : RewriteTest {
             PROGRAM-ID. acceptStatement.
             PROCEDURE DIVISION.
             PARAGRAPH_NAME.
-            CLOSE fileName UNIT FOR LOCK
+            CLOSE fileName UNIT FOR REMOVAL WITH LOCK
             CLOSE fileName WITH NO REWIND
             CLOSE fileName NO WAIT USING CLOSE-DISPOSITION OF ABORT
             CLOSE fileName NO WAIT USING ASSOCIATED-DATA identifier
-            CLOSE fileName NO WAIT USING ASSOCIATED-DATA-LENGTH OF identifier
+            CLOSE fileName NO WAIT USING ASSOCIATED-DATA-LENGTH OF identifier.
         """)
     )
 }
