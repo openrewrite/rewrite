@@ -32,7 +32,7 @@ import org.openrewrite.java.JavaRecipeTest
     "UseOfObsoleteCollectionType",
     "UnnecessaryLocalVariable",
     "EmptyFinallyBlock",
-    "ClassInitializerMayBeStatic"
+    "ClassInitializerMayBeStatic", "FunctionName"
 )
 interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
     override val recipe: Recipe
@@ -712,6 +712,48 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
                     for (String s : list) {
                         // do nothing
                     }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun `remove file getter methods as they do not side effect`() = assertChanged(
+        before = """
+            import java.io.File;
+
+            class Test {
+                static void method(File file) {
+                    String canonicalPath = file.getCanonicalPath();
+                }
+            }
+        """,
+        after = """
+            import java.io.File;
+
+            class Test {
+                static void method(File file) {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun `remove file getter methods when chained as they do not side effect`() = assertChanged(
+        before = """
+            import java.io.File;
+
+            class Test {
+                static void method(File file) {
+                    String canonicalPath = file.getParentFile().getCanonicalPath();
+                }
+            }
+        """,
+        after = """
+            import java.io.File;
+
+            class Test {
+                static void method(File file) {
                 }
             }
         """

@@ -22,6 +22,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.DeleteStatement;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.dataflow.internal.InvocationMatcher;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -36,6 +38,13 @@ import java.util.function.Predicate;
 @EqualsAndHashCode(callSuper = true)
 @SuppressWarnings("ConstantConditions")
 public class RemoveUnusedLocalVariables extends Recipe {
+    /**
+     * All methods that start with 'get' matching this InvocationMatcher will be considered non-side effecting.
+     */
+    private static final InvocationMatcher SAFE_GETTER_METHODS = InvocationMatcher.fromInvocationMatchers(
+            new MethodMatcher("java.io.File *(..)")
+    );
+
     @Incubating(since = "7.17.2")
     @Option(displayName = "Ignore matching variable names",
             description = "An array of variable identifier names for local variables to ignore, even if the local variable is unused.",
@@ -169,6 +178,9 @@ public class RemoveUnusedLocalVariables extends Recipe {
             new JavaIsoVisitor<AtomicBoolean>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation methodInvocation, AtomicBoolean result) {
+                    if (SAFE_GETTER_METHODS.matches(methodInvocation) && methodInvocation.getSimpleName().startsWith("get")) {
+                        return methodInvocation;
+                    }
                     result.set(true);
                     return methodInvocation;
                 }
