@@ -24,6 +24,10 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RecipeExceptionDemonstration extends Recipe {
@@ -42,11 +46,6 @@ public class RecipeExceptionDemonstration extends Recipe {
         return "Show how recipe exceptions are rendered in various forms of OpenRewrite tooling.";
     }
 
-//    @Override
-//    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-//        return new UsesMethod<>(methodPattern);
-//    }
-
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
@@ -55,10 +54,28 @@ public class RecipeExceptionDemonstration extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 if (methodMatcher.matches(method)) {
-                    throw new RuntimeException("Demonstrating an exception thrown on a matching method.");
+                    throw new RecipeExceptionDemonstrationException("Demonstrating an exception thrown on a matching method.");
                 }
                 return super.visitMethodInvocation(method, executionContext);
             }
         };
+    }
+
+    public static class RecipeExceptionDemonstrationException extends RuntimeException {
+        static boolean restrictStackTrace = false;
+        public RecipeExceptionDemonstrationException(String message) {
+            super(message);
+        }
+
+        @Override
+        public StackTraceElement[] getStackTrace() {
+            if (restrictStackTrace) {
+                return Arrays.stream(super.getStackTrace())
+                        .filter(ste -> ste.getClassName().startsWith(RecipeExceptionDemonstration.class.getName()))
+                        .toArray(StackTraceElement[]::new);
+            } else {
+                return super.getStackTrace();
+            }
+        }
     }
 }
