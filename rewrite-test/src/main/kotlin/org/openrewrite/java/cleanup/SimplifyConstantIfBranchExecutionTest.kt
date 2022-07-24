@@ -649,4 +649,23 @@ interface SimplifyConstantIfBranchExecutionTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun `negated (true && true)`(jp: JavaParser) = assertChanged(
+        before = """
+            public class A {
+                void test() {
+                    if (!(true && true)) {
+                        throw new RuntimeException();
+                    }
+                }
+            }
+        """,
+        after = """
+            public class A {
+                void test() {
+                }
+            }
+        """
+    )
 }

@@ -71,11 +71,16 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
         private <E extends Expression> E cleanupBooleanExpression(
                 E expression, ExecutionContext context
         ) {
-            final E ex1 =
+            E ex1 =
                     (E) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
                             .visitNonNull(expression, context, getCursor().getParentOrThrow());
-            return (E) new SimplifyBooleanExpressionVisitor<>()
-                            .visitNonNull(ex1, context, getCursor().getParentOrThrow());
+            ex1 = (E) new SimplifyBooleanExpressionVisitor<>()
+                    .visitNonNull(ex1, context, getCursor().getParentOrThrow());
+            if (expression == ex1 || isLiteralFalse(ex1) || isLiteralTrue(ex1)) {
+                return ex1;
+            }
+            // Run recursively until no further changes are needed
+            return cleanupBooleanExpression(ex1, context);
         }
 
         @Override
@@ -146,7 +151,7 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
         }
 
         private boolean visitsKeyWord(J.If iff) {
-            if (iff.getIfCondition().getTree() instanceof J.Literal && ((J.Literal) iff.getIfCondition().getTree()).getValue() == Boolean.valueOf(false)) {
+            if (isLiteralFalse(iff.getIfCondition().getTree())) {
                 return false;
             }
 
