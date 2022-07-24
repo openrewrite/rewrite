@@ -1,5 +1,9 @@
 ![Logo](https://github.com/openrewrite/rewrite/raw/main/doc/logo-oss.png)
-# Semantic code search and transformation
+# Safely modernize your source code.
+
+### Automated software refactoring to keep up-to-date with API changes, fix vulnerabilities, and improve code quality.
+
+
 
 [![ci](https://github.com/openrewrite/rewrite/actions/workflows/ci.yml/badge.svg)](https://github.com/openrewrite/rewrite/actions/workflows/ci.yml)
 [![Apache 2.0](https://img.shields.io/github/license/openrewrite/rewrite.svg)](https://www.apache.org/licenses/LICENSE-2.0)
