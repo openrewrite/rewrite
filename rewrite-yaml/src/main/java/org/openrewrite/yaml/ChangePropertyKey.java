@@ -23,6 +23,7 @@ import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.yaml.search.FindProperty;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
@@ -114,6 +115,11 @@ public class ChangePropertyKey extends Recipe {
                     .map(e2 -> e2.getKey().getValue())
                     .collect(Collectors.joining("."));
 
+            if (newPropertyKey.startsWith(oldPropertyKey)
+                    && (matches(prop, newPropertyKey) || matches(prop, newPropertyKey + ".*") || childMatchesNewPropertyKey(entry, prop))) {
+                return e;
+            }
+
             String propertyToTest = newPropertyKey;
             if (matches(prop, oldPropertyKey)) {
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
@@ -156,6 +162,13 @@ public class ChangePropertyKey extends Recipe {
             }
 
             return e;
+        }
+
+        private boolean childMatchesNewPropertyKey(Yaml.Mapping.Entry entry, String cursorPropertyKey) {
+            String rescopedNewPropertyKey = newPropertyKey.replaceFirst(
+                    cursorPropertyKey.replace(".", "\\."),
+                    entry.getKey().getValue());
+            return !FindProperty.find(entry, rescopedNewPropertyKey, relaxedBinding).isEmpty();
         }
     }
 

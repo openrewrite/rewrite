@@ -122,14 +122,38 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         """
     )
 
+    @Nested
+    inner class AvoidsRegenerativeChanges {
+        @Test
+        fun `indented property`() = assertUnchanged(
+            recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null),
+            before = """
+            a:
+              b:
+                c:
+                  d: true
+            """
+        )
+
+        @Test
+        fun `dot-separated property equal to newPropertyKey`() = assertUnchanged(
+            recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null),
+            before = "a.b.c.d: true",
+        )
+
+        @Test
+        fun `dot-separated property including newPropertyKey`() = assertUnchanged(
+            recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null),
+            before = "a.b.c.d.x: true",
+        )
+    }
+
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1114")
     fun `change path to one path longer`() = assertChanged(
         recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null),
         before = "a.b.c: true",
         after = "a.b.c.d: true",
-        cycles = 1,
-        expectedCyclesThatMakeChanges = 1
     )
 
     @Test
