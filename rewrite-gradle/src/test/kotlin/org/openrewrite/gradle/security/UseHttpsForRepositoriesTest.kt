@@ -16,68 +16,77 @@
 package org.openrewrite.gradle.security
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Recipe
-import org.openrewrite.gradle.GradleRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
 @Suppress("HttpUrlsUsage")
-class UseHttpsForRepositoriesTest : GradleRecipeTest {
-    override val recipe: Recipe
-        get() = UseHttpsForRepositories()
+class UseHttpsForRepositoriesTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(UseHttpsForRepositories())
+    }
 
     @Test
-    fun unchangedUseOfHttps() = assertUnchanged(
-        before = """
-            repositories {
-                maven { url 'https://repo.spring.example.com/libs-release-local' }
-            }
-        """
-    )
-
-    @Test
-    fun updateUnwrappedInvocationToUseHttpsSingleQuote() = assertChanged(
-        before = """
-            repositories {
-                maven { url 'http://repo.spring.example.com/libs-release-local' }
-            }
-        """,
-        after = """
-            repositories {
-                maven { url 'https://repo.spring.example.com/libs-release-local' }
-            }
-        """
-    )
-
-    @Test
-    fun updateUnwrappedInvocationToUseHttpsDoubleQuote() = assertChanged(
-        before = """
-            repositories {
-                maven { url "http://repo.spring.example.com/libs-release-local" }
-            }
-        """,
-        after = """
-            repositories {
-                maven { url "https://repo.spring.example.com/libs-release-local" }
-            }
-        """
-    )
-
-    @Test
-    fun updateUnwrappedInvocationToUseHttpsGString() = assertChanged(
-        before = """
-            repositories {
-                maven {
-                    def subRepo = properties.snapshot ? 'snapshot' : 'release'
-                    url "http://repo.spring.example.com/libs-release-local/${'$'}subRepo"
+    fun unchangedUseOfHttps() = rewriteRun(
+        buildGradle(
+            """
+                repositories {
+                    maven { url 'https://repo.spring.example.com/libs-release-local' }
                 }
-            }
-        """,
-        after = """
-            repositories {
-                maven {
-                    def subRepo = properties.snapshot ? 'snapshot' : 'release'
-                    url "https://repo.spring.example.com/libs-release-local/${'$'}subRepo"
+            """
+        )
+    )
+
+    @Test
+    fun updateUnwrappedInvocationToUseHttpsSingleQuote() = rewriteRun(
+        buildGradle(
+            """
+                repositories {
+                    maven { url 'http://repo.spring.example.com/libs-release-local' }
                 }
-            }
-        """
+            """,
+            """
+                repositories {
+                    maven { url 'https://repo.spring.example.com/libs-release-local' }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun updateUnwrappedInvocationToUseHttpsDoubleQuote() = rewriteRun(
+        buildGradle(
+            """
+                repositories {
+                    maven { url "http://repo.spring.example.com/libs-release-local" }
+                }
+            """,
+            """
+                repositories {
+                    maven { url "https://repo.spring.example.com/libs-release-local" }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun updateUnwrappedInvocationToUseHttpsGString() = rewriteRun(
+        buildGradle(
+            """
+                repositories {
+                    maven {
+                        def subRepo = properties.snapshot ? 'snapshot' : 'release'
+                        url "http://repo.spring.example.com/libs-release-local/${'$'}subRepo"
+                    }
+                }
+            """,
+            """
+                repositories {
+                    maven {
+                        def subRepo = properties.snapshot ? 'snapshot' : 'release'
+                        url "https://repo.spring.example.com/libs-release-local/${'$'}subRepo"
+                    }
+                }
+            """
+        )
     )
 }

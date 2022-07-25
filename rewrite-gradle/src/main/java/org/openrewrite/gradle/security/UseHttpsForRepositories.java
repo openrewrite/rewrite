@@ -61,7 +61,6 @@ public class UseHttpsForRepositories extends Recipe {
     @Override
     public GroovyVisitor<ExecutionContext> getVisitor() {
         return new GroovyVisitor<ExecutionContext>() {
-
             private J.Literal fixupLiteralIfNeeded(J.Literal arg) {
                 String url = (String) arg.getValue();
                 //noinspection HttpUrlsUsage
