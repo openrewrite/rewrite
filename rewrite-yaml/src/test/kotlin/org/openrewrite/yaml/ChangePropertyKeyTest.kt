@@ -16,6 +16,7 @@
 package org.openrewrite.yaml
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
@@ -30,13 +31,14 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             "management.metrics.binders.*.enabled",
             "management.metrics.enable.process.files",
             null,
+            null,
             null
         )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1873")
     @Test
     fun `shorter new key with indented config`() = assertChanged(
-        recipe = ChangePropertyKey("a.b.c.d.e", "x.y", null, null),
+        recipe = ChangePropertyKey("a.b.c.d.e", "x.y", null, null, null),
         before =
         """
         a:
@@ -55,7 +57,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1873")
     @Test
     fun `longer new key with indented config`() = assertChanged(
-        recipe = ChangePropertyKey("x.y", "a.b.c.d.e",  null, null),
+        recipe = ChangePropertyKey("x.y", "a.b.c.d.e",  null, null, null),
         before =
         """
         x:
@@ -85,6 +87,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         recipe = ChangePropertyKey(
             "management.metrics.binders.files.enabled",
             "management.metrics.enable.process.files",
+            null,
             null,
             null
         ),
@@ -119,17 +122,43 @@ class ChangePropertyKeyTest : YamlRecipeTest {
         """
     )
 
+    @Nested
+    inner class AvoidsRegenerativeChanges {
+        @Test
+        fun `indented property`() = assertUnchanged(
+            recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null),
+            before = """
+            a:
+              b:
+                c:
+                  d: true
+            """
+        )
+
+        @Test
+        fun `dot-separated property equal to newPropertyKey`() = assertUnchanged(
+            recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null),
+            before = "a.b.c.d: true",
+        )
+
+        @Test
+        fun `dot-separated property including newPropertyKey`() = assertUnchanged(
+            recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null),
+            before = "a.b.c.d.x: true",
+        )
+    }
+
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1114")
     fun `change path to one path longer`() = assertChanged(
-        recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null),
+        recipe = ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null),
         before = "a.b.c: true",
-        after = "a.b.c.d: true"
+        after = "a.b.c.d: true",
     )
 
     @Test
     fun `change path to one path shorter`() = assertChanged(
-        recipe = ChangePropertyKey("a.b.c.d", "a.b.c", null, null),
+        recipe = ChangePropertyKey("a.b.c.d", "a.b.c", null, null, null),
         before = "a.b.c.d: true",
         after = "a.b.c: true"
     )
@@ -148,7 +177,8 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             "management.metrics.binders.files.enabled",
             "management.metrics.enable.process.files",
             null,
-            "**/a.yml"
+            "**/a.yml",
+            null
         )
         assertChanged(recipe = recipe, before = matchingFile, after = "management.metrics.enable.process.files: true")
         assertUnchanged(recipe = recipe, before = nonMatchingFile)
@@ -164,7 +194,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
     )
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     fun relaxedBinding(propertyKey: String) = assertChanged(
-        recipe = ChangePropertyKey(propertyKey, "acme.my-project.person.changed-first-name-key", true, null),
+        recipe = ChangePropertyKey(propertyKey, "acme.my-project.person.changed-first-name-key", true, null, null),
         before = """
             unrelated.root: true
             acme.my-project:
@@ -190,6 +220,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             "acme.my-project.person.first-name",
             "acme.my-project.person.changed-first-name-key",
             false,
+            null,
             null
         ),
         before = """
@@ -211,6 +242,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             "i",
             "a.b.c",
             false,
+            null,
             null
         ),
         before = """
@@ -240,6 +272,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             "old-property",
             "new-property.sub-property.super-sub",
             true,
+            null,
             null
         ),
         before = """
@@ -268,6 +301,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             "a.b.c.a0",
             "a.b.a0",
             true,
+            null,
             null
         ),
         before = """
@@ -288,6 +322,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             "description",
             "newDescription",
             false,
+            null,
             null
         ),
         before = """
@@ -305,7 +340,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1744")
     @Test
     fun updatePropertyWithMapping() = assertChanged(
-        recipe = ChangePropertyKey("app.foo.change.from", "app.bar.change.to", null, null),
+        recipe = ChangePropertyKey("app.foo.change.from", "app.bar.change.to", null, null, null),
         before = """
             app:
               foo.change.from: hi
@@ -325,20 +360,20 @@ class ChangePropertyKeyTest : YamlRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = ChangePropertyKey(null, null, null, null)
+        var recipe = ChangePropertyKey(null, null, null, null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("newPropertyKey")
         assertThat(valid.failures()[1].property).isEqualTo("oldPropertyKey")
 
-        recipe = ChangePropertyKey(null, "management.metrics.enable.process.files", null, null)
+        recipe = ChangePropertyKey(null, "management.metrics.enable.process.files", null, null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("oldPropertyKey")
 
-        recipe = ChangePropertyKey("management.metrics.binders.files.enabled", null, null, null)
+        recipe = ChangePropertyKey("management.metrics.binders.files.enabled", null, null, null, null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(1)
@@ -348,6 +383,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             ChangePropertyKey(
                 "management.metrics.binders.files.enabled",
                 "management.metrics.enable.process.files",
+                null,
                 null,
                 null
             )
@@ -379,7 +415,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1841")
     fun relocatesPropertyIfNothingElseInFamily() = assertChanged(
-        recipe = ChangePropertyKey("a.b.c", "x.y.z", true, null),
+        recipe = ChangePropertyKey("a.b.c", "x.y.z", true, null, null),
         before = """
             a:
               b:
@@ -401,6 +437,7 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             "spring.elasticsearch.rest.sniffer.interval",
             "spring.elasticsearch.restclient.sniffer.interval",
             true,
+            null,
             null
         ),
         before = """
@@ -416,4 +453,209 @@ class ChangePropertyKeyTest : YamlRecipeTest {
                   restclient.sniffer.interval: 1
         """
     )
+
+    @Nested
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/189")
+    inner class WhenOldPropertyKeyIsPrefixOfDotSeparatedKey {
+        @Test
+        fun `scalar value`() = assertChanged(
+            recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null),
+            before = """
+                spring.profiles.group.prod: proddb,prodmq,prodmetrics
+            """,
+            after = """
+                spring.config.activate.on-profile.group.prod: proddb,prodmq,prodmetrics
+            """
+        )
+
+        @Test
+        fun `mapping value`() = assertChanged(
+            recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null),
+            before = """
+                spring.profiles.group:
+                  prod: proddb,prodmq,prodmetrics
+            """,
+            after = """
+                spring.config.activate.on-profile.group:
+                  prod: proddb,prodmq,prodmetrics
+            """
+        )
+
+        @Test
+        fun `match split across parent entries`() = assertChanged(
+            recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null),
+            before = """
+                spring:
+                  profiles.group:
+                    prod: proddb,prodmq,prodmetrics
+            """,
+            after = """
+                spring:
+                  config.activate.on-profile.group:
+                    prod: proddb,prodmq,prodmetrics
+            """
+        )
+    }
+
+    @Nested
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/189")
+    inner class Except {
+        @Nested
+        inner class DotAndIndentCombinations {
+            @Test
+            fun `dot dot dot`() = assertUnchanged(
+                recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+                before = """
+                    spring.profiles.group.prod: proddb,prodmq,prodmetrics
+                """
+            )
+
+            @Test
+            fun `dot dot indent`() = assertUnchanged(
+                recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+                before = """
+                    spring.profiles.group:
+                      prod: proddb,prodmq,prodmetrics
+                """
+            )
+
+            @Test
+            fun `dot indent dot`() = assertUnchanged(
+                recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+                before = """
+                    spring.profiles:
+                      group.prod: proddb,prodmq,prodmetrics
+                """
+            )
+
+            @Test
+            fun `dot indent indent`() = assertUnchanged(
+                recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+                before = """
+                    spring.profiles:
+                      group:
+                        prod: proddb,prodmq,prodmetrics
+                """
+            )
+
+            @Test
+            fun `indent dot dot`() = assertUnchanged(
+                recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+                before = """
+                    spring:
+                      profiles.group.prod: proddb,prodmq,prodmetrics
+                """
+            )
+
+            @Test
+            fun `indent dot indent`() = assertUnchanged(
+                recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+                before = """
+                    spring:
+                      profiles.group:
+                        prod: proddb,prodmq,prodmetrics
+                """
+            )
+
+            @Test
+            fun `indent indent dot`() = assertUnchanged(
+                recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+                before = """
+                    spring:
+                      profiles:
+                        group.prod: proddb,prodmq,prodmetrics
+                """
+            )
+
+            @Test
+            fun `indent indent indent`() = assertUnchanged(
+                recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+                before = """
+                    spring:
+                      profiles:
+                        group:
+                          prod: proddb,prodmq,prodmetrics
+                """
+            )
+        }
+
+        @Test
+        fun `multiple excluded entries`() = assertChanged(
+            recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group", "active", "include")),
+            before = """
+                spring:
+                  profiles:
+                    active: allEnvs
+                    include: baseProfile
+                    foo: bar
+                    group:
+                      prod: proddb,prodmq,prodmetrics
+            """,
+            after = """
+                spring:
+                  profiles:
+                    active: allEnvs
+                    include: baseProfile
+                    group:
+                      prod: proddb,prodmq,prodmetrics
+                  config.activate.on-profile:
+                    foo: bar
+            """
+        )
+
+        @Test
+        fun `target mapping includes non-excluded entry with scalar value`() = assertChanged(
+            recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+            before = """
+                spring:
+                  profiles:
+                    foo: bar
+                    group:
+                      prod: proddb,prodmq,prodmetrics
+            """,
+            after = """
+                spring:
+                  profiles:
+                    group:
+                      prod: proddb,prodmq,prodmetrics
+                  config.activate.on-profile:
+                    foo: bar
+            """
+        )
+
+        @Test
+        fun `target mapping includes non-excluded entry with mapping value`() = assertChanged(
+            recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+            before = """
+                spring:
+                  profiles:
+                    foo:
+                      bar: qwe
+                    group:
+                      prod: proddb,prodmq,prodmetrics
+            """,
+            after = """
+                spring:
+                  profiles:
+                    group:
+                      prod: proddb,prodmq,prodmetrics
+                  config.activate.on-profile:
+                    foo:
+                      bar: qwe
+            """
+        )
+
+        @Test
+        fun `target mapping has scalar value`() = assertChanged(
+            recipe = ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, listOf("group")),
+            before = """
+                spring:
+                  profiles: foo
+            """,
+            after = """
+                spring:
+                  config.activate.on-profile: foo
+            """
+        )
+    }
 }
