@@ -1381,7 +1381,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 (Name) visit(ctx.sectionName()),
                 words(ctx.SECTION()),
-                (Name) visit(ctx.integerLiteral())
+                visitNullable(ctx.integerLiteral())
         );
     }
 
