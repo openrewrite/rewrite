@@ -385,16 +385,6 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
-    public Cobol.OnExceptionClause visitOnExceptionClause(Cobol.OnExceptionClause onExceptionClause, P p) {
-        return (Cobol.OnExceptionClause) super.visitOnExceptionClause(onExceptionClause, p);
-    }
-
-    @Override
-    public Cobol.NotOnExceptionClause visitNotOnExceptionClause(Cobol.NotOnExceptionClause notOnExceptionClause, P p) {
-        return (Cobol.NotOnExceptionClause) super.visitNotOnExceptionClause(notOnExceptionClause, p);
-    }
-
-    @Override
     public Cobol.AlterStatement visitAlterStatement(Cobol.AlterStatement alterStatement, P p) {
         return (Cobol.AlterStatement) super.visitAlterStatement(alterStatement, p);
     }
@@ -627,5 +617,24 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     @Override
     public Cobol.RewriteFrom visitRewriteFrom(Cobol.RewriteFrom rewriteFrom, P p) {
         return (Cobol.RewriteFrom) super.visitRewriteFrom(rewriteFrom, p);
+    }
+
+    public Cobol.Call visitCall(Cobol.Call call, P p) {
+        return (Cobol.Call) super.visitCall(call, p);
+    }
+
+    @Override
+    public Cobol.CallPhrase visitCallPhrase(Cobol.CallPhrase callPhrase, P p) {
+        return (Cobol.CallPhrase) super.visitCallPhrase(callPhrase, p);
+    }
+
+    @Override
+    public Cobol.CallBy visitCallBy(Cobol.CallBy callBy, P p) {
+        return (Cobol.CallBy) super.visitCallBy(callBy, p);
+    }
+
+    @Override
+    public Cobol.CallGivingPhrase visitCallGivingPhrase(Cobol.CallGivingPhrase callGivingPhrase, P p) {
+        return (Cobol.CallGivingPhrase) super.visitCallGivingPhrase(callGivingPhrase, p);
     }
 }

@@ -211,11 +211,22 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitOnExceptionClause(CobolParser.OnExceptionClauseContext ctx) {
-        return new Cobol.OnExceptionClause(
+        return new Cobol.StatementPhrase(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.ON(), ctx.EXCEPTION()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
+    public Object visitOnOverflowPhrase(CobolParser.OnOverflowPhraseContext ctx) {
+        return new Cobol.StatementPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ON(), ctx.OVERFLOW()),
                 convertAllContainer(ctx.statement())
         );
     }
@@ -233,12 +244,120 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitNotOnExceptionClause(CobolParser.NotOnExceptionClauseContext ctx) {
-        return new Cobol.NotOnExceptionClause(
+        return new Cobol.StatementPhrase(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.NOT(), ctx.ON(), ctx.EXCEPTION()),
                 convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
+    public Object visitCallStatement(CobolParser.CallStatementContext ctx) {
+        return new Cobol.Call(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CALL()),
+                visit(ctx.identifier(), ctx.literal()),
+                visitNullable(ctx.callUsingPhrase()),
+                visitNullable(ctx.callGivingPhrase()),
+                visitNullable(ctx.onOverflowPhrase()),
+                visitNullable(ctx.onExceptionClause()),
+                visitNullable(ctx.notOnExceptionClause()),
+                padLeft(ctx.END_CALL())
+        );
+    }
+
+    @Override
+    public Object visitCallUsingPhrase(CobolParser.CallUsingPhraseContext ctx) {
+        return new Cobol.CallPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.USING()),
+                convertAllContainer(ctx.callUsingParameter())
+        );
+    }
+
+    @Override
+    public Object visitCallByReferencePhrase(CobolParser.CallByReferencePhraseContext ctx) {
+        return new Cobol.CallPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BY(), ctx.REFERENCE()),
+                convertAllContainer(ctx.callByReference())
+        );
+    }
+
+    @Override
+    public Object visitCallByReference(CobolParser.CallByReferenceContext ctx) {
+        return new Cobol.CallBy(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ADDRESS(), ctx.OF(), ctx.INTEGER(), ctx.STRING(), ctx.OMITTED()),
+                ctx.identifier() != null ? (Name) visit(ctx.identifier()) :
+                        ctx.literal() != null ? (Name) visit(ctx.literal()) :
+                                ctx.fileName() != null ? (Name) visit(ctx.fileName()) : null
+        );
+    }
+
+    @Override
+    public Object visitCallByValuePhrase(CobolParser.CallByValuePhraseContext ctx) {
+        return new Cobol.CallPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BY(), ctx.VALUE()),
+                convertAllContainer(ctx.callByValue())
+        );
+    }
+
+    @Override
+    public Object visitCallByValue(CobolParser.CallByValueContext ctx) {
+        return new Cobol.CallBy(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ADDRESS(), ctx.LENGTH(), ctx.OF()),
+                visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitCallByContentPhrase(CobolParser.CallByContentPhraseContext ctx) {
+        return new Cobol.CallPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BY(), ctx.CONTENT()),
+                convertAllContainer(ctx.callByContent())
+        );
+    }
+
+    @Override
+    public Object visitCallByContent(CobolParser.CallByContentContext ctx) {
+        return new Cobol.CallBy(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ADDRESS(), ctx.LENGTH(), ctx.OF(), ctx.OMITTED()),
+                ctx.identifier() != null ? (Name) visit(ctx.identifier()) :
+                        ctx.literal() != null ? (Name) visit(ctx.literal()) : null
+        );
+    }
+
+    @Override
+    public Object visitCallGivingPhrase(CobolParser.CallGivingPhraseContext ctx) {
+        return new Cobol.CallGivingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.GIVING(), ctx.RETURNING()),
+                (Name) visit(ctx.identifier())
         );
     }
 
@@ -1413,7 +1532,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     @Override
     public Cobol.Display visitDisplayStatement(CobolParser.DisplayStatementContext ctx) {
         if (ctx.displayAt() != null || ctx.displayUpon() != null || ctx.displayWith() != null ||
-                ctx.onExceptionClause() != null || ctx.notOnExceptionClause() != null ||
                 ctx.END_DISPLAY() != null) {
             throw new UnsupportedOperationException("Implement me");
         }

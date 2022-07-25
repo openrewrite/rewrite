@@ -719,20 +719,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return acceptMessageCountStatement;
     }
 
-    public Cobol visitOnExceptionClause(Cobol.OnExceptionClause onExceptionClause, PrintOutputCapture<P> p) {
-        visitSpace(onExceptionClause.getPrefix(), p);
-        visitMarkers(onExceptionClause.getMarkers(), p);
-        p.append(onExceptionClause.getWords());
-        return onExceptionClause;
-    }
-
-    public Cobol visitNotOnExceptionClause(Cobol.NotOnExceptionClause notOnExceptionClause, PrintOutputCapture<P> p) {
-        visitSpace(notOnExceptionClause.getPrefix(), p);
-        visitMarkers(notOnExceptionClause.getMarkers(), p);
-        p.append(notOnExceptionClause.getWords());
-        return notOnExceptionClause;
-    }
-
     public Cobol visitAlterStatement(Cobol.AlterStatement alterStatement, PrintOutputCapture<P> p) {
         visitSpace(alterStatement.getPrefix(), p);
         visitMarkers(alterStatement.getMarkers(), p);
@@ -1031,6 +1017,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(procedureSection.getPrefix(), p);
         visitMarkers(procedureSection.getMarkers(), p);
         visit(procedureSection.getProcedureSectionHeader(), p);
+        visitLeftPadded("", procedureSection.getPadding().getDot(), p);
         visit(procedureSection.getParagraphs(), p);
         return procedureSection;
     }
@@ -1108,5 +1095,43 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitMarkers(rewriteFrom.getMarkers(), p);
         p.append(rewriteFrom.getFrom());
         return rewriteFrom;
+    }
+
+    public Cobol visitCall(Cobol.Call call, PrintOutputCapture<P> p) {
+        visitSpace(call.getPrefix(), p);
+        visitMarkers(call.getMarkers(), p);
+        p.append(call.getCall());
+        visit(call.getIdentifier(), p);
+        visit(call.getCallUsingPhrase(), p);
+        visit(call.getCallGivingPhrase(), p);
+        visit(call.getOnOverflowPhrase(), p);
+        visit(call.getOnExceptionClause(), p);
+        visit(call.getNotOnExceptionClause(), p);
+        visitLeftPadded("", call.getPadding().getEndCall(), p);
+        return call;
+    }
+
+    public Cobol visitCallPhrase(Cobol.CallPhrase callPhrase, PrintOutputCapture<P> p) {
+        visitSpace(callPhrase.getPrefix(), p);
+        visitMarkers(callPhrase.getMarkers(), p);
+        p.append(callPhrase.getWords());
+        visitContainer("", callPhrase.getPadding().getParameters(), "", "", p);
+        return callPhrase;
+    }
+
+    public Cobol visitCallBy(Cobol.CallBy callBy, PrintOutputCapture<P> p) {
+        visitSpace(callBy.getPrefix(), p);
+        visitMarkers(callBy.getMarkers(), p);
+        p.append(callBy.getWords());
+        visit(callBy.getIdentifier(), p);
+        return callBy;
+    }
+
+    public Cobol visitCallGivingPhrase(Cobol.CallGivingPhrase callGivingPhrase, PrintOutputCapture<P> p) {
+        visitSpace(callGivingPhrase.getPrefix(), p);
+        visitMarkers(callGivingPhrase.getMarkers(), p);
+        p.append(callGivingPhrase.getWords());
+        visit(callGivingPhrase.getIdentifier(), p);
+        return callGivingPhrase;
     }
 }

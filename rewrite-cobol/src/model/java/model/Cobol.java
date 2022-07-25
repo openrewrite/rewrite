@@ -57,16 +57,6 @@ public interface Cobol {
         String words;
     }
 
-    class OnExceptionClause implements Statement {
-        String words;
-        CobolContainer<Statement> statements;
-    }
-
-    class NotOnExceptionClause implements Statement {
-        String words;
-        CobolContainer<Statement> statements;
-    }
-
     class Add implements Statement {
         String add;
         Cobol operation;
@@ -180,6 +170,46 @@ public interface Cobol {
     class InTable implements Cobol {
         String words;
         // TODO .. implement TableCall
+    }
+
+    class Call implements Statement {
+        String call;
+        Name identifier;
+
+        @Nullable
+        CallPhrase callUsingPhrase;
+
+        @Nullable
+        CallGivingPhrase callGivingPhrase;
+
+        @Nullable
+        StatementPhrase onOverflowPhrase;
+
+        @Nullable
+        StatementPhrase onExceptionClause;
+
+        @Nullable
+        StatementPhrase notOnExceptionClause;
+
+        @Nullable
+        CobolLeftPadded<String> endCall;
+    }
+
+    class CallPhrase implements Cobol {
+        String words;
+        CobolContainer<Cobol> parameters;
+    }
+
+    class CallGivingPhrase implements Cobol {
+        String words;
+        Name identifier;
+    }
+
+    class CallBy implements Cobol {
+        String words;
+
+        @Nullable
+        Name identifier;
     }
 
     class Cancel implements Statement {

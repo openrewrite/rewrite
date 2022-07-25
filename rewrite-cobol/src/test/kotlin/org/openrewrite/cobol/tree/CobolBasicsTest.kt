@@ -326,4 +326,23 @@ class CobolBasicsTest : RewriteTest {
             REWRITE dataName IN fileName END-REWRITE.
         """)
     )
+
+    @Test
+    fun callStatement() = rewriteRun(
+        // onOverflowPhrase? onExceptionClause? notOnExceptionClause
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION USING GRP-01.
+            SECT-IC109-0001 SECTION.
+            PARA-IC109.
+                CALL "IC110A" USING BY REFERENCE WS1 GRP-01.
+                CALL "IC110A" USING BY VALUE ADDRESS OF GRP-01.
+                CALL "IC110A" USING BY CONTENT LENGTH OF GRP-01.
+                CALL "IC110A" GIVING GRP-01.
+                CALL "IC110A" ON OVERFLOW CONTINUE.
+                CALL "IC110A" ON EXCEPTION CONTINUE.
+                CALL "IC110A" NOT ON EXCEPTION CONTINUE.
+        """)
+    )
 }

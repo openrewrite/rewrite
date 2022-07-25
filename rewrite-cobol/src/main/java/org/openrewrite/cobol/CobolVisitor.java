@@ -746,20 +746,6 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return a;
     }
 
-    public Cobol visitOnExceptionClause(Cobol.OnExceptionClause onExceptionClause, P p) {
-        Cobol.OnExceptionClause o = onExceptionClause;
-        o = o.withPrefix(visitSpace(o.getPrefix(), p));
-        o = o.withMarkers(visitMarkers(o.getMarkers(), p));
-        return o;
-    }
-
-    public Cobol visitNotOnExceptionClause(Cobol.NotOnExceptionClause notOnExceptionClause, P p) {
-        Cobol.NotOnExceptionClause n = notOnExceptionClause;
-        n = n.withPrefix(visitSpace(n.getPrefix(), p));
-        n = n.withMarkers(visitMarkers(n.getMarkers(), p));
-        return n;
-    }
-
     public Cobol visitAlterStatement(Cobol.AlterStatement alterStatement, P p) {
         Cobol.AlterStatement a = alterStatement;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
@@ -1131,5 +1117,35 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         r = r.withPrefix(visitSpace(r.getPrefix(), p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
         return r;
+    }
+
+    public Cobol visitCall(Cobol.Call call, P p) {
+        Cobol.Call c = call;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        return c;
+    }
+
+
+    public Cobol visitCallPhrase(Cobol.CallPhrase callPhrase, P p) {
+        Cobol.CallPhrase c = callPhrase;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.getPadding().withParameters(visitContainer(c.getPadding().getParameters(), p));
+        return c;
+    }
+
+    public Cobol visitCallBy(Cobol.CallBy callBy, P p) {
+        Cobol.CallBy c = callBy;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        return c;
+    }
+
+    public Cobol visitCallGivingPhrase(Cobol.CallGivingPhrase callGivingPhrase, P p) {
+        Cobol.CallGivingPhrase c = callGivingPhrase;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        return c;
     }
 }
