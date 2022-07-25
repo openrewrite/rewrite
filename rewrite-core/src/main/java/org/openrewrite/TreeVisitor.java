@@ -21,6 +21,8 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import net.bytebuddy.ByteBuddy;
+import net.bytebuddy.description.type.TypeDescription;
+import net.bytebuddy.description.type.TypeDescription.ForLoadedType;
 import net.bytebuddy.dynamic.DynamicType;
 import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.MethodCall;
@@ -33,6 +35,7 @@ import org.openrewrite.marker.Markers;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,8 +44,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
 import static java.lang.reflect.Modifier.*;
+import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.parameterizedType;
+import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.typeVariable;
 import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
-import static net.bytebuddy.matcher.ElementMatchers.named;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -363,34 +367,23 @@ public abstract class TreeVisitor<T extends Tree, P> {
                         .newInstance(this);
             }
 
-            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = byteBuddy
-                    .subclass(adaptTo, NO_CONSTRUCTORS)
+            TypeDescription.Generic generic = parameterizedType(
+                    ForLoadedType.of(adaptTo), typeVariable("P").build()).build();
+            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = byteBuddy.subclass(generic, NO_CONSTRUCTORS)
+                    .typeVariable("P")
                     .defineField("delegate", delegateType, PRIVATE | FINAL)
                     .defineConstructor(PUBLIC)
                     .withParameter(delegateType)
-                    .intercept(MethodCall.invoke(adaptTo.getConstructor())
-                            .andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
+                    .intercept(MethodCall.invoke(adaptTo.getConstructor()).andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
 
-            for (Method adaptToVisitMethod : adaptTo.getMethods()) {
-                if (!adaptToVisitMethod.getName().startsWith("visit") || adaptToVisitMethod.isBridge() ||
-                        adaptToVisitMethod.isSynthetic() || adaptToVisitMethod.getName().equals("visit")) {
-                    continue;
-                }
-
-                // only delegate to visitor methods declared by the visitor being adapted
-                nextMethod:
-                for (Method delegatableMethod : getClass().getDeclaredMethods()) {
-                    if (delegatableMethod.getName().equals(adaptToVisitMethod.getName()) &&
-                            delegatableMethod.getParameterCount() == adaptToVisitMethod.getParameterCount()) {
-                        Class<?>[] parameterTypes = delegatableMethod.getParameterTypes();
-                        for (int i = 0; i < parameterTypes.length; i++) {
-                            if (!adaptToVisitMethod.getParameterTypes()[i].equals(parameterTypes[i])) {
-                                continue nextMethod;
-                            }
+            for (Method method : delegateType.getDeclaredMethods()) {
+                if (method.getName().startsWith("visit")) {
+                    for (Method adaptToMethod : adaptTo.getDeclaredMethods()) {
+                        if (method.equals(adaptToMethod) && !Modifier.isFinal(adaptToMethod.getModifiers())) {
+                            builder = builder.define(method)
+                                    .intercept(MethodDelegation.toField("delegate"));
+                            break;
                         }
-                        builder = builder
-                                .method(named(delegatableMethod.getName()))
-                                .intercept(MethodDelegation.toField("delegate"));
                     }
                 }
             }

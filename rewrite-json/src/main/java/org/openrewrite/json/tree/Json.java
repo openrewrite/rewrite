@@ -37,7 +37,7 @@ public interface Json extends Tree {
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof JsonVisitor ?
-                (R) acceptJson((JsonVisitor<P>) v, p) : v.defaultValue(this, p);
+                (R) acceptJson(v.adapt(JsonVisitor.class), p) : v.defaultValue(this, p);
     }
 
     @Nullable
@@ -47,7 +47,7 @@ public interface Json extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof JsonVisitor;
+        return v.isAdaptableTo(JsonVisitor.class);
     }
 
     Space getPrefix();

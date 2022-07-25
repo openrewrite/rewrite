@@ -37,7 +37,7 @@ public interface Proto extends Tree {
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof ProtoVisitor ?
-                (R) acceptProto((ProtoVisitor<P>) v, p) : v.defaultValue(this, p);
+                (R) acceptProto(v.adapt(ProtoVisitor.class), p) : v.defaultValue(this, p);
     }
 
     @Nullable
@@ -47,7 +47,7 @@ public interface Proto extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof ProtoVisitor;
+        return v.isAdaptableTo(ProtoVisitor.class);
     }
 
     Space getPrefix();

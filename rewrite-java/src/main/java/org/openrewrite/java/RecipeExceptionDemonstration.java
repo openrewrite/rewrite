@@ -24,7 +24,9 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -70,9 +72,13 @@ public class RecipeExceptionDemonstration extends Recipe {
         @Override
         public StackTraceElement[] getStackTrace() {
             if (restrictStackTrace) {
-                return Arrays.stream(super.getStackTrace())
-                        .filter(ste -> ste.getClassName().startsWith(RecipeExceptionDemonstration.class.getName()))
-                        .toArray(StackTraceElement[]::new);
+                List<StackTraceElement> restricted = new ArrayList<>();
+                for (StackTraceElement ste : super.getStackTrace()) {
+                    if (ste.getClassName().startsWith(RecipeExceptionDemonstration.class.getName())) {
+                        restricted.add(ste);
+                    }
+                }
+                return restricted.toArray(new StackTraceElement[0]);
             } else {
                 return super.getStackTrace();
             }

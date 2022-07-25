@@ -43,9 +43,7 @@ public interface Hcl extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return v instanceof HclVisitor ?
-                (R) acceptHcl((HclVisitor<P>) v, p) :
-                v.defaultValue(this, p);
+        return (R) acceptHcl(v.adapt(HclVisitor.class), p);
     }
 
     @Nullable
@@ -55,7 +53,7 @@ public interface Hcl extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof HclVisitor;
+        return v.isAdaptableTo(HclVisitor.class);
     }
 
     Space getPrefix();

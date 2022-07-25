@@ -33,12 +33,12 @@ public interface Properties extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) acceptProperties((PropertiesVisitor<P>) v, p);
+        return (R) acceptProperties(v.adapt(PropertiesVisitor.class), p);
     }
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof PropertiesVisitor;
+        return v.isAdaptableTo(PropertiesVisitor.class);
     }
 
     @Nullable

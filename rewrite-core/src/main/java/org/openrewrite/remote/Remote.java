@@ -17,7 +17,6 @@ package org.openrewrite.remote;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
-import org.openrewrite.binary.BinaryVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
@@ -28,7 +27,6 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -86,16 +84,12 @@ public interface Remote extends SourceFile {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) ((RemoteVisitor<P>) v).visitRemote(this, p);
+        return (R) v.adapt(RemoteVisitor.class).visitRemote(this, p);
     }
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof BinaryVisitor;
-    }
-
-    static void applyPatch(List<Remote> remotes, Path projectDir) {
-
+        return v.isAdaptableTo(RemoteVisitor.class);
     }
 
     static Builder builder(SourceFile before, URI uri) {

@@ -24,7 +24,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.RecipesThatMadeChanges;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 
 import java.lang.reflect.Method;
@@ -262,8 +261,8 @@ public interface RecipeScheduler {
                             //noinspection unchecked
                             afterFile = (S) new TreeVisitor<Tree, Integer>() {
                                 @Override
-                                public @Nullable Tree visit(@Nullable Tree tree, Integer integer) {
-                                    if (tree == nearestTree && tree != null) {
+                                public Tree preVisit(Tree tree, Integer integer) {
+                                    if (tree == nearestTree) {
                                         try {
                                             Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
                                             Method withMarkers = tree.getClass().getDeclaredMethod("withMarkers", Markers.class);
@@ -273,7 +272,7 @@ public interface RecipeScheduler {
                                         } catch (Throwable ignored) {
                                         }
                                     }
-                                    return super.visit(tree, integer);
+                                    return tree;
                                 }
                             }.visitNonNull(requireNonNull(afterFile), 0);
                         }

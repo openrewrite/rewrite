@@ -52,7 +52,7 @@ public interface Xml extends Tree {
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof XmlVisitor ?
-                (R) acceptXml((XmlVisitor<P>) v, p) : v.defaultValue(this, p);
+                (R) acceptXml(v.adapt(XmlVisitor.class), p) : v.defaultValue(this, p);
     }
 
     @Nullable
@@ -62,7 +62,7 @@ public interface Xml extends Tree {
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof XmlVisitor;
+        return v.isAdaptableTo(XmlVisitor.class);
     }
 
     String getPrefix();

@@ -37,12 +37,12 @@ public interface Yaml extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) acceptYaml((YamlVisitor<P>) v, p);
+        return (R) acceptYaml(v.adapt(YamlVisitor.class), p);
     }
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof YamlVisitor;
+        return v.isAdaptableTo(YamlVisitor.class);
     }
 
     @Nullable

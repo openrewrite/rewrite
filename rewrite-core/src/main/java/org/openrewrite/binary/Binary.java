@@ -42,7 +42,7 @@ public class Binary implements SourceFile, Tree {
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof BinaryVisitor;
+        return v.isAdaptableTo(BinaryVisitor.class);
     }
 
     @Override
@@ -83,6 +83,6 @@ public class Binary implements SourceFile, Tree {
     @SuppressWarnings("unchecked")
     @Override
     public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) ((BinaryVisitor<P>)v).visitBinary(this, p);
+        return (R) v.adapt(BinaryVisitor.class).visitBinary(this, p);
     }
 }

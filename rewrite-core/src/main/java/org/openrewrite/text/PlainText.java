@@ -68,13 +68,13 @@ public class PlainText implements SourceFile, Tree {
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v instanceof PlainTextVisitor;
+        return v.isAdaptableTo(PlainTextVisitor.class);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) ((PlainTextVisitor<P>) v).visitText(this, p);
+        return (R) v.adapt(PlainTextVisitor.class).visitText(this, p);
     }
 
     @Override
