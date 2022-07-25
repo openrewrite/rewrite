@@ -637,4 +637,34 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.CallGivingPhrase visitCallGivingPhrase(Cobol.CallGivingPhrase callGivingPhrase, P p) {
         return (Cobol.CallGivingPhrase) super.visitCallGivingPhrase(callGivingPhrase, p);
     }
+
+    @Override
+    public Cobol.Write visitWrite(Cobol.Write write, P p) {
+        return (Cobol.Write) super.visitWrite(write, p);
+    }
+
+    @Override
+    public Cobol.WriteFromPhrase visitWriteFromPhrase(Cobol.WriteFromPhrase writeFromPhrase, P p) {
+        return (Cobol.WriteFromPhrase) super.visitWriteFromPhrase(writeFromPhrase, p);
+    }
+
+    @Override
+    public Cobol.WriteAdvancingPhrase visitWriteAdvancingPhrase(Cobol.WriteAdvancingPhrase writeAdvancingPhrase, P p) {
+        return (Cobol.WriteAdvancingPhrase) super.visitWriteAdvancingPhrase(writeAdvancingPhrase, p);
+    }
+
+    @Override
+    public Cobol.WriteAdvancingPage visitWriteAdvancingPage(Cobol.WriteAdvancingPage writeAdvancingPage, P p) {
+        return (Cobol.WriteAdvancingPage) super.visitWriteAdvancingPage(writeAdvancingPage, p);
+    }
+
+    @Override
+    public Cobol.WriteAdvancingLines visitWriteAdvancingLines(Cobol.WriteAdvancingLines writeAdvancingLines, P p) {
+        return (Cobol.WriteAdvancingLines) super.visitWriteAdvancingLines(writeAdvancingLines, p);
+    }
+
+    @Override
+    public Cobol.WriteAdvancingMnemonic visitWriteAdvancingMnemonic(Cobol.WriteAdvancingMnemonic writeAdvancingMnemonic, P p) {
+        return (Cobol.WriteAdvancingMnemonic) super.visitWriteAdvancingMnemonic(writeAdvancingMnemonic, p);
+    }
 }

@@ -1134,4 +1134,57 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(callGivingPhrase.getIdentifier(), p);
         return callGivingPhrase;
     }
+
+    public Cobol visitWrite(Cobol.Write write, PrintOutputCapture<P> p) {
+        visitSpace(write.getPrefix(), p);
+        visitMarkers(write.getMarkers(), p);
+        p.append(write.getWrite());
+        visit(write.getRecordName(), p);
+        visit(write.getWriteFromPhrase(), p);
+        visit(write.getWriteAdvancingPhrase(), p);
+        visit(write.getWriteAtEndOfPagePhrase(), p);
+        visit(write.getWriteNotAtEndOfPagePhrase(), p);
+        visit(write.getInvalidKeyPhrase(), p);
+        visit(write.getNotInvalidKeyPhrase(), p);
+        visitLeftPadded("", write.getPadding().getEndWrite(), p);
+        return write;
+    }
+
+    public Cobol visitWriteFromPhrase(Cobol.WriteFromPhrase writeFromPhrase, PrintOutputCapture<P> p) {
+        visitSpace(writeFromPhrase.getPrefix(), p);
+        visitMarkers(writeFromPhrase.getMarkers(), p);
+        p.append(writeFromPhrase.getFrom());
+        visit(writeFromPhrase.getName(), p);
+        return writeFromPhrase;
+    }
+
+    public Cobol visitWriteAdvancingPhrase(Cobol.WriteAdvancingPhrase writeAdvancingPhrase, PrintOutputCapture<P> p) {
+        visitSpace(writeAdvancingPhrase.getPrefix(), p);
+        visitMarkers(writeAdvancingPhrase.getMarkers(), p);
+        p.append(writeAdvancingPhrase.getWords());
+        visit(writeAdvancingPhrase.getWriteBy(), p);
+        return writeAdvancingPhrase;
+    }
+
+    public Cobol visitWriteAdvancingPage(Cobol.WriteAdvancingPage writeAdvancingPage, PrintOutputCapture<P> p) {
+        visitSpace(writeAdvancingPage.getPrefix(), p);
+        visitMarkers(writeAdvancingPage.getMarkers(), p);
+        p.append(writeAdvancingPage.getPage());
+        return writeAdvancingPage;
+    }
+
+    public Cobol visitWriteAdvancingLines(Cobol.WriteAdvancingLines writeAdvancingLines, PrintOutputCapture<P> p) {
+        visitSpace(writeAdvancingLines.getPrefix(), p);
+        visitMarkers(writeAdvancingLines.getMarkers(), p);
+        visit(writeAdvancingLines.getName(), p);
+        p.append(writeAdvancingLines.getWords());
+        return writeAdvancingLines;
+    }
+
+    public Cobol visitWriteAdvancingMnemonic(Cobol.WriteAdvancingMnemonic writeAdvancingMnemonic, PrintOutputCapture<P> p) {
+        visitSpace(writeAdvancingMnemonic.getPrefix(), p);
+        visitMarkers(writeAdvancingMnemonic.getMarkers(), p);
+        visit(writeAdvancingMnemonic.getName(), p);
+        return writeAdvancingMnemonic;
+    }
 }

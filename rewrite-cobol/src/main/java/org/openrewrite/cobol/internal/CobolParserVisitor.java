@@ -1117,6 +1117,99 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitWriteStatement(CobolParser.WriteStatementContext ctx) {
+        return new Cobol.Write(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WRITE()),
+                (Cobol.QualifiedDataName) visit(ctx.recordName()),
+                visitNullable(ctx.writeFromPhrase()),
+                visitNullable(ctx.writeAdvancingPhrase()),
+                visitNullable(ctx.writeAtEndOfPagePhrase()),
+                visitNullable(ctx.writeNotAtEndOfPagePhrase()),
+                visitNullable(ctx.invalidKeyPhrase()),
+                visitNullable(ctx.notInvalidKeyPhrase()),
+                padLeft(ctx.END_WRITE())
+        );
+    }
+
+    @Override
+    public Object visitWriteFromPhrase(CobolParser.WriteFromPhraseContext ctx) {
+        return new Cobol.WriteFromPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FROM()),
+                visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitWriteAdvancingPhrase(CobolParser.WriteAdvancingPhraseContext ctx) {
+        return new Cobol.WriteAdvancingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BEFORE(), ctx.AFTER(), ctx.ADVANCING()),
+                visit(ctx.writeAdvancingPage(), ctx.writeAdvancingLines(), ctx.writeAdvancingMnemonic())
+        );
+    }
+
+    @Override
+    public Object visitWriteAdvancingPage(CobolParser.WriteAdvancingPageContext ctx) {
+        return new Cobol.WriteAdvancingPage(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PAGE())
+        );
+    }
+
+    @Override
+    public Object visitWriteAdvancingLines(CobolParser.WriteAdvancingLinesContext ctx) {
+        return new Cobol.WriteAdvancingLines(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.identifier(), ctx.literal()),
+                words(ctx.LINE(), ctx.LINES())
+        );
+    }
+
+    @Override
+    public Object visitWriteAdvancingMnemonic(CobolParser.WriteAdvancingMnemonicContext ctx) {
+        return new Cobol.WriteAdvancingMnemonic(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.mnemonicName())
+        );
+    }
+
+    @Override
+    public Object visitWriteAtEndOfPagePhrase(CobolParser.WriteAtEndOfPagePhraseContext ctx) {
+        return new Cobol.StatementPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.AT(), ctx.END_OF_PAGE(), ctx.EOP()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
+    public Object visitWriteNotAtEndOfPagePhrase(CobolParser.WriteNotAtEndOfPagePhraseContext ctx) {
+        return new Cobol.StatementPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.NOT(), ctx.AT(), ctx.END_OF_PAGE(), ctx.EOP()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
     public Object visitLinkageSection(CobolParser.LinkageSectionContext ctx) {
         return new Cobol.LinkageSection(
                 randomId(),

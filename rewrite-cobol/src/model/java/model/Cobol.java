@@ -906,4 +906,53 @@ public interface Cobol {
         String words;
         CobolContainer<DataDescriptionEntry> dataDescriptions;
     }
+
+    class Write implements Statement {
+        String write;
+        QualifiedDataName recordName;
+
+        @Nullable
+        WriteFromPhrase writeFromPhrase;
+
+        @Nullable
+        WriteAdvancingPhrase writeAdvancingPhrase;
+
+        @Nullable
+        StatementPhrase writeAtEndOfPagePhrase;
+
+        @Nullable
+        StatementPhrase writeNotAtEndOfPagePhrase;
+
+        @Nullable
+        StatementPhrase invalidKeyPhrase;
+
+        @Nullable
+        StatementPhrase notInvalidKeyPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endWrite;
+    }
+
+    class WriteFromPhrase implements Cobol {
+        String from;
+        Name name;
+    }
+
+    class WriteAdvancingPhrase implements Cobol {
+        String words;
+        Cobol writeBy;
+    }
+
+    class WriteAdvancingPage implements Cobol {
+        String page;
+    }
+
+    class WriteAdvancingLines implements Cobol {
+        Name name;
+        String words;
+    }
+
+    class WriteAdvancingMnemonic implements Cobol {
+        Name name;
+    }
 }

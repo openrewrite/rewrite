@@ -6487,4 +6487,203 @@ public interface Cobol extends Tree {
             }
         }
     }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Write implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String write;
+
+        @Getter
+        @With
+        QualifiedDataName recordName;
+
+        @Getter
+        @Nullable
+        @With
+        WriteFromPhrase writeFromPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        WriteAdvancingPhrase writeAdvancingPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase writeAtEndOfPagePhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase writeNotAtEndOfPagePhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase invalidKeyPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase notInvalidKeyPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endWrite;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitWrite(this, p);
+        }
+
+        @Nullable
+        public String getEndWrite() {
+            return endWrite == null ? null : endWrite.getElement();
+        }
+
+        public Write withEndWrite(@Nullable String endWrite) {
+            if (endWrite == null) {
+                return this.endWrite == null ? this : new Write(id, prefix, markers, write, recordName, writeFromPhrase, writeAdvancingPhrase, writeAtEndOfPagePhrase, writeNotAtEndOfPagePhrase, invalidKeyPhrase, notInvalidKeyPhrase, null);
+            }
+            return getPadding().withEndWrite(CobolLeftPadded.withElement(this.endWrite, endWrite));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Write t;
+
+            @Nullable
+            public CobolLeftPadded<String> getEndWrite() {
+                return t.endWrite;
+            }
+
+            public Write withEndWrite(@Nullable CobolLeftPadded<String> endWrite) {
+                return t.endWrite == endWrite ? t : new Write(t.padding, t.id, t.prefix, t.markers, t.write, t.recordName, t.writeFromPhrase, t.writeAdvancingPhrase, t.writeAtEndOfPagePhrase, t.writeNotAtEndOfPagePhrase, t.invalidKeyPhrase, t.notInvalidKeyPhrase, endWrite);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class WriteFromPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String from;
+        Name name;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitWriteFromPhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class WriteAdvancingPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Cobol writeBy;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitWriteAdvancingPhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class WriteAdvancingPage implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String page;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitWriteAdvancingPage(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class WriteAdvancingLines implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Name name;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitWriteAdvancingLines(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class WriteAdvancingMnemonic implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Name name;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitWriteAdvancingMnemonic(this, p);
+        }
+    }
 }

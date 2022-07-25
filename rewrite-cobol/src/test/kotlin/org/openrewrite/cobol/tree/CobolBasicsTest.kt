@@ -329,7 +329,6 @@ class CobolBasicsTest : RewriteTest {
 
     @Test
     fun callStatement() = rewriteRun(
-        // onOverflowPhrase? onExceptionClause? notOnExceptionClause
         cobol("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. acceptStatement.
@@ -343,6 +342,24 @@ class CobolBasicsTest : RewriteTest {
                 CALL "IC110A" ON OVERFLOW CONTINUE.
                 CALL "IC110A" ON EXCEPTION CONTINUE.
                 CALL "IC110A" NOT ON EXCEPTION CONTINUE.
+        """)
+    )
+
+    @Test
+    fun writeStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION USING GRP-01.
+            PARA-IC109.
+                WRITE IC110A FROM GRP-01.
+                WRITE IC110A BEFORE ADVANCING PAGE.
+                WRITE IC110A BEFORE ADVANCING 10 LINES.
+                WRITE IC110A BEFORE ADVANCING GRP-01.
+                WRITE IC110A AT END-OF-PAGE CONTINUE.
+                WRITE IC110A NOT AT END-OF-PAGE CONTINUE.
+                WRITE IC110A INVALID KEY CONTINUE.
+                WRITE IC110A NOT INVALID KEY CONTINUE.
         """)
     )
 }
