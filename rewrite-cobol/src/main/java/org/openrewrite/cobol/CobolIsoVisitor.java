@@ -511,7 +511,7 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
 
     @Override
     public Cobol.Entry visitEntry(Cobol.Entry entry, P p) {
-        return (Cobol.Entry) super.visitEntry(entry, p);
+        return super.visitEntry(entry, p);
     }
 
     @Override
@@ -617,5 +617,15 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     @Override
     public Cobol.UseDebugOn visitUseDebugOn(Cobol.UseDebugOn useDebugOn, P p) {
         return (Cobol.UseDebugOn) super.visitUseDebugOn(useDebugOn, p);
+    }
+
+    @Override
+    public Cobol.Rewrite visitRewrite(Cobol.Rewrite rewrite, P p) {
+        return (Cobol.Rewrite) super.visitRewrite(rewrite, p);
+    }
+
+    @Override
+    public Cobol.RewriteFrom visitRewriteFrom(Cobol.RewriteFrom rewriteFrom, P p) {
+        return (Cobol.RewriteFrom) super.visitRewriteFrom(rewriteFrom, p);
     }
 }

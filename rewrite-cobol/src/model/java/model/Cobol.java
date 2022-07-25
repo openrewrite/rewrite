@@ -675,6 +675,27 @@ public interface Cobol {
         String words;
     }
 
+    class Rewrite implements Statement {
+        String rewrite;
+
+        @Nullable
+        QualifiedDataName recordName;
+
+        @Nullable
+        StatementPhrase invalidKeyPhrase;
+
+        @Nullable
+        StatementPhrase notInvalidKeyPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endRewrite;
+    }
+
+    class RewriteFrom implements Cobol {
+        String from;
+        Name identifier;
+    }
+
     class Roundable implements Name {
         Identifier identifier;
 

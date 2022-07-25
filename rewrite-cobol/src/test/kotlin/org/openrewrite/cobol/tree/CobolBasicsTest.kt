@@ -315,4 +315,15 @@ class CobolBasicsTest : RewriteTest {
             CLOSE fileName NO WAIT USING ASSOCIATED-DATA-LENGTH OF identifier.
         """)
     )
+
+    @Test
+    fun rewriteStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            PARAGRAPH_NAME.
+            REWRITE dataName IN fileName END-REWRITE.
+        """)
+    )
 }

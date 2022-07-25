@@ -448,6 +448,31 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitRewriteStatement(CobolParser.RewriteStatementContext ctx) {
+        return new Cobol.Rewrite(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REWRITE()),
+                visitNullable(ctx.recordName()),
+                visitNullable(ctx.invalidKeyPhrase()),
+                visitNullable(ctx.notInvalidKeyPhrase()),
+                padLeft(ctx.END_REWRITE())
+        );
+    }
+
+    @Override
+    public Object visitRewriteFrom(CobolParser.RewriteFromContext ctx) {
+        return new Cobol.RewriteFrom(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FROM()),
+                (Name) visit(ctx.identifier())
+        );
+    }
+
+    @Override
     public Cobol.DecimalPointClause visitDecimalPointClause(CobolParser.DecimalPointClauseContext ctx) {
         return new Cobol.DecimalPointClause(
                 randomId(),
@@ -1035,7 +1060,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 visit(ctx.dataName(), ctx.conditionName()),
                 convertAllContainer(ctx.qualifiedInData()),
-                (Cobol.InFile) visit(ctx.inFile())
+                visitNullable(ctx.inFile())
         );
     }
 

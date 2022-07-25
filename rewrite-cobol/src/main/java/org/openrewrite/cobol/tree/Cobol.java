@@ -4754,6 +4754,116 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Rewrite implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String rewrite;
+
+        @Getter
+        @Nullable
+        @With
+        QualifiedDataName recordName;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase invalidKeyPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase notInvalidKeyPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endRewrite;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRewrite(this, p);
+        }
+
+        @Nullable
+        public String getEndRewrite() {
+            return endRewrite == null ? null : endRewrite.getElement();
+        }
+
+        public Rewrite withEndRewrite(@Nullable String endRewrite) {
+            if (endRewrite == null) {
+                return this.endRewrite == null ? this : new Rewrite(id, prefix, markers, rewrite, recordName, invalidKeyPhrase, notInvalidKeyPhrase, null);
+            }
+            return getPadding().withEndRewrite(CobolLeftPadded.withElement(this.endRewrite, endRewrite));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Rewrite t;
+
+            @Nullable
+            public CobolLeftPadded<String> getEndRewrite() {
+                return t.endRewrite;
+            }
+
+            public Rewrite withEndRewrite(@Nullable CobolLeftPadded<String> endRewrite) {
+                return t.endRewrite == endRewrite ? t : new Rewrite(t.padding, t.id, t.prefix, t.markers, t.rewrite, t.recordName, t.invalidKeyPhrase, t.notInvalidKeyPhrase, endRewrite);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class RewriteFrom implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String from;
+        Name identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRewriteFrom(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Roundable implements Name {
         @Nullable
         @NonFinal

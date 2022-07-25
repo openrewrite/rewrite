@@ -852,6 +852,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(inData.getPrefix(), p);
         visitMarkers(inData.getMarkers(), p);
         p.append(inData.getWords());
+        visit(inData.getName(), p);
         return inData;
     }
 
@@ -859,6 +860,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(inFile.getPrefix(), p);
         visitMarkers(inFile.getMarkers(), p);
         p.append(inFile.getWords());
+        visit(inFile.getName(), p);
         return inFile;
     }
 
@@ -866,6 +868,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(inMnemonic.getPrefix(), p);
         visitMarkers(inMnemonic.getMarkers(), p);
         p.append(inMnemonic.getWords());
+        visit(inMnemonic.getName(), p);
         return inMnemonic;
     }
 
@@ -873,6 +876,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(inLibrary.getPrefix(), p);
         visitMarkers(inLibrary.getMarkers(), p);
         p.append(inLibrary.getWords());
+        visit(inLibrary.getName(), p);
         return inLibrary;
     }
 
@@ -954,6 +958,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitQualifiedDataNameFormat1(Cobol.QualifiedDataNameFormat1 qualifiedDataNameFormat1, PrintOutputCapture<P> p) {
         visitSpace(qualifiedDataNameFormat1.getPrefix(), p);
         visitMarkers(qualifiedDataNameFormat1.getMarkers(), p);
+        visit(qualifiedDataNameFormat1.getName(), p);
         visitContainer("", qualifiedDataNameFormat1.getPadding().getQualifiedInData(), "", "", p);
         visit(qualifiedDataNameFormat1.getInFile(), p);
         return qualifiedDataNameFormat1;
@@ -1085,5 +1090,23 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(useDebugOn.getWords());
         visit(useDebugOn.getProcedureName(), p);
         return useDebugOn;
+    }
+
+    public Cobol visitRewrite(Cobol.Rewrite rewrite, PrintOutputCapture<P> p) {
+        visitSpace(rewrite.getPrefix(), p);
+        visitMarkers(rewrite.getMarkers(), p);
+        p.append(rewrite.getRewrite());
+        visit(rewrite.getRecordName(), p);
+        visit(rewrite.getInvalidKeyPhrase(), p);
+        visit(rewrite.getNotInvalidKeyPhrase(), p);
+        visitLeftPadded("", rewrite.getPadding().getEndRewrite(), p);
+        return rewrite;
+    }
+
+    public Cobol visitRewriteFrom(Cobol.RewriteFrom rewriteFrom, PrintOutputCapture<P> p) {
+        visitSpace(rewriteFrom.getPrefix(), p);
+        visitMarkers(rewriteFrom.getMarkers(), p);
+        p.append(rewriteFrom.getFrom());
+        return rewriteFrom;
     }
 }
