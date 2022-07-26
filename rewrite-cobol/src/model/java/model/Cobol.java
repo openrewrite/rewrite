@@ -827,6 +827,12 @@ public interface Cobol {
         CobolContainer<Sentence> sentences;
     }
 
+    class ParenExpression implements Cobol {
+        String leftParen;
+        CobolContainer<Cobol> expressions;
+        String rightParen;
+    }
+
     class Picture implements Cobol {
         String chars;
 
