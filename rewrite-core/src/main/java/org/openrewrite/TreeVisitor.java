@@ -24,6 +24,7 @@ import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.description.type.TypeDescription.ForLoadedType;
 import net.bytebuddy.dynamic.DynamicType;
+import net.bytebuddy.dynamic.scaffold.TypeValidation;
 import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.MethodCall;
 import net.bytebuddy.implementation.MethodDelegation;
@@ -33,9 +34,9 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.*;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +45,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
 import static java.lang.reflect.Modifier.*;
-import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.parameterizedType;
-import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.typeVariable;
+import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.*;
 import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
 
 /**
@@ -62,7 +62,10 @@ import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Defaul
  */
 @LanguageVisitor("all")
 public abstract class TreeVisitor<T extends Tree, P> {
-    private static final ByteBuddy byteBuddy = new ByteBuddy();
+    private static final ByteBuddy byteBuddy = new ByteBuddy()
+            // supports the case of package private bounds on visitors like LineEndingsCount
+            .with(TypeValidation.DISABLED);
+
     private static final Map<Class<?>, Map<Class<?>, Class<?>>> adaptedVisitorsCache =
             new IdentityHashMap<>();
 
@@ -367,19 +370,43 @@ public abstract class TreeVisitor<T extends Tree, P> {
                         .newInstance(this);
             }
 
-            TypeDescription.Generic generic = parameterizedType(
-                    ForLoadedType.of(adaptTo), typeVariable("P").build()).build();
-            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = byteBuddy.subclass(generic, NO_CONSTRUCTORS)
-                    .typeVariable("P")
+            TypeVariable<?>[] tp = getClass().getTypeParameters();
+            Type genericSuperclass = getClass().getGenericSuperclass();
+            DynamicType.Builder<?> classBuilder;
+            if (tp.length > 0) {
+                TypeDescription.Generic generic = parameterizedType(
+                        ForLoadedType.of(adaptTo), of(tp[0]).build()).build();
+                classBuilder = byteBuddy.subclass(generic, NO_CONSTRUCTORS)
+                        .typeVariable(tp[0].getName());
+            } else {
+                // FIXME this isn't working for FindTypes (extends from JavaIsoVisitor<Integer>).
+                Type p = ((ParameterizedType) genericSuperclass).getActualTypeArguments()[0];
+                TypeDescription.Generic generic = parameterizedType(
+                        ForLoadedType.of(adaptTo), of(p).build()).build();
+                classBuilder = byteBuddy.subclass(generic, NO_CONSTRUCTORS);
+            }
+
+            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = classBuilder
+                    .name(getClass().getSimpleName() + "_" + adaptTo.getSimpleName())
                     .defineField("delegate", delegateType, PRIVATE | FINAL)
                     .defineConstructor(PUBLIC)
                     .withParameter(delegateType)
                     .intercept(MethodCall.invoke(adaptTo.getConstructor()).andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
 
-            for (Method method : delegateType.getDeclaredMethods()) {
-                if (method.getName().startsWith("visit")) {
-                    for (Method adaptToMethod : adaptTo.getDeclaredMethods()) {
-                        if (method.equals(adaptToMethod) && !Modifier.isFinal(adaptToMethod.getModifiers())) {
+            for (Method method : getClass().getDeclaredMethods()) {
+                if (method.getName().startsWith("visit") || method.getName().equals("preVisit") ||
+                        method.getName().equals("postVisit")) {
+                    nextMethod:
+                    for (Method adaptToMethod : adaptTo.getMethods()) {
+                        if (method.getName().equals(adaptToMethod.getName()) &&
+                                method.getParameterCount() == adaptToMethod.getParameterCount() &&
+                                !Modifier.isFinal(adaptToMethod.getModifiers())) {
+                            Class<?>[] parameterTypes = method.getParameterTypes();
+                            for (int i = 0; i < parameterTypes.length; i++) {
+                                if (!method.getParameterTypes()[i].equals(parameterTypes[i])) {
+                                    continue nextMethod;
+                                }
+                            }
                             builder = builder.define(method)
                                     .intercept(MethodDelegation.toField("delegate"));
                             break;
@@ -389,6 +416,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
             }
 
             DynamicType.Unloaded<?> unloaded = builder.make();
+
+            // for debugging class generation issues
+//            try {
+//                unloaded.saveIn(new File("./adapted"));
+//            } catch (IOException e) {
+//                throw new RuntimeException(e);
+//            }
+
             Class<?> adapted = unloaded
                     .load(getClass().getClassLoader())
                     .getLoaded();
