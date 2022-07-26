@@ -17,10 +17,7 @@ package org.openrewrite.remote;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.binary.Binary;
-import org.openrewrite.internal.LanguageVisitor;
 
-@LanguageVisitor("remote")
 public class RemoteVisitor<P> extends TreeVisitor<Remote, P> {
 
     @Override

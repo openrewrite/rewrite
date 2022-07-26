@@ -17,14 +17,12 @@ package org.openrewrite.protobuf;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.LanguageVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.protobuf.tree.*;
 
 import java.util.List;
 
-@LanguageVisitor("proto")
 public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
 
     public Proto visitBlock(Proto.Block block, P p) {

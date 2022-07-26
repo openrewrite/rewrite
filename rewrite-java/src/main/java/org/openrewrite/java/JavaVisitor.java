@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.openrewrite.*;
-import org.openrewrite.internal.LanguageVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.dataflow.Dataflow;
@@ -28,7 +27,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
-@LanguageVisitor("java")
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Nullable

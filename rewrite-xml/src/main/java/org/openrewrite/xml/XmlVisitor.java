@@ -18,13 +18,11 @@ package org.openrewrite.xml;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.LanguageVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.format.AutoFormatVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-@LanguageVisitor("xml")
 public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
 
     @Override

@@ -28,7 +28,6 @@ import net.bytebuddy.dynamic.scaffold.TypeValidation;
 import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.MethodCall;
 import net.bytebuddy.implementation.MethodDelegation;
-import org.openrewrite.internal.LanguageVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -59,7 +58,6 @@ import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Defaul
  * @param <T> The type of tree.
  * @param <P> An input object that is passed to every visit method.
  */
-@LanguageVisitor("all")
 public abstract class TreeVisitor<T extends Tree, P> {
     private static final ByteBuddy byteBuddy = new ByteBuddy()
             // supports the case of package private bounds on visitors like LineEndingsCount
@@ -351,6 +349,43 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 "type hierarhcy of visitor " + getClass().getName());
     }
 
+    @SuppressWarnings("rawtypes")
+    private Class<? extends TreeVisitor> adapterDelegateType() {
+        for (TypeVariable<? extends Class<? extends TreeVisitor>> tp : getClass().getTypeParameters()) {
+            for (Type bound : tp.getBounds()) {
+                if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
+                    return getClass();
+                }
+            }
+        }
+
+        Class<?> v2 = getClass();
+        Type sup = v2.getGenericSuperclass();
+        for (int i = 0; i < 20; i++) {
+            if (sup instanceof ParameterizedType) {
+                for (Type bound : ((ParameterizedType) sup).getActualTypeArguments()) {
+                    if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
+                        if(getLanguage() == null) {
+                            return (Class<? extends TreeVisitor>) ((ParameterizedType) sup).getRawType();
+                        }
+                        //noinspection unchecked
+                        return (Class<? extends TreeVisitor>) v2;
+                    }
+                }
+                sup = ((ParameterizedType) sup).getRawType();
+            } else if (sup instanceof Class) {
+                v2 = (Class<?>) sup;
+                if (v2.getName().endsWith("IsoVisitor")) {
+                    //noinspection unchecked
+                    return (Class<? extends TreeVisitor>) v2;
+                }
+                sup = ((Class<?>) sup).getGenericSuperclass();
+            }
+        }
+        throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
+                "type hierarhcy of visitor " + getClass().getName());
+    }
+
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {
         if (adaptTo.isAssignableFrom(getClass())) {
             //noinspection unchecked
@@ -360,11 +395,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         }
 
         try {
-            Class<?> delegateType = getClass();
-            while (delegateType.getAnnotationsByType(LanguageVisitor.class).length == 0 && !(delegateType.getName().endsWith("IsoVisitor") && delegateType.getSuperclass().getAnnotationsByType(LanguageVisitor.class).length != 0)) {
-                delegateType = delegateType.getSuperclass();
-            }
-
+            Class<?> delegateType = adapterDelegateType();
             Map<Class<?>, Class<?>> adaptedFrom = adaptedVisitorsCache.get(getClass());
             if (adaptedFrom != null && adaptedFrom.containsKey(adaptTo)) {
                 //noinspection unchecked
@@ -378,13 +409,17 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 TypeDescription.Generic generic = parameterizedType(ForLoadedType.of(adaptTo), of(tp[0]).build()).build();
                 classBuilder = byteBuddy.subclass(generic, NO_CONSTRUCTORS).typeVariable(tp[0].getName());
             } else {
-                // FIXME this isn't working for FindTypes (extends from JavaIsoVisitor<Integer>).
                 Type p = ((ParameterizedType) genericSuperclass).getActualTypeArguments()[0];
                 TypeDescription.Generic generic = parameterizedType(ForLoadedType.of(adaptTo), of(p).build()).build();
                 classBuilder = byteBuddy.subclass(generic, NO_CONSTRUCTORS);
             }
 
-            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = classBuilder.name(getClass().getSimpleName() + "_" + adaptTo.getSimpleName()).defineField("delegate", delegateType, PRIVATE | FINAL).defineConstructor(PUBLIC).withParameter(delegateType).intercept(MethodCall.invoke(adaptTo.getConstructor()).andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
+            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = classBuilder
+                    .name(getClass().getSimpleName().trim() + "_" + adaptTo.getSimpleName())
+                    .defineField("delegate", delegateType, PRIVATE | FINAL)
+                    .defineConstructor(PUBLIC).withParameter(delegateType)
+                    .intercept(MethodCall.invoke(adaptTo.getConstructor())
+                            .andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
 
             for (Method method : getClass().getDeclaredMethods()) {
                 if (method.getName().startsWith("visit") || method.getName().equals("preVisit") || method.getName().equals("postVisit")) {

@@ -16,12 +16,10 @@
 package org.openrewrite.java;
 
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.LanguageVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Javadoc;
 
-@LanguageVisitor("javadoc")
 public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     protected JavaVisitor<P> javaVisitor;
 

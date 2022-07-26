@@ -17,9 +17,7 @@ package org.openrewrite.binary;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.LanguageVisitor;
 
-@LanguageVisitor("binary")
 public class BinaryVisitor <P> extends TreeVisitor<Binary, P> {
 
     @Override

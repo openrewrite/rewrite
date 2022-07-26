@@ -17,13 +17,11 @@ package org.openrewrite.groovy;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.tree.*;
-import org.openrewrite.internal.LanguageVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 
-@LanguageVisitor("groovy")
 public class GroovyVisitor<P> extends JavaVisitor<P> {
 
     @Override

@@ -18,14 +18,12 @@ package org.openrewrite.yaml;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.LanguageVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.cleanup.RemoveUnusedVisitor;
 import org.openrewrite.yaml.format.AutoFormatVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
-@LanguageVisitor("yaml")
 public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
 
     @Override
