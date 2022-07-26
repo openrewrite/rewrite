@@ -108,6 +108,21 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitComputeStatement(CobolParser.ComputeStatementContext ctx) {
+        return new Cobol.ComputeStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.COMPUTE()),
+                convertAllContainer(ctx.computeStore()),
+                words(ctx.EQUALCHAR(), ctx.EQUAL()),
+                (Cobol.ArithmeticExpression) visit(ctx.arithmeticExpression()),
+                visitNullable(ctx.onSizeErrorPhrase()),
+                visitNullable(ctx.notOnSizeErrorPhrase())
+        );
+    }
+
+    @Override
     public Object visitAcceptStatement(CobolParser.AcceptStatementContext ctx) {
         return new Cobol.Accept(
                 randomId(),
@@ -183,6 +198,88 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 (Cobol.ProcedureName) visit(ctx.procedureName(0)),
                 words(ctx.TO(0), ctx.PROCEED(), ctx.PROCEED() != null ? ctx.TO(1) : null),
                 (Cobol.ProcedureName) visit(ctx.procedureName(1))
+        );
+    }
+
+
+    @Override
+    public Object visitArithmeticExpression(CobolParser.ArithmeticExpressionContext ctx) {
+        return new Cobol.ArithmeticExpression(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.MultDivs) visit(ctx.multDivs()),
+                convertAllContainer(ctx.plusMinus())
+        );
+    }
+
+    @Override
+    public Object visitMultDivs(CobolParser.MultDivsContext ctx) {
+        return new Cobol.MultDivs(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.Powers) visit(ctx.powers()),
+                convertAllContainer(ctx.multDiv())
+        );
+    }
+
+    @Override
+    public Object visitMultDiv(CobolParser.MultDivContext ctx) {
+        return new Cobol.MultDiv(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ASTERISKCHAR(), ctx.SLASHCHAR()),
+                (Cobol.Powers) visit(ctx.powers())
+        );
+    }
+
+    @Override
+    public Object visitPowers(CobolParser.PowersContext ctx) {
+        return new Cobol.Powers(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PLUSCHAR(), ctx.MINUSCHAR()),
+                (Cobol.Basis) visit(ctx.basis()),
+                convertAllContainer(ctx.power())
+        );
+    }
+
+    @Override
+    public Object visitPower(CobolParser.PowerContext ctx) {
+        return new Cobol.Power(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DOUBLEASTERISKCHAR()),
+                (Cobol.Basis) visit(ctx.basis())
+        );
+    }
+
+    @Override
+    public Object visitBasis(CobolParser.BasisContext ctx) {
+        return new Cobol.Basis(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LPARENCHAR()),
+                visitNullable(ctx.arithmeticExpression()),
+                words(ctx.RPARENCHAR()),
+                visitNullable(ctx.identifier()),
+                visitNullable(ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitPlusMinus(CobolParser.PlusMinusContext ctx) {
+        return new Cobol.PlusMinus(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PLUSCHAR(), ctx.MINUSCHAR()),
+                (Cobol.MultDivs) visit(ctx.multDivs())
         );
     }
 

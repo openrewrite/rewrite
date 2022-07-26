@@ -667,4 +667,49 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.WriteAdvancingMnemonic visitWriteAdvancingMnemonic(Cobol.WriteAdvancingMnemonic writeAdvancingMnemonic, P p) {
         return (Cobol.WriteAdvancingMnemonic) super.visitWriteAdvancingMnemonic(writeAdvancingMnemonic, p);
     }
+
+    @Override
+    public Cobol.ArithmeticExpression visitArithmeticExpression(Cobol.ArithmeticExpression arithmeticExpression, P p) {
+        return (Cobol.ArithmeticExpression) super.visitArithmeticExpression(arithmeticExpression, p);
+    }
+
+    @Override
+    public Cobol.Basis visitBasis(Cobol.Basis basis, P p) {
+        return (Cobol.Basis) super.visitBasis(basis, p);
+    }
+
+    @Override
+    public Cobol.ComputeStatement visitComputeStatement(Cobol.ComputeStatement computeStatement, P p) {
+        return (Cobol.ComputeStatement) super.visitComputeStatement(computeStatement, p);
+    }
+
+    @Override
+    public Cobol.ComputeStore visitComputeStore(Cobol.ComputeStore computeStore, P p) {
+        return (Cobol.ComputeStore) super.visitComputeStore(computeStore, p);
+    }
+
+    @Override
+    public Cobol.MultDivs visitMultDivs(Cobol.MultDivs multDivs, P p) {
+        return (Cobol.MultDivs) super.visitMultDivs(multDivs, p);
+    }
+
+    @Override
+    public Cobol.MultDiv visitMultDiv(Cobol.MultDiv multDiv, P p) {
+        return (Cobol.MultDiv) super.visitMultDiv(multDiv, p);
+    }
+
+    @Override
+    public Cobol.Powers visitPowers(Cobol.Powers powers, P p) {
+        return (Cobol.Powers) super.visitPowers(powers, p);
+    }
+
+    @Override
+    public Cobol.Power visitPower(Cobol.Power power, P p) {
+        return (Cobol.Power) super.visitPower(power, p);
+    }
+
+    @Override
+    public Cobol.PlusMinus visitPlusMinus(Cobol.PlusMinus plusMinus, P p) {
+        return (Cobol.PlusMinus) super.visitPlusMinus(plusMinus, p);
+    }
 }

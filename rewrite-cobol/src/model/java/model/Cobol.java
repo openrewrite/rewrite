@@ -132,6 +132,29 @@ public interface Cobol {
         ProcedureName to;
     }
 
+    class ArithmeticExpression implements Cobol {
+        MultDivs multDivs;
+        CobolContainer<PlusMinus> plusMinuses;
+    }
+
+    class Basis implements Cobol {
+
+        @Nullable
+        String lParen;
+
+        @Nullable
+        ArithmeticExpression arithmeticExpression;
+
+        @Nullable
+        String rParen;
+
+        @Nullable
+        Identifier identifier;
+
+        @Nullable
+        Literal literal;
+    }
+
     class ProcedureName implements Cobol {
         Name paragraphName;
 
@@ -313,6 +336,19 @@ public interface Cobol {
     class CollatingSequenceAlphabet implements Cobol {
         String words;
         Identifier alphabetName;
+    }
+
+    class ComputeStatement implements Statement {
+        String words;
+        CobolContainer<ComputeStore> computeStores;
+        String equalWord;
+        ArithmeticExpression arithmeticExpression;
+        StatementPhrase onSizeErrorPhrase;
+        StatementPhrase notOnSizeErrorPhrase;
+    }
+
+    class ComputeStore implements Cobol {
+        Roundable roundable;
     }
 
     class ConfigurationSection implements Cobol {
@@ -504,6 +540,16 @@ public interface Cobol {
         CobolContainer<DataDescriptionEntry> dataDescriptions;
     }
 
+    class MultDivs implements Cobol {
+        Powers powers;
+        CobolContainer<MultDiv> multDivs;
+    }
+
+    class MultDiv implements Cobol {
+        String words;
+        Powers powers;
+    }
+
     class ObjectComputer implements Cobol {
         CobolRightPadded<String> words;
 
@@ -519,6 +565,17 @@ public interface Cobol {
     class OdtClause implements Cobol {
         String words;
         Identifier mnemonicName;
+    }
+
+    class Powers implements Cobol {
+        String words;
+        Basis basis;
+        CobolContainer<Power> powers;
+    }
+
+    class Power implements Cobol {
+        String words;
+        Basis basis;
     }
 
     class ProcedureDivision implements Cobol {
@@ -633,6 +690,11 @@ public interface Cobol {
                     .replace(")", "")
                     .trim();
         }
+    }
+
+    class PlusMinus implements Cobol {
+        String words;
+        MultDivs multDivs;
     }
 
     class ProgramIdParagraph implements Cobol {

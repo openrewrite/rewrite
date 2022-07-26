@@ -362,4 +362,14 @@ class CobolBasicsTest : RewriteTest {
                 WRITE IC110A NOT INVALID KEY CONTINUE.
         """)
     )
+
+    @Test
+    fun computeStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION .
+                PROGRAM-ID . HELLO-WORLD .
+                PROCEDURE DIVISION .
+                COMPUTE V = (1 + 2) .
+        """)
+    )
 }

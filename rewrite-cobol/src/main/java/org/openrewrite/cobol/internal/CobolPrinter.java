@@ -1187,4 +1187,83 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(writeAdvancingMnemonic.getName(), p);
         return writeAdvancingMnemonic;
     }
+
+    public Cobol visitArithmeticExpression(Cobol.ArithmeticExpression arithmeticExpression, PrintOutputCapture<P> p) {
+        visitSpace(arithmeticExpression.getPrefix(), p);
+        visitMarkers(arithmeticExpression.getMarkers(), p);
+        visit(arithmeticExpression.getMultDivs(), p);
+        visitContainer("", arithmeticExpression.getPadding().getPlusMinuses(), "", "", p);
+        return arithmeticExpression;
+    }
+
+    public Cobol visitBasis(Cobol.Basis basis, PrintOutputCapture<P> p) {
+        visitSpace(basis.getPrefix(), p);
+        visitMarkers(basis.getMarkers(), p);
+        p.append(basis.getLParen());
+        visit(basis.getArithmeticExpression(), p);
+        p.append(basis.getRParen());
+        visit(basis.getIdentifier(), p);
+        visit(basis.getLiteral(), p);
+        return basis;
+    }
+
+    public Cobol visitComputeStatement(Cobol.ComputeStatement computeStatement, PrintOutputCapture<P> p) {
+        visitSpace(computeStatement.getPrefix(), p);
+        visitMarkers(computeStatement.getMarkers(), p);
+        p.append(computeStatement.getWords());
+        visitContainer("", computeStatement.getPadding().getComputeStores(), "", "", p);
+        p.append(computeStatement.getEqualWord());
+        visit(computeStatement.getArithmeticExpression(), p);
+        visit(computeStatement.getOnSizeErrorPhrase(), p);
+        visit(computeStatement.getNotOnSizeErrorPhrase(), p);
+        return computeStatement;
+    }
+
+    public Cobol visitComputeStore(Cobol.ComputeStore computeStore, PrintOutputCapture<P> p) {
+        visitSpace(computeStore.getPrefix(), p);
+        visitMarkers(computeStore.getMarkers(), p);
+        visit(computeStore.getRoundable(), p);
+        return computeStore;
+    }
+
+    public Cobol visitMultDivs(Cobol.MultDivs multDivs, PrintOutputCapture<P> p) {
+        visitSpace(multDivs.getPrefix(), p);
+        visitMarkers(multDivs.getMarkers(), p);
+        visit(multDivs.getPowers(), p);
+        visitContainer("", multDivs.getPadding().getMultDivs(), "", "", p);
+        return multDivs;
+    }
+
+    public Cobol visitMultDiv(Cobol.MultDiv multDiv, PrintOutputCapture<P> p) {
+        visitSpace(multDiv.getPrefix(), p);
+        visitMarkers(multDiv.getMarkers(), p);
+        p.append(multDiv.getWords());
+        visit(multDiv.getPowers(), p);
+        return multDiv;
+    }
+
+    public Cobol visitPowers(Cobol.Powers powers, PrintOutputCapture<P> p) {
+        visitSpace(powers.getPrefix(), p);
+        visitMarkers(powers.getMarkers(), p);
+        p.append(powers.getWords());
+        visit(powers.getBasis(), p);
+        visitContainer("", powers.getPadding().getPowers(), "", "", p);
+        return powers;
+    }
+
+    public Cobol visitPower(Cobol.Power power, PrintOutputCapture<P> p) {
+        visitSpace(power.getPrefix(), p);
+        visitMarkers(power.getMarkers(), p);
+        p.append(power.getWords());
+        visit(power.getBasis(), p);
+        return power;
+    }
+
+    public Cobol visitPlusMinus(Cobol.PlusMinus plusMinus, PrintOutputCapture<P> p) {
+        visitSpace(plusMinus.getPrefix(), p);
+        visitMarkers(plusMinus.getMarkers(), p);
+        p.append(plusMinus.getWords());
+        visit(plusMinus.getMultDivs(), p);
+        return plusMinus;
+    }
 }
