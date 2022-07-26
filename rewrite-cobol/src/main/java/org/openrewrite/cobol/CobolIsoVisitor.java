@@ -798,4 +798,19 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public @Nullable Cobol.MergeOutputThrough visitMergeOutputThrough(Cobol.MergeOutputThrough mergeOutputThrough, P p) {
         return (Cobol.MergeOutputThrough) super.visitMergeOutputThrough(mergeOutputThrough, p);
     }
+
+    @Override
+    public Cobol.MultiplyStatement visitMultiplyStatement(Cobol.MultiplyStatement multiplyStatement, P p) {
+        return (Cobol.MultiplyStatement) super.visitMultiplyStatement(multiplyStatement, p);
+    }
+
+    @Override
+    public Cobol.MultiplyRegular visitMultiplyRegular(Cobol.MultiplyRegular multiplyRegular, P p) {
+        return (Cobol.MultiplyRegular) super.visitMultiplyRegular(multiplyRegular, p);
+    }
+
+    @Override
+    public Cobol.MultiplyGiving visitMultiplyGiving(Cobol.MultiplyGiving multiplyGiving, P p) {
+        return (Cobol.MultiplyGiving) super.visitMultiplyGiving(multiplyGiving, p);
+    }
 }

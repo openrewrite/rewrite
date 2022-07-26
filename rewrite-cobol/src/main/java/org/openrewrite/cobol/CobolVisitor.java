@@ -1426,4 +1426,30 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         m = m.withProcedureName((Cobol.ProcedureName) visit(m.getProcedureName(), p));
         return m;
     }
+
+    public Cobol visitMultiplyStatement(Cobol.MultiplyStatement multiplyStatement, P p) {
+        Cobol.MultiplyStatement m = multiplyStatement;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withMultiply((Cobol) visit(m.getMultiply(), p));
+        m = m.withOnSizeErrorPhrase((Cobol.StatementPhrase) visit(m.getOnSizeErrorPhrase(), p));
+        m = m.withNotOnSizeErrorPhrase((Cobol.StatementPhrase) visit(m.getNotOnSizeErrorPhrase(), p));
+        return m;
+    }
+
+    public Cobol visitMultiplyRegular(Cobol.MultiplyRegular multiplyRegular, P p) {
+        Cobol.MultiplyRegular m = multiplyRegular;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.getPadding().withOperand(visitContainer(m.getPadding().getOperand(), p));
+        return m;
+    }
+
+    public Cobol visitMultiplyGiving(Cobol.MultiplyGiving multiplyGiving, P p) {
+        Cobol.MultiplyGiving m = multiplyGiving;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.getPadding().withResult(visitContainer(m.getPadding().getResult(), p));
+        return m;
+    }
 }

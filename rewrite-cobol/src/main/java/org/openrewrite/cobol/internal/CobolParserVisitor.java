@@ -1588,6 +1588,43 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.MultiplyStatement visitMultiplyStatement(CobolParser.MultiplyStatementContext ctx) {
+        return new Cobol.MultiplyStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.MULTIPLY()),
+                visit(ctx.identifier(), ctx.literal()),
+                words(ctx.BY()),
+                visit(ctx.multiplyRegular(), ctx.multiplyGiving()),
+                visitNullable(ctx.onSizeErrorPhrase()),
+                visitNullable(ctx.notOnSizeErrorPhrase()),
+                words(ctx.END_MULTIPLY())
+        );
+    }
+
+    @Override
+    public Cobol.MultiplyRegular visitMultiplyRegular(CobolParser.MultiplyRegularContext ctx) {
+        return new Cobol.MultiplyRegular(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.multiplyRegularOperand())
+        );
+    }
+
+    @Override
+    public Cobol.MultiplyGiving visitMultiplyGiving(CobolParser.MultiplyGivingContext ctx) {
+        return new Cobol.MultiplyGiving(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.multiplyGivingOperand()),
+                convertAllContainer(padLeft(ctx.GIVING()), ctx.multiplyGivingResult())
+        );
+    }
+
+    @Override
     public Cobol.DataDescriptionEntry visitDataDescriptionEntryFormat1(CobolParser.DataDescriptionEntryFormat1Context ctx) {
         TerminalNode level = ctx.INTEGERLITERAL() == null ? ctx.LEVEL_NUMBER_77() : ctx.INTEGERLITERAL();
         return new Cobol.DataDescriptionEntry(

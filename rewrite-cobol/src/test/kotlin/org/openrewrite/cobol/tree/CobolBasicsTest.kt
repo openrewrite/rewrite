@@ -214,6 +214,17 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
+
+    fun multiplyStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. MULTIPLYTEST.
+            PROCEDURE DIVISION.
+            MULTIPLY -1.3 BY MULT4 ROUNDED.
+        """)
+    )
+
+    @Test
     fun fileSection() = rewriteRun(
         cobol("""
                 IDENTIFICATION DIVISION.

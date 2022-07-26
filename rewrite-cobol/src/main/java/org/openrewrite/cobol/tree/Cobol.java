@@ -4511,6 +4511,174 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class MultiplyStatement implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name multiplicand;
+        String by;
+        Cobol multiply;
+
+        @Nullable
+        StatementPhrase onSizeErrorPhrase;
+
+        @Nullable
+        StatementPhrase notOnSizeErrorPhrase;
+
+        @Nullable
+        String endMultiply;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMultiplyStatement(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class MultiplyRegular implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        CobolContainer<Roundable> operand;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMultiplyRegular(this, p);
+        }
+
+        public List<Cobol.Roundable> getOperand() {
+            return operand.getElements();
+        }
+
+        public MultiplyRegular withOperand(List<Cobol.Roundable> operand) {
+            return getPadding().withOperand(this.operand.getPadding().withElements(CobolRightPadded.withElements(
+                    this.operand.getPadding().getElements(), operand)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MultiplyRegular t;
+
+            public CobolContainer<Cobol.Roundable> getOperand() {
+                return t.operand;
+            }
+
+            public MultiplyRegular withOperand(CobolContainer<Cobol.Roundable> operand) {
+                return t.operand == operand ? t : new MultiplyRegular(t.padding, t.id, t.prefix, t.markers, operand);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class MultiplyGiving implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Name operand;
+
+        CobolContainer<Roundable> result;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMultiplyGiving(this, p);
+        }
+
+        public List<Cobol.Roundable> getResult() {
+            return result.getElements();
+        }
+
+        public MultiplyGiving withResult(List<Cobol.Roundable> result) {
+            return getPadding().withResult(this.result.getPadding().withElements(CobolRightPadded.withElements(
+                    this.result.getPadding().getElements(), result)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MultiplyGiving t;
+
+            public CobolContainer<Cobol.Roundable> getResult() {
+                return t.result;
+            }
+
+            public MultiplyGiving withResult(CobolContainer<Cobol.Roundable> result) {
+                return t.result == result ? t : new MultiplyGiving(t.padding, t.id, t.prefix, t.markers, t.operand, result);
+            }
+        }
+    }
 
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

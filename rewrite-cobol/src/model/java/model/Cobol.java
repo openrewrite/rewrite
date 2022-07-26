@@ -15,6 +15,7 @@
  */
 package model;
 
+import org.openrewrite.cobol.internal.grammar.CobolParser;
 import org.openrewrite.cobol.tree.CobolContainer;
 import org.openrewrite.cobol.tree.CobolLeftPadded;
 import org.openrewrite.cobol.tree.CobolRightPadded;
@@ -653,6 +654,31 @@ public interface Cobol {
         String words;
         Identifier moveCorrespondingToSendingArea;
         CobolContainer<Identifier> to;
+    }
+
+    class MultiplyStatement implements Statement {
+        String words;
+        Name multiplicand;
+        String by;
+        Cobol multiply;
+
+        @Nullable
+        StatementPhrase onSizeErrorPhrase;
+
+        @Nullable
+        StatementPhrase notOnSizeErrorPhrase;
+
+        @Nullable
+        String endMultiply;
+    }
+
+    class MultiplyRegular implements Cobol {
+        CobolContainer<Roundable> operand;
+    }
+
+    class MultiplyGiving implements Cobol {
+        Name operand;
+        CobolContainer<Roundable> result;
     }
 
     class IdentificationDivision implements Cobol {

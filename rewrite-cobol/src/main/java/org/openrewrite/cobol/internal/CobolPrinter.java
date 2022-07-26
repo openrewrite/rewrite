@@ -1415,4 +1415,31 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(mergeOutputThrough.getWords());
         return mergeOutputThrough;
     }
+
+    public Cobol visitMultiplyStatement(Cobol.MultiplyStatement multiplyStatement, PrintOutputCapture<P> p) {
+        visitSpace(multiplyStatement.getPrefix(), p);
+        visitMarkers(multiplyStatement.getMarkers(), p);
+        p.append(multiplyStatement.getWords());
+        visit(multiplyStatement.getMultiplicand(), p);
+        p.append(multiplyStatement.getBy());
+        visit(multiplyStatement.getMultiply(), p);
+        visit(multiplyStatement.getOnSizeErrorPhrase(), p);
+        visit(multiplyStatement.getNotOnSizeErrorPhrase(), p);
+        p.append(multiplyStatement.getEndMultiply());
+        return multiplyStatement;
+    }
+
+    public Cobol visitMultiplyRegular(Cobol.MultiplyRegular multiplyRegular, PrintOutputCapture<P> p) {
+        visitSpace(multiplyRegular.getPrefix(), p);
+        visitMarkers(multiplyRegular.getMarkers(), p);
+        visitContainer("", multiplyRegular.getPadding().getOperand(), "", "", p);
+        return multiplyRegular;
+    }
+
+    public Cobol visitMultiplyGiving(Cobol.MultiplyGiving multiplyGiving, PrintOutputCapture<P> p) {
+        visitSpace(multiplyGiving.getPrefix(), p);
+        visitMarkers(multiplyGiving.getMarkers(), p);
+        visitContainer("", multiplyGiving.getPadding().getResult(), "", "", p);
+        return multiplyGiving;
+    }
 }
