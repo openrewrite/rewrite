@@ -389,7 +389,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
                     .withParameter(delegateType)
                     .intercept(MethodCall.invoke(adaptTo.getConstructor()).andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
 
-            delegateMethod:
             for (Method method : getClass().getDeclaredMethods()) {
                 if (method.getName().startsWith("visit") || method.getName().equals("preVisit") ||
                         method.getName().equals("postVisit")) {
@@ -406,7 +405,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                             }
                             builder = builder.define(method)
                                     .intercept(MethodDelegation.toField("delegate"));
-                            break delegateMethod;
+                            break nextMethod;
                         }
                     }
                 }
