@@ -1436,6 +1436,124 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.MergeStatement visitMergeStatement(CobolParser.MergeStatementContext ctx) {
+        return new Cobol.MergeStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.MERGE()),
+                (Name) visit(ctx.fileName()),
+                convertAllContainer(ctx.mergeOnKeyClause()),
+                visitNullable(ctx.mergeCollatingSequencePhrase()),
+                convertAllContainer(ctx.mergeUsing()),
+                visitNullable(ctx.mergeOutputProcedurePhrase()),
+                convertAllContainer(ctx.mergeGivingPhrase())
+        );
+    }
+
+    @Override
+    public Cobol.MergeOnKeyClause visitMergeOnKeyClause(CobolParser.MergeOnKeyClauseContext ctx) {
+        return new Cobol.MergeOnKeyClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ON(), ctx.ASCENDING(), ctx.DESCENDING(), ctx.KEY()),
+                convertAllContainer(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
+    public Cobol.MergeCollatingSequencePhrase visitMergeCollatingSequencePhrase(CobolParser.MergeCollatingSequencePhraseContext ctx) {
+        return new Cobol.MergeCollatingSequencePhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.COLLATING(), ctx.SEQUENCE(), ctx.IS()),
+                convertAllContainer(ctx.alphabetName()),
+                visitNullable(ctx.mergeCollatingAlphanumeric()),
+                visitNullable(ctx.mergeCollatingNational())
+        );
+    }
+
+    @Override
+    public Cobol.Mergeable visitMergeCollatingAlphanumeric(CobolParser.MergeCollatingAlphanumericContext ctx) {
+        return new Cobol.Mergeable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOR(), ctx.ALPHANUMERIC(), ctx.IS()),
+                (Name) visit(ctx.alphabetName())
+        );
+    }
+
+    @Override
+    public Cobol.Mergeable visitMergeCollatingNational(CobolParser.MergeCollatingNationalContext ctx) {
+        return new Cobol.Mergeable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOR(), ctx.NATIONAL(), ctx.IS()),
+                (Name) visit(ctx.alphabetName())
+        );
+    }
+
+    @Override
+    public Cobol.MergeUsing visitMergeUsing(CobolParser.MergeUsingContext ctx) {
+        return new Cobol.MergeUsing(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.USING()),
+                convertAllContainer(ctx.fileName())
+        );
+    }
+
+    @Override
+    public Cobol.MergeOutputProcedurePhrase visitMergeOutputProcedurePhrase(CobolParser.MergeOutputProcedurePhraseContext ctx) {
+        return new Cobol.MergeOutputProcedurePhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.OUTPUT(), ctx.PROCEDURE(), ctx.IS()),
+                visitProcedureName(ctx.procedureName()),
+                visitNullable(ctx.mergeOutputThrough())
+        );
+    }
+
+    @Override
+    public Cobol.MergeOutputThrough visitMergeOutputThrough(CobolParser.MergeOutputThroughContext ctx) {
+        return new Cobol.MergeOutputThrough(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.THROUGH(), ctx.THRU()),
+                visitProcedureName(ctx.procedureName())
+        );
+    }
+
+    @Override
+    public Cobol.MergeGivingPhrase visitMergeGivingPhrase(CobolParser.MergeGivingPhraseContext ctx) {
+        return new Cobol.MergeGivingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.GIVING()),
+                convertAllContainer(ctx.mergeGiving())
+        );
+    }
+
+    @Override
+    public Cobol.MergeGiving visitMergeGiving(CobolParser.MergeGivingContext ctx) {
+        return new Cobol.MergeGiving(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.fileName()),
+                words(ctx.LOCK(), ctx.SAVE(), ctx.NO(), ctx.REWIND(), ctx.CRUNCH(), ctx.RELEASE(), ctx.WITH(), ctx.REMOVE(), ctx.CRUNCH())
+        );
+    }
+
+    @Override
     public Cobol.MoveStatement visitMoveStatement(CobolParser.MoveStatementContext ctx) {
         return new Cobol.MoveStatement(
                 randomId(),

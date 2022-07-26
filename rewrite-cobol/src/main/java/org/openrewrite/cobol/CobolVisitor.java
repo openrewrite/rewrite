@@ -1350,4 +1350,80 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         return d;
     }
+
+    public Cobol visitMergeStatement(Cobol.MergeStatement mergeStatement, P p) {
+        Cobol.MergeStatement m = mergeStatement;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.getPadding().withMergeOnKeyClause(visitContainer(m.getPadding().getMergeOnKeyClause(), p));
+        m = m.withMergeCollatingSequencePhrase((Cobol.MergeCollatingSequencePhrase) visit(m.getMergeCollatingSequencePhrase(), p));
+        m = m.getPadding().withMergeUsing(visitContainer(m.getPadding().getMergeUsing(), p));
+        m = m.withMergeOutputProcedurePhrase((Cobol.MergeOutputProcedurePhrase) visit(m.getMergeOutputProcedurePhrase(), p));
+        m = m.getPadding().withMergeGivingPhrase(visitContainer(m.getPadding().getMergeGivingPhrase(), p));
+        return m;
+    }
+
+    public Cobol visitMergeOnKeyClause(Cobol.MergeOnKeyClause mergeOnKeyClause, P p) {
+        Cobol.MergeOnKeyClause m = mergeOnKeyClause;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.getPadding().withQualifiedDataName(visitContainer(m.getPadding().getQualifiedDataName(), p));
+        return m;
+    }
+
+    public Cobol visitMergeCollatingSequencePhrase(Cobol.MergeCollatingSequencePhrase mergeCollatingSequencePhrase, P p) {
+        Cobol.MergeCollatingSequencePhrase m = mergeCollatingSequencePhrase;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withMergeCollatingAlphanumeric((Cobol.Mergeable) visit(m.getMergeCollatingAlphanumeric(), p));
+        m = m.withMergeCollatingNational((Cobol.Mergeable) visit(m.getMergeCollatingNational(), p));
+        return m;
+    }
+
+    public Cobol visitMergeable(Cobol.Mergeable mergeable, P p) {
+        Cobol.Mergeable m = mergeable;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        return m;
+    }
+
+    public Cobol visitMergeOutputProcedurePhrase(Cobol.MergeOutputProcedurePhrase mergeOutputProcedurePhrase, P p) {
+        Cobol.MergeOutputProcedurePhrase m = mergeOutputProcedurePhrase;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withProcedureName((Cobol.ProcedureName) visit(m.getProcedureName(), p));
+        m = m.withMergeOutputThrough((Cobol.MergeOutputThrough) visit(m.getMergeOutputThrough(), p));
+        return m;
+    }
+
+    public Cobol visitMergeGivingPhrase(Cobol.MergeGivingPhrase mergeGivingPhrase, P p) {
+        Cobol.MergeGivingPhrase m = mergeGivingPhrase;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.getPadding().withMergeGiving(visitContainer(m.getPadding().getMergeGiving(), p));
+        return m;
+    }
+
+    public Cobol visitMergeGiving(Cobol.MergeGiving mergeGiving, P p) {
+        Cobol.MergeGiving m = mergeGiving;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        return m;
+    }
+
+    public @Nullable Cobol visitMergeUsing(Cobol.MergeUsing mergeUsing, P p) {
+        Cobol.MergeUsing m = mergeUsing;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withFileNames(visitContainer(m.getFileNames(), p));
+        return m;
+    }
+
+    public @Nullable Cobol visitMergeOutputThrough(Cobol.MergeOutputThrough mergeOutputThrough, P p) {
+        Cobol.MergeOutputThrough m = mergeOutputThrough;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withProcedureName((Cobol.ProcedureName) visit(m.getProcedureName(), p));
+        return m;
+    }
 }

@@ -1337,4 +1337,82 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(divideRemainder.getName(), p);
         return divideRemainder;
     }
+
+    public Cobol visitMergeStatement(Cobol.MergeStatement mergeStatement, PrintOutputCapture<P> p) {
+        visitSpace(mergeStatement.getPrefix(), p);
+        visitMarkers(mergeStatement.getMarkers(), p);
+        p.append(mergeStatement.getWords());
+        visit(mergeStatement.getFileName(), p);
+        visitContainer("", mergeStatement.getPadding().getMergeOnKeyClause(), "", "", p);
+        visit(mergeStatement.getMergeCollatingSequencePhrase(), p);
+        visitContainer("", mergeStatement.getPadding().getMergeUsing(), "", "", p);
+        visit(mergeStatement.getMergeOutputProcedurePhrase(), p);
+        visitContainer("", mergeStatement.getPadding().getMergeGivingPhrase(), "", "", p);
+        return mergeStatement;
+    }
+
+    public Cobol visitMergeOnKeyClause(Cobol.MergeOnKeyClause mergeOnKeyClause, PrintOutputCapture<P> p) {
+        visitSpace(mergeOnKeyClause.getPrefix(), p);
+        visitMarkers(mergeOnKeyClause.getMarkers(), p);
+        p.append(mergeOnKeyClause.getWords());
+        visitContainer("", mergeOnKeyClause.getPadding().getQualifiedDataName(), "", "", p);
+        return mergeOnKeyClause;
+    }
+
+    public Cobol visitMergeCollatingSequencePhrase(Cobol.MergeCollatingSequencePhrase mergeCollatingSequencePhrase, PrintOutputCapture<P> p) {
+        visitSpace(mergeCollatingSequencePhrase.getPrefix(), p);
+        visitMarkers(mergeCollatingSequencePhrase.getMarkers(), p);
+        p.append(mergeCollatingSequencePhrase.getWords());
+        visit(mergeCollatingSequencePhrase.getMergeCollatingAlphanumeric(), p);
+        visit(mergeCollatingSequencePhrase.getMergeCollatingNational(), p);
+        return mergeCollatingSequencePhrase;
+    }
+
+    public Cobol visitMergeable(Cobol.Mergeable mergeable, PrintOutputCapture<P> p) {
+        visitSpace(mergeable.getPrefix(), p);
+        visitMarkers(mergeable.getMarkers(), p);
+        p.append(mergeable.getWords());
+        return mergeable;
+    }
+
+    public Cobol visitMergeOutputProcedurePhrase(Cobol.MergeOutputProcedurePhrase mergeOutputProcedurePhrase, PrintOutputCapture<P> p) {
+        visitSpace(mergeOutputProcedurePhrase.getPrefix(), p);
+        visitMarkers(mergeOutputProcedurePhrase.getMarkers(), p);
+        p.append(mergeOutputProcedurePhrase.getWords());
+        visit(mergeOutputProcedurePhrase.getProcedureName(), p);
+        visit(mergeOutputProcedurePhrase.getMergeOutputThrough(), p);
+        return mergeOutputProcedurePhrase;
+    }
+
+    public Cobol visitMergeGivingPhrase(Cobol.MergeGivingPhrase mergeGivingPhrase, PrintOutputCapture<P> p) {
+        visitSpace(mergeGivingPhrase.getPrefix(), p);
+        visitMarkers(mergeGivingPhrase.getMarkers(), p);
+        p.append(mergeGivingPhrase.getWords());
+        visitContainer("", mergeGivingPhrase.getPadding().getMergeGiving(), "", "", p);
+        return mergeGivingPhrase;
+    }
+
+    public Cobol visitMergeGiving(Cobol.MergeGiving mergeGiving, PrintOutputCapture<P> p) {
+        visitSpace(mergeGiving.getPrefix(), p);
+        visitMarkers(mergeGiving.getMarkers(), p);
+        p.append(mergeGiving.getWords());
+        return mergeGiving;
+    }
+
+    @Override
+    public Cobol visitMergeUsing(Cobol.MergeUsing mergeUsing, PrintOutputCapture<P> p) {
+        visitSpace(mergeUsing.getPrefix(), p);
+        visitMarkers(mergeUsing.getMarkers(), p);
+        p.append(mergeUsing.getWords());
+        visitContainer(mergeUsing.getFileNames(), p);
+        return mergeUsing;
+    }
+
+    @Override
+    public @Nullable Cobol visitMergeOutputThrough(Cobol.MergeOutputThrough mergeOutputThrough, PrintOutputCapture<P> p) {
+        visitSpace(mergeOutputThrough.getPrefix(), p);
+        visitMarkers(mergeOutputThrough.getMarkers(), p);
+        p.append(mergeOutputThrough.getWords());
+        return mergeOutputThrough;
+    }
 }

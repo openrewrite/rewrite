@@ -16,6 +16,7 @@
 package org.openrewrite.cobol;
 
 import org.openrewrite.cobol.tree.Cobol;
+import org.openrewrite.internal.lang.Nullable;
 
 public class CobolIsoVisitor<P> extends CobolVisitor<P> {
 
@@ -751,5 +752,50 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     @Override
     public Cobol.DivideRemainder visitDivideRemainder(Cobol.DivideRemainder divideRemainder, P p) {
         return (Cobol.DivideRemainder) super.visitDivideRemainder(divideRemainder, p);
+    }
+
+    @Override
+    public Cobol.MergeStatement visitMergeStatement(Cobol.MergeStatement mergeStatement, P p) {
+        return (Cobol.MergeStatement) super.visitMergeStatement(mergeStatement, p);
+    }
+
+    @Override
+    public Cobol.MergeOnKeyClause visitMergeOnKeyClause(Cobol.MergeOnKeyClause mergeOnKeyClause, P p) {
+        return (Cobol.MergeOnKeyClause) super.visitMergeOnKeyClause(mergeOnKeyClause, p);
+    }
+
+    @Override
+    public Cobol.MergeCollatingSequencePhrase visitMergeCollatingSequencePhrase(Cobol.MergeCollatingSequencePhrase mergeCollatingSequencePhrase, P p) {
+        return (Cobol.MergeCollatingSequencePhrase) super.visitMergeCollatingSequencePhrase(mergeCollatingSequencePhrase, p);
+    }
+
+    @Override
+    public Cobol.Mergeable visitMergeable(Cobol.Mergeable mergeable, P p) {
+        return (Cobol.Mergeable) super.visitMergeable(mergeable, p);
+    }
+
+    @Override
+    public Cobol.MergeOutputProcedurePhrase visitMergeOutputProcedurePhrase(Cobol.MergeOutputProcedurePhrase mergeOutputProcedurePhrase, P p) {
+        return (Cobol.MergeOutputProcedurePhrase) super.visitMergeOutputProcedurePhrase(mergeOutputProcedurePhrase, p);
+    }
+
+    @Override
+    public Cobol.MergeGivingPhrase visitMergeGivingPhrase(Cobol.MergeGivingPhrase mergeGivingPhrase, P p) {
+        return (Cobol.MergeGivingPhrase) super.visitMergeGivingPhrase(mergeGivingPhrase, p);
+    }
+
+    @Override
+    public Cobol.MergeGiving visitMergeGiving(Cobol.MergeGiving mergeGiving, P p) {
+        return (Cobol.MergeGiving) super.visitMergeGiving(mergeGiving, p);
+    }
+
+    @Override
+    public @Nullable Cobol.MergeUsing visitMergeUsing(Cobol.MergeUsing mergeUsing, P p) {
+        return (Cobol.MergeUsing) super.visitMergeUsing(mergeUsing, p);
+    }
+
+    @Override
+    public @Nullable Cobol.MergeOutputThrough visitMergeOutputThrough(Cobol.MergeOutputThrough mergeOutputThrough, P p) {
+        return (Cobol.MergeOutputThrough) super.visitMergeOutputThrough(mergeOutputThrough, p);
     }
 }

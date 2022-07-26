@@ -201,6 +201,19 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
+    fun mergeStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. MERGETEST.
+            PROCEDURE DIVISION.
+            MERGE-TEST.
+                MERGE ST-FS4  ON ASCENDING KEY SORT-KEY
+                    USING  SQ-FS1  SQ-FS2
+                    OUTPUT PROCEDURE IS MERGE-OUTPUT-PROC.
+        """)
+    )
+
+    @Test
     fun fileSection() = rewriteRun(
         cobol("""
                 IDENTIFICATION DIVISION.

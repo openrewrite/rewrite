@@ -3957,6 +3957,394 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class MergeStatement implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        @Getter
+        @With
+        Name fileName;
+
+        CobolContainer<MergeOnKeyClause> mergeOnKeyClause;
+
+        @Getter
+        @Nullable
+        @With
+        MergeCollatingSequencePhrase mergeCollatingSequencePhrase;
+
+        CobolContainer<Name> mergeUsing;
+
+        @Getter
+        @Nullable
+        @With
+        MergeOutputProcedurePhrase mergeOutputProcedurePhrase;
+
+        CobolContainer<MergeGivingPhrase> mergeGivingPhrase;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMergeStatement(this, p);
+        }
+
+        public List<Cobol.MergeOnKeyClause> getMergeOnKeyClause() {
+            return mergeOnKeyClause.getElements();
+        }
+
+        public MergeStatement withMergeOnKeyClause(List<Cobol.MergeOnKeyClause> mergeOnKeyClause) {
+            return getPadding().withMergeOnKeyClause(this.mergeOnKeyClause.getPadding().withElements(CobolRightPadded.withElements(
+                    this.mergeOnKeyClause.getPadding().getElements(), mergeOnKeyClause)));
+        }
+
+        public List<Name> getMergeUsing() {
+            return mergeUsing.getElements();
+        }
+
+        public MergeStatement withMergeUsing(List<Name> mergeUsing) {
+            return getPadding().withMergeUsing(this.mergeUsing.getPadding().withElements(CobolRightPadded.withElements(
+                    this.mergeUsing.getPadding().getElements(), mergeUsing)));
+        }
+
+        public List<Cobol.MergeGivingPhrase> getMergeGivingPhrase() {
+            return mergeGivingPhrase.getElements();
+        }
+
+        public MergeStatement withMergeGivingPhrase(List<Cobol.MergeGivingPhrase> mergeGivingPhrase) {
+            return getPadding().withMergeGivingPhrase(this.mergeGivingPhrase.getPadding().withElements(CobolRightPadded.withElements(
+                    this.mergeGivingPhrase.getPadding().getElements(), mergeGivingPhrase)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MergeStatement t;
+
+            public CobolContainer<Cobol.MergeOnKeyClause> getMergeOnKeyClause() {
+                return t.mergeOnKeyClause;
+            }
+
+            public MergeStatement withMergeOnKeyClause(CobolContainer<Cobol.MergeOnKeyClause> mergeOnKeyClause) {
+                return t.mergeOnKeyClause == mergeOnKeyClause ? t : new MergeStatement(t.padding, t.id, t.prefix, t.markers, t.words, t.fileName, mergeOnKeyClause, t.mergeCollatingSequencePhrase, t.mergeUsing, t.mergeOutputProcedurePhrase, t.mergeGivingPhrase);
+            }
+
+            public CobolContainer<Name> getMergeUsing() {
+                return t.mergeUsing;
+            }
+
+            public MergeStatement withMergeUsing(CobolContainer<Name> mergeUsing) {
+                return t.mergeUsing == mergeUsing ? t : new MergeStatement(t.padding, t.id, t.prefix, t.markers, t.words, t.fileName, t.mergeOnKeyClause, t.mergeCollatingSequencePhrase, mergeUsing, t.mergeOutputProcedurePhrase, t.mergeGivingPhrase);
+            }
+
+            public CobolContainer<Cobol.MergeGivingPhrase> getMergeGivingPhrase() {
+                return t.mergeGivingPhrase;
+            }
+
+            public MergeStatement withMergeGivingPhrase(CobolContainer<Cobol.MergeGivingPhrase> mergeGivingPhrase) {
+                return t.mergeGivingPhrase == mergeGivingPhrase ? t : new MergeStatement(t.padding, t.id, t.prefix, t.markers, t.words, t.fileName, t.mergeOnKeyClause, t.mergeCollatingSequencePhrase, t.mergeUsing, t.mergeOutputProcedurePhrase, mergeGivingPhrase);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class MergeOnKeyClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<QualifiedDataName> qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMergeOnKeyClause(this, p);
+        }
+
+        public List<Cobol.QualifiedDataName> getQualifiedDataName() {
+            return qualifiedDataName.getElements();
+        }
+
+        public MergeOnKeyClause withQualifiedDataName(List<Cobol.QualifiedDataName> qualifiedDataName) {
+            return getPadding().withQualifiedDataName(this.qualifiedDataName.getPadding().withElements(CobolRightPadded.withElements(
+                    this.qualifiedDataName.getPadding().getElements(), qualifiedDataName)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MergeOnKeyClause t;
+
+            public CobolContainer<Cobol.QualifiedDataName> getQualifiedDataName() {
+                return t.qualifiedDataName;
+            }
+
+            public MergeOnKeyClause withQualifiedDataName(CobolContainer<Cobol.QualifiedDataName> qualifiedDataName) {
+                return t.qualifiedDataName == qualifiedDataName ? t : new MergeOnKeyClause(t.padding, t.id, t.prefix, t.markers, t.words, qualifiedDataName);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class MergeCollatingSequencePhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        CobolContainer<Name> name;
+
+        @Nullable
+        Mergeable mergeCollatingAlphanumeric;
+
+        @Nullable
+        Mergeable mergeCollatingNational;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMergeCollatingSequencePhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Mergeable implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name name;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMergeable(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class MergeUsing implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        CobolContainer<Name> fileNames;
+
+        @Override
+        public @Nullable <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMergeUsing(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class MergeOutputProcedurePhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        ProcedureName procedureName;
+
+        @Nullable
+        Cobol.MergeOutputThrough mergeOutputThrough;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMergeOutputProcedurePhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class MergeOutputThrough implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        ProcedureName procedureName;
+
+        @Override
+        public @Nullable <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMergeOutputThrough(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class MergeGivingPhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<MergeGiving> mergeGiving;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMergeGivingPhrase(this, p);
+        }
+
+        public List<Cobol.MergeGiving> getMergeGiving() {
+            return mergeGiving.getElements();
+        }
+
+        public MergeGivingPhrase withMergeGiving(List<Cobol.MergeGiving> mergeGiving) {
+            return getPadding().withMergeGiving(this.mergeGiving.getPadding().withElements(CobolRightPadded.withElements(
+                    this.mergeGiving.getPadding().getElements(), mergeGiving)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MergeGivingPhrase t;
+
+            public CobolContainer<Cobol.MergeGiving> getMergeGiving() {
+                return t.mergeGiving;
+            }
+
+            public MergeGivingPhrase withMergeGiving(CobolContainer<Cobol.MergeGiving> mergeGiving) {
+                return t.mergeGiving == mergeGiving ? t : new MergeGivingPhrase(t.padding, t.id, t.prefix, t.markers, t.words, mergeGiving);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class MergeGiving implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Name name;
+
+        @Nullable
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMergeGiving(this, p);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

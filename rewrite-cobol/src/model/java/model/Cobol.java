@@ -572,6 +572,73 @@ public interface Cobol {
         CobolContainer<DataDescriptionEntry> dataDescriptions;
     }
 
+    class MergeStatement implements Statement {
+        String words;
+        Name fileName;
+        CobolContainer<MergeOnKeyClause> mergeOnKeyClause;
+
+        @Nullable
+        MergeCollatingSequencePhrase mergeCollatingSequencePhrase;
+
+        CobolContainer<Name> mergeUsing;
+
+        @Nullable
+        MergeOutputProcedurePhrase mergeOutputProcedurePhrase;
+
+        CobolContainer<MergeGivingPhrase> mergeGivingPhrase;
+    }
+
+    class MergeOnKeyClause implements Cobol {
+        String words;
+        CobolContainer<QualifiedDataName> qualifiedDataName;
+    }
+
+    class MergeCollatingSequencePhrase implements Cobol {
+        String words;
+        CobolContainer<Name> name;
+
+        @Nullable
+        Mergeable mergeCollatingAlphanumeric;
+
+        @Nullable
+        Mergeable mergeCollatingNational;
+    }
+
+    class Mergeable implements Cobol {
+        String words;
+        Name name;
+    }
+
+    class MergeUsing implements Cobol {
+        String words;
+        CobolContainer<Name> fileName;
+    }
+
+    class MergeOutputProcedurePhrase implements Cobol {
+        String words;
+        ProcedureName procedureName;
+
+        @Nullable
+        MergeOutputThrough mergeOutputThrough;
+    }
+
+    class MergeOutputThrough implements Cobol {
+        String words;
+        ProcedureName procedureName;
+    }
+
+    class MergeGivingPhrase implements Cobol {
+        String words;
+        CobolContainer<MergeGiving> mergeGiving;
+    }
+
+    class MergeGiving implements Cobol {
+        Name name;
+
+        @Nullable
+        String words;
+    }
+
     class MoveStatement implements Statement {
         String words;
         Cobol moveToStatement;
