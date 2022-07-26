@@ -24,6 +24,7 @@ import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.description.type.TypeDescription.ForLoadedType;
 import net.bytebuddy.dynamic.DynamicType;
+import net.bytebuddy.dynamic.scaffold.TypeValidation;
 import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.MethodCall;
 import net.bytebuddy.implementation.MethodDelegation;
@@ -61,7 +62,10 @@ import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Defaul
  */
 @LanguageVisitor("all")
 public abstract class TreeVisitor<T extends Tree, P> {
-    private static final ByteBuddy byteBuddy = new ByteBuddy();
+    private static final ByteBuddy byteBuddy = new ByteBuddy()
+            // supports the case of package private bounds on visitors like LineEndingsCount
+            .with(TypeValidation.DISABLED);
+
     private static final Map<Class<?>, Map<Class<?>, Class<?>>> adaptedVisitorsCache =
             new IdentityHashMap<>();
 
@@ -405,7 +409,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                             }
                             builder = builder.define(method)
                                     .intercept(MethodDelegation.toField("delegate"));
-                            break nextMethod;
+                            break;
                         }
                     }
                 }
@@ -413,11 +417,12 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
             DynamicType.Unloaded<?> unloaded = builder.make();
 
-            try {
-                unloaded.saveIn(new File("./adapted"));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            // for debugging class generation issues
+//            try {
+//                unloaded.saveIn(new File("./adapted"));
+//            } catch (IOException e) {
+//                throw new RuntimeException(e);
+//            }
 
             Class<?> adapted = unloaded
                     .load(getClass().getClassLoader())
