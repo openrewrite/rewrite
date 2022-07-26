@@ -23,7 +23,7 @@ dependencies {
 
     implementation("org.antlr:antlr4:4.9.+")
     implementation("org.yaml:snakeyaml:latest.release")
-    implementation("io.micrometer:micrometer-core:1.+")
+    implementation("io.micrometer:micrometer-core:1.9.+")
 
     testImplementation(project(":rewrite-test"))
 }

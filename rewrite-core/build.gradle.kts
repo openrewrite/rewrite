@@ -26,7 +26,7 @@ dependencies {
 
     implementation("org.apache.commons:commons-compress:latest.release")
 
-    implementation("io.micrometer:micrometer-core:1.+")
+    implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
 

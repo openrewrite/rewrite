@@ -19,7 +19,7 @@ tasks.register<JavaExec>("generateAntlrSources") {
 dependencies {
     api(project(":rewrite-core"))
 
-    api("io.micrometer:micrometer-core:1.+")
+    api("io.micrometer:micrometer-core:1.9.+")
     api("org.jetbrains:annotations:latest.release")
 
     implementation("org.antlr:antlr4:4.9.+")

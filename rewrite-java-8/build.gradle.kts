@@ -18,7 +18,7 @@ dependencies {
     implementation(project(":rewrite-java"))
     implementation("org.ow2.asm:asm:latest.release")
 
-    implementation("io.micrometer:micrometer-core:1.+")
+    implementation("io.micrometer:micrometer-core:1.9.+")
 
     testImplementation("org.jetbrains.kotlin:kotlin-reflect")
     testImplementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
