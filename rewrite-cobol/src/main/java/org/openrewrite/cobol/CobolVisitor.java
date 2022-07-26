@@ -1280,4 +1280,48 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         pp = pp.withMultDivs((Cobol.MultDivs) visit(pp.getMultDivs(), p));
         return pp;
     }
+
+    public Cobol visitDivide(Cobol.Divide divide, P p) {
+        Cobol.Divide d = divide;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withAction((Cobol) visit(d.getAction(), p));
+        d = d.withOnSizeErrorPhrase((Cobol.StatementPhrase) visit(d.getOnSizeErrorPhrase(), p));
+        d = d.withNotOnSizeErrorPhrase((Cobol.StatementPhrase) visit(d.getNotOnSizeErrorPhrase(), p));
+        if (d.getPadding().getEndDivide() != null) {
+            d = d.getPadding().withEndDivide(visitLeftPadded(d.getPadding().getEndDivide(), p));
+        }
+        return d;
+    }
+
+    public Cobol visitDivideInto(Cobol.DivideInto divideInto, P p) {
+        Cobol.DivideInto d = divideInto;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.getPadding().withRoundable(visitContainer(d.getPadding().getRoundable(), p));
+        return d;
+    }
+
+    public Cobol visitDivideGiving(Cobol.DivideGiving divideGiving, P p) {
+        Cobol.DivideGiving d = divideGiving;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withDivideGivingPhrase((Cobol.DivideGivingPhrase) visit(d.getDivideGivingPhrase(), p));
+        return d;
+    }
+
+    public Cobol visitDivideGivingPhrase(Cobol.DivideGivingPhrase divideGivingPhrase, P p) {
+        Cobol.DivideGivingPhrase d = divideGivingPhrase;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.getPadding().withRoundable(visitContainer(d.getPadding().getRoundable(), p));
+        return d;
+    }
+
+    public Cobol visitDivideRemainder(Cobol.DivideRemainder divideRemainder, P p) {
+        Cobol.DivideRemainder d = divideRemainder;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
 }

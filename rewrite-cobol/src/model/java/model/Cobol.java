@@ -450,6 +450,48 @@ public interface Cobol {
         List<Name> operands;
     }
 
+    class Divide implements Statement {
+        String divide;
+        Name name;
+
+        Cobol action;
+
+        @Nullable
+        DivideRemainder divideRemainder;
+
+        @Nullable
+        StatementPhrase onSizeErrorPhrase;
+
+        @Nullable
+        StatementPhrase notOnSizeErrorPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endDivide;
+    }
+
+    class DivideInto implements Cobol {
+        String into;
+        CobolContainer<Roundable> roundable;
+    }
+
+    class DivideGiving implements Cobol {
+        String word;
+        Name name;
+
+        @Nullable
+        DivideGivingPhrase divideGivingPhrase;
+    }
+
+    class DivideGivingPhrase implements Cobol {
+        String giving;
+        CobolContainer<Roundable> roundable;
+    }
+
+    class DivideRemainder implements Cobol {
+        String remainder;
+        Name name;
+    }
+
     class Enable implements Statement {
         String enable;
         String type;

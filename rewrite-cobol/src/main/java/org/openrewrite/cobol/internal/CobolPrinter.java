@@ -1266,4 +1266,50 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(plusMinus.getMultDivs(), p);
         return plusMinus;
     }
+
+    public Cobol visitDivide(Cobol.Divide divide, PrintOutputCapture<P> p) {
+        visitSpace(divide.getPrefix(), p);
+        visitMarkers(divide.getMarkers(), p);
+        p.append(divide.getDivide());
+        visit(divide.getName(), p);
+        visit(divide.getAction(), p);
+        visit(divide.getDivideRemainder(), p);
+        visit(divide.getOnSizeErrorPhrase(), p);
+        visit(divide.getNotOnSizeErrorPhrase(), p);
+        visitLeftPadded("", divide.getPadding().getEndDivide(), p);
+        return divide;
+    }
+
+    public Cobol visitDivideInto(Cobol.DivideInto divideInto, PrintOutputCapture<P> p) {
+        visitSpace(divideInto.getPrefix(), p);
+        visitMarkers(divideInto.getMarkers(), p);
+        p.append(divideInto.getInto());
+        visitContainer("", divideInto.getPadding().getRoundable(), "", "", p);
+        return divideInto;
+    }
+
+    public Cobol visitDivideGiving(Cobol.DivideGiving divideGiving, PrintOutputCapture<P> p) {
+        visitSpace(divideGiving.getPrefix(), p);
+        visitMarkers(divideGiving.getMarkers(), p);
+        p.append(divideGiving.getWord());
+        visit(divideGiving.getName(), p);
+        visit(divideGiving.getDivideGivingPhrase(), p);
+        return divideGiving;
+    }
+
+    public Cobol visitDivideGivingPhrase(Cobol.DivideGivingPhrase divideGivingPhrase, PrintOutputCapture<P> p) {
+        visitSpace(divideGivingPhrase.getPrefix(), p);
+        visitMarkers(divideGivingPhrase.getMarkers(), p);
+        p.append(divideGivingPhrase.getGiving());
+        visitContainer("", divideGivingPhrase.getPadding().getRoundable(), "", "", p);
+        return divideGivingPhrase;
+    }
+
+    public Cobol visitDivideRemainder(Cobol.DivideRemainder divideRemainder, PrintOutputCapture<P> p) {
+        visitSpace(divideRemainder.getPrefix(), p);
+        visitMarkers(divideRemainder.getMarkers(), p);
+        p.append(divideRemainder.getRemainder());
+        visit(divideRemainder.getName(), p);
+        return divideRemainder;
+    }
 }

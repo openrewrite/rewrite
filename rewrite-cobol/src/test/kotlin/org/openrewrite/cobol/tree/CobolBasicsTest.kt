@@ -372,4 +372,20 @@ class CobolBasicsTest : RewriteTest {
                 COMPUTE V = (1 + 2) .
         """)
     )
+
+    @Test
+    fun divideStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION USING GRP-01.
+            SIG-TEST-GF-5-0.
+                DIVIDE 0.097 INTO DIV7 ROUNDED.
+                DIVIDE 0.097 INTO DIV7 GIVING DIV8 ROUNDED.
+                DIVIDE 0.097 BY DIV7 GIVING DIV8 ROUNDED.
+                DIVIDE 0.097 INTO DIV7 REMAINDER DIV9.
+                DIVIDE 0.097 INTO DIV7 ON SIZE ERROR CONTINUE.
+                DIVIDE 0.097 INTO DIV7 NOT ON SIZE ERROR CONTINUE.
+        """)
+    )
 }

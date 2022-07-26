@@ -2854,6 +2854,289 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Divide implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String divide;
+
+        @Getter
+        @With
+        Name name;
+
+        @Getter
+        @With
+        Cobol action;
+
+        @Getter
+        @Nullable
+        @With
+        DivideRemainder divideRemainder;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase onSizeErrorPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase notOnSizeErrorPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endDivide;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDivide(this, p);
+        }
+
+        @Nullable
+        public String getEndDivide() {
+            return endDivide == null ? null : endDivide.getElement();
+        }
+
+        public Divide withEndDivide(@Nullable String endDivide) {
+            if (endDivide == null) {
+                return this.endDivide == null ? this : new Divide(id, prefix, markers, divide, name, action, divideRemainder, onSizeErrorPhrase, notOnSizeErrorPhrase, null);
+            }
+            return getPadding().withEndDivide(CobolLeftPadded.withElement(this.endDivide, endDivide));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Divide t;
+
+            @Nullable
+            public CobolLeftPadded<String> getEndDivide() {
+                return t.endDivide;
+            }
+
+            public Divide withEndDivide(@Nullable CobolLeftPadded<String> endDivide) {
+                return t.endDivide == endDivide ? t : new Divide(t.padding, t.id, t.prefix, t.markers, t.divide, t.name, t.action, t.divideRemainder, t.onSizeErrorPhrase, t.notOnSizeErrorPhrase, endDivide);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class DivideInto implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String into;
+
+        CobolContainer<Roundable> roundable;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDivideInto(this, p);
+        }
+
+        public List<Cobol.Roundable> getRoundable() {
+            return roundable.getElements();
+        }
+
+        public DivideInto withRoundable(List<Cobol.Roundable> roundable) {
+            return getPadding().withRoundable(this.roundable.getPadding().withElements(CobolRightPadded.withElements(
+                    this.roundable.getPadding().getElements(), roundable)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DivideInto t;
+
+            public CobolContainer<Cobol.Roundable> getRoundable() {
+                return t.roundable;
+            }
+
+            public DivideInto withRoundable(CobolContainer<Cobol.Roundable> roundable) {
+                return t.roundable == roundable ? t : new DivideInto(t.padding, t.id, t.prefix, t.markers, t.into, roundable);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class DivideGiving implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String word;
+        Name name;
+
+        @Nullable
+        DivideGivingPhrase divideGivingPhrase;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDivideGiving(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class DivideGivingPhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String giving;
+
+        CobolContainer<Roundable> roundable;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDivideGivingPhrase(this, p);
+        }
+
+        public List<Cobol.Roundable> getRoundable() {
+            return roundable.getElements();
+        }
+
+        public DivideGivingPhrase withRoundable(List<Cobol.Roundable> roundable) {
+            return getPadding().withRoundable(this.roundable.getPadding().withElements(CobolRightPadded.withElements(
+                    this.roundable.getPadding().getElements(), roundable)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DivideGivingPhrase t;
+
+            public CobolContainer<Cobol.Roundable> getRoundable() {
+                return t.roundable;
+            }
+
+            public DivideGivingPhrase withRoundable(CobolContainer<Cobol.Roundable> roundable) {
+                return t.roundable == roundable ? t : new DivideGivingPhrase(t.padding, t.id, t.prefix, t.markers, t.giving, roundable);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class DivideRemainder implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String remainder;
+        Name name;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDivideRemainder(this, p);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

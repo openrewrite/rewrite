@@ -329,6 +329,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitOnSizeErrorPhrase(CobolParser.OnSizeErrorPhraseContext ctx) {
+        return new Cobol.StatementPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ON(), ctx.SIZE(), ctx.ERROR()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
     public Object visitNotInvalidKeyPhrase(CobolParser.NotInvalidKeyPhraseContext ctx) {
         return new Cobol.StatementPhrase(
                 randomId(),
@@ -346,6 +357,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.NOT(), ctx.ON(), ctx.EXCEPTION()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
+    public Object visitNotOnSizeErrorPhrase(CobolParser.NotOnSizeErrorPhraseContext ctx) {
+        return new Cobol.StatementPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.NOT(), ctx.ON(), ctx.SIZE(), ctx.ERROR()),
                 convertAllContainer(ctx.statement())
         );
     }
@@ -747,6 +769,89 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 ctx.WITH() == null ? null : words(ctx.WITH()),
                 words(ctx.KEY()),
                 visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitDivideByGivingStatement(CobolParser.DivideByGivingStatementContext ctx) {
+        return new Cobol.DivideGiving(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BY()),
+                visit(ctx.identifier(), ctx.literal()),
+                visitNullable(ctx.divideGivingPhrase())
+        );
+    }
+
+    @Override
+    public Object visitDivideGiving(CobolParser.DivideGivingContext ctx) {
+        return visit(ctx.roundable());
+    }
+
+    @Override
+    public Object visitDivideGivingPhrase(CobolParser.DivideGivingPhraseContext ctx) {
+        return new Cobol.DivideGivingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.GIVING()),
+                convertAllContainer(ctx.divideGiving())
+        );
+    }
+
+    @Override
+    public Object visitDivideIntoGivingStatement(CobolParser.DivideIntoGivingStatementContext ctx) {
+        return new Cobol.DivideGiving(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INTO()),
+                visit(ctx.identifier(), ctx.literal()),
+                visitNullable(ctx.divideGivingPhrase())
+        );
+    }
+
+    @Override
+    public Object visitDivideIntoStatement(CobolParser.DivideIntoStatementContext ctx) {
+        return new Cobol.DivideInto(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INTO()),
+                convertAllContainer(ctx.divideInto())
+        );
+    }
+
+    @Override
+    public Object visitDivideInto(CobolParser.DivideIntoContext ctx) {
+        return visit(ctx.roundable());
+    }
+
+    @Override
+    public Object visitDivideRemainder(CobolParser.DivideRemainderContext ctx) {
+        return new Cobol.DivideRemainder(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REMAINDER()),
+                (Name) visit(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Object visitDivideStatement(CobolParser.DivideStatementContext ctx) {
+        return new Cobol.Divide(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DIVIDE()),
+                visit(ctx.identifier(), ctx.literal()),
+                visit(ctx.divideIntoStatement(), ctx.divideIntoGivingStatement(), ctx.divideByGivingStatement()),
+                visitNullable(ctx.divideRemainder()),
+                visitNullable(ctx.onSizeErrorPhrase()),
+                visitNullable(ctx.notOnSizeErrorPhrase()),
+                padLeft(ctx.END_DIVIDE())
         );
     }
 

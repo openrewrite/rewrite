@@ -712,4 +712,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.PlusMinus visitPlusMinus(Cobol.PlusMinus plusMinus, P p) {
         return (Cobol.PlusMinus) super.visitPlusMinus(plusMinus, p);
     }
+
+    @Override
+    public Cobol.Divide visitDivide(Cobol.Divide divide, P p) {
+        return (Cobol.Divide) super.visitDivide(divide, p);
+    }
+
+    @Override
+    public Cobol.DivideInto visitDivideInto(Cobol.DivideInto divideInto, P p) {
+        return (Cobol.DivideInto) super.visitDivideInto(divideInto, p);
+    }
+
+    @Override
+    public Cobol.DivideGiving visitDivideGiving(Cobol.DivideGiving divideGiving, P p) {
+        return (Cobol.DivideGiving) super.visitDivideGiving(divideGiving, p);
+    }
+
+    @Override
+    public Cobol.DivideGivingPhrase visitDivideGivingPhrase(Cobol.DivideGivingPhrase divideGivingPhrase, P p) {
+        return (Cobol.DivideGivingPhrase) super.visitDivideGivingPhrase(divideGivingPhrase, p);
+    }
+
+    @Override
+    public Cobol.DivideRemainder visitDivideRemainder(Cobol.DivideRemainder divideRemainder, P p) {
+        return (Cobol.DivideRemainder) super.visitDivideRemainder(divideRemainder, p);
+    }
 }
