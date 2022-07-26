@@ -612,7 +612,7 @@ public interface Cobol {
 
     class MergeUsing implements Cobol {
         String words;
-        CobolContainer<Name> fileName;
+        CobolContainer<Name> fileNames;
     }
 
     class MergeOutputProcedurePhrase implements Cobol {
