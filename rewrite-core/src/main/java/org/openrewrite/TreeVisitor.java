@@ -34,8 +34,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
-import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -45,7 +43,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
 import static java.lang.reflect.Modifier.*;
-import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.*;
+import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.of;
+import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.parameterizedType;
 import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
 
 /**
@@ -66,8 +65,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             // supports the case of package private bounds on visitors like LineEndingsCount
             .with(TypeValidation.DISABLED);
 
-    private static final Map<Class<?>, Map<Class<?>, Class<?>>> adaptedVisitorsCache =
-            new IdentityHashMap<>();
+    private static final Map<Class<?>, Map<Class<?>, Class<?>>> adaptedVisitorsCache = new IdentityHashMap<>();
 
     private static final Cursor ROOT = new Cursor(null, "root");
 
@@ -92,10 +90,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     private List<TreeVisitor<T, P>> afterVisit;
 
     private int visitCount;
-    private final DistributionSummary visitCountSummary = DistributionSummary.builder("rewrite.visitor.visit.method.count")
-            .description("Visit methods called per source file visited.")
-            .tag("visitor.class", getClass().getName())
-            .register(Metrics.globalRegistry);
+    private final DistributionSummary visitCountSummary = DistributionSummary.builder("rewrite.visitor.visit.method.count").description("Visit methods called per source file visited.").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry);
 
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return true;
@@ -149,8 +144,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
     public final Cursor getCursor() {
         if (cursor == null) {
-            throw new IllegalStateException("Cursoring is not enabled for this visitor. " +
-                    "Call setCursoringOn() in the visitor's constructor to enable.");
+            throw new IllegalStateException("Cursoring is not enabled for this visitor. " + "Call setCursoringOn() in the visitor's constructor to enable.");
         }
         return cursor;
     }
@@ -244,8 +238,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                             diff.visit((node, visit) -> {
                                 if (!node.hasChildren() && node.getPropertyName() != null) {
                                     //noinspection unchecked
-                                    t2.set((T) observer.getObserver().propertyChanged(node.getPropertyName(),
-                                            getCursor(), t2.get(), node.canonicalGet(tree), node.canonicalGet(t2.get())));
+                                    t2.set((T) observer.getObserver().propertyChanged(node.getPropertyName(), getCursor(), t2.get(), node.canonicalGet(tree), node.canonicalGet(t2.get())));
                                 }
                             });
                             t = t2.get();
@@ -257,9 +250,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             setCursor(cursor.getParent());
 
             if (topLevel) {
-                sample.stop(Timer.builder("rewrite.visitor.visit")
-                        .tag("visitor.class", getClass().getName())
-                        .register(Metrics.globalRegistry));
+                sample.stop(Timer.builder("rewrite.visitor.visit").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry));
                 visitCountSummary.record(visitCount);
 
                 if (t != null) {
@@ -271,9 +262,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                     }
                 }
 
-                sample.stop(Timer.builder("rewrite.visitor.visit.cumulative")
-                        .tag("visitor.class", getClass().getName())
-                        .register(Metrics.globalRegistry));
+                sample.stop(Timer.builder("rewrite.visitor.visit.cumulative").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry));
                 afterVisit = null;
             }
         } catch (Throwable e) {
@@ -328,87 +317,91 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public boolean isAdaptableTo(@SuppressWarnings("rawtypes") Class<? extends TreeVisitor> adaptTo) {
-        Class<?> firstLanguageVisitorInHierarchy = getClass();
-        while (firstLanguageVisitorInHierarchy.getAnnotationsByType(LanguageVisitor.class).length == 0) {
-            firstLanguageVisitorInHierarchy = firstLanguageVisitorInHierarchy.getSuperclass();
+        Class<? extends Tree> mine = visitorTreeType(getClass());
+        Class<? extends Tree> theirs = visitorTreeType(adaptTo);
+        return mine.isAssignableFrom(theirs);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private Class<? extends Tree> visitorTreeType(Class<? extends TreeVisitor> v) {
+        for (TypeVariable<? extends Class<? extends TreeVisitor>> tp : v.getTypeParameters()) {
+            for (Type bound : tp.getBounds()) {
+                if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
+                    //noinspection unchecked
+                    return (Class<? extends Tree>) bound;
+                }
+            }
         }
-        return adaptTo.isAssignableFrom(firstLanguageVisitorInHierarchy) ||
-                firstLanguageVisitorInHierarchy.isAssignableFrom(adaptTo);
+
+        Type sup = v.getGenericSuperclass();
+        for (int i = 0; i < 20; i++) {
+            if (sup instanceof ParameterizedType) {
+                for (Type bound : ((ParameterizedType) sup).getActualTypeArguments()) {
+                    if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
+                        //noinspection unchecked
+                        return (Class<? extends Tree>) bound;
+                    }
+                }
+                sup = ((ParameterizedType) sup).getRawType();
+            } else if (sup instanceof Class) {
+                sup = ((Class<?>) sup).getGenericSuperclass();
+            }
+        }
+        throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
+                "type hierarhcy of visitor " + getClass().getName());
     }
 
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {
         if (adaptTo.isAssignableFrom(getClass())) {
             //noinspection unchecked
             return (V) this;
-        }
-
-        Class<?> firstLanguageVisitorInHierarchy = getClass();
-        while (firstLanguageVisitorInHierarchy.getAnnotationsByType(LanguageVisitor.class).length == 0) {
-            firstLanguageVisitorInHierarchy = firstLanguageVisitorInHierarchy.getSuperclass();
-        }
-
-        if (firstLanguageVisitorInHierarchy.equals(adaptTo)) {
-            //noinspection unchecked
-            return (V) this;
-        } else if (!firstLanguageVisitorInHierarchy.isAssignableFrom(adaptTo)) {
-            throw new IllegalArgumentException(adaptTo.getSimpleName() + " must be assignable to " + getClass().getName() + " in order to be adaptable.");
+        } else if (!isAdaptableTo(adaptTo)) {
+            throw new IllegalArgumentException(getClass().getSimpleName() + " must be adaptable to " + adaptTo.getName() + ".");
         }
 
         try {
             Class<?> delegateType = getClass();
-            while (delegateType.getAnnotationsByType(LanguageVisitor.class).length == 0 &&
-                    !(delegateType.getName().endsWith("IsoVisitor") && delegateType.getSuperclass()
-                            .getAnnotationsByType(LanguageVisitor.class).length != 0)) {
+            while (delegateType.getAnnotationsByType(LanguageVisitor.class).length == 0 && !(delegateType.getName().endsWith("IsoVisitor") && delegateType.getSuperclass().getAnnotationsByType(LanguageVisitor.class).length != 0)) {
                 delegateType = delegateType.getSuperclass();
             }
 
             Map<Class<?>, Class<?>> adaptedFrom = adaptedVisitorsCache.get(getClass());
             if (adaptedFrom != null && adaptedFrom.containsKey(adaptTo)) {
                 //noinspection unchecked
-                return (V) adaptedFrom.get(adaptTo)
-                        .getDeclaredConstructor(delegateType)
-                        .newInstance(this);
+                return (V) adaptedFrom.get(adaptTo).getDeclaredConstructor(delegateType).newInstance(this);
             }
 
             TypeVariable<?>[] tp = getClass().getTypeParameters();
             Type genericSuperclass = getClass().getGenericSuperclass();
             DynamicType.Builder<?> classBuilder;
             if (tp.length > 0) {
-                TypeDescription.Generic generic = parameterizedType(
-                        ForLoadedType.of(adaptTo), of(tp[0]).build()).build();
-                classBuilder = byteBuddy.subclass(generic, NO_CONSTRUCTORS)
-                        .typeVariable(tp[0].getName());
+                TypeDescription.Generic generic = parameterizedType(ForLoadedType.of(adaptTo), of(tp[0]).build()).build();
+                classBuilder = byteBuddy.subclass(generic, NO_CONSTRUCTORS).typeVariable(tp[0].getName());
             } else {
                 // FIXME this isn't working for FindTypes (extends from JavaIsoVisitor<Integer>).
                 Type p = ((ParameterizedType) genericSuperclass).getActualTypeArguments()[0];
-                TypeDescription.Generic generic = parameterizedType(
-                        ForLoadedType.of(adaptTo), of(p).build()).build();
+                TypeDescription.Generic generic = parameterizedType(ForLoadedType.of(adaptTo), of(p).build()).build();
                 classBuilder = byteBuddy.subclass(generic, NO_CONSTRUCTORS);
             }
 
-            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = classBuilder
-                    .name(getClass().getSimpleName() + "_" + adaptTo.getSimpleName())
-                    .defineField("delegate", delegateType, PRIVATE | FINAL)
-                    .defineConstructor(PUBLIC)
-                    .withParameter(delegateType)
-                    .intercept(MethodCall.invoke(adaptTo.getConstructor()).andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
+            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = classBuilder.name(getClass().getSimpleName() + "_" + adaptTo.getSimpleName()).defineField("delegate", delegateType, PRIVATE | FINAL).defineConstructor(PUBLIC).withParameter(delegateType).intercept(MethodCall.invoke(adaptTo.getConstructor()).andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
 
             for (Method method : getClass().getDeclaredMethods()) {
-                if (method.getName().startsWith("visit") || method.getName().equals("preVisit") ||
-                        method.getName().equals("postVisit")) {
+                if (method.getName().startsWith("visit") || method.getName().equals("preVisit") || method.getName().equals("postVisit")) {
+                    if (method.getName().equals("visitSourceFile")) {
+                        continue;
+                    }
+
                     nextMethod:
                     for (Method adaptToMethod : adaptTo.getMethods()) {
-                        if (method.getName().equals(adaptToMethod.getName()) &&
-                                method.getParameterCount() == adaptToMethod.getParameterCount() &&
-                                !Modifier.isFinal(adaptToMethod.getModifiers())) {
+                        if (method.getName().equals(adaptToMethod.getName()) && method.getParameterCount() == adaptToMethod.getParameterCount() && !Modifier.isFinal(adaptToMethod.getModifiers())) {
                             Class<?>[] parameterTypes = method.getParameterTypes();
                             for (int i = 0; i < parameterTypes.length; i++) {
                                 if (!method.getParameterTypes()[i].equals(parameterTypes[i])) {
                                     continue nextMethod;
                                 }
                             }
-                            builder = builder.define(method)
-                                    .intercept(MethodDelegation.toField("delegate"));
+                            builder = builder.define(method).intercept(MethodDelegation.toField("delegate"));
                             break;
                         }
                     }
@@ -424,17 +417,12 @@ public abstract class TreeVisitor<T extends Tree, P> {
 //                throw new RuntimeException(e);
 //            }
 
-            Class<?> adapted = unloaded
-                    .load(getClass().getClassLoader())
-                    .getLoaded();
+            Class<?> adapted = unloaded.load(getClass().getClassLoader()).getLoaded();
 
-            adaptedVisitorsCache.computeIfAbsent(getClass(), from -> new IdentityHashMap<>())
-                    .put(adaptTo, adapted);
+            adaptedVisitorsCache.computeIfAbsent(getClass(), from -> new IdentityHashMap<>()).put(adaptTo, adapted);
 
             //noinspection unchecked
-            return (V) adapted
-                    .getDeclaredConstructor(delegateType)
-                    .newInstance(this);
+            return (V) adapted.getDeclaredConstructor(delegateType).newInstance(this);
         } catch (InstantiationException | NoSuchMethodException | InvocationTargetException |
                  IllegalAccessException e) {
             throw new RuntimeException(e);

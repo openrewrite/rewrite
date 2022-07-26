@@ -131,7 +131,6 @@ class RecipeLifecycleTest {
 
     @Suppress("USELESS_IS_CHECK")
     class FooVisitor<P> : TreeVisitor<FooSource, P>() {
-
         override fun preVisit(tree: FooSource, p: P): FooSource {
             if (tree !is FooSource) {
                 throw RuntimeException("tree is not a FooSource")
@@ -148,7 +147,7 @@ class RecipeLifecycleTest {
     }
 
     class FooSource : SourceFile {
-        override fun <P : Any?> isAcceptable(v: TreeVisitor<*, P>, p: P) = v is FooVisitor
+        override fun <P : Any?> isAcceptable(v: TreeVisitor<*, P>, p: P) = v.isAdaptableTo(FooVisitor::class.java)
 
         override fun getMarkers(): Markers = throw NotImplementedError()
         override fun <T : SourceFile?> withMarkers(markers: Markers): T = throw NotImplementedError()
@@ -166,7 +165,7 @@ class RecipeLifecycleTest {
         override fun <T : SourceFile?> withFileAttributes(fileAttributes: FileAttributes?): T = throw NotImplementedError()
     }
 
-    // https://github.com/openrewrite/rewrite/issues/389
+    @Issue("https://github.com/openrewrite/rewrite/issues/389")
     @Test
     fun sourceFilesAcceptOnlyApplicableVisitors() {
         val sources = listOf(FooSource(), PlainText(randomId(), Paths.get("test.txt"), Markers.build(listOf()), null, false, null, null, "Hello"))
