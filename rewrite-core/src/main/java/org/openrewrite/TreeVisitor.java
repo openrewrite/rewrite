@@ -19,8 +19,10 @@ import de.danielbechler.diff.ObjectDifferBuilder;
 import de.danielbechler.diff.node.DiffNode;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import net.bytebuddy.ByteBuddy;
+import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.description.type.TypeDescription.ForLoadedType;
 import net.bytebuddy.dynamic.DynamicType;
@@ -28,12 +30,14 @@ import net.bytebuddy.dynamic.scaffold.TypeValidation;
 import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.MethodCall;
 import net.bytebuddy.implementation.MethodDelegation;
+import net.bytebuddy.implementation.bind.MethodDelegationBinder;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.lang.reflect.*;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +67,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
             // supports the case of package private bounds on visitors like LineEndingsCount
             .with(TypeValidation.DISABLED);
 
-    private static final Map<Class<?>, Map<Class<?>, Class<?>>> adaptedVisitorsCache = new IdentityHashMap<>();
+    private static final Map<Class<?>, Map<Class<?>, Class<?>>> adaptedVisitorsCache =
+            Metrics.globalRegistry.gaugeMapSize("rewrite.adapted.visitor.cache.size", Tags.empty(),
+                    new IdentityHashMap<>());
 
     private static final Cursor ROOT = new Cursor(null, "root");
 
@@ -365,7 +371,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             if (sup instanceof ParameterizedType) {
                 for (Type bound : ((ParameterizedType) sup).getActualTypeArguments()) {
                     if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
-                        if(getLanguage() == null) {
+                        if (getLanguage() == null) {
                             return (Class<? extends TreeVisitor>) ((ParameterizedType) sup).getRawType();
                         }
                         //noinspection unchecked
@@ -436,7 +442,22 @@ public abstract class TreeVisitor<T extends Tree, P> {
                                     continue nextMethod;
                                 }
                             }
-                            builder = builder.define(method).intercept(MethodDelegation.toField("delegate"));
+                            builder = builder.define(method)
+                                    .intercept(MethodDelegation
+                                            .withDefaultConfiguration()
+                                            .withBindingResolver(new MethodDelegationBinder.BindingResolver() {
+                                                @Override
+                                                public MethodDelegationBinder.MethodBinding resolve(MethodDelegationBinder.AmbiguityResolver ambiguityResolver, MethodDescription source, List<MethodDelegationBinder.MethodBinding> targets) {
+                                                    List<MethodDelegationBinder.MethodBinding> targetsWithMatchingName = new ArrayList<>();
+                                                    for (MethodDelegationBinder.MethodBinding target : targets) {
+                                                        if (target.getTarget().getName().equals(source.getName())) {
+                                                            targetsWithMatchingName.add(target);
+                                                        }
+                                                    }
+                                                    return Default.INSTANCE.resolve(ambiguityResolver, source, targetsWithMatchingName);
+                                                }
+                                            })
+                                            .toField("delegate"));
                             break;
                         }
                     }
