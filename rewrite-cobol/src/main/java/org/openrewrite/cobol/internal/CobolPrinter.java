@@ -1135,6 +1135,31 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return callGivingPhrase;
     }
 
+    public Cobol visitMoveStatement(Cobol.MoveStatement moveStatement, PrintOutputCapture<P> p) {
+        visitSpace(moveStatement.getPrefix(), p);
+        visitMarkers(moveStatement.getMarkers(), p);
+        p.append(moveStatement.getWords());
+        visit(moveStatement.getMoveToStatement(), p);
+        return moveStatement;
+    }
+
+    public Cobol visitMoveToStatement(Cobol.MoveToStatement moveToStatement, PrintOutputCapture<P> p) {
+        visitSpace(moveToStatement.getPrefix(), p);
+        visitMarkers(moveToStatement.getMarkers(), p);
+        visit(moveToStatement.getFrom(), p);
+        visitContainer("", moveToStatement.getPadding().getTo(), "", "", p);
+        return moveToStatement;
+    }
+
+    public Cobol visitMoveCorrespondingToStatement(Cobol.MoveCorrespondingToStatement moveCorrespondingToStatement, PrintOutputCapture<P> p) {
+        visitSpace(moveCorrespondingToStatement.getPrefix(), p);
+        visitMarkers(moveCorrespondingToStatement.getMarkers(), p);
+        p.append(moveCorrespondingToStatement.getWords());
+        visit(moveCorrespondingToStatement.getMoveCorrespondingToSendingArea(), p);
+        visitContainer("", moveCorrespondingToStatement.getPadding().getTo(), "", "", p);
+        return moveCorrespondingToStatement;
+    }
+
     public Cobol visitWrite(Cobol.Write write, PrintOutputCapture<P> p) {
         visitSpace(write.getPrefix(), p);
         visitMarkers(write.getMarkers(), p);

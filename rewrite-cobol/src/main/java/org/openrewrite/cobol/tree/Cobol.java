@@ -3957,6 +3957,173 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class MoveStatement implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Cobol moveToStatement;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMoveStatement(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class MoveToStatement implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Name from;
+
+        CobolContainer<Identifier> to;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMoveToStatement(this, p);
+        }
+
+        public List<Cobol.Identifier> getTo() {
+            return to.getElements();
+        }
+
+        public MoveToStatement withTo(List<Cobol.Identifier> to) {
+            return getPadding().withTo(this.to.getPadding().withElements(CobolRightPadded.withElements(
+                    this.to.getPadding().getElements(), to)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MoveToStatement t;
+
+            public CobolContainer<Cobol.Identifier> getTo() {
+                return t.to;
+            }
+
+            public MoveToStatement withTo(CobolContainer<Cobol.Identifier> to) {
+                return t.to == to ? t : new MoveToStatement(t.padding, t.id, t.prefix, t.markers, t.from, to);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class MoveCorrespondingToStatement implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        @Getter
+        @With
+        Identifier moveCorrespondingToSendingArea;
+
+        CobolContainer<Identifier> to;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitMoveCorrespondingToStatement(this, p);
+        }
+
+        public List<Cobol.Identifier> getTo() {
+            return to.getElements();
+        }
+
+        public MoveCorrespondingToStatement withTo(List<Cobol.Identifier> to) {
+            return getPadding().withTo(this.to.getPadding().withElements(CobolRightPadded.withElements(
+                    this.to.getPadding().getElements(), to)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MoveCorrespondingToStatement t;
+
+            public CobolContainer<Cobol.Identifier> getTo() {
+                return t.to;
+            }
+
+            public MoveCorrespondingToStatement withTo(CobolContainer<Cobol.Identifier> to) {
+                return t.to == to ? t : new MoveCorrespondingToStatement(t.padding, t.id, t.prefix, t.markers, t.words, t.moveCorrespondingToSendingArea, to);
+            }
+        }
+    }
+
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

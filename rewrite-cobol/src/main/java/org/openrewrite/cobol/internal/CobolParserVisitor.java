@@ -1412,7 +1412,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitLinkageSection(CobolParser.LinkageSectionContext ctx) {
+    public Cobol.LinkageSection visitLinkageSection(CobolParser.LinkageSectionContext ctx) {
         return new Cobol.LinkageSection(
                 randomId(),
                 sourceBefore(ctx.LINKAGE().getText()),
@@ -1423,7 +1423,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitLocalStorageSection(CobolParser.LocalStorageSectionContext ctx) {
+    public Cobol.LocalStorageSection visitLocalStorageSection(CobolParser.LocalStorageSectionContext ctx) {
         return new Cobol.LocalStorageSection(
                 randomId(),
                 prefix(ctx),
@@ -1432,6 +1432,40 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 ctx.LD() == null ? null : ctx.LD().getText(),
                 ctx.localName() == null ? null : (Name) visit(ctx.localName()),
                 convertAllContainer(sourceBefore("."), ctx.dataDescriptionEntry())
+        );
+    }
+
+    @Override
+    public Cobol.MoveStatement visitMoveStatement(CobolParser.MoveStatementContext ctx) {
+        return new Cobol.MoveStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.MOVE(), ctx.ALL()),
+                visit(ctx.moveCorrespondingToStatement(), ctx.moveToStatement())
+        );
+    }
+
+    @Override
+    public Cobol.MoveToStatement visitMoveToStatement(CobolParser.MoveToStatementContext ctx) {
+        return new Cobol.MoveToStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.moveToSendingArea()),
+                convertAllContainer(padLeft(ctx.TO()), ctx.identifier())
+        );
+    }
+
+    @Override
+    public Cobol.MoveCorrespondingToStatement visitMoveCorrespondingToStatement(CobolParser.MoveCorrespondingToStatementContext ctx) {
+        return new Cobol.MoveCorrespondingToStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CORRESPONDING(), ctx.CORR()),
+                (Cobol.Identifier) visit(ctx.moveCorrespondingToSendingArea()),
+                convertAllContainer(padLeft(ctx.TO()), ctx.identifier())
         );
     }
 
@@ -1581,7 +1615,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitExhibitStatement(CobolParser.ExhibitStatementContext ctx) {
+    public Cobol.Exhibit visitExhibitStatement(CobolParser.ExhibitStatementContext ctx) {
         return new Cobol.Exhibit(
                 randomId(),
                 prefix(ctx),
@@ -1592,7 +1626,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitFileSection(CobolParser.FileSectionContext ctx) {
+    public Cobol.FileSection visitFileSection(CobolParser.FileSectionContext ctx) {
         return new Cobol.FileSection(
                 randomId(),
                 prefix(ctx),
@@ -1603,7 +1637,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitFileDescriptionEntry(CobolParser.FileDescriptionEntryContext ctx) {
+    public Cobol.FileDescriptionEntry visitFileDescriptionEntry(CobolParser.FileDescriptionEntryContext ctx) {
         return new Cobol.FileDescriptionEntry(
                 randomId(),
                 prefix(ctx),

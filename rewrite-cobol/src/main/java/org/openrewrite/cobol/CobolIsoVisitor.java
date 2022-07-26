@@ -639,6 +639,21 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
+    public Cobol.MoveStatement visitMoveStatement(Cobol.MoveStatement moveStatement, P p) {
+        return (Cobol.MoveStatement) super.visitMoveStatement(moveStatement, p);
+    }
+
+    @Override
+    public Cobol.MoveToStatement visitMoveToStatement(Cobol.MoveToStatement moveToStatement, P p) {
+        return (Cobol.MoveToStatement) super.visitMoveToStatement(moveToStatement, p);
+    }
+
+    @Override
+    public Cobol.MoveCorrespondingToStatement visitMoveCorrespondingToStatement(Cobol.MoveCorrespondingToStatement moveCorrespondingToStatement, P p) {
+        return (Cobol.MoveCorrespondingToStatement) super.visitMoveCorrespondingToStatement(moveCorrespondingToStatement, p);
+    }
+
+    @Override
     public Cobol.Write visitWrite(Cobol.Write write, P p) {
         return (Cobol.Write) super.visitWrite(write, p);
     }

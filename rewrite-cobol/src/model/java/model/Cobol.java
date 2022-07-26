@@ -572,6 +572,22 @@ public interface Cobol {
         CobolContainer<DataDescriptionEntry> dataDescriptions;
     }
 
+    class MoveStatement implements Statement {
+        String words;
+        Cobol moveToStatement;
+    }
+
+    class MoveToStatement implements Cobol {
+        Name from;
+        CobolContainer<Identifier> to;
+    }
+
+    class MoveCorrespondingToStatement implements Cobol {
+        String words;
+        Identifier moveCorrespondingToSendingArea;
+        CobolContainer<Identifier> to;
+    }
+
     class IdentificationDivision implements Cobol {
         String words;
         CobolLeftPadded<ProgramIdParagraph> programIdParagraph;

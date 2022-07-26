@@ -1149,6 +1149,32 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return c;
     }
 
+    public Cobol visitMoveStatement(Cobol.MoveStatement moveStatement, P p) {
+        Cobol.MoveStatement m = moveStatement;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withMoveToStatement(visit(m.getMoveToStatement(), p));
+        return m;
+    }
+
+    public Cobol visitMoveToStatement(Cobol.MoveToStatement moveToStatement, P p) {
+        Cobol.MoveToStatement m = moveToStatement;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withFrom((Name) visit(m.getFrom(), p));
+        m = m.getPadding().withTo(visitContainer(m.getPadding().getTo(), p));
+        return m;
+    }
+
+    public Cobol visitMoveCorrespondingToStatement(Cobol.MoveCorrespondingToStatement moveCorrespondingToStatement, P p) {
+        Cobol.MoveCorrespondingToStatement m = moveCorrespondingToStatement;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withMoveCorrespondingToSendingArea((Cobol.Identifier) visit(m.getMoveCorrespondingToSendingArea(), p));
+        m = m.getPadding().withTo(visitContainer(m.getPadding().getTo(), p));
+        return m;
+    }
+
     public Cobol visitWrite(Cobol.Write write, P p) {
         Cobol.Write w = write;
         w = w.withPrefix(visitSpace(w.getPrefix(), p));

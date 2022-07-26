@@ -188,6 +188,19 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
+    fun moveStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. MOVETEST.
+            DATA DIVISION.
+            PROCEDURE DIVISION USING GRP-01.
+            PARA-MOVETEST.
+                MOVE "MOVETEST" TO DN1.
+                MOVE SPACE TO WS1.
+        """)
+    )
+
+    @Test
     fun fileSection() = rewriteRun(
         cobol("""
                 IDENTIFICATION DIVISION.
