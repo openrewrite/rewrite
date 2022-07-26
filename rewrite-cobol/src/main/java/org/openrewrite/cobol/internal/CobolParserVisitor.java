@@ -1436,8 +1436,8 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Cobol.MergeStatement visitMergeStatement(CobolParser.MergeStatementContext ctx) {
-        return new Cobol.MergeStatement(
+    public Cobol.Merge visitMergeStatement(CobolParser.MergeStatementContext ctx) {
+        return new Cobol.Merge(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
@@ -1588,8 +1588,8 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Cobol.MultiplyStatement visitMultiplyStatement(CobolParser.MultiplyStatementContext ctx) {
-        return new Cobol.MultiplyStatement(
+    public Cobol.Multiply visitMultiplyStatement(CobolParser.MultiplyStatementContext ctx) {
+        return new Cobol.Multiply(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
@@ -1599,7 +1599,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 visit(ctx.multiplyRegular(), ctx.multiplyGiving()),
                 visitNullable(ctx.onSizeErrorPhrase()),
                 visitNullable(ctx.notOnSizeErrorPhrase()),
-                words(ctx.END_MULTIPLY())
+                padLeft(ctx.END_MULTIPLY())
         );
     }
 

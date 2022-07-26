@@ -1351,8 +1351,8 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return d;
     }
 
-    public Cobol visitMergeStatement(Cobol.MergeStatement mergeStatement, P p) {
-        Cobol.MergeStatement m = mergeStatement;
+    public Cobol visitMerge(Cobol.Merge merge, P p) {
+        Cobol.Merge m = merge;
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
         m = m.getPadding().withMergeOnKeyClause(visitContainer(m.getPadding().getMergeOnKeyClause(), p));
@@ -1415,7 +1415,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.MergeUsing m = mergeUsing;
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
-        m = m.withFileNames(visitContainer(m.getFileNames(), p));
+        m = m.getPadding().withFileNames(visitContainer(m.getPadding().getFileNames(), p));
         return m;
     }
 
@@ -1427,8 +1427,8 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return m;
     }
 
-    public Cobol visitMultiplyStatement(Cobol.MultiplyStatement multiplyStatement, P p) {
-        Cobol.MultiplyStatement m = multiplyStatement;
+    public Cobol visitMultiply(Cobol.Multiply multiply, P p) {
+        Cobol.Multiply m = multiply;
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
         m = m.withMultiply((Cobol) visit(m.getMultiply(), p));

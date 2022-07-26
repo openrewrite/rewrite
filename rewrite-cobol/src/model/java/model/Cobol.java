@@ -573,7 +573,7 @@ public interface Cobol {
         CobolContainer<DataDescriptionEntry> dataDescriptions;
     }
 
-    class MergeStatement implements Statement {
+    class Merge implements Statement {
         String words;
         Name fileName;
         CobolContainer<MergeOnKeyClause> mergeOnKeyClause;
@@ -656,7 +656,7 @@ public interface Cobol {
         CobolContainer<Identifier> to;
     }
 
-    class MultiplyStatement implements Statement {
+    class Multiply implements Statement {
         String words;
         Name multiplicand;
         String by;
@@ -669,7 +669,7 @@ public interface Cobol {
         StatementPhrase notOnSizeErrorPhrase;
 
         @Nullable
-        String endMultiply;
+        CobolLeftPadded<String> endMultiply;
     }
 
     class MultiplyRegular implements Cobol {

@@ -755,8 +755,8 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
-    public Cobol.MergeStatement visitMergeStatement(Cobol.MergeStatement mergeStatement, P p) {
-        return (Cobol.MergeStatement) super.visitMergeStatement(mergeStatement, p);
+    public Cobol.Merge visitMerge(Cobol.Merge merge, P p) {
+        return (Cobol.Merge) super.visitMerge(merge, p);
     }
 
     @Override
@@ -800,8 +800,8 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
-    public Cobol.MultiplyStatement visitMultiplyStatement(Cobol.MultiplyStatement multiplyStatement, P p) {
-        return (Cobol.MultiplyStatement) super.visitMultiplyStatement(multiplyStatement, p);
+    public Cobol.Multiply visitMultiply(Cobol.Multiply multiply, P p) {
+        return (Cobol.Multiply) super.visitMultiply(multiply, p);
     }
 
     @Override

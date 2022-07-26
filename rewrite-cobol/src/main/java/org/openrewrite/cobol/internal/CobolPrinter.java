@@ -1338,17 +1338,17 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return divideRemainder;
     }
 
-    public Cobol visitMergeStatement(Cobol.MergeStatement mergeStatement, PrintOutputCapture<P> p) {
-        visitSpace(mergeStatement.getPrefix(), p);
-        visitMarkers(mergeStatement.getMarkers(), p);
-        p.append(mergeStatement.getWords());
-        visit(mergeStatement.getFileName(), p);
-        visitContainer("", mergeStatement.getPadding().getMergeOnKeyClause(), "", "", p);
-        visit(mergeStatement.getMergeCollatingSequencePhrase(), p);
-        visitContainer("", mergeStatement.getPadding().getMergeUsing(), "", "", p);
-        visit(mergeStatement.getMergeOutputProcedurePhrase(), p);
-        visitContainer("", mergeStatement.getPadding().getMergeGivingPhrase(), "", "", p);
-        return mergeStatement;
+    public Cobol visitMerge(Cobol.Merge merge, PrintOutputCapture<P> p) {
+        visitSpace(merge.getPrefix(), p);
+        visitMarkers(merge.getMarkers(), p);
+        p.append(merge.getWords());
+        visit(merge.getFileName(), p);
+        visitContainer("", merge.getPadding().getMergeOnKeyClause(), "", "", p);
+        visit(merge.getMergeCollatingSequencePhrase(), p);
+        visitContainer("", merge.getPadding().getMergeUsing(), "", "", p);
+        visit(merge.getMergeOutputProcedurePhrase(), p);
+        visitContainer("", merge.getPadding().getMergeGivingPhrase(), "", "", p);
+        return merge;
     }
 
     public Cobol visitMergeOnKeyClause(Cobol.MergeOnKeyClause mergeOnKeyClause, PrintOutputCapture<P> p) {
@@ -1404,7 +1404,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(mergeUsing.getPrefix(), p);
         visitMarkers(mergeUsing.getMarkers(), p);
         p.append(mergeUsing.getWords());
-        visitContainer(mergeUsing.getFileNames(), p);
+        visit(mergeUsing.getFileNames(), p);
         return mergeUsing;
     }
 
@@ -1416,17 +1416,17 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return mergeOutputThrough;
     }
 
-    public Cobol visitMultiplyStatement(Cobol.MultiplyStatement multiplyStatement, PrintOutputCapture<P> p) {
-        visitSpace(multiplyStatement.getPrefix(), p);
-        visitMarkers(multiplyStatement.getMarkers(), p);
-        p.append(multiplyStatement.getWords());
-        visit(multiplyStatement.getMultiplicand(), p);
-        p.append(multiplyStatement.getBy());
-        visit(multiplyStatement.getMultiply(), p);
-        visit(multiplyStatement.getOnSizeErrorPhrase(), p);
-        visit(multiplyStatement.getNotOnSizeErrorPhrase(), p);
-        p.append(multiplyStatement.getEndMultiply());
-        return multiplyStatement;
+    public Cobol visitMultiply(Cobol.Multiply multiply, PrintOutputCapture<P> p) {
+        visitSpace(multiply.getPrefix(), p);
+        visitMarkers(multiply.getMarkers(), p);
+        p.append(multiply.getWords());
+        visit(multiply.getMultiplicand(), p);
+        p.append(multiply.getBy());
+        visit(multiply.getMultiply(), p);
+        visit(multiply.getOnSizeErrorPhrase(), p);
+        visit(multiply.getNotOnSizeErrorPhrase(), p);
+        p.append(multiply.getEndMultiply());
+        return multiply;
     }
 
     public Cobol visitMultiplyRegular(Cobol.MultiplyRegular multiplyRegular, PrintOutputCapture<P> p) {
