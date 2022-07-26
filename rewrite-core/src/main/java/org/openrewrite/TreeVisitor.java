@@ -22,7 +22,6 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.description.type.TypeDescription.ForLoadedType;
 import net.bytebuddy.dynamic.DynamicType;
@@ -46,6 +45,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
 import static java.lang.reflect.Modifier.*;
+import static java.util.Objects.requireNonNull;
 import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.of;
 import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.parameterizedType;
 import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
@@ -68,8 +68,8 @@ public abstract class TreeVisitor<T extends Tree, P> {
             .with(TypeValidation.DISABLED);
 
     private static final Map<Class<?>, Map<Class<?>, Class<?>>> adaptedVisitorsCache =
-            Metrics.globalRegistry.gaugeMapSize("rewrite.adapted.visitor.cache.size", Tags.empty(),
-                    new IdentityHashMap<>());
+            requireNonNull(Metrics.globalRegistry.gaugeMapSize("rewrite.adapted.visitor.cache.size", Tags.empty(),
+                    new IdentityHashMap<>()));
 
     private static final Cursor ROOT = new Cursor(null, "root");
 
@@ -372,6 +372,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 for (Type bound : ((ParameterizedType) sup).getActualTypeArguments()) {
                     if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
                         if (getLanguage() == null) {
+                            //noinspection unchecked
                             return (Class<? extends TreeVisitor>) ((ParameterizedType) sup).getRawType();
                         }
                         //noinspection unchecked
@@ -445,17 +446,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
                             builder = builder.define(method)
                                     .intercept(MethodDelegation
                                             .withDefaultConfiguration()
-                                            .withBindingResolver(new MethodDelegationBinder.BindingResolver() {
-                                                @Override
-                                                public MethodDelegationBinder.MethodBinding resolve(MethodDelegationBinder.AmbiguityResolver ambiguityResolver, MethodDescription source, List<MethodDelegationBinder.MethodBinding> targets) {
-                                                    List<MethodDelegationBinder.MethodBinding> targetsWithMatchingName = new ArrayList<>();
-                                                    for (MethodDelegationBinder.MethodBinding target : targets) {
-                                                        if (target.getTarget().getName().equals(source.getName())) {
-                                                            targetsWithMatchingName.add(target);
-                                                        }
+                                            .withBindingResolver((ambiguityResolver, source, targets) -> {
+                                                List<MethodDelegationBinder.MethodBinding> targetsWithMatchingName = new ArrayList<>();
+                                                for (MethodDelegationBinder.MethodBinding target : targets) {
+                                                    if (target.getTarget().getName().equals(source.getName())) {
+                                                        targetsWithMatchingName.add(target);
                                                     }
-                                                    return Default.INSTANCE.resolve(ambiguityResolver, source, targetsWithMatchingName);
                                                 }
+                                                return MethodDelegationBinder.BindingResolver.Default.INSTANCE.resolve(ambiguityResolver, source, targetsWithMatchingName);
                                             })
                                             .toField("delegate"));
                             break;
