@@ -681,6 +681,32 @@ public interface Cobol {
         CobolContainer<Roundable> result;
     }
 
+    class NextSentence implements Statement {
+        String words;
+    }
+
+    class Open implements Statement {
+        String words;
+        CobolContainer<Cobol> open;
+    }
+
+    class OpenInputOutputStatement implements Cobol {
+        String words;
+        CobolContainer<Openable> openInput;
+    }
+
+    class Openable implements Cobol {
+        Name fileName;
+
+        @Nullable
+        String words;
+    }
+
+    class OpenIOExtendStatement implements Cobol {
+        String words;
+        CobolContainer<Name> fileNames;
+    }
+
     class IdentificationDivision implements Cobol {
         String words;
         CobolLeftPadded<ProgramIdParagraph> programIdParagraph;

@@ -1625,6 +1625,94 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.NextSentence visitNextSentenceStatement(CobolParser.NextSentenceStatementContext ctx) {
+        return new Cobol.NextSentence(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.NEXT(), ctx.SENTENCE())
+            );
+    }
+
+    @Override
+    public Cobol.Open visitOpenStatement(CobolParser.OpenStatementContext ctx) {
+        return new Cobol.Open(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.OPEN()),
+                convertAllContainer(ctx.openInputStatement(), ctx.openOutputStatement(), ctx.openIOStatement(),
+                        ctx.openExtendStatement())
+        );
+    }
+
+    @Override
+    public Cobol.OpenInputOutputStatement visitOpenInputStatement(CobolParser.OpenInputStatementContext ctx) {
+        return new Cobol.OpenInputOutputStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INPUT()),
+                convertAllContainer(ctx.openInput())
+        );
+    }
+
+    @Override
+    public Cobol.Openable visitOpenInput(CobolParser.OpenInputContext ctx) {
+        return new Cobol.Openable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.fileName()),
+                words(ctx.REVERSED(), ctx.WITH(), ctx.NO(), ctx.REWIND())
+        );
+    }
+
+    @Override
+    public Cobol.OpenInputOutputStatement visitOpenOutputStatement(CobolParser.OpenOutputStatementContext ctx) {
+        return new Cobol.OpenInputOutputStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.OUTPUT()),
+                convertAllContainer(ctx.openOutput())
+        );
+    }
+
+    @Override
+    public Cobol.Openable visitOpenOutput(CobolParser.OpenOutputContext ctx) {
+        return new Cobol.Openable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.fileName()),
+                words(ctx.WITH(), ctx.NO(), ctx.REWIND())
+        );
+    }
+
+    @Override
+    public Cobol.OpenIOExtendStatement visitOpenIOStatement(CobolParser.OpenIOStatementContext ctx) {
+        return new Cobol.OpenIOExtendStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.I_O()),
+                convertAllContainer(ctx.fileName())
+        );
+    }
+
+    @Override
+    public Cobol.OpenIOExtendStatement visitOpenExtendStatement(CobolParser.OpenExtendStatementContext ctx) {
+        return new Cobol.OpenIOExtendStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.EXTEND()),
+                convertAllContainer(ctx.fileName())
+        );
+    }
+
+    @Override
     public Cobol.DataDescriptionEntry visitDataDescriptionEntryFormat1(CobolParser.DataDescriptionEntryFormat1Context ctx) {
         TerminalNode level = ctx.INTEGERLITERAL() == null ? ctx.LEVEL_NUMBER_77() : ctx.INTEGERLITERAL();
         return new Cobol.DataDescriptionEntry(
@@ -2188,6 +2276,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(List<T> trees) {
         return convertAllContainer(trees, () -> Space.EMPTY);
+    }
+
+    @SafeVarargs
+    private final CobolContainer<Cobol> convertAllContainer(List<? extends ParseTree>... trees) {
+        for(List<? extends ParseTree> tree : trees) {
+            if(tree != null) {
+                return convertAllContainer(tree, () -> Space.EMPTY);
+            }
+        }
+        throw new IllegalArgumentException("All input trees cannot be null");
     }
 
     private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(List<T> trees, Supplier<Space> sourceBefore) {

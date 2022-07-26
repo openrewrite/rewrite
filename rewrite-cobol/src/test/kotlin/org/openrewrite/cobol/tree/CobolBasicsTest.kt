@@ -225,6 +225,18 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
+    fun openStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. OPENTEST.
+            PROCEDURE DIVISION.
+            OPEN OUTPUT SQ-FS2.
+            OPEN INPUT TFIL REVERSED.
+            OPEN INPUT TFIL WITH NO REWIND.
+        """)
+    )
+
+    @Test
     fun fileSection() = rewriteRun(
         cobol("""
                 IDENTIFICATION DIVISION.

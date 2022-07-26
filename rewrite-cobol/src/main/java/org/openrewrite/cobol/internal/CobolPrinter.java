@@ -1442,4 +1442,43 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", multiplyGiving.getPadding().getResult(), "", "", p);
         return multiplyGiving;
     }
+
+    public Cobol visitNextSentence(Cobol.NextSentence nextSentence, PrintOutputCapture<P> p) {
+        visitSpace(nextSentence.getPrefix(), p);
+        visitMarkers(nextSentence.getMarkers(), p);
+        p.append(nextSentence.getWords());
+        return nextSentence;
+    }
+
+    public Cobol visitOpen(Cobol.Open open, PrintOutputCapture<P> p) {
+        visitSpace(open.getPrefix(), p);
+        visitMarkers(open.getMarkers(), p);
+        p.append(open.getWords());
+        visitContainer("", open.getPadding().getOpen(), "", "", p);
+        return open;
+    }
+
+    public Cobol visitOpenInputOutputStatement(Cobol.OpenInputOutputStatement openInputOutputStatement, PrintOutputCapture<P> p) {
+        visitSpace(openInputOutputStatement.getPrefix(), p);
+        visitMarkers(openInputOutputStatement.getMarkers(), p);
+        p.append(openInputOutputStatement.getWords());
+        visitContainer("", openInputOutputStatement.getPadding().getOpenInput(), "", "", p);
+        return openInputOutputStatement;
+    }
+
+    public Cobol visitOpenable(Cobol.Openable openable, PrintOutputCapture<P> p) {
+        visitSpace(openable.getPrefix(), p);
+        visitMarkers(openable.getMarkers(), p);
+        visit(openable.getFileName(), p);
+        p.append(openable.getWords());
+        return openable;
+    }
+
+    public Cobol visitOpenIOExtendStatement(Cobol.OpenIOExtendStatement openIOExtendStatement, PrintOutputCapture<P> p) {
+        visitSpace(openIOExtendStatement.getPrefix(), p);
+        visitMarkers(openIOExtendStatement.getMarkers(), p);
+        p.append(openIOExtendStatement.getWords());
+        visitContainer("", openIOExtendStatement.getPadding().getFileNames(), "", "", p);
+        return openIOExtendStatement;
+    }
 }

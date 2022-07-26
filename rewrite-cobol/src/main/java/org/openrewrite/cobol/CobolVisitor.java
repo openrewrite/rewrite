@@ -1452,4 +1452,42 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         m = m.getPadding().withResult(visitContainer(m.getPadding().getResult(), p));
         return m;
     }
+
+    public Cobol visitNextSentence(Cobol.NextSentence nextSentence, P p) {
+        Cobol.NextSentence n = nextSentence;
+        n = n.withPrefix(visitSpace(n.getPrefix(), p));
+        n = n.withMarkers(visitMarkers(n.getMarkers(), p));
+        return n;
+    }
+
+    public Cobol visitOpen(Cobol.Open open, P p) {
+        Cobol.Open o = open;
+        o = o.withPrefix(visitSpace(o.getPrefix(), p));
+        o = o.withMarkers(visitMarkers(o.getMarkers(), p));
+        o = o.getPadding().withOpen(visitContainer(o.getPadding().getOpen(), p));
+        return o;
+    }
+
+    public Cobol visitOpenInputOutputStatement(Cobol.OpenInputOutputStatement openInputOutputStatement, P p) {
+        Cobol.OpenInputOutputStatement o = openInputOutputStatement;
+        o = o.withPrefix(visitSpace(o.getPrefix(), p));
+        o = o.withMarkers(visitMarkers(o.getMarkers(), p));
+        o = o.getPadding().withOpenInput(visitContainer(o.getPadding().getOpenInput(), p));
+        return o;
+    }
+
+    public Cobol visitOpenable(Cobol.Openable openable, P p) {
+        Cobol.Openable o = openable;
+        o = o.withPrefix(visitSpace(o.getPrefix(), p));
+        o = o.withMarkers(visitMarkers(o.getMarkers(), p));
+        return o;
+    }
+
+    public Cobol visitOpenIOExtendStatement(Cobol.OpenIOExtendStatement openIOExtendStatement, P p) {
+        Cobol.OpenIOExtendStatement o = openIOExtendStatement;
+        o = o.withPrefix(visitSpace(o.getPrefix(), p));
+        o = o.withMarkers(visitMarkers(o.getMarkers(), p));
+        o = o.getPadding().withFileNames(visitContainer(o.getPadding().getFileNames(), p));
+        return o;
+    }
 }

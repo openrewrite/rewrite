@@ -813,4 +813,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.MultiplyGiving visitMultiplyGiving(Cobol.MultiplyGiving multiplyGiving, P p) {
         return (Cobol.MultiplyGiving) super.visitMultiplyGiving(multiplyGiving, p);
     }
+
+    @Override
+    public Cobol.NextSentence visitNextSentence(Cobol.NextSentence nextSentence, P p) {
+        return (Cobol.NextSentence) super.visitNextSentence(nextSentence, p);
+    }
+
+    @Override
+    public Cobol.Open visitOpen(Cobol.Open open, P p) {
+        return (Cobol.Open) super.visitOpen(open, p);
+    }
+
+    @Override
+    public Cobol.OpenInputOutputStatement visitOpenInputOutputStatement(Cobol.OpenInputOutputStatement openInputOutputStatement, P p) {
+        return (Cobol.OpenInputOutputStatement) super.visitOpenInputOutputStatement(openInputOutputStatement, p);
+    }
+
+    @Override
+    public Cobol.Openable visitOpenable(Cobol.Openable openable, P p) {
+        return (Cobol.Openable) super.visitOpenable(openable, p);
+    }
+
+    @Override
+    public Cobol.OpenIOExtendStatement visitOpenIOExtendStatement(Cobol.OpenIOExtendStatement openIOExtendStatement, P p) {
+        return (Cobol.OpenIOExtendStatement) super.visitOpenIOExtendStatement(openIOExtendStatement, p);
+    }
 }

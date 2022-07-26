@@ -4627,6 +4627,260 @@ public interface Cobol extends Tree {
         }
     }
 
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class NextSentence implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitNextSentence(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Open implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Cobol> open;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitOpen(this, p);
+        }
+
+        public List<Cobol> getOpen() {
+            return open.getElements();
+        }
+
+        public Open withOpen(List<Cobol> open) {
+            return getPadding().withOpen(this.open.getPadding().withElements(CobolRightPadded.withElements(
+                    this.open.getPadding().getElements(), open)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Open t;
+
+            public CobolContainer<Cobol> getOpen() {
+                return t.open;
+            }
+
+            public Open withOpen(CobolContainer<Cobol> open) {
+                return t.open == open ? t : new Open(t.padding, t.id, t.prefix, t.markers, t.words, open);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class OpenInputOutputStatement implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Openable> openInput;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitOpenInputOutputStatement(this, p);
+        }
+
+        public List<Cobol.Openable> getOpenInput() {
+            return openInput.getElements();
+        }
+
+        public OpenInputOutputStatement withOpenInput(List<Cobol.Openable> openInput) {
+            return getPadding().withOpenInput(this.openInput.getPadding().withElements(CobolRightPadded.withElements(
+                    this.openInput.getPadding().getElements(), openInput)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final OpenInputOutputStatement t;
+
+            public CobolContainer<Cobol.Openable> getOpenInput() {
+                return t.openInput;
+            }
+
+            public OpenInputOutputStatement withOpenInput(CobolContainer<Cobol.Openable> openInput) {
+                return t.openInput == openInput ? t : new OpenInputOutputStatement(t.padding, t.id, t.prefix, t.markers, t.words, openInput);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Openable implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Name fileName;
+
+        @Nullable
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitOpenable(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class OpenIOExtendStatement implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Name> fileNames;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitOpenIOExtendStatement(this, p);
+        }
+
+        public List<Name> getFileNames() {
+            return fileNames.getElements();
+        }
+
+        public OpenIOExtendStatement withFileNames(List<Name> fileNames) {
+            return getPadding().withFileNames(this.fileNames.getPadding().withElements(CobolRightPadded.withElements(
+                    this.fileNames.getPadding().getElements(), fileNames)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final OpenIOExtendStatement t;
+
+            public CobolContainer<Name> getFileNames() {
+                return t.fileNames;
+            }
+
+            public OpenIOExtendStatement withFileNames(CobolContainer<Name> fileNames) {
+                return t.fileNames == fileNames ? t : new OpenIOExtendStatement(t.padding, t.id, t.prefix, t.markers, t.words, fileNames);
+            }
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
