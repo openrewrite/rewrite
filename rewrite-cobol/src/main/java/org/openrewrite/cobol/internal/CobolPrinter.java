@@ -1941,4 +1941,12 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(receivable.getWords());
         return receivable;
     }
+
+    public Cobol visitTerminate(Cobol.Terminate terminate, PrintOutputCapture<P> p) {
+        visitSpace(terminate.getPrefix(), p);
+        visitMarkers(terminate.getMarkers(), p);
+        visit(terminate.getTerminate(), p);
+        visit(terminate.getReportName(), p);
+        return terminate;
+    }
 }

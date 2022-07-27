@@ -4297,7 +4297,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         String generate;
-        ReportName reportName;
+        QualifiedDataName reportName;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -9517,6 +9517,24 @@ public interface Cobol extends Tree {
             public SymbolicCharactersClause withInAlphabet(@Nullable CobolLeftPadded<String> inAlphabet) {
                 return t.inAlphabet == inAlphabet ? t : new SymbolicCharactersClause(t.padding, t.id, t.prefix, t.markers, t.words, t.symbols, inAlphabet, t.alphabetName);
             }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Terminate implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        CobolWord terminate;
+        QualifiedDataName reportName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitTerminate(this, p);
         }
     }
 

@@ -936,7 +936,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Generate g = generate;
         g = g.withPrefix(visitSpace(g.getPrefix(), p));
         g = g.withMarkers(visitMarkers(g.getMarkers(), p));
-        g = g.withReportName((Cobol.ReportName) visit(g.getReportName(), p));
+        g = g.withReportName((Cobol.QualifiedDataName) visit(g.getReportName(), p));
         return g;
     }
 
@@ -1950,5 +1950,14 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         r = r.withPrefix(visitSpace(r.getPrefix(), p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
         return r;
+    }
+
+    public Cobol visitTerminate(Cobol.Terminate terminate, P p) {
+        Cobol.Terminate t = terminate;
+        t = t.withPrefix(visitSpace(t.getPrefix(), p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.withTerminate((Cobol.CobolWord) visit(t.getTerminate(), p));
+        t = t.withReportName((Cobol.QualifiedDataName) visit(t.getReportName(), p));
+        return t;
     }
 }

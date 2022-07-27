@@ -609,4 +609,26 @@ class CobolBasicsTest : RewriteTest {
                 UNSTRING IDENTIFIER INTO IDENTIFIER NOT ON OVERFLOW.
         """)
     )
+
+    @Test
+    fun terminateStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. terminateStatement.
+            PROCEDURE DIVISION.
+            RW301M-CONTROL.
+                TERMINATE RFIL2.
+        """)
+    )
+
+    @Test
+    fun generateStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. terminateStatement.
+            PROCEDURE DIVISION.
+            RW301M-CONTROL.
+                GENERATE RREC.
+        """)
+    )
 }

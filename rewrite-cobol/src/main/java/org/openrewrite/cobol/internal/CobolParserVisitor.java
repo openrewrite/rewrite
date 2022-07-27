@@ -861,16 +861,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitReportName(CobolParser.ReportNameContext ctx) {
-        return new Cobol.ReportName(
-                randomId(),
-                prefix(ctx),
-                Markers.EMPTY,
-                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
-        );
-    }
-
-    @Override
     public Cobol.ReserveNetworkClause visitReserveNetworkClause(CobolParser.ReserveNetworkClauseContext ctx) {
         return new Cobol.ReserveNetworkClause(
                 randomId(),
@@ -1435,6 +1425,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 convertAllContainer(ctx.setTo()),
                 padLeft(ctx.UP() == null ? ctx.DOWN() : ctx.UP()),
                 (Name) visit(ctx.setByValue())
+        );
+    }
+
+    @Override
+    public Object visitTerminateStatement(CobolParser.TerminateStatementContext ctx) {
+        return new Cobol.Terminate(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.TERMINATE()),
+                (Cobol.QualifiedDataName) visit(ctx.reportName())
         );
     }
 
@@ -2680,7 +2681,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.GENERATE()),
-                (Cobol.ReportName) visit(ctx.reportName())
+                (Cobol.QualifiedDataName) visit(ctx.reportName())
         );
     }
 

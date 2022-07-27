@@ -1098,4 +1098,9 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.Receivable visitReceivable(Cobol.Receivable receivable, P p) {
         return (Cobol.Receivable) super.visitReceivable(receivable, p);
     }
+
+    @Override
+    public Cobol.Terminate visitTerminate(Cobol.Terminate terminate, P p) {
+        return (Cobol.Terminate) super.visitTerminate(terminate, p);
+    }
 }
