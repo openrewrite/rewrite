@@ -2,6 +2,8 @@ package org.openrewrite.java.controlflow;
 
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
+
+
 import org.graphstream.ui.swing_viewer.SwingViewer;
 import org.graphstream.ui.swing_viewer.ViewPanel;
 import org.graphstream.ui.view.Viewer;
@@ -9,6 +11,8 @@ import org.graphstream.ui.view.ViewerListener;
 import org.graphstream.ui.view.ViewerPipe;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.EtchedBorder;
 import java.awt.*;
 import java.util.Map;
 
@@ -29,7 +33,7 @@ public class GraphShower {
 
         ControlFlowGraph cfg = new ControlFlowGraph.ControlFlowGraphBuilder()
                 .nodeToIndex(nodeToIndex)
-                .expanded(true)
+                .expanded(false)
                 .build();
 
         graph = cfg.loadGraph();
@@ -55,7 +59,7 @@ public class GraphShower {
         codeArea.setEditable(false);
 
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        panel.setBorder(BorderFactory.createLineBorder(Color.blue, 5));
+//        panel.setBorder(BorderFactory.createLineBorder(Color.blue, 5));
         mainFrame.add(panel);
 //          graph.display();
 
@@ -93,8 +97,13 @@ public class GraphShower {
             if (nodeToNode.get(graph.getNode(id)) instanceof ControlFlowNode.BasicBlock) {
                 ControlFlowNode.BasicBlock basicBlock = (ControlFlowNode.BasicBlock) nodeToNode.get(graph.getNode(id));
                 codeArea.setText(basicBlock.getStatementsWithinBlock());
+                codeArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+                codeArea.setForeground(Color.white);
+                codeArea.setBackground(Color.BLACK);
             } else {
+                codeArea.setForeground(Color.BLACK);
                 codeArea.setText("--Select a Basic Block--");
+                codeArea.setBackground(Color.WHITE);
             }
 
             codeArea.setEditable(false);

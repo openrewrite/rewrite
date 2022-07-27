@@ -332,7 +332,7 @@ public abstract class ControlFlowNode {
     }
 
     @NoArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
-    static class Start extends ControlFlowNode {
+    public static class Start extends ControlFlowNode {
         private ControlFlowNode successor = null;
 
         @Override
@@ -355,7 +355,7 @@ public abstract class ControlFlowNode {
     }
 
     @NoArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
-    static class End extends ControlFlowNode {
+    public static class End extends ControlFlowNode {
 
         @Override
         Set<ControlFlowNode> getSuccessors() {

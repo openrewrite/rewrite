@@ -1,41 +1,73 @@
+graph {
+    fill-color: black;
+}
+
+edge {
+    fill-color: grey;
+    /*size: 5px;*/
+    arrow-size: 20px, 5px;
+    arrow-shape: arrow;
+}
+
+node {
+    text-offset: 10px;
+}
+
 node.BasicBlock {
     fill-color: #f0f0f0;
     text-color: blue;
     text-size: 15;
     shape: box;
-    size: 50px;
+    size-mode: fit;
 }
 
 node.ConditionNode {
     fill-color: #f0f0f0;
     text-color: blue;
     text-size: 15;
-    shape: circle;
-    size: 50px;
+    shape: diamond;
+    size-mode: fit;
+    text-offset: 20px;
+    text-alignment: center;
 }
 
-node.StartEnd {
+node.Start {
+    fill-color: #f0f0f0;
+    text-color: blue;
+    text-size: 15px;
+    shape: circle;
+    size: 75px;
+}
+
+node.End {
     fill-color: #f0f0f0;
     text-color: blue;
     text-size: 15px;
     shape: cross;
-    size: 50px;
+    size: 75px;
 }
 
 edge.BranchTrue {
-    fill-color: #14d914;
-    text-color: #7c8000;
-    text-size: 15px;
+    fill-color: #f2fa03;
+    text-size: 20;
+    text-style: bold;
+
 }
 
 edge.BranchFalse {
-    fill-color: #c9a6a6;
-    text-color: red;
-    text-size: 15;
+    fill-color: #ef3636;
+    text-size: 20;
+    text-style: bold;
 }
 
-sprite {
-    fill-mode: none;
-    text-size:12;
-    size-mode: fit;
+sprite.TrueLabel {
+    text-color: #f2fa03;
+    text-size: 20;
+    text-style: bold;
+}
+
+sprite.FalseLabel {
+    text-color: #ef3636;
+    text-size: 20;
+    text-style: bold;
 }

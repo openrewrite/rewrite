@@ -7,6 +7,7 @@ import org.graphstream.graph.Edge;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
+import org.graphstream.ui.spriteManager.Sprite;
 import org.graphstream.ui.spriteManager.SpriteManager;
 
 import java.util.HashMap;
@@ -31,7 +32,6 @@ public class ControlFlowGraph {
 
     public Graph loadGraph() {
         Graph graph = new SingleGraph("CFG");
-        SpriteManager sman = new SpriteManager(graph);
 
 
         String cssUrl;
@@ -46,7 +46,18 @@ public class ControlFlowGraph {
         else return getCollapsedGraph(graph);
     }
 
+    private void addSpriteToEdge (SpriteManager sman, String edgeIdentified, String spriteClass, String label, double dist) {
+        Sprite trueSuccessorSprite = sman.addSprite(edgeIdentified + "label-sprite");
+        trueSuccessorSprite.attachToEdge(edgeIdentified);
+        trueSuccessorSprite.setPosition(0.5, dist, 0);
+        trueSuccessorSprite.setAttribute("ui.class", spriteClass);
+        trueSuccessorSprite.setAttribute("ui.label", label);
+    }
+
     public Graph getCollapsedGraph(Graph graph) {
+
+        SpriteManager sman = new SpriteManager(graph);
+
         for (ControlFlowNode node : nodeToIndex.keySet()) {
             if (node instanceof ControlFlowNode.BasicBlock) {
 
@@ -56,23 +67,6 @@ public class ControlFlowGraph {
                 n.setAttribute("ui.label", basicBlock.getStatementsWithinBlock());
                 abstractNodeToVisualNode.put(n, node);
 
-
-//                Sprite s1 = sman.addSprite("S1" + nodeToIndex.get(node));
-//                s1.setAttribute("ui.class", "BasicBlock");
-//                s1.setAttribute("ui.label", basicBlock.getStatementsWithinBlock());
-//                s1.attachToNode(String.valueOf(nodeToIndex.get(node)));
-//
-//                try {
-//                    for (int lineNumber = 0; (line = bufReader.readLine()) != null; lineNumber++) {
-//                        Sprite s1 = sman.addSprite("S1" + line + nodeToIndex.get(node));
-//                        s1.setAttribute("ui.label", line);
-//                        s1.setPosition(lineNumber);
-//                        s1.attachToNode(String.valueOf(nodeToIndex.get(node)));
-//                    }
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-
             } else if (node instanceof ControlFlowNode.ConditionNode) {
                 ControlFlowNode.ConditionNode conditionNode = (ControlFlowNode.ConditionNode) node;
                 Node n = graph.addNode(String.valueOf(nodeToIndex.get(node)));
@@ -80,9 +74,14 @@ public class ControlFlowGraph {
 //                n.setAttribute("ui.label", nodeToIndex.get(node));
                 n.setAttribute("ui.label", conditionNode.getCondition());
                 abstractNodeToVisualNode.put(n, node);
+            } else if (node instanceof ControlFlowNode.Start) {
+                Node n = graph.addNode(String.valueOf(nodeToIndex.get(node)));
+                n.setAttribute("ui.class", "Start");
+                n.setAttribute("ui.label", node.toString());
+                abstractNodeToVisualNode.put(n, node);
             } else {
                 Node n = graph.addNode(String.valueOf(nodeToIndex.get(node)));
-                n.setAttribute("ui.class", "StartEnd");
+                n.setAttribute("ui.class", "End");
                 n.setAttribute("ui.label", node.toString());
                 abstractNodeToVisualNode.put(n, node);
             }
@@ -93,13 +92,17 @@ public class ControlFlowGraph {
                 ControlFlowNode.ConditionNode conditionNode = (ControlFlowNode.ConditionNode) node;
                 ControlFlowNode trueSuccessor = conditionNode.getTruthySuccessor();
                 ControlFlowNode falseSuccessor = conditionNode.getFalsySuccessor();
-                Edge trueEdge = graph.addEdge(nodeToIndex.get(node) + "->" + nodeToIndex.get(trueSuccessor), String.valueOf(nodeToIndex.get(node)), String.valueOf(nodeToIndex.get(trueSuccessor)), true);
-                trueEdge.setAttribute("ui.class", "BranchTrue");
-                trueEdge.setAttribute("ui.label", "True");
 
-                Edge falseEdge = graph.addEdge(nodeToIndex.get(node) + "->" + nodeToIndex.get(falseSuccessor), String.valueOf(nodeToIndex.get(node)), String.valueOf(nodeToIndex.get(falseSuccessor)), true);
+                String trueEdgeId = nodeToIndex.get(node) + "->" + nodeToIndex.get(trueSuccessor);
+                Edge trueEdge = graph.addEdge(trueEdgeId,String.valueOf(nodeToIndex.get(node)), String.valueOf(nodeToIndex.get(trueSuccessor)), true);
+                trueEdge.setAttribute("ui.class", "BranchTrue");
+                addSpriteToEdge(sman, trueEdgeId, "TrueLabel", "True", -0.1);
+
+
+                String falseEdgeId = nodeToIndex.get(node) + "->" + nodeToIndex.get(falseSuccessor);
+                Edge falseEdge = graph.addEdge(falseEdgeId, String.valueOf(nodeToIndex.get(node)), String.valueOf(nodeToIndex.get(falseSuccessor)), true);
                 falseEdge.setAttribute("ui.class", "BranchFalse");
-                falseEdge.setAttribute("ui.label", "False");
+                addSpriteToEdge(sman, falseEdgeId, "FalseLabel", "False", 0.1);
             } else {
                 for (ControlFlowNode successor : node.getSuccessors()) {
                     graph.addEdge(nodeToIndex.get(node) + "->" + nodeToIndex.get(successor), String.valueOf(nodeToIndex.get(node)), String.valueOf(nodeToIndex.get(successor)), true);
@@ -133,10 +136,16 @@ public class ControlFlowGraph {
                 n.setAttribute("ui.class", "ConditionNode");
                 n.setAttribute("ui.label", conditionNode.getCondition());
                 abstractNodeToVisualNode.put(n, node);
+            } else if (node instanceof ControlFlowNode.Start) { // start/end nodes
+                Node n = graph.addNode(String.valueOf(nodeToIndex.get(node)) + "-0");
+                n.setAttribute("ui.class", "Start");
+                n.setAttribute("ui.label", node.toString());
+                abstractNodeToVisualNode.put(n, node);
             } else {
                 Node n = graph.addNode(String.valueOf(nodeToIndex.get(node)) + "-0");
-                n.setAttribute("ui.class", "StartEnd");
+                n.setAttribute("ui.class", "End");
                 n.setAttribute("ui.label", node.toString());
+                System.out.println("Got here");
                 abstractNodeToVisualNode.put(n, node);
             }
         }

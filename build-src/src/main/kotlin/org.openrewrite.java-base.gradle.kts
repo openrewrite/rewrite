@@ -10,6 +10,10 @@ plugins {
     id("org.gradle.test-retry")
 }
 
+repositories {
+    maven (url = uri("https://jitpack.io"))
+}
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(17))

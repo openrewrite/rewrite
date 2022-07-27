@@ -170,6 +170,71 @@ interface ControlFlowTest : RewriteTest {
     }
 
     @Test
+    fun `display control flow graph for single large basic block`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract int start();
+                void test() {
+                    int x = start();
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    x++;
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract int start();
+                void test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                    int x = start();
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    System.out.println(x);
+                    x++;
+                }
+            }
+            """
+        )
+    )
+    @Test
     fun `display control flow graph for single basic block`() = rewriteRun(
         java(
             """
