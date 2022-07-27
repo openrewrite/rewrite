@@ -38,12 +38,12 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.recipeDescriptor
 public class ClasspathScanningLoader implements ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(ClasspathScanningLoader.class);
 
-    private final List<Recipe> recipes = new ArrayList<>();
-    private final List<NamedStyles> styles = new ArrayList<>();
+    private final /*~~>*/List<Recipe> recipes = new ArrayList<>();
+    private final /*~~>*/List<NamedStyles> styles = new ArrayList<>();
 
-    private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
-    private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
-    private final List<RecipeExample> recipeExamples = new ArrayList<>();
+    private final /*~~>*/List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
+    private final /*~~>*/List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
+    private final /*~~>*/List<RecipeExample> recipeExamples = new ArrayList<>();
 
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
@@ -94,7 +94,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      */
     private void scanYaml(ClassGraph classGraph, Properties properties, @Nullable ClassLoader classLoader) {
         try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
-            List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
+            /*~~>*/List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
                 yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader));

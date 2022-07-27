@@ -42,7 +42,7 @@ import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.Tree.randomId;
 
 public interface RecipeScheduler {
-    default <T> List<T> mapAsync(List<T> input, UnaryOperator<T> mapFn) {
+    default <T> /*~~>*/List<T> mapAsync(/*~~>*/List<T> input, UnaryOperator<T> mapFn) {
         @SuppressWarnings("unchecked") CompletableFuture<T>[] futures =
                 new CompletableFuture[input.size()];
 
@@ -56,8 +56,8 @@ public interface RecipeScheduler {
         return ListUtils.map(input, (j, in) -> futures[j].join());
     }
 
-    default List<Result> scheduleRun(Recipe recipe,
-                                     List<? extends SourceFile> before,
+    default /*~~>*/List<Result> scheduleRun(Recipe recipe,
+                                     /*~~>*/List<? extends SourceFile> before,
                                      ExecutionContext ctx,
                                      int maxCycles,
                                      int minCycles) {
@@ -77,8 +77,8 @@ public interface RecipeScheduler {
                 .record(before.size());
 
         Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile = new HashMap<>();
-        List<? extends SourceFile> acc = before;
-        List<? extends SourceFile> after = acc;
+        /*~~>*/List<? extends SourceFile> acc = before;
+        /*~~>*/List<? extends SourceFile> after = acc;
 
         WatchableExecutionContext ctxWithWatch = new WatchableExecutionContext(ctx);
         for (int i = 0; i < maxCycles; i++) {
@@ -102,7 +102,7 @@ public interface RecipeScheduler {
             sourceFileIdentities.put(sourceFile.getId(), sourceFile);
         }
 
-        List<Result> results = new ArrayList<>();
+        /*~~>*/List<Result> results = new ArrayList<>();
 
         // added or changed files
         for (SourceFile s : after) {
@@ -168,8 +168,8 @@ public interface RecipeScheduler {
         return results;
     }
 
-    default <S extends SourceFile> List<S> scheduleVisit(Stack<Recipe> recipeStack,
-                                                         List<S> before,
+    default <S extends SourceFile> /*~~>*/List<S> scheduleVisit(Stack<Recipe> recipeStack,
+                                                         /*~~>*/List<S> before,
                                                          ExecutionContext ctx,
                                                          Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile) {
         long startTime = System.nanoTime();
@@ -205,7 +205,7 @@ public interface RecipeScheduler {
         }
 
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
-        List<S> after = !recipe.validate(ctx).isValid() ?
+        /*~~>*/List<S> after = !recipe.validate(ctx).isValid() ?
                 before :
                 mapAsync(before, s -> {
                     Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", recipe.getDisplayName());
@@ -281,7 +281,7 @@ public interface RecipeScheduler {
                     }
 
                     if (afterFile != null && afterFile != s) {
-                        List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
+                        /*~~>*/List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
                         recipeStackList.add(recipeStack);
                         afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
                                 new RecipesThatMadeChanges(randomId(), recipeStackList),
@@ -303,10 +303,10 @@ public interface RecipeScheduler {
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).
 
-        List<SourceFile> afterWidened;
+        /*~~>*/List<SourceFile> afterWidened;
         try {
             //noinspection unchecked
-            afterWidened = recipe.visit((List<SourceFile>) after, ctx);
+            afterWidened = recipe.visit((/*~~>*/List<SourceFile>) after, ctx);
         } catch (Throwable t) {
             ctx.getOnError().accept(t);
             return before;
@@ -323,7 +323,7 @@ public interface RecipeScheduler {
                     // a new source file generated
                     recipeThatDeletedSourceFile.put(s.getId(), recipeStack);
                 } else if (s != original) {
-                    List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
+                    /*~~>*/List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
                     recipeStackList.add(recipeStack);
                     return s.withMarkers(s.getMarkers().computeByType(
                             new RecipesThatMadeChanges(randomId(), recipeStackList),
@@ -346,7 +346,7 @@ public interface RecipeScheduler {
         for (Recipe r : recipe.getRecipeList()) {
             if (ctx.getMessage(PANIC) != null) {
                 //noinspection unchecked
-                return (List<S>) afterWidened;
+                return (/*~~>*/List<S>) afterWidened;
             }
 
             Stack<Recipe> nextStack = new Stack<>();
@@ -357,7 +357,7 @@ public interface RecipeScheduler {
         }
 
         //noinspection unchecked
-        return (List<S>) afterWidened;
+        return (/*~~>*/List<S>) afterWidened;
     }
 
     <T> CompletableFuture<T> schedule(Callable<T> fn);

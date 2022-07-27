@@ -151,7 +151,7 @@ public class GitProvenance implements Marker {
         String branch = null;
         try {
             Git git = Git.open(repository.getDirectory());
-            List<RemoteConfig> remotes = git.remoteList().call();
+            /*~~>*/List<RemoteConfig> remotes = git.remoteList().call();
             for (RemoteConfig remote : remotes) {
                 if (remoteBranch.startsWith(remote.getName()) &&
                         (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {

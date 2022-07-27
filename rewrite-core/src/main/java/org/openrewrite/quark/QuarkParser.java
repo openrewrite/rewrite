@@ -32,8 +32,8 @@ import static org.openrewrite.Tree.randomId;
 
 public class QuarkParser implements Parser<Quark> {
 
-    public static List<Quark> parseAllOtherFiles(Path rootDir, List<SourceFile> sourceFiles) throws IOException {
-        Stack<List<PathMatcher>> gitignores = new Stack<>();
+    public static /*~~>*/List<Quark> parseAllOtherFiles(Path rootDir, /*~~>*/List<SourceFile> sourceFiles) throws IOException {
+        Stack</*~~>*/List<PathMatcher>> gitignores = new Stack<>();
         parseGitignore(new File(System.getProperty("user.home") + "/.gitignore"), gitignores);
 
         Set<Path> sourceFilePaths = new HashSet<>();
@@ -41,7 +41,7 @@ public class QuarkParser implements Parser<Quark> {
             sourceFilePaths.add(sourceFile.getSourcePath());
         }
 
-        List<Path> quarks = new ArrayList<>();
+        /*~~>*/List<Path> quarks = new ArrayList<>();
         Files.walkFileTree(rootDir, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
@@ -71,7 +71,7 @@ public class QuarkParser implements Parser<Quark> {
             }
 
             private boolean isIgnored(Path path) {
-                for (List<PathMatcher> gitignore : gitignores) {
+                for (/*~~>*/List<PathMatcher> gitignore : gitignores) {
                     for (PathMatcher gitignoreLine : gitignore) {
                         if (gitignoreLine.matches(path)) {
                             return true;
@@ -84,11 +84,11 @@ public class QuarkParser implements Parser<Quark> {
         return new QuarkParser().parse(quarks, rootDir, new InMemoryExecutionContext());
     }
 
-    private static void parseGitignore(File gitignore, Stack<List<PathMatcher>> gitignores) throws IOException {
+    private static void parseGitignore(File gitignore, Stack</*~~>*/List<PathMatcher>> gitignores) throws IOException {
         if (gitignore.exists()) {
             try (FileInputStream fis = new FileInputStream(gitignore);
                  BufferedReader reader = new BufferedReader(new InputStreamReader(fis))) {
-                List<PathMatcher> gitignorePaths = new ArrayList<>();
+                /*~~>*/List<PathMatcher> gitignorePaths = new ArrayList<>();
                 String line;
                 while ((line = reader.readLine()) != null) {
                     if (!line.trim().startsWith("#") && !StringUtils.isBlank(line)) {
@@ -102,9 +102,9 @@ public class QuarkParser implements Parser<Quark> {
     }
 
     @Override
-    public List<Quark> parseInputs(Iterable<Parser.Input> sources, @Nullable Path relativeTo,
+    public /*~~>*/List<Quark> parseInputs(Iterable<Parser.Input> sources, @Nullable Path relativeTo,
                                    ExecutionContext ctx) {
-        List<Quark> quarks = new ArrayList<>();
+        /*~~>*/List<Quark> quarks = new ArrayList<>();
         for (Parser.Input source : sources) {
             quarks.add(new Quark(randomId(),
                     relativeTo == null ?

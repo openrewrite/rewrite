@@ -35,8 +35,8 @@ import static org.openrewrite.Tree.randomId;
  */
 public class BinaryParser implements Parser<Binary> {
     @Override
-    public List<Binary> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        List<Binary> plainTexts = new ArrayList<>();
+    public /*~~>*/List<Binary> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+        /*~~>*/List<Binary> plainTexts = new ArrayList<>();
         for (Input source : sources) {
             plainTexts.add(new Binary(randomId(),
                     relativeTo == null ?

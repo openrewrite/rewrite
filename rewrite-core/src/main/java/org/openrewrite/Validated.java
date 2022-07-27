@@ -33,7 +33,7 @@ public interface Validated extends Iterable<Validated> {
         return !isValid();
     }
 
-    default List<Invalid> failures() {
+    default /*~~>*/List<Invalid> failures() {
         return stream(spliterator(), false)
                 .filter(Validated::isInvalid)
                 .map(v -> (Invalid) v)

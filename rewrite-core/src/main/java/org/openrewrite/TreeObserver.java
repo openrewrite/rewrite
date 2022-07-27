@@ -33,7 +33,7 @@ public interface TreeObserver {
 
     final class Subscription {
         private final TreeObserver observer;
-        private final List<Predicate<Tree>> predicates = new ArrayList<>();
+        private final /*~~>*/List<Predicate<Tree>> predicates = new ArrayList<>();
 
         public Subscription(TreeObserver observer) {
             this.observer = observer;

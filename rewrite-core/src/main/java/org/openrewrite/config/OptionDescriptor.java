@@ -41,7 +41,7 @@ public class OptionDescriptor {
     String example;
 
     @Nullable
-    List<String> valid;
+    /*~~>*/List<String> valid;
 
     boolean required;
 

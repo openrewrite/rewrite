@@ -34,7 +34,7 @@ public class Environment {
     private final Collection<? extends ResourceLoader> resourceLoaders;
 
     public Collection<Recipe> listRecipes() {
-        List<Recipe> recipes = resourceLoaders.stream()
+        /*~~>*/List<Recipe> recipes = resourceLoaders.stream()
                 .flatMap(r -> r.listRecipes().stream())
                 .collect(toList());
         for (Recipe recipe : recipes) {
@@ -66,7 +66,7 @@ public class Environment {
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
         Recipe root = new CompositeRecipe();
         Collection<Recipe> recipes = listRecipes();
-        List<String> recipesNotFound = new ArrayList<>();
+        /*~~>*/List<String> recipesNotFound = new ArrayList<>();
         for (String activeRecipe : activeRecipes) {
             boolean foundRecipe = false;
             for (Recipe recipe : recipes) {
@@ -100,15 +100,15 @@ public class Environment {
     /**
      * @return A list of validations of style names that could be activated.
      */
-    public List<NamedStyles> listStyles() {
+    public /*~~>*/List<NamedStyles> listStyles() {
         return resourceLoaders.stream()
                 .flatMap(r -> r.listStyles().stream())
                 .collect(toList());
     }
 
-    public List<NamedStyles> activateStyles(Iterable<String> activeStyles) {
-        List<NamedStyles> activated = new ArrayList<>();
-        List<NamedStyles> styles = listStyles();
+    public /*~~>*/List<NamedStyles> activateStyles(Iterable<String> activeStyles) {
+        /*~~>*/List<NamedStyles> activated = new ArrayList<>();
+        /*~~>*/List<NamedStyles> styles = listStyles();
         for (String activeStyle : activeStyles) {
             for (NamedStyles style : styles) {
                 if (style.getName().equals(activeStyle)) {
@@ -119,7 +119,7 @@ public class Environment {
         return activated;
     }
 
-    public List<NamedStyles> activateStyles(String... activeStyles) {
+    public /*~~>*/List<NamedStyles> activateStyles(String... activeStyles) {
         return activateStyles(Arrays.asList(activeStyles));
     }
 

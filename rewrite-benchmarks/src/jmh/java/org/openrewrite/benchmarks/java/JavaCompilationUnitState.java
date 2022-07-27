@@ -29,14 +29,14 @@ import java.util.List;
 
 @State(Scope.Benchmark)
 public class JavaCompilationUnitState {
-    List<J.CompilationUnit> sourceFiles;
+    /*~~>*/List<J.CompilationUnit> sourceFiles;
 
     @Setup(Level.Trial)
     public void setup() throws URISyntaxException {
         Path rewriteRoot = Paths.get(ChangeTypeBenchmark.class.getResource("./")
                 .toURI()).resolve("../../../../../../../../").normalize();
 
-        List<Path> inputs = Arrays.asList(
+        /*~~>*/List<Path> inputs = Arrays.asList(
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/lang/Nullable.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/lang/NullUtils.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/MetricsHelper.java"),
@@ -80,7 +80,7 @@ public class JavaCompilationUnitState {
         hole.consume(sourceFiles.size());
     }
 
-    public List<J.CompilationUnit> getSourceFiles() {
+    public /*~~>*/List<J.CompilationUnit> getSourceFiles() {
         return sourceFiles;
     }
 }

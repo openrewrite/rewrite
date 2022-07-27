@@ -38,7 +38,7 @@ public class EncodingDetectingInputStreamTest {
 
     @Test
     void isUtf8() {
-        List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
+        /*~~>*/List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
         for (String accent : accents) {
             assertThat(read(accent, UTF_8).getCharset()).isEqualTo(UTF_8);
         }
@@ -46,7 +46,7 @@ public class EncodingDetectingInputStreamTest {
 
     @Test
     void isWindows1252() {
-        List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
+        /*~~>*/List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
         for (String accent : accents) {
             assertThat(read(accent, WINDOWS_1252).getCharset()).isEqualTo(WINDOWS_1252);
         }

@@ -119,7 +119,7 @@ public class UpgradePluginVersion extends Recipe {
         };
     }
 
-    public static List<String> availablePluginVersions(String pluginId, ExecutionContext ctx) {
+    public static /*~~>*/List<String> availablePluginVersions(String pluginId, ExecutionContext ctx) {
         String uri = "https://plugins.gradle.org/plugin/" + pluginId;
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
 
@@ -128,7 +128,7 @@ public class UpgradePluginVersion extends Recipe {
                 @Language("xml")
                 String responseBody = StringUtils.readFully(response.getBody());
 
-                List<String> versions = new ArrayList<>();
+                /*~~>*/List<String> versions = new ArrayList<>();
                 Matcher matcher = Pattern.compile("href=\"/plugin/" + pluginId + "/([^\"]+)\"").matcher(responseBody);
                 int lastFind = 0;
                 while (matcher.find(lastFind)) {

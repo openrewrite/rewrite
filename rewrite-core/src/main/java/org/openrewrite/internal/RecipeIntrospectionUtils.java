@@ -77,7 +77,7 @@ public class RecipeIntrospectionUtils {
     }
 
     public static RecipeDescriptor recipeDescriptorFromDeclarativeRecipe(DeclarativeRecipe recipe, URI source) {
-        List<RecipeDescriptor> recipeList = new ArrayList<>();
+        /*~~>*/List<RecipeDescriptor> recipeList = new ArrayList<>();
         for (Recipe childRecipe : recipe.getRecipeList()) {
             recipeList.add(recipeDescriptorFromRecipe(childRecipe));
         }
@@ -118,8 +118,8 @@ public class RecipeIntrospectionUtils {
     }
 
     public static RecipeDescriptor recipeDescriptorFromRecipe(Recipe recipe) {
-        List<OptionDescriptor> options = getOptionsDescriptors(recipe);
-        List<RecipeDescriptor> recipeList = new ArrayList<>();
+        /*~~>*/List<OptionDescriptor> options = getOptionsDescriptors(recipe);
+        /*~~>*/List<RecipeDescriptor> recipeList = new ArrayList<>();
         for (Recipe next : recipe.getRecipeList()) {
             recipeList.add(recipeDescriptorFromRecipe(next));
         }
@@ -154,7 +154,7 @@ public class RecipeIntrospectionUtils {
                 } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
                     throw new RuntimeException(e);
                 }
-            } else if (List.class.isAssignableFrom(param.getType())) {
+            } else if (/*~~>*/List.class.isAssignableFrom(param.getType())) {
                 constructorArgs[i] = emptyList();
             } else {
                 constructorArgs[i] = null;
@@ -169,8 +169,8 @@ public class RecipeIntrospectionUtils {
         }
     }
 
-    private static List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
-        List<OptionDescriptor> options = new ArrayList<>();
+    private static /*~~>*/List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
+        /*~~>*/List<OptionDescriptor> options = new ArrayList<>();
 
         for (Field field : recipeClass.getDeclaredFields()) {
             Option option = field.getAnnotation(Option.class);
@@ -188,8 +188,8 @@ public class RecipeIntrospectionUtils {
         return options;
     }
 
-    private static List<OptionDescriptor> getOptionsDescriptors(Recipe recipe) {
-        List<OptionDescriptor> options = new ArrayList<>();
+    private static /*~~>*/List<OptionDescriptor> getOptionsDescriptors(Recipe recipe) {
+        /*~~>*/List<OptionDescriptor> options = new ArrayList<>();
 
         for (Field field : recipe.getClass().getDeclaredFields()) {
             field.setAccessible(true);

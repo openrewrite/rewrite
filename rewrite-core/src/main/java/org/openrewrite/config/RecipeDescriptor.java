@@ -41,13 +41,13 @@ public class RecipeDescriptor {
     Duration estimatedEffortPerOccurrence;
 
     @EqualsAndHashCode.Include
-    List<OptionDescriptor> options;
+    /*~~>*/List<OptionDescriptor> options;
 
     @Deprecated
-    List<String> languages;
+    /*~~>*/List<String> languages;
 
     @With
-    List<RecipeDescriptor> recipeList;
+    /*~~>*/List<RecipeDescriptor> recipeList;
 
     URI source;
 }

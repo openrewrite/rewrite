@@ -80,7 +80,7 @@ public class AppendToTextFile extends Recipe {
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+    protected /*~~>*/List<SourceFile> visit(/*~~>*/List<SourceFile> before, ExecutionContext ctx) {
         String maybeNewline = !Boolean.FALSE.equals(appendNewline) ? "\n" : "";
         return visit(before, ctx,
                 relativeFileName,
@@ -89,7 +89,7 @@ public class AppendToTextFile extends Recipe {
                 existingFileStrategy != null ? Strategy.valueOf(existingFileStrategy.toUpperCase()) : Strategy.LEAVE);
     }
 
-    private List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx,
+    private /*~~>*/List<SourceFile> visit(/*~~>*/List<SourceFile> before, ExecutionContext ctx,
             String path, String content, String preamble, Strategy strategy) {
         SourceFile sourceFile = null;
         for (SourceFile it : before) {
@@ -122,7 +122,7 @@ public class AppendToTextFile extends Recipe {
         }
     }
 
-    private List<SourceFile> replace(List<SourceFile> before, SourceFile existingFile, PlainText newFile) {
+    private /*~~>*/List<SourceFile> replace(/*~~>*/List<SourceFile> before, SourceFile existingFile, PlainText newFile) {
         final ArrayList<SourceFile> after = new ArrayList<>(before);
         after.remove(existingFile);
         after.add(newFile);

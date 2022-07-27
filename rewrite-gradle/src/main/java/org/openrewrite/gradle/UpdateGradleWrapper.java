@@ -114,11 +114,11 @@ public class UpdateGradleWrapper extends Recipe {
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+    protected /*~~>*/List<SourceFile> visit(/*~~>*/List<SourceFile> before, ExecutionContext ctx) {
         GradleWrapper gradleWrapper = validate(ctx).getValue();
         assert gradleWrapper != null;
 
-        List<SourceFile> sourceFileList = ListUtils.map(before, sourceFile -> {
+        /*~~>*/List<SourceFile> sourceFileList = ListUtils.map(before, sourceFile -> {
             if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                 PlainText gradlew = (PlainText) setExecutable(sourceFile);
                 String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"));

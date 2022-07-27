@@ -225,7 +225,7 @@ public class CategoryTree<G> {
     public Collection<CategoryTree<G>> getSubtrees() {
         synchronized (lock) {
             if (!subtrees.isEmpty() && !recipesByGroup.isEmpty()) {
-                List<CategoryTree<G>> subtreesAndCore = new ArrayList<>(subtrees);
+                /*~~>*/List<CategoryTree<G>> subtreesAndCore = new ArrayList<>(subtrees);
                 subtreesAndCore.add(syntheticCore());
                 return subtreesAndCore;
             }

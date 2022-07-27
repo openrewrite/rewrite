@@ -45,7 +45,7 @@ public class DeclarativeRecipe extends Recipe {
 
     private final URI source;
 
-    private final List<Recipe> uninitializedRecipes = new ArrayList<>();
+    private final /*~~>*/List<Recipe> uninitializedRecipes = new ArrayList<>();
 
     private final boolean causesAnotherCycle;
 

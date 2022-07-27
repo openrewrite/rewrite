@@ -165,7 +165,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     }
                     String description = (String) r.get("description");
                     Set<String> tags = Collections.emptySet();
-                    List<String> rawTags = (List<String>) r.get("tags");
+                    /*~~>*/List<String> rawTags = (/*~~>*/List<String>) r.get("tags");
                     if (rawTags != null) {
                         tags = new HashSet<>(rawTags);
                     }
@@ -177,7 +177,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     }
                     DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags,
                             estimatedEffortPerOccurrence, source, (boolean) r.getOrDefault("causesAnotherCycle", false));
-                    List<Object> recipeList = (List<Object>) r.get("recipeList");
+                    /*~~>*/List<Object> recipeList = (/*~~>*/List<Object>) r.get("recipeList");
                     if (recipeList == null) {
                         throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
                     }
@@ -239,7 +239,7 @@ public class YamlResourceLoader implements ResourceLoader {
                 internalRecipes.stream()
         ).collect(toList());
 
-        List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
+        /*~~>*/List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
         for (Recipe recipe : internalRecipes) {
             DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
             declarativeRecipe.initialize(allRecipes);
@@ -254,7 +254,7 @@ public class YamlResourceLoader implements ResourceLoader {
         return loadResources(ResourceType.Style).stream()
                 .filter(r -> r.containsKey("name"))
                 .map(s -> {
-                    List<Style> styles = new ArrayList<>();
+                    /*~~>*/List<Style> styles = new ArrayList<>();
                     String name = (String) s.get("name");
                     String displayName = (String) s.get("displayName");
                     if (displayName == null) {
@@ -262,12 +262,12 @@ public class YamlResourceLoader implements ResourceLoader {
                     }
                     String description = (String) s.get("description");
                     Set<String> tags = Collections.emptySet();
-                    List<String> rawTags = (List<String>) s.get("tags");
+                    /*~~>*/List<String> rawTags = (/*~~>*/List<String>) s.get("tags");
                     if (rawTags != null) {
                         tags = new HashSet<>(rawTags);
                     }
                     DeclarativeNamedStyles namedStyles = new DeclarativeNamedStyles(randomId(), name, displayName, description, tags, styles);
-                    List<Object> styleConfigs = (List<Object>) s.get("styleConfigs");
+                    /*~~>*/List<Object> styleConfigs = (/*~~>*/List<Object>) s.get("styleConfigs");
                     if (styleConfigs != null) {
                         for (int i = 0; i < styleConfigs.size(); i++) {
                             Object next = styleConfigs.get(i);
@@ -317,7 +317,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     String description = (String) c.get("description");
                     Set<String> tags = Collections.emptySet();
                     @SuppressWarnings("unchecked")
-                    List<String> rawTags = (List<String>) c.get("tags");
+                    /*~~>*/List<String> rawTags = (/*~~>*/List<String>) c.get("tags");
                     if (rawTags != null) {
                         tags = new HashSet<>(rawTags);
                     }

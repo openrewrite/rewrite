@@ -66,8 +66,8 @@ public class Result {
     @Nullable
     private Path relativeTo;
 
-    public List<UncaughtVisitorException> getRecipeErrors() {
-        List<UncaughtVisitorException> exceptions = new ArrayList<>();
+    public /*~~>*/List<UncaughtVisitorException> getRecipeErrors() {
+        /*~~>*/List<UncaughtVisitorException> exceptions = new ArrayList<>();
         new TreeVisitor<Tree, Integer>() {
             @Nullable
             @Override
@@ -100,8 +100,8 @@ public class Result {
      * Return a list of recipes that have made changes as a hierarchy of descriptors.
      * The method transforms the flat, stack-based representation into descriptors where children are grouped under their common parents.
      */
-    public List<RecipeDescriptor> getRecipeDescriptorsThatMadeChanges() {
-        List<RecipeDescriptor> recipesToDisplay = new ArrayList<>();
+    public /*~~>*/List<RecipeDescriptor> getRecipeDescriptorsThatMadeChanges() {
+        /*~~>*/List<RecipeDescriptor> recipesToDisplay = new ArrayList<>();
 
         for (Stack<Recipe> currentStack : recipes) {
             Recipe root;

@@ -26,5 +26,5 @@ import java.util.UUID;
 @With
 public class FileListing implements Marker {
     UUID id;
-    List<Path> files;
+    /*~~>*/List<Path> files;
 }

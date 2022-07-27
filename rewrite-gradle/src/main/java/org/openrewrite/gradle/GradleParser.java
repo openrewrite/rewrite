@@ -55,7 +55,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     }
 
     @Override
-    public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public /*~~>*/List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         Iterable<Input> gradleWrapped = StreamSupport.stream(sources.spliterator(), false)
                 .map(source ->
                         new Parser.Input(
@@ -74,7 +74,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
 
         return groovyParser.parseInputs(gradleWrapped, relativeTo, ctx).stream()
                 .map(cu -> {
-                    List<Statement> projectBody = cu.getClasses()
+                    /*~~>*/List<Statement> projectBody = cu.getClasses()
                             .get(cu.getClasses().size() - 1)
                             .getBody().getStatements();
                     J.MethodDeclaration script = (J.MethodDeclaration) projectBody.get(projectBody.size() - 1);

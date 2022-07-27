@@ -38,13 +38,13 @@ public class Markers implements Tree {
     UUID id;
 
     @With
-    List<Marker> markers;
+    /*~~>*/List<Marker> markers;
 
     public static Markers build(Collection<? extends Marker> markers) {
-        List<Marker> markerList;
-        if (markers instanceof List) {
+        /*~~>*/List<Marker> markerList;
+        if (markers instanceof /*~~>*/List) {
             //noinspection unchecked
-            markerList = (List<Marker>) markers;
+            markerList = (/*~~>*/List<Marker>) markers;
         } else {
             markerList = new ArrayList<>(markers.size());
             markerList.addAll(markers);
@@ -74,7 +74,7 @@ public class Markers implements Tree {
                 return this;
             }
         }
-        List<Marker> updatedmarker = new ArrayList<>(markers);
+        /*~~>*/List<Marker> updatedmarker = new ArrayList<>(markers);
         updatedmarker.add(marker);
         return new Markers(id, updatedmarker);
     }
@@ -89,7 +89,7 @@ public class Markers implements Tree {
      */
     public <M extends Marker> Markers computeByType(M identity, BinaryOperator<M> remappingFunction) {
         AtomicBoolean updated = new AtomicBoolean(false);
-        List<Marker> markers = ListUtils.map(this.markers, m -> {
+        /*~~>*/List<Marker> markers = ListUtils.map(/*~~>*/this.markers, m -> {
             if (m.getClass().equals(identity.getClass())) {
                 updated.set(true);
 
@@ -102,7 +102,7 @@ public class Markers implements Tree {
     }
 
     public Markers removeByType(Class<? extends Marker> type) {
-        return withMarkers(ListUtils.map(this.markers, m -> type.equals(m.getClass()) ? null : m));
+        return withMarkers(ListUtils.map(/*~~>*/this.markers, m -> type.equals(m.getClass()) ? null : m));
     }
 
     public <M extends Marker> Markers setByType(M m) {
@@ -119,7 +119,7 @@ public class Markers implements Tree {
      */
     public <M extends Marker> Markers compute(M identity, BinaryOperator<M> remappingFunction) {
         AtomicBoolean foundEqualMarker = new AtomicBoolean(false);
-        List<Marker> updatedMarkers = ListUtils.map(markers, m -> {
+        /*~~>*/List<Marker> updatedMarkers = ListUtils.map(markers, m -> {
             if (m.equals(identity)) {
                 foundEqualMarker.set(true);
                 //noinspection unchecked
@@ -147,7 +147,7 @@ public class Markers implements Tree {
         return compute(m, (m1, m2) -> m1);
     }
 
-    public <M extends Marker> List<M> findAll(Class<M> markerType) {
+    public <M extends Marker> /*~~>*/List<M> findAll(Class<M> markerType) {
         return markers.stream()
                 .filter(markerType::isInstance)
                 .map(markerType::cast)

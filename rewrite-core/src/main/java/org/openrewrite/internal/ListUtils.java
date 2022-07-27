@@ -43,12 +43,12 @@ public final class ListUtils {
      * @param <T>             The type of elements in the list.
      * @return A new list with the element inserted in an approximately ordered place.
      */
-    public static <T> List<T> insertInOrder(List<T> ls, T insert, Comparator<T> naturalOrdering) {
+    public static <T> /*~~>*/List<T> insertInOrder(/*~~>*/List<T> ls, T insert, Comparator<T> naturalOrdering) {
         if (ls == null || ls.isEmpty()) {
             return singletonList(insert);
         }
 
-        List<T> ordered = new ArrayList<>(ls);
+        /*~~>*/List<T> ordered = new ArrayList<>(ls);
         ordered.add(insert);
         ordered.sort(naturalOrdering);
 
@@ -60,7 +60,7 @@ public final class ListUtils {
             comesAfter = t;
         }
 
-        List<T> newLs = new ArrayList<>(ls);
+        /*~~>*/List<T> newLs = new ArrayList<>(ls);
         if (comesAfter == null) {
             newLs.add(0, insert);
         } else {
@@ -74,14 +74,14 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> mapLast(List<T> ls, UnaryOperator<T> mapLast) {
+    public static <T> /*~~>*/List<T> mapLast(/*~~>*/List<T> ls, UnaryOperator<T> mapLast) {
         if (ls == null || ls.isEmpty()) {
             return ls;
         }
         T last = ls.get(ls.size() - 1);
         T newLast = mapLast.apply(last);
         if (last != newLast) {
-            List<T> newLs = new ArrayList<>(ls);
+            /*~~>*/List<T> newLs = new ArrayList<>(ls);
             if (newLast == null) {
                 newLs.remove(ls.size() - 1);
             } else {
@@ -92,14 +92,14 @@ public final class ListUtils {
         return ls;
     }
 
-    public static <T> List<T> mapFirst(List<T> ls, UnaryOperator<T> mapFirst) {
+    public static <T> /*~~>*/List<T> mapFirst(/*~~>*/List<T> ls, UnaryOperator<T> mapFirst) {
         if (ls == null || ls.isEmpty()) {
             return ls;
         }
         T first = ls.iterator().next();
         T newFirst = mapFirst.apply(first);
         if (first != newFirst) {
-            List<T> newLs = new ArrayList<>(ls);
+            /*~~>*/List<T> newLs = new ArrayList<>(ls);
             if (newFirst == null) {
                 newLs.remove(0);
             } else {
@@ -110,11 +110,11 @@ public final class ListUtils {
         return ls;
     }
 
-    public static <T> List<T> map(@Nullable List<T> ls, BiFunction<Integer, T, T> map) {
+    public static <T> /*~~>*/List<T> map(@Nullable /*~~>*/List<T> ls, BiFunction<Integer, T, T> map) {
         if (ls == null || ls.isEmpty()) {
             return ls;
         }
-        List<T> newLs = ls;
+        /*~~>*/List<T> newLs = ls;
         for (int i = 0; i < ls.size(); i++) {
             T tree = ls.get(i);
             T newTree = map.apply(i, tree);
@@ -134,15 +134,15 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> map(@Nullable List<T> ls, UnaryOperator<T> map) {
+    public static <T> /*~~>*/List<T> map(@Nullable /*~~>*/List<T> ls, UnaryOperator<T> map) {
         return map(ls, (i, t) -> map.apply(t));
     }
 
-    public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, Object> flatMap) {
+    public static <T> /*~~>*/List<T> flatMap(@Nullable /*~~>*/List<T> ls, BiFunction<Integer, T, Object> flatMap) {
         if (ls == null || ls.isEmpty()) {
             return ls;
         }
-        List<T> newLs = ls;
+        /*~~>*/List<T> newLs = ls;
         int j = 0;
         for (int i = 0; i < ls.size(); i++, j++) {
             T tree = ls.get(i);
@@ -191,28 +191,28 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> flatMap(@Nullable List<T> ls, Function<T, Object> flatMap) {
+    public static <T> /*~~>*/List<T> flatMap(@Nullable /*~~>*/List<T> ls, Function<T, Object> flatMap) {
         return flatMap(ls, (i, t) -> flatMap.apply(t));
     }
 
-    public static <T> List<T> concat(@Nullable List<T> ls, @Nullable T t) {
+    public static <T> /*~~>*/List<T> concat(@Nullable /*~~>*/List<T> ls, @Nullable T t) {
         if (t == null && ls == null) {
             return emptyList();
         } else if (t == null) {
             return ls;
         }
-        List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls);
+        /*~~>*/List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls);
         newLs.add(t);
         return newLs;
     }
 
-    public static <T> List<T> concat(@Nullable T t, @Nullable List<T> ls) {
+    public static <T> /*~~>*/List<T> concat(@Nullable T t, @Nullable /*~~>*/List<T> ls) {
         if (t == null && ls == null) {
             return null;
         } else if (t == null) {
             return ls;
         }
-        List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls.size() + 1);
+        /*~~>*/List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls.size() + 1);
         newLs.add(t);
         if (ls != null) {
             newLs.addAll(ls);
@@ -220,7 +220,7 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> concatAll(@Nullable List<T> ls, @Nullable List<T> t) {
+    public static <T> /*~~>*/List<T> concatAll(@Nullable /*~~>*/List<T> ls, @Nullable /*~~>*/List<T> t) {
         if (ls == null && t == null) {
             return null;
         } else if (t == null || t.isEmpty()) {
@@ -229,13 +229,13 @@ public final class ListUtils {
             return t;
         }
 
-        List<T> newLs = new ArrayList<>(ls);
+        /*~~>*/List<T> newLs = new ArrayList<>(ls);
         newLs.addAll(t);
 
         return newLs;
     }
 
-    public static <T> List<T> insertAll(@Nullable List<T> ls, int index, @Nullable List<T> t) {
+    public static <T> /*~~>*/List<T> insertAll(@Nullable /*~~>*/List<T> ls, int index, @Nullable /*~~>*/List<T> t) {
         if (ls == null && t == null) {
             return emptyList();
         } else if (t == null || t.isEmpty()) {
@@ -244,14 +244,14 @@ public final class ListUtils {
             return t;
         }
 
-        List<T> newLs = new ArrayList<>(ls);
+        /*~~>*/List<T> newLs = new ArrayList<>(ls);
         newLs.addAll(index, t);
 
         return newLs;
     }
 
     @Nullable
-    public static <T> List<T> nullIfEmpty(List<T> ls) {
+    public static <T> /*~~>*/List<T> nullIfEmpty(/*~~>*/List<T> ls) {
         return ls == null || ls.isEmpty() ? null : ls;
     }
 }

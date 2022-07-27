@@ -39,7 +39,7 @@ import java.util.stream.StreamSupport;
 import static java.util.stream.Collectors.toList;
 
 public interface Parser<S extends SourceFile> {
-    default List<S> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    default /*~~>*/List<S> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return parseInputs(StreamSupport
                         .stream(sourceFiles.spliterator(), false)
                         .map(sourceFile -> new Input(sourceFile, () -> {
@@ -56,11 +56,11 @@ public interface Parser<S extends SourceFile> {
         );
     }
 
-    default List<S> parse(String... sources) {
+    default /*~~>*/List<S> parse(String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
-    default List<S> parse(ExecutionContext ctx, String... sources) {
+    default /*~~>*/List<S> parse(ExecutionContext ctx, String... sources) {
         return parseInputs(
                 Arrays.stream(sources).map(source ->
                         new Input(
@@ -81,7 +81,7 @@ public interface Parser<S extends SourceFile> {
      * @param ctx        The execution context
      * @return A list of {@link SourceFile}.
      */
-    List<S> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx);
+    /*~~>*/List<S> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx);
 
     boolean accept(Path path);
 
@@ -89,7 +89,7 @@ public interface Parser<S extends SourceFile> {
         return input.isSynthetic() || accept(input.getPath());
     }
 
-    default List<Input> acceptedInputs(Iterable<Input> input) {
+    default /*~~>*/List<Input> acceptedInputs(Iterable<Input> input) {
         return StreamSupport.stream(input.spliterator(), false)
                 .filter(this::accept)
                 .collect(toList());
@@ -153,7 +153,7 @@ public interface Parser<S extends SourceFile> {
             );
         }
 
-        public static List<Input> fromResource(String resource, String delimiter) {
+        public static /*~~>*/List<Input> fromResource(String resource, String delimiter) {
             return Arrays.stream(StringUtils.readFully(Input.class.getResourceAsStream(resource)).split(delimiter))
                     .map(source -> new Parser.Input(
                             Paths.get(Long.toString(System.nanoTime())), null,

@@ -171,8 +171,8 @@ public abstract class OperatingSystem {
         return null;
     }
 
-    public List<File> findAllInPath(String name) {
-        List<File> all = new ArrayList<>();
+    public /*~~>*/List<File> findAllInPath(String name) {
+        /*~~>*/List<File> all = new ArrayList<>();
         for (File dir : getPath()) {
             File candidate = new File(dir, name);
             if (candidate.isFile()) {
@@ -182,12 +182,12 @@ public abstract class OperatingSystem {
         return all;
     }
 
-    public List<File> getPath() {
+    public /*~~>*/List<File> getPath() {
         String path = System.getenv(getPathVar());
         if (path == null) {
             return emptyList();
         }
-        List<File> entries = new ArrayList<>();
+        /*~~>*/List<File> entries = new ArrayList<>();
         for (String entry : path.split(Pattern.quote(File.pathSeparator))) {
             entries.add(new File(entry));
         }

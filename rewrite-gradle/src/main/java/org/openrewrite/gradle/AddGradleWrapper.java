@@ -93,13 +93,13 @@ public class AddGradleWrapper extends Recipe {
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+    protected /*~~>*/List<SourceFile> visit(/*~~>*/List<SourceFile> before, ExecutionContext ctx) {
         GradleWrapper gradleWrapper = validate(ctx).getValue();
         assert gradleWrapper != null;
         return addGradleFiles(gradleWrapper, before);
     }
 
-    public static List<SourceFile> addGradleFiles(GradleWrapper gradleWrapper, List<SourceFile> before) {
+    public static /*~~>*/List<SourceFile> addGradleFiles(GradleWrapper gradleWrapper, /*~~>*/List<SourceFile> before) {
         boolean needsGradleWrapperProperties = true;
         boolean needsGradleWrapperJar = true;
         boolean needsGradleShellScript = true;
@@ -119,7 +119,7 @@ public class AddGradleWrapper extends Recipe {
             return before;
         }
 
-        List<SourceFile> gradleWrapperFiles = new ArrayList<>();
+        /*~~>*/List<SourceFile> gradleWrapperFiles = new ArrayList<>();
         ZonedDateTime now = ZonedDateTime.now();
         if (needsGradleWrapperProperties) {
             //noinspection UnusedProperty

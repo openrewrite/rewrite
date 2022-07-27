@@ -31,7 +31,7 @@ public class NullUtils {
      * <li>org.openrewrite.internal.lang.NonNullFields</li>
      * <li>org.springframework.lang.NonNullFields</li>
      */
-    private static final List<String> PACKAGE_LEVEL_NON_NULL_ANNOTATIONS = Collections.singletonList(
+    private static final /*~~>*/List<String> PACKAGE_LEVEL_NON_NULL_ANNOTATIONS = Collections.singletonList(
             "NonNullFields"
     );
 
@@ -48,7 +48,7 @@ public class NullUtils {
      * <li>org.checkerframework.checker.nullness.qual.NonNull</li>
      * <li>javax.validation.constraints.NotNull</li>
      */
-    private static List<String> FIELD_LEVEL_NON_NULL_ANNOTATIONS = Arrays.asList(
+    private static /*~~>*/List<String> FIELD_LEVEL_NON_NULL_ANNOTATIONS = Arrays.asList(
             "NonNull",
             "Nonnull",
             "NotNull"
@@ -67,7 +67,7 @@ public class NullUtils {
      * <li>org.checkerframework.checker.nullness.qual.Nullable</li>
      * <li>javax.validation.constraints.NotNull</li>
      */
-    private static List<String> FIELD_LEVEL_NULLABLE_ANNOTATIONS = Collections.singletonList(
+    private static /*~~>*/List<String> FIELD_LEVEL_NULLABLE_ANNOTATIONS = Collections.singletonList(
             "Nullable"
     );
 
@@ -80,7 +80,7 @@ public class NullUtils {
      * @param _class The class to reflect over
      * @return A list of fields marked as non-null, sorted by their name in alphabetical order.
      */
-    public static List<Field> findNonNullFields(@NonNull Class<?> _class) {
+    public static /*~~>*/List<Field> findNonNullFields(@NonNull Class<?> _class) {
 
         boolean defaultNonNull = Arrays.stream(_class.getPackage().getDeclaredAnnotations())
                 .map(a -> a.annotationType().getSimpleName())
@@ -91,7 +91,7 @@ public class NullUtils {
             return Collections.emptyList();
         }
 
-        List<Field> nonNullFields = new ArrayList<>(fields.length);
+        /*~~>*/List<Field> nonNullFields = new ArrayList<>(fields.length);
         for (Field field : fields) {
             field.setAccessible(true);
             if(fieldHasNonNullableAnnotation(field) ||

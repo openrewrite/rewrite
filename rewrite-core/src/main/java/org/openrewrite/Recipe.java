@@ -68,10 +68,10 @@ public abstract class Recipe {
     };
 
     @Getter
-    private final transient List<TreeVisitor<?, ExecutionContext>> singleSourceApplicableTests = new ArrayList<>();
+    private final transient /*~~>*/List<TreeVisitor<?, ExecutionContext>> singleSourceApplicableTests = new ArrayList<>();
 
     @Getter
-    private final transient List<TreeVisitor<?, ExecutionContext>> applicableTests = new ArrayList<>();
+    private final transient /*~~>*/List<TreeVisitor<?, ExecutionContext>> applicableTests = new ArrayList<>();
 
     public static Recipe noop() {
         return new Noop();
@@ -145,7 +145,7 @@ public abstract class Recipe {
      * @deprecated
      */
     @Deprecated
-    public List<String> getLanguages() {
+    public /*~~>*/List<String> getLanguages() {
         return emptyList();
     }
 
@@ -162,7 +162,7 @@ public abstract class Recipe {
     }
 
     @JsonIgnore
-    private final List<Recipe> recipeList = new CopyOnWriteArrayList<>();
+    private final /*~~>*/List<Recipe> recipeList = new CopyOnWriteArrayList<>();
 
     /**
      * @param recipe {@link Recipe} to add to this recipe's pipeline.
@@ -173,7 +173,7 @@ public abstract class Recipe {
         return this;
     }
 
-    public List<Recipe> getRecipeList() {
+    public /*~~>*/List<Recipe> getRecipeList() {
         return recipeList;
     }
 
@@ -216,7 +216,7 @@ public abstract class Recipe {
      */
     @SuppressWarnings("unused")
     public Recipe addApplicableTest(TreeVisitor<?, ExecutionContext> test) {
-        this.applicableTests.add(test);
+        /*~~>*/this.applicableTests.add(test);
         return this;
     }
 
@@ -250,7 +250,7 @@ public abstract class Recipe {
      * @return A tree visitor that performs an applicability test.
      */
     public Recipe addSingleSourceApplicableTest(TreeVisitor<?, ExecutionContext> test) {
-        this.singleSourceApplicableTests.add(test);
+        /*~~>*/this.singleSourceApplicableTests.add(test);
         return this;
     }
 
@@ -262,24 +262,24 @@ public abstract class Recipe {
      * @return A set of source files, with some files potentially added/deleted/modified.
      */
     @SuppressWarnings("unused")
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+    protected /*~~>*/List<SourceFile> visit(/*~~>*/List<SourceFile> before, ExecutionContext ctx) {
         return before;
     }
 
-    public final List<Result> run(List<? extends SourceFile> before) {
+    public final /*~~>*/List<Result> run(/*~~>*/List<? extends SourceFile> before) {
         return run(before, new InMemoryExecutionContext());
     }
 
-    public final List<Result> run(List<? extends SourceFile> before, ExecutionContext ctx) {
+    public final /*~~>*/List<Result> run(/*~~>*/List<? extends SourceFile> before, ExecutionContext ctx) {
         return run(before, ctx, 3);
     }
 
-    public final List<Result> run(List<? extends SourceFile> before, ExecutionContext ctx, int maxCycles) {
+    public final /*~~>*/List<Result> run(/*~~>*/List<? extends SourceFile> before, ExecutionContext ctx, int maxCycles) {
         return run(before, ctx, ForkJoinScheduler.common(), maxCycles, 1);
     }
 
     @Incubating(since = "7.3.0")
-    public final List<Result> run(List<? extends SourceFile> before,
+    public final /*~~>*/List<Result> run(/*~~>*/List<? extends SourceFile> before,
                                   ExecutionContext ctx,
                                   RecipeScheduler recipeScheduler,
                                   int maxCycles,
@@ -305,7 +305,7 @@ public abstract class Recipe {
      */
     public Validated validate() {
         Validated validated = Validated.none();
-        List<Field> requiredFields = NullUtils.findNonNullFields(this.getClass());
+        /*~~>*/List<Field> requiredFields = NullUtils.findNonNullFields(this.getClass());
         for (Field field : requiredFields) {
             try {
                 validated = validated.and(Validated.required(field.getName(), field.get(this)));
