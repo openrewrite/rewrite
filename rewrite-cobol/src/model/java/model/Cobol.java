@@ -918,6 +918,53 @@ public interface Cobol {
         String words;
     }
 
+    class Purge implements Statement {
+        CobolContainer<Name> names;
+    }
+
+    class Read implements Statement {
+        String words;
+        Name fileName;
+        String nextRecord;
+
+        @Nullable
+        ReadInto readInto;
+
+        @Nullable
+        ReadWith readWith;
+
+        @Nullable
+        ReadKey readKey;
+
+        @Nullable
+        StatementPhrase invalidKeyPhrase;
+
+        @Nullable
+        StatementPhrase notInvalidKeyPhrase;
+
+        @Nullable
+        StatementPhrase atEndPhrase;
+
+        @Nullable
+        StatementPhrase notAtEndPhrase;
+
+        String endRead;
+    }
+
+    class ReadInto implements Cobol {
+        String words;
+        Identifier identifier;
+    }
+
+    class ReadWith implements Cobol {
+        String words;
+    }
+
+    class ReadKey implements Cobol {
+        String words;
+        QualifiedDataName qualifiedDataName;
+    }
+
     class IdentificationDivision implements Cobol {
         String words;
         CobolLeftPadded<ProgramIdParagraph> programIdParagraph;

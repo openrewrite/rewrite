@@ -1575,6 +1575,53 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return performTestClause;
     }
 
+    public Cobol visitPurge(Cobol.Purge purge, PrintOutputCapture<P> p) {
+        visitSpace(purge.getPrefix(), p);
+        visitMarkers(purge.getMarkers(), p);
+        visitContainer("", purge.getPadding().getNames(), "", "", p);
+        return purge;
+    }
+
+    public Cobol visitRead(Cobol.Read read, PrintOutputCapture<P> p) {
+        visitSpace(read.getPrefix(), p);
+        visitMarkers(read.getMarkers(), p);
+        p.append(read.getWords());
+        visit(read.getFileName(), p);
+        p.append(read.getNextRecord());
+        visit(read.getReadInto(), p);
+        visit(read.getReadWith(), p);
+        visit(read.getReadKey(), p);
+        visit(read.getInvalidKeyPhrase(), p);
+        visit(read.getNotInvalidKeyPhrase(), p);
+        visit(read.getAtEndPhrase(), p);
+        visit(read.getNotAtEndPhrase(), p);
+        p.append(read.getEndRead());
+        return read;
+    }
+
+    public Cobol visitReadInto(Cobol.ReadInto readInto, PrintOutputCapture<P> p) {
+        visitSpace(readInto.getPrefix(), p);
+        visitMarkers(readInto.getMarkers(), p);
+        p.append(readInto.getWords());
+        visit(readInto.getIdentifier(), p);
+        return readInto;
+    }
+
+    public Cobol visitReadWith(Cobol.ReadWith readWith, PrintOutputCapture<P> p) {
+        visitSpace(readWith.getPrefix(), p);
+        visitMarkers(readWith.getMarkers(), p);
+        p.append(readWith.getWords());
+        return readWith;
+    }
+
+    public Cobol visitReadKey(Cobol.ReadKey readKey, PrintOutputCapture<P> p) {
+        visitSpace(readKey.getPrefix(), p);
+        visitMarkers(readKey.getMarkers(), p);
+        p.append(readKey.getWords());
+        visit(readKey.getQualifiedDataName(), p);
+        return readKey;
+    }
+
     public Cobol visitEvaluate(Cobol.Evaluate evaluate, PrintOutputCapture<P> p) {
         visitSpace(evaluate.getPrefix(), p);
         visitMarkers(evaluate.getMarkers(), p);

@@ -895,6 +895,31 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
+    public Cobol.Purge visitPurge(Cobol.Purge purge, P p) {
+        return (Cobol.Purge) super.visitPurge(purge, p);
+    }
+
+    @Override
+    public Cobol.Read visitRead(Cobol.Read read, P p) {
+        return (Cobol.Read) super.visitRead(read, p);
+    }
+
+    @Override
+    public Cobol.ReadInto visitReadInto(Cobol.ReadInto readInto, P p) {
+        return (Cobol.ReadInto) super.visitReadInto(readInto, p);
+    }
+
+    @Override
+    public Cobol.ReadWith visitReadWith(Cobol.ReadWith readWith, P p) {
+        return (Cobol.ReadWith) super.visitReadWith(readWith, p);
+    }
+
+    @Override
+    public Cobol.ReadKey visitReadKey(Cobol.ReadKey readKey, P p) {
+        return (Cobol.ReadKey) super.visitReadKey(readKey, p);
+    }
+
+    @Override
     public Cobol.Evaluate visitEvaluate(Cobol.Evaluate evaluate, P p) {
         return (Cobol.Evaluate) super.visitEvaluate(evaluate, p);
     }

@@ -1585,6 +1585,51 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return pp;
     }
 
+    public Cobol visitPurge(Cobol.Purge purge, P p) {
+        Cobol.Purge pp = purge;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.getPadding().withNames(visitContainer(pp.getPadding().getNames(), p));
+        return pp;
+    }
+
+    public Cobol visitRead(Cobol.Read read, P p) {
+        Cobol.Read r = read;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withReadInto((Cobol.ReadInto) visit(r.getReadInto(), p));
+        r = r.withReadWith((Cobol.ReadWith) visit(r.getReadWith(), p));
+        r = r.withReadKey((Cobol.ReadKey) visit(r.getReadKey(), p));
+        r = r.withInvalidKeyPhrase((Cobol.StatementPhrase) visit(r.getInvalidKeyPhrase(), p));
+        r = r.withNotInvalidKeyPhrase((Cobol.StatementPhrase) visit(r.getNotInvalidKeyPhrase(), p));
+        r = r.withAtEndPhrase((Cobol.StatementPhrase) visit(r.getAtEndPhrase(), p));
+        r = r.withNotAtEndPhrase((Cobol.StatementPhrase) visit(r.getNotAtEndPhrase(), p));
+        return r;
+    }
+
+    public Cobol visitReadInto(Cobol.ReadInto readInto, P p) {
+        Cobol.ReadInto r = readInto;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIdentifier((Cobol.Identifier) visit(r.getIdentifier(), p));
+        return r;
+    }
+
+    public Cobol visitReadWith(Cobol.ReadWith readWith, P p) {
+        Cobol.ReadWith r = readWith;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReadKey(Cobol.ReadKey readKey, P p) {
+        Cobol.ReadKey r = readKey;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withQualifiedDataName((Cobol.QualifiedDataName) visit(r.getQualifiedDataName(), p));
+        return r;
+    }
+
     public Cobol visitEvaluate(Cobol.Evaluate evaluate, P p) {
         Cobol.Evaluate e = evaluate;
         e = e.withPrefix(visitSpace(e.getPrefix(), p));

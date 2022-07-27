@@ -247,6 +247,16 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
+    fun readStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. READTEST.
+            PROCEDURE DIVISION.
+            READ SQ-FS3 END .
+        """)
+    )
+
+    @Test
     fun fileSection() = rewriteRun(
         cobol("""
                 IDENTIFICATION DIVISION.

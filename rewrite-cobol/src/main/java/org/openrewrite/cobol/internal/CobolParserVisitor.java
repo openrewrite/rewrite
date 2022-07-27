@@ -2001,6 +2001,68 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.Purge visitPurgeStatement(CobolParser.PurgeStatementContext ctx) {
+        return new Cobol.Purge(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(padLeft(ctx.PURGE()), ctx.cdName())
+        );
+    }
+
+    @Override
+    public Cobol.Read visitReadStatement(CobolParser.ReadStatementContext ctx) {
+        return new Cobol.Read(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.READ()),
+                (Name) visit(ctx.fileName()),
+                words(ctx.NEXT(), ctx.RECORD()),
+                visitNullable(ctx.readInto()),
+                visitNullable(ctx.readWith()),
+                visitNullable(ctx.readKey()),
+                visitNullable(ctx.invalidKeyPhrase()),
+                visitNullable(ctx.notInvalidKeyPhrase()),
+                visitNullable(ctx.atEndPhrase()),
+                visitNullable(ctx.notAtEndPhrase()),
+                words(ctx.END_READ())
+        );
+    }
+
+    @Override
+    public Cobol.ReadInto visitReadInto(CobolParser.ReadIntoContext ctx) {
+        return new Cobol.ReadInto(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INTO()),
+                (Cobol.Identifier) visit(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Cobol.ReadWith visitReadWith(CobolParser.ReadWithContext ctx) {
+        return new Cobol.ReadWith(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.KEPT(), ctx.NO(), ctx.LOCK(), ctx.WAIT())
+        );
+    }
+
+    @Override
+    public Cobol.ReadKey visitReadKey(CobolParser.ReadKeyContext ctx) {
+        return new Cobol.ReadKey(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.KEY(), ctx.IS()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
     public Cobol.DataDescriptionEntry visitDataDescriptionEntryFormat1(CobolParser.DataDescriptionEntryFormat1Context ctx) {
         TerminalNode level = ctx.INTEGERLITERAL() == null ? ctx.LEVEL_NUMBER_77() : ctx.INTEGERLITERAL();
         return new Cobol.DataDescriptionEntry(

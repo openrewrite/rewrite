@@ -5964,6 +5964,170 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Purge implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        CobolContainer<Name> names;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitPurge(this, p);
+        }
+
+        public List<Name> getNames() {
+            return names.getElements();
+        }
+
+        public Purge withNames(List<Name> names) {
+            return getPadding().withNames(this.names.getPadding().withElements(CobolRightPadded.withElements(
+                    this.names.getPadding().getElements(), names)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Purge t;
+
+            public CobolContainer<Name> getNames() {
+                return t.names;
+            }
+
+            public Purge withNames(CobolContainer<Name> names) {
+                return t.names == names ? t : new Purge(t.padding, t.id, t.prefix, t.markers, names);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Read implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name fileName;
+        String nextRecord;
+
+        @Nullable
+        ReadInto readInto;
+
+        @Nullable
+        ReadWith readWith;
+
+        @Nullable
+        ReadKey readKey;
+
+        @Nullable
+        StatementPhrase invalidKeyPhrase;
+
+        @Nullable
+        StatementPhrase notInvalidKeyPhrase;
+
+        @Nullable
+        StatementPhrase atEndPhrase;
+
+        @Nullable
+        StatementPhrase notAtEndPhrase;
+
+        String endRead;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRead(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReadInto implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Identifier identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReadInto(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReadWith implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReadWith(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReadKey implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReadKey(this, p);
+        }
+    }
+
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class IdentificationDivision implements Cobol {
         @Nullable
         @NonFinal
