@@ -36,6 +36,7 @@ class CreateTextFileTest : RecipeTest<PlainText> {
         val results = recipe.run(emptyList())
         assertThat(results).hasSize(1)
         assertThat(results[0].after!!.printAll()).isEqualTo("foo")
+        assertThat(results[0].after!!.sourcePath).isEqualTo(Paths.get(".github/CODEOWNERS"))
     }
 
     @Test
