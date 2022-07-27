@@ -1530,7 +1530,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
         pp = pp.withPerformTestClause((Cobol.PerformTestClause) visit(pp.getPerformTestClause(), p));
-        pp = pp.withCondition((Cobol) visit(pp.getCondition(), p));
+        pp = pp.withCondition((Cobol.Condition) visit(pp.getCondition(), p));
         return pp;
     }
 

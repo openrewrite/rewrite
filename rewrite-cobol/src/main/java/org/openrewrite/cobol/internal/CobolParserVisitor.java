@@ -1908,7 +1908,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 visitNullable(ctx.performTestClause()),
                 words(ctx.UNTIL()),
-                (Cobol) visit(ctx.condition()) // TODO: Update to Condition once available
+                (Cobol.Condition) visit(ctx.condition())
         );
     }
 

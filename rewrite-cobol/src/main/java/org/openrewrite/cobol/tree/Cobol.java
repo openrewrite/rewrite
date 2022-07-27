@@ -5782,12 +5782,12 @@ public interface Cobol extends Tree {
         PerformTestClause performTestClause;
 
         String words;
-        Cobol condition;
+        Condition condition;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitPerformUntil(this, p);
-        } //TODO: Replace with type Condition
+        }
     }
 
     @Value

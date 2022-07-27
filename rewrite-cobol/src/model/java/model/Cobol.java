@@ -881,7 +881,7 @@ public interface Cobol {
         PerformTestClause performTestClause;
 
         String words;
-        Cobol condition; //TODO: Replace with type Condition
+        Condition condition;
     }
 
     class PerformVarying implements Cobol {
