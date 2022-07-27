@@ -257,6 +257,17 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
+    fun receiveStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. MERGETEST.
+            PROCEDURE DIVISION.
+            RECEIVE CM-INQUE-1 MESSAGE INTO MSG-72
+                NO DATA.
+        """.trimIndent())
+    )
+
+    @Test
     fun fileSection() = rewriteRun(
         cobol("""
                 IDENTIFICATION DIVISION.

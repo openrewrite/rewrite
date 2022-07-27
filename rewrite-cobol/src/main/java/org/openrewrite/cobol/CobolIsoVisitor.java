@@ -1073,4 +1073,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.CobolWord visitCobolWord(Cobol.CobolWord cobolWord, P p) {
         return (Cobol.CobolWord) super.visitCobolWord(cobolWord, p);
     }
+
+    @Override
+    public Cobol.Receive visitReceive(Cobol.Receive receive, P p) {
+        return (Cobol.Receive) super.visitReceive(receive, p);
+    }
+
+    @Override
+    public Cobol.ReceiveFromStatement visitReceiveFromStatement(Cobol.ReceiveFromStatement receiveFromStatement, P p) {
+        return (Cobol.ReceiveFromStatement) super.visitReceiveFromStatement(receiveFromStatement, p);
+    }
+
+    @Override
+    public Cobol.ReceiveFrom visitReceiveFrom(Cobol.ReceiveFrom receiveFrom, P p) {
+        return (Cobol.ReceiveFrom) super.visitReceiveFrom(receiveFrom, p);
+    }
+
+    @Override
+    public Cobol.ReceiveIntoStatement visitReceiveIntoStatement(Cobol.ReceiveIntoStatement receiveIntoStatement, P p) {
+        return (Cobol.ReceiveIntoStatement) super.visitReceiveIntoStatement(receiveIntoStatement, p);
+    }
+
+    @Override
+    public Cobol.Receivable visitReceivable(Cobol.Receivable receivable, P p) {
+        return (Cobol.Receivable) super.visitReceivable(receivable, p);
+    }
 }

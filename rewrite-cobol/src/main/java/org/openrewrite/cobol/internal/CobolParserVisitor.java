@@ -2368,6 +2368,134 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.Receive visitReceiveStatement(CobolParser.ReceiveStatementContext ctx) {
+        return new Cobol.Receive(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RECEIVE()),
+                visit(ctx.receiveFromStatement(), ctx.receiveIntoStatement()),
+                visitNullable(ctx.onExceptionClause()),
+                visitNullable(ctx.notOnExceptionClause()),
+                words(ctx.END_RECEIVE())
+        );
+    }
+
+    @Override
+    public Cobol.ReceiveFromStatement visitReceiveFromStatement(CobolParser.ReceiveFromStatementContext ctx) {
+        return new Cobol.ReceiveFromStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.dataName()),
+                words(ctx.FROM()),
+                (Cobol.ReceiveFrom) visit(ctx.receiveFrom()),
+                convertAllContainer(ctx.receiveBefore(), ctx.receiveWith(), ctx.receiveThread(), ctx.receiveSize(), ctx.receiveStatus())
+        );
+    }
+
+    @Override
+    public Cobol.ReceiveFrom visitReceiveFrom(CobolParser.ReceiveFromContext ctx) {
+        return new Cobol.ReceiveFrom(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LAST(), ctx.ANY(), ctx.THREAD()),
+                visitNullable(ctx.dataName())
+        );
+    }
+
+    @Override
+    public Cobol.ReceiveIntoStatement visitReceiveIntoStatement(CobolParser.ReceiveIntoStatementContext ctx) {
+        return new Cobol.ReceiveIntoStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.cdName()),
+                words(ctx.MESSAGE(), ctx.SEGMENT(), ctx.INTO()),
+                (Identifier) visit(ctx.identifier()),
+                visitNullable(ctx.receiveNoData()),
+                visitNullable(ctx.receiveWithData())
+        );
+    }
+
+    @Override
+    public Cobol.StatementPhrase visitReceiveNoData(CobolParser.ReceiveNoDataContext ctx) {
+        return new Cobol.StatementPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.NO(), ctx.DATA()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
+    public Cobol.StatementPhrase visitReceiveWithData(CobolParser.ReceiveWithDataContext ctx) {
+        return new Cobol.StatementPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.DATA()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
+    public Cobol.Receivable visitReceiveBefore(CobolParser.ReceiveBeforeContext ctx) {
+        return new Cobol.Receivable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BEFORE(), ctx.TIME()),
+                visit(ctx.numericLiteral(), ctx.identifier())
+        );
+    }
+
+    @Override
+    public Cobol.CobolWord visitReceiveWith(CobolParser.ReceiveWithContext ctx) {
+        return new Cobol.CobolWord(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.NO(), ctx.WAIT())
+        );
+    }
+
+    @Override
+    public Cobol.Receivable visitReceiveThread(CobolParser.ReceiveThreadContext ctx) {
+        return new Cobol.Receivable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.THREAD(), ctx.IN()),
+                (Name) visit(ctx.dataName())
+        );
+    }
+
+    @Override
+    public Cobol.Receivable visitReceiveSize(CobolParser.ReceiveSizeContext ctx) {
+        return new Cobol.Receivable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SIZE(), ctx.IN()),
+                visit(ctx.numericLiteral(), ctx.identifier())
+        );
+    }
+
+    @Override
+    public Cobol.Receivable visitReceiveStatus(CobolParser.ReceiveStatusContext ctx) {
+        return new Cobol.Receivable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.STATUS(), ctx.IN()),
+                (Name) visit(ctx.identifier())
+        );
+    }
+
+    @Override
     public Object visitEnableStatement(CobolParser.EnableStatementContext ctx) {
         return new Cobol.Enable(
                 randomId(),

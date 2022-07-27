@@ -7917,6 +7917,176 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
+    class Receive implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String receive;
+        Cobol fromOrInto;
+
+        @Nullable
+        StatementPhrase onExceptionClause;
+
+        @Nullable
+        StatementPhrase notOnExceptionClause;
+
+        String endReceive;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReceive(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ReceiveFromStatement implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        CobolWord dataName;
+
+        @Getter
+        @With
+        String from;
+
+        @Getter
+        @With
+        ReceiveFrom receiveFrom;
+
+        CobolContainer<Cobol> beforeWithThreadSizeStatus;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReceiveFromStatement(this, p);
+        }
+
+        public List<Cobol> getBeforeWithThreadSizeStatus() {
+            return beforeWithThreadSizeStatus.getElements();
+        }
+
+        public ReceiveFromStatement withBeforeWithThreadSizeStatus(List<Cobol> beforeWithThreadSizeStatus) {
+            return getPadding().withBeforeWithThreadSizeStatus(this.beforeWithThreadSizeStatus.getPadding().withElements(CobolRightPadded.withElements(
+                    this.beforeWithThreadSizeStatus.getPadding().getElements(), beforeWithThreadSizeStatus)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ReceiveFromStatement t;
+
+            public CobolContainer<Cobol> getBeforeWithThreadSizeStatus() {
+                return t.beforeWithThreadSizeStatus;
+            }
+
+            public ReceiveFromStatement withBeforeWithThreadSizeStatus(CobolContainer<Cobol> beforeWithThreadSizeStatus) {
+                return t.beforeWithThreadSizeStatus == beforeWithThreadSizeStatus ? t : new ReceiveFromStatement(t.padding, t.id, t.prefix, t.markers, t.dataName, t.from, t.receiveFrom, beforeWithThreadSizeStatus);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReceiveFrom implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Nullable
+        CobolWord dataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReceiveFrom(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReceiveIntoStatement implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        CobolWord cdName;
+        String words;
+        Identifier identifier;
+
+        @Nullable
+        StatementPhrase receiveNoData;
+
+        @Nullable
+        StatementPhrase receiveWithData;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReceiveIntoStatement(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Receivable implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name value;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReceivable(this, p);
+        }
+    }
+
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     class RelationalOperator implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;

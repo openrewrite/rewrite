@@ -1894,4 +1894,51 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(cobolWord.getWord());
         return cobolWord;
     }
+
+    public Cobol visitReceive(Cobol.Receive receive, PrintOutputCapture<P> p) {
+        visitSpace(receive.getPrefix(), p);
+        visitMarkers(receive.getMarkers(), p);
+        p.append(receive.getReceive());
+        visit(receive.getFromOrInto(), p);
+        visit(receive.getOnExceptionClause(), p);
+        visit(receive.getNotOnExceptionClause(), p);
+        p.append(receive.getEndReceive());
+        return receive;
+    }
+
+    public Cobol visitReceiveFromStatement(Cobol.ReceiveFromStatement receiveFromStatement, PrintOutputCapture<P> p) {
+        visitSpace(receiveFromStatement.getPrefix(), p);
+        visitMarkers(receiveFromStatement.getMarkers(), p);
+        visit(receiveFromStatement.getDataName(), p);
+        p.append(receiveFromStatement.getFrom());
+        visit(receiveFromStatement.getReceiveFrom(), p);
+        visitContainer("", receiveFromStatement.getPadding().getBeforeWithThreadSizeStatus(), "", "", p);
+        return receiveFromStatement;
+    }
+
+    public Cobol visitReceiveFrom(Cobol.ReceiveFrom receiveFrom, PrintOutputCapture<P> p) {
+        visitSpace(receiveFrom.getPrefix(), p);
+        visitMarkers(receiveFrom.getMarkers(), p);
+        p.append(receiveFrom.getWords());
+        visit(receiveFrom.getDataName(), p);
+        return receiveFrom;
+    }
+
+    public Cobol visitReceiveIntoStatement(Cobol.ReceiveIntoStatement receiveIntoStatement, PrintOutputCapture<P> p) {
+        visitSpace(receiveIntoStatement.getPrefix(), p);
+        visitMarkers(receiveIntoStatement.getMarkers(), p);
+        visit(receiveIntoStatement.getCdName(), p);
+        p.append(receiveIntoStatement.getWords());
+        visit(receiveIntoStatement.getIdentifier(), p);
+        visit(receiveIntoStatement.getReceiveNoData(), p);
+        visit(receiveIntoStatement.getReceiveWithData(), p);
+        return receiveIntoStatement;
+    }
+
+    public Cobol visitReceivable(Cobol.Receivable receivable, PrintOutputCapture<P> p) {
+        visitSpace(receivable.getPrefix(), p);
+        visitMarkers(receivable.getMarkers(), p);
+        p.append(receivable.getWords());
+        return receivable;
+    }
 }

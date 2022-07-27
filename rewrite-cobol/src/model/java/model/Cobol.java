@@ -16,11 +16,7 @@
 package model;
 
 import org.openrewrite.cobol.tree.CobolContainer;
-import org.openrewrite.cobol.tree.CobolLeftPadded;
-import org.openrewrite.cobol.tree.CobolRightPadded;
 import org.openrewrite.internal.lang.Nullable;
-
-import java.util.List;
 
 public interface Cobol {
 

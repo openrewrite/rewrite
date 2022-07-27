@@ -1906,4 +1906,49 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         return c;
     }
+
+    public Cobol visitReceive(Cobol.Receive receive, P p) {
+        Cobol.Receive r = receive;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withFromOrInto((Cobol) visit(r.getFromOrInto(), p));
+        r = r.withOnExceptionClause((Cobol.StatementPhrase) visit(r.getOnExceptionClause(), p));
+        r = r.withNotOnExceptionClause((Cobol.StatementPhrase) visit(r.getNotOnExceptionClause(), p));
+        return r;
+    }
+
+    public Cobol visitReceiveFromStatement(Cobol.ReceiveFromStatement receiveFromStatement, P p) {
+        Cobol.ReceiveFromStatement r = receiveFromStatement;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withDataName((Cobol.CobolWord) visit(r.getDataName(), p));
+        r = r.withReceiveFrom((Cobol.ReceiveFrom) visit(r.getReceiveFrom(), p));
+        r = r.getPadding().withBeforeWithThreadSizeStatus(visitContainer(r.getPadding().getBeforeWithThreadSizeStatus(), p));
+        return r;
+    }
+
+    public Cobol visitReceiveFrom(Cobol.ReceiveFrom receiveFrom, P p) {
+        Cobol.ReceiveFrom r = receiveFrom;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withDataName((Cobol.CobolWord) visit(r.getDataName(), p));
+        return r;
+    }
+
+    public Cobol visitReceiveIntoStatement(Cobol.ReceiveIntoStatement receiveIntoStatement, P p) {
+        Cobol.ReceiveIntoStatement r = receiveIntoStatement;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withCdName((Cobol.CobolWord) visit(r.getCdName(), p));
+        r = r.withReceiveNoData((Cobol.StatementPhrase) visit(r.getReceiveNoData(), p));
+        r = r.withReceiveWithData((Cobol.StatementPhrase) visit(r.getReceiveWithData(), p));
+        return r;
+    }
+
+    public Cobol visitReceivable(Cobol.Receivable receivable, P p) {
+        Cobol.Receivable r = receivable;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
 }
