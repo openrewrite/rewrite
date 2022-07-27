@@ -1383,6 +1383,179 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitUnstringStatement(CobolParser.UnstringStatementContext ctx) {
+        return new Cobol.UnString(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.UNSTRING()),
+                (Cobol.UnstringSendingPhrase) visit(ctx.unstringSendingPhrase()),
+                (Cobol.UnstringIntoPhrase) visit(ctx.unstringIntoPhrase()),
+                visitNullable(ctx.unstringWithPointerPhrase()),
+                visitNullable(ctx.unstringTallyingPhrase()),
+                visitNullable(ctx.onOverflowPhrase()),
+                visitNullable(ctx.notOnOverflowPhrase()),
+                padLeft(ctx.END_UNSTRING())
+        );
+    }
+
+    @Override
+    public Object visitUnstringSendingPhrase(CobolParser.UnstringSendingPhraseContext ctx) {
+        return new Cobol.UnstringSendingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.Identifier) visit(ctx.identifier()),
+                visitNullable(ctx.unstringDelimitedByPhrase()),
+                convertAllContainer(ctx.unstringOrAllPhrase())
+        );
+    }
+
+    @Override
+    public Object visitUnstringDelimitedByPhrase(CobolParser.UnstringDelimitedByPhraseContext ctx) {
+        return new Cobol.UnstringDelimitedByPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DELIMITED(), ctx.BY(), ctx.ALL()),
+                visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitUnstringOrAllPhrase(CobolParser.UnstringOrAllPhraseContext ctx) {
+        return new Cobol.UnstringOrAllPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.OR(), ctx.ALL()),
+                visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitUnstringIntoPhrase(CobolParser.UnstringIntoPhraseContext ctx) {
+        return new Cobol.UnstringIntoPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INTO()),
+                convertAllContainer(ctx.unstringInto())
+        );
+    }
+
+    @Override
+    public Object visitUnstringInto(CobolParser.UnstringIntoContext ctx) {
+        return new Cobol.UnstringInto(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.Identifier) visit(ctx.identifier()),
+                visitNullable(ctx.unstringDelimiterIn()),
+                visitNullable(ctx.unstringCountIn())
+        );
+    }
+
+    @Override
+    public Object visitUnstringDelimiterIn(CobolParser.UnstringDelimiterInContext ctx) {
+        return new Cobol.UnstringDelimiterIn(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DELIMITER(), ctx.IN()),
+                (Cobol.Identifier) visit(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Object visitUnstringCountIn(CobolParser.UnstringCountInContext ctx) {
+        return new Cobol.UnstringCountIn(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.COUNT(), ctx.IN()),
+                (Cobol.Identifier) visit(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Object visitUnstringWithPointerPhrase(CobolParser.UnstringWithPointerPhraseContext ctx) {
+        return new Cobol.UnstringWithPointerPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.POINTER()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
+    public Object visitUnstringTallyingPhrase(CobolParser.UnstringTallyingPhraseContext ctx) {
+        return new Cobol.UnstringTallyingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TALLYING(), ctx.IN()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
+    public Object visitUseStatement(CobolParser.UseStatementContext ctx) {
+        return new Cobol.UseStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.USE()),
+                visit(ctx.useAfterClause(), ctx.useDebugClause())
+        );
+    }
+
+    @Override
+    public Object visitUseAfterClause(CobolParser.UseAfterClauseContext ctx) {
+        return new Cobol.UseAfterClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.GLOBAL(), ctx.AFTER(), ctx.STANDARD(), ctx.EXCEPTION(), ctx.ERROR(), ctx.PROCEDURE(), ctx.ON()),
+                (Cobol.UseAfterOn) visit(ctx.useAfterOn())
+        );
+    }
+
+    @Override
+    public Object visitUseAfterOn(CobolParser.UseAfterOnContext ctx) {
+        return new Cobol.UseAfterOn(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INPUT(), ctx.OUTPUT(), ctx.I_O(), ctx.EXTEND()),
+                convertAllContainer(ctx.fileName())
+        );
+    }
+
+    @Override
+    public Object visitUseDebugClause(CobolParser.UseDebugClauseContext ctx) {
+        return new Cobol.UseDebugClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOR(), ctx.DEBUGGING(), ctx.ON()),
+                convertAllContainer(ctx.useDebugOn())
+        );
+    }
+
+    @Override
+    public Object visitUseDebugOn(CobolParser.UseDebugOnContext ctx) {
+        return new Cobol.UseDebugClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ALL(), ctx.PROCEDURES(), ctx.REFERENCES(), ctx.OF()),
+                ctx.PROCEDURES() != null ? null : visit(ctx.identifier(), ctx.procedureName(), ctx.fileName())
+        );
+    }
+
+    @Override
     public Cobol.Identifier visitCobolWord(CobolParser.CobolWordContext ctx) {
         return new Cobol.Identifier(
                 randomId(),

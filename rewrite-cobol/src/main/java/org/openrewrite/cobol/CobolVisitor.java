@@ -1807,4 +1807,94 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         r = r.withArithmeticExpression((Cobol.ArithmeticExpression) visit(r.getArithmeticExpression(), p));
         return r;
     }
+
+    public Cobol visitUnString(Cobol.UnString unString, P p) {
+        Cobol.UnString u = unString;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withUnstringSendingPhrase((Cobol.UnstringSendingPhrase) visit(u.getUnstringSendingPhrase(), p));
+        u = u.withUnstringIntoPhrase((Cobol.UnstringIntoPhrase) visit(u.getUnstringIntoPhrase(), p));
+        u = u.withUnstringWithPointerPhrase((Cobol.UnstringWithPointerPhrase) visit(u.getUnstringWithPointerPhrase(), p));
+        u = u.withUnstringTallyingPhrase((Cobol.UnstringTallyingPhrase) visit(u.getUnstringTallyingPhrase(), p));
+        u = u.withOnOverflowPhrase((Cobol.StatementPhrase) visit(u.getOnOverflowPhrase(), p));
+        u = u.withNotOnOverflowPhrase((Cobol.StatementPhrase) visit(u.getNotOnOverflowPhrase(), p));
+        if (u.getPadding().getEndUnstring() != null) {
+            u = u.getPadding().withEndUnstring(visitLeftPadded(u.getPadding().getEndUnstring(), p));
+        }
+        return u;
+    }
+
+    public Cobol visitUnstringSendingPhrase(Cobol.UnstringSendingPhrase unstringSendingPhrase, P p) {
+        Cobol.UnstringSendingPhrase u = unstringSendingPhrase;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withIdentifier((Cobol.Identifier) visit(u.getIdentifier(), p));
+        u = u.withUnstringDelimitedByPhrase((Cobol.UnstringDelimitedByPhrase) visit(u.getUnstringDelimitedByPhrase(), p));
+        u = u.getPadding().withUnstringOrAllPhrases(visitContainer(u.getPadding().getUnstringOrAllPhrases(), p));
+        return u;
+    }
+
+    public Cobol visitUnstringDelimitedByPhrase(Cobol.UnstringDelimitedByPhrase unstringDelimitedByPhrase, P p) {
+        Cobol.UnstringDelimitedByPhrase u = unstringDelimitedByPhrase;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        return u;
+    }
+
+    public Cobol visitUnstringOrAllPhrase(Cobol.UnstringOrAllPhrase unstringOrAllPhrase, P p) {
+        Cobol.UnstringOrAllPhrase u = unstringOrAllPhrase;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        return u;
+    }
+
+    public Cobol visitUnstringIntoPhrase(Cobol.UnstringIntoPhrase unstringIntoPhrase, P p) {
+        Cobol.UnstringIntoPhrase u = unstringIntoPhrase;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.getPadding().withUnstringIntos(visitContainer(u.getPadding().getUnstringIntos(), p));
+        return u;
+    }
+
+    public Cobol visitUnstringInto(Cobol.UnstringInto unstringInto, P p) {
+        Cobol.UnstringInto u = unstringInto;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withIdentifier((Cobol.Identifier) visit(u.getIdentifier(), p));
+        u = u.withUnstringDelimiterIn((Cobol.UnstringDelimiterIn) visit(u.getUnstringDelimiterIn(), p));
+        u = u.withUnstringCountIn((Cobol.UnstringCountIn) visit(u.getUnstringCountIn(), p));
+        return u;
+    }
+
+    public Cobol visitUnstringDelimiterIn(Cobol.UnstringDelimiterIn unstringDelimiterIn, P p) {
+        Cobol.UnstringDelimiterIn u = unstringDelimiterIn;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withIdentifier((Cobol.Identifier) visit(u.getIdentifier(), p));
+        return u;
+    }
+
+    public Cobol visitUnstringCountIn(Cobol.UnstringCountIn unstringCountIn, P p) {
+        Cobol.UnstringCountIn u = unstringCountIn;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withIdentifier((Cobol.Identifier) visit(u.getIdentifier(), p));
+        return u;
+    }
+
+    public Cobol visitUnstringWithPointerPhrase(Cobol.UnstringWithPointerPhrase unstringWithPointerPhrase, P p) {
+        Cobol.UnstringWithPointerPhrase u = unstringWithPointerPhrase;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withQualifiedDataName((Cobol.QualifiedDataName) visit(u.getQualifiedDataName(), p));
+        return u;
+    }
+
+    public Cobol visitUnstringTallyingPhrase(Cobol.UnstringTallyingPhrase unstringTallyingPhrase, P p) {
+        Cobol.UnstringTallyingPhrase u = unstringTallyingPhrase;
+        u = u.withPrefix(visitSpace(u.getPrefix(), p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withQualifiedDataName((Cobol.QualifiedDataName) visit(u.getQualifiedDataName(), p));
+        return u;
+    }
 }

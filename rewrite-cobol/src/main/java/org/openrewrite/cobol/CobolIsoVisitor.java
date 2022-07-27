@@ -1018,4 +1018,54 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.RelationSignCondition visitRelationSignCondition(Cobol.RelationSignCondition relationSignCondition, P p) {
         return (Cobol.RelationSignCondition) super.visitRelationSignCondition(relationSignCondition, p);
     }
+
+    @Override
+    public Cobol.UnString visitUnString(Cobol.UnString unString, P p) {
+        return (Cobol.UnString) super.visitUnString(unString, p);
+    }
+
+    @Override
+    public Cobol.UnstringSendingPhrase visitUnstringSendingPhrase(Cobol.UnstringSendingPhrase unstringSendingPhrase, P p) {
+        return (Cobol.UnstringSendingPhrase) super.visitUnstringSendingPhrase(unstringSendingPhrase, p);
+    }
+
+    @Override
+    public Cobol.UnstringDelimitedByPhrase visitUnstringDelimitedByPhrase(Cobol.UnstringDelimitedByPhrase unstringDelimitedByPhrase, P p) {
+        return (Cobol.UnstringDelimitedByPhrase) super.visitUnstringDelimitedByPhrase(unstringDelimitedByPhrase, p);
+    }
+
+    @Override
+    public Cobol.UnstringOrAllPhrase visitUnstringOrAllPhrase(Cobol.UnstringOrAllPhrase unstringOrAllPhrase, P p) {
+        return (Cobol.UnstringOrAllPhrase) super.visitUnstringOrAllPhrase(unstringOrAllPhrase, p);
+    }
+
+    @Override
+    public Cobol.UnstringIntoPhrase visitUnstringIntoPhrase(Cobol.UnstringIntoPhrase unstringIntoPhrase, P p) {
+        return (Cobol.UnstringIntoPhrase) super.visitUnstringIntoPhrase(unstringIntoPhrase, p);
+    }
+
+    @Override
+    public Cobol.UnstringInto visitUnstringInto(Cobol.UnstringInto unstringInto, P p) {
+        return (Cobol.UnstringInto) super.visitUnstringInto(unstringInto, p);
+    }
+
+    @Override
+    public Cobol.UnstringDelimiterIn visitUnstringDelimiterIn(Cobol.UnstringDelimiterIn unstringDelimiterIn, P p) {
+        return (Cobol.UnstringDelimiterIn) super.visitUnstringDelimiterIn(unstringDelimiterIn, p);
+    }
+
+    @Override
+    public Cobol.UnstringCountIn visitUnstringCountIn(Cobol.UnstringCountIn unstringCountIn, P p) {
+        return (Cobol.UnstringCountIn) super.visitUnstringCountIn(unstringCountIn, p);
+    }
+
+    @Override
+    public Cobol.UnstringWithPointerPhrase visitUnstringWithPointerPhrase(Cobol.UnstringWithPointerPhrase unstringWithPointerPhrase, P p) {
+        return (Cobol.UnstringWithPointerPhrase) super.visitUnstringWithPointerPhrase(unstringWithPointerPhrase, p);
+    }
+
+    @Override
+    public Cobol.UnstringTallyingPhrase visitUnstringTallyingPhrase(Cobol.UnstringTallyingPhrase unstringTallyingPhrase, P p) {
+        return (Cobol.UnstringTallyingPhrase) super.visitUnstringTallyingPhrase(unstringTallyingPhrase, p);
+    }
 }

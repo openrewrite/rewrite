@@ -9375,6 +9375,393 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class UnString implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String unstring;
+
+        @Getter
+        @With
+        UnstringSendingPhrase unstringSendingPhrase;
+
+        @Getter
+        @With
+        UnstringIntoPhrase unstringIntoPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        UnstringWithPointerPhrase unstringWithPointerPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        UnstringTallyingPhrase unstringTallyingPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase onOverflowPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase notOnOverflowPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endUnstring;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUnString(this, p);
+        }
+
+        @Nullable
+        public String getEndUnstring() {
+            return endUnstring == null ? null : endUnstring.getElement();
+        }
+
+        public UnString withEndUnstring(@Nullable String endUnstring) {
+            if (endUnstring == null) {
+                return this.endUnstring == null ? this : new UnString(id, prefix, markers, unstring, unstringSendingPhrase, unstringIntoPhrase, unstringWithPointerPhrase, unstringTallyingPhrase, onOverflowPhrase, notOnOverflowPhrase, null);
+            }
+            return getPadding().withEndUnstring(CobolLeftPadded.withElement(this.endUnstring, endUnstring));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final UnString t;
+
+            @Nullable
+            public CobolLeftPadded<String> getEndUnstring() {
+                return t.endUnstring;
+            }
+
+            public UnString withEndUnstring(@Nullable CobolLeftPadded<String> endUnstring) {
+                return t.endUnstring == endUnstring ? t : new UnString(t.padding, t.id, t.prefix, t.markers, t.unstring, t.unstringSendingPhrase, t.unstringIntoPhrase, t.unstringWithPointerPhrase, t.unstringTallyingPhrase, t.onOverflowPhrase, t.notOnOverflowPhrase, endUnstring);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class UnstringSendingPhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Identifier identifier;
+
+        @Getter
+        @Nullable
+        @With
+        UnstringDelimitedByPhrase unstringDelimitedByPhrase;
+
+        @Nullable
+        CobolContainer<UnstringOrAllPhrase> unstringOrAllPhrases;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUnstringSendingPhrase(this, p);
+        }
+
+        public List<Cobol.UnstringOrAllPhrase> getUnstringOrAllPhrases() {
+            return unstringOrAllPhrases.getElements();
+        }
+
+        public UnstringSendingPhrase withUnstringOrAllPhrases(List<Cobol.UnstringOrAllPhrase> unstringOrAllPhrases) {
+            return getPadding().withUnstringOrAllPhrases(this.unstringOrAllPhrases.getPadding().withElements(CobolRightPadded.withElements(
+                    this.unstringOrAllPhrases.getPadding().getElements(), unstringOrAllPhrases)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final UnstringSendingPhrase t;
+
+            @Nullable
+            public CobolContainer<Cobol.UnstringOrAllPhrase> getUnstringOrAllPhrases() {
+                return t.unstringOrAllPhrases;
+            }
+
+            public UnstringSendingPhrase withUnstringOrAllPhrases(@Nullable CobolContainer<Cobol.UnstringOrAllPhrase> unstringOrAllPhrases) {
+                return t.unstringOrAllPhrases == unstringOrAllPhrases ? t : new UnstringSendingPhrase(t.padding, t.id, t.prefix, t.markers, t.identifier, t.unstringDelimitedByPhrase, unstringOrAllPhrases);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class UnstringDelimitedByPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name name;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUnstringDelimitedByPhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class UnstringOrAllPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name name;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUnstringOrAllPhrase(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class UnstringIntoPhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String into;
+
+        CobolContainer<UnstringInto> unstringIntos;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUnstringIntoPhrase(this, p);
+        }
+
+        public List<Cobol.UnstringInto> getUnstringIntos() {
+            return unstringIntos.getElements();
+        }
+
+        public UnstringIntoPhrase withUnstringIntos(List<Cobol.UnstringInto> unstringIntos) {
+            return getPadding().withUnstringIntos(this.unstringIntos.getPadding().withElements(CobolRightPadded.withElements(
+                    this.unstringIntos.getPadding().getElements(), unstringIntos)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final UnstringIntoPhrase t;
+
+            public CobolContainer<Cobol.UnstringInto> getUnstringIntos() {
+                return t.unstringIntos;
+            }
+
+            public UnstringIntoPhrase withUnstringIntos(CobolContainer<Cobol.UnstringInto> unstringIntos) {
+                return t.unstringIntos == unstringIntos ? t : new UnstringIntoPhrase(t.padding, t.id, t.prefix, t.markers, t.into, unstringIntos);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class UnstringInto implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Identifier identifier;
+
+        @Nullable
+        UnstringDelimiterIn unstringDelimiterIn;
+
+        @Nullable
+        UnstringCountIn unstringCountIn;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUnstringInto(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class UnstringDelimiterIn implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Identifier identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUnstringDelimiterIn(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class UnstringCountIn implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Identifier identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUnstringCountIn(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class UnstringWithPointerPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUnstringWithPointerPhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class UnstringTallyingPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitUnstringTallyingPhrase(this, p);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

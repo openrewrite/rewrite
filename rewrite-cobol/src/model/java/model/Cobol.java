@@ -1378,6 +1378,82 @@ public interface Cobol {
         Identifier alphabetName;
     }
 
+    class UnString implements Statement {
+        String unstring;
+        UnstringSendingPhrase unstringSendingPhrase;
+        UnstringIntoPhrase unstringIntoPhrase;
+
+        @Nullable
+        UnstringWithPointerPhrase unstringWithPointerPhrase;
+
+        @Nullable
+        UnstringTallyingPhrase unstringTallyingPhrase;
+
+        @Nullable
+        StatementPhrase onOverflowPhrase;
+
+        @Nullable
+        StatementPhrase notOnOverflowPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endUnstring;
+    }
+
+    class UnstringSendingPhrase implements Cobol {
+        Identifier identifier;
+
+        @Nullable
+        UnstringDelimitedByPhrase unstringDelimitedByPhrase;
+
+        @Nullable
+        CobolContainer<UnstringOrAllPhrase> unstringOrAllPhrases;
+    }
+
+    class UnstringDelimitedByPhrase implements Cobol {
+        String words;
+        Name name;
+    }
+
+    class UnstringOrAllPhrase implements Cobol {
+        String words;
+        Name name;
+    }
+
+    class UnstringIntoPhrase implements Cobol {
+        String into;
+        CobolContainer<UnstringInto> unstringIntos;
+    }
+
+    class UnstringInto implements Cobol {
+        Identifier identifier;
+
+        @Nullable
+        UnstringDelimiterIn unstringDelimiterIn;
+
+        @Nullable
+        UnstringCountIn unstringCountIn;
+    }
+
+    class UnstringDelimiterIn implements Cobol {
+        String words;
+        Identifier identifier;
+    }
+
+    class UnstringCountIn implements Cobol {
+        String words;
+        Identifier identifier;
+    }
+
+    class UnstringWithPointerPhrase implements Cobol {
+        String words;
+        QualifiedDataName qualifiedDataName;
+    }
+
+    class UnstringTallyingPhrase implements Cobol {
+        String words;
+        QualifiedDataName qualifiedDataName;
+    }
+
     class UseStatement implements Cobol {
         String use;
         Cobol clause;

@@ -1792,4 +1792,92 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(relationSignCondition.getWords());
         return relationSignCondition;
     }
+
+    public Cobol visitUnString(Cobol.UnString unString, PrintOutputCapture<P> p) {
+        visitSpace(unString.getPrefix(), p);
+        visitMarkers(unString.getMarkers(), p);
+        p.append(unString.getUnstring());
+        visit(unString.getUnstringSendingPhrase(), p);
+        visit(unString.getUnstringIntoPhrase(), p);
+        visit(unString.getUnstringWithPointerPhrase(), p);
+        visit(unString.getUnstringTallyingPhrase(), p);
+        visit(unString.getOnOverflowPhrase(), p);
+        visit(unString.getNotOnOverflowPhrase(), p);
+        visitLeftPadded("", unString.getPadding().getEndUnstring(), p);
+        return unString;
+    }
+
+    public Cobol visitUnstringSendingPhrase(Cobol.UnstringSendingPhrase unstringSendingPhrase, PrintOutputCapture<P> p) {
+        visitSpace(unstringSendingPhrase.getPrefix(), p);
+        visitMarkers(unstringSendingPhrase.getMarkers(), p);
+        visit(unstringSendingPhrase.getIdentifier(), p);
+        visit(unstringSendingPhrase.getUnstringDelimitedByPhrase(), p);
+        visitContainer("", unstringSendingPhrase.getPadding().getUnstringOrAllPhrases(), "", "", p);
+        return unstringSendingPhrase;
+    }
+
+    public Cobol visitUnstringDelimitedByPhrase(Cobol.UnstringDelimitedByPhrase unstringDelimitedByPhrase, PrintOutputCapture<P> p) {
+        visitSpace(unstringDelimitedByPhrase.getPrefix(), p);
+        visitMarkers(unstringDelimitedByPhrase.getMarkers(), p);
+        p.append(unstringDelimitedByPhrase.getWords());
+        visit(unstringDelimitedByPhrase.getName(), p);
+        return unstringDelimitedByPhrase;
+    }
+
+    public Cobol visitUnstringOrAllPhrase(Cobol.UnstringOrAllPhrase unstringOrAllPhrase, PrintOutputCapture<P> p) {
+        visitSpace(unstringOrAllPhrase.getPrefix(), p);
+        visitMarkers(unstringOrAllPhrase.getMarkers(), p);
+        p.append(unstringOrAllPhrase.getWords());
+        visit(unstringOrAllPhrase.getName(), p);
+        return unstringOrAllPhrase;
+    }
+
+    public Cobol visitUnstringIntoPhrase(Cobol.UnstringIntoPhrase unstringIntoPhrase, PrintOutputCapture<P> p) {
+        visitSpace(unstringIntoPhrase.getPrefix(), p);
+        visitMarkers(unstringIntoPhrase.getMarkers(), p);
+        p.append(unstringIntoPhrase.getInto());
+        visitContainer("", unstringIntoPhrase.getPadding().getUnstringIntos(), "", "", p);
+        return unstringIntoPhrase;
+    }
+
+    public Cobol visitUnstringInto(Cobol.UnstringInto unstringInto, PrintOutputCapture<P> p) {
+        visitSpace(unstringInto.getPrefix(), p);
+        visitMarkers(unstringInto.getMarkers(), p);
+        visit(unstringInto.getIdentifier(), p);
+        visit(unstringInto.getUnstringDelimiterIn(), p);
+        visit(unstringInto.getUnstringCountIn(), p);
+        return unstringInto;
+    }
+
+    public Cobol visitUnstringDelimiterIn(Cobol.UnstringDelimiterIn unstringDelimiterIn, PrintOutputCapture<P> p) {
+        visitSpace(unstringDelimiterIn.getPrefix(), p);
+        visitMarkers(unstringDelimiterIn.getMarkers(), p);
+        p.append(unstringDelimiterIn.getWords());
+        visit(unstringDelimiterIn.getIdentifier(), p);
+        return unstringDelimiterIn;
+    }
+
+    public Cobol visitUnstringCountIn(Cobol.UnstringCountIn unstringCountIn, PrintOutputCapture<P> p) {
+        visitSpace(unstringCountIn.getPrefix(), p);
+        visitMarkers(unstringCountIn.getMarkers(), p);
+        p.append(unstringCountIn.getWords());
+        visit(unstringCountIn.getIdentifier(), p);
+        return unstringCountIn;
+    }
+
+    public Cobol visitUnstringWithPointerPhrase(Cobol.UnstringWithPointerPhrase unstringWithPointerPhrase, PrintOutputCapture<P> p) {
+        visitSpace(unstringWithPointerPhrase.getPrefix(), p);
+        visitMarkers(unstringWithPointerPhrase.getMarkers(), p);
+        p.append(unstringWithPointerPhrase.getWords());
+        visit(unstringWithPointerPhrase.getQualifiedDataName(), p);
+        return unstringWithPointerPhrase;
+    }
+
+    public Cobol visitUnstringTallyingPhrase(Cobol.UnstringTallyingPhrase unstringTallyingPhrase, PrintOutputCapture<P> p) {
+        visitSpace(unstringTallyingPhrase.getPrefix(), p);
+        visitMarkers(unstringTallyingPhrase.getMarkers(), p);
+        p.append(unstringTallyingPhrase.getWords());
+        visit(unstringTallyingPhrase.getQualifiedDataName(), p);
+        return unstringTallyingPhrase;
+    }
 }
