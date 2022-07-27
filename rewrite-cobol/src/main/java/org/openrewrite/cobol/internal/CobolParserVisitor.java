@@ -123,6 +123,21 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitAbbreviation(CobolParser.AbbreviationContext ctx) {
+        return new Cobol.Abbreviation(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.NOT()),
+                visitNullable(ctx.relationalOperator()),
+                words(ctx.LPARENCHAR()),
+                (Cobol) visit(ctx.arithmeticExpression()),
+                visitNullable(ctx.abbreviation()),
+                words(ctx.RPARENCHAR())
+        );
+    }
+
+    @Override
     public Object visitAcceptStatement(CobolParser.AcceptStatementContext ctx) {
         return new Cobol.Accept(
                 randomId(),
@@ -201,6 +216,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
         );
     }
 
+    @Override
+    public Object visitAndOrCondition(CobolParser.AndOrConditionContext ctx) {
+        return new Cobol.AndOrCondition(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.AND(), ctx.OR()),
+                (Cobol.CombinableCondition) visit(ctx.combinableCondition()),
+                convertAllContainer(ctx.abbreviation())
+        );
+    }
 
     @Override
     public Object visitArithmeticExpression(CobolParser.ArithmeticExpressionContext ctx) {
@@ -270,6 +296,15 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 visitNullable(ctx.identifier()),
                 visitNullable(ctx.literal())
         );
+    }
+
+    @Override
+    public Object visitBooleanLiteral(CobolParser.BooleanLiteralContext ctx) {
+        return new Cobol.Identifier(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TRUE(), ctx.FALSE()));
     }
 
     @Override
@@ -518,6 +553,18 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitClassCondition(CobolParser.ClassConditionContext ctx) {
+        return new Cobol.ClassCondition(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.identifier()),
+                words(ctx.IS(), ctx.NOT(), ctx.NUMERIC(), ctx.ALPHABETIC(), ctx.ALPHABETIC_LOWER(), ctx.ALPHABETIC_UPPER(), ctx.DBCS(), ctx.KANJI()),
+                visitNullable(ctx.className())
+        );
+    }
+
+    @Override
     public Object visitCloseStatement(CobolParser.CloseStatementContext ctx) {
         return new Cobol.Close(
                 randomId(),
@@ -604,6 +651,42 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitCombinableCondition(CobolParser.CombinableConditionContext ctx) {
+        return new Cobol.CombinableCondition(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.NOT()),
+                (Cobol) visit(ctx.simpleCondition())
+        );
+    }
+
+    @Override
+    public Object visitCondition(CobolParser.ConditionContext ctx) {
+        return new Cobol.Condition(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CombinableCondition) visit(ctx.combinableCondition()),
+                convertAllContainer(ctx.andOrCondition())
+        );
+    }
+
+    @Override
+    public Object visitConditionNameReference(CobolParser.ConditionNameReferenceContext ctx) {
+        return new Cobol.ConditionNameReference(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Name) visit(ctx.conditionName()),
+                convertAllContainer(ctx.inData()),
+                visitNullable(ctx.inFile()),
+                convertAllContainer(ctx.conditionNameSubscriptReference()),
+                convertAllContainer(ctx.inMnemonic())
+        );
+    }
+
+    @Override
     public Object visitContinueStatement(CobolParser.ContinueStatementContext ctx) {
         return new Cobol.Continue(
                 randomId(),
@@ -661,6 +744,62 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                         ctx.IS() != null || ctx.ARE() != null ?
                                 padLeft(whitespace(), words(ctx.IS(), ctx.ARE())) : null,
                         ctx.integerLiteral()
+                )
+        );
+    }
+
+    @Override
+    public Object visitRelationSignCondition(CobolParser.RelationSignConditionContext ctx) {
+        return new Cobol.RelationSignCondition(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.ArithmeticExpression) visit(ctx.arithmeticExpression()),
+                words(ctx.IS(), ctx.NOT(), ctx.POSITIVE(), ctx.NEGATIVE(), ctx.ZERO())
+        );
+    }
+
+    @Override
+    public Object visitRelationArithmeticComparison(CobolParser.RelationArithmeticComparisonContext ctx) {
+        return new Cobol.RelationArithmeticComparison(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.ArithmeticExpression) visit(ctx.arithmeticExpression().get(0)),
+                (Cobol.RelationalOperator) visit(ctx.relationalOperator()),
+                (Cobol.ArithmeticExpression) visit(ctx.arithmeticExpression().get(1))
+        );
+    }
+
+    @Override
+    public Object visitRelationCombinedComparison(CobolParser.RelationCombinedComparisonContext ctx) {
+        return new Cobol.RelationCombinedComparison(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.ArithmeticExpression) visit(ctx.arithmeticExpression()),
+                (Cobol.RelationalOperator) visit(ctx.relationalOperator()),
+                new Cobol.ParenExpression(
+                        randomId(),
+                        prefix(ctx),
+                        Markers.EMPTY,
+                        words(ctx.LPARENCHAR()),
+                        (Cobol) visit(ctx.relationCombinedCondition()),
+                        words(ctx.RPARENCHAR())
+                )
+        );
+    }
+
+    @Override
+    public Object visitRelationalOperator(CobolParser.RelationalOperatorContext ctx) {
+        return new Cobol.RelationalOperator(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.ARE(), ctx.NOT(),
+                        ctx.GREATER(), ctx.LESS(), ctx.THAN(), ctx.OR(), ctx.EQUAL(), ctx.TO(),
+                        ctx.MORETHANCHAR(), ctx.LESSTHANCHAR(), ctx.EQUALCHAR(), ctx.NOTEQUALCHAR(),
+                        ctx.MORETHANOREQUAL(), ctx.LESSTHANOREQUAL()
                 )
         );
     }
@@ -785,11 +924,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitDivideGiving(CobolParser.DivideGivingContext ctx) {
-        return visit(ctx.roundable());
-    }
-
-    @Override
     public Object visitDivideGivingPhrase(CobolParser.DivideGivingPhraseContext ctx) {
         return new Cobol.DivideGivingPhrase(
                 randomId(),
@@ -821,11 +955,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 words(ctx.INTO()),
                 convertAllContainer(ctx.divideInto())
         );
-    }
-
-    @Override
-    public Object visitDivideInto(CobolParser.DivideIntoContext ctx) {
-        return visit(ctx.roundable());
     }
 
     @Override
@@ -1125,6 +1254,18 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 (Cobol) visit(ctx.integerLiteral()),
                 null
         );
+    }
+
+    @Override
+    public Object visitSimpleCondition(CobolParser.SimpleConditionContext ctx) {
+        return ctx.condition() != null ? new Cobol.ParenExpression(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LPARENCHAR()),
+                (Cobol) visit(ctx.condition()),
+                words(ctx.RPARENCHAR())
+        ) : visit(ctx.relationCondition(), ctx.classCondition(), ctx.conditionNameReference());
     }
 
     @Override
@@ -2005,6 +2146,100 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitEvaluateStatement(CobolParser.EvaluateStatementContext ctx) {
+        return new Cobol.Evaluate(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.EVALUATE()),
+                (Cobol) visit(ctx.evaluateSelect()),
+                convertAllContainer(ctx.evaluateAlsoSelect()),
+                convertAllContainer(ctx.evaluateWhenPhrase()),
+                visitNullable(ctx.evaluateWhenOther()),
+                padLeft(ctx.END_EVALUATE())
+        );
+    }
+
+    @Override
+    public Object visitEvaluateAlsoCondition(CobolParser.EvaluateAlsoConditionContext ctx) {
+        return new Cobol.EvaluateAlsoCondition(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ALSO()),
+                (Cobol.EvaluateCondition) visit(ctx.evaluateCondition())
+        );
+    }
+
+    @Override
+    public Object visitEvaluateAlsoSelect(CobolParser.EvaluateAlsoSelectContext ctx) {
+        return new Cobol.EvaluateAlso(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ALSO()),
+                (Cobol) visit(ctx.evaluateSelect())
+        );
+    }
+
+    @Override
+    public Object visitEvaluateCondition(CobolParser.EvaluateConditionContext ctx) {
+        return new Cobol.EvaluateCondition(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ANY(), ctx.NOT()),
+                ctx.ANY() != null ? null : visit(ctx.evaluateValue(), ctx.condition(), ctx.booleanLiteral()),
+                visitNullable(ctx.evaluateThrough())
+        );
+    }
+
+    @Override
+    public Object visitEvaluateThrough(CobolParser.EvaluateThroughContext ctx) {
+        return new Cobol.EvaluateThrough(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.THROUGH(), ctx.THRU()),
+                (Cobol) visit(ctx.evaluateValue())
+        );
+    }
+
+    @Override
+    public Object visitEvaluateWhenPhrase(CobolParser.EvaluateWhenPhraseContext ctx) {
+        return new Cobol.EvaluateWhenPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.evaluateWhen()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
+    public Object visitEvaluateWhen(CobolParser.EvaluateWhenContext ctx) {
+        return new Cobol.EvaluateWhen(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WHEN()),
+                (Cobol.EvaluateCondition) visit(ctx.evaluateCondition()),
+                convertAllContainer(ctx.evaluateAlsoCondition())
+        );
+    }
+
+    @Override
+    public Object visitEvaluateWhenOther(CobolParser.EvaluateWhenOtherContext ctx) {
+        return new Cobol.StatementPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WHEN(), ctx.OTHER()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
     public Cobol.Exhibit visitExhibitStatement(CobolParser.ExhibitStatementContext ctx) {
         return new Cobol.Exhibit(
                 randomId(),
@@ -2335,8 +2570,10 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitIntegerLiteral(CobolParser.IntegerLiteralContext ctx) {
-        return new Cobol.Identifier(randomId(),
-                sourceBefore(ctx.getText()), Markers.EMPTY,
+        return new Cobol.Identifier(
+                randomId(),
+                sourceBefore(ctx.getText()),
+                Markers.EMPTY,
                 ctx.getText());
     }
 

@@ -447,4 +447,59 @@ class CobolBasicsTest : RewriteTest {
                 DIVIDE 0.097 INTO DIV7 NOT ON SIZE ERROR CONTINUE.
         """)
     )
+
+    @Test
+    fun evaluateStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION USING GRP-01.
+            F-ANNUITY-02.
+            EVALUATE IC110A END-EVALUATE.
+            EVALUATE IC110A ALSO IC110B.
+            EVALUATE IC110A
+            WHEN ANY ALSO ANY
+                CONTINUE
+            WHEN IDENTIFIER THRU IDENTIFIER
+                CONTINUE
+            WHEN TRUE
+                CONTINUE
+            WHEN OTHER
+                CONTINUE.
+        """)
+    )
+
+    @Disabled("Requires changes to Basis")
+    @Test
+    fun conditions() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION USING GRP-01.
+            F-ANNUITY-02.
+            EVALUATE IC110A
+            WHEN IDENTIFIER IS NOT ALPHABETIC-LOWER
+                CONTINUE
+            WHEN IDENTIFIER IN IDENTIFIER
+                CONTINUE
+        """)
+    )
+
+    @Disabled("Requires changes to Basis")
+    @Test
+    fun relationConditions() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION USING GRP-01.
+            F-ANNUITY-02.
+            EVALUATE IC110A
+            WHEN IDENTIFIER IS NOT ZERO
+                CONTINUE
+            WHEN IDENTIFIER LESSTHANOREQUAL IDENTIFIER
+                CONTINUE
+            WHEN IDENTIFIER MORETHANOREQUAL (IDENTIFIER AND IDENTIFIER OR IDENTIFIER)
+                CONTINUE
+        """)
+    )
 }

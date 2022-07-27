@@ -893,4 +893,104 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.PerformTestClause visitPerformTestClause(Cobol.PerformTestClause performTestClause, P p) {
         return (Cobol.PerformTestClause) super.visitPerformTestClause(performTestClause, p);
     }
+
+    @Override
+    public Cobol.Evaluate visitEvaluate(Cobol.Evaluate evaluate, P p) {
+        return (Cobol.Evaluate) super.visitEvaluate(evaluate, p);
+    }
+
+    @Override
+    public Cobol.EvaluateAlso visitEvaluateAlso(Cobol.EvaluateAlso evaluateAlso, P p) {
+        return (Cobol.EvaluateAlso) super.visitEvaluateAlso(evaluateAlso, p);
+    }
+
+    @Override
+    public Cobol.EvaluateAlsoCondition visitEvaluateAlsoCondition(Cobol.EvaluateAlsoCondition evaluateAlsoCondition, P p) {
+        return (Cobol.EvaluateAlsoCondition) super.visitEvaluateAlsoCondition(evaluateAlsoCondition, p);
+    }
+
+    @Override
+    public Cobol.EvaluateCondition visitEvaluateCondition(Cobol.EvaluateCondition evaluateCondition, P p) {
+        return (Cobol.EvaluateCondition) super.visitEvaluateCondition(evaluateCondition, p);
+    }
+
+    @Override
+    public Cobol.EvaluateThrough visitEvaluateThrough(Cobol.EvaluateThrough evaluateThrough, P p) {
+        return (Cobol.EvaluateThrough) super.visitEvaluateThrough(evaluateThrough, p);
+    }
+
+    @Override
+    public Cobol.EvaluateWhen visitEvaluateWhen(Cobol.EvaluateWhen evaluateWhen, P p) {
+        return (Cobol.EvaluateWhen) super.visitEvaluateWhen(evaluateWhen, p);
+    }
+
+    @Override
+    public Cobol.EvaluateWhenPhrase visitEvaluateWhenPhrase(Cobol.EvaluateWhenPhrase evaluateWhenPhrase, P p) {
+        return (Cobol.EvaluateWhenPhrase) super.visitEvaluateWhenPhrase(evaluateWhenPhrase, p);
+    }
+
+    @Override
+    public Cobol.EvaluateValueThrough visitEvaluateValueThrough(Cobol.EvaluateValueThrough evaluateValueThrough, P p) {
+        return (Cobol.EvaluateValueThrough) super.visitEvaluateValueThrough(evaluateValueThrough, p);
+    }
+
+    @Override
+    public Cobol.Abbreviation visitAbbreviation(Cobol.Abbreviation abbreviation, P p) {
+        return (Cobol.Abbreviation) super.visitAbbreviation(abbreviation, p);
+    }
+
+    @Override
+    public Cobol.AndOrCondition visitAndOrCondition(Cobol.AndOrCondition andOrCondition, P p) {
+        return (Cobol.AndOrCondition) super.visitAndOrCondition(andOrCondition, p);
+    }
+
+    @Override
+    public Cobol.ClassCondition visitClassCondition(Cobol.ClassCondition classCondition, P p) {
+        return (Cobol.ClassCondition) super.visitClassCondition(classCondition, p);
+    }
+
+    @Override
+    public Cobol.CombinableCondition visitCombinableCondition(Cobol.CombinableCondition combinableCondition, P p) {
+        return (Cobol.CombinableCondition) super.visitCombinableCondition(combinableCondition, p);
+    }
+
+    @Override
+    public Cobol.Condition visitCondition(Cobol.Condition condition, P p) {
+        return (Cobol.Condition) super.visitCondition(condition, p);
+    }
+
+    @Override
+    public Cobol.ConditionNameReference visitConditionNameReference(Cobol.ConditionNameReference conditionNameReference, P p) {
+        return (Cobol.ConditionNameReference) super.visitConditionNameReference(conditionNameReference, p);
+    }
+
+    @Override
+    public Cobol.ParenExpression visitParenExpression(Cobol.ParenExpression parenExpression, P p) {
+        return (Cobol.ParenExpression) super.visitParenExpression(parenExpression, p);
+    }
+
+    @Override
+    public Cobol.RelationalOperator visitRelationalOperator(Cobol.RelationalOperator relationalOperator, P p) {
+        return (Cobol.RelationalOperator) super.visitRelationalOperator(relationalOperator, p);
+    }
+
+    @Override
+    public Cobol.RelationArithmeticComparison visitRelationArithmeticComparison(Cobol.RelationArithmeticComparison relationArithmeticComparison, P p) {
+        return (Cobol.RelationArithmeticComparison) super.visitRelationArithmeticComparison(relationArithmeticComparison, p);
+    }
+
+    @Override
+    public Cobol.RelationCombinedComparison visitRelationCombinedComparison(Cobol.RelationCombinedComparison relationCombinedComparison, P p) {
+        return (Cobol.RelationCombinedComparison) super.visitRelationCombinedComparison(relationCombinedComparison, p);
+    }
+
+    @Override
+    public Cobol.RelationCombinedCondition visitRelationCombinedCondition(Cobol.RelationCombinedCondition relationCombinedCondition, P p) {
+        return (Cobol.RelationCombinedCondition) super.visitRelationCombinedCondition(relationCombinedCondition, p);
+    }
+
+    @Override
+    public Cobol.RelationSignCondition visitRelationSignCondition(Cobol.RelationSignCondition relationSignCondition, P p) {
+        return (Cobol.RelationSignCondition) super.visitRelationSignCondition(relationSignCondition, p);
+    }
 }

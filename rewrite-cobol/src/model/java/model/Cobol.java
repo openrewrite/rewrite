@@ -15,7 +15,6 @@
  */
 package model;
 
-import org.openrewrite.cobol.internal.grammar.CobolParser;
 import org.openrewrite.cobol.tree.CobolContainer;
 import org.openrewrite.cobol.tree.CobolLeftPadded;
 import org.openrewrite.cobol.tree.CobolRightPadded;
@@ -24,6 +23,25 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 
 public interface Cobol {
+
+    class Abbreviation implements Cobol {
+        @Nullable
+        String not;
+
+        @Nullable
+        RelationalOperator relationalOperator;
+
+        @Nullable
+        String leftParen;
+
+        Cobol arithmeticExpression;
+
+        @Nullable
+        Cobol abbreviation;
+
+        @Nullable
+        String rightParen;
+    }
 
     class Accept implements Statement {
         String accept;
@@ -131,6 +149,16 @@ public interface Cobol {
         ProcedureName from;
         String words;
         ProcedureName to;
+    }
+
+    class AndOrCondition implements Cobol {
+        String logicalOperator;
+
+        @Nullable
+        CombinableCondition combinableCondition;
+
+        @Nullable
+        CobolContainer<Cobol> abbreviations;
     }
 
     class ArithmeticExpression implements Cobol {
@@ -281,6 +309,16 @@ public interface Cobol {
         Name to;
     }
 
+    class ClassCondition implements Cobol {
+        Name name;
+
+        @Nullable
+        String words;
+
+        @Nullable
+        Name className;
+    }
+
     class Close implements Statement {
         String close;
         CobolContainer<CloseFile> closeFiles;
@@ -350,6 +388,35 @@ public interface Cobol {
 
     class ComputeStore implements Cobol {
         Roundable roundable;
+    }
+
+    class CombinableCondition implements Cobol {
+        @Nullable
+        String not;
+
+        Cobol simpleCondition;
+    }
+
+    class Condition implements Cobol {
+        CombinableCondition combinableCondition;
+
+        CobolContainer<AndOrCondition> andOrConditions;
+    }
+
+    class ConditionNameReference implements Cobol {
+        Name name;
+
+        @Nullable
+        CobolContainer<InData> inDatas;
+
+        @Nullable
+        InFile inFile;
+
+        @Nullable
+        CobolContainer<ParenExpression> references;
+
+        @Nullable
+        CobolContainer<InMnemonic> inMnemonics;
     }
 
     class ConfigurationSection implements Cobol {
@@ -521,6 +588,74 @@ public interface Cobol {
     class EnvironmentDivision implements Cobol {
         String words;
         CobolContainer<Cobol> body;
+    }
+
+    class Evaluate implements Statement {
+        String evaluate;
+        Cobol select;
+
+        @Nullable
+        CobolContainer<EvaluateAlso> alsoSelect;
+
+        @Nullable
+        CobolContainer<EvaluateWhenPhrase> whenPhrase;
+
+        @Nullable
+        StatementPhrase whenOther;
+
+        CobolLeftPadded<String> endPhrase;
+    }
+
+    class EvaluateAlso implements Cobol {
+        String also;
+        Cobol select;
+    }
+
+    class EvaluateAlsoCondition implements Cobol {
+        String also;
+
+        EvaluateCondition condition;
+    }
+
+    class EvaluateCondition implements Cobol {
+        @Nullable
+        String words;
+
+        @Nullable
+        Cobol condition;
+
+        @Nullable
+        EvaluateThrough evaluateThrough;
+    }
+
+    class EvaluateThrough implements Cobol {
+        String through;
+        Cobol value;
+    }
+
+    class EvaluateValueThrough implements Cobol {
+        @Nullable
+        String not;
+
+        Cobol value;
+
+        @Nullable
+        EvaluateThrough evaluateThrough;
+    }
+
+    class EvaluateWhen implements Cobol {
+        String when;
+        EvaluateCondition condition;
+
+        @Nullable
+        CobolContainer<EvaluateAlsoCondition> alsoCondition;
+    }
+
+    class EvaluateWhenPhrase implements Cobol {
+        CobolContainer<EvaluateWhenPhrase> whens;
+
+        @Nullable
+        CobolContainer<Statement> statements;
     }
 
     class Exhibit implements Statement {
@@ -931,7 +1066,7 @@ public interface Cobol {
 
     class ParenExpression implements Cobol {
         String leftParen;
-        CobolContainer<Cobol> expressions;
+        Cobol expression;
         String rightParen;
     }
 
@@ -1016,6 +1151,32 @@ public interface Cobol {
 
     class QualifiedInData implements Cobol {
         Cobol in;
+    }
+
+    class RelationalOperator implements Cobol {
+        String words;
+    }
+
+    class RelationArithmeticComparison implements Cobol {
+        ArithmeticExpression arithmeticExpressionA;
+        RelationalOperator relationalOperator;
+        ArithmeticExpression arithmeticExpressionB;
+    }
+
+    class RelationCombinedComparison implements Cobol {
+        ArithmeticExpression arithmeticExpression;
+        RelationalOperator relationalOperator;
+        ParenExpression combinedCondition;
+    }
+
+    class RelationCombinedCondition implements Cobol {
+        ArithmeticExpression arithmeticExpression;
+        CobolContainer<Cobol> andOrArithmeticExpressions;
+    }
+
+    class RelationSignCondition implements Cobol {
+        ArithmeticExpression arithmeticExpression;
+        String words;
     }
 
     class ReportName implements Cobol {

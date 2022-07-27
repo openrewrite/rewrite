@@ -1574,4 +1574,175 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(performTestClause.getWords());
         return performTestClause;
     }
+
+    public Cobol visitEvaluate(Cobol.Evaluate evaluate, PrintOutputCapture<P> p) {
+        visitSpace(evaluate.getPrefix(), p);
+        visitMarkers(evaluate.getMarkers(), p);
+        p.append(evaluate.getEvaluate());
+        visit(evaluate.getSelect(), p);
+        visitContainer("", evaluate.getPadding().getAlsoSelect(), "", "", p);
+        visitContainer("", evaluate.getPadding().getWhenPhrase(), "", "", p);
+        visit(evaluate.getWhenOther(), p);
+        visitLeftPadded("", evaluate.getPadding().getEndPhrase(), p);
+        return evaluate;
+    }
+
+    public Cobol visitEvaluateAlso(Cobol.EvaluateAlso evaluateAlso, PrintOutputCapture<P> p) {
+        visitSpace(evaluateAlso.getPrefix(), p);
+        visitMarkers(evaluateAlso.getMarkers(), p);
+        p.append(evaluateAlso.getAlso());
+        visit(evaluateAlso.getSelect(), p);
+        return evaluateAlso;
+    }
+
+    public Cobol visitEvaluateAlsoCondition(Cobol.EvaluateAlsoCondition evaluateAlsoCondition, PrintOutputCapture<P> p) {
+        visitSpace(evaluateAlsoCondition.getPrefix(), p);
+        visitMarkers(evaluateAlsoCondition.getMarkers(), p);
+        p.append(evaluateAlsoCondition.getAlso());
+        visit(evaluateAlsoCondition.getCondition(), p);
+        return evaluateAlsoCondition;
+    }
+
+    public Cobol visitEvaluateCondition(Cobol.EvaluateCondition evaluateCondition, PrintOutputCapture<P> p) {
+        visitSpace(evaluateCondition.getPrefix(), p);
+        visitMarkers(evaluateCondition.getMarkers(), p);
+        p.append(evaluateCondition.getWords());
+        visit(evaluateCondition.getCondition(), p);
+        visit(evaluateCondition.getEvaluateThrough(), p);
+        return evaluateCondition;
+    }
+
+    public Cobol visitEvaluateThrough(Cobol.EvaluateThrough evaluateThrough, PrintOutputCapture<P> p) {
+        visitSpace(evaluateThrough.getPrefix(), p);
+        visitMarkers(evaluateThrough.getMarkers(), p);
+        p.append(evaluateThrough.getThrough());
+        visit(evaluateThrough.getValue(), p);
+        return evaluateThrough;
+    }
+
+    public Cobol visitEvaluateWhen(Cobol.EvaluateWhen evaluateWhen, PrintOutputCapture<P> p) {
+        visitSpace(evaluateWhen.getPrefix(), p);
+        visitMarkers(evaluateWhen.getMarkers(), p);
+        p.append(evaluateWhen.getWhen());
+        visit(evaluateWhen.getCondition(), p);
+        visitContainer("", evaluateWhen.getPadding().getAlsoCondition(), "", "", p);
+        return evaluateWhen;
+    }
+
+    public Cobol visitEvaluateWhenPhrase(Cobol.EvaluateWhenPhrase evaluateWhenPhrase, PrintOutputCapture<P> p) {
+        visitSpace(evaluateWhenPhrase.getPrefix(), p);
+        visitMarkers(evaluateWhenPhrase.getMarkers(), p);
+        visitContainer("", evaluateWhenPhrase.getPadding().getWhens(), "", "", p);
+        visitContainer("", evaluateWhenPhrase.getPadding().getStatements(), "", "", p);
+        return evaluateWhenPhrase;
+    }
+
+    public Cobol visitEvaluateValueThrough(Cobol.EvaluateValueThrough evaluateValueThrough, PrintOutputCapture<P> p) {
+        visitSpace(evaluateValueThrough.getPrefix(), p);
+        visitMarkers(evaluateValueThrough.getMarkers(), p);
+        p.append(evaluateValueThrough.getNot());
+        visit(evaluateValueThrough.getValue(), p);
+        visit(evaluateValueThrough.getEvaluateThrough(), p);
+        return evaluateValueThrough;
+    }
+
+    public Cobol visitAbbreviation(Cobol.Abbreviation abbreviation, PrintOutputCapture<P> p) {
+        visitSpace(abbreviation.getPrefix(), p);
+        visitMarkers(abbreviation.getMarkers(), p);
+        p.append(abbreviation.getNot());
+        visit(abbreviation.getRelationalOperator(), p);
+        if (abbreviation.getLeftParen() != null) {
+            p.append(abbreviation.getLeftParen());
+        }
+        visit(abbreviation.getArithmeticExpression(), p);
+        visit(abbreviation.getAbbreviation(), p);
+        if (abbreviation.getRightParen() != null) {
+            p.append(abbreviation.getRightParen());
+        }
+        return abbreviation;
+    }
+
+    public Cobol visitAndOrCondition(Cobol.AndOrCondition andOrCondition, PrintOutputCapture<P> p) {
+        visitSpace(andOrCondition.getPrefix(), p);
+        visitMarkers(andOrCondition.getMarkers(), p);
+        p.append(andOrCondition.getLogicalOperator());
+        visit(andOrCondition.getCombinableCondition(), p);
+        visitContainer("", andOrCondition.getPadding().getAbbreviations(), "", "", p);
+        return andOrCondition;
+    }
+
+    public Cobol visitClassCondition(Cobol.ClassCondition classCondition, PrintOutputCapture<P> p) {
+        visitSpace(classCondition.getPrefix(), p);
+        visitMarkers(classCondition.getMarkers(), p);
+        p.append(classCondition.getWords());
+        return classCondition;
+    }
+
+    public Cobol visitCombinableCondition(Cobol.CombinableCondition combinableCondition, PrintOutputCapture<P> p) {
+        visitSpace(combinableCondition.getPrefix(), p);
+        visitMarkers(combinableCondition.getMarkers(), p);
+        p.append(combinableCondition.getNot());
+        visit(combinableCondition.getSimpleCondition(), p);
+        return combinableCondition;
+    }
+
+    public Cobol visitConditionNameReference(Cobol.ConditionNameReference conditionNameReference, PrintOutputCapture<P> p) {
+        visitSpace(conditionNameReference.getPrefix(), p);
+        visitMarkers(conditionNameReference.getMarkers(), p);
+        visitContainer("", conditionNameReference.getPadding().getInDatas(), "", "", p);
+        visit(conditionNameReference.getInFile(), p);
+        visitContainer("", conditionNameReference.getPadding().getReferences(), "", "", p);
+        visitContainer("", conditionNameReference.getPadding().getInMnemonics(), "", "", p);
+        return conditionNameReference;
+    }
+
+    public Cobol visitParenExpression(Cobol.ParenExpression parenExpression, PrintOutputCapture<P> p) {
+        visitSpace(parenExpression.getPrefix(), p);
+        visitMarkers(parenExpression.getMarkers(), p);
+        p.append(parenExpression.getLeftParen());
+        visit(parenExpression.getExpression(), p);
+        p.append(parenExpression.getRightParen());
+        return parenExpression;
+    }
+
+    public Cobol visitRelationalOperator(Cobol.RelationalOperator relationalOperator, PrintOutputCapture<P> p) {
+        visitSpace(relationalOperator.getPrefix(), p);
+        visitMarkers(relationalOperator.getMarkers(), p);
+        p.append(relationalOperator.getWords());
+        return relationalOperator;
+    }
+
+    public Cobol visitRelationArithmeticComparison(Cobol.RelationArithmeticComparison relationArithmeticComparison, PrintOutputCapture<P> p) {
+        visitSpace(relationArithmeticComparison.getPrefix(), p);
+        visitMarkers(relationArithmeticComparison.getMarkers(), p);
+        visit(relationArithmeticComparison.getArithmeticExpressionA(), p);
+        visit(relationArithmeticComparison.getRelationalOperator(), p);
+        visit(relationArithmeticComparison.getArithmeticExpressionB(), p);
+        return relationArithmeticComparison;
+    }
+
+    public Cobol visitRelationCombinedComparison(Cobol.RelationCombinedComparison relationCombinedComparison, PrintOutputCapture<P> p) {
+        visitSpace(relationCombinedComparison.getPrefix(), p);
+        visitMarkers(relationCombinedComparison.getMarkers(), p);
+        visit(relationCombinedComparison.getArithmeticExpression(), p);
+        visit(relationCombinedComparison.getRelationalOperator(), p);
+        visit(relationCombinedComparison.getCombinedCondition(), p);
+        return relationCombinedComparison;
+    }
+
+    public Cobol visitRelationCombinedCondition(Cobol.RelationCombinedCondition relationCombinedCondition, PrintOutputCapture<P> p) {
+        visitSpace(relationCombinedCondition.getPrefix(), p);
+        visitMarkers(relationCombinedCondition.getMarkers(), p);
+        visit(relationCombinedCondition.getArithmeticExpression(), p);
+        visitContainer("", relationCombinedCondition.getPadding().getAndOrArithmeticExpressions(), "", "", p);
+        return relationCombinedCondition;
+    }
+
+    public Cobol visitRelationSignCondition(Cobol.RelationSignCondition relationSignCondition, PrintOutputCapture<P> p) {
+        visitSpace(relationSignCondition.getPrefix(), p);
+        visitMarkers(relationSignCondition.getMarkers(), p);
+        visit(relationSignCondition.getArithmeticExpression(), p);
+        p.append(relationSignCondition.getWords());
+        return relationSignCondition;
+    }
 }

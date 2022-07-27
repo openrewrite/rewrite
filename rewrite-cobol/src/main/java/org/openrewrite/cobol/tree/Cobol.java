@@ -162,6 +162,39 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Abbreviation implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        String not;
+
+        @Nullable
+        RelationalOperator relationalOperator;
+
+        @Nullable
+        String leftParen;
+
+        Cobol arithmeticExpression;
+
+        @Nullable
+        Cobol abbreviation;
+
+        @Nullable
+        String rightParen;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitAbbreviation(this, p);
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -900,6 +933,85 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitAlterProceedTo(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class AndOrCondition implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String logicalOperator;
+
+        @Getter
+        @Nullable
+        @With
+        CombinableCondition combinableCondition;
+
+        @Nullable
+        CobolContainer<Cobol> abbreviations;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitAndOrCondition(this, p);
+        }
+
+        public List<Cobol> getAbbreviations() {
+            return abbreviations.getElements();
+        }
+
+        public AndOrCondition withAbbreviations(List<Cobol> abbreviations) {
+            return getPadding().withAbbreviations(this.abbreviations.getPadding().withElements(CobolRightPadded.withElements(
+                    this.abbreviations.getPadding().getElements(), abbreviations)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final AndOrCondition t;
+
+            @Nullable
+            public CobolContainer<Cobol> getAbbreviations() {
+                return t.abbreviations;
+            }
+
+            public AndOrCondition withAbbreviations(@Nullable CobolContainer<Cobol> abbreviations) {
+                return t.abbreviations == abbreviations ? t : new AndOrCondition(t.padding, t.id, t.prefix, t.markers, t.logicalOperator, t.combinableCondition, abbreviations);
+            }
         }
     }
 
@@ -1698,6 +1810,29 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ClassCondition implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Name name;
+
+        @Nullable
+        String words;
+
+        @Nullable
+        Name className;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitClassCondition(this, p);
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2153,6 +2288,220 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitComputeStore(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class CombinableCondition implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        String not;
+
+        Cobol simpleCondition;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitCombinableCondition(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Condition implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        CombinableCondition combinableCondition;
+
+        CobolContainer<AndOrCondition> andOrConditions;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitCondition(this, p);
+        }
+
+        public List<Cobol.AndOrCondition> getAndOrConditions() {
+            return andOrConditions.getElements();
+        }
+
+        public Condition withAndOrConditions(List<Cobol.AndOrCondition> andOrConditions) {
+            return getPadding().withAndOrConditions(this.andOrConditions.getPadding().withElements(CobolRightPadded.withElements(
+                    this.andOrConditions.getPadding().getElements(), andOrConditions)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Condition t;
+
+            public CobolContainer<Cobol.AndOrCondition> getAndOrConditions() {
+                return t.andOrConditions;
+            }
+
+            public Condition withAndOrConditions(CobolContainer<Cobol.AndOrCondition> andOrConditions) {
+                return t.andOrConditions == andOrConditions ? t : new Condition(t.padding, t.id, t.prefix, t.markers, t.combinableCondition, andOrConditions);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ConditionNameReference implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Name name;
+
+        @Nullable
+        CobolContainer<InData> inDatas;
+
+        @Getter
+        @Nullable
+        @With
+        InFile inFile;
+
+        @Nullable
+        CobolContainer<ParenExpression> references;
+
+        @Nullable
+        CobolContainer<InMnemonic> inMnemonics;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitConditionNameReference(this, p);
+        }
+
+        public List<Cobol.InData> getInDatas() {
+            return inDatas.getElements();
+        }
+
+        public ConditionNameReference withInDatas(List<Cobol.InData> inDatas) {
+            return getPadding().withInDatas(this.inDatas.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inDatas.getPadding().getElements(), inDatas)));
+        }
+
+        public List<Cobol.ParenExpression> getReferences() {
+            return references.getElements();
+        }
+
+        public ConditionNameReference withReferences(List<Cobol.ParenExpression> references) {
+            return getPadding().withReferences(this.references.getPadding().withElements(CobolRightPadded.withElements(
+                    this.references.getPadding().getElements(), references)));
+        }
+
+        public List<Cobol.InMnemonic> getInMnemonics() {
+            return inMnemonics.getElements();
+        }
+
+        public ConditionNameReference withInMnemonics(List<Cobol.InMnemonic> inMnemonics) {
+            return getPadding().withInMnemonics(this.inMnemonics.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inMnemonics.getPadding().getElements(), inMnemonics)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ConditionNameReference t;
+
+            @Nullable
+            public CobolContainer<Cobol.InData> getInDatas() {
+                return t.inDatas;
+            }
+
+            public ConditionNameReference withInDatas(@Nullable CobolContainer<Cobol.InData> inDatas) {
+                return t.inDatas == inDatas ? t : new ConditionNameReference(t.padding, t.id, t.prefix, t.markers, t.name, inDatas, t.inFile, t.references, t.inMnemonics);
+            }
+
+            @Nullable
+            public CobolContainer<Cobol.ParenExpression> getReferences() {
+                return t.references;
+            }
+
+            public ConditionNameReference withReferences(@Nullable CobolContainer<Cobol.ParenExpression> references) {
+                return t.references == references ? t : new ConditionNameReference(t.padding, t.id, t.prefix, t.markers, t.name, t.inDatas, t.inFile, references, t.inMnemonics);
+            }
+
+            @Nullable
+            public CobolContainer<Cobol.InMnemonic> getInMnemonics() {
+                return t.inMnemonics;
+            }
+
+            public ConditionNameReference withInMnemonics(@Nullable CobolContainer<Cobol.InMnemonic> inMnemonics) {
+                return t.inMnemonics == inMnemonics ? t : new ConditionNameReference(t.padding, t.id, t.prefix, t.markers, t.name, t.inDatas, t.inFile, t.references, inMnemonics);
+            }
         }
     }
 
@@ -3326,6 +3675,400 @@ public interface Cobol extends Tree {
 
             public EnvironmentDivision withBody(CobolContainer<Cobol> body) {
                 return t.body == body ? t : new EnvironmentDivision(t.padding, t.id, t.prefix, t.markers, t.words, body);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Evaluate implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String evaluate;
+
+        @Getter
+        @With
+        Cobol select;
+
+        @Nullable
+        CobolContainer<EvaluateAlso> alsoSelect;
+
+        @Nullable
+        CobolContainer<EvaluateWhenPhrase> whenPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase whenOther;
+
+        CobolLeftPadded<String> endPhrase;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEvaluate(this, p);
+        }
+
+        public List<Cobol.EvaluateAlso> getAlsoSelect() {
+            return alsoSelect.getElements();
+        }
+
+        public Evaluate withAlsoSelect(List<Cobol.EvaluateAlso> alsoSelect) {
+            return getPadding().withAlsoSelect(this.alsoSelect.getPadding().withElements(CobolRightPadded.withElements(
+                    this.alsoSelect.getPadding().getElements(), alsoSelect)));
+        }
+
+        public List<Cobol.EvaluateWhenPhrase> getWhenPhrase() {
+            return whenPhrase.getElements();
+        }
+
+        public Evaluate withWhenPhrase(List<Cobol.EvaluateWhenPhrase> whenPhrase) {
+            return getPadding().withWhenPhrase(this.whenPhrase.getPadding().withElements(CobolRightPadded.withElements(
+                    this.whenPhrase.getPadding().getElements(), whenPhrase)));
+        }
+
+        public String getEndPhrase() {
+            return endPhrase.getElement();
+        }
+
+        public Evaluate withEndPhrase(String endPhrase) {
+            //noinspection ConstantConditions
+            return getPadding().withEndPhrase(CobolLeftPadded.withElement(this.endPhrase, endPhrase));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Evaluate t;
+
+            @Nullable
+            public CobolContainer<Cobol.EvaluateAlso> getAlsoSelect() {
+                return t.alsoSelect;
+            }
+
+            public Evaluate withAlsoSelect(@Nullable CobolContainer<Cobol.EvaluateAlso> alsoSelect) {
+                return t.alsoSelect == alsoSelect ? t : new Evaluate(t.padding, t.id, t.prefix, t.markers, t.evaluate, t.select, alsoSelect, t.whenPhrase, t.whenOther, t.endPhrase);
+            }
+
+            @Nullable
+            public CobolContainer<Cobol.EvaluateWhenPhrase> getWhenPhrase() {
+                return t.whenPhrase;
+            }
+
+            public Evaluate withWhenPhrase(@Nullable CobolContainer<Cobol.EvaluateWhenPhrase> whenPhrase) {
+                return t.whenPhrase == whenPhrase ? t : new Evaluate(t.padding, t.id, t.prefix, t.markers, t.evaluate, t.select, t.alsoSelect, whenPhrase, t.whenOther, t.endPhrase);
+            }
+
+            public CobolLeftPadded<String> getEndPhrase() {
+                return t.endPhrase;
+            }
+
+            public Evaluate withEndPhrase(CobolLeftPadded<String> endPhrase) {
+                return t.endPhrase == endPhrase ? t : new Evaluate(t.padding, t.id, t.prefix, t.markers, t.evaluate, t.select, t.alsoSelect, t.whenPhrase, t.whenOther, endPhrase);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class EvaluateAlso implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String also;
+        Cobol select;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEvaluateAlso(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class EvaluateAlsoCondition implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String also;
+
+        EvaluateCondition condition;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEvaluateAlsoCondition(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class EvaluateCondition implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        String words;
+
+        @Nullable
+        Cobol condition;
+
+        @Nullable
+        EvaluateThrough evaluateThrough;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEvaluateCondition(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class EvaluateThrough implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String through;
+        Cobol value;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEvaluateThrough(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class EvaluateValueThrough implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        String not;
+
+        Cobol value;
+
+        @Nullable
+        EvaluateThrough evaluateThrough;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEvaluateValueThrough(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class EvaluateWhen implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String when;
+
+        @Getter
+        @With
+        EvaluateCondition condition;
+
+        @Nullable
+        CobolContainer<EvaluateAlsoCondition> alsoCondition;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEvaluateWhen(this, p);
+        }
+
+        public List<Cobol.EvaluateAlsoCondition> getAlsoCondition() {
+            return alsoCondition.getElements();
+        }
+
+        public EvaluateWhen withAlsoCondition(List<Cobol.EvaluateAlsoCondition> alsoCondition) {
+            return getPadding().withAlsoCondition(this.alsoCondition.getPadding().withElements(CobolRightPadded.withElements(
+                    this.alsoCondition.getPadding().getElements(), alsoCondition)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final EvaluateWhen t;
+
+            @Nullable
+            public CobolContainer<Cobol.EvaluateAlsoCondition> getAlsoCondition() {
+                return t.alsoCondition;
+            }
+
+            public EvaluateWhen withAlsoCondition(@Nullable CobolContainer<Cobol.EvaluateAlsoCondition> alsoCondition) {
+                return t.alsoCondition == alsoCondition ? t : new EvaluateWhen(t.padding, t.id, t.prefix, t.markers, t.when, t.condition, alsoCondition);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class EvaluateWhenPhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        CobolContainer<EvaluateWhenPhrase> whens;
+
+        @Nullable
+        CobolContainer<Statement> statements;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitEvaluateWhenPhrase(this, p);
+        }
+
+        public List<Cobol.EvaluateWhenPhrase> getWhens() {
+            return whens.getElements();
+        }
+
+        public EvaluateWhenPhrase withWhens(List<Cobol.EvaluateWhenPhrase> whens) {
+            return getPadding().withWhens(this.whens.getPadding().withElements(CobolRightPadded.withElements(
+                    this.whens.getPadding().getElements(), whens)));
+        }
+
+        public List<Statement> getStatements() {
+            return statements.getElements();
+        }
+
+        public EvaluateWhenPhrase withStatements(List<Statement> statements) {
+            return getPadding().withStatements(this.statements.getPadding().withElements(CobolRightPadded.withElements(
+                    this.statements.getPadding().getElements(), statements)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final EvaluateWhenPhrase t;
+
+            public CobolContainer<Cobol.EvaluateWhenPhrase> getWhens() {
+                return t.whens;
+            }
+
+            public EvaluateWhenPhrase withWhens(CobolContainer<Cobol.EvaluateWhenPhrase> whens) {
+                return t.whens == whens ? t : new EvaluateWhenPhrase(t.padding, t.id, t.prefix, t.markers, whens, t.statements);
+            }
+
+            @Nullable
+            public CobolContainer<Statement> getStatements() {
+                return t.statements;
+            }
+
+            public EvaluateWhenPhrase withStatements(@Nullable CobolContainer<Statement> statements) {
+                return t.statements == statements ? t : new EvaluateWhenPhrase(t.padding, t.id, t.prefix, t.markers, t.whens, statements);
             }
         }
     }
@@ -6473,6 +7216,25 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ParenExpression implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String leftParen;
+        Cobol expression;
+        String rightParen;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitParenExpression(this, p);
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -6972,6 +7734,151 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitQualifiedInData(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class RelationalOperator implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRelationalOperator(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class RelationArithmeticComparison implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        ArithmeticExpression arithmeticExpressionA;
+        RelationalOperator relationalOperator;
+        ArithmeticExpression arithmeticExpressionB;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRelationArithmeticComparison(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class RelationCombinedComparison implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        ArithmeticExpression arithmeticExpression;
+        RelationalOperator relationalOperator;
+        ParenExpression combinedCondition;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRelationCombinedComparison(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class RelationCombinedCondition implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        ArithmeticExpression arithmeticExpression;
+
+        CobolContainer<Cobol> andOrArithmeticExpressions;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRelationCombinedCondition(this, p);
+        }
+
+        public List<Cobol> getAndOrArithmeticExpressions() {
+            return andOrArithmeticExpressions.getElements();
+        }
+
+        public RelationCombinedCondition withAndOrArithmeticExpressions(List<Cobol> andOrArithmeticExpressions) {
+            return getPadding().withAndOrArithmeticExpressions(this.andOrArithmeticExpressions.getPadding().withElements(CobolRightPadded.withElements(
+                    this.andOrArithmeticExpressions.getPadding().getElements(), andOrArithmeticExpressions)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final RelationCombinedCondition t;
+
+            public CobolContainer<Cobol> getAndOrArithmeticExpressions() {
+                return t.andOrArithmeticExpressions;
+            }
+
+            public RelationCombinedCondition withAndOrArithmeticExpressions(CobolContainer<Cobol> andOrArithmeticExpressions) {
+                return t.andOrArithmeticExpressions == andOrArithmeticExpressions ? t : new RelationCombinedCondition(t.padding, t.id, t.prefix, t.markers, t.arithmeticExpression, andOrArithmeticExpressions);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class RelationSignCondition implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        ArithmeticExpression arithmeticExpression;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRelationSignCondition(this, p);
         }
     }
 
