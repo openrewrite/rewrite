@@ -72,14 +72,18 @@ public class CreateTextFile extends Recipe {
             return before;
         }
 
-        PlainTextParser parser = new PlainTextParser();
-        PlainText brandNewFile = parser.parse(fileContents).get(0);
+        PlainText brandNewFile = createNewFile(relativeFileName, fileContents);
 
         if (matchingFile != null) {
-            brandNewFile = new PlainText(matchingFile.getId(), brandNewFile.getSourcePath(), brandNewFile.getMarkers(),
-                    null, false, null, null, brandNewFile.getText());
+            brandNewFile = brandNewFile.withId(matchingFile.getId());
         }
 
         return ListUtils.concat(before, brandNewFile);
+    }
+
+    public static PlainText createNewFile(String relativeFilePath, String fileContents) {
+        PlainTextParser parser = new PlainTextParser();
+        PlainText brandNewFile = parser.parse(fileContents).get(0);
+        return brandNewFile.withSourcePath(Paths.get(relativeFilePath));
     }
 }
