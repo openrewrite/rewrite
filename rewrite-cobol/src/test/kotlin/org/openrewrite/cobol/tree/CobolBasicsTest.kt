@@ -503,7 +503,13 @@ class CobolBasicsTest : RewriteTest {
             PROGRAM-ID. acceptStatement.
             PROCEDURE DIVISION USING GRP-01.
             F-ANNUITY-02.
-            EVALUATE DFHRESP (IDENTIFIER).
+            EVALUATE IC110A
+            WHEN IDENTIFIER IS NOT ZERO
+                CONTINUE
+            WHEN IDENTIFIER LESSTHANOREQUAL IDENTIFIER
+                CONTINUE
+            WHEN IDENTIFIER MORETHANOREQUAL (IDENTIFIER AND IDENTIFIER OR IDENTIFIER)
+                CONTINUE.
         """)
     )
 
