@@ -503,13 +503,31 @@ class CobolBasicsTest : RewriteTest {
             PROGRAM-ID. acceptStatement.
             PROCEDURE DIVISION USING GRP-01.
             F-ANNUITY-02.
-            EVALUATE IC110A
-            WHEN IDENTIFIER IS NOT ZERO
-                CONTINUE
-            WHEN IDENTIFIER LESSTHANOREQUAL IDENTIFIER
-                CONTINUE
-            WHEN IDENTIFIER MORETHANOREQUAL (IDENTIFIER AND IDENTIFIER OR IDENTIFIER)
-                CONTINUE
+            EVALUATE DFHRESP (IDENTIFIER).
+        """)
+    )
+
+    @Disabled("Requires change to Literal.")
+    @Test
+    fun multiElementLiteral() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            Literal-Test.
+            EVALUATE DFHRESP (IDENTIFIER).
+        """)
+    )
+
+    @Disabled("Requires change to Identifier.")
+    @Test
+    fun multiElementIdentifier() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            Identifier-Test.
+            EVALUATE IDENTIFIER IN IDENTIFIER.
         """)
     )
 }
