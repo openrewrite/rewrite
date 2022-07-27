@@ -1,3 +1,4 @@
 package org.openrewrite.cobol.tree;
 
-public interface Name extends Identifier { }
+public interface Name extends Cobol {
+}

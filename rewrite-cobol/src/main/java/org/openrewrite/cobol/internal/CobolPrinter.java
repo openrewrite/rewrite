@@ -104,13 +104,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return display;
     }
 
-    public Cobol visitLiteral(Cobol.Literal literal, PrintOutputCapture<P> p) {
-        visitSpace(literal.getPrefix(), p);
-        visitMarkers(literal.getMarkers(), p);
-        p.append(literal.getValueSource());
-        return literal;
-    }
-
     public Cobol visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, PrintOutputCapture<P> p) {
         visitSpace(identificationDivision.getPrefix(), p);
         visitMarkers(identificationDivision.getMarkers(), p);

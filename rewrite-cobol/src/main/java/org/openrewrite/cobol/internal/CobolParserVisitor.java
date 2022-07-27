@@ -570,7 +570,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.CHANNEL()),
-                (Cobol.Literal) visit(ctx.integerLiteral()),
+                (Literal) visit(ctx.integerLiteral()),
                 padLeft(ctx.IS()),
                 (Identifier) visit(ctx.mnemonicName())
         );
@@ -767,9 +767,9 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.CURRENCY(), ctx.SIGN(), ctx.IS()),
-                (Cobol.Literal) visit(ctx.literal(0)),
+                (Literal) visit(ctx.literal(0)),
                 ctx.literal().size() > 1 ? padLeft(whitespace(), words(ctx.WITH(), ctx.PICTURE(), ctx.SYMBOL())) : null,
-                ctx.literal().size() > 1 ? (Cobol.Literal) visit(ctx.literal(1)) : null
+                ctx.literal().size() > 1 ? (Literal) visit(ctx.literal(1)) : null
         );
     }
 
@@ -1103,7 +1103,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                (Cobol.Literal) visit(ctx.literal()),
+                (Literal) visit(ctx.literal()),
                 visitNullable(ctx.alphabetThrough()),
                 ctx.alphabetAlso() == null ? null : convertAllContainer(ctx.alphabetAlso())
         );
@@ -1116,7 +1116,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.THROUGH(), ctx.THRU()),
-                (Cobol.Literal) visit(ctx.literal())
+                (Literal) visit(ctx.literal())
         );
     }
 
@@ -1648,9 +1648,9 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 sourceBefore(ctx.integerLiteral().getText()),
                 Markers.EMPTY,
                 ctx.integerLiteral().getText(),
-                (Cobol.Literal) visit(ctx.literal(0)),
+                (Literal) visit(ctx.literal(0)),
                 words(ctx.INVOKE()),
-                (Cobol.Literal) visit(ctx.literal(1))
+                (Literal) visit(ctx.literal(1))
         );
     }
 
@@ -2408,7 +2408,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 ctx.ENTRY().getText(),
-                (Cobol.Literal) visit(ctx.literal()),
+                (Literal) visit(ctx.literal()),
                 convertAllContainer(padLeft(ctx.USING()), ctx.identifier())
         );
     }
@@ -2861,17 +2861,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 words(ctx.INVALID(), ctx.KEY()),
                 convertAllContainer(ctx.statement())
-        );
-    }
-
-    @Override
-    public Cobol.Literal visitLiteral(CobolParser.LiteralContext ctx) {
-        return new Cobol.Literal(
-                randomId(),
-                sourceBefore(ctx.getText()),
-                Markers.EMPTY,
-                ctx.getText(), // TODO extract literal values from various literal types
-                ctx.getText()
         );
     }
 

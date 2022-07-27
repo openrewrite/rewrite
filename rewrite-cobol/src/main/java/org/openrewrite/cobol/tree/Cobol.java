@@ -861,11 +861,11 @@ public interface Cobol extends Tree {
             return v.visitAlphabetAlso(this, p);
         }
 
-        public List<Cobol.Literal> getLiterals() {
+        public List<Literal> getLiterals() {
             return literals.getElements();
         }
 
-        public AlphabetAlso withLiterals(List<Cobol.Literal> literals) {
+        public AlphabetAlso withLiterals(List<Literal> literals) {
             return getPadding().withLiterals(this.literals.getPadding().withElements(CobolRightPadded.withElements(
                     this.literals.getPadding().getElements(), literals)));
         }
@@ -889,11 +889,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final AlphabetAlso t;
 
-            public CobolContainer<Cobol.Literal> getLiterals() {
+            public CobolContainer<Literal> getLiterals() {
                 return t.literals;
             }
 
-            public AlphabetAlso withLiterals(CobolContainer<Cobol.Literal> literals) {
+            public AlphabetAlso withLiterals(CobolContainer<Literal> literals) {
                 return t.literals == literals ? t : new AlphabetAlso(t.padding, t.id, t.prefix, t.markers, t.words, literals);
             }
         }
@@ -2089,7 +2089,7 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    public class CobolWord implements Name {
+    public class CobolWord implements Literal, Identifier {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -4396,24 +4396,6 @@ public interface Cobol extends Tree {
             public FileDescriptionEntry withDataDescriptions(CobolContainer<Cobol.DataDescriptionEntry> dataDescriptions) {
                 return t.dataDescriptions == dataDescriptions ? t : new FileDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.words, t.name, t.clauses, dataDescriptions);
             }
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class Literal implements Name {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        Object value;
-        String valueSource;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitLiteral(this, p);
         }
     }
 
@@ -7768,7 +7750,7 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class QualifiedDataName implements Cobol, Name {
+    class QualifiedDataName implements Cobol, Identifier {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -9276,11 +9258,11 @@ public interface Cobol extends Tree {
                     this.symbols.getPadding().getElements(), symbols)));
         }
 
-        public List<Cobol.Literal> getLiterals() {
+        public List<Literal> getLiterals() {
             return literals.getElements();
         }
 
-        public SymbolicCharacter withLiterals(List<Cobol.Literal> literals) {
+        public SymbolicCharacter withLiterals(List<Literal> literals) {
             return getPadding().withLiterals(this.literals.getPadding().withElements(CobolRightPadded.withElements(
                     this.literals.getPadding().getElements(), literals)));
         }
@@ -9312,11 +9294,11 @@ public interface Cobol extends Tree {
                 return t.symbols == symbols ? t : new SymbolicCharacter(t.padding, t.id, t.prefix, t.markers, symbols, t.literals);
             }
 
-            public CobolContainer<Cobol.Literal> getLiterals() {
+            public CobolContainer<Literal> getLiterals() {
                 return t.literals;
             }
 
-            public SymbolicCharacter withLiterals(CobolContainer<Cobol.Literal> literals) {
+            public SymbolicCharacter withLiterals(CobolContainer<Literal> literals) {
                 return t.literals == literals ? t : new SymbolicCharacter(t.padding, t.id, t.prefix, t.markers, t.symbols, literals);
             }
         }

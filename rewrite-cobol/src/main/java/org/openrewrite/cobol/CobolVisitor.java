@@ -198,13 +198,6 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return e;
     }
 
-    public Cobol visitLiteral(Cobol.Literal literal, P p) {
-        Cobol.Literal l = literal;
-        l = l.withPrefix(visitSpace(l.getPrefix(), p));
-        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
-        return l;
-    }
-
     public Cobol visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, P p) {
         Cobol.IdentificationDivision i = identificationDivision;
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
@@ -430,7 +423,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.AlphabetLiteral a = alphabetLiteral;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        a = a.withLiteral((Cobol.Literal) visit(a.getLiteral(), p));
+        a = a.withLiteral((Literal) visit(a.getLiteral(), p));
         a = a.withAlphabetThrough((Cobol.AlphabetThrough) visit(a.getAlphabetThrough(), p));
         a = a.getPadding().withAlphabetAlso(visitContainer(a.getPadding().getAlphabetAlso(), p));
         return a;
@@ -440,7 +433,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.AlphabetThrough a = alphabetThrough;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        a = a.withLiteral((Cobol.Literal) visit(a.getLiteral(), p));
+        a = a.withLiteral((Literal) visit(a.getLiteral(), p));
         return a;
     }
 
@@ -464,7 +457,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.ChannelClause c = channelClause;
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        c = c.withLiteral((Cobol.Literal) visit(c.getLiteral(), p));
+        c = c.withLiteral((Literal) visit(c.getLiteral(), p));
         if (c.getPadding().getIs() != null) {
             c = c.getPadding().withIs(visitLeftPadded(c.getPadding().getIs(), p));
         }
@@ -476,11 +469,11 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.CurrencyClause c = currencyClause;
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        c = c.withLiteral((Cobol.Literal) visit(c.getLiteral(), p));
+        c = c.withLiteral((Literal) visit(c.getLiteral(), p));
         if (c.getPadding().getPictureSymbol() != null) {
             c = c.getPadding().withPictureSymbol(visitLeftPadded(c.getPadding().getPictureSymbol(), p));
         }
-        c = c.withPictureSymbolLiteral((Cobol.Literal) visit(c.getPictureSymbolLiteral(), p));
+        c = c.withPictureSymbolLiteral((Literal) visit(c.getPictureSymbolLiteral(), p));
         return c;
     }
 
@@ -602,8 +595,8 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.DataBaseSectionEntry d = dataBaseSectionEntry;
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
-        d = d.withFrom((Cobol.Literal) visit(d.getFrom(), p));
-        d = d.withTo((Cobol.Literal) visit(d.getTo(), p));
+        d = d.withFrom((Literal) visit(d.getFrom(), p));
+        d = d.withTo((Literal) visit(d.getTo(), p));
         return d;
     }
 
@@ -784,7 +777,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         c = c.withIdentifier((Identifier) visit(c.getIdentifier(), p));
-        c = c.withLiteral((Cobol.Literal) visit(c.getLiteral(), p));
+        c = c.withLiteral((Literal) visit(c.getLiteral(), p));
         return c;
     }
 
@@ -1235,7 +1228,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         b = b.withMarkers(visitMarkers(b.getMarkers(), p));
         b = b.withArithmeticExpression((Cobol.ArithmeticExpression) visit(b.getArithmeticExpression(), p));
         b = b.withIdentifier((Identifier) visit(b.getIdentifier(), p));
-        b = b.withLiteral((Cobol.Literal) visit(b.getLiteral(), p));
+        b = b.withLiteral((Literal) visit(b.getLiteral(), p));
         return b;
     }
 

@@ -31,11 +31,6 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
-    public Cobol.Literal visitLiteral(Cobol.Literal literal, P p) {
-        return (Cobol.Literal) super.visitLiteral(literal, p);
-    }
-
-    @Override
     public Cobol.IdentificationDivision visitIdentificationDivision(Cobol.IdentificationDivision identificationDivision, P p) {
         return (Cobol.IdentificationDivision) super.visitIdentificationDivision(identificationDivision, p);
     }
