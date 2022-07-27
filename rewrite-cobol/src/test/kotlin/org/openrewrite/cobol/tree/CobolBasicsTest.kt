@@ -521,21 +521,18 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
-    @Disabled("Requires changes to Basis")
     @Test
     fun relationConditions() = rewriteRun(
         cobol("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. acceptStatement.
-            PROCEDURE DIVISION USING GRP-01.
+            PROCEDURE DIVISION.
             F-ANNUITY-02.
             EVALUATE IC110A
-            WHEN IDENTIFIER IS NOT ZERO
-                CONTINUE
-            WHEN IDENTIFIER LESSTHANOREQUAL IDENTIFIER
-                CONTINUE
-            WHEN IDENTIFIER MORETHANOREQUAL (IDENTIFIER AND IDENTIFIER OR IDENTIFIER)
-                CONTINUE.
+            WHEN NOT +IDENTIFIER IS NOT ZERO
+            WHEN NOT +IDENTIFIER IS GREATER OR EQUAL +IDENTIFIER
+            WHEN NOT +ZERO GREATER THAN (IDENTIFIER AND IDENTIFIER OR IDENTIFIER)
+            .
         """)
     )
 

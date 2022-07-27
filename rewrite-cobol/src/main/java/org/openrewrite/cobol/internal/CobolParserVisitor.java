@@ -717,25 +717,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.LPARENCHAR()),
-                ctx.subscript().stream()
-                        .flatMap(it -> {
-                            Cobol.Subscript subscript = (Cobol.Subscript) visit(it);
-                            int saveCursor = cursor;
-                            Space prefix = whitespace();
-                            if(source.charAt(cursor) == ',') {
-                                Cobol.CobolWord comma = new Cobol.CobolWord(
-                                        randomId(),
-                                        prefix,
-                                        Markers.EMPTY,
-                                        ","
-                                );
-                                cursor += 1; // skip the comma
-                                return Stream.of(subscript, comma);
-                            }
-                            cursor = saveCursor;
-                            return Stream.of(subscript);
-                        })
-                        .collect(Collectors.toList()),
+                convertAllList(singletonList(","), ctx.subscript()),
                 words(ctx.RPARENCHAR())
         );
     }
@@ -851,6 +833,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                         (Cobol) visit(ctx.relationCombinedCondition()),
                         words(ctx.RPARENCHAR())
                 )
+        );
+    }
+
+    @Override
+    public Object visitRelationCombinedCondition(CobolParser.RelationCombinedConditionContext ctx) {
+        return new Cobol.RelationCombinedCondition(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllList(Arrays.asList("AND", "OR"), ctx.arithmeticExpression())
         );
     }
 
@@ -2929,6 +2921,33 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(List<T> trees, Supplier<Space> sourceBefore) {
         //noinspection unchecked
         return CobolContainer.build(convertAll(trees, t -> padRight((C) visit(t), sourceBefore.get())));
+    }
+
+    @SafeVarargs
+    private final List<Cobol> convertAllList(List<String> delimiters, List<? extends ParserRuleContext>... trees) {
+        return Arrays.stream(trees)
+                .flatMap(Collection::stream)
+                .filter(Objects::nonNull)
+                .flatMap(it -> {
+                    Cobol cobol = (Cobol) visit(it);
+                    int saveCursor = cursor;
+                    Space prefix = whitespace();
+                    for (String delimiter : delimiters) {
+                        if (source.substring(cursor).startsWith(delimiter)) {
+                            Cobol.CobolWord comma = new Cobol.CobolWord(
+                                    randomId(),
+                                    prefix,
+                                    Markers.EMPTY,
+                                    delimiter
+                            );
+                            cursor += delimiter.length(); // skip the delimiter
+                            return Stream.of(cobol, comma);
+                        }
+                    }
+                    cursor = saveCursor;
+                    return Stream.of(cobol);
+                })
+                .collect(Collectors.toList());
     }
 
     private Space prefix(ParserRuleContext ctx) {

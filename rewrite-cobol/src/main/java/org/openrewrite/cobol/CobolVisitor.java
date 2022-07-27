@@ -1781,8 +1781,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.RelationCombinedCondition r = relationCombinedCondition;
         r = r.withPrefix(visitSpace(r.getPrefix(), p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
-        r = r.withArithmeticExpression((Cobol.ArithmeticExpression) visit(r.getArithmeticExpression(), p));
-        r = r.getPadding().withAndOrArithmeticExpressions(visitContainer(r.getPadding().getAndOrArithmeticExpressions(), p));
+        r = r.withRelationalArithmeticExpressions(ListUtils.map(r.getRelationalArithmeticExpressions(), it -> visit(it, p)));
         return r;
     }
 

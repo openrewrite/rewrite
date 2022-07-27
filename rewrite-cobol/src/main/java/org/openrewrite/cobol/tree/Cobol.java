@@ -7969,75 +7969,20 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class RelationCombinedCondition implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        ArithmeticExpression arithmeticExpression;
-
-        CobolContainer<Cobol> andOrArithmeticExpressions;
+        List<Cobol> relationalArithmeticExpressions;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitRelationCombinedCondition(this, p);
-        }
-
-        public List<Cobol> getAndOrArithmeticExpressions() {
-            return andOrArithmeticExpressions.getElements();
-        }
-
-        public RelationCombinedCondition withAndOrArithmeticExpressions(List<Cobol> andOrArithmeticExpressions) {
-            return getPadding().withAndOrArithmeticExpressions(this.andOrArithmeticExpressions.getPadding().withElements(CobolRightPadded.withElements(
-                    this.andOrArithmeticExpressions.getPadding().getElements(), andOrArithmeticExpressions)));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final RelationCombinedCondition t;
-
-            public CobolContainer<Cobol> getAndOrArithmeticExpressions() {
-                return t.andOrArithmeticExpressions;
-            }
-
-            public RelationCombinedCondition withAndOrArithmeticExpressions(CobolContainer<Cobol> andOrArithmeticExpressions) {
-                return t.andOrArithmeticExpressions == andOrArithmeticExpressions ? t : new RelationCombinedCondition(t.padding, t.id, t.prefix, t.markers, t.arithmeticExpression, andOrArithmeticExpressions);
-            }
         }
     }
 

@@ -1767,8 +1767,9 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitRelationCombinedCondition(Cobol.RelationCombinedCondition relationCombinedCondition, PrintOutputCapture<P> p) {
         visitSpace(relationCombinedCondition.getPrefix(), p);
         visitMarkers(relationCombinedCondition.getMarkers(), p);
-        visit(relationCombinedCondition.getArithmeticExpression(), p);
-        visitContainer("", relationCombinedCondition.getPadding().getAndOrArithmeticExpressions(), "", "", p);
+        for (Cobol c : relationCombinedCondition.getRelationalArithmeticExpressions()) {
+            visit(c, p);
+        }
         return relationCombinedCondition;
     }
 
