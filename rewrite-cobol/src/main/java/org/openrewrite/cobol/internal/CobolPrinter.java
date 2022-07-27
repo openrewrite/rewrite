@@ -104,13 +104,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return display;
     }
 
-    public Cobol visitIdentifier(Cobol.Identifier identifier, PrintOutputCapture<P> p) {
-        visitSpace(identifier.getPrefix(), p);
-        visitMarkers(identifier.getMarkers(), p);
-        p.append(identifier.getSimpleName());
-        return identifier;
-    }
-
     public Cobol visitLiteral(Cobol.Literal literal, PrintOutputCapture<P> p) {
         visitSpace(literal.getPrefix(), p);
         visitMarkers(literal.getMarkers(), p);
@@ -598,7 +591,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(localStorageSection.getWords());
         if (localStorageSection.getLocalName() != null) {
             p.append(localStorageSection.getLocalData());
-            p.append(localStorageSection.getLocalName().getSimpleName());
+            visit(localStorageSection.getLocalName(), p);
         }
         visitContainer(".", localStorageSection.getPadding().getDataDescriptions(), "", "", p);
         return localStorageSection;
@@ -1736,6 +1729,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitConditionNameReference(Cobol.ConditionNameReference conditionNameReference, PrintOutputCapture<P> p) {
         visitSpace(conditionNameReference.getPrefix(), p);
         visitMarkers(conditionNameReference.getMarkers(), p);
+        visit(conditionNameReference.getName(), p);
         visitContainer("", conditionNameReference.getPadding().getInDatas(), "", "", p);
         visit(conditionNameReference.getInFile(), p);
         visitContainer("", conditionNameReference.getPadding().getReferences(), "", "", p);
@@ -1879,5 +1873,31 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(unstringTallyingPhrase.getWords());
         visit(unstringTallyingPhrase.getQualifiedDataName(), p);
         return unstringTallyingPhrase;
+    }
+
+    public Cobol visitConditionNameSubscriptReference(Cobol.ConditionNameSubscriptReference conditionNameSubscriptReference, PrintOutputCapture<P> p) {
+        visitSpace(conditionNameSubscriptReference.getPrefix(), p);
+        visitMarkers(conditionNameSubscriptReference.getMarkers(), p);
+        p.append(conditionNameSubscriptReference.getLeftParen());
+        for(Cobol c : conditionNameSubscriptReference.getSubscripts()) {
+            visit(c, p);
+        }
+        p.append(conditionNameSubscriptReference.getRightParen());
+        return conditionNameSubscriptReference;
+    }
+
+    public Cobol visitSubscript(Cobol.Subscript subscript, PrintOutputCapture<P> p) {
+        visitSpace(subscript.getPrefix(), p);
+        visitMarkers(subscript.getMarkers(), p);
+        visit(subscript.getFirst(), p);
+        visit(subscript.getIntegerLiteral(), p);
+        return subscript;
+    }
+
+    public Cobol visitCobolWord(Cobol.CobolWord cobolWord, PrintOutputCapture<P> p) {
+        visitSpace(cobolWord.getPrefix(), p);
+        visitMarkers(cobolWord.getMarkers(), p);
+        p.append(cobolWord.getWord());
+        return cobolWord;
     }
 }

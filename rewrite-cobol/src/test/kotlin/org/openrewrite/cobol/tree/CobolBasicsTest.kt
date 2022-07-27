@@ -495,6 +495,32 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
+    @Test
+    fun conditionNameSubscriptReference() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            COMMA-SUBSCRIPT-TEST.
+            EVALUATE NOT IDENTIFIER (IDENTIFIER, IDENTIFIER IDENTIFIER)
+            .
+        """)
+    )
+
+    @Disabled("Table call not yet implemented")
+    @Test
+    fun tableCallTest() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            COMMA-SUBSCRIPT-TEST.
+            EVALUATE SUBSCRIPT
+            WHEN IDENTIFIER (IDENTIFIER, IDENTIFIER IDENTIFIER)
+                CONTINUE.
+        """)
+    )
+
     @Disabled("Requires changes to Basis")
     @Test
     fun relationConditions() = rewriteRun(

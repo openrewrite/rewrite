@@ -31,11 +31,6 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
-    public Cobol.Identifier visitIdentifier(Cobol.Identifier identifier, P p) {
-        return (Cobol.Identifier) super.visitIdentifier(identifier, p);
-    }
-
-    @Override
     public Cobol.Literal visitLiteral(Cobol.Literal literal, P p) {
         return (Cobol.Literal) super.visitLiteral(literal, p);
     }
@@ -1067,5 +1062,20 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     @Override
     public Cobol.UnstringTallyingPhrase visitUnstringTallyingPhrase(Cobol.UnstringTallyingPhrase unstringTallyingPhrase, P p) {
         return (Cobol.UnstringTallyingPhrase) super.visitUnstringTallyingPhrase(unstringTallyingPhrase, p);
+    }
+
+    @Override
+    public Cobol.ConditionNameSubscriptReference visitConditionNameSubscriptReference(Cobol.ConditionNameSubscriptReference conditionNameSubscriptReference, P p) {
+        return (Cobol.ConditionNameSubscriptReference) super.visitConditionNameSubscriptReference(conditionNameSubscriptReference, p);
+    }
+
+    @Override
+    public Cobol.Subscript visitSubscript(Cobol.Subscript subscript, P p) {
+        return (Cobol.Subscript) super.visitSubscript(subscript, p);
+    }
+
+    @Override
+    public Cobol.CobolWord visitCobolWord(Cobol.CobolWord cobolWord, P p) {
+        return (Cobol.CobolWord) super.visitCobolWord(cobolWord, p);
     }
 }

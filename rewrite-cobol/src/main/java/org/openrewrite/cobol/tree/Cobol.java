@@ -2086,6 +2086,23 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    public class CobolWord implements Name {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String word;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitCobolWord(this, p);
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2130,11 +2147,11 @@ public interface Cobol extends Tree {
             return v.visitCollatingSequenceClause(this, p);
         }
 
-        public List<Cobol.Identifier> getAlphabetName() {
+        public List<Identifier> getAlphabetName() {
             return alphabetName.getElements();
         }
 
-        public CollatingSequenceClause withAlphabetName(List<Cobol.Identifier> alphabetName) {
+        public CollatingSequenceClause withAlphabetName(List<Identifier> alphabetName) {
             return getPadding().withAlphabetName(this.alphabetName.getPadding().withElements(CobolRightPadded.withElements(
                     this.alphabetName.getPadding().getElements(), alphabetName)));
         }
@@ -2158,11 +2175,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final CollatingSequenceClause t;
 
-            public CobolContainer<Cobol.Identifier> getAlphabetName() {
+            public CobolContainer<Identifier> getAlphabetName() {
                 return t.alphabetName;
             }
 
-            public CollatingSequenceClause withAlphabetName(CobolContainer<Cobol.Identifier> alphabetName) {
+            public CollatingSequenceClause withAlphabetName(CobolContainer<Identifier> alphabetName) {
                 return t.alphabetName == alphabetName ? t : new CollatingSequenceClause(t.padding, t.id, t.prefix, t.markers, t.words, alphabetName, t.alphanumeric, t.national);
             }
         }
@@ -2502,6 +2519,42 @@ public interface Cobol extends Tree {
             public ConditionNameReference withInMnemonics(@Nullable CobolContainer<Cobol.InMnemonic> inMnemonics) {
                 return t.inMnemonics == inMnemonics ? t : new ConditionNameReference(t.padding, t.id, t.prefix, t.markers, t.name, t.inDatas, t.inFile, t.references, inMnemonics);
             }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
+    class ConditionNameSubscriptReference implements Cobol {
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String leftParen;
+
+        @Getter
+        @With
+        List<Cobol> subscripts;
+
+        @Getter
+        @With
+        String rightParen;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitConditionNameSubscriptReference(this, p);
         }
     }
 
@@ -3568,11 +3621,11 @@ public interface Cobol extends Tree {
             return v.visitEntry(this, p);
         }
 
-        public List<Cobol.Identifier> getIdentifiers() {
+        public List<Identifier> getIdentifiers() {
             return identifiers.getElements();
         }
 
-        public Entry withIdentifiers(List<Cobol.Identifier> identifiers) {
+        public Entry withIdentifiers(List<Identifier> identifiers) {
             return getPadding().withIdentifiers(this.identifiers.getPadding().withElements(CobolRightPadded.withElements(
                     this.identifiers.getPadding().getElements(), identifiers)));
         }
@@ -3597,11 +3650,11 @@ public interface Cobol extends Tree {
             private final Entry t;
 
             @Nullable
-            public CobolContainer<Cobol.Identifier> getIdentifiers() {
+            public CobolContainer<Identifier> getIdentifiers() {
                 return t.identifiers;
             }
 
-            public Entry withIdentifiers(@Nullable CobolContainer<Cobol.Identifier> identifiers) {
+            public Entry withIdentifiers(@Nullable CobolContainer<Identifier> identifiers) {
                 return t.identifiers == identifiers ? t : new Entry(t.padding, t.id, t.prefix, t.markers, t.entry, t.literal, identifiers);
             }
         }
@@ -4107,11 +4160,11 @@ public interface Cobol extends Tree {
             return v.visitExhibit(this, p);
         }
 
-        public List<Cobol.Identifier> getOperands() {
+        public List<Identifier> getOperands() {
             return operands.getElements();
         }
 
-        public Exhibit withOperands(List<Cobol.Identifier> operands) {
+        public Exhibit withOperands(List<Identifier> operands) {
             return getPadding().withOperands(this.operands.getPadding().withElements(CobolRightPadded.withElements(
                     this.operands.getPadding().getElements(), operands)));
         }
@@ -4135,11 +4188,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final Exhibit t;
 
-            public CobolContainer<Cobol.Identifier> getOperands() {
+            public CobolContainer<Identifier> getOperands() {
                 return t.operands;
             }
 
-            public Exhibit withOperands(CobolContainer<Cobol.Identifier> operands) {
+            public Exhibit withOperands(CobolContainer<Identifier> operands) {
                 return t.operands == operands ? t : new Exhibit(t.padding, t.id, t.prefix, t.markers, t.words, operands);
             }
         }
@@ -4349,23 +4402,6 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class Identifier implements Name {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String simpleName;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitIdentifier(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
     class Literal implements Name {
         @EqualsAndHashCode.Include
         UUID id;
@@ -4374,11 +4410,6 @@ public interface Cobol extends Tree {
         Markers markers;
         Object value;
         String valueSource;
-
-        @Override
-        public String getSimpleName() {
-            return value.toString();
-        }
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -5017,11 +5048,11 @@ public interface Cobol extends Tree {
             return v.visitMoveToStatement(this, p);
         }
 
-        public List<Cobol.Identifier> getTo() {
+        public List<Identifier> getTo() {
             return to.getElements();
         }
 
-        public MoveToStatement withTo(List<Cobol.Identifier> to) {
+        public MoveToStatement withTo(List<Identifier> to) {
             return getPadding().withTo(this.to.getPadding().withElements(CobolRightPadded.withElements(
                     this.to.getPadding().getElements(), to)));
         }
@@ -5045,11 +5076,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final MoveToStatement t;
 
-            public CobolContainer<Cobol.Identifier> getTo() {
+            public CobolContainer<Identifier> getTo() {
                 return t.to;
             }
 
-            public MoveToStatement withTo(CobolContainer<Cobol.Identifier> to) {
+            public MoveToStatement withTo(CobolContainer<Identifier> to) {
                 return t.to == to ? t : new MoveToStatement(t.padding, t.id, t.prefix, t.markers, t.from, to);
             }
         }
@@ -5093,11 +5124,11 @@ public interface Cobol extends Tree {
             return v.visitMoveCorrespondingToStatement(this, p);
         }
 
-        public List<Cobol.Identifier> getTo() {
+        public List<Identifier> getTo() {
             return to.getElements();
         }
 
-        public MoveCorrespondingToStatement withTo(List<Cobol.Identifier> to) {
+        public MoveCorrespondingToStatement withTo(List<Identifier> to) {
             return getPadding().withTo(this.to.getPadding().withElements(CobolRightPadded.withElements(
                     this.to.getPadding().getElements(), to)));
         }
@@ -5121,11 +5152,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final MoveCorrespondingToStatement t;
 
-            public CobolContainer<Cobol.Identifier> getTo() {
+            public CobolContainer<Identifier> getTo() {
                 return t.to;
             }
 
-            public MoveCorrespondingToStatement withTo(CobolContainer<Cobol.Identifier> to) {
+            public MoveCorrespondingToStatement withTo(CobolContainer<Identifier> to) {
                 return t.to == to ? t : new MoveCorrespondingToStatement(t.padding, t.id, t.prefix, t.markers, t.words, t.moveCorrespondingToSendingArea, to);
             }
         }
@@ -7737,7 +7768,7 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class QualifiedDataName implements Cobol {
+    class QualifiedDataName implements Cobol, Name {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -8195,7 +8226,7 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class Roundable implements Name {
+    class Roundable implements Cobol {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -8219,11 +8250,6 @@ public interface Cobol extends Tree {
 
         @Nullable
         CobolLeftPadded<String> rounded;
-
-        @Override
-        public String getSimpleName() {
-            return identifier.getSimpleName();
-        }
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -8710,11 +8736,11 @@ public interface Cobol extends Tree {
             return v.visitSetTo(this, p);
         }
 
-        public List<Cobol.Identifier> getTo() {
+        public List<Identifier> getTo() {
             return to.getElements();
         }
 
-        public SetTo withTo(List<Cobol.Identifier> to) {
+        public SetTo withTo(List<Identifier> to) {
             return getPadding().withTo(this.to.getPadding().withElements(CobolRightPadded.withElements(
                     this.to.getPadding().getElements(), to)));
         }
@@ -8747,11 +8773,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final SetTo t;
 
-            public CobolContainer<Cobol.Identifier> getTo() {
+            public CobolContainer<Identifier> getTo() {
                 return t.to;
             }
 
-            public SetTo withTo(CobolContainer<Cobol.Identifier> to) {
+            public SetTo withTo(CobolContainer<Identifier> to) {
                 return t.to == to ? t : new SetTo(t.padding, t.id, t.prefix, t.markers, to, t.values);
             }
 
@@ -8800,11 +8826,11 @@ public interface Cobol extends Tree {
             return v.visitSetUpDown(this, p);
         }
 
-        public List<Cobol.Identifier> getTo() {
+        public List<Identifier> getTo() {
             return to.getElements();
         }
 
-        public SetUpDown withTo(List<Cobol.Identifier> to) {
+        public SetUpDown withTo(List<Identifier> to) {
             return getPadding().withTo(this.to.getPadding().withElements(CobolRightPadded.withElements(
                     this.to.getPadding().getElements(), to)));
         }
@@ -8837,11 +8863,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final SetUpDown t;
 
-            public CobolContainer<Cobol.Identifier> getTo() {
+            public CobolContainer<Identifier> getTo() {
                 return t.to;
             }
 
-            public SetUpDown withTo(CobolContainer<Cobol.Identifier> to) {
+            public SetUpDown withTo(CobolContainer<Identifier> to) {
                 return t.to == to ? t : new SetUpDown(t.padding, t.id, t.prefix, t.markers, to, t.operation, t.value);
             }
 
@@ -9188,6 +9214,28 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Subscript implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        Cobol first;
+
+        @Nullable
+        CobolWord integerLiteral;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSubscript(this, p);
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -9219,11 +9267,11 @@ public interface Cobol extends Tree {
             return v.visitSymbolicCharacter(this, p);
         }
 
-        public List<Cobol.Identifier> getSymbols() {
+        public List<Identifier> getSymbols() {
             return symbols.getElements();
         }
 
-        public SymbolicCharacter withSymbols(List<Cobol.Identifier> symbols) {
+        public SymbolicCharacter withSymbols(List<Identifier> symbols) {
             return getPadding().withSymbols(this.symbols.getPadding().withElements(CobolRightPadded.withElements(
                     this.symbols.getPadding().getElements(), symbols)));
         }
@@ -9256,11 +9304,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final SymbolicCharacter t;
 
-            public CobolContainer<Cobol.Identifier> getSymbols() {
+            public CobolContainer<Identifier> getSymbols() {
                 return t.symbols;
             }
 
-            public SymbolicCharacter withSymbols(CobolContainer<Cobol.Identifier> symbols) {
+            public SymbolicCharacter withSymbols(CobolContainer<Identifier> symbols) {
                 return t.symbols == symbols ? t : new SymbolicCharacter(t.padding, t.id, t.prefix, t.markers, symbols, t.literals);
             }
 
