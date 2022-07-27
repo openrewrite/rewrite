@@ -547,7 +547,7 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
-    @Disabled("Requires change to Literal.")
+    @Disabled("Requires table call to be implemented")
     @Test
     fun multiElementLiteral() = rewriteRun(
         cobol("""
@@ -559,7 +559,6 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
-    @Disabled("Requires change to Identifier.")
     @Test
     fun multiElementIdentifier() = rewriteRun(
         cobol("""
