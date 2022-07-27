@@ -237,6 +237,16 @@ class CobolBasicsTest : RewriteTest {
     )
 
     @Test
+    fun performStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. PARSERTEST.
+            PROCEDURE DIVISION.
+            PERFORM ST301M-MERGE THRU ST301M-SORT 1 TIMES.            
+        """)
+    )
+
+    @Test
     fun fileSection() = rewriteRun(
         cobol("""
                 IDENTIFICATION DIVISION.

@@ -838,4 +838,59 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.OpenIOExtendStatement visitOpenIOExtendStatement(Cobol.OpenIOExtendStatement openIOExtendStatement, P p) {
         return (Cobol.OpenIOExtendStatement) super.visitOpenIOExtendStatement(openIOExtendStatement, p);
     }
+
+    @Override
+    public Cobol.Perform visitPerform(Cobol.Perform perform, P p) {
+        return (Cobol.Perform) super.visitPerform(perform, p);
+    }
+
+    @Override
+    public Cobol.PerformInlineStatement visitPerformInlineStatement(Cobol.PerformInlineStatement performInlineStatement, P p) {
+        return (Cobol.PerformInlineStatement) super.visitPerformInlineStatement(performInlineStatement, p);
+    }
+
+    @Override
+    public Cobol.PerformProcedureStatement visitPerformProcedureStatement(Cobol.PerformProcedureStatement performProcedureStatement, P p) {
+        return (Cobol.PerformProcedureStatement) super.visitPerformProcedureStatement(performProcedureStatement, p);
+    }
+
+    @Override
+    public Cobol.PerformTimes visitPerformTimes(Cobol.PerformTimes performTimes, P p) {
+        return (Cobol.PerformTimes) super.visitPerformTimes(performTimes, p);
+    }
+
+    @Override
+    public Cobol.PerformUntil visitPerformUntil(Cobol.PerformUntil performUntil, P p) {
+        return (Cobol.PerformUntil) super.visitPerformUntil(performUntil, p);
+    }
+
+    @Override
+    public Cobol.PerformVarying visitPerformVarying(Cobol.PerformVarying performVarying, P p) {
+        return (Cobol.PerformVarying) super.visitPerformVarying(performVarying, p);
+    }
+
+    @Override
+    public Cobol.PerformVaryingClause visitPerformVaryingClause(Cobol.PerformVaryingClause performVaryingClause, P p) {
+        return (Cobol.PerformVaryingClause) super.visitPerformVaryingClause(performVaryingClause, p);
+    }
+
+    @Override
+    public Cobol.PerformVaryingPhrase visitPerformVaryingPhrase(Cobol.PerformVaryingPhrase performVaryingPhrase, P p) {
+        return (Cobol.PerformVaryingPhrase) super.visitPerformVaryingPhrase(performVaryingPhrase, p);
+    }
+
+    @Override
+    public Cobol.Performable visitPerformable(Cobol.Performable performable, P p) {
+        return (Cobol.Performable) super.visitPerformable(performable, p);
+    }
+
+    @Override
+    public Cobol.PerformFrom visitPerformFrom(Cobol.PerformFrom performFrom, P p) {
+        return (Cobol.PerformFrom) super.visitPerformFrom(performFrom, p);
+    }
+
+    @Override
+    public Cobol.PerformTestClause visitPerformTestClause(Cobol.PerformTestClause performTestClause, P p) {
+        return (Cobol.PerformTestClause) super.visitPerformTestClause(performTestClause, p);
+    }
 }

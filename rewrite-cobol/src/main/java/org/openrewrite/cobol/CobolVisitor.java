@@ -1490,4 +1490,98 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         o = o.getPadding().withFileNames(visitContainer(o.getPadding().getFileNames(), p));
         return o;
     }
+
+    public Cobol visitPerform(Cobol.Perform perform, P p) {
+        Cobol.Perform pp = perform;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withStatement((Cobol) visit(pp.getStatement(), p));
+        return pp;
+    }
+
+    public Cobol visitPerformInlineStatement(Cobol.PerformInlineStatement performInlineStatement, P p) {
+        Cobol.PerformInlineStatement pp = performInlineStatement;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withPerformType((Cobol) visit(pp.getPerformType(), p));
+        pp = pp.getPadding().withStatements(visitContainer(pp.getPadding().getStatements(), p));
+        return pp;
+    }
+
+    public Cobol visitPerformProcedureStatement(Cobol.PerformProcedureStatement performProcedureStatement, P p) {
+        Cobol.PerformProcedureStatement pp = performProcedureStatement;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withProcedureName((Cobol.ProcedureName) visit(pp.getProcedureName(), p));
+        pp = pp.withThroughProcedure((Cobol.ProcedureName) visit(pp.getThroughProcedure(), p));
+        pp = pp.withPerformType((Cobol) visit(pp.getPerformType(), p));
+        return pp;
+    }
+
+    public Cobol visitPerformTimes(Cobol.PerformTimes performTimes, P p) {
+        Cobol.PerformTimes pp = performTimes;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        return pp;
+    }
+
+    public Cobol visitPerformUntil(Cobol.PerformUntil performUntil, P p) {
+        Cobol.PerformUntil pp = performUntil;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withPerformTestClause((Cobol.PerformTestClause) visit(pp.getPerformTestClause(), p));
+        pp = pp.withCondition((Cobol) visit(pp.getCondition(), p));
+        return pp;
+    }
+
+    public Cobol visitPerformVarying(Cobol.PerformVarying performVarying, P p) {
+        Cobol.PerformVarying pp = performVarying;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withFirst((Cobol) visit(pp.getFirst(), p));
+        pp = pp.withSecond((Cobol) visit(pp.getSecond(), p));
+        return pp;
+    }
+
+    public Cobol visitPerformVaryingClause(Cobol.PerformVaryingClause performVaryingClause, P p) {
+        Cobol.PerformVaryingClause pp = performVaryingClause;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withPerformVaryingPhrase((Cobol.PerformVaryingPhrase) visit(pp.getPerformVaryingPhrase(), p));
+        pp = pp.getPadding().withPerformAfter(visitContainer(pp.getPadding().getPerformAfter(), p));
+        return pp;
+    }
+
+    public Cobol visitPerformVaryingPhrase(Cobol.PerformVaryingPhrase performVaryingPhrase, P p) {
+        Cobol.PerformVaryingPhrase pp = performVaryingPhrase;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withFrom((Cobol.PerformFrom) visit(pp.getFrom(), p));
+        pp = pp.withBy((Cobol.Performable) visit(pp.getBy(), p));
+        pp = pp.withUntil((Cobol.PerformUntil) visit(pp.getUntil(), p));
+        return pp;
+    }
+
+    public Cobol visitPerformable(Cobol.Performable performable, P p) {
+        Cobol.Performable pp = performable;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withExpression((Cobol) visit(pp.getExpression(), p));
+        return pp;
+    }
+
+    public Cobol visitPerformFrom(Cobol.PerformFrom performFrom, P p) {
+        Cobol.PerformFrom pp = performFrom;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withFrom((Cobol) visit(pp.getFrom(), p));
+        return pp;
+    }
+
+    public Cobol visitPerformTestClause(Cobol.PerformTestClause performTestClause, P p) {
+        Cobol.PerformTestClause pp = performTestClause;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        return pp;
+    }
 }

@@ -1481,4 +1481,97 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", openIOExtendStatement.getPadding().getFileNames(), "", "", p);
         return openIOExtendStatement;
     }
+
+    public Cobol visitPerform(Cobol.Perform perform, PrintOutputCapture<P> p) {
+        visitSpace(perform.getPrefix(), p);
+        visitMarkers(perform.getMarkers(), p);
+        p.append(perform.getWords());
+        visit(perform.getStatement(), p);
+        return perform;
+    }
+
+    public Cobol visitPerformInlineStatement(Cobol.PerformInlineStatement performInlineStatement, PrintOutputCapture<P> p) {
+        visitSpace(performInlineStatement.getPrefix(), p);
+        visitMarkers(performInlineStatement.getMarkers(), p);
+        visit(performInlineStatement.getPerformType(), p);
+        visitContainer("", performInlineStatement.getPadding().getStatements(), "", "", p);
+        p.append(performInlineStatement.getWords());
+        return performInlineStatement;
+    }
+
+    public Cobol visitPerformProcedureStatement(Cobol.PerformProcedureStatement performProcedureStatement, PrintOutputCapture<P> p) {
+        visitSpace(performProcedureStatement.getPrefix(), p);
+        visitMarkers(performProcedureStatement.getMarkers(), p);
+        visit(performProcedureStatement.getProcedureName(), p);
+        p.append(performProcedureStatement.getWords());
+        visit(performProcedureStatement.getThroughProcedure(), p);
+        visit(performProcedureStatement.getPerformType(), p);
+        return performProcedureStatement;
+    }
+
+    public Cobol visitPerformTimes(Cobol.PerformTimes performTimes, PrintOutputCapture<P> p) {
+        visitSpace(performTimes.getPrefix(), p);
+        visitMarkers(performTimes.getMarkers(), p);
+        visit(performTimes.getValue(), p);
+        p.append(performTimes.getWords());
+        return performTimes;
+    }
+
+    public Cobol visitPerformUntil(Cobol.PerformUntil performUntil, PrintOutputCapture<P> p) {
+        visitSpace(performUntil.getPrefix(), p);
+        visitMarkers(performUntil.getMarkers(), p);
+        visit(performUntil.getPerformTestClause(), p);
+        p.append(performUntil.getWords());
+        visit(performUntil.getCondition(), p);
+        return performUntil;
+    }
+
+    public Cobol visitPerformVarying(Cobol.PerformVarying performVarying, PrintOutputCapture<P> p) {
+        visitSpace(performVarying.getPrefix(), p);
+        visitMarkers(performVarying.getMarkers(), p);
+        visit(performVarying.getFirst(), p);
+        visit(performVarying.getSecond(), p);
+        return performVarying;
+    }
+
+    public Cobol visitPerformVaryingClause(Cobol.PerformVaryingClause performVaryingClause, PrintOutputCapture<P> p) {
+        visitSpace(performVaryingClause.getPrefix(), p);
+        visitMarkers(performVaryingClause.getMarkers(), p);
+        p.append(performVaryingClause.getWords());
+        visit(performVaryingClause.getPerformVaryingPhrase(), p);
+        visitContainer("", performVaryingClause.getPadding().getPerformAfter(), "", "", p);
+        return performVaryingClause;
+    }
+
+    public Cobol visitPerformVaryingPhrase(Cobol.PerformVaryingPhrase performVaryingPhrase, PrintOutputCapture<P> p) {
+        visitSpace(performVaryingPhrase.getPrefix(), p);
+        visitMarkers(performVaryingPhrase.getMarkers(), p);
+        visit(performVaryingPhrase.getFrom(), p);
+        visit(performVaryingPhrase.getBy(), p);
+        visit(performVaryingPhrase.getUntil(), p);
+        return performVaryingPhrase;
+    }
+
+    public Cobol visitPerformable(Cobol.Performable performable, PrintOutputCapture<P> p) {
+        visitSpace(performable.getPrefix(), p);
+        visitMarkers(performable.getMarkers(), p);
+        p.append(performable.getWords());
+        visit(performable.getExpression(), p);
+        return performable;
+    }
+
+    public Cobol visitPerformFrom(Cobol.PerformFrom performFrom, PrintOutputCapture<P> p) {
+        visitSpace(performFrom.getPrefix(), p);
+        visitMarkers(performFrom.getMarkers(), p);
+        p.append(performFrom.getWords());
+        visit(performFrom.getFrom(), p);
+        return performFrom;
+    }
+
+    public Cobol visitPerformTestClause(Cobol.PerformTestClause performTestClause, PrintOutputCapture<P> p) {
+        visitSpace(performTestClause.getPrefix(), p);
+        visitMarkers(performTestClause.getMarkers(), p);
+        p.append(performTestClause.getWords());
+        return performTestClause;
+    }
 }

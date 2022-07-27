@@ -707,6 +707,82 @@ public interface Cobol {
         CobolContainer<Name> fileNames;
     }
 
+    class Perform implements Statement {
+        String words;
+        Cobol statement;
+    }
+
+    class PerformInlineStatement implements Cobol {
+
+        @Nullable
+        Cobol performType;
+
+        CobolContainer<Statement> statements;
+        String words;
+    }
+
+    class PerformProcedureStatement implements Cobol {
+        ProcedureName procedureName;
+
+        @Nullable
+        String words;
+
+        @Nullable
+        ProcedureName throughProcedure;
+
+        @Nullable
+        Cobol performType;
+
+    }
+
+    class PerformTimes implements Cobol {
+        Name value;
+        String words;
+    }
+
+    class PerformUntil implements Cobol {
+
+        @Nullable
+        PerformTestClause performTestClause;
+
+        String words;
+        Cobol condition; //TODO: Replace with type Condition
+    }
+
+    class PerformVarying implements Cobol {
+        Cobol first;
+
+        @Nullable
+        Cobol second;
+    }
+
+    class PerformVaryingClause implements Cobol {
+        String words;
+        PerformVaryingPhrase performVaryingPhrase;
+        CobolContainer<Performable> performAfter;
+    }
+
+    class PerformVaryingPhrase implements Cobol {
+        Name name;
+        PerformFrom from;
+        Performable by;
+        PerformUntil until;
+    }
+
+    class Performable implements Cobol {
+        String words;
+        Cobol expression;
+    }
+
+    class PerformFrom implements Cobol {
+        String words;
+        Cobol from;
+    }
+
+    class PerformTestClause implements Cobol {
+        String words;
+    }
+
     class IdentificationDivision implements Cobol {
         String words;
         CobolLeftPadded<ProgramIdParagraph> programIdParagraph;

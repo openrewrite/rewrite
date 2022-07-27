@@ -1713,6 +1713,153 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.Perform visitPerformStatement(CobolParser.PerformStatementContext ctx) {
+        return new Cobol.Perform(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PERFORM()),
+                visit(ctx.performInlineStatement(), ctx.performProcedureStatement())
+        );
+    }
+
+    @Override
+    public Cobol.PerformInlineStatement visitPerformInlineStatement(CobolParser.PerformInlineStatementContext ctx) {
+        return new Cobol.PerformInlineStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol) visit(ctx.performType()),
+                convertAllContainer(ctx.statement()),
+                words(ctx.END_PERFORM())
+        );
+    }
+
+    @Override
+    public Cobol.PerformProcedureStatement visitPerformProcedureStatement(CobolParser.PerformProcedureStatementContext ctx) {
+        return new Cobol.PerformProcedureStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.ProcedureName) visit(ctx.procedureName(0)),
+                words(ctx.THROUGH(), ctx.THRU()),
+                (ctx.procedureName().size() > 1) ? (Cobol.ProcedureName) visit(ctx.procedureName(1)) : null,
+                visitNullable(ctx.performType())
+        );
+    }
+
+    @Override
+    public Cobol.PerformTimes visitPerformTimes(CobolParser.PerformTimesContext ctx) {
+        return new Cobol.PerformTimes(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.identifier(), ctx.integerLiteral()),
+                words(ctx.TIMES())
+        );
+    }
+
+    @Override
+    public Cobol.PerformUntil visitPerformUntil(CobolParser.PerformUntilContext ctx) {
+        return new Cobol.PerformUntil(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visitNullable(ctx.performTestClause()),
+                words(ctx.UNTIL()),
+                (Cobol) visit(ctx.condition()) // TODO: Update to Condition once available
+        );
+    }
+
+    @Override
+    public Cobol.PerformVarying visitPerformVarying(CobolParser.PerformVaryingContext ctx) {
+        if(ctx.performVaryingClause().getRuleIndex() == ctx.getRuleIndex()) {
+            return new Cobol.PerformVarying(
+                    randomId(),
+                    prefix(ctx),
+                    Markers.EMPTY,
+                    (Cobol) visit(ctx.performVaryingClause()),
+                    visitNullable(ctx.performTestClause())
+            );
+        }
+        return new Cobol.PerformVarying(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol) visit(ctx.performTestClause()),
+                (Cobol) visit(ctx.performVaryingClause())
+        );
+    }
+
+    @Override
+    public Cobol.PerformVaryingClause visitPerformVaryingClause(CobolParser.PerformVaryingClauseContext ctx) {
+        return new Cobol.PerformVaryingClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.VARYING()),
+                (Cobol.PerformVaryingPhrase) visit(ctx.performVaryingPhrase()),
+                convertAllContainer(ctx.performAfter())
+        );
+    }
+
+    @Override
+    public Cobol.PerformVaryingPhrase visitPerformVaryingPhrase(CobolParser.PerformVaryingPhraseContext ctx) {
+        return new Cobol.PerformVaryingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.identifier(), ctx.literal()),
+                (Cobol.PerformFrom) visit(ctx.performFrom()),
+                (Cobol.Performable) visit(ctx.performBy()),
+                (Cobol.PerformUntil) visit(ctx.performUntil())
+        );
+    }
+
+    @Override
+    public Cobol.Performable visitPerformAfter(CobolParser.PerformAfterContext ctx) {
+        return new Cobol.Performable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.AFTER()),
+                (Cobol) visit(ctx.performVaryingPhrase())
+        );
+    }
+
+    @Override
+    public Cobol.Performable visitPerformFrom(CobolParser.PerformFromContext ctx) {
+        return new Cobol.Performable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FROM()),
+                visit(ctx.identifier(), ctx.literal(), ctx.arithmeticExpression())
+        );
+    }
+
+    @Override
+    public Cobol.Performable visitPerformBy(CobolParser.PerformByContext ctx) {
+        return new Cobol.Performable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BY()),
+                visit(ctx.identifier(), ctx.literal(), ctx.arithmeticExpression())
+        );
+    }
+
+    @Override
+    public Cobol.PerformTestClause visitPerformTestClause(CobolParser.PerformTestClauseContext ctx) {
+        return new Cobol.PerformTestClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.TEST(), ctx.BEFORE(), ctx.AFTER())
+        );
+    }
+
+    @Override
     public Cobol.DataDescriptionEntry visitDataDescriptionEntryFormat1(CobolParser.DataDescriptionEntryFormat1Context ctx) {
         TerminalNode level = ctx.INTEGERLITERAL() == null ? ctx.LEVEL_NUMBER_77() : ctx.INTEGERLITERAL();
         return new Cobol.DataDescriptionEntry(
