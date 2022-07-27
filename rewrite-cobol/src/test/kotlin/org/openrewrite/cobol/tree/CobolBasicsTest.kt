@@ -530,4 +530,31 @@ class CobolBasicsTest : RewriteTest {
             EVALUATE IDENTIFIER IN IDENTIFIER.
         """)
     )
+
+    @Disabled("fix open statements implementation")
+    @Test
+    fun openMultipleStatements() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            OPEN-FILES.
+                OPEN     INPUT IDENTIFIER REVERSED INPUT IDENTIFIER REVERSED
+                OPEN     OUTPUT IDENTIFIER WITH NO REWIND IDENTIFIER WITH NO REWIND
+                OPEN     I-O IDENTIFIER IDENTIFIER I-O IDENTIFIER IDENTIFIER
+                OPEN     EXTEND IDENTIFIER IDENTIFIER EXTEND IDENTIFIER IDENTIFIER.
+        """)
+    )
+
+    @Disabled("fix open statements implementation")
+    @Test
+    fun outOfOrderOpenStatements() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            OPEN-FILES.
+                OPEN     INPUT IDENTIFIER OUTPUT IDENTIFIER INPUT IDENTIFIER OUTPUT IDENTIFIER.
+        """)
+    )
 }
