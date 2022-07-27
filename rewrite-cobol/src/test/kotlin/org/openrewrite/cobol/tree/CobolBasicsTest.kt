@@ -537,7 +537,6 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
-    @Disabled("fix open statements implementation")
     @Test
     fun openMultipleStatements() = rewriteRun(
         cobol("""
@@ -552,7 +551,6 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
-    @Disabled("fix open statements implementation")
     @Test
     fun outOfOrderOpenStatements() = rewriteRun(
         cobol("""

@@ -29,11 +29,11 @@ import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -2898,13 +2898,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @SafeVarargs
-    private final CobolContainer<Cobol> convertAllContainer(List<? extends ParseTree>... trees) {
-        for(List<? extends ParseTree> tree : trees) {
-            if(tree != null) {
-                return convertAllContainer(tree, () -> Space.EMPTY);
-            }
-        }
-        throw new IllegalArgumentException("All input trees cannot be null");
+    private final CobolContainer<Cobol> convertAllContainer(List<? extends ParserRuleContext>... trees) {
+        return convertAllContainer(Arrays.stream(trees)
+                        .filter(Objects::nonNull)
+                        .flatMap(Collection::stream)
+                        .sorted(Comparator.comparingInt(it -> it.start.getStartIndex()))
+                        .collect(Collectors.toList()),
+                () -> Space.EMPTY);
     }
 
     private <C extends Cobol, T extends ParseTree> CobolContainer<C> convertAllContainer(List<T> trees, Supplier<Space> sourceBefore) {
