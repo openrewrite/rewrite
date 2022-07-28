@@ -1313,4 +1313,19 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.GoToDependingOnStatement visitGoToDependingOnStatement(Cobol.GoToDependingOnStatement goToDependingOnStatement, P p) {
         return (Cobol.GoToDependingOnStatement) super.visitGoToDependingOnStatement(goToDependingOnStatement, p);
     }
+
+    @Override
+    public Cobol.If visitIf(Cobol.If _if, P p) {
+        return (Cobol.If) super.visitIf(_if, p);
+    }
+
+    @Override
+    public Cobol.IfThen visitIfThen(Cobol.IfThen ifThen, P p) {
+        return (Cobol.IfThen) super.visitIfThen(ifThen, p);
+    }
+
+    @Override
+    public Cobol.IfElse visitIfElse(Cobol.IfElse ifElse, P p) {
+        return (Cobol.IfElse) super.visitIfElse(ifElse, p);
+    }
 }

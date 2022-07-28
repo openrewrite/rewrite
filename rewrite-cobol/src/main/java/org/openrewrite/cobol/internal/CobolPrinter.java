@@ -2387,4 +2387,33 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(goToDependingOnStatement.getIdentifier(), p);
         return goToDependingOnStatement;
     }
+
+    public Cobol visitIf(Cobol.If _if, PrintOutputCapture<P> p) {
+        visitSpace(_if.getPrefix(), p);
+        visitMarkers(_if.getMarkers(), p);
+        p.append(_if.getWord());
+        visit(_if.getCondition(), p);
+        visit(_if.getIfThen(), p);
+        visit(_if.getIfElse(), p);
+        visitLeftPadded("", _if.getPadding().getEndIf(), p);
+        return _if;
+    }
+
+    public Cobol visitIfThen(Cobol.IfThen ifThen, PrintOutputCapture<P> p) {
+        visitSpace(ifThen.getPrefix(), p);
+        visitMarkers(ifThen.getMarkers(), p);
+        p.append(ifThen.getWord());
+        p.append(ifThen.getNextSentence());
+        visitContainer("", ifThen.getPadding().getStatements(), "", "", p);
+        return ifThen;
+    }
+
+    public Cobol visitIfElse(Cobol.IfElse ifElse, PrintOutputCapture<P> p) {
+        visitSpace(ifElse.getPrefix(), p);
+        visitMarkers(ifElse.getMarkers(), p);
+        p.append(ifElse.getWord());
+        p.append(ifElse.getNextSentence());
+        visitContainer("", ifElse.getPadding().getStatements(), "", "", p);
+        return ifElse;
+    }
 }

@@ -2394,4 +2394,31 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         g = g.getPadding().withProcedureNames(visitContainer(g.getPadding().getProcedureNames(), p));
         return g;
     }
+
+    public Cobol visitIf(Cobol.If _if, P p) {
+        Cobol.If i = _if;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withCondition((Cobol.Condition) visit(i.getCondition(), p));
+        i = i.withIfThen((Cobol.IfThen) visit(i.getIfThen(), p));
+        i = i.withIfElse((Cobol.IfElse) visit(i.getIfElse(), p));
+        i = i.getPadding().withEndIf(visitLeftPadded(i.getPadding().getEndIf(), p));
+        return i;
+    }
+
+    public Cobol visitIfThen(Cobol.IfThen ifThen, P p) {
+        Cobol.IfThen i = ifThen;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withStatements(visitContainer(i.getPadding().getStatements(), p));
+        return i;
+    }
+
+    public Cobol visitIfElse(Cobol.IfElse ifElse, P p) {
+        Cobol.IfElse i = ifElse;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withStatements(visitContainer(i.getPadding().getStatements(), p));
+        return i;
+    }
 }

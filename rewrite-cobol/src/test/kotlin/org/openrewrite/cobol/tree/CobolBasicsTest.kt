@@ -747,4 +747,19 @@ class CobolBasicsTest : RewriteTest {
             .
         """)
     )
+
+    @Test
+    fun ifStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. subtractStatement.
+            PROCEDURE DIVISION.
+            IF--TEST-GF-99.
+                IF      ZERO IS EQUAL TO IF-D1
+                   THEN PERFORM PASS
+                ELSE
+                    PERFORM FAIL.
+            .
+        """)
+    )
 }

@@ -30,4 +30,5 @@ public interface Cobol {
     class ParenExpression {}
     class Condition {}
     class ProcedureName {}
+
 }

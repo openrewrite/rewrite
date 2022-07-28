@@ -1038,6 +1038,249 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class If implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String word;
+
+        @Getter
+        @With
+        Condition condition;
+
+        @Getter
+        @With
+        IfThen ifThen;
+
+        @Getter
+        @Nullable
+        @With
+        IfElse ifElse;
+
+        CobolLeftPadded<String> endIf;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitIf(this, p);
+        }
+
+        public String getEndIf() {
+            return endIf.getElement();
+        }
+
+        public If withEndIf(String endIf) {
+            //noinspection ConstantConditions
+            return getPadding().withEndIf(CobolLeftPadded.withElement(this.endIf, endIf));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final If t;
+
+            public CobolLeftPadded<String> getEndIf() {
+                return t.endIf;
+            }
+
+            public If withEndIf(CobolLeftPadded<String> endIf) {
+                return t.endIf == endIf ? t : new If(t.padding, t.id, t.prefix, t.markers, t.word, t.condition, t.ifThen, t.ifElse, endIf);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class IfThen implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String word;
+
+        @Getter
+        @Nullable
+        @With
+        String nextSentence;
+
+        @Nullable
+        CobolContainer<Statement> statements;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitIfThen(this, p);
+        }
+
+        public List<Statement> getStatements() {
+            return statements.getElements();
+        }
+
+        public IfThen withStatements(List<Statement> statements) {
+            return getPadding().withStatements(this.statements.getPadding().withElements(CobolRightPadded.withElements(
+                    this.statements.getPadding().getElements(), statements)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final IfThen t;
+
+            @Nullable
+            public CobolContainer<Statement> getStatements() {
+                return t.statements;
+            }
+
+            public IfThen withStatements(@Nullable CobolContainer<Statement> statements) {
+                return t.statements == statements ? t : new IfThen(t.padding, t.id, t.prefix, t.markers, t.word, t.nextSentence, statements);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class IfElse implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String word;
+
+        @Getter
+        @Nullable
+        @With
+        String nextSentence;
+
+        @Nullable
+        CobolContainer<Statement> statements;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitIfElse(this, p);
+        }
+
+        public List<Statement> getStatements() {
+            return statements.getElements();
+        }
+
+        public IfElse withStatements(List<Statement> statements) {
+            return getPadding().withStatements(this.statements.getPadding().withElements(CobolRightPadded.withElements(
+                    this.statements.getPadding().getElements(), statements)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final IfElse t;
+
+            @Nullable
+            public CobolContainer<Statement> getStatements() {
+                return t.statements;
+            }
+
+            public IfElse withStatements(@Nullable CobolContainer<Statement> statements) {
+                return t.statements == statements ? t : new IfElse(t.padding, t.id, t.prefix, t.markers, t.word, t.nextSentence, statements);
+            }
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

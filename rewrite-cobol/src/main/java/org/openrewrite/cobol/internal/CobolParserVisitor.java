@@ -3612,6 +3612,44 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitIfStatement(CobolParser.IfStatementContext ctx) {
+        return new Cobol.If(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IF()),
+                (Cobol.Condition) visit(ctx.condition()),
+                (Cobol.IfThen) visit(ctx.ifThen()),
+                visitNullable(ctx.ifElse()),
+                padLeft(ctx.END_IF())
+        );
+    }
+
+    @Override
+    public Object visitIfElse(CobolParser.IfElseContext ctx) {
+        return new Cobol.IfElse(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ELSE()),
+                words(ctx.NEXT(), ctx.SENTENCE()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
+    public Object visitIfThen(CobolParser.IfThenContext ctx) {
+        return new Cobol.IfThen(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.THEN()),
+                words(ctx.NEXT(), ctx.SENTENCE()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
     public Object visitInData(CobolParser.InDataContext ctx) {
         return new Cobol.InData(
                 randomId(),
