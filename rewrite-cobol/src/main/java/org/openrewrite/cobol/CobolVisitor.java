@@ -169,9 +169,8 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Picture pp = picture;
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
-        if (pp.getPadding().getCardinalitySource() != null) {
-            pp = pp.getPadding().withCardinalitySource(visitLeftPadded(pp.getPadding().getCardinalitySource(), p));
-        }
+        pp = pp.withWords(ListUtils.map(pp.getWords(), it -> (Cobol.CobolWord) visit(it, p)));
+        pp = pp.withParenExpression((Cobol.ParenExpression) visit(pp.getParenExpression(), p));
         return pp;
     }
 
@@ -661,7 +660,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.ScreenDescriptionControlClause s = screenDescriptionControlClause;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        s = s.withIdentifier((Identifier) visit(s.getIdentifier(), p));
+        s = s.withValue((Name) visit(s.getValue(), p));
         return s;
     }
 
@@ -669,7 +668,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.ScreenDescriptionSizeClause s = screenDescriptionSizeClause;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        s = s.withIdentifier((Identifier) visit(s.getIdentifier(), p));
+        s = s.withValue((Name) visit(s.getValue(), p));
         return s;
     }
 
@@ -2145,5 +2144,184 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         s = s.withQualifiedDataName((Cobol.QualifiedDataName) visit(s.getQualifiedDataName(), p));
         return s;
+    }
+
+    public Cobol visitScreenDescriptionBellClause(Cobol.ScreenDescriptionBellClause screenDescriptionBellClause, P p) {
+        Cobol.ScreenDescriptionBellClause s = screenDescriptionBellClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionBlinkClause(Cobol.ScreenDescriptionBlinkClause screenDescriptionBlinkClause, P p) {
+        Cobol.ScreenDescriptionBlinkClause s = screenDescriptionBlinkClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionEraseClause(Cobol.ScreenDescriptionEraseClause screenDescriptionEraseClause, P p) {
+        Cobol.ScreenDescriptionEraseClause s = screenDescriptionEraseClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionLightClause(Cobol.ScreenDescriptionLightClause screenDescriptionLightClause, P p) {
+        Cobol.ScreenDescriptionLightClause s = screenDescriptionLightClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionGridClause(Cobol.ScreenDescriptionGridClause screenDescriptionGridClause, P p) {
+        Cobol.ScreenDescriptionGridClause s = screenDescriptionGridClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionReverseVideoClause(Cobol.ScreenDescriptionReverseVideoClause screenDescriptionReverseVideoClause, P p) {
+        Cobol.ScreenDescriptionReverseVideoClause s = screenDescriptionReverseVideoClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionUnderlineClause(Cobol.ScreenDescriptionUnderlineClause screenDescriptionUnderlineClause, P p) {
+        Cobol.ScreenDescriptionUnderlineClause s = screenDescriptionUnderlineClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionLineClause(Cobol.ScreenDescriptionLineClause screenDescriptionLineClause, P p) {
+        Cobol.ScreenDescriptionLineClause s = screenDescriptionLineClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionColumnClause(Cobol.ScreenDescriptionColumnClause screenDescriptionColumnClause, P p) {
+        Cobol.ScreenDescriptionColumnClause s = screenDescriptionColumnClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionForegroundColorClause(Cobol.ScreenDescriptionForegroundColorClause screenDescriptionForegroundColorClause, P p) {
+        Cobol.ScreenDescriptionForegroundColorClause s = screenDescriptionForegroundColorClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionBackgroundColorClause(Cobol.ScreenDescriptionBackgroundColorClause screenDescriptionBackgroundColorClause, P p) {
+        Cobol.ScreenDescriptionBackgroundColorClause s = screenDescriptionBackgroundColorClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionValueClause(Cobol.ScreenDescriptionValueClause screenDescriptionValueClause, P p) {
+        Cobol.ScreenDescriptionValueClause s = screenDescriptionValueClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionPictureClause(Cobol.ScreenDescriptionPictureClause screenDescriptionPictureClause, P p) {
+        Cobol.ScreenDescriptionPictureClause s = screenDescriptionPictureClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionFromClause(Cobol.ScreenDescriptionFromClause screenDescriptionFromClause, P p) {
+        Cobol.ScreenDescriptionFromClause s = screenDescriptionFromClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withScreenDescriptionToClause((Cobol.ScreenDescriptionToClause) visit(s.getScreenDescriptionToClause(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionUsageClause(Cobol.ScreenDescriptionUsageClause screenDescriptionUsageClause, P p) {
+        Cobol.ScreenDescriptionUsageClause s = screenDescriptionUsageClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionBlankWhenZeroClause(Cobol.ScreenDescriptionBlankWhenZeroClause screenDescriptionBlankWhenZeroClause, P p) {
+        Cobol.ScreenDescriptionBlankWhenZeroClause s = screenDescriptionBlankWhenZeroClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionJustifiedClause(Cobol.ScreenDescriptionJustifiedClause screenDescriptionJustifiedClause, P p) {
+        Cobol.ScreenDescriptionJustifiedClause s = screenDescriptionJustifiedClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionSignClause(Cobol.ScreenDescriptionSignClause screenDescriptionSignClause, P p) {
+        Cobol.ScreenDescriptionSignClause s = screenDescriptionSignClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionAutoClause(Cobol.ScreenDescriptionAutoClause screenDescriptionAutoClause, P p) {
+        Cobol.ScreenDescriptionAutoClause s = screenDescriptionAutoClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionRequiredClause(Cobol.ScreenDescriptionRequiredClause screenDescriptionRequiredClause, P p) {
+        Cobol.ScreenDescriptionRequiredClause s = screenDescriptionRequiredClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionPromptClause(Cobol.ScreenDescriptionPromptClause screenDescriptionPromptClause, P p) {
+        Cobol.ScreenDescriptionPromptClause s = screenDescriptionPromptClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withScreenDescriptionPromptOccursClause((Cobol.ScreenDescriptionPromptOccursClause) visit(s.getScreenDescriptionPromptOccursClause(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionPromptOccursClause(Cobol.ScreenDescriptionPromptOccursClause screenDescriptionPromptOccursClause, P p) {
+        Cobol.ScreenDescriptionPromptOccursClause s = screenDescriptionPromptOccursClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withInteger((Cobol.CobolWord) visit(s.getInteger(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionFullClause(Cobol.ScreenDescriptionFullClause screenDescriptionFullClause, P p) {
+        Cobol.ScreenDescriptionFullClause s = screenDescriptionFullClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitScreenDescriptionZeroFillClause(Cobol.ScreenDescriptionZeroFillClause screenDescriptionZeroFillClause, P p) {
+        Cobol.ScreenDescriptionZeroFillClause s = screenDescriptionZeroFillClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
+    public Cobol visitPictureString(Cobol.PictureString pictureString, P p) {
+        Cobol.PictureString pp = pictureString;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.getPadding().withPictures(visitContainer(pp.getPadding().getPictures(), p));
+        return pp;
     }
 }

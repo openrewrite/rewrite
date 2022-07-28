@@ -1148,4 +1148,129 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.StringWithPointerPhrase visitStringWithPointerPhrase(Cobol.StringWithPointerPhrase stringWithPointerPhrase, P p) {
         return (Cobol.StringWithPointerPhrase) super.visitStringWithPointerPhrase(stringWithPointerPhrase, p);
     }
+
+    @Override
+    public Cobol.ScreenDescriptionBellClause visitScreenDescriptionBellClause(Cobol.ScreenDescriptionBellClause screenDescriptionBellClause, P p) {
+        return (Cobol.ScreenDescriptionBellClause) super.visitScreenDescriptionBellClause(screenDescriptionBellClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionBlinkClause visitScreenDescriptionBlinkClause(Cobol.ScreenDescriptionBlinkClause screenDescriptionBlinkClause, P p) {
+        return (Cobol.ScreenDescriptionBlinkClause) super.visitScreenDescriptionBlinkClause(screenDescriptionBlinkClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionEraseClause visitScreenDescriptionEraseClause(Cobol.ScreenDescriptionEraseClause screenDescriptionEraseClause, P p) {
+        return (Cobol.ScreenDescriptionEraseClause) super.visitScreenDescriptionEraseClause(screenDescriptionEraseClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionLightClause visitScreenDescriptionLightClause(Cobol.ScreenDescriptionLightClause screenDescriptionLightClause, P p) {
+        return (Cobol.ScreenDescriptionLightClause) super.visitScreenDescriptionLightClause(screenDescriptionLightClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionGridClause visitScreenDescriptionGridClause(Cobol.ScreenDescriptionGridClause screenDescriptionGridClause, P p) {
+        return (Cobol.ScreenDescriptionGridClause) super.visitScreenDescriptionGridClause(screenDescriptionGridClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionReverseVideoClause visitScreenDescriptionReverseVideoClause(Cobol.ScreenDescriptionReverseVideoClause screenDescriptionReverseVideoClause, P p) {
+        return (Cobol.ScreenDescriptionReverseVideoClause) super.visitScreenDescriptionReverseVideoClause(screenDescriptionReverseVideoClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionUnderlineClause visitScreenDescriptionUnderlineClause(Cobol.ScreenDescriptionUnderlineClause screenDescriptionUnderlineClause, P p) {
+        return (Cobol.ScreenDescriptionUnderlineClause) super.visitScreenDescriptionUnderlineClause(screenDescriptionUnderlineClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionLineClause visitScreenDescriptionLineClause(Cobol.ScreenDescriptionLineClause screenDescriptionLineClause, P p) {
+        return (Cobol.ScreenDescriptionLineClause) super.visitScreenDescriptionLineClause(screenDescriptionLineClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionColumnClause visitScreenDescriptionColumnClause(Cobol.ScreenDescriptionColumnClause screenDescriptionColumnClause, P p) {
+        return (Cobol.ScreenDescriptionColumnClause) super.visitScreenDescriptionColumnClause(screenDescriptionColumnClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionForegroundColorClause visitScreenDescriptionForegroundColorClause(Cobol.ScreenDescriptionForegroundColorClause screenDescriptionForegroundColorClause, P p) {
+        return (Cobol.ScreenDescriptionForegroundColorClause) super.visitScreenDescriptionForegroundColorClause(screenDescriptionForegroundColorClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionBackgroundColorClause visitScreenDescriptionBackgroundColorClause(Cobol.ScreenDescriptionBackgroundColorClause screenDescriptionBackgroundColorClause, P p) {
+        return (Cobol.ScreenDescriptionBackgroundColorClause) super.visitScreenDescriptionBackgroundColorClause(screenDescriptionBackgroundColorClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionValueClause visitScreenDescriptionValueClause(Cobol.ScreenDescriptionValueClause screenDescriptionValueClause, P p) {
+        return (Cobol.ScreenDescriptionValueClause) super.visitScreenDescriptionValueClause(screenDescriptionValueClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionPictureClause visitScreenDescriptionPictureClause(Cobol.ScreenDescriptionPictureClause screenDescriptionPictureClause, P p) {
+        return (Cobol.ScreenDescriptionPictureClause) super.visitScreenDescriptionPictureClause(screenDescriptionPictureClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionFromClause visitScreenDescriptionFromClause(Cobol.ScreenDescriptionFromClause screenDescriptionFromClause, P p) {
+        return (Cobol.ScreenDescriptionFromClause) super.visitScreenDescriptionFromClause(screenDescriptionFromClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionUsageClause visitScreenDescriptionUsageClause(Cobol.ScreenDescriptionUsageClause screenDescriptionUsageClause, P p) {
+        return (Cobol.ScreenDescriptionUsageClause) super.visitScreenDescriptionUsageClause(screenDescriptionUsageClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionBlankWhenZeroClause visitScreenDescriptionBlankWhenZeroClause(Cobol.ScreenDescriptionBlankWhenZeroClause screenDescriptionBlankWhenZeroClause, P p) {
+        return (Cobol.ScreenDescriptionBlankWhenZeroClause) super.visitScreenDescriptionBlankWhenZeroClause(screenDescriptionBlankWhenZeroClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionJustifiedClause visitScreenDescriptionJustifiedClause(Cobol.ScreenDescriptionJustifiedClause screenDescriptionJustifiedClause, P p) {
+        return (Cobol.ScreenDescriptionJustifiedClause) super.visitScreenDescriptionJustifiedClause(screenDescriptionJustifiedClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionSignClause visitScreenDescriptionSignClause(Cobol.ScreenDescriptionSignClause screenDescriptionSignClause, P p) {
+        return (Cobol.ScreenDescriptionSignClause) super.visitScreenDescriptionSignClause(screenDescriptionSignClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionAutoClause visitScreenDescriptionAutoClause(Cobol.ScreenDescriptionAutoClause screenDescriptionAutoClause, P p) {
+        return (Cobol.ScreenDescriptionAutoClause) super.visitScreenDescriptionAutoClause(screenDescriptionAutoClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionRequiredClause visitScreenDescriptionRequiredClause(Cobol.ScreenDescriptionRequiredClause screenDescriptionRequiredClause, P p) {
+        return (Cobol.ScreenDescriptionRequiredClause) super.visitScreenDescriptionRequiredClause(screenDescriptionRequiredClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionPromptClause visitScreenDescriptionPromptClause(Cobol.ScreenDescriptionPromptClause screenDescriptionPromptClause, P p) {
+        return (Cobol.ScreenDescriptionPromptClause) super.visitScreenDescriptionPromptClause(screenDescriptionPromptClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionPromptOccursClause visitScreenDescriptionPromptOccursClause(Cobol.ScreenDescriptionPromptOccursClause screenDescriptionPromptOccursClause, P p) {
+        return (Cobol.ScreenDescriptionPromptOccursClause) super.visitScreenDescriptionPromptOccursClause(screenDescriptionPromptOccursClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionFullClause visitScreenDescriptionFullClause(Cobol.ScreenDescriptionFullClause screenDescriptionFullClause, P p) {
+        return (Cobol.ScreenDescriptionFullClause) super.visitScreenDescriptionFullClause(screenDescriptionFullClause, p);
+    }
+
+    @Override
+    public Cobol.ScreenDescriptionZeroFillClause visitScreenDescriptionZeroFillClause(Cobol.ScreenDescriptionZeroFillClause screenDescriptionZeroFillClause, P p) {
+        return (Cobol.ScreenDescriptionZeroFillClause) super.visitScreenDescriptionZeroFillClause(screenDescriptionZeroFillClause, p);
+    }
+
+    @Override
+    public Cobol.PictureString visitPictureString(Cobol.PictureString pictureString, P p) {
+        return (Cobol.PictureString) super.visitPictureString(pictureString, p);
+    }
 }

@@ -7395,37 +7395,25 @@ public interface Cobol extends Tree {
         @With
         Markers markers;
 
+        CobolContainer<CobolWord> words;
+
         @Getter
+        @Nullable
         @With
-        String chars;
-
-        @Nullable
-        CobolLeftPadded<String> cardinalitySource;
-
-        @Nullable
-        public String getCardinality() {
-            return cardinalitySource == null ? null : cardinalitySource
-                    .getElement()
-                    .replace("(", "")
-                    .replace(")", "")
-                    .trim();
-        }
+        ParenExpression parenExpression;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitPicture(this, p);
         }
 
-        @Nullable
-        public String getCardinalitySource() {
-            return cardinalitySource == null ? null : cardinalitySource.getElement();
+        public List<Cobol.CobolWord> getWords() {
+            return words.getElements();
         }
 
-        public Picture withCardinalitySource(@Nullable String cardinalitySource) {
-            if (cardinalitySource == null) {
-                return this.cardinalitySource == null ? this : new Picture(id, prefix, markers, chars, null);
-            }
-            return getPadding().withCardinalitySource(CobolLeftPadded.withElement(this.cardinalitySource, cardinalitySource));
+        public Picture withWords(List<Cobol.CobolWord> words) {
+            return getPadding().withWords(this.words.getPadding().withElements(CobolRightPadded.withElements(
+                    this.words.getPadding().getElements(), words)));
         }
 
         public Padding getPadding() {
@@ -7447,13 +7435,80 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final Picture t;
 
-            @Nullable
-            public CobolLeftPadded<String> getCardinalitySource() {
-                return t.cardinalitySource;
+            public CobolContainer<Cobol.CobolWord> getWords() {
+                return t.words;
             }
 
-            public Picture withCardinalitySource(@Nullable CobolLeftPadded<String> cardinalitySource) {
-                return t.cardinalitySource == cardinalitySource ? t : new Picture(t.padding, t.id, t.prefix, t.markers, t.chars, cardinalitySource);
+            public Picture withWords(CobolContainer<Cobol.CobolWord> words) {
+                return t.words == words ? t : new Picture(t.padding, t.id, t.prefix, t.markers, words, t.parenExpression);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class PictureString implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        CobolContainer<Picture> pictures;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitPictureString(this, p);
+        }
+
+        public List<Cobol.Picture> getPictures() {
+            return pictures.getElements();
+        }
+
+        public PictureString withPictures(List<Cobol.Picture> pictures) {
+            return getPadding().withPictures(this.pictures.getPadding().withElements(CobolRightPadded.withElements(
+                    this.pictures.getPadding().getElements(), pictures)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final PictureString t;
+
+            public CobolContainer<Cobol.Picture> getPictures() {
+                return t.pictures;
+            }
+
+            public PictureString withPictures(CobolContainer<Cobol.Picture> pictures) {
+                return t.pictures == pictures ? t : new PictureString(t.padding, t.id, t.prefix, t.markers, pictures);
             }
         }
     }
@@ -8595,6 +8650,60 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
+    class ScreenDescriptionAutoClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String auto;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionAutoClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionBackgroundColorClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String background;
+
+        String is;
+        Name value;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionBackgroundColorClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionBellClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String bell;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionBellClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     class ScreenDescriptionBlankClause implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
@@ -8609,6 +8718,59 @@ public interface Cobol extends Tree {
         }
     }
 
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionBlankWhenZeroClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionBlankWhenZeroClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionBlinkClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String blink;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionBlinkClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionColumnClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name value;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionColumnClause(this, p);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
@@ -8619,11 +8781,263 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         String words;
-        Identifier identifier;
+        Name value;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitScreenDescriptionControlClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionEraseClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionEraseClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionForegroundColorClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name value;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionForegroundColorClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionFromClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String from;
+        Name value;
+
+        @Nullable
+        ScreenDescriptionToClause screenDescriptionToClause;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionFromClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionFullClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String word;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionFullClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionGridClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String word;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionGridClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionJustifiedClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionJustifiedClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionLightClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String light;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionLightClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionLineClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name value;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionLineClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionPictureClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        PictureString pictureString;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionPictureClause(this, p);
+        }
+    }
+
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionPromptClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name name;
+
+        @Nullable
+        ScreenDescriptionPromptOccursClause screenDescriptionPromptOccursClause;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionPromptClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionPromptOccursClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String occurs;
+        CobolWord integer;
+        String times;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionPromptOccursClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionRequiredClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String required;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionRequiredClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionReverseVideoClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String word;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionReverseVideoClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionSignClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionSignClause(this, p);
         }
     }
 
@@ -8637,7 +9051,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         String words;
-        Identifier identifier;
+        Name value;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -8654,12 +9068,46 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        String to;
         Identifier identifier;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitScreenDescriptionToClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionUnderlineClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String underline;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionUnderlineClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionUsageClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionUsageClause(this, p);
         }
     }
 
@@ -8672,7 +9120,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        String using;
         Identifier identifier;
 
         @Override
@@ -8681,6 +9129,40 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionValueClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name value;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionValueClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ScreenDescriptionZeroFillClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String word;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitScreenDescriptionZeroFillClause(this, p);
+        }
+    }
 
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

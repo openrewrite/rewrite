@@ -1277,12 +1277,75 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitScreenDescriptionAutoClause(CobolParser.ScreenDescriptionAutoClauseContext ctx) {
+        return new Cobol.ScreenDescriptionAutoClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.AUTO(), ctx.AUTO_SKIP())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionBackgroundColorClause(CobolParser.ScreenDescriptionBackgroundColorClauseContext ctx) {
+        return new Cobol.ScreenDescriptionBackgroundColorClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BACKGROUND_COLOR(), ctx.BACKGROUND_COLOUR()),
+                words(ctx.IS()),
+                visit(ctx.identifier(), ctx.identifier())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionBellClause(CobolParser.ScreenDescriptionBellClauseContext ctx) {
+        return new Cobol.ScreenDescriptionBellClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BELL())
+        );
+    }
+
+    @Override
     public Object visitScreenDescriptionBlankClause(CobolParser.ScreenDescriptionBlankClauseContext ctx) {
         return new Cobol.ScreenDescriptionBlankClause(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.BLANK(), ctx.SCREEN(), ctx.LINE())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionBlankWhenZeroClause(CobolParser.ScreenDescriptionBlankWhenZeroClauseContext ctx) {
+        return new Cobol.ScreenDescriptionBlankWhenZeroClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BLANK(), ctx.WHEN(), ctx.ZERO())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionBlinkClause(CobolParser.ScreenDescriptionBlinkClauseContext ctx) {
+        return new Cobol.ScreenDescriptionBlankWhenZeroClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BLINK())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionColumnClause(CobolParser.ScreenDescriptionColumnClauseContext ctx) {
+        return new Cobol.ScreenDescriptionColumnClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.COLUMN(), ctx.COL(), ctx.NUMBER(), ctx.IS(), ctx.PLUS(), ctx.PLUSCHAR(), ctx.MINUSCHAR()),
+                visit(ctx.identifier(), ctx.integerLiteral())
         );
     }
 
@@ -1294,6 +1357,198 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 words(ctx.CONTROL(), ctx.IS()),
                 (Identifier) visit(ctx.identifier())
+        );
+    }
+
+
+    @Override
+    public Object visitScreenDescriptionEntry(CobolParser.ScreenDescriptionEntryContext ctx) {
+        return new Cobol.ScreenDescriptionEntry(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INTEGERLITERAL()),
+                ctx.FILLER() == null ?
+                        (ctx.screenName() == null ? null : padLeft(ctx.screenName())) :
+                        padLeft(ctx.FILLER()),
+                convertAllContainer(ctx.screenDescriptionBlankClause(),
+                        ctx.screenDescriptionAutoClause(),
+                        ctx.screenDescriptionBellClause(),
+                        ctx.screenDescriptionBlinkClause(),
+                        ctx.screenDescriptionBlankWhenZeroClause(),
+                        ctx.screenDescriptionBackgroundColorClause(),
+                        ctx.screenDescriptionEraseClause(),
+                        ctx.screenDescriptionLightClause(),
+                        ctx.screenDescriptionGridClause(),
+                        ctx.screenDescriptionReverseVideoClause(),
+                        ctx.screenDescriptionUnderlineClause(),
+                        ctx.screenDescriptionSizeClause(),
+                        ctx.screenDescriptionLineClause(),
+                        ctx.screenDescriptionColumnClause(),
+                        ctx.screenDescriptionForegroundColorClause(),
+                        ctx.screenDescriptionControlClause(),
+                        ctx.screenDescriptionValueClause(),
+                        ctx.screenDescriptionPictureClause(),
+                        ctx.screenDescriptionFromClause(),
+                        ctx.screenDescriptionUsingClause(),
+                        ctx.screenDescriptionUsageClause(),
+                        ctx.screenDescriptionJustifiedClause(),
+                        ctx.screenDescriptionSignClause(),
+                        ctx.screenDescriptionSecureClause(),
+                        ctx.screenDescriptionRequiredClause(),
+                        ctx.screenDescriptionPromptClause(),
+                        ctx.screenDescriptionFullClause(),
+                        ctx.screenDescriptionZeroFillClause())
+                        .withLastSpace(sourceBefore("."))
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionEraseClause(CobolParser.ScreenDescriptionEraseClauseContext ctx) {
+        return new Cobol.ScreenDescriptionEraseClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ERASE(), ctx.EOL(), ctx.EOS())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionForegroundColorClause(CobolParser.ScreenDescriptionForegroundColorClauseContext ctx) {
+        return new Cobol.ScreenDescriptionForegroundColorClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOREGROUND_COLOR(), ctx.FOREGROUND_COLOUR(), ctx.IS()),
+                visit(ctx.identifier(), ctx.integerLiteral())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionFromClause(CobolParser.ScreenDescriptionFromClauseContext ctx) {
+        return new Cobol.ScreenDescriptionFromClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FROM()),
+                visit(ctx.identifier(), ctx.literal()),
+                visitNullable(ctx.screenDescriptionToClause())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionFullClause(CobolParser.ScreenDescriptionFullClauseContext ctx) {
+        return new Cobol.ScreenDescriptionFullClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FULL(), ctx.LENGTH_CHECK())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionGridClause(CobolParser.ScreenDescriptionGridClauseContext ctx) {
+        return new Cobol.ScreenDescriptionFullClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.GRID(), ctx.LEFTLINE(), ctx.OVERLINE())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionJustifiedClause(CobolParser.ScreenDescriptionJustifiedClauseContext ctx) {
+        return new Cobol.ScreenDescriptionJustifiedClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.JUSTIFIED(), ctx.JUST(), ctx.RIGHT())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionLightClause(CobolParser.ScreenDescriptionLightClauseContext ctx) {
+        return new Cobol.ScreenDescriptionLightClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.HIGHLIGHT(), ctx.LOWLIGHT())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionLineClause(CobolParser.ScreenDescriptionLineClauseContext ctx) {
+        return new Cobol.ScreenDescriptionLineClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LINE(), ctx.NUMBER(), ctx.IS(), ctx.PLUS(), ctx.PLUSCHAR(), ctx.MINUSCHAR()),
+                visit(ctx.identifier(), ctx.integerLiteral())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionPictureClause(CobolParser.ScreenDescriptionPictureClauseContext ctx) {
+        return new Cobol.ScreenDescriptionPictureClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PICTURE(), ctx.PIC(), ctx.IS()),
+                (Cobol.PictureString) visit(ctx.pictureString())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionPromptClause(CobolParser.ScreenDescriptionPromptClauseContext ctx) {
+        return new Cobol.ScreenDescriptionPromptClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PROMPT(), ctx.CHARACTER(), ctx.IS()),
+                visit(ctx.identifier(), ctx.literal()),
+                visitNullable(ctx.screenDescriptionPromptOccursClause())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionPromptOccursClause(CobolParser.ScreenDescriptionPromptOccursClauseContext ctx) {
+        return new Cobol.ScreenDescriptionPromptOccursClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.OCCURS()),
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                words(ctx.TIMES())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionRequiredClause(CobolParser.ScreenDescriptionRequiredClauseContext ctx) {
+        return new Cobol.ScreenDescriptionRequiredClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REQUIRED(), ctx.EMPTY_CHECK())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionReverseVideoClause(CobolParser.ScreenDescriptionReverseVideoClauseContext ctx) {
+        return new Cobol.ScreenDescriptionReverseVideoClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REVERSE_VIDEO())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionSignClause(CobolParser.ScreenDescriptionSignClauseContext ctx) {
+        return new Cobol.ScreenDescriptionSignClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SIGN(), ctx.IS(), ctx.LEADING(), ctx.TRAILING(), ctx.SEPARATE(), ctx.CHARACTER())
         );
     }
 
@@ -1320,6 +1575,26 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitScreenDescriptionUnderlineClause(CobolParser.ScreenDescriptionUnderlineClauseContext ctx) {
+        return new Cobol.ScreenDescriptionUnderlineClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.UNDERLINE())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionUsageClause(CobolParser.ScreenDescriptionUsageClauseContext ctx) {
+        return new Cobol.ScreenDescriptionUsageClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.USAGE(), ctx.IS(), ctx.DISPLAY(), ctx.DISPLAY_1())
+        );
+    }
+
+    @Override
     public Object visitScreenDescriptionUsingClause(CobolParser.ScreenDescriptionUsingClauseContext ctx) {
         return new Cobol.ScreenDescriptionUsingClause(
                 randomId(),
@@ -1331,17 +1606,23 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Object visitScreenDescriptionEntry(CobolParser.ScreenDescriptionEntryContext ctx) {
-        return new Cobol.ScreenDescriptionEntry(
+    public Object visitScreenDescriptionValueClause(CobolParser.ScreenDescriptionValueClauseContext ctx) {
+        return new Cobol.ScreenDescriptionValueClause(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                words(ctx.INTEGERLITERAL()),
-                ctx.FILLER() == null ?
-                        (ctx.screenName() == null ? null : padLeft(ctx.screenName())) :
-                        padLeft(ctx.FILLER()),
-                convertAllContainer(emptyList()) // add screen clauses
-                        .withLastSpace(sourceBefore("."))
+                words(ctx.VALUE(), ctx.IS()),
+                (Name) visit(ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitScreenDescriptionZeroFillClause(CobolParser.ScreenDescriptionZeroFillClauseContext ctx) {
+        return new Cobol.ScreenDescriptionZeroFillClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ZERO_FILL())
         );
     }
 
@@ -3311,11 +3592,30 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                ctx.pictureChars().stream()
-                        .map(RuleContext::getText)
-                        .map(this::skip)
-                        .collect(Collectors.joining("")),
-                padLeft(ctx.pictureCardinality())
+                convertAllContainer(ctx.pictureChars()),
+                visitNullable(ctx.pictureCardinality())
+        );
+    }
+
+    @Override
+    public Object visitPictureCardinality(CobolParser.PictureCardinalityContext ctx) {
+        return new Cobol.ParenExpression(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LPARENCHAR()),
+                (Cobol) visit(ctx.integerLiteral()),
+                words(ctx.RPARENCHAR())
+        );
+    }
+
+    @Override
+    public Object visitPictureString(CobolParser.PictureStringContext ctx) {
+        return new Cobol.PictureString(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.picture())
         );
     }
 

@@ -329,7 +329,6 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
-    @Disabled("Implement Container in ScreenDescriptionEntry.")
     @Test
     fun screenSection() = rewriteRun(
         cobol("""
@@ -337,7 +336,46 @@ class CobolBasicsTest : RewriteTest {
             PROGRAM-ID. DBSection.
             DATA DIVISION.
             SCREEN SECTION.
-            01 SCREEN1 BLANK LINE BELL BLINK CONTROL IS 77 SIZE IS 77 USING 77.
+            01 SCREEN1 BLANK LINE
+            BELL
+            BLINK
+            ERASE EOL
+            HIGHLIGHT
+            GRID
+            UNDERLINE
+            SIZE IS IDENTIFIER IN IDENTIFIER
+            LINE NUMBER IS PLUS IDENTIFIER IN IDENTIFIER
+            COLUMN NUMBER IS PLUS IDENTIFIER IN IDENTIFIER
+            FOREGROUND-COLOR IS IDENTIFIER IN IDENTIFIER
+            BACKGROUND-COLOR IS IDENTIFIER IN IDENTIFIER
+            CONTROL IS IDENTIFIER IN IDENTIFIER
+            VALUE IS 10
+            PICTURE IS ${'$'}(10)
+            FROM IDENTIFIER IN IDENTIFIER TO IDENTIFIER IN IDENTIFIER
+            USING IDENTIFIER IN IDENTIFIER
+            USAGE IS DISPLAY
+            BLANK WHEN ZERO
+            JUSTIFIED RIGHT
+            SIGN IS LEADING SEPARATE CHARACTER
+            AUTO
+            SECURE
+            REQUIRED
+            PROMPT CHARACTER IS IDENTIFIER IN IDENTIFIER OCCURS 01 TIMES
+            FULL
+            ZERO-FILL
+            .
+        """)
+    )
+
+    @Disabled("Potential lexer issue: The REVERSE-VIDEO token maps to RESERVE-VIDEO")
+    @Test
+    fun reverseVideo() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. DBSection.
+            DATA DIVISION.
+            SCREEN SECTION.
+            01 REVERSE-VIDEO.
         """)
     )
 
@@ -495,7 +533,6 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
-    @Disabled("Requires changes to Basis")
     @Test
     fun conditions() = rewriteRun(
         cobol("""
@@ -507,7 +544,7 @@ class CobolBasicsTest : RewriteTest {
             WHEN IDENTIFIER IS NOT ALPHABETIC-LOWER
                 CONTINUE
             WHEN IDENTIFIER IN IDENTIFIER
-                CONTINUE
+                CONTINUE.
         """)
     )
 
