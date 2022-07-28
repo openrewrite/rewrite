@@ -1128,4 +1128,34 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.SubtractMinuendCorresponding visitSubtractMinuendCorresponding(Cobol.SubtractMinuendCorresponding subtractMinuendCorresponding, P p) {
         return (Cobol.SubtractMinuendCorresponding) super.visitSubtractMinuendCorresponding(subtractMinuendCorresponding, p);
     }
+
+    @Override
+    public Cobol.StringStatement visitStringStatement(Cobol.StringStatement stringStatement, P p) {
+        return (Cobol.StringStatement) super.visitStringStatement(stringStatement, p);
+    }
+
+    @Override
+    public Cobol.StringSendingPhrase visitStringSendingPhrase(Cobol.StringSendingPhrase stringSendingPhrase, P p) {
+        return (Cobol.StringSendingPhrase) super.visitStringSendingPhrase(stringSendingPhrase, p);
+    }
+
+    @Override
+    public Cobol.StringDelimitedByPhrase visitStringDelimitedByPhrase(Cobol.StringDelimitedByPhrase stringDelimitedByPhrase, P p) {
+        return (Cobol.StringDelimitedByPhrase) super.visitStringDelimitedByPhrase(stringDelimitedByPhrase, p);
+    }
+
+    @Override
+    public Cobol.StringForPhrase visitStringForPhrase(Cobol.StringForPhrase stringForPhrase, P p) {
+        return (Cobol.StringForPhrase) super.visitStringForPhrase(stringForPhrase, p);
+    }
+
+    @Override
+    public Cobol.StringIntoPhrase visitStringIntoPhrase(Cobol.StringIntoPhrase stringIntoPhrase, P p) {
+        return (Cobol.StringIntoPhrase) super.visitStringIntoPhrase(stringIntoPhrase, p);
+    }
+
+    @Override
+    public Cobol.StringWithPointerPhrase visitStringWithPointerPhrase(Cobol.StringWithPointerPhrase stringWithPointerPhrase, P p) {
+        return (Cobol.StringWithPointerPhrase) super.visitStringWithPointerPhrase(stringWithPointerPhrase, p);
+    }
 }

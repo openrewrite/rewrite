@@ -2090,4 +2090,59 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(subtractMinuendCorresponding.getRounded(), p);
         return subtractMinuendCorresponding;
     }
+
+    public Cobol visitStringStatement(Cobol.StringStatement stringStatement, PrintOutputCapture<P> p) {
+        visitSpace(stringStatement.getPrefix(), p);
+        visitMarkers(stringStatement.getMarkers(), p);
+        visit(stringStatement.getString(), p);
+        visitContainer("", stringStatement.getPadding().getStringSendingPhrases(), "", "", p);
+        visit(stringStatement.getStringIntoPhrase(), p);
+        visit(stringStatement.getStringWithPointerPhrase(), p);
+        visit(stringStatement.getOnOverflowPhrase(), p);
+        visit(stringStatement.getNotOnOverflowPhrase(), p);
+        visitLeftPadded("", stringStatement.getPadding().getEndString(), p);
+        return stringStatement;
+    }
+
+    public Cobol visitStringSendingPhrase(Cobol.StringSendingPhrase stringSendingPhrase, PrintOutputCapture<P> p) {
+        visitSpace(stringSendingPhrase.getPrefix(), p);
+        visitMarkers(stringSendingPhrase.getMarkers(), p);
+        for (Cobol s : stringSendingPhrase.getSendings()) {
+            visit(s, p);
+        }
+        visit(stringSendingPhrase.getPhrase(), p);
+        return stringSendingPhrase;
+    }
+
+    public Cobol visitStringDelimitedByPhrase(Cobol.StringDelimitedByPhrase stringDelimitedByPhrase, PrintOutputCapture<P> p) {
+        visitSpace(stringDelimitedByPhrase.getPrefix(), p);
+        visitMarkers(stringDelimitedByPhrase.getMarkers(), p);
+        p.append(stringDelimitedByPhrase.getWord());
+        visit(stringDelimitedByPhrase.getIdentifier(), p);
+        return stringDelimitedByPhrase;
+    }
+
+    public Cobol visitStringForPhrase(Cobol.StringForPhrase stringForPhrase, PrintOutputCapture<P> p) {
+        visitSpace(stringForPhrase.getPrefix(), p);
+        visitMarkers(stringForPhrase.getMarkers(), p);
+        p.append(stringForPhrase.getWord());
+        visit(stringForPhrase.getIdentifier(), p);
+        return stringForPhrase;
+    }
+
+    public Cobol visitStringIntoPhrase(Cobol.StringIntoPhrase stringIntoPhrase, PrintOutputCapture<P> p) {
+        visitSpace(stringIntoPhrase.getPrefix(), p);
+        visitMarkers(stringIntoPhrase.getMarkers(), p);
+        p.append(stringIntoPhrase.getInto());
+        visit(stringIntoPhrase.getIdentifier(), p);
+        return stringIntoPhrase;
+    }
+
+    public Cobol visitStringWithPointerPhrase(Cobol.StringWithPointerPhrase stringWithPointerPhrase, PrintOutputCapture<P> p) {
+        visitSpace(stringWithPointerPhrase.getPrefix(), p);
+        visitMarkers(stringWithPointerPhrase.getMarkers(), p);
+        p.append(stringWithPointerPhrase.getWords());
+        visit(stringWithPointerPhrase.getQualifiedDataName(), p);
+        return stringWithPointerPhrase;
+    }
 }

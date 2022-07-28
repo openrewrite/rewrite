@@ -666,4 +666,18 @@ class CobolBasicsTest : RewriteTest {
                 EXIT PROGRAM.
         """)
     )
+
+    @Test
+    fun stringStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. subtractStatement.
+            PROCEDURE DIVISION.
+            RW301M-CONTROL.
+                STRING NONNUMERICLITERAL, NONNUMERICLITERAL NONNUMERICLITERAL DELIMITED BY SIZE
+                INTO IDENTIFIER
+                WITH POINTER IDENTIFIER END-STRING
+            .
+        """)
+    )
 }

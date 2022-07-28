@@ -9660,6 +9660,211 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class StringStatement implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        CobolWord string;
+
+        CobolContainer<Cobol> stringSendingPhrases;
+
+        @Getter
+        @With
+        StringIntoPhrase stringIntoPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StringWithPointerPhrase stringWithPointerPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase onOverflowPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase notOnOverflowPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endString;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitStringStatement(this, p);
+        }
+
+        public List<Cobol> getStringSendingPhrases() {
+            return stringSendingPhrases.getElements();
+        }
+
+        public StringStatement withStringSendingPhrases(List<Cobol> stringSendingPhrases) {
+            return getPadding().withStringSendingPhrases(this.stringSendingPhrases.getPadding().withElements(CobolRightPadded.withElements(
+                    this.stringSendingPhrases.getPadding().getElements(), stringSendingPhrases)));
+        }
+
+        @Nullable
+        public String getEndString() {
+            return endString == null ? null : endString.getElement();
+        }
+
+        public StringStatement withEndString(@Nullable String endString) {
+            if (endString == null) {
+                return this.endString == null ? this : new StringStatement(id, prefix, markers, string, stringSendingPhrases, stringIntoPhrase, stringWithPointerPhrase, onOverflowPhrase, notOnOverflowPhrase, null);
+            }
+            return getPadding().withEndString(CobolLeftPadded.withElement(this.endString, endString));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final StringStatement t;
+
+            public CobolContainer<Cobol> getStringSendingPhrases() {
+                return t.stringSendingPhrases;
+            }
+
+            public StringStatement withStringSendingPhrases(CobolContainer<Cobol> stringSendingPhrases) {
+                return t.stringSendingPhrases == stringSendingPhrases ? t : new StringStatement(t.padding, t.id, t.prefix, t.markers, t.string, stringSendingPhrases, t.stringIntoPhrase, t.stringWithPointerPhrase, t.onOverflowPhrase, t.notOnOverflowPhrase, t.endString);
+            }
+
+            @Nullable
+            public CobolLeftPadded<String> getEndString() {
+                return t.endString;
+            }
+
+            public StringStatement withEndString(@Nullable CobolLeftPadded<String> endString) {
+                return t.endString == endString ? t : new StringStatement(t.padding, t.id, t.prefix, t.markers, t.string, t.stringSendingPhrases, t.stringIntoPhrase, t.stringWithPointerPhrase, t.onOverflowPhrase, t.notOnOverflowPhrase, endString);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class StringSendingPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        List<Cobol> sendings;
+        Cobol phrase;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitStringSendingPhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class StringDelimitedByPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String word;
+        CobolWord identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitStringDelimitedByPhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class StringForPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String word;
+        CobolWord identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitStringForPhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class StringIntoPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String into;
+        Identifier identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitStringIntoPhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class StringWithPointerPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitStringWithPointerPhrase(this, p);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

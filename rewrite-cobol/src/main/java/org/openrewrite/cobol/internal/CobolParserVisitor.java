@@ -3125,6 +3125,77 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitStringStatement(CobolParser.StringStatementContext ctx) {
+        return new Cobol.StringStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.STRING()),
+                convertAllContainer(ctx.stringSendingPhrase()),
+                (Cobol.StringIntoPhrase) visit(ctx.stringIntoPhrase()),
+                visitNullable(ctx.stringWithPointerPhrase()),
+                visitNullable(ctx.onOverflowPhrase()),
+                visitNullable(ctx.notOnOverflowPhrase()),
+                padLeft(ctx.END_STRING())
+        );
+    }
+
+    @Override
+    public Object visitStringSendingPhrase(CobolParser.StringSendingPhraseContext ctx) {
+        return new Cobol.StringSendingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllList(singletonList(","), ctx.stringSending()),
+                visit(ctx.stringDelimitedByPhrase(), ctx.stringForPhrase())
+        );
+    }
+
+    @Override
+    public Object visitStringDelimitedByPhrase(CobolParser.StringDelimitedByPhraseContext ctx) {
+        return new Cobol.StringDelimitedByPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DELIMITED(), ctx.BY()),
+                (Cobol.CobolWord) visit(ctx.SIZE(), ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitStringForPhrase(CobolParser.StringForPhraseContext ctx) {
+        return new Cobol.StringForPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOR()),
+                visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitStringIntoPhrase(CobolParser.StringIntoPhraseContext ctx) {
+        return new Cobol.StringIntoPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INTO()),
+                (Identifier) visit(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Object visitStringWithPointerPhrase(CobolParser.StringWithPointerPhraseContext ctx) {
+        return new Cobol.StringWithPointerPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.POINTER()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
     public Cobol.Subscript visitSubscript(CobolParser.SubscriptContext ctx) {
         return new Cobol.Subscript(
                 randomId(),

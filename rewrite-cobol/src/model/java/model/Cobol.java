@@ -16,10 +16,14 @@
 package model;
 
 import org.openrewrite.cobol.tree.CobolContainer;
+import org.openrewrite.cobol.tree.CobolLeftPadded;
 import org.openrewrite.internal.lang.Nullable;
+
+import java.util.List;
 
 public interface Cobol {
 
+    class CobolWord {}
     class QualifiedDataName {}
     class StatementPhrase {}
 
