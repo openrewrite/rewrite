@@ -734,4 +734,17 @@ class CobolBasicsTest : RewriteTest {
             .
         """)
     )
+
+    @Test
+    fun goToStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. subtractStatement.
+            PROCEDURE DIVISION.
+            ACCEPT-TEST-01.
+                GO TO CM105-FINI.
+                GO TO CM105-FINI DEPENDING ON IDENTIFIER IN IDENTIFIER.
+            .
+        """)
+    )
 }

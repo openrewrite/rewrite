@@ -2370,4 +2370,28 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         e = e.getPadding().withExecSqlLmsLines(visitContainer(e.getPadding().getExecSqlLmsLines(), p));
         return e;
     }
+
+    public Cobol visitGoBack(Cobol.GoBack goBack, P p) {
+        Cobol.GoBack g = goBack;
+        g = g.withPrefix(visitSpace(g.getPrefix(), p));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
+        g = g.withGoBack((Cobol.CobolWord) visit(g.getGoBack(), p));
+        return g;
+    }
+
+    public Cobol visitGoTo(Cobol.GoTo _goTo, P p) {
+        Cobol.GoTo g = _goTo;
+        g = g.withPrefix(visitSpace(g.getPrefix(), p));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
+        g = g.withStatement(visit(g.getStatement(), p));
+        return g;
+    }
+
+    public Cobol visitGoToDependingOnStatement(Cobol.GoToDependingOnStatement goToDependingOnStatement, P p) {
+        Cobol.GoToDependingOnStatement g = goToDependingOnStatement;
+        g = g.withPrefix(visitSpace(g.getPrefix(), p));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
+        g = g.getPadding().withProcedureNames(visitContainer(g.getPadding().getProcedureNames(), p));
+        return g;
+    }
 }

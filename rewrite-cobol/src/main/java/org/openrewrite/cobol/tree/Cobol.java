@@ -4464,6 +4464,121 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class GoBack implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        CobolWord goBack;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitGoBack(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class GoTo implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        Cobol statement;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitGoTo(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class GoToDependingOnStatement implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Nullable
+        CobolContainer<ProcedureName> procedureNames;
+
+        @Getter
+        @With
+        String words;
+
+        @Getter
+        @Nullable
+        @With
+        Identifier identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitGoToDependingOnStatement(this, p);
+        }
+
+        public List<Cobol.ProcedureName> getProcedureNames() {
+            return procedureNames.getElements();
+        }
+
+        public GoToDependingOnStatement withProcedureNames(List<Cobol.ProcedureName> procedureNames) {
+            return getPadding().withProcedureNames(this.procedureNames.getPadding().withElements(CobolRightPadded.withElements(
+                    this.procedureNames.getPadding().getElements(), procedureNames)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final GoToDependingOnStatement t;
+
+            @Nullable
+            public CobolContainer<Cobol.ProcedureName> getProcedureNames() {
+                return t.procedureNames;
+            }
+
+            public GoToDependingOnStatement withProcedureNames(@Nullable CobolContainer<Cobol.ProcedureName> procedureNames) {
+                return t.procedureNames == procedureNames ? t : new GoToDependingOnStatement(t.padding, t.id, t.prefix, t.markers, procedureNames, t.words, t.identifier);
+            }
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

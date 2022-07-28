@@ -24,30 +24,10 @@ import java.util.List;
 
 public interface Cobol {
 
-    class CobolWord {
-    }
-
-    class QualifiedDataName {
-    }
-
-    class StatementPhrase {
-    }
-
-    class ParenExpression {
-    }
-
-    class Condition {
-    }
-
-    class ExecCics implements Statement {
-        CobolContainer<CobolWord> execCicsLines;
-    }
-
-    class ExecSql implements Statement {
-        CobolContainer<CobolWord> execSqlLines;
-    }
-
-    class ExecSqlIms implements Statement {
-        CobolContainer<CobolWord> execSqlLmsLines;
-    }
+    class CobolWord {}
+    class QualifiedDataName {}
+    class StatementPhrase {}
+    class ParenExpression {}
+    class Condition {}
+    class ProcedureName {}
 }

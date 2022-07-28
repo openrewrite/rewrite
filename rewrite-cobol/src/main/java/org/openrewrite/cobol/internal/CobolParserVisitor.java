@@ -759,6 +759,39 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitGobackStatement(CobolParser.GobackStatementContext ctx) {
+        return new Cobol.GoBack(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.GOBACK())
+        );
+    }
+
+    @Override
+    public Object visitGoToStatement(CobolParser.GoToStatementContext ctx) {
+        return new Cobol.GoTo(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.GO(), ctx.TO()),
+                visit(ctx.goToStatementSimple(), ctx.goToDependingOnStatement())
+        );
+    }
+
+    @Override
+    public Object visitGoToDependingOnStatement(CobolParser.GoToDependingOnStatementContext ctx) {
+        return new Cobol.GoToDependingOnStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.procedureName()),
+                words(ctx.MORE_LABELS(), ctx.DEPENDING(), ctx.ON()),
+                visitNullable(ctx.identifier())
+        );
+    }
+
+    @Override
     public Cobol.OdtClause visitOdtClause(CobolParser.OdtClauseContext ctx) {
         return new Cobol.OdtClause(
                 randomId(),

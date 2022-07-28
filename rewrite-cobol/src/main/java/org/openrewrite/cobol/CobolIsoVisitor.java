@@ -1298,4 +1298,19 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.ExecSqlImsStatement visitExecSqlImsStatement(Cobol.ExecSqlImsStatement execSqlImsStatement, P p) {
         return (Cobol.ExecSqlImsStatement) super.visitExecSqlImsStatement(execSqlImsStatement, p);
     }
+
+    @Override
+    public Cobol.GoBack visitGoBack(Cobol.GoBack goBack, P p) {
+        return (Cobol.GoBack) super.visitGoBack(goBack, p);
+    }
+
+    @Override
+    public Cobol.GoTo visitGoTo(Cobol.GoTo _goTo, P p) {
+        return (Cobol.GoTo) super.visitGoTo(_goTo, p);
+    }
+
+    @Override
+    public Cobol.GoToDependingOnStatement visitGoToDependingOnStatement(Cobol.GoToDependingOnStatement goToDependingOnStatement, P p) {
+        return (Cobol.GoToDependingOnStatement) super.visitGoToDependingOnStatement(goToDependingOnStatement, p);
+    }
 }

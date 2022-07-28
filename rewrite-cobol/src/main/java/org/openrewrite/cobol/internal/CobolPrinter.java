@@ -2363,4 +2363,28 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", execSqlImsStatement.getPadding().getExecSqlLmsLines(), "", "", p);
         return execSqlImsStatement;
     }
+
+    public Cobol visitGoBack(Cobol.GoBack goBack, PrintOutputCapture<P> p) {
+        visitSpace(goBack.getPrefix(), p);
+        visitMarkers(goBack.getMarkers(), p);
+        visit(goBack.getGoBack(), p);
+        return goBack;
+    }
+
+    public Cobol visitGoTo(Cobol.GoTo _goTo, PrintOutputCapture<P> p) {
+        visitSpace(_goTo.getPrefix(), p);
+        visitMarkers(_goTo.getMarkers(), p);
+        p.append(_goTo.getWords());
+        visit(_goTo.getStatement(), p);
+        return _goTo;
+    }
+
+    public Cobol visitGoToDependingOnStatement(Cobol.GoToDependingOnStatement goToDependingOnStatement, PrintOutputCapture<P> p) {
+        visitSpace(goToDependingOnStatement.getPrefix(), p);
+        visitMarkers(goToDependingOnStatement.getMarkers(), p);
+        visitContainer("", goToDependingOnStatement.getPadding().getProcedureNames(), "", "", p);
+        p.append(goToDependingOnStatement.getWords());
+        visit(goToDependingOnStatement.getIdentifier(), p);
+        return goToDependingOnStatement;
+    }
 }
