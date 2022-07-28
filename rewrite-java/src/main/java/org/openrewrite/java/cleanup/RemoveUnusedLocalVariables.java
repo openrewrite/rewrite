@@ -38,13 +38,6 @@ import java.util.function.Predicate;
 @EqualsAndHashCode(callSuper = true)
 @SuppressWarnings("ConstantConditions")
 public class RemoveUnusedLocalVariables extends Recipe {
-    /**
-     * All methods that start with 'get' matching this InvocationMatcher will be considered non-side effecting.
-     */
-    private static final InvocationMatcher SAFE_GETTER_METHODS = InvocationMatcher.fromInvocationMatchers(
-            new MethodMatcher("java.io.File *(..)")
-    );
-
     @Incubating(since = "7.17.2")
     @Option(displayName = "Ignore matching variable names",
             description = "An array of variable identifier names for local variables to ignore, even if the local variable is unused.",
@@ -75,124 +68,126 @@ public class RemoveUnusedLocalVariables extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemoveUnusedLocalVariablesVisitor(ignoreVariablesNamed);
-    }
+        // All methods that start with 'get' matching this InvocationMatcher will be considered non-side effecting.
+        InvocationMatcher SAFE_GETTER_METHODS = InvocationMatcher.fromInvocationMatchers(
+                new MethodMatcher("java.io.File *(..)")
+        );
 
-    private static class RemoveUnusedLocalVariablesVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private Set<String> ignoreVariableNames;
-
-        RemoveUnusedLocalVariablesVisitor(String[] ignoreVariablesNamed) {
-            if (ignoreVariablesNamed != null) {
-                ignoreVariableNames = new HashSet<>(ignoreVariablesNamed.length);
-                ignoreVariableNames.addAll(Arrays.asList(ignoreVariablesNamed));
-            }
+        Set<String> ignoreVariableNames;
+        if (ignoreVariablesNamed == null) {
+            ignoreVariableNames = null;
+        } else {
+            ignoreVariableNames = new HashSet<>(ignoreVariablesNamed.length);
+            ignoreVariableNames.addAll(Arrays.asList(ignoreVariablesNamed));
         }
 
-        private Cursor getCursorToParentScope(Cursor cursor) {
-            return cursor.dropParentUntil(is ->
-                    is instanceof J.Block ||
-                            is instanceof J.MethodDeclaration ||
-                            is instanceof J.ForLoop ||
-                            is instanceof J.ForEachLoop ||
-                            is instanceof J.ForLoop.Control ||
-                            is instanceof J.ForEachLoop.Control ||
-                            is instanceof J.Case ||
-                            is instanceof J.Try ||
-                            is instanceof J.Try.Resource ||
-                            is instanceof J.Try.Catch ||
-                            is instanceof J.MultiCatch ||
-                            is instanceof J.Lambda
-            );
-        }
-
-        @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
-            // skip matching ignored variable names right away
-            if (ignoreVariableNames != null && ignoreVariableNames.contains(variable.getSimpleName())) {
-                return variable;
+        return new JavaIsoVisitor<ExecutionContext>() {
+            private Cursor getCursorToParentScope(Cursor cursor) {
+                return cursor.dropParentUntil(is ->
+                        is instanceof J.Block ||
+                                is instanceof J.MethodDeclaration ||
+                                is instanceof J.ForLoop ||
+                                is instanceof J.ForEachLoop ||
+                                is instanceof J.ForLoop.Control ||
+                                is instanceof J.ForEachLoop.Control ||
+                                is instanceof J.Case ||
+                                is instanceof J.Try ||
+                                is instanceof J.Try.Resource ||
+                                is instanceof J.Try.Catch ||
+                                is instanceof J.MultiCatch ||
+                                is instanceof J.Lambda
+                );
             }
 
-            Cursor parentScope = getCursorToParentScope(getCursor());
-            J parent = parentScope.getValue();
-            if (parentScope.getParent() == null ||
-                    // skip class instance variables
-                    parentScope.getParent().getValue() instanceof J.ClassDeclaration ||
-                    // skip anonymous class instance variables
-                    parentScope.getParent().getValue() instanceof J.NewClass ||
-                    // skip if method declaration parameter
-                    parent instanceof J.MethodDeclaration ||
-                    // skip if defined in an enhanced or standard for loop, since there isn't much we can do about the semantics at that point
-                    parent instanceof J.ForLoop.Control || parent instanceof J.ForEachLoop.Control ||
-                    // skip if defined in a try's catch clause as an Exception variable declaration
-                    parent instanceof J.Try.Resource || parent instanceof J.Try.Catch || parent instanceof J.MultiCatch ||
-                    // skip if defined as a parameter to a lambda expression
-                    parent instanceof J.Lambda ||
-                    // skip if the initializer may have a side effect
-                    initializerMightSideEffect(variable)
-            ) {
-                return variable;
-            }
-
-            List<J> readReferences = References.findRhsReferences(parentScope.getValue(), variable.getName());
-            if (readReferences.isEmpty()) {
-                List<Statement> assignmentReferences = References.findLhsReferences(parentScope.getValue(), variable.getName());
-                for (Statement ref : assignmentReferences) {
-                    doAfterVisit(new DeleteStatement<>(ref));
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+                // skip matching ignored variable names right away
+                if (ignoreVariableNames != null && ignoreVariableNames.contains(variable.getSimpleName())) {
+                    return variable;
                 }
-                return null;
-            }
 
-            return super.visitVariable(variable, ctx);
-        }
-
-        @Override
-        public Statement visitStatement(Statement statement, ExecutionContext executionContext) {
-            List<Comment> comments = getCursor().pollNearestMessage("COMMENTS_KEY");
-            if (comments != null) {
-                statement = statement.withComments(ListUtils.concatAll(statement.getComments(), comments));
-            }
-            return super.visitStatement(statement, executionContext);
-        }
-
-        @Override
-        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-            if (!multiVariable.getAllAnnotations().isEmpty()) {
-                return multiVariable;
-            }
-
-            J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
-            if (mv.getVariables().isEmpty()) {
-                if (!mv.getPrefix().getComments().isEmpty()) {
-                    getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration).putMessage("COMMENTS_KEY", mv.getPrefix().getComments());
+                Cursor parentScope = getCursorToParentScope(getCursor());
+                J parent = parentScope.getValue();
+                if (parentScope.getParent() == null ||
+                        // skip class instance variables
+                        parentScope.getParent().getValue() instanceof J.ClassDeclaration ||
+                        // skip anonymous class instance variables
+                        parentScope.getParent().getValue() instanceof J.NewClass ||
+                        // skip if method declaration parameter
+                        parent instanceof J.MethodDeclaration ||
+                        // skip if defined in an enhanced or standard for loop, since there isn't much we can do about the semantics at that point
+                        parent instanceof J.ForLoop.Control || parent instanceof J.ForEachLoop.Control ||
+                        // skip if defined in a try's catch clause as an Exception variable declaration
+                        parent instanceof J.Try.Resource || parent instanceof J.Try.Catch || parent instanceof J.MultiCatch ||
+                        // skip if defined as a parameter to a lambda expression
+                        parent instanceof J.Lambda ||
+                        // skip if the initializer may have a side effect
+                        initializerMightSideEffect(variable)
+                ) {
+                    return variable;
                 }
-                doAfterVisit(new DeleteStatement<>(mv));
-            }
-            return mv;
-        }
 
-        private boolean initializerMightSideEffect(J.VariableDeclarations.NamedVariable variable) {
-            if (variable.getInitializer() == null) {
-                return false;
+                List<J> readReferences = References.findRhsReferences(parentScope.getValue(), variable.getName());
+                if (readReferences.isEmpty()) {
+                    List<Statement> assignmentReferences = References.findLhsReferences(parentScope.getValue(), variable.getName());
+                    for (Statement ref : assignmentReferences) {
+                        doAfterVisit(new DeleteStatement<>(ref));
+                    }
+                    return null;
+                }
+
+                return super.visitVariable(variable, ctx);
             }
-            AtomicBoolean mightSideEffect = new AtomicBoolean(false);
-            new JavaIsoVisitor<AtomicBoolean>() {
-                @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation methodInvocation, AtomicBoolean result) {
-                    if (SAFE_GETTER_METHODS.matches(methodInvocation) && methodInvocation.getSimpleName().startsWith("get")) {
+
+            @Override
+            public Statement visitStatement(Statement statement, ExecutionContext executionContext) {
+                List<Comment> comments = getCursor().pollNearestMessage("COMMENTS_KEY");
+                if (comments != null) {
+                    statement = statement.withComments(ListUtils.concatAll(statement.getComments(), comments));
+                }
+                return super.visitStatement(statement, executionContext);
+            }
+
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                if (!multiVariable.getAllAnnotations().isEmpty()) {
+                    return multiVariable;
+                }
+
+                J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
+                if (mv.getVariables().isEmpty()) {
+                    if (!mv.getPrefix().getComments().isEmpty()) {
+                        getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration).putMessage("COMMENTS_KEY", mv.getPrefix().getComments());
+                    }
+                    doAfterVisit(new DeleteStatement<>(mv));
+                }
+                return mv;
+            }
+
+            private boolean initializerMightSideEffect(J.VariableDeclarations.NamedVariable variable) {
+                if (variable.getInitializer() == null) {
+                    return false;
+                }
+                AtomicBoolean mightSideEffect = new AtomicBoolean(false);
+                new JavaIsoVisitor<AtomicBoolean>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation methodInvocation, AtomicBoolean result) {
+                        if (SAFE_GETTER_METHODS.matches(methodInvocation) && methodInvocation.getSimpleName().startsWith("get")) {
+                            return methodInvocation;
+                        }
+                        result.set(true);
                         return methodInvocation;
                     }
-                    result.set(true);
-                    return methodInvocation;
-                }
 
-                @Override
-                public J.Assignment visitAssignment(J.Assignment assignment, AtomicBoolean result) {
-                    result.set(true);
-                    return assignment;
-                }
-            }.visit(variable.getInitializer(), mightSideEffect);
-            return mightSideEffect.get();
-        }
+                    @Override
+                    public J.Assignment visitAssignment(J.Assignment assignment, AtomicBoolean result) {
+                        result.set(true);
+                        return assignment;
+                    }
+                }.visit(variable.getInitializer(), mightSideEffect);
+                return mightSideEffect.get();
+            }
+        };
     }
 
     private static class References {
@@ -325,5 +320,4 @@ public class RemoveUnusedLocalVariables extends Recipe {
             return refs;
         }
     }
-
 }
