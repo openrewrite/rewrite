@@ -565,7 +565,11 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitMarkers(fileDescriptionEntry.getMarkers(), p);
         p.append(fileDescriptionEntry.getWords());
         visit(fileDescriptionEntry.getName(), p);
-        visitContainer("", fileDescriptionEntry.getPadding().getClauses(), "", "", p);
+        if (fileDescriptionEntry.getClauses() != null) {
+            for (Cobol c : fileDescriptionEntry.getClauses()) {
+                visit(c, p);
+            }
+        }
         visitContainer(".", fileDescriptionEntry.getPadding().getDataDescriptions(), "", "", p);
         return fileDescriptionEntry;
     }

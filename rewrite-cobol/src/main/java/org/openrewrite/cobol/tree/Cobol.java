@@ -4289,23 +4289,19 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        Identifier name;
+        CobolWord name;
 
-        CobolContainer<Cobol> clauses;
+        @Getter
+        @With
+        @Nullable
+        List<Cobol> clauses;
+
+        @Nullable
         CobolContainer<DataDescriptionEntry> dataDescriptions;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitFileDescriptionEntry(this, p);
-        }
-
-        public List<Cobol> getClauses() {
-            return clauses.getElements();
-        }
-
-        public FileDescriptionEntry withClauses(List<Cobol> clauses) {
-            return getPadding().withClauses(this.clauses.getPadding().withElements(CobolRightPadded.withElements(
-                    this.clauses.getPadding().getElements(), clauses)));
         }
 
         public List<Cobol.DataDescriptionEntry> getDataDescriptions() {
@@ -4336,19 +4332,12 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final FileDescriptionEntry t;
 
-            public CobolContainer<Cobol> getClauses() {
-                return t.clauses;
-            }
-
-            public FileDescriptionEntry withClauses(CobolContainer<Cobol> clauses) {
-                return t.clauses == clauses ? t : new FileDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.words, t.name, clauses, t.dataDescriptions);
-            }
-
+            @Nullable
             public CobolContainer<Cobol.DataDescriptionEntry> getDataDescriptions() {
                 return t.dataDescriptions;
             }
 
-            public FileDescriptionEntry withDataDescriptions(CobolContainer<Cobol.DataDescriptionEntry> dataDescriptions) {
+            public FileDescriptionEntry withDataDescriptions(@Nullable CobolContainer<Cobol.DataDescriptionEntry> dataDescriptions) {
                 return t.dataDescriptions == dataDescriptions ? t : new FileDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.words, t.name, t.clauses, dataDescriptions);
             }
         }

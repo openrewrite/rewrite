@@ -3198,8 +3198,8 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.FD(), ctx.SD()),
-                (Identifier) visit(ctx.fileName()),
-                CobolContainer.empty(),
+                (Cobol.CobolWord) visit(ctx.fileName()),
+                convertAllList(singletonList("."), ctx.fileDescriptionEntryClause()),
                 convertAllContainer(sourceBefore("."), ctx.dataDescriptionEntry())
         );
     }
