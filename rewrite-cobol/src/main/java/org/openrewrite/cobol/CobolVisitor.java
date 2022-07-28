@@ -2016,4 +2016,95 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         s = s.withRounded((Cobol.CobolWord) visit(s.getRounded(), p));
         return s;
     }
+
+    public Cobol visitRelease(Cobol.Release release, P p) {
+        Cobol.Release r = release;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withRecordName((Cobol.QualifiedDataName) visit(r.getRecordName(), p));
+        r = r.withQualifiedDataName((Cobol.QualifiedDataName) visit(r.getQualifiedDataName(), p));
+        return r;
+    }
+
+    public Cobol visitReturn(Cobol.Return r, P p) {
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withFileName((Name) visit(r.getFileName(), p));
+        r = r.withInto((Cobol.ReturnInto) visit(r.getInto(), p));
+        r = r.withAtEndPhrase((Cobol.StatementPhrase) visit(r.getAtEndPhrase(), p));
+        r = r.withNotAtEndPhrase((Cobol.StatementPhrase) visit(r.getNotAtEndPhrase(), p));
+        return r;
+    }
+
+    public Cobol visitReturnInto(Cobol.ReturnInto returnInto, P p) {
+        Cobol.ReturnInto r = returnInto;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withQualifiedDataName((Cobol.QualifiedDataName) visit(r.getQualifiedDataName(), p));
+        return r;
+    }
+
+    public Cobol visitSearch(Cobol.Search search, P p) {
+        Cobol.Search s = search;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withQualifiedDataName((Cobol.QualifiedDataName) visit(s.getQualifiedDataName(), p));
+        s = s.withSearchVarying((Cobol.SearchVarying) visit(s.getSearchVarying(), p));
+        s = s.withAtEndPhrase((Cobol.StatementPhrase) visit(s.getAtEndPhrase(), p));
+        s = s.getPadding().withSearchWhen(visitContainer(s.getPadding().getSearchWhen(), p));
+        return s;
+    }
+
+    public Cobol visitSearchVarying(Cobol.SearchVarying searchVarying, P p) {
+        Cobol.SearchVarying s = searchVarying;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withQualifiedDataName((Cobol.QualifiedDataName) visit(s.getQualifiedDataName(), p));
+        return s;
+    }
+
+    public Cobol visitSearchWhen(Cobol.SearchWhen searchWhen, P p) {
+        Cobol.SearchWhen s = searchWhen;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withCondition((Cobol.Condition) visit(s.getCondition(), p));
+        s = s.getPadding().withStatements(visitContainer(s.getPadding().getStatements(), p));
+        return s;
+    }
+
+    public Cobol visitSend(Cobol.Send send, P p) {
+        Cobol.Send s = send;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withStatement((Cobol) visit(s.getStatement(), p));
+        s = s.withOnExceptionClause((Cobol.StatementPhrase) visit(s.getOnExceptionClause(), p));
+        s = s.withNotOnExceptionClause((Cobol.StatementPhrase) visit(s.getNotOnExceptionClause(), p));
+        return s;
+    }
+
+    public Cobol visitSendStatementSync(Cobol.SendStatementSync sendStatementSync, P p) {
+        Cobol.SendStatementSync s = sendStatementSync;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withSendFromPhrase((Cobol.SendPhrase) visit(s.getSendFromPhrase(), p));
+        s = s.withSendWithPhrase((Cobol.SendPhrase) visit(s.getSendWithPhrase(), p));
+        s = s.withSendReplacingPhrase((Cobol.SendPhrase) visit(s.getSendReplacingPhrase(), p));
+        s = s.withSendAdvancingPhrase((Cobol.SendPhrase) visit(s.getSendAdvancingPhrase(), p));
+        return s;
+    }
+
+    public Cobol visitSendPhrase(Cobol.SendPhrase sendPhrase, P p) {
+        Cobol.SendPhrase s = sendPhrase;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withTarget((Identifier) visit(s.getTarget(), p));
+        return s;
+    }
+
+    public Cobol visitSendAdvancingLines(Cobol.SendAdvancingLines sendAdvancingLines, P p) {
+        Cobol.SendAdvancingLines s = sendAdvancingLines;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
 }

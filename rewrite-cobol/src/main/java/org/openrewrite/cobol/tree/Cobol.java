@@ -8174,6 +8174,75 @@ public interface Cobol extends Tree {
         }
     }
 
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Release implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String release;
+        QualifiedDataName recordName;
+        String from;
+
+        @Nullable
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRelease(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Return implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name fileName;
+        String record;
+        @Nullable
+        ReturnInto into;
+
+        StatementPhrase atEndPhrase;
+
+        @Nullable
+        StatementPhrase notAtEndPhrase;
+
+        String endReturn;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReturn(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReturnInto implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String into;
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReturnInto(this, p);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
@@ -8651,6 +8720,286 @@ public interface Cobol extends Tree {
             return v.visitScreenDescriptionUsingClause(this, p);
         }
     }
+
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Search implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        @Getter
+        @With
+        QualifiedDataName qualifiedDataName;
+
+        @Getter
+        @Nullable
+        @With
+        SearchVarying searchVarying;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase atEndPhrase;
+
+        CobolContainer<SearchWhen> searchWhen;
+
+        @Getter
+        @With
+        String endSearch;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSearch(this, p);
+        }
+
+        public List<Cobol.SearchWhen> getSearchWhen() {
+            return searchWhen.getElements();
+        }
+
+        public Search withSearchWhen(List<Cobol.SearchWhen> searchWhen) {
+            return getPadding().withSearchWhen(this.searchWhen.getPadding().withElements(CobolRightPadded.withElements(
+                    this.searchWhen.getPadding().getElements(), searchWhen)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Search t;
+
+            public CobolContainer<Cobol.SearchWhen> getSearchWhen() {
+                return t.searchWhen;
+            }
+
+            public Search withSearchWhen(CobolContainer<Cobol.SearchWhen> searchWhen) {
+                return t.searchWhen == searchWhen ? t : new Search(t.padding, t.id, t.prefix, t.markers, t.words, t.qualifiedDataName, t.searchVarying, t.atEndPhrase, searchWhen, t.endSearch);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class SearchVarying implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String varying;
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSearchVarying(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class SearchWhen implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String when;
+
+        @Getter
+        @With
+        Condition condition;
+
+        @Getter
+        @With
+        String nextSentence;
+        CobolContainer<Statement> statements;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSearchWhen(this, p);
+        }
+
+        public List<Statement> getStatements() {
+            return statements.getElements();
+        }
+
+        public SearchWhen withStatements(List<Statement> statements) {
+            return getPadding().withStatements(this.statements.getPadding().withElements(CobolRightPadded.withElements(
+                    this.statements.getPadding().getElements(), statements)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final SearchWhen t;
+
+            public CobolContainer<Statement> getStatements() {
+                return t.statements;
+            }
+
+            public SearchWhen withStatements(CobolContainer<Statement> statements) {
+                return t.statements == statements ? t : new SearchWhen(t.padding, t.id, t.prefix, t.markers, t.when, t.condition, t.nextSentence, statements);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Send implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String send;
+        Cobol statement;
+
+        @Nullable
+        StatementPhrase onExceptionClause;
+
+        @Nullable
+        StatementPhrase notOnExceptionClause;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSend(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class SendStatementSync implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Name name;
+
+        @Nullable
+        SendPhrase sendFromPhrase;
+
+        @Nullable
+        SendPhrase sendWithPhrase;
+
+        @Nullable
+        SendPhrase sendReplacingPhrase;
+
+        @Nullable
+        SendPhrase sendAdvancingPhrase;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSendStatementSync(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class SendPhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Nullable
+        Cobol target;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSendPhrase(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class SendAdvancingLines implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Name name;
+        String lines;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSendAdvancingLines(this, p);
+        }
+    }
+
 
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

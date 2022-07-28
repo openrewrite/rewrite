@@ -20,4 +20,8 @@ import org.openrewrite.internal.lang.Nullable;
 
 public interface Cobol {
 
+    class QualifiedDataName {}
+    class StatementPhrase {}
+
+    class Condition {}
 }

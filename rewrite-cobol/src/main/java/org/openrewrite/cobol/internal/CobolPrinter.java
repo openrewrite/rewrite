@@ -1942,6 +1942,98 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return receivable;
     }
 
+    @Override
+    public Cobol visitReturn(Cobol.Return r, PrintOutputCapture<P> p) {
+        visitSpace(r.getPrefix(), p);
+        visitMarkers(r.getMarkers(), p);
+        p.append(r.getWords());
+        visit(r.getFileName(), p);
+        p.append(r.getRecord());
+        visit(r.getInto(), p);
+        visit(r.getAtEndPhrase(), p);
+        visit(r.getNotAtEndPhrase(), p);
+        p.append(r.getEndReturn());
+        return r;
+    }
+
+    @Override
+    public Cobol visitReturnInto(Cobol.ReturnInto r, PrintOutputCapture<P> p) {
+        visitSpace(r.getPrefix(), p);
+        visitMarkers(r.getMarkers(), p);
+        p.append(r.getInto());
+        visit(r.getQualifiedDataName(), p);
+        return r;
+    }
+
+    @Override
+    public Cobol visitSearch(Cobol.Search s, PrintOutputCapture<P> p) {
+        visitSpace(s.getPrefix(), p);
+        visitMarkers(s.getMarkers(), p);
+        p.append(s.getWords());
+        visit(s.getQualifiedDataName(), p);
+        visit(s.getSearchVarying(), p);
+        visit(s.getAtEndPhrase(), p);
+        for(Cobol.SearchWhen sw : s.getSearchWhen()) {
+            visit(sw, p);
+        }
+        p.append(s.getEndSearch());
+        return s;
+    }
+
+    @Override
+    public Cobol visitSearchVarying(Cobol.SearchVarying s, PrintOutputCapture<P> p) {
+        visitSpace(s.getPrefix(), p);
+        visitMarkers(s.getMarkers(), p);
+        p.append(s.getVarying());
+        visit(s.getQualifiedDataName(), p);
+        return s;
+    }
+
+    @Override
+    public Cobol visitSearchWhen(Cobol.SearchWhen s, PrintOutputCapture<P> p) {
+        visitSpace(s.getPrefix(), p);
+        visitMarkers(s.getMarkers(), p);
+        p.append(s.getWhen());
+        visit(s.getCondition(), p);
+        p.append(s.getNextSentence());
+        for(Statement st : s.getStatements()) {
+            visit(st, p);
+        }
+        return s;
+    }
+
+    @Override
+    public Cobol visitSend(Cobol.Send s, PrintOutputCapture<P> p) {
+        visitSpace(s.getPrefix(), p);
+        visitMarkers(s.getMarkers(), p);
+        p.append(s.getSend());
+        visit(s.getStatement(), p);
+        visit(s.getOnExceptionClause(), p);
+        visit(s.getNotOnExceptionClause(), p);
+        return s;
+    }
+
+    @Override
+    public Cobol visitSendStatementSync(Cobol.SendStatementSync s, PrintOutputCapture<P> p) {
+        visitSpace(s.getPrefix(), p);
+        visitMarkers(s.getMarkers(), p);
+        visit(s.getName(), p);
+        visit(s.getSendFromPhrase(), p);
+        visit(s.getSendWithPhrase(), p);
+        visit(s.getSendReplacingPhrase(), p);
+        visit(s.getSendAdvancingPhrase(), p);
+        return s;
+    }
+
+    @Override
+    public Cobol visitSendPhrase(Cobol.SendPhrase s, PrintOutputCapture<P> p) {
+        visitSpace(s.getPrefix(), p);
+        visitMarkers(s.getMarkers(), p);
+        p.append(s.getWords());
+        visit(s.getTarget(), p);
+        return s;
+    }
+
     public Cobol visitTerminate(Cobol.Terminate terminate, PrintOutputCapture<P> p) {
         visitSpace(terminate.getPrefix(), p);
         visitMarkers(terminate.getMarkers(), p);

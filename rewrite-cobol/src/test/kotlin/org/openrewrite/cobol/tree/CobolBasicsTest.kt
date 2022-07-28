@@ -518,6 +518,17 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
+    @Test
+    fun sendStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            SEND CM-OUTQUE-1 FROM MSG-70 WITH EMI
+                AFTER ADVANCING PAGE.
+        """)
+    )
+
     @Disabled("Table call not yet implemented")
     @Test
     fun tableCallTest() = rewriteRun(

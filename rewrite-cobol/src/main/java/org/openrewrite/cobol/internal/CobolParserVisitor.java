@@ -1343,6 +1343,138 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.Search visitSearchStatement(CobolParser.SearchStatementContext ctx) {
+        return new Cobol.Search(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SEARCH(), ctx.ALL()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName()),
+                visitNullable(ctx.searchVarying()),
+                visitNullable(ctx.atEndPhrase()),
+                convertAllContainer(ctx.searchWhen()),
+                words(ctx.END_SEARCH())
+        );
+    }
+
+    @Override
+    public Cobol.SearchVarying visitSearchVarying(CobolParser.SearchVaryingContext ctx) {
+        return new Cobol.SearchVarying(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.VARYING()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
+    public Cobol.SearchWhen visitSearchWhen(CobolParser.SearchWhenContext ctx) {
+        return new Cobol.SearchWhen(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WHEN()),
+                (Cobol.Condition) visit(ctx.condition()),
+                words(ctx.NEXT(), ctx.SENTENCE()),
+                convertAllContainer(ctx.statement())
+        );
+    }
+
+    @Override
+    public Cobol.Send visitSendStatement(CobolParser.SendStatementContext ctx) {
+        return new Cobol.Send(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SEND()),
+                visit(ctx.sendStatementSync(), ctx.sendStatementAsync()),
+                visitNullable(ctx.onExceptionClause()),
+                visitNullable(ctx.notOnExceptionClause())
+        );
+    }
+
+    @Override
+    public Cobol.SendPhrase visitSendStatementAsync(CobolParser.SendStatementAsyncContext ctx) {
+        return new Cobol.SendPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TO(), ctx.TOP(), ctx.BOTTOM()),
+                (Cobol) visit(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Cobol.SendStatementSync visitSendStatementSync(CobolParser.SendStatementSyncContext ctx) {
+        return new Cobol.SendStatementSync(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.identifier(), ctx.literal()),
+                visitNullable(ctx.sendFromPhrase()),
+                visitNullable(ctx.sendWithPhrase()),
+                visitNullable(ctx.sendReplacingPhrase()),
+                visitNullable(ctx.sendAdvancingPhrase())
+        );
+    }
+
+    @Override
+    public Cobol.SendPhrase visitSendFromPhrase(CobolParser.SendFromPhraseContext ctx) {
+        return new Cobol.SendPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FROM()),
+                (Cobol) visit(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Cobol.SendPhrase visitSendWithPhrase(CobolParser.SendWithPhraseContext ctx) {
+        return new Cobol.SendPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.EGI(), ctx.EMI(), ctx.ESI()),
+                visitNullable(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Cobol.SendPhrase visitSendReplacingPhrase(CobolParser.SendReplacingPhraseContext ctx) {
+        return new Cobol.SendPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REPLACING(), ctx.LINE()),
+                null
+        );
+    }
+
+    @Override
+    public Cobol.SendPhrase visitSendAdvancingPhrase(CobolParser.SendAdvancingPhraseContext ctx) {
+        return new Cobol.SendPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BEFORE(), ctx.AFTER(), ctx.ADVANCING()),
+                visit(ctx.sendAdvancingPage(), ctx.sendAdvancingLines(), ctx.sendAdvancingMnemonic())
+        );
+    }
+
+    @Override
+    public Cobol.SendAdvancingLines visitSendAdvancingLines(CobolParser.SendAdvancingLinesContext ctx) {
+        return new Cobol.SendAdvancingLines(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.identifier(), ctx.literal()),
+                words(ctx.LINE(), ctx.LINES())
+        );
+    }
+
+    @Override
     public Object visitScreenSection(CobolParser.ScreenSectionContext ctx) {
         return new Cobol.ScreenSection(
                 randomId(),
@@ -2557,6 +2689,46 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 words(ctx.STATUS(), ctx.IN()),
                 (Name) visit(ctx.identifier())
+        );
+    }
+
+    @Override
+    public Cobol.Release visitReleaseStatement(CobolParser.ReleaseStatementContext ctx) {
+        return new Cobol.Release(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RELEASE()),
+                (Cobol.QualifiedDataName) visit(ctx.recordName()),
+                words(ctx.FROM()),
+                visitNullable(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
+    public Cobol.Return visitReturnStatement(CobolParser.ReturnStatementContext ctx) {
+        return new Cobol.Return(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RETURN()),
+                (Name) visit(ctx.fileName()),
+                words(ctx.RECORD()),
+                visitNullable(ctx.returnInto()),
+                (Cobol.StatementPhrase) visit(ctx.atEndPhrase()),
+                (Cobol.StatementPhrase) visit(ctx.notAtEndPhrase()),
+                words(ctx.END_RETURN())
+        );
+    }
+
+    @Override
+    public Cobol.ReturnInto visitReturnInto(CobolParser.ReturnIntoContext ctx) {
+        return new Cobol.ReturnInto(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INTO()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
         );
     }
 
