@@ -1949,4 +1949,53 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(terminate.getReportName(), p);
         return terminate;
     }
+
+    public Cobol visitSubtract(Cobol.Subtract subtract, PrintOutputCapture<P> p) {
+        visitSpace(subtract.getPrefix(), p);
+        visitMarkers(subtract.getMarkers(), p);
+        visit(subtract.getSubstract(), p);
+        visit(subtract.getOperation(), p);
+        visit(subtract.getOnSizeErrorPhrase(), p);
+        visit(subtract.getNotOnSizeErrorPhrase(), p);
+        visitLeftPadded("", subtract.getPadding().getEndSubtract(), p);
+        return subtract;
+    }
+
+    public Cobol visitSubtractFromStatement(Cobol.SubtractFromStatement subtractFromStatement, PrintOutputCapture<P> p) {
+        visitSpace(subtractFromStatement.getPrefix(), p);
+        visitMarkers(subtractFromStatement.getMarkers(), p);
+        visitContainer("", subtractFromStatement.getPadding().getSubtractSubtrahend(), "", "", p);
+        visit(subtractFromStatement.getFrom(), p);
+        visitContainer("", subtractFromStatement.getPadding().getSubtractMinuend(), "", "", p);
+        return subtractFromStatement;
+    }
+
+    public Cobol visitSubtractFromGivingStatement(Cobol.SubtractFromGivingStatement subtractFromGivingStatement, PrintOutputCapture<P> p) {
+        visitSpace(subtractFromGivingStatement.getPrefix(), p);
+        visitMarkers(subtractFromGivingStatement.getMarkers(), p);
+        visitContainer("", subtractFromGivingStatement.getPadding().getSubtractSubtrahend(), "", "", p);
+        visit(subtractFromGivingStatement.getFrom(), p);
+        visit(subtractFromGivingStatement.getSubtractMinuendGiving(), p);
+        visit(subtractFromGivingStatement.getGiving(), p);
+        visitContainer("", subtractFromGivingStatement.getPadding().getSubtractGiving(), "", "", p);
+        return subtractFromGivingStatement;
+    }
+
+    public Cobol visitSubtractCorrespondingStatement(Cobol.SubtractCorrespondingStatement subtractCorrespondingStatement, PrintOutputCapture<P> p) {
+        visitSpace(subtractCorrespondingStatement.getPrefix(), p);
+        visitMarkers(subtractCorrespondingStatement.getMarkers(), p);
+        visit(subtractCorrespondingStatement.getCorresponding(), p);
+        visit(subtractCorrespondingStatement.getQualifiedDataName(), p);
+        visit(subtractCorrespondingStatement.getGiving(), p);
+        visit(subtractCorrespondingStatement.getSubtractMinuendCorresponding(), p);
+        return subtractCorrespondingStatement;
+    }
+
+    public Cobol visitSubtractMinuendCorresponding(Cobol.SubtractMinuendCorresponding subtractMinuendCorresponding, PrintOutputCapture<P> p) {
+        visitSpace(subtractMinuendCorresponding.getPrefix(), p);
+        visitMarkers(subtractMinuendCorresponding.getMarkers(), p);
+        visit(subtractMinuendCorresponding.getQualifiedDataName(), p);
+        visit(subtractMinuendCorresponding.getRounded(), p);
+        return subtractMinuendCorresponding;
+    }
 }

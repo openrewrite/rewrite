@@ -1210,6 +1210,70 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitSubtractStatement(CobolParser.SubtractStatementContext ctx) {
+        return new Cobol.Subtract(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.SUBTRACT()),
+                visit(ctx.subtractFromStatement(), ctx.subtractFromGivingStatement(), ctx.subtractCorrespondingStatement()),
+                visitNullable(ctx.onSizeErrorPhrase()),
+                visitNullable(ctx.notOnSizeErrorPhrase()),
+                padLeft(ctx.END_SUBTRACT())
+        );
+    }
+
+    @Override
+    public Object visitSubtractFromStatement(CobolParser.SubtractFromStatementContext ctx) {
+        return new Cobol.SubtractFromStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.subtractSubtrahend()),
+                (Cobol.CobolWord) visit(ctx.FROM()),
+                convertAllContainer(ctx.subtractMinuend())
+        );
+    }
+
+    @Override
+    public Object visitSubtractFromGivingStatement(CobolParser.SubtractFromGivingStatementContext ctx) {
+        return new Cobol.SubtractFromGivingStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.subtractSubtrahend()),
+                (Cobol.CobolWord) visit(ctx.FROM()),
+                (Cobol.CobolWord) visit(ctx.subtractMinuendGiving()),
+                (Cobol.CobolWord) visit(ctx.GIVING()),
+                convertAllContainer(ctx.subtractGiving())
+        );
+    }
+
+    @Override
+    public Object visitSubtractCorrespondingStatement(CobolParser.SubtractCorrespondingStatementContext ctx) {
+        return new Cobol.SubtractCorrespondingStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.CORRESPONDING(), ctx.CORR()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName()),
+                (Cobol.CobolWord) visit(ctx.FROM()),
+                (Cobol.SubtractMinuendCorresponding) visit(ctx.subtractMinuendCorresponding())
+        );
+    }
+
+    @Override
+    public Object visitSubtractMinuendCorresponding(CobolParser.SubtractMinuendCorrespondingContext ctx) {
+        return new Cobol.SubtractMinuendCorresponding(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName()),
+                visitNullable(ctx.ROUNDED())
+        );
+    }
+
+    @Override
     public Object visitScreenDescriptionBlankClause(CobolParser.ScreenDescriptionBlankClauseContext ctx) {
         return new Cobol.ScreenDescriptionBlankClause(
                 randomId(),
@@ -2647,6 +2711,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 words(ctx.EXHIBIT(), ctx.NAMED(), ctx.CHANGED()),
                 convertAllContainer(ctx.exhibitOperand())
+        );
+    }
+
+    @Override
+    public Object visitExitStatement(CobolParser.ExitStatementContext ctx) {
+        return new Cobol.Exit(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.EXIT(), ctx.PROGRAM())
         );
     }
 

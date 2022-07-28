@@ -631,4 +631,28 @@ class CobolBasicsTest : RewriteTest {
                 GENERATE RREC.
         """)
     )
+
+    @Test
+    fun subtractStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. subtractStatement.
+            PROCEDURE DIVISION.
+            RW301M-CONTROL.
+                SUBTRACT 1 FROM ERROR-COUNTER
+                SUBTRACT N-10 FROM 0 GIVING N-19
+                SUBTRACT CORRESPONDING IDENTIFIER FROM IDENTIFIER ROUNDED.
+        """)
+    )
+
+    @Test
+    fun exitStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. subtractStatement.
+            PROCEDURE DIVISION.
+            RW301M-CONTROL.
+                EXIT PROGRAM.
+        """)
+    )
 }

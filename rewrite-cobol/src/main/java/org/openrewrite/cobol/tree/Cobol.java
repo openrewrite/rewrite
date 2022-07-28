@@ -9338,6 +9338,327 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Subtract implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        CobolWord substract;
+
+        @Getter
+        @With
+        Cobol operation;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase onSizeErrorPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase notOnSizeErrorPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endSubtract;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSubtract(this, p);
+        }
+
+        @Nullable
+        public String getEndSubtract() {
+            return endSubtract == null ? null : endSubtract.getElement();
+        }
+
+        public Subtract withEndSubtract(@Nullable String endSubtract) {
+            if (endSubtract == null) {
+                return this.endSubtract == null ? this : new Subtract(id, prefix, markers, substract, operation, onSizeErrorPhrase, notOnSizeErrorPhrase, null);
+            }
+            return getPadding().withEndSubtract(CobolLeftPadded.withElement(this.endSubtract, endSubtract));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Subtract t;
+
+            @Nullable
+            public CobolLeftPadded<String> getEndSubtract() {
+                return t.endSubtract;
+            }
+
+            public Subtract withEndSubtract(@Nullable CobolLeftPadded<String> endSubtract) {
+                return t.endSubtract == endSubtract ? t : new Subtract(t.padding, t.id, t.prefix, t.markers, t.substract, t.operation, t.onSizeErrorPhrase, t.notOnSizeErrorPhrase, endSubtract);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class SubtractFromStatement implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        CobolContainer<CobolWord> subtractSubtrahend;
+
+        @Getter
+        @With
+        CobolWord from;
+
+        CobolContainer<Roundable> subtractMinuend;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSubtractFromStatement(this, p);
+        }
+
+        public List<Cobol.CobolWord> getSubtractSubtrahend() {
+            return subtractSubtrahend.getElements();
+        }
+
+        public SubtractFromStatement withSubtractSubtrahend(List<Cobol.CobolWord> subtractSubtrahend) {
+            return getPadding().withSubtractSubtrahend(this.subtractSubtrahend.getPadding().withElements(CobolRightPadded.withElements(
+                    this.subtractSubtrahend.getPadding().getElements(), subtractSubtrahend)));
+        }
+
+        public List<Cobol.Roundable> getSubtractMinuend() {
+            return subtractMinuend.getElements();
+        }
+
+        public SubtractFromStatement withSubtractMinuend(List<Cobol.Roundable> subtractMinuend) {
+            return getPadding().withSubtractMinuend(this.subtractMinuend.getPadding().withElements(CobolRightPadded.withElements(
+                    this.subtractMinuend.getPadding().getElements(), subtractMinuend)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final SubtractFromStatement t;
+
+            public CobolContainer<Cobol.CobolWord> getSubtractSubtrahend() {
+                return t.subtractSubtrahend;
+            }
+
+            public SubtractFromStatement withSubtractSubtrahend(CobolContainer<Cobol.CobolWord> subtractSubtrahend) {
+                return t.subtractSubtrahend == subtractSubtrahend ? t : new SubtractFromStatement(t.padding, t.id, t.prefix, t.markers, subtractSubtrahend, t.from, t.subtractMinuend);
+            }
+
+            public CobolContainer<Cobol.Roundable> getSubtractMinuend() {
+                return t.subtractMinuend;
+            }
+
+            public SubtractFromStatement withSubtractMinuend(CobolContainer<Cobol.Roundable> subtractMinuend) {
+                return t.subtractMinuend == subtractMinuend ? t : new SubtractFromStatement(t.padding, t.id, t.prefix, t.markers, t.subtractSubtrahend, t.from, subtractMinuend);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class SubtractFromGivingStatement implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        CobolContainer<CobolWord> subtractSubtrahend;
+
+        @Getter
+        @With
+        CobolWord from;
+
+        @Getter
+        @With
+        Name subtractMinuendGiving;
+
+        @Getter
+        @With
+        CobolWord giving;
+
+        CobolContainer<Roundable> subtractGiving;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSubtractFromGivingStatement(this, p);
+        }
+
+        public List<Cobol.CobolWord> getSubtractSubtrahend() {
+            return subtractSubtrahend.getElements();
+        }
+
+        public SubtractFromGivingStatement withSubtractSubtrahend(List<Cobol.CobolWord> subtractSubtrahend) {
+            return getPadding().withSubtractSubtrahend(this.subtractSubtrahend.getPadding().withElements(CobolRightPadded.withElements(
+                    this.subtractSubtrahend.getPadding().getElements(), subtractSubtrahend)));
+        }
+
+        public List<Cobol.Roundable> getSubtractGiving() {
+            return subtractGiving.getElements();
+        }
+
+        public SubtractFromGivingStatement withSubtractGiving(List<Cobol.Roundable> subtractGiving) {
+            return getPadding().withSubtractGiving(this.subtractGiving.getPadding().withElements(CobolRightPadded.withElements(
+                    this.subtractGiving.getPadding().getElements(), subtractGiving)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final SubtractFromGivingStatement t;
+
+            public CobolContainer<Cobol.CobolWord> getSubtractSubtrahend() {
+                return t.subtractSubtrahend;
+            }
+
+            public SubtractFromGivingStatement withSubtractSubtrahend(CobolContainer<Cobol.CobolWord> subtractSubtrahend) {
+                return t.subtractSubtrahend == subtractSubtrahend ? t : new SubtractFromGivingStatement(t.padding, t.id, t.prefix, t.markers, subtractSubtrahend, t.from, t.subtractMinuendGiving, t.giving, t.subtractGiving);
+            }
+
+            public CobolContainer<Cobol.Roundable> getSubtractGiving() {
+                return t.subtractGiving;
+            }
+
+            public SubtractFromGivingStatement withSubtractGiving(CobolContainer<Cobol.Roundable> subtractGiving) {
+                return t.subtractGiving == subtractGiving ? t : new SubtractFromGivingStatement(t.padding, t.id, t.prefix, t.markers, t.subtractSubtrahend, t.from, t.subtractMinuendGiving, t.giving, subtractGiving);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class SubtractCorrespondingStatement implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        CobolWord corresponding;
+        QualifiedDataName qualifiedDataName;
+        CobolWord giving;
+        SubtractMinuendCorresponding subtractMinuendCorresponding;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSubtractCorrespondingStatement(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class SubtractMinuendCorresponding implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        QualifiedDataName qualifiedDataName;
+
+        @Nullable
+        CobolWord rounded;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSubtractMinuendCorresponding(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class SymbolicCharacter implements Cobol {
         @Nullable
         @NonFinal

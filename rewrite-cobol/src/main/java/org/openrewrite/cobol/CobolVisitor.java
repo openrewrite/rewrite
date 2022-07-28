@@ -1960,4 +1960,60 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         t = t.withReportName((Cobol.QualifiedDataName) visit(t.getReportName(), p));
         return t;
     }
+
+    public Cobol visitSubtract(Cobol.Subtract subtract, P p) {
+        Cobol.Subtract s = subtract;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withSubstract((Cobol.CobolWord) visit(s.getSubstract(), p));
+        s = s.withOperation((Cobol) visit(s.getOperation(), p));
+        s = s.withOnSizeErrorPhrase((Cobol.StatementPhrase) visit(s.getOnSizeErrorPhrase(), p));
+        s = s.withNotOnSizeErrorPhrase((Cobol.StatementPhrase) visit(s.getNotOnSizeErrorPhrase(), p));
+        if (s.getPadding().getEndSubtract() != null) {
+            s = s.getPadding().withEndSubtract(visitLeftPadded(s.getPadding().getEndSubtract(), p));
+        }
+        return s;
+    }
+
+    public Cobol visitSubtractFromStatement(Cobol.SubtractFromStatement subtractFromStatement, P p) {
+        Cobol.SubtractFromStatement s = subtractFromStatement;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withSubtractSubtrahend(visitContainer(s.getPadding().getSubtractSubtrahend(), p));
+        s = s.withFrom((Cobol.CobolWord) visit(s.getFrom(), p));
+        s = s.getPadding().withSubtractMinuend(visitContainer(s.getPadding().getSubtractMinuend(), p));
+        return s;
+    }
+
+    public Cobol visitSubtractFromGivingStatement(Cobol.SubtractFromGivingStatement subtractFromGivingStatement, P p) {
+        Cobol.SubtractFromGivingStatement s = subtractFromGivingStatement;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withSubtractSubtrahend(visitContainer(s.getPadding().getSubtractSubtrahend(), p));
+        s = s.withFrom((Cobol.CobolWord) visit(s.getFrom(), p));
+        s = s.withSubtractMinuendGiving((Name) visit(s.getSubtractMinuendGiving(), p));
+        s = s.withGiving((Cobol.CobolWord) visit(s.getGiving(), p));
+        s = s.getPadding().withSubtractGiving(visitContainer(s.getPadding().getSubtractGiving(), p));
+        return s;
+    }
+
+    public Cobol visitSubtractCorrespondingStatement(Cobol.SubtractCorrespondingStatement subtractCorrespondingStatement, P p) {
+        Cobol.SubtractCorrespondingStatement s = subtractCorrespondingStatement;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withCorresponding((Cobol.CobolWord) visit(s.getCorresponding(), p));
+        s = s.withQualifiedDataName((Cobol.QualifiedDataName) visit(s.getQualifiedDataName(), p));
+        s = s.withGiving((Cobol.CobolWord) visit(s.getGiving(), p));
+        s = s.withSubtractMinuendCorresponding((Cobol.SubtractMinuendCorresponding) visit(s.getSubtractMinuendCorresponding(), p));
+        return s;
+    }
+
+    public Cobol visitSubtractMinuendCorresponding(Cobol.SubtractMinuendCorresponding subtractMinuendCorresponding, P p) {
+        Cobol.SubtractMinuendCorresponding s = subtractMinuendCorresponding;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withQualifiedDataName((Cobol.QualifiedDataName) visit(s.getQualifiedDataName(), p));
+        s = s.withRounded((Cobol.CobolWord) visit(s.getRounded(), p));
+        return s;
+    }
 }

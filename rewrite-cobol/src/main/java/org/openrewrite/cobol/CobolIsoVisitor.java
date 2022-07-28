@@ -1103,4 +1103,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.Terminate visitTerminate(Cobol.Terminate terminate, P p) {
         return (Cobol.Terminate) super.visitTerminate(terminate, p);
     }
+
+    @Override
+    public Cobol.Subtract visitSubtract(Cobol.Subtract subtract, P p) {
+        return (Cobol.Subtract) super.visitSubtract(subtract, p);
+    }
+
+    @Override
+    public Cobol.SubtractFromStatement visitSubtractFromStatement(Cobol.SubtractFromStatement subtractFromStatement, P p) {
+        return (Cobol.SubtractFromStatement) super.visitSubtractFromStatement(subtractFromStatement, p);
+    }
+
+    @Override
+    public Cobol.SubtractFromGivingStatement visitSubtractFromGivingStatement(Cobol.SubtractFromGivingStatement subtractFromGivingStatement, P p) {
+        return (Cobol.SubtractFromGivingStatement) super.visitSubtractFromGivingStatement(subtractFromGivingStatement, p);
+    }
+
+    @Override
+    public Cobol.SubtractCorrespondingStatement visitSubtractCorrespondingStatement(Cobol.SubtractCorrespondingStatement subtractCorrespondingStatement, P p) {
+        return (Cobol.SubtractCorrespondingStatement) super.visitSubtractCorrespondingStatement(subtractCorrespondingStatement, p);
+    }
+
+    @Override
+    public Cobol.SubtractMinuendCorresponding visitSubtractMinuendCorresponding(Cobol.SubtractMinuendCorresponding subtractMinuendCorresponding, P p) {
+        return (Cobol.SubtractMinuendCorresponding) super.visitSubtractMinuendCorresponding(subtractMinuendCorresponding, p);
+    }
 }
