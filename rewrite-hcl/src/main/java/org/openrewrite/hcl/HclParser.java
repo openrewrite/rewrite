@@ -92,7 +92,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".tf");
+        return path.toString().endsWith(".tf") || path.toString().endsWith(".tfvars");
     }
 
     @Override
