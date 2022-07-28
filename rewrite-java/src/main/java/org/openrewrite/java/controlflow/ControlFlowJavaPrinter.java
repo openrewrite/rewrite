@@ -128,6 +128,14 @@ public class ControlFlowJavaPrinter<P> extends JavaPrinter<P> {
         if (enclosing != null && enclosing.getIfCondition() == controlParens) {
             return super.visitControlParentheses(controlParens, p);
         }
+        J.WhileLoop enclosingLoop = getCursor().firstEnclosing(J.WhileLoop.class);
+        if (enclosingLoop != null && enclosingLoop.getCondition() == controlParens) {
+            return super.visitControlParentheses(controlParens, p);
+        }
+        J.DoWhileLoop enclosingDoWhileLoop = getCursor().firstEnclosing(J.DoWhileLoop.class);
+        if (enclosingDoWhileLoop != null && enclosingDoWhileLoop.getWhileCondition() == controlParens) {
+            return super.visitControlParentheses(controlParens, p);
+        }
         maybeEnableOrDisable(controlParens, p);
         J j = super.visitControlParentheses(controlParens, p);
         return j;

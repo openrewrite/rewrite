@@ -1786,4 +1786,38 @@ interface ControlFlowTest : RewriteTest {
             """.trimIndent()
         )
     )
+
+    @Test
+    fun `example code`() = rewriteRun(
+        java(
+            """
+            import java.io.File;
+            import java.io.FileOutputStream;
+            import java.io.IOException;
+            import java.io.InputStream;
+            import java.util.Enumeration;
+            import java.util.zip.ZipEntry;
+            import java.util.zip.ZipFile;
+
+            class Test {
+                void test(File destination, ZipEntry e) {
+                    File f = new File(destination, e.getName());
+                    if (!f.toPath().startsWith(destination.toPath())) {
+                        throw new IOException("Bad Zip Entry!");
+                    }
+                    IOUtils.copy(
+                            zip.getInputStream(e),
+                            new FileOutputStream(f)
+                    );
+                }
+            }
+
+            class IOUtils {
+                void copy(Object input, Object output) {
+                    //.. nop
+                }
+            }
+            """.trimIndent()
+        )
+    )
 }

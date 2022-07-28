@@ -4,13 +4,14 @@ graph {
 
 edge {
     fill-color: grey;
-    /*size: 5px;*/
+    size: 3px;
     arrow-size: 20px, 5px;
     arrow-shape: arrow;
 }
 
 node {
-    text-offset: 10px;
+    text-offset: 10px, 5px;
+    text-padding: 5px;
 }
 
 node.BasicBlock {
@@ -27,7 +28,7 @@ node.ConditionNode {
     text-size: 15;
     shape: diamond;
     size-mode: fit;
-    text-offset: 20px;
+    text-offset: 40px;
     text-alignment: center;
 }
 
