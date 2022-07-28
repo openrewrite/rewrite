@@ -3997,7 +3997,7 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class EvaluateWhenPhrase implements Cobol {
+    class EvaluateWhenPhrase implements Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -4077,6 +4077,210 @@ public interface Cobol extends Tree {
 
             public EvaluateWhenPhrase withStatements(@Nullable CobolContainer<Statement> statements) {
                 return t.statements == statements ? t : new EvaluateWhenPhrase(t.padding, t.id, t.prefix, t.markers, t.whens, statements);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ExecCicsStatement implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        CobolContainer<CobolWord> execCicsLines;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitExecCicsStatement(this, p);
+        }
+
+        public List<Cobol.CobolWord> getExecCicsLines() {
+            return execCicsLines.getElements();
+        }
+
+        public ExecCicsStatement withExecCicsLines(List<Cobol.CobolWord> execCicsLines) {
+            return getPadding().withExecCicsLines(this.execCicsLines.getPadding().withElements(CobolRightPadded.withElements(
+                    this.execCicsLines.getPadding().getElements(), execCicsLines)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ExecCicsStatement t;
+
+            public CobolContainer<Cobol.CobolWord> getExecCicsLines() {
+                return t.execCicsLines;
+            }
+
+            public ExecCicsStatement withExecCicsLines(CobolContainer<Cobol.CobolWord> execCicsLines) {
+                return t.execCicsLines == execCicsLines ? t : new ExecCicsStatement(t.padding, t.id, t.prefix, t.markers, execCicsLines);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ExecSqlStatement implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        CobolContainer<CobolWord> execSqlLines;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitExecSqlStatement(this, p);
+        }
+
+        public List<Cobol.CobolWord> getExecSqlLines() {
+            return execSqlLines.getElements();
+        }
+
+        public ExecSqlStatement withExecSqlLines(List<Cobol.CobolWord> execSqlLines) {
+            return getPadding().withExecSqlLines(this.execSqlLines.getPadding().withElements(CobolRightPadded.withElements(
+                    this.execSqlLines.getPadding().getElements(), execSqlLines)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ExecSqlStatement t;
+
+            public CobolContainer<Cobol.CobolWord> getExecSqlLines() {
+                return t.execSqlLines;
+            }
+
+            public ExecSqlStatement withExecSqlLines(CobolContainer<Cobol.CobolWord> execSqlLines) {
+                return t.execSqlLines == execSqlLines ? t : new ExecSqlStatement(t.padding, t.id, t.prefix, t.markers, execSqlLines);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ExecSqlImsStatement implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        CobolContainer<CobolWord> execSqlLmsLines;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitExecSqlImsStatement(this, p);
+        }
+
+        public List<Cobol.CobolWord> getExecSqlLmsLines() {
+            return execSqlLmsLines.getElements();
+        }
+
+        public ExecSqlImsStatement withExecSqlLmsLines(List<Cobol.CobolWord> execSqlLmsLines) {
+            return getPadding().withExecSqlLmsLines(this.execSqlLmsLines.getPadding().withElements(CobolRightPadded.withElements(
+                    this.execSqlLmsLines.getPadding().getElements(), execSqlLmsLines)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ExecSqlImsStatement t;
+
+            public CobolContainer<Cobol.CobolWord> getExecSqlLmsLines() {
+                return t.execSqlLmsLines;
+            }
+
+            public ExecSqlImsStatement withExecSqlLmsLines(CobolContainer<Cobol.CobolWord> execSqlLmsLines) {
+                return t.execSqlLmsLines == execSqlLmsLines ? t : new ExecSqlImsStatement(t.padding, t.id, t.prefix, t.markers, execSqlLmsLines);
             }
         }
     }

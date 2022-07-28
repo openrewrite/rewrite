@@ -2342,4 +2342,25 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(startKey.getQualifiedDataName(), p);
         return startKey;
     }
+
+    public Cobol visitExecCicsStatement(Cobol.ExecCicsStatement execCicsStatement, PrintOutputCapture<P> p) {
+        visitSpace(execCicsStatement.getPrefix(), p);
+        visitMarkers(execCicsStatement.getMarkers(), p);
+        visitContainer("", execCicsStatement.getPadding().getExecCicsLines(), "", "", p);
+        return execCicsStatement;
+    }
+
+    public Cobol visitExecSqlStatement(Cobol.ExecSqlStatement execSqlStatement, PrintOutputCapture<P> p) {
+        visitSpace(execSqlStatement.getPrefix(), p);
+        visitMarkers(execSqlStatement.getMarkers(), p);
+        visitContainer("", execSqlStatement.getPadding().getExecSqlLines(), "", "", p);
+        return execSqlStatement;
+    }
+
+    public Cobol visitExecSqlImsStatement(Cobol.ExecSqlImsStatement execSqlImsStatement, PrintOutputCapture<P> p) {
+        visitSpace(execSqlImsStatement.getPrefix(), p);
+        visitMarkers(execSqlImsStatement.getMarkers(), p);
+        visitContainer("", execSqlImsStatement.getPadding().getExecSqlLmsLines(), "", "", p);
+        return execSqlImsStatement;
+    }
 }

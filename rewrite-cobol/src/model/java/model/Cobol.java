@@ -38,4 +38,16 @@ public interface Cobol {
 
     class Condition {
     }
+
+    class ExecCics implements Statement {
+        CobolContainer<CobolWord> execCicsLines;
+    }
+
+    class ExecSql implements Statement {
+        CobolContainer<CobolWord> execSqlLines;
+    }
+
+    class ExecSqlIms implements Statement {
+        CobolContainer<CobolWord> execSqlLmsLines;
+    }
 }

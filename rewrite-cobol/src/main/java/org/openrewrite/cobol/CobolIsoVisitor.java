@@ -1283,4 +1283,19 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.StartKey visitStartKey(Cobol.StartKey startKey, P p) {
         return (Cobol.StartKey) super.visitStartKey(startKey, p);
     }
+
+    @Override
+    public Cobol.ExecCicsStatement visitExecCicsStatement(Cobol.ExecCicsStatement execCicsStatement, P p) {
+        return (Cobol.ExecCicsStatement) super.visitExecCicsStatement(execCicsStatement, p);
+    }
+
+    @Override
+    public Cobol.ExecSqlStatement visitExecSqlStatement(Cobol.ExecSqlStatement execSqlStatement, P p) {
+        return (Cobol.ExecSqlStatement) super.visitExecSqlStatement(execSqlStatement, p);
+    }
+
+    @Override
+    public Cobol.ExecSqlImsStatement visitExecSqlImsStatement(Cobol.ExecSqlImsStatement execSqlImsStatement, P p) {
+        return (Cobol.ExecSqlImsStatement) super.visitExecSqlImsStatement(execSqlImsStatement, p);
+    }
 }

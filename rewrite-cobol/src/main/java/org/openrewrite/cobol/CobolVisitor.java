@@ -2346,4 +2346,28 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         s = s.withQualifiedDataName((Cobol.QualifiedDataName) visit(s.getQualifiedDataName(), p));
         return s;
     }
+
+    public Cobol visitExecCicsStatement(Cobol.ExecCicsStatement execCicsStatement, P p) {
+        Cobol.ExecCicsStatement e = execCicsStatement;
+        e = e.withPrefix(visitSpace(e.getPrefix(), p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.getPadding().withExecCicsLines(visitContainer(e.getPadding().getExecCicsLines(), p));
+        return e;
+    }
+
+    public Cobol visitExecSqlStatement(Cobol.ExecSqlStatement execSqlStatement, P p) {
+        Cobol.ExecSqlStatement e = execSqlStatement;
+        e = e.withPrefix(visitSpace(e.getPrefix(), p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.getPadding().withExecSqlLines(visitContainer(e.getPadding().getExecSqlLines(), p));
+        return e;
+    }
+
+    public Cobol visitExecSqlImsStatement(Cobol.ExecSqlImsStatement execSqlImsStatement, P p) {
+        Cobol.ExecSqlImsStatement e = execSqlImsStatement;
+        e = e.withPrefix(visitSpace(e.getPrefix(), p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.getPadding().withExecSqlLmsLines(visitContainer(e.getPadding().getExecSqlLmsLines(), p));
+        return e;
+    }
 }

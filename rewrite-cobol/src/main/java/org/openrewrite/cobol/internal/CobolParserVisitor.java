@@ -3160,6 +3160,36 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitExecCicsStatement(CobolParser.ExecCicsStatementContext ctx) {
+        return new Cobol.ExecCicsStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.EXECCICSLINE())
+        );
+    }
+
+    @Override
+    public Object visitExecSqlImsStatement(CobolParser.ExecSqlImsStatementContext ctx) {
+        return new Cobol.ExecSqlImsStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.EXECSQLIMSLINE())
+        );
+    }
+
+    @Override
+    public Object visitExecSqlStatement(CobolParser.ExecSqlStatementContext ctx) {
+        return new Cobol.ExecSqlStatement(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.EXECSQLLINE())
+        );
+    }
+
+    @Override
     public Cobol.Exhibit visitExhibitStatement(CobolParser.ExhibitStatementContext ctx) {
         return new Cobol.Exhibit(
                 randomId(),
