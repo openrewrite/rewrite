@@ -1207,34 +1207,17 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return arithmeticExpression;
     }
 
-    public Cobol visitBasis(Cobol.Basis basis, PrintOutputCapture<P> p) {
-        visitSpace(basis.getPrefix(), p);
-        visitMarkers(basis.getMarkers(), p);
-        p.append(basis.getLParen());
-        visit(basis.getArithmeticExpression(), p);
-        p.append(basis.getRParen());
-        visit(basis.getIdentifier(), p);
-        visit(basis.getLiteral(), p);
-        return basis;
-    }
-
-    public Cobol visitComputeStatement(Cobol.ComputeStatement computeStatement, PrintOutputCapture<P> p) {
-        visitSpace(computeStatement.getPrefix(), p);
-        visitMarkers(computeStatement.getMarkers(), p);
-        p.append(computeStatement.getWords());
-        visitContainer("", computeStatement.getPadding().getComputeStores(), "", "", p);
-        p.append(computeStatement.getEqualWord());
-        visit(computeStatement.getArithmeticExpression(), p);
-        visit(computeStatement.getOnSizeErrorPhrase(), p);
-        visit(computeStatement.getNotOnSizeErrorPhrase(), p);
-        return computeStatement;
-    }
-
-    public Cobol visitComputeStore(Cobol.ComputeStore computeStore, PrintOutputCapture<P> p) {
-        visitSpace(computeStore.getPrefix(), p);
-        visitMarkers(computeStore.getMarkers(), p);
-        visit(computeStore.getRoundable(), p);
-        return computeStore;
+    public Cobol visitCompute(Cobol.Compute compute, PrintOutputCapture<P> p) {
+        visitSpace(compute.getPrefix(), p);
+        visitMarkers(compute.getMarkers(), p);
+        p.append(compute.getCompute());
+        visitContainer("", compute.getPadding().getRoundables(), "", "", p);
+        p.append(compute.getEqualWord());
+        visit(compute.getArithmeticExpression(), p);
+        visit(compute.getOnSizeErrorPhrase(), p);
+        visit(compute.getNotOnSizeErrorPhrase(), p);
+        p.append(compute.getEndCompute());
+        return compute;
     }
 
     public Cobol visitMultDivs(Cobol.MultDivs multDivs, PrintOutputCapture<P> p) {
@@ -1256,8 +1239,8 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitPowers(Cobol.Powers powers, PrintOutputCapture<P> p) {
         visitSpace(powers.getPrefix(), p);
         visitMarkers(powers.getMarkers(), p);
-        p.append(powers.getWords());
-        visit(powers.getBasis(), p);
+        p.append(powers.getPlusMinusChar());
+        visit(powers.getExpression(), p);
         visitContainer("", powers.getPadding().getPowers(), "", "", p);
         return powers;
     }
@@ -1265,8 +1248,8 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitPower(Cobol.Power power, PrintOutputCapture<P> p) {
         visitSpace(power.getPrefix(), p);
         visitMarkers(power.getMarkers(), p);
-        p.append(power.getWords());
-        visit(power.getBasis(), p);
+        p.append(power.getPower());
+        visit(power.getExpression(), p);
         return power;
     }
 

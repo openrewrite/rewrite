@@ -1351,6 +1351,7 @@ public interface Cobol extends Tree {
         @With
         MultDivs multDivs;
 
+        @Nullable
         CobolContainer<PlusMinus> plusMinuses;
 
         @Override
@@ -1393,39 +1394,6 @@ public interface Cobol extends Tree {
             public ArithmeticExpression withPlusMinuses(CobolContainer<Cobol.PlusMinus> plusMinuses) {
                 return t.plusMinuses == plusMinuses ? t : new ArithmeticExpression(t.padding, t.id, t.prefix, t.markers, t.multDivs, plusMinuses);
             }
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class Basis implements Cobol {
-
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-
-        Markers markers;
-
-        @Nullable
-        String lParen;
-
-        @Nullable
-        ArithmeticExpression arithmeticExpression;
-
-        @Nullable
-        String rParen;
-
-        @Nullable
-        Identifier identifier;
-
-        @Nullable
-        Literal literal;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitBasis(this, p);
         }
     }
 
@@ -2208,7 +2176,7 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class ComputeStatement implements Statement {
+    class Compute implements Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2228,9 +2196,9 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        String compute;
 
-        CobolContainer<ComputeStore> computeStores;
+        CobolContainer<Roundable> roundables;
 
         @Getter
         @With
@@ -2248,18 +2216,22 @@ public interface Cobol extends Tree {
         @With
         StatementPhrase notOnSizeErrorPhrase;
 
+        @Getter
+        @With
+        String endCompute;
+
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitComputeStatement(this, p);
+            return v.visitCompute(this, p);
         }
 
-        public List<Cobol.ComputeStore> getComputeStores() {
-            return computeStores.getElements();
+        public List<Roundable> getRoundables() {
+            return roundables.getElements();
         }
 
-        public ComputeStatement withComputeStores(List<Cobol.ComputeStore> computeStores) {
-            return getPadding().withComputeStores(this.computeStores.getPadding().withElements(CobolRightPadded.withElements(
-                    this.computeStores.getPadding().getElements(), computeStores)));
+        public Compute withRoundables(List<Roundable> roundables) {
+            return getPadding().withRoundables(this.roundables.getPadding().withElements(CobolRightPadded.withElements(
+                    this.roundables.getPadding().getElements(), roundables)));
         }
 
         public Padding getPadding() {
@@ -2279,32 +2251,15 @@ public interface Cobol extends Tree {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final ComputeStatement t;
+            private final Compute t;
 
-            public CobolContainer<Cobol.ComputeStore> getComputeStores() {
-                return t.computeStores;
+            public CobolContainer<Roundable> getRoundables() {
+                return t.roundables;
             }
 
-            public ComputeStatement withComputeStores(CobolContainer<Cobol.ComputeStore> computeStores) {
-                return t.computeStores == computeStores ? t : new ComputeStatement(t.padding, t.id, t.prefix, t.markers, t.words, computeStores, t.equalWord, t.arithmeticExpression, t.onSizeErrorPhrase, t.notOnSizeErrorPhrase);
+            public Compute withRoundables(CobolContainer<Cobol.Roundable> roundables) {
+                return t.roundables == roundables ? t : new Compute(t.padding, t.id, t.prefix, t.markers, t.compute, roundables, t.equalWord, t.arithmeticExpression, t.onSizeErrorPhrase, t.notOnSizeErrorPhrase, t.endCompute);
             }
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class ComputeStore implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        Roundable roundable;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitComputeStore(this, p);
         }
     }
 
@@ -6307,6 +6262,7 @@ public interface Cobol extends Tree {
         @With
         Powers powers;
 
+        @Nullable
         CobolContainer<MultDiv> multDivs;
 
         @Override
@@ -6577,12 +6533,13 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        String plusMinusChar;
 
         @Getter
         @With
-        Basis basis;
+        Cobol expression;
 
+        @Nullable
         CobolContainer<Power> powers;
 
         @Override
@@ -6623,7 +6580,7 @@ public interface Cobol extends Tree {
             }
 
             public Powers withPowers(CobolContainer<Cobol.Power> powers) {
-                return t.powers == powers ? t : new Powers(t.padding, t.id, t.prefix, t.markers, t.words, t.basis, powers);
+                return t.powers == powers ? t : new Powers(t.padding, t.id, t.prefix, t.markers, t.plusMinusChar, t.expression, powers);
             }
         }
     }
@@ -6637,8 +6594,11 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
-        Basis basis;
+
+        @Nullable
+        String power;
+
+        Cobol expression;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {

@@ -1222,32 +1222,14 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return a;
     }
 
-    public Cobol visitBasis(Cobol.Basis basis, P p) {
-        Cobol.Basis b = basis;
-        b = b.withPrefix(visitSpace(b.getPrefix(), p));
-        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
-        b = b.withArithmeticExpression((Cobol.ArithmeticExpression) visit(b.getArithmeticExpression(), p));
-        b = b.withIdentifier((Identifier) visit(b.getIdentifier(), p));
-        b = b.withLiteral((Literal) visit(b.getLiteral(), p));
-        return b;
-    }
-
-    public Cobol visitComputeStatement(Cobol.ComputeStatement computeStatement, P p) {
-        Cobol.ComputeStatement c = computeStatement;
+    public Cobol visitCompute(Cobol.Compute compute, P p) {
+        Cobol.Compute c = compute;
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        c = c.getPadding().withComputeStores(visitContainer(c.getPadding().getComputeStores(), p));
+        c = c.getPadding().withRoundables(visitContainer(c.getPadding().getRoundables(), p));
         c = c.withArithmeticExpression((Cobol.ArithmeticExpression) visit(c.getArithmeticExpression(), p));
         c = c.withOnSizeErrorPhrase((Cobol.StatementPhrase) visit(c.getOnSizeErrorPhrase(), p));
         c = c.withNotOnSizeErrorPhrase((Cobol.StatementPhrase) visit(c.getNotOnSizeErrorPhrase(), p));
-        return c;
-    }
-
-    public Cobol visitComputeStore(Cobol.ComputeStore computeStore, P p) {
-        Cobol.ComputeStore c = computeStore;
-        c = c.withPrefix(visitSpace(c.getPrefix(), p));
-        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        c = c.withRoundable((Cobol.Roundable) visit(c.getRoundable(), p));
         return c;
     }
 
@@ -1272,7 +1254,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Powers pp = powers;
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
-        pp = pp.withBasis((Cobol.Basis) visit(pp.getBasis(), p));
+        pp = pp.withExpression(visit(pp.getExpression(), p));
         pp = pp.getPadding().withPowers(visitContainer(pp.getPadding().getPowers(), p));
         return pp;
     }
@@ -1281,7 +1263,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.Power pp = power;
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
-        pp = pp.withBasis((Cobol.Basis) visit(pp.getBasis(), p));
+        pp = pp.withExpression(visit(pp.getExpression(), p));
         return pp;
     }
 

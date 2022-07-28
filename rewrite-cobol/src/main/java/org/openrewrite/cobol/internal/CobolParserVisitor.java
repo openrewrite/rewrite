@@ -109,7 +109,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitComputeStatement(CobolParser.ComputeStatementContext ctx) {
-        return new Cobol.ComputeStatement(
+        return new Cobol.Compute(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
@@ -118,7 +118,8 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 words(ctx.EQUALCHAR(), ctx.EQUAL()),
                 (Cobol.ArithmeticExpression) visit(ctx.arithmeticExpression()),
                 visitNullable(ctx.onSizeErrorPhrase()),
-                visitNullable(ctx.notOnSizeErrorPhrase())
+                visitNullable(ctx.notOnSizeErrorPhrase()),
+                words(ctx.END_COMPUTE())
         );
     }
 
@@ -279,7 +280,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.PLUSCHAR(), ctx.MINUSCHAR()),
-                (Cobol.Basis) visit(ctx.basis()),
+                (Cobol)visit(ctx.basis()),
                 convertAllContainer(ctx.power())
         );
     }
@@ -291,22 +292,24 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.DOUBLEASTERISKCHAR()),
-                (Cobol.Basis) visit(ctx.basis())
+                (Cobol) visit(ctx.basis())
         );
     }
 
     @Override
     public Object visitBasis(CobolParser.BasisContext ctx) {
-        return new Cobol.Basis(
-                randomId(),
-                prefix(ctx),
-                Markers.EMPTY,
-                words(ctx.LPARENCHAR()),
-                visitNullable(ctx.arithmeticExpression()),
-                words(ctx.RPARENCHAR()),
-                visitNullable(ctx.identifier()),
-                visitNullable(ctx.literal())
-        );
+        if (ctx.LPARENCHAR() != null) {
+            return new Cobol.ParenExpression(
+                    randomId(),
+                    prefix(ctx),
+                    Markers.EMPTY,
+                    words(ctx.LPARENCHAR()),
+                    (Cobol) visit(ctx.arithmeticExpression()),
+                    words(ctx.RPARENCHAR())
+            );
+        } else {
+            return visit(ctx.identifier(), ctx.literal());
+        }
     }
 
     @Override

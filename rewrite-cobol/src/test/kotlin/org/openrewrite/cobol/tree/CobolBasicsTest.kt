@@ -447,9 +447,14 @@ class CobolBasicsTest : RewriteTest {
     fun computeStatement() = rewriteRun(
         cobol("""
             IDENTIFICATION DIVISION .
-                PROGRAM-ID . HELLO-WORLD .
-                PROCEDURE DIVISION .
+            PROGRAM-ID . HELLO-WORLD .
+            PROCEDURE DIVISION .
                 COMPUTE V = (1 + 2) .
+                COMPUTE LAG-TIME =
+                    ((SYS-HRS * 3600) + (SYS-MINS * 60) + SYS-SECS) -
+                    ((HOURS OF MSG-TIME * 3600) + (MINUTES OF MSG-TIME * 60)
+                    + SECONDS OF MSG-TIME)
+                    END-COMPUTE .
         """)
     )
 

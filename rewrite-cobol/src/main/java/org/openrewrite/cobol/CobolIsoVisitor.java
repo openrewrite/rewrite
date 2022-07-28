@@ -680,18 +680,8 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
-    public Cobol.Basis visitBasis(Cobol.Basis basis, P p) {
-        return (Cobol.Basis) super.visitBasis(basis, p);
-    }
-
-    @Override
-    public Cobol.ComputeStatement visitComputeStatement(Cobol.ComputeStatement computeStatement, P p) {
-        return (Cobol.ComputeStatement) super.visitComputeStatement(computeStatement, p);
-    }
-
-    @Override
-    public Cobol.ComputeStore visitComputeStore(Cobol.ComputeStore computeStore, P p) {
-        return (Cobol.ComputeStore) super.visitComputeStore(computeStore, p);
+    public Cobol.Compute visitCompute(Cobol.Compute compute, P p) {
+        return (Cobol.Compute) super.visitCompute(compute, p);
     }
 
     @Override
