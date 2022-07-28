@@ -2322,4 +2322,24 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", pictureString.getPadding().getPictures(), "", "", p);
         return pictureString;
     }
+
+    public Cobol visitStart(Cobol.Start start, PrintOutputCapture<P> p) {
+        visitSpace(start.getPrefix(), p);
+        visitMarkers(start.getMarkers(), p);
+        p.append(start.getStart());
+        visit(start.getFileName(), p);
+        visit(start.getStartKey(), p);
+        visit(start.getInvalidKeyPhrase(), p);
+        visit(start.getNotInvalidKeyPhrase(), p);
+        visitLeftPadded("", start.getPadding().getEndStart(), p);
+        return start;
+    }
+
+    public Cobol visitStartKey(Cobol.StartKey startKey, PrintOutputCapture<P> p) {
+        visitSpace(startKey.getPrefix(), p);
+        visitMarkers(startKey.getMarkers(), p);
+        p.append(startKey.getWords());
+        visit(startKey.getQualifiedDataName(), p);
+        return startKey;
+    }
 }

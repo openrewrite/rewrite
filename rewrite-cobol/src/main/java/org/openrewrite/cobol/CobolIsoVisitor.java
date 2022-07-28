@@ -1273,4 +1273,14 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.PictureString visitPictureString(Cobol.PictureString pictureString, P p) {
         return (Cobol.PictureString) super.visitPictureString(pictureString, p);
     }
+
+    @Override
+    public Cobol.Start visitStart(Cobol.Start start, P p) {
+        return (Cobol.Start) super.visitStart(start, p);
+    }
+
+    @Override
+    public Cobol.StartKey visitStartKey(Cobol.StartKey startKey, P p) {
+        return (Cobol.StartKey) super.visitStartKey(startKey, p);
+    }
 }

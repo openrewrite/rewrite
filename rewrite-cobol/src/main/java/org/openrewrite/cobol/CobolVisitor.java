@@ -2324,4 +2324,26 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         pp = pp.getPadding().withPictures(visitContainer(pp.getPadding().getPictures(), p));
         return pp;
     }
+
+    public Cobol visitStart(Cobol.Start start, P p) {
+        Cobol.Start s = start;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withFileName((Cobol.CobolWord) visit(s.getFileName(), p));
+        s = s.withStartKey((Cobol.StartKey) visit(s.getStartKey(), p));
+        s = s.withInvalidKeyPhrase((Cobol.StatementPhrase) visit(s.getInvalidKeyPhrase(), p));
+        s = s.withNotInvalidKeyPhrase((Cobol.StatementPhrase) visit(s.getNotInvalidKeyPhrase(), p));
+        if (s.getPadding().getEndStart() != null) {
+            s = s.getPadding().withEndStart(visitLeftPadded(s.getPadding().getEndStart(), p));
+        }
+        return s;
+    }
+
+    public Cobol visitStartKey(Cobol.StartKey startKey, P p) {
+        Cobol.StartKey s = startKey;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withQualifiedDataName((Cobol.QualifiedDataName) visit(s.getQualifiedDataName(), p));
+        return s;
+    }
 }

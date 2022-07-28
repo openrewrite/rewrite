@@ -3395,6 +3395,34 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitStartStatement(CobolParser.StartStatementContext ctx) {
+        return new Cobol.Start(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.START()),
+                (Cobol.CobolWord) visit(ctx.fileName()),
+                visitNullable(ctx.startKey()),
+                visitNullable(ctx.invalidKeyPhrase()),
+                visitNullable(ctx.notInvalidKeyPhrase()),
+                padLeft(ctx.END_START())
+        );
+    }
+
+    @Override
+    public Object visitStartKey(CobolParser.StartKeyContext ctx) {
+        return new Cobol.StartKey(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.KEY(), ctx.IS(),
+                        ctx.NOT(), ctx.GREATER(), ctx.LESS(), ctx.THAN(), ctx.OR(), ctx.EQUAL(), ctx.TO(),
+                        ctx.MORETHANCHAR(), ctx.LESSTHANCHAR(), ctx.MORETHANOREQUAL(), ctx.EQUALCHAR()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
     public Cobol.Stop visitStopStatement(CobolParser.StopStatementContext ctx) {
         if (ctx.literal() != null || ctx.stopStatementGiving() != null) {
             throw new UnsupportedOperationException("Implement me");

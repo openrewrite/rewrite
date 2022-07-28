@@ -722,4 +722,16 @@ class CobolBasicsTest : RewriteTest {
             .
         """)
     )
+
+    @Test
+    fun startStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. subtractStatement.
+            PROCEDURE DIVISION.
+            STA-TEST-GF-01.
+                START IX-FS2 KEY IS NOT LESS THAN IDENTIFIER IN IDENTIFIER END-START.
+            .
+        """)
+    )
 }

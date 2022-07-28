@@ -24,14 +24,18 @@ import java.util.List;
 
 public interface Cobol {
 
-    class CobolWord {}
-    class QualifiedDataName {}
-    class StatementPhrase {}
-    class ParenExpression {}
+    class CobolWord {
+    }
 
-    class Condition {}
+    class QualifiedDataName {
+    }
 
-    class ScreenDescriptionBackgroundColorClause implements Cobol {
+    class StatementPhrase {
+    }
 
+    class ParenExpression {
+    }
+
+    class Condition {
     }
 }

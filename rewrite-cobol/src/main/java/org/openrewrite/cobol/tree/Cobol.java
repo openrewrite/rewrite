@@ -10006,6 +10006,120 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Start implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String start;
+
+        @Getter
+        @With
+        CobolWord fileName;
+
+        @Getter
+        @Nullable
+        @With
+        StartKey startKey;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase invalidKeyPhrase;
+
+        @Getter
+        @Nullable
+        @With
+        StatementPhrase notInvalidKeyPhrase;
+
+        @Nullable
+        CobolLeftPadded<String> endStart;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitStart(this, p);
+        }
+
+        @Nullable
+        public String getEndStart() {
+            return endStart == null ? null : endStart.getElement();
+        }
+
+        public Start withEndStart(@Nullable String endStart) {
+            if (endStart == null) {
+                return this.endStart == null ? this : new Start(id, prefix, markers, start, fileName, startKey, invalidKeyPhrase, notInvalidKeyPhrase, null);
+            }
+            return getPadding().withEndStart(CobolLeftPadded.withElement(this.endStart, endStart));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Start t;
+
+            @Nullable
+            public CobolLeftPadded<String> getEndStart() {
+                return t.endStart;
+            }
+
+            public Start withEndStart(@Nullable CobolLeftPadded<String> endStart) {
+                return t.endStart == endStart ? t : new Start(t.padding, t.id, t.prefix, t.markers, t.start, t.fileName, t.startKey, t.invalidKeyPhrase, t.notInvalidKeyPhrase, endStart);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class StartKey implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitStartKey(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class StatementPhrase implements Cobol {
         @Nullable
         @NonFinal
