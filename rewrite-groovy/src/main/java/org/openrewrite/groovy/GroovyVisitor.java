@@ -49,7 +49,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public final J visitCompilationUnit(J.CompilationUnit cu, P p) {
+    public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         throw new UnsupportedOperationException("Groovy has a different structure for its compilation unit. See G.CompilationUnit.");
     }
 
