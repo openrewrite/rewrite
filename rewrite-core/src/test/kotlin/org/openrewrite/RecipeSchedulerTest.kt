@@ -15,6 +15,7 @@
  */
 package org.openrewrite
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.text.PlainText
@@ -24,13 +25,18 @@ class RecipeSchedulerTest : RewriteTest {
 
     @Test
     fun exceptionsCauseResult() = rewriteRun(
-        { spec -> spec.executionContext(InMemoryExecutionContext()).recipe(BoomRecipe()) },
-        text(
-            "hello",
-            "~~(org.openrewrite.BoomException: boom\n" +
-                    "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:41)\n" +
-                    "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:39))~~>hello"
-        )
+            { spec ->
+                spec
+                        .executionContext(InMemoryExecutionContext())
+                        .recipe(BoomRecipe())
+                        .afterRecipe { results -> assertThat(results[0].recipeErrors).isNotEmpty() }
+            },
+            text(
+                    "hello",
+                    "~~(org.openrewrite.BoomException: boom\n" +
+                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:47)\n" +
+                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:45))~~>hello"
+            )
     )
 }
 
@@ -46,11 +52,8 @@ class BoomRecipe : Recipe() {
 /**
  * Simplified exception that only displays stack trace elements within the [BoomRecipe].
  */
-class BoomException: RuntimeException("boom") {
-    override fun getStackTrace(): Array<StackTraceElement> {
-        val stackTrace = super.getStackTrace()
-        return stackTrace
+class BoomException : RuntimeException("boom") {
+    override fun getStackTrace() = super.getStackTrace()
             .filter { it.className.startsWith(BoomRecipe::class.java.name) }
             .toTypedArray()
-    }
 }
