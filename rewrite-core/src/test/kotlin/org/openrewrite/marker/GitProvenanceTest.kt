@@ -20,6 +20,7 @@ import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION
 import org.eclipse.jgit.lib.Constants
 import org.eclipse.jgit.lib.RepositoryCache
+import org.eclipse.jgit.transport.TagOpt
 import org.eclipse.jgit.transport.URIish
 import org.eclipse.jgit.util.FS
 import org.junit.jupiter.api.Test
@@ -165,6 +166,37 @@ class GitProvenanceTest {
 
             assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), null)!!.branch)
                 .isEqualTo(null)
+        } catch (ignored: Throwable) {
+            // can't run git command line
+        }
+    }
+
+    @Test
+    fun noLocalBranchDeriveFromRemote(@TempDir projectDir: Path) {
+
+        val remoteDir = projectDir.resolve("remote")
+        val fileKey = RepositoryCache.FileKey.exact(remoteDir.toFile(), FS.DETECTED)
+        val remoteRepo = fileKey.open(false)
+        remoteRepo.create(true)
+
+        // push an initial commit to the remote
+        val cloneDir = projectDir.resolve("clone1")
+        val gitSetup = Git.cloneRepository().setURI(remoteRepo.directory.absolutePath).setDirectory(cloneDir.toFile()).call()
+        projectDir.resolve("test.txt").writeText("hi")
+        gitSetup.add().addFilepattern("*").call()
+        val commit = gitSetup.commit().setMessage("init").setSign(false).call()
+        gitSetup.push().add("master").setRemote("origin").call()
+
+        //Now create new workspace directory, git init and then fetch from remote.
+        val workspaceDir = projectDir.resolve("workspace")
+        val git = Git.init().setDirectory(workspaceDir.toFile()).call()
+        git.remoteAdd().setName("origin").setUri(URIish(remoteRepo.directory.absolutePath)).call()
+        git.fetch().setRemote("origin").setForceUpdate(true).setTagOpt(TagOpt.FETCH_TAGS).setRefSpecs("+refs/heads/*:refs/remotes/origin/*").call()
+        git.checkout().setName(commit.name).call()
+
+        try {
+            assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("workspace"), null)!!.branch)
+                .isEqualTo("master")
         } catch (ignored: Throwable) {
             // can't run git command line
         }

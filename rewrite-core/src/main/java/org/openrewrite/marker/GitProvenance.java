@@ -116,21 +116,24 @@ public class GitProvenance implements Marker {
             }
 
             if (branch == null) {
-                Git git = Git.open(repository.getDirectory());
-                ObjectId commit = repository.resolve(Constants.HEAD);
-                Map<ObjectId, String> branchesByCommit = git.nameRev().addPrefix("refs/heads/").add(commit).call();
-                if (branchesByCommit.containsKey(commit)) {
-                    // detached head but _not_ a shallow clone
-                    branch = branchesByCommit.get(commit);
-                    if (branch.contains("^")) {
-                        branch = branch.substring(0, branch.indexOf('^'));
-                    } else if (branch.contains("~")) {
-                        branch = branch.substring(0, branch.indexOf('~'));
+                try (Git git = Git.open(repository.getDirectory())) {
+                    ObjectId commit = repository.resolve(Constants.HEAD);
+                    Map<ObjectId, String> branchesByCommit = git.nameRev().addPrefix("refs/heads/").add(commit).call();
+                    if (branchesByCommit.containsKey(commit)) {
+                        // detached head but _not_ a shallow clone
+                        branch = branchesByCommit.get(commit);
+                    } else {
+                        // detached head and _also_ a shallow clone
+                        branchesByCommit = git.nameRev().add(commit).call();
+                        branch = localBranchName(repository, branchesByCommit.get(commit));
                     }
-                } else {
-                    // detached head and _also_ a shallow clone
-                    branchesByCommit = git.nameRev().add(commit).call();
-                    branch = localBranchName(repository, branchesByCommit.get(commit));
+                    if (branch != null) {
+                        if (branch.contains("^")) {
+                            branch = branch.substring(0, branch.indexOf('^'));
+                        } else if (branch.contains("~")) {
+                            branch = branch.substring(0, branch.indexOf('~'));
+                        }
+                    }
                 }
             }
 
@@ -146,11 +149,13 @@ public class GitProvenance implements Marker {
     private static String localBranchName(Repository repository, @Nullable String remoteBranch) throws IOException, GitAPIException {
         if (remoteBranch == null) {
             return null;
+        } else if (remoteBranch.startsWith("remotes/")) {
+            // Remote branch names retrieved from git are prefixed with "remotes/"
+            remoteBranch = remoteBranch.substring(8);
         }
 
         String branch = null;
-        try {
-            Git git = Git.open(repository.getDirectory());
+        try (Git git = Git.open(repository.getDirectory())) {
             List<RemoteConfig> remotes = git.remoteList().call();
             for (RemoteConfig remote : remotes) {
                 if (remoteBranch.startsWith(remote.getName()) &&
