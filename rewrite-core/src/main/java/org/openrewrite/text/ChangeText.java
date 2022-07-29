@@ -15,8 +15,8 @@
  */
 package org.openrewrite.text;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 
 import java.util.Collections;
@@ -24,7 +24,9 @@ import java.util.Set;
 
 import static org.openrewrite.Validated.required;
 
-@Value
+@Getter
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@RequiredArgsConstructor
 @EqualsAndHashCode(callSuper = false)
 public class ChangeText extends Recipe {
 

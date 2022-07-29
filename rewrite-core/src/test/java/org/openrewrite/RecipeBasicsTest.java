@@ -24,7 +24,8 @@ import java.util.HashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RecipeTest {
+public class RecipeBasicsTest {
+
     @Test
     void cloneRecipe() throws JsonMappingException {
         ChangeText ct = new ChangeText("hi");
