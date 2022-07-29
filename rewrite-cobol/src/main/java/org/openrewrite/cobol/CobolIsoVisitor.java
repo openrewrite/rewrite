@@ -1448,4 +1448,64 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.InspectTo visitInspectTo(Cobol.InspectTo inspectTo, P p) {
         return (Cobol.InspectTo) super.visitInspectTo(inspectTo, p);
     }
+
+    @Override
+    public Cobol.CommitmentControlClause visitCommitmentControlClause(Cobol.CommitmentControlClause commitmentControlClause, P p) {
+        return (Cobol.CommitmentControlClause) super.visitCommitmentControlClause(commitmentControlClause, p);
+    }
+
+    @Override
+    public Cobol.FileControlParagraph visitFileControlParagraph(Cobol.FileControlParagraph fileControlParagraph, P p) {
+        return (Cobol.FileControlParagraph) super.visitFileControlParagraph(fileControlParagraph, p);
+    }
+
+    @Override
+    public Cobol.FileControlEntry visitFileControlEntry(Cobol.FileControlEntry fileControlEntry, P p) {
+        return (Cobol.FileControlEntry) super.visitFileControlEntry(fileControlEntry, p);
+    }
+
+    @Override
+    public Cobol.InputOutputSection visitInputOutputSection(Cobol.InputOutputSection inputOutputSection, P p) {
+        return (Cobol.InputOutputSection) super.visitInputOutputSection(inputOutputSection, p);
+    }
+
+    @Override
+    public Cobol.IoControlParagraph visitIoControlParagraph(Cobol.IoControlParagraph ioControlParagraph, P p) {
+        return (Cobol.IoControlParagraph) super.visitIoControlParagraph(ioControlParagraph, p);
+    }
+
+    @Override
+    public Cobol.MultipleFileClause visitMultipleFileClause(Cobol.MultipleFileClause multipleFileClause, P p) {
+        return (Cobol.MultipleFileClause) super.visitMultipleFileClause(multipleFileClause, p);
+    }
+
+    @Override
+    public Cobol.MultipleFilePosition visitMultipleFilePosition(Cobol.MultipleFilePosition multipleFilePosition, P p) {
+        return (Cobol.MultipleFilePosition) super.visitMultipleFilePosition(multipleFilePosition, p);
+    }
+
+    @Override
+    public Cobol.RerunClause visitRerunClause(Cobol.RerunClause rerunClause, P p) {
+        return (Cobol.RerunClause) super.visitRerunClause(rerunClause, p);
+    }
+
+    @Override
+    public Cobol.RerunEveryClock visitRerunEveryClock(Cobol.RerunEveryClock rerunEveryClock, P p) {
+        return (Cobol.RerunEveryClock) super.visitRerunEveryClock(rerunEveryClock, p);
+    }
+
+    @Override
+    public Cobol.RerunEveryOf visitRerunEveryOf(Cobol.RerunEveryOf rerunEveryOf, P p) {
+        return (Cobol.RerunEveryOf) super.visitRerunEveryOf(rerunEveryOf, p);
+    }
+
+    @Override
+    public Cobol.RerunEveryRecords visitRerunEveryRecords(Cobol.RerunEveryRecords rerunEveryRecords, P p) {
+        return (Cobol.RerunEveryRecords) super.visitRerunEveryRecords(rerunEveryRecords, p);
+    }
+
+    @Override
+    public Cobol.SameClause visitSameClause(Cobol.SameClause sameClause, P p) {
+        return (Cobol.SameClause) super.visitSameClause(sameClause, p);
+    }
 }

@@ -689,6 +689,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitCommitmentControlClause(CobolParser.CommitmentControlClauseContext ctx) {
+        return new Cobol.CommitmentControlClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.COMMITMENT(), ctx.CONTROL(), ctx.FOR()),
+                (Cobol.CobolWord) visit(ctx.fileName())
+        );
+    }
+
+    @Override
     public Object visitCondition(CobolParser.ConditionContext ctx) {
         return new Cobol.Condition(
                 randomId(),
@@ -755,6 +766,29 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 (Literal) visit(ctx.literal(0)),
                 ctx.literal().size() > 1 ? padLeft(whitespace(), words(ctx.WITH(), ctx.PICTURE(), ctx.SYMBOL())) : null,
                 ctx.literal().size() > 1 ? (Literal) visit(ctx.literal(1)) : null
+        );
+    }
+
+    @Override
+    public Object visitFileControlEntry(CobolParser.FileControlEntryContext ctx) {
+        return new Cobol.FileControlEntry(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol) visit(ctx.selectClause()),
+                convertAllContainer(ctx.fileControlClause())
+        );
+    }
+
+    @Override
+    public Object visitFileControlParagraph(CobolParser.FileControlParagraphContext ctx) {
+        return new Cobol.FileControlParagraph(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FILE_CONTROL()),
+                convertAllList(singletonList("."), ctx.fileControlEntry()),
+                padLeft(ctx.DOT_FS().get(ctx.DOT_FS().size() - 1))
         );
     }
 
@@ -893,6 +927,53 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                         ctx.MORETHANCHAR(), ctx.LESSTHANCHAR(), ctx.EQUALCHAR(), ctx.NOTEQUALCHAR(),
                         ctx.MORETHANOREQUAL(), ctx.LESSTHANOREQUAL()
                 )
+        );
+    }
+
+    @Override
+    public Object visitRerunClause(CobolParser.RerunClauseContext ctx) {
+        return new Cobol.RerunClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RERUN()),
+                words(ctx.ON()),
+                visit(ctx.assignmentName(), ctx.fileName()),
+                words(ctx.EVERY()),
+                visit(ctx.rerunEveryRecords(), ctx.rerunEveryOf(), ctx.rerunEveryClock())
+        );
+    }
+
+    @Override
+    public Object visitRerunEveryClock(CobolParser.RerunEveryClockContext ctx) {
+        return new Cobol.RerunEveryClock(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                words(ctx.CLOCK_UNITS())
+        );
+    }
+
+    @Override
+    public Object visitRerunEveryOf(CobolParser.RerunEveryOfContext ctx) {
+        return new Cobol.RerunEveryOf(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.END(), ctx.OF().size() == 1 ? null : ctx.OF(0), ctx.REEL(), ctx.UNIT(), ctx.OF(ctx.OF().size() == 1 ? 0 : 1)),
+                (Cobol.CobolWord) visit(ctx.fileName())
+        );
+    }
+
+    @Override
+    public Object visitRerunEveryRecords(CobolParser.RerunEveryRecordsContext ctx) {
+        return new Cobol.RerunEveryRecords(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                words(ctx.RECORDS())
         );
     }
 
@@ -1242,6 +1323,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 ctx.WORDS() != null || ctx.MODULES() != null ?
                         padLeft(whitespace(), words(ctx.WORDS(), ctx.MODULES())) :
                         null
+        );
+    }
+
+    @Override
+    public Object visitSameClause(CobolParser.SameClauseContext ctx) {
+        return new Cobol.SameClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SAME(), ctx.RECORD(), ctx.SORT(), ctx.SORT_MERGE(), ctx.AREA(), ctx.FOR()),
+                convertAllContainer(ctx.fileName())
         );
     }
 
@@ -3919,6 +4011,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitInputOutputSection(CobolParser.InputOutputSectionContext ctx) {
+        return new Cobol.InputOutputSection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INPUT_OUTPUT(), ctx.SECTION(), ctx.DOT_FS()),
+                convertAllContainer(ctx.inputOutputSectionParagraph())
+        );
+    }
+
+    @Override
     public Object visitInspectStatement(CobolParser.InspectStatementContext ctx) {
         return new Cobol.Inspect(
                 randomId(),
@@ -4088,6 +4191,20 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 words(ctx.TO()),
                 visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitIoControlParagraph(CobolParser.IoControlParagraphContext ctx) {
+        return new Cobol.IoControlParagraph(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.I_O_CONTROL()),
+                padLeft(ctx.DOT_FS(0)),
+                visitNullable(ctx.fileName()),
+                ctx.fileName() == null ? null : words(ctx.DOT_FS(1)),
+                convertAllContainer(ctx.ioControlClause())
         );
     }
 

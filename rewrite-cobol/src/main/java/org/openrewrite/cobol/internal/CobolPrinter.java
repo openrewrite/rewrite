@@ -2626,4 +2626,112 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(inspectTo.getIdentifier(), p);
         return inspectTo;
     }
+
+    public Cobol visitCommitmentControlClause(Cobol.CommitmentControlClause commitmentControlClause, PrintOutputCapture<P> p) {
+        visitSpace(commitmentControlClause.getPrefix(), p);
+        visitMarkers(commitmentControlClause.getMarkers(), p);
+        p.append(commitmentControlClause.getWords());
+        visit(commitmentControlClause.getFileName(), p);
+        return commitmentControlClause;
+    }
+
+    public Cobol visitFileControlParagraph(Cobol.FileControlParagraph fileControlParagraph, PrintOutputCapture<P> p) {
+        visitSpace(fileControlParagraph.getPrefix(), p);
+        visitMarkers(fileControlParagraph.getMarkers(), p);
+        p.append(fileControlParagraph.getFileControl());
+        if (fileControlParagraph.getControlEntries() != null) {
+            for (Cobol c : fileControlParagraph.getControlEntries()) {
+                visit(c, p);
+            }
+        }
+        visitLeftPadded("", fileControlParagraph.getPadding().getDot(), p);
+        return fileControlParagraph;
+    }
+
+    public Cobol visitFileControlEntry(Cobol.FileControlEntry fileControlEntry, PrintOutputCapture<P> p) {
+        visitSpace(fileControlEntry.getPrefix(), p);
+        visitMarkers(fileControlEntry.getMarkers(), p);
+        visit(fileControlEntry.getSelectClause(), p);
+        visitContainer("", fileControlEntry.getPadding().getControlClauses(), "", "", p);
+        return fileControlEntry;
+    }
+
+    public Cobol visitInputOutputSection(Cobol.InputOutputSection inputOutputSection, PrintOutputCapture<P> p) {
+        visitSpace(inputOutputSection.getPrefix(), p);
+        visitMarkers(inputOutputSection.getMarkers(), p);
+        p.append(inputOutputSection.getWords());
+        visitContainer("", inputOutputSection.getPadding().getParagraphs(), "", "", p);
+        return inputOutputSection;
+    }
+
+    public Cobol visitIoControlParagraph(Cobol.IoControlParagraph ioControlParagraph, PrintOutputCapture<P> p) {
+        visitSpace(ioControlParagraph.getPrefix(), p);
+        visitMarkers(ioControlParagraph.getMarkers(), p);
+        p.append(ioControlParagraph.getIOControl());
+        visitLeftPadded("", ioControlParagraph.getPadding().getDot(), p);
+        visit(ioControlParagraph.getFileName(), p);
+        p.append(ioControlParagraph.getFileNameDot());
+        visitContainer("", ioControlParagraph.getPadding().getClauses(), "", ".", p);
+        return ioControlParagraph;
+    }
+
+    public Cobol visitMultipleFileClause(Cobol.MultipleFileClause multipleFileClause, PrintOutputCapture<P> p) {
+        visitSpace(multipleFileClause.getPrefix(), p);
+        visitMarkers(multipleFileClause.getMarkers(), p);
+        p.append(multipleFileClause.getWords());
+        visitContainer("", multipleFileClause.getPadding().getFilePositions(), "", "", p);
+        return multipleFileClause;
+    }
+
+    public Cobol visitMultipleFilePosition(Cobol.MultipleFilePosition multipleFilePosition, PrintOutputCapture<P> p) {
+        visitSpace(multipleFilePosition.getPrefix(), p);
+        visitMarkers(multipleFilePosition.getMarkers(), p);
+        visit(multipleFilePosition.getFileName(), p);
+        p.append(multipleFilePosition.getPosition());
+        visit(multipleFilePosition.getIntegerLiteral(), p);
+        return multipleFilePosition;
+    }
+
+    public Cobol visitRerunClause(Cobol.RerunClause rerunClause, PrintOutputCapture<P> p) {
+        visitSpace(rerunClause.getPrefix(), p);
+        visitMarkers(rerunClause.getMarkers(), p);
+        p.append(rerunClause.getRerun());
+        p.append(rerunClause.getOn());
+        visit(rerunClause.getName(), p);
+        p.append(rerunClause.getEvery());
+        visit(rerunClause.getAction(), p);
+        return rerunClause;
+    }
+
+    public Cobol visitRerunEveryClock(Cobol.RerunEveryClock rerunEveryClock, PrintOutputCapture<P> p) {
+        visitSpace(rerunEveryClock.getPrefix(), p);
+        visitMarkers(rerunEveryClock.getMarkers(), p);
+        visit(rerunEveryClock.getIntegerLiteral(), p);
+        p.append(rerunEveryClock.getClockUnits());
+        return rerunEveryClock;
+    }
+
+    public Cobol visitRerunEveryOf(Cobol.RerunEveryOf rerunEveryOf, PrintOutputCapture<P> p) {
+        visitSpace(rerunEveryOf.getPrefix(), p);
+        visitMarkers(rerunEveryOf.getMarkers(), p);
+        p.append(rerunEveryOf.getRecords());
+        visit(rerunEveryOf.getFileName(), p);
+        return rerunEveryOf;
+    }
+
+    public Cobol visitRerunEveryRecords(Cobol.RerunEveryRecords rerunEveryRecords, PrintOutputCapture<P> p) {
+        visitSpace(rerunEveryRecords.getPrefix(), p);
+        visitMarkers(rerunEveryRecords.getMarkers(), p);
+        visit(rerunEveryRecords.getIntegerLiteral(), p);
+        p.append(rerunEveryRecords.getRecords());
+        return rerunEveryRecords;
+    }
+
+    public Cobol visitSameClause(Cobol.SameClause sameClause, PrintOutputCapture<P> p) {
+        visitSpace(sameClause.getPrefix(), p);
+        visitMarkers(sameClause.getMarkers(), p);
+        p.append(sameClause.getWords());
+        visitContainer("", sameClause.getPadding().getFileNames(), "", "", p);
+        return sameClause;
+    }
 }

@@ -72,6 +72,7 @@ class CobolDivisionTest : RewriteTest {
         )
     )
 
+    @Disabled("Implement fileControlEntry clauses")
     @Test
     fun environmentDivision() = rewriteRun(
         cobol(
@@ -90,6 +91,9 @@ class CobolDivisionTest : RewriteTest {
                 SPECIAL-NAMES.
                     ALPHABET PRG-COLL-SEQ IS
                     STANDARD-2.
+                INPUT-OUTPUT SECTION.
+                FILE-CONTROL. SELECT OPTIONAL IDENTIFIER ASSIGN TO DISK.
+                I-O-CONTROL. IDENTIFIER. RERUN ON IDENTIFIER EVERY 10 RECORDS.
             """
         )
     )

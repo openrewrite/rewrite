@@ -2631,4 +2631,106 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         i = i.withIdentifier((Name) visit(i.getIdentifier(), p));
         return i;
     }
+
+    public Cobol visitCommitmentControlClause(Cobol.CommitmentControlClause commitmentControlClause, P p) {
+        Cobol.CommitmentControlClause c = commitmentControlClause;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withFileName((Cobol.CobolWord) visit(c.getFileName(), p));
+        return c;
+    }
+
+    public Cobol visitFileControlParagraph(Cobol.FileControlParagraph fileControlParagraph, P p) {
+        Cobol.FileControlParagraph f = fileControlParagraph;
+        f = f.withPrefix(visitSpace(f.getPrefix(), p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        f = f.withControlEntries(ListUtils.map(f.getControlEntries(), t -> (Cobol) visit(t, p)));
+        f = f.getPadding().withDot(visitLeftPadded(f.getPadding().getDot(), p));
+        return f;
+    }
+
+    public Cobol visitFileControlEntry(Cobol.FileControlEntry fileControlEntry, P p) {
+        Cobol.FileControlEntry f = fileControlEntry;
+        f = f.withPrefix(visitSpace(f.getPrefix(), p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        f = f.withSelectClause((Cobol) visit(f.getSelectClause(), p));
+        f = f.getPadding().withControlClauses(visitContainer(f.getPadding().getControlClauses(), p));
+        return f;
+    }
+
+    public Cobol visitInputOutputSection(Cobol.InputOutputSection inputOutputSection, P p) {
+        Cobol.InputOutputSection i = inputOutputSection;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withParagraphs(visitContainer(i.getPadding().getParagraphs(), p));
+        return i;
+    }
+
+    public Cobol visitIoControlParagraph(Cobol.IoControlParagraph ioControlParagraph, P p) {
+        Cobol.IoControlParagraph i = ioControlParagraph;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withDot(visitLeftPadded(i.getPadding().getDot(), p));
+        i = i.withFileName((Cobol.CobolWord) visit(i.getFileName(), p));
+        i = i.getPadding().withClauses(visitContainer(i.getPadding().getClauses(), p));
+        return i;
+    }
+
+    public Cobol visitMultipleFileClause(Cobol.MultipleFileClause multipleFileClause, P p) {
+        Cobol.MultipleFileClause m = multipleFileClause;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.getPadding().withFilePositions(visitContainer(m.getPadding().getFilePositions(), p));
+        return m;
+    }
+
+    public Cobol visitMultipleFilePosition(Cobol.MultipleFilePosition multipleFilePosition, P p) {
+        Cobol.MultipleFilePosition m = multipleFilePosition;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withFileName((Cobol.CobolWord) visit(m.getFileName(), p));
+        m = m.withIntegerLiteral((Cobol.CobolWord) visit(m.getIntegerLiteral(), p));
+        return m;
+    }
+
+    public Cobol visitRerunClause(Cobol.RerunClause rerunClause, P p) {
+        Cobol.RerunClause r = rerunClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withName((Cobol.CobolWord) visit(r.getName(), p));
+        r = r.withAction((Cobol) visit(r.getAction(), p));
+        return r;
+    }
+
+    public Cobol visitRerunEveryClock(Cobol.RerunEveryClock rerunEveryClock, P p) {
+        Cobol.RerunEveryClock r = rerunEveryClock;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        return r;
+    }
+
+    public Cobol visitRerunEveryOf(Cobol.RerunEveryOf rerunEveryOf, P p) {
+        Cobol.RerunEveryOf r = rerunEveryOf;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withFileName((Cobol.CobolWord) visit(r.getFileName(), p));
+        return r;
+    }
+
+    public Cobol visitRerunEveryRecords(Cobol.RerunEveryRecords rerunEveryRecords, P p) {
+        Cobol.RerunEveryRecords r = rerunEveryRecords;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        return r;
+    }
+
+    public Cobol visitSameClause(Cobol.SameClause sameClause, P p) {
+        Cobol.SameClause s = sameClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withFileNames(visitContainer(s.getPadding().getFileNames(), p));
+        return s;
+    }
 }
