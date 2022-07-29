@@ -2421,4 +2421,164 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         i = i.getPadding().withStatements(visitContainer(i.getPadding().getStatements(), p));
         return i;
     }
+
+    public Cobol visitInitialize(Cobol.Initialize initialize, P p) {
+        Cobol.Initialize i = initialize;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withIdentifiers(visitContainer(i.getPadding().getIdentifiers(), p));
+        i = i.withInitializeReplacingPhrase((Cobol.InitializeReplacingPhrase) visit(i.getInitializeReplacingPhrase(), p));
+        return i;
+    }
+
+    public Cobol visitInitializeReplacingPhrase(Cobol.InitializeReplacingPhrase initializeReplacingPhrase, P p) {
+        Cobol.InitializeReplacingPhrase i = initializeReplacingPhrase;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withInitializeReplacingBy(visitContainer(i.getPadding().getInitializeReplacingBy(), p));
+        return i;
+    }
+
+    public Cobol visitInitializeReplacingBy(Cobol.InitializeReplacingBy initializeReplacingBy, P p) {
+        Cobol.InitializeReplacingBy i = initializeReplacingBy;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withIdentifier((Cobol.CobolWord) visit(i.getIdentifier(), p));
+        return i;
+    }
+
+    public Cobol visitInitiate(Cobol.Initiate initiate, P p) {
+        Cobol.Initiate i = initiate;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withReportNames(visitContainer(i.getPadding().getReportNames(), p));
+        return i;
+    }
+
+    public Cobol visitInspect(Cobol.Inspect inspect, P p) {
+        Cobol.Inspect i = inspect;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withPhrase((Cobol) visit(i.getPhrase(), p));
+        return i;
+    }
+
+    public Cobol visitInspectAllLeading(Cobol.InspectAllLeading inspectAllLeading, P p) {
+        Cobol.InspectAllLeading i = inspectAllLeading;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withWord((Cobol.CobolWord) visit(i.getWord(), p));
+        i = i.getPadding().withInspections(visitContainer(i.getPadding().getInspections(), p));
+        return i;
+    }
+
+    public Cobol visitInspectAllLeadings(Cobol.InspectAllLeadings inspectAllLeadings, P p) {
+        Cobol.InspectAllLeadings i = inspectAllLeadings;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withLeadings(visitContainer(i.getPadding().getLeadings(), p));
+        return i;
+    }
+
+    public Cobol visitInspectBeforeAfter(Cobol.InspectBeforeAfter inspectBeforeAfter, P p) {
+        Cobol.InspectBeforeAfter i = inspectBeforeAfter;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withIdentifier((Name) visit(i.getIdentifier(), p));
+        return i;
+    }
+
+    public Cobol visitInspectBy(Cobol.InspectBy inspectBy, P p) {
+        Cobol.InspectBy i = inspectBy;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withIdentifier((Name) visit(i.getIdentifier(), p));
+        return i;
+    }
+
+    public Cobol visitInspectCharacters(Cobol.InspectCharacters inspectCharacters, P p) {
+        Cobol.InspectCharacters i = inspectCharacters;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withInspections(visitContainer(i.getPadding().getInspections(), p));
+        return i;
+    }
+
+    public Cobol visitInspectConvertingPhrase(Cobol.InspectConvertingPhrase inspectConvertingPhrase, P p) {
+        Cobol.InspectConvertingPhrase i = inspectConvertingPhrase;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withIdentifier((Name) visit(i.getIdentifier(), p));
+        i = i.withInspectTo((Cobol.InspectTo) visit(i.getInspectTo(), p));
+        i = i.getPadding().withInspections(visitContainer(i.getPadding().getInspections(), p));
+        return i;
+    }
+
+    public Cobol visitInspectFor(Cobol.InspectFor inspectFor, P p) {
+        Cobol.InspectFor i = inspectFor;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withInspects(visitContainer(i.getPadding().getInspects(), p));
+        return i;
+    }
+
+    public Cobol visitInspectReplacingAllLeadings(Cobol.InspectReplacingAllLeadings inspectReplacingAllLeadings, P p) {
+        Cobol.InspectReplacingAllLeadings i = inspectReplacingAllLeadings;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withInspections(visitContainer(i.getPadding().getInspections(), p));
+        return i;
+    }
+
+    public Cobol visitInspectReplacingAllLeading(Cobol.InspectReplacingAllLeading inspectReplacingAllLeading, P p) {
+        Cobol.InspectReplacingAllLeading i = inspectReplacingAllLeading;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withIdentifier((Name) visit(i.getIdentifier(), p));
+        i = i.withInspectBy((Cobol.InspectBy) visit(i.getInspectBy(), p));
+        i = i.getPadding().withInspections(visitContainer(i.getPadding().getInspections(), p));
+        return i;
+    }
+
+    public Cobol visitInspectReplacingCharacters(Cobol.InspectReplacingCharacters inspectReplacingCharacters, P p) {
+        Cobol.InspectReplacingCharacters i = inspectReplacingCharacters;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withInspectBy((Cobol.InspectBy) visit(i.getInspectBy(), p));
+        i = i.getPadding().withInspections(visitContainer(i.getPadding().getInspections(), p));
+        return i;
+    }
+
+    public Cobol visitInspectReplacingPhrase(Cobol.InspectReplacingPhrase inspectReplacingPhrase, P p) {
+        Cobol.InspectReplacingPhrase i = inspectReplacingPhrase;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withInspections(visitContainer(i.getPadding().getInspections(), p));
+        return i;
+    }
+
+    public Cobol visitInspectTallyingPhrase(Cobol.InspectTallyingPhrase inspectTallyingPhrase, P p) {
+        Cobol.InspectTallyingPhrase i = inspectTallyingPhrase;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withInspectFors(visitContainer(i.getPadding().getInspectFors(), p));
+        return i;
+    }
+
+    public Cobol visitInspectTallyingReplacingPhrase(Cobol.InspectTallyingReplacingPhrase inspectTallyingReplacingPhrase, P p) {
+        Cobol.InspectTallyingReplacingPhrase i = inspectTallyingReplacingPhrase;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withInspectFors(visitContainer(i.getPadding().getInspectFors(), p));
+        i = i.getPadding().withReplacingPhrases(visitContainer(i.getPadding().getReplacingPhrases(), p));
+        return i;
+    }
+
+    public Cobol visitInspectTo(Cobol.InspectTo inspectTo, P p) {
+        Cobol.InspectTo i = inspectTo;
+        i = i.withPrefix(visitSpace(i.getPrefix(), p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withIdentifier((Name) visit(i.getIdentifier(), p));
+        return i;
+    }
 }

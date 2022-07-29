@@ -1394,6 +1394,1158 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Initialize implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String initialize;
+
+        CobolContainer<Identifier> identifiers;
+
+        @Getter
+        @Nullable
+        @With
+        InitializeReplacingPhrase initializeReplacingPhrase;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInitialize(this, p);
+        }
+
+        public List<Identifier> getIdentifiers() {
+            return identifiers.getElements();
+        }
+
+        public Initialize withIdentifiers(List<Identifier> identifiers) {
+            return getPadding().withIdentifiers(this.identifiers.getPadding().withElements(CobolRightPadded.withElements(
+                    this.identifiers.getPadding().getElements(), identifiers)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Initialize t;
+
+            public CobolContainer<Identifier> getIdentifiers() {
+                return t.identifiers;
+            }
+
+            public Initialize withIdentifiers(CobolContainer<Identifier> identifiers) {
+                return t.identifiers == identifiers ? t : new Initialize(t.padding, t.id, t.prefix, t.markers, t.initialize, identifiers, t.initializeReplacingPhrase);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InitializeReplacingPhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String replacing;
+
+        CobolContainer<InitializeReplacingBy> initializeReplacingBy;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInitializeReplacingPhrase(this, p);
+        }
+
+        public List<Cobol.InitializeReplacingBy> getInitializeReplacingBy() {
+            return initializeReplacingBy.getElements();
+        }
+
+        public InitializeReplacingPhrase withInitializeReplacingBy(List<Cobol.InitializeReplacingBy> initializeReplacingBy) {
+            return getPadding().withInitializeReplacingBy(this.initializeReplacingBy.getPadding().withElements(CobolRightPadded.withElements(
+                    this.initializeReplacingBy.getPadding().getElements(), initializeReplacingBy)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InitializeReplacingPhrase t;
+
+            public CobolContainer<Cobol.InitializeReplacingBy> getInitializeReplacingBy() {
+                return t.initializeReplacingBy;
+            }
+
+            public InitializeReplacingPhrase withInitializeReplacingBy(CobolContainer<Cobol.InitializeReplacingBy> initializeReplacingBy) {
+                return t.initializeReplacingBy == initializeReplacingBy ? t : new InitializeReplacingPhrase(t.padding, t.id, t.prefix, t.markers, t.replacing, initializeReplacingBy);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class InitializeReplacingBy implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInitializeReplacingBy(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Initiate implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String initiate;
+
+        CobolContainer<QualifiedDataName> reportNames;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInitiate(this, p);
+        }
+
+        public List<Cobol.QualifiedDataName> getReportNames() {
+            return reportNames.getElements();
+        }
+
+        public Initiate withReportNames(List<Cobol.QualifiedDataName> reportNames) {
+            return getPadding().withReportNames(this.reportNames.getPadding().withElements(CobolRightPadded.withElements(
+                    this.reportNames.getPadding().getElements(), reportNames)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Initiate t;
+
+            public CobolContainer<Cobol.QualifiedDataName> getReportNames() {
+                return t.reportNames;
+            }
+
+            public Initiate withReportNames(CobolContainer<Cobol.QualifiedDataName> reportNames) {
+                return t.reportNames == reportNames ? t : new Initiate(t.padding, t.id, t.prefix, t.markers, t.initiate, reportNames);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Inspect implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String inspect;
+        Identifier identifier;
+        Cobol phrase;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspect(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectAllLeading implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        CobolWord word;
+
+        @Nullable
+        CobolContainer<InspectBeforeAfter> inspections;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectAllLeading(this, p);
+        }
+
+        public List<Cobol.InspectBeforeAfter> getInspections() {
+            return inspections.getElements();
+        }
+
+        public InspectAllLeading withInspections(List<Cobol.InspectBeforeAfter> inspections) {
+            return getPadding().withInspections(this.inspections.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inspections.getPadding().getElements(), inspections)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectAllLeading t;
+
+            @Nullable
+            public CobolContainer<Cobol.InspectBeforeAfter> getInspections() {
+                return t.inspections;
+            }
+
+            public InspectAllLeading withInspections(@Nullable CobolContainer<Cobol.InspectBeforeAfter> inspections) {
+                return t.inspections == inspections ? t : new InspectAllLeading(t.padding, t.id, t.prefix, t.markers, t.word, inspections);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectAllLeadings implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String word;
+
+        CobolContainer<InspectAllLeading> leadings;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectAllLeadings(this, p);
+        }
+
+        public List<Cobol.InspectAllLeading> getLeadings() {
+            return leadings.getElements();
+        }
+
+        public InspectAllLeadings withLeadings(List<Cobol.InspectAllLeading> leadings) {
+            return getPadding().withLeadings(this.leadings.getPadding().withElements(CobolRightPadded.withElements(
+                    this.leadings.getPadding().getElements(), leadings)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectAllLeadings t;
+
+            public CobolContainer<Cobol.InspectAllLeading> getLeadings() {
+                return t.leadings;
+            }
+
+            public InspectAllLeadings withLeadings(CobolContainer<Cobol.InspectAllLeading> leadings) {
+                return t.leadings == leadings ? t : new InspectAllLeadings(t.padding, t.id, t.prefix, t.markers, t.word, leadings);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class InspectBeforeAfter implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectBeforeAfter(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class InspectBy implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String by;
+        Name identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectBy(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectCharacters implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String character;
+
+        @Nullable
+        CobolContainer<InspectBeforeAfter> inspections;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectCharacters(this, p);
+        }
+
+        public List<Cobol.InspectBeforeAfter> getInspections() {
+            return inspections.getElements();
+        }
+
+        public InspectCharacters withInspections(List<Cobol.InspectBeforeAfter> inspections) {
+            return getPadding().withInspections(this.inspections.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inspections.getPadding().getElements(), inspections)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectCharacters t;
+
+            @Nullable
+            public CobolContainer<Cobol.InspectBeforeAfter> getInspections() {
+                return t.inspections;
+            }
+
+            public InspectCharacters withInspections(@Nullable CobolContainer<Cobol.InspectBeforeAfter> inspections) {
+                return t.inspections == inspections ? t : new InspectCharacters(t.padding, t.id, t.prefix, t.markers, t.character, inspections);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectConvertingPhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String converting;
+
+        @Getter
+        @With
+        Name identifier;
+
+        @Getter
+        @With
+        InspectTo inspectTo;
+
+        @Nullable
+        CobolContainer<InspectBeforeAfter> inspections;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectConvertingPhrase(this, p);
+        }
+
+        public List<Cobol.InspectBeforeAfter> getInspections() {
+            return inspections.getElements();
+        }
+
+        public InspectConvertingPhrase withInspections(List<Cobol.InspectBeforeAfter> inspections) {
+            return getPadding().withInspections(this.inspections.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inspections.getPadding().getElements(), inspections)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectConvertingPhrase t;
+
+            @Nullable
+            public CobolContainer<Cobol.InspectBeforeAfter> getInspections() {
+                return t.inspections;
+            }
+
+            public InspectConvertingPhrase withInspections(@Nullable CobolContainer<Cobol.InspectBeforeAfter> inspections) {
+                return t.inspections == inspections ? t : new InspectConvertingPhrase(t.padding, t.id, t.prefix, t.markers, t.converting, t.identifier, t.inspectTo, inspections);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectFor implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Identifier identifier;
+
+        @Getter
+        @With
+        String word;
+
+        CobolContainer<Cobol> inspects;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectFor(this, p);
+        }
+
+        public List<Cobol> getInspects() {
+            return inspects.getElements();
+        }
+
+        public InspectFor withInspects(List<Cobol> inspects) {
+            return getPadding().withInspects(this.inspects.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inspects.getPadding().getElements(), inspects)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectFor t;
+
+            public CobolContainer<Cobol> getInspects() {
+                return t.inspects;
+            }
+
+            public InspectFor withInspects(CobolContainer<Cobol> inspects) {
+                return t.inspects == inspects ? t : new InspectFor(t.padding, t.id, t.prefix, t.markers, t.identifier, t.word, inspects);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectReplacingAllLeadings implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String word;
+
+        CobolContainer<InspectReplacingAllLeading> inspections;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectReplacingAllLeadings(this, p);
+        }
+
+        public List<Cobol.InspectReplacingAllLeading> getInspections() {
+            return inspections.getElements();
+        }
+
+        public InspectReplacingAllLeadings withInspections(List<Cobol.InspectReplacingAllLeading> inspections) {
+            return getPadding().withInspections(this.inspections.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inspections.getPadding().getElements(), inspections)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectReplacingAllLeadings t;
+
+            public CobolContainer<Cobol.InspectReplacingAllLeading> getInspections() {
+                return t.inspections;
+            }
+
+            public InspectReplacingAllLeadings withInspections(CobolContainer<Cobol.InspectReplacingAllLeading> inspections) {
+                return t.inspections == inspections ? t : new InspectReplacingAllLeadings(t.padding, t.id, t.prefix, t.markers, t.word, inspections);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectReplacingAllLeading implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Name identifier;
+
+        @Getter
+        @With
+        InspectBy inspectBy;
+
+        @Nullable
+        CobolContainer<InspectBeforeAfter> inspections;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectReplacingAllLeading(this, p);
+        }
+
+        public List<Cobol.InspectBeforeAfter> getInspections() {
+            return inspections.getElements();
+        }
+
+        public InspectReplacingAllLeading withInspections(List<Cobol.InspectBeforeAfter> inspections) {
+            return getPadding().withInspections(this.inspections.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inspections.getPadding().getElements(), inspections)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectReplacingAllLeading t;
+
+            @Nullable
+            public CobolContainer<Cobol.InspectBeforeAfter> getInspections() {
+                return t.inspections;
+            }
+
+            public InspectReplacingAllLeading withInspections(@Nullable CobolContainer<Cobol.InspectBeforeAfter> inspections) {
+                return t.inspections == inspections ? t : new InspectReplacingAllLeading(t.padding, t.id, t.prefix, t.markers, t.identifier, t.inspectBy, inspections);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectReplacingCharacters implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String word;
+
+        @Getter
+        @With
+        InspectBy inspectBy;
+
+        @Nullable
+        CobolContainer<InspectBeforeAfter> inspections;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectReplacingCharacters(this, p);
+        }
+
+        public List<Cobol.InspectBeforeAfter> getInspections() {
+            return inspections.getElements();
+        }
+
+        public InspectReplacingCharacters withInspections(List<Cobol.InspectBeforeAfter> inspections) {
+            return getPadding().withInspections(this.inspections.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inspections.getPadding().getElements(), inspections)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectReplacingCharacters t;
+
+            @Nullable
+            public CobolContainer<Cobol.InspectBeforeAfter> getInspections() {
+                return t.inspections;
+            }
+
+            public InspectReplacingCharacters withInspections(@Nullable CobolContainer<Cobol.InspectBeforeAfter> inspections) {
+                return t.inspections == inspections ? t : new InspectReplacingCharacters(t.padding, t.id, t.prefix, t.markers, t.word, t.inspectBy, inspections);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectReplacingPhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String word;
+
+        CobolContainer<Cobol> inspections;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectReplacingPhrase(this, p);
+        }
+
+        public List<Cobol> getInspections() {
+            return inspections.getElements();
+        }
+
+        public InspectReplacingPhrase withInspections(List<Cobol> inspections) {
+            return getPadding().withInspections(this.inspections.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inspections.getPadding().getElements(), inspections)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectReplacingPhrase t;
+
+            public CobolContainer<Cobol> getInspections() {
+                return t.inspections;
+            }
+
+            public InspectReplacingPhrase withInspections(CobolContainer<Cobol> inspections) {
+                return t.inspections == inspections ? t : new InspectReplacingPhrase(t.padding, t.id, t.prefix, t.markers, t.word, inspections);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectTallyingPhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String tallying;
+
+        CobolContainer<InspectFor> inspectFors;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectTallyingPhrase(this, p);
+        }
+
+        public List<Cobol.InspectFor> getInspectFors() {
+            return inspectFors.getElements();
+        }
+
+        public InspectTallyingPhrase withInspectFors(List<Cobol.InspectFor> inspectFors) {
+            return getPadding().withInspectFors(this.inspectFors.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inspectFors.getPadding().getElements(), inspectFors)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectTallyingPhrase t;
+
+            public CobolContainer<Cobol.InspectFor> getInspectFors() {
+                return t.inspectFors;
+            }
+
+            public InspectTallyingPhrase withInspectFors(CobolContainer<Cobol.InspectFor> inspectFors) {
+                return t.inspectFors == inspectFors ? t : new InspectTallyingPhrase(t.padding, t.id, t.prefix, t.markers, t.tallying, inspectFors);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class InspectTallyingReplacingPhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String tallying;
+
+        CobolContainer<InspectFor> inspectFors;
+        CobolContainer<InspectReplacingPhrase> replacingPhrases;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectTallyingReplacingPhrase(this, p);
+        }
+
+        public List<Cobol.InspectFor> getInspectFors() {
+            return inspectFors.getElements();
+        }
+
+        public InspectTallyingReplacingPhrase withInspectFors(List<Cobol.InspectFor> inspectFors) {
+            return getPadding().withInspectFors(this.inspectFors.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inspectFors.getPadding().getElements(), inspectFors)));
+        }
+
+        public List<Cobol.InspectReplacingPhrase> getReplacingPhrases() {
+            return replacingPhrases.getElements();
+        }
+
+        public InspectTallyingReplacingPhrase withReplacingPhrases(List<Cobol.InspectReplacingPhrase> replacingPhrases) {
+            return getPadding().withReplacingPhrases(this.replacingPhrases.getPadding().withElements(CobolRightPadded.withElements(
+                    this.replacingPhrases.getPadding().getElements(), replacingPhrases)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InspectTallyingReplacingPhrase t;
+
+            public CobolContainer<Cobol.InspectFor> getInspectFors() {
+                return t.inspectFors;
+            }
+
+            public InspectTallyingReplacingPhrase withInspectFors(CobolContainer<Cobol.InspectFor> inspectFors) {
+                return t.inspectFors == inspectFors ? t : new InspectTallyingReplacingPhrase(t.padding, t.id, t.prefix, t.markers, t.tallying, inspectFors, t.replacingPhrases);
+            }
+
+            public CobolContainer<Cobol.InspectReplacingPhrase> getReplacingPhrases() {
+                return t.replacingPhrases;
+            }
+
+            public InspectTallyingReplacingPhrase withReplacingPhrases(CobolContainer<Cobol.InspectReplacingPhrase> replacingPhrases) {
+                return t.replacingPhrases == replacingPhrases ? t : new InspectTallyingReplacingPhrase(t.padding, t.id, t.prefix, t.markers, t.tallying, t.inspectFors, replacingPhrases);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class InspectTo implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String to;
+        Name identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitInspectTo(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Call implements Statement {
         @Nullable
         @NonFinal
@@ -10910,7 +12062,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         String word;
-        CobolWord identifier;
+        Name identifier;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -10928,7 +12080,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         String word;
-        CobolWord identifier;
+        Name identifier;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -11108,7 +12260,7 @@ public interface Cobol extends Tree {
         @With
         Markers markers;
 
-        CobolContainer<CobolWord> subtractSubtrahend;
+        CobolContainer<Name> subtractSubtrahend;
 
         @Getter
         @With
@@ -11121,11 +12273,11 @@ public interface Cobol extends Tree {
             return v.visitSubtractFromStatement(this, p);
         }
 
-        public List<Cobol.CobolWord> getSubtractSubtrahend() {
+        public List<Name> getSubtractSubtrahend() {
             return subtractSubtrahend.getElements();
         }
 
-        public SubtractFromStatement withSubtractSubtrahend(List<Cobol.CobolWord> subtractSubtrahend) {
+        public SubtractFromStatement withSubtractSubtrahend(List<Name> subtractSubtrahend) {
             return getPadding().withSubtractSubtrahend(this.subtractSubtrahend.getPadding().withElements(CobolRightPadded.withElements(
                     this.subtractSubtrahend.getPadding().getElements(), subtractSubtrahend)));
         }
@@ -11158,11 +12310,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final SubtractFromStatement t;
 
-            public CobolContainer<Cobol.CobolWord> getSubtractSubtrahend() {
+            public CobolContainer<Name> getSubtractSubtrahend() {
                 return t.subtractSubtrahend;
             }
 
-            public SubtractFromStatement withSubtractSubtrahend(CobolContainer<Cobol.CobolWord> subtractSubtrahend) {
+            public SubtractFromStatement withSubtractSubtrahend(CobolContainer<Name> subtractSubtrahend) {
                 return t.subtractSubtrahend == subtractSubtrahend ? t : new SubtractFromStatement(t.padding, t.id, t.prefix, t.markers, subtractSubtrahend, t.from, t.subtractMinuend);
             }
 
@@ -11199,7 +12351,7 @@ public interface Cobol extends Tree {
         @With
         Markers markers;
 
-        CobolContainer<CobolWord> subtractSubtrahend;
+        CobolContainer<Name> subtractSubtrahend;
 
         @Getter
         @With
@@ -11220,11 +12372,11 @@ public interface Cobol extends Tree {
             return v.visitSubtractFromGivingStatement(this, p);
         }
 
-        public List<Cobol.CobolWord> getSubtractSubtrahend() {
+        public List<Name> getSubtractSubtrahend() {
             return subtractSubtrahend.getElements();
         }
 
-        public SubtractFromGivingStatement withSubtractSubtrahend(List<Cobol.CobolWord> subtractSubtrahend) {
+        public SubtractFromGivingStatement withSubtractSubtrahend(List<Name> subtractSubtrahend) {
             return getPadding().withSubtractSubtrahend(this.subtractSubtrahend.getPadding().withElements(CobolRightPadded.withElements(
                     this.subtractSubtrahend.getPadding().getElements(), subtractSubtrahend)));
         }
@@ -11257,11 +12409,11 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final SubtractFromGivingStatement t;
 
-            public CobolContainer<Cobol.CobolWord> getSubtractSubtrahend() {
+            public CobolContainer<Name> getSubtractSubtrahend() {
                 return t.subtractSubtrahend;
             }
 
-            public SubtractFromGivingStatement withSubtractSubtrahend(CobolContainer<Cobol.CobolWord> subtractSubtrahend) {
+            public SubtractFromGivingStatement withSubtractSubtrahend(CobolContainer<Name> subtractSubtrahend) {
                 return t.subtractSubtrahend == subtractSubtrahend ? t : new SubtractFromGivingStatement(t.padding, t.id, t.prefix, t.markers, subtractSubtrahend, t.from, t.subtractMinuendGiving, t.giving, t.subtractGiving);
             }
 

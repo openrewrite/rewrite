@@ -3716,6 +3716,226 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitInitializeStatement(CobolParser.InitializeStatementContext ctx) {
+        return new Cobol.Initialize(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INITIALIZE()),
+                convertAllContainer(ctx.identifier()),
+                visitNullable(ctx.initializeReplacingPhrase())
+        );
+    }
+
+    @Override
+    public Object visitInitializeReplacingPhrase(CobolParser.InitializeReplacingPhraseContext ctx) {
+        return new Cobol.InitializeReplacingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REPLACING()),
+                convertAllContainer(ctx.initializeReplacingBy())
+        );
+    }
+
+    @Override
+    public Object visitInitializeReplacingBy(CobolParser.InitializeReplacingByContext ctx) {
+        return new Cobol.InitializeReplacingBy(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ALPHABETIC(), ctx.ALPHANUMERIC(), ctx.ALPHANUMERIC_EDITED(),
+                        ctx.NATIONAL(), ctx.NATIONAL_EDITED(), ctx.NUMERIC(), ctx.NATIONAL_EDITED(),
+                        ctx.DBCS(), ctx.EGCS(), ctx.DATA(), ctx.BY()),
+                visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitInitiateStatement(CobolParser.InitiateStatementContext ctx) {
+        return new Cobol.Initiate(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INITIATE()),
+                convertAllContainer(ctx.reportName())
+        );
+    }
+
+    @Override
+    public Object visitInspectStatement(CobolParser.InspectStatementContext ctx) {
+        return new Cobol.Inspect(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INSPECT()),
+                (Identifier) visit(ctx.identifier()),
+                visit(ctx.inspectTallyingPhrase(), ctx.inspectReplacingPhrase(),
+                        ctx.inspectTallyingReplacingPhrase(), ctx.inspectConvertingPhrase())
+        );
+    }
+
+    @Override
+    public Object visitInspectAllLeading(CobolParser.InspectAllLeadingContext ctx) {
+        return new Cobol.InspectAllLeading(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.identifier(), ctx.literal()),
+                convertAllContainer(ctx.inspectBeforeAfter())
+        );
+    }
+
+    @Override
+    public Object visitInspectAllLeadings(CobolParser.InspectAllLeadingsContext ctx) {
+        return new Cobol.InspectAllLeading(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.ALL(), ctx.LEADING()),
+                convertAllContainer(ctx.inspectAllLeading())
+        );
+    }
+
+    @Override
+    public Object visitInspectBeforeAfter(CobolParser.InspectBeforeAfterContext ctx) {
+        return new Cobol.InspectBeforeAfter(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BEFORE(), ctx.AFTER(), ctx.INITIAL()),
+                visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitInspectBy(CobolParser.InspectByContext ctx) {
+        return new Cobol.InspectBy(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BY()),
+                visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitInspectCharacters(CobolParser.InspectCharactersContext ctx) {
+        return new Cobol.InspectCharacters(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CHARACTER(), ctx.CHARACTERS()),
+                convertAllContainer(ctx.inspectBeforeAfter())
+        );
+    }
+
+    @Override
+    public Object visitInspectConvertingPhrase(CobolParser.InspectConvertingPhraseContext ctx) {
+        return new Cobol.InspectConvertingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CONVERTING()),
+                visit(ctx.identifier(), ctx.literal()),
+                (Cobol.InspectTo) visit(ctx.inspectTo()),
+                convertAllContainer(ctx.inspectBeforeAfter())
+        );
+    }
+
+    @Override
+    public Object visitInspectFor(CobolParser.InspectForContext ctx) {
+        return new Cobol.InspectFor(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Identifier) visit(ctx.identifier()),
+                words(ctx.FOR()),
+                convertAllContainer(ctx.inspectCharacters(), ctx.inspectAllLeadings())
+        );
+    }
+
+    @Override
+    public Object visitInspectReplacingAllLeadings(CobolParser.InspectReplacingAllLeadingsContext ctx) {
+        return new Cobol.InspectReplacingAllLeadings(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ALL(), ctx.LEADING(), ctx.FIRST()),
+                convertAllContainer(ctx.inspectReplacingAllLeading())
+        );
+    }
+
+    @Override
+    public Object visitInspectReplacingAllLeading(CobolParser.InspectReplacingAllLeadingContext ctx) {
+        return new Cobol.InspectReplacingAllLeading(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.identifier(), ctx.literal()),
+                (Cobol.InspectBy) visit(ctx.inspectBy()),
+                convertAllContainer(ctx.inspectBeforeAfter())
+        );
+    }
+
+    @Override
+    public Object visitInspectReplacingCharacters(CobolParser.InspectReplacingCharactersContext ctx) {
+        return new Cobol.InspectReplacingCharacters(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CHARACTER(), ctx.CHARACTERS()),
+                (Cobol.InspectBy) visit(ctx.inspectBy()),
+                convertAllContainer(ctx.inspectBeforeAfter())
+        );
+    }
+
+    @Override
+    public Object visitInspectReplacingPhrase(CobolParser.InspectReplacingPhraseContext ctx) {
+        return new Cobol.InspectReplacingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REPLACING()),
+                convertAllContainer(ctx.inspectReplacingCharacters(), ctx.inspectReplacingAllLeadings())
+        );
+    }
+
+    @Override
+    public Object visitInspectTallyingPhrase(CobolParser.InspectTallyingPhraseContext ctx) {
+        return new Cobol.InspectTallyingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TALLYING()),
+                convertAllContainer(ctx.inspectFor())
+        );
+    }
+
+    @Override
+    public Object visitInspectTallyingReplacingPhrase(CobolParser.InspectTallyingReplacingPhraseContext ctx) {
+        return new Cobol.InspectTallyingReplacingPhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TALLYING()),
+                convertAllContainer(ctx.inspectFor()),
+                convertAllContainer(ctx.inspectReplacingPhrase())
+        );
+    }
+
+    @Override
+    public Object visitInspectTo(CobolParser.InspectToContext ctx) {
+        return new Cobol.InspectTo(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TO()),
+                visit(ctx.identifier(), ctx.literal())
+        );
+    }
+
+    @Override
     public Cobol.Picture visitPicture(CobolParser.PictureContext ctx) {
         return new Cobol.Picture(
                 randomId(),

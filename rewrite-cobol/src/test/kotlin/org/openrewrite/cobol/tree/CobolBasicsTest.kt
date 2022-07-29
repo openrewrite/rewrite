@@ -762,4 +762,43 @@ class CobolBasicsTest : RewriteTest {
             .
         """)
     )
+
+    @Test
+    fun initializeStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. subtractStatement.
+            PROCEDURE DIVISION.
+            INI-TEST-GF-1-0.
+                INITIALIZE IDENTIFIER IN IDENTIFIER REPLACING NATIONAL DATA BY 42.
+            .
+        """)
+    )
+
+    @Test
+    fun initiateStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. subtractStatement.
+            PROCEDURE DIVISION.
+            RW301M-CONTROL.
+                INITIATE RFIL2.
+            .
+        """)
+    )
+
+    @Test
+    fun inspectStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. subtractStatement.
+            PROCEDURE DIVISION.
+            RW301M-CONTROL.
+                INSPECT IDENTIFIER IN IDENTIFIER TALLYING IDENTIFIER IN IDENTIFIER FOR CHARACTER BEFORE INITIAL 42
+                INSPECT IDENTIFIER IN IDENTIFIER REPLACING CHARACTER BY IDENTIFIER IN IDENTIFIER BEFORE INITIAL 42
+                INSPECT IDENTIFIER IN IDENTIFIER TALLYING IDENTIFIER IN IDENTIFIER FOR CHARACTER BEFORE IDENTIFIER IN IDENTIFIER REPLACING ALL IDENTIFIER IN IDENTIFIER BY IDENTIFIER IN IDENTIFIER
+                INSPECT IDENTIFIER IN IDENTIFIER CONVERTING IDENTIFIER IN IDENTIFIER TO IDENTIFIER IN IDENTIFIER BEFORE IDENTIFIER IN IDENTIFIER
+            .
+        """)
+    )
 }

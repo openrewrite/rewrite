@@ -1328,4 +1328,99 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.IfElse visitIfElse(Cobol.IfElse ifElse, P p) {
         return (Cobol.IfElse) super.visitIfElse(ifElse, p);
     }
+
+    @Override
+    public Cobol.Initialize visitInitialize(Cobol.Initialize initialize, P p) {
+        return (Cobol.Initialize) super.visitInitialize(initialize, p);
+    }
+
+    @Override
+    public Cobol.InitializeReplacingPhrase visitInitializeReplacingPhrase(Cobol.InitializeReplacingPhrase initializeReplacingPhrase, P p) {
+        return (Cobol.InitializeReplacingPhrase) super.visitInitializeReplacingPhrase(initializeReplacingPhrase, p);
+    }
+
+    @Override
+    public Cobol.InitializeReplacingBy visitInitializeReplacingBy(Cobol.InitializeReplacingBy initializeReplacingBy, P p) {
+        return (Cobol.InitializeReplacingBy) super.visitInitializeReplacingBy(initializeReplacingBy, p);
+    }
+
+    @Override
+    public Cobol.Initiate visitInitiate(Cobol.Initiate initiate, P p) {
+        return (Cobol.Initiate) super.visitInitiate(initiate, p);
+    }
+
+    @Override
+    public Cobol.Inspect visitInspect(Cobol.Inspect inspect, P p) {
+        return (Cobol.Inspect) super.visitInspect(inspect, p);
+    }
+
+    @Override
+    public Cobol.InspectAllLeading visitInspectAllLeading(Cobol.InspectAllLeading inspectAllLeading, P p) {
+        return (Cobol.InspectAllLeading) super.visitInspectAllLeading(inspectAllLeading, p);
+    }
+
+    @Override
+    public Cobol.InspectAllLeadings visitInspectAllLeadings(Cobol.InspectAllLeadings inspectAllLeadings, P p) {
+        return (Cobol.InspectAllLeadings) super.visitInspectAllLeadings(inspectAllLeadings, p);
+    }
+
+    @Override
+    public Cobol.InspectBeforeAfter visitInspectBeforeAfter(Cobol.InspectBeforeAfter inspectBeforeAfter, P p) {
+        return (Cobol.InspectBeforeAfter) super.visitInspectBeforeAfter(inspectBeforeAfter, p);
+    }
+
+    @Override
+    public Cobol.InspectBy visitInspectBy(Cobol.InspectBy inspectBy, P p) {
+        return (Cobol.InspectBy) super.visitInspectBy(inspectBy, p);
+    }
+
+    @Override
+    public Cobol.InspectCharacters visitInspectCharacters(Cobol.InspectCharacters inspectCharacters, P p) {
+        return (Cobol.InspectCharacters) super.visitInspectCharacters(inspectCharacters, p);
+    }
+
+    @Override
+    public Cobol.InspectConvertingPhrase visitInspectConvertingPhrase(Cobol.InspectConvertingPhrase inspectConvertingPhrase, P p) {
+        return (Cobol.InspectConvertingPhrase) super.visitInspectConvertingPhrase(inspectConvertingPhrase, p);
+    }
+
+    @Override
+    public Cobol.InspectFor visitInspectFor(Cobol.InspectFor inspectFor, P p) {
+        return (Cobol.InspectFor) super.visitInspectFor(inspectFor, p);
+    }
+
+    @Override
+    public Cobol.InspectReplacingAllLeadings visitInspectReplacingAllLeadings(Cobol.InspectReplacingAllLeadings inspectReplacingAllLeadings, P p) {
+        return (Cobol.InspectReplacingAllLeadings) super.visitInspectReplacingAllLeadings(inspectReplacingAllLeadings, p);
+    }
+
+    @Override
+    public Cobol.InspectReplacingAllLeading visitInspectReplacingAllLeading(Cobol.InspectReplacingAllLeading inspectReplacingAllLeading, P p) {
+        return (Cobol.InspectReplacingAllLeading) super.visitInspectReplacingAllLeading(inspectReplacingAllLeading, p);
+    }
+
+    @Override
+    public Cobol.InspectReplacingCharacters visitInspectReplacingCharacters(Cobol.InspectReplacingCharacters inspectReplacingCharacters, P p) {
+        return (Cobol.InspectReplacingCharacters) super.visitInspectReplacingCharacters(inspectReplacingCharacters, p);
+    }
+
+    @Override
+    public Cobol.InspectReplacingPhrase visitInspectReplacingPhrase(Cobol.InspectReplacingPhrase inspectReplacingPhrase, P p) {
+        return (Cobol.InspectReplacingPhrase) super.visitInspectReplacingPhrase(inspectReplacingPhrase, p);
+    }
+
+    @Override
+    public Cobol.InspectTallyingPhrase visitInspectTallyingPhrase(Cobol.InspectTallyingPhrase inspectTallyingPhrase, P p) {
+        return (Cobol.InspectTallyingPhrase) super.visitInspectTallyingPhrase(inspectTallyingPhrase, p);
+    }
+
+    @Override
+    public Cobol.InspectTallyingReplacingPhrase visitInspectTallyingReplacingPhrase(Cobol.InspectTallyingReplacingPhrase inspectTallyingReplacingPhrase, P p) {
+        return (Cobol.InspectTallyingReplacingPhrase) super.visitInspectTallyingReplacingPhrase(inspectTallyingReplacingPhrase, p);
+    }
+
+    @Override
+    public Cobol.InspectTo visitInspectTo(Cobol.InspectTo inspectTo, P p) {
+        return (Cobol.InspectTo) super.visitInspectTo(inspectTo, p);
+    }
 }
