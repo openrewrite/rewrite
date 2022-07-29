@@ -2768,4 +2768,142 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         c = c.getPadding().withInitialIOs(visitContainer(c.getPadding().getInitialIOs(), p));
         return c;
     }
+
+    public Cobol visitReportDescription(Cobol.ReportDescription reportDescription, P p) {
+        Cobol.ReportDescription r = reportDescription;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withReportDescriptionEntry((Cobol.ReportDescriptionEntry) visit(r.getReportDescriptionEntry(), p));
+        r = r.getPadding().withGroupDescriptionEntries(visitContainer(r.getPadding().getGroupDescriptionEntries(), p));
+        return r;
+    }
+
+    public Cobol visitReportDescriptionEntry(Cobol.ReportDescriptionEntry reportDescriptionEntry, P p) {
+        Cobol.ReportDescriptionEntry r = reportDescriptionEntry;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withQualifiedDataName((Cobol.QualifiedDataName) visit(r.getQualifiedDataName(), p));
+        r = r.withReportDescriptionGlobalClause((Cobol.ReportDescriptionGlobalClause) visit(r.getReportDescriptionGlobalClause(), p));
+        r = r.withReportDescriptionPageLimitClause((Cobol.ReportDescriptionGlobalClause) visit(r.getReportDescriptionPageLimitClause(), p));
+        r = r.withReportDescriptionHeadingClause((Cobol.ReportDescriptionGlobalClause) visit(r.getReportDescriptionHeadingClause(), p));
+        r = r.withReportDescriptionFirstDetailClause((Cobol.ReportDescriptionGlobalClause) visit(r.getReportDescriptionFirstDetailClause(), p));
+        r = r.withReportDescriptionLastDetailClause((Cobol.ReportDescriptionGlobalClause) visit(r.getReportDescriptionLastDetailClause(), p));
+        r = r.withReportDescriptionFootingClause((Cobol.ReportDescriptionGlobalClause) visit(r.getReportDescriptionFootingClause(), p));
+        r = r.getPadding().withDot(visitLeftPadded(r.getPadding().getDot(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupDescriptionEntryFormat1(Cobol.ReportGroupDescriptionEntryFormat1 reportGroupDescriptionEntryFormat1, P p) {
+        Cobol.ReportGroupDescriptionEntryFormat1 r = reportGroupDescriptionEntryFormat1;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        r = r.withDataName((Cobol.CobolWord) visit(r.getDataName(), p));
+        r = r.withGroupLineNumberClause((Cobol.ReportGroupLineNumberClause) visit(r.getGroupLineNumberClause(), p));
+        r = r.withGroupNextGroupClause((Cobol.ReportGroupNextGroupClause) visit(r.getGroupNextGroupClause(), p));
+        r = r.withGroupTypeClause((Cobol.ReportGroupTypeClause) visit(r.getGroupTypeClause(), p));
+        r = r.withGroupUsageClause((Cobol.ReportGroupUsageClause) visit(r.getGroupUsageClause(), p));
+        r = r.getPadding().withDot(visitLeftPadded(r.getPadding().getDot(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupDescriptionEntryFormat2(Cobol.ReportGroupDescriptionEntryFormat2 reportGroupDescriptionEntryFormat2, P p) {
+        Cobol.ReportGroupDescriptionEntryFormat2 r = reportGroupDescriptionEntryFormat2;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        r = r.withDataName((Cobol.CobolWord) visit(r.getDataName(), p));
+        r = r.withReportGroupLineNumberClause((Cobol.ReportGroupLineNumberClause) visit(r.getReportGroupLineNumberClause(), p));
+        r = r.withGroupUsageClause((Cobol.ReportGroupUsageClause) visit(r.getGroupUsageClause(), p));
+        r = r.getPadding().withDot(visitLeftPadded(r.getPadding().getDot(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupDescriptionEntryFormat3(Cobol.ReportGroupDescriptionEntryFormat3 reportGroupDescriptionEntryFormat3, P p) {
+        Cobol.ReportGroupDescriptionEntryFormat3 r = reportGroupDescriptionEntryFormat3;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        r = r.withDataName((Cobol.CobolWord) visit(r.getDataName(), p));
+        r = r.getPadding().withClauses(visitContainer(r.getPadding().getClauses(), p));
+        r = r.getPadding().withDot(visitLeftPadded(r.getPadding().getDot(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupLineNumberClause(Cobol.ReportGroupLineNumberClause reportGroupLineNumberClause, P p) {
+        Cobol.ReportGroupLineNumberClause r = reportGroupLineNumberClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withClause((Cobol) visit(r.getClause(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupLineNumberNextPage(Cobol.ReportGroupLineNumberNextPage reportGroupLineNumberNextPage, P p) {
+        Cobol.ReportGroupLineNumberNextPage r = reportGroupLineNumberNextPage;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupLineNumberPlus(Cobol.ReportGroupLineNumberPlus reportGroupLineNumberPlus, P p) {
+        Cobol.ReportGroupLineNumberPlus r = reportGroupLineNumberPlus;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupNextGroupClause(Cobol.ReportGroupNextGroupClause reportGroupNextGroupClause, P p) {
+        Cobol.ReportGroupNextGroupClause r = reportGroupNextGroupClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withClause((Cobol) visit(r.getClause(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupNextGroupNextPage(Cobol.ReportGroupNextGroupNextPage reportGroupNextGroupNextPage, P p) {
+        Cobol.ReportGroupNextGroupNextPage r = reportGroupNextGroupNextPage;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupNextGroupPlus(Cobol.ReportGroupNextGroupPlus reportGroupNextGroupPlus, P p) {
+        Cobol.ReportGroupNextGroupPlus r = reportGroupNextGroupPlus;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupTypeClause(Cobol.ReportGroupTypeClause reportGroupTypeClause, P p) {
+        Cobol.ReportGroupTypeClause r = reportGroupTypeClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withType((Cobol) visit(r.getType(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupUsageClause(Cobol.ReportGroupUsageClause reportGroupUsageClause, P p) {
+        Cobol.ReportGroupUsageClause r = reportGroupUsageClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportDescriptionGlobalClause(Cobol.ReportDescriptionGlobalClause reportDescriptionGlobalClause, P p) {
+        Cobol.ReportDescriptionGlobalClause r = reportDescriptionGlobalClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportSection(Cobol.ReportSection reportSection, P p) {
+        Cobol.ReportSection r = reportSection;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.getPadding().withDescriptions(visitContainer(r.getPadding().getDescriptions(), p));
+        return r;
+    }
 }

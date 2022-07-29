@@ -836,4 +836,16 @@ class CobolDivisionTest : RewriteTest {
                 CD COMMNAME FOR INITIAL I-O.
         """)
     )
+
+    @Test
+    fun reportSection() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. communicationSection.
+            DATA DIVISION.
+            REPORT SECTION.
+                RD IDENTIFIER IN IDENTIFIER IS GLOBAL.
+                10 IDENTIFIER LINE NUMBER IS 10 ON NEXT PAGE.
+        """)
+    )
 }

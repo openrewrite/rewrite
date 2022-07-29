@@ -241,6 +241,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitAssignClause(CobolParser.AssignClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
     public Cobol.StatementPhrase visitAtEndPhrase(CobolParser.AtEndPhraseContext ctx) {
         return new Cobol.StatementPhrase(
                 randomId(),
@@ -701,19 +706,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitCommunicationDescriptionEntryFormat1(CobolParser.CommunicationDescriptionEntryFormat1Context ctx) {
-        if (ctx.symbolicQueueClause() != null ||
-                ctx.symbolicSubQueueClause() != null ||
-                ctx.messageDateClause() != null ||
-                ctx.messageTimeClause() != null ||
-                ctx.symbolicSourceClause() != null ||
-                ctx.textLengthClause() != null ||
-                ctx.endKeyClause() != null ||
-                ctx.statusKeyClause() != null ||
-                ctx.messageCountClause() != null ||
-                ctx.dataDescName() != null) {
-            throw new UnsupportedOperationException("Implement me");
-        }
-
         return new Cobol.CommunicationDescriptionEntryFormat1(
                 randomId(),
                 prefix(ctx),
@@ -736,16 +728,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitCommunicationDescriptionEntryFormat2(CobolParser.CommunicationDescriptionEntryFormat2Context ctx) {
-        if (ctx.destinationCountClause() != null ||
-                ctx.textLengthClause() != null ||
-                ctx.statusKeyClause() != null ||
-                ctx.destinationTableClause() != null ||
-                ctx.errorKeyClause() != null ||
-                ctx.textLengthClause() != null ||
-                ctx.symbolicDestinationClause() != null) {
-            throw new UnsupportedOperationException("Implement me");
-        }
-
         return new Cobol.CommunicationDescriptionEntryFormat2(
                 randomId(),
                 prefix(ctx),
@@ -764,16 +746,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitCommunicationDescriptionEntryFormat3(CobolParser.CommunicationDescriptionEntryFormat3Context ctx) {
-        if (ctx.messageDateClause() != null ||
-                ctx.messageTimeClause() != null ||
-                ctx.symbolicTerminalClause() != null ||
-                ctx.textLengthClause() != null ||
-                ctx.endKeyClause() != null ||
-                ctx.statusKeyClause() != null ||
-                ctx.dataDescName() != null) {
-            throw new UnsupportedOperationException("Implement me");
-        }
-
         return new Cobol.CommunicationDescriptionEntryFormat3(
                 randomId(),
                 prefix(ctx),
@@ -896,6 +868,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitFileStatusClause(CobolParser.FileStatusClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
     public Object visitGobackStatement(CobolParser.GobackStatementContext ctx) {
         return new Cobol.GoBack(
                 randomId(),
@@ -965,6 +942,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                         ctx.integerLiteral()
                 )
         );
+    }
+
+    @Override
+    public Object visitSymbolicDestinationClause(CobolParser.SymbolicDestinationClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
     }
 
     @Override
@@ -1160,6 +1142,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 (Cobol.StatementPhrase) visit(ctx.notInvalidKeyPhrase()),
                 padLeft(ctx.END_DELETE())
         );
+    }
+
+    @Override
+    public Object visitDestinationCountClause(CobolParser.DestinationCountClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitDestinationTableClause(CobolParser.DestinationTableClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
     }
 
     @Override
@@ -1415,6 +1407,21 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitMessageCountClause(CobolParser.MessageCountClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitMessageDateClause(CobolParser.MessageDateClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitMessageTimeClause(CobolParser.MessageTimeClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
     public Cobol.ValuedObjectComputerClause visitDiskSizeClause(CobolParser.DiskSizeClauseContext ctx) {
         return new Cobol.ValuedObjectComputerClause(
                 randomId(),
@@ -1427,6 +1434,332 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                         padLeft(whitespace(), words(ctx.WORDS(), ctx.MODULES())) :
                         null
         );
+    }
+
+    @Override
+    public Object visitPasswordClause(CobolParser.PasswordClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitRecordKeyClause(CobolParser.RecordKeyClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitRelativeKeyClause(CobolParser.RelativeKeyClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportDescription(CobolParser.ReportDescriptionContext ctx) {
+        return new Cobol.ReportDescription(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.ReportDescriptionEntry) visit(ctx.reportDescriptionEntry()),
+                convertAllContainer(ctx.reportGroupDescriptionEntry())
+        );
+    }
+
+    @Override
+    public Object visitReportDescriptionEntry(CobolParser.ReportDescriptionEntryContext ctx) {
+        return new Cobol.ReportDescriptionEntry(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RD()),
+                (Cobol.QualifiedDataName) visit(ctx.reportName()),
+                visitNullable(ctx.reportDescriptionGlobalClause()),
+                visitNullable(ctx.reportDescriptionPageLimitClause()),
+                visitNullable(ctx.reportDescriptionHeadingClause()),
+                visitNullable(ctx.reportDescriptionFirstDetailClause()),
+                visitNullable(ctx.reportDescriptionLastDetailClause()),
+                visitNullable(ctx.reportDescriptionFootingClause()),
+                padLeft(ctx.DOT_FS())
+        );
+    }
+
+    @Override
+    public Object visitReportDescriptionFirstDetailClause(CobolParser.ReportDescriptionFirstDetailClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportDescriptionFootingClause(CobolParser.ReportDescriptionFootingClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportDescriptionHeadingClause(CobolParser.ReportDescriptionHeadingClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportDescriptionLastDetailClause(CobolParser.ReportDescriptionLastDetailClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportDescriptionPageLimitClause(CobolParser.ReportDescriptionPageLimitClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupBlankWhenZeroClause(CobolParser.ReportGroupBlankWhenZeroClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupColumnNumberClause(CobolParser.ReportGroupColumnNumberClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupDescriptionEntryFormat1(CobolParser.ReportGroupDescriptionEntryFormat1Context ctx) {
+        return new Cobol.ReportGroupDescriptionEntryFormat1(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                (Cobol.CobolWord) visit(ctx.dataName()),
+                visitNullable(ctx.reportGroupLineNumberClause()),
+                visitNullable(ctx.reportGroupNextGroupClause()),
+                (Cobol.ReportGroupTypeClause) visit(ctx.reportGroupTypeClause()),
+                visitNullable(ctx.reportGroupUsageClause()),
+                padLeft(ctx.DOT_FS())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupDescriptionEntryFormat2(CobolParser.ReportGroupDescriptionEntryFormat2Context ctx) {
+        return new Cobol.ReportGroupDescriptionEntryFormat2(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                visitNullable(ctx.dataName()),
+                visitNullable(ctx.reportGroupLineNumberClause()),
+                (Cobol.ReportGroupUsageClause) visit(ctx.reportGroupUsageClause()),
+                padLeft(ctx.DOT_FS())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupDescriptionEntryFormat3(CobolParser.ReportGroupDescriptionEntryFormat3Context ctx) {
+        return new Cobol.ReportGroupDescriptionEntryFormat3(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                visitNullable(ctx.dataName()),
+                convertAllContainer(ctx.reportGroupPictureClause(),
+                        ctx.reportGroupUsageClause(),
+                        ctx.reportGroupSignClause(),
+                        ctx.reportGroupJustifiedClause(),
+                        ctx.reportGroupBlankWhenZeroClause(),
+                        ctx.reportGroupLineNumberClause(),
+                        ctx.reportGroupColumnNumberClause(),
+                        ctx.reportGroupSourceClause(),
+                        ctx.reportGroupValueClause(),
+                        ctx.reportGroupSumClause(),
+                        ctx.reportGroupResetClause(),
+                        ctx.reportGroupIndicateClause()),
+                padLeft(ctx.DOT_FS())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupIndicateClause(CobolParser.ReportGroupIndicateClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupJustifiedClause(CobolParser.ReportGroupJustifiedClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupLineNumberClause(CobolParser.ReportGroupLineNumberClauseContext ctx) {
+        return new Cobol.ReportGroupLineNumberClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LINE(), ctx.NUMBER(), ctx.IS()),
+                visit(ctx.reportGroupLineNumberNextPage(), ctx.reportGroupLineNumberPlus())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupLineNumberNextPage(CobolParser.ReportGroupLineNumberNextPageContext ctx) {
+        return new Cobol.ReportGroupLineNumberNextPage(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                words(ctx.ON(), ctx.NEXT(), ctx.PAGE())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupLineNumberPlus(CobolParser.ReportGroupLineNumberPlusContext ctx) {
+        return new Cobol.ReportGroupLineNumberPlus(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PLUS()),
+                (Cobol.CobolWord) visit(ctx.integerLiteral())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupNextGroupClause(CobolParser.ReportGroupNextGroupClauseContext ctx) {
+        return new Cobol.ReportGroupNextGroupClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.NEXT(), ctx.GROUP(), ctx.IS()),
+                visit(ctx.integerLiteral(), ctx.reportGroupNextGroupNextPage(), ctx.reportGroupNextGroupPlus())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupNextGroupNextPage(CobolParser.ReportGroupNextGroupNextPageContext ctx) {
+        return new Cobol.ReportGroupNextGroupNextPage(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.NEXT(), ctx.PAGE())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupNextGroupPlus(CobolParser.ReportGroupNextGroupPlusContext ctx) {
+        return new Cobol.ReportGroupNextGroupPlus(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PLUS()),
+                (Cobol.CobolWord) visit(ctx.integerLiteral())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupPictureClause(CobolParser.ReportGroupPictureClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupResetClause(CobolParser.ReportGroupResetClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupSignClause(CobolParser.ReportGroupSignClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupSourceClause(CobolParser.ReportGroupSourceClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupSumClause(CobolParser.ReportGroupSumClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupTypeClause(CobolParser.ReportGroupTypeClauseContext ctx) {
+        return new Cobol.ReportGroupTypeClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TYPE(), ctx.IS()),
+                visit(ctx.reportGroupTypeReportHeading(),
+                        ctx.reportGroupTypeReportFooting(),
+                        ctx.reportGroupTypePageHeading(),
+                        ctx.reportGroupTypePageFooting(),
+                        ctx.reportGroupTypeControlHeading(),
+                        ctx.reportGroupTypeControlFooting(),
+                        ctx.reportGroupTypeDetail())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupTypeControlHeading(CobolParser.ReportGroupTypeControlHeadingContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupTypeControlFooting(CobolParser.ReportGroupTypeControlFootingContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupTypeDetail(CobolParser.ReportGroupTypeDetailContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupTypePageHeading(CobolParser.ReportGroupTypePageHeadingContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupTypePageFooting(CobolParser.ReportGroupTypePageFootingContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupTypeReportHeading(CobolParser.ReportGroupTypeReportHeadingContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupTypeReportFooting(CobolParser.ReportGroupTypeReportFootingContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportGroupUsageClause(CobolParser.ReportGroupUsageClauseContext ctx) {
+        return new Cobol.ReportGroupUsageClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.USAGE(), ctx.IS(), ctx.DISPLAY(), ctx.DISPLAY_1())
+        );
+    }
+
+    @Override
+    public Object visitReportGroupValueClause(CobolParser.ReportGroupValueClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReportDescriptionGlobalClause(CobolParser.ReportDescriptionGlobalClauseContext ctx) {
+        return new Cobol.ReportDescriptionGlobalClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.GLOBAL())
+        );
+    }
+
+    @Override
+    public Object visitReportSection(CobolParser.ReportSectionContext ctx) {
+        return new Cobol.ReportSection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REPORT(), ctx.SECTION(), ctx.DOT_FS()),
+                convertAllContainer(ctx.reportDescription())
+        );
+    }
+
+    @Override
+    public Object visitReserveClause(CobolParser.ReserveClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
     }
 
     @Override
@@ -1976,6 +2309,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitSelectClause(CobolParser.SelectClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
     public Cobol.SendAdvancingLines visitSendAdvancingLines(CobolParser.SendAdvancingLinesContext ctx) {
         return new Cobol.SendAdvancingLines(
                 randomId(),
@@ -2020,6 +2358,26 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 (Cobol) visit(ctx.condition()),
                 words(ctx.RPARENCHAR())
         ) : visit(ctx.relationCondition(), ctx.classCondition(), ctx.conditionNameReference());
+    }
+
+    @Override
+    public Object visitSymbolicSourceClause(CobolParser.SymbolicSourceClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitSymbolicSubQueueClause(CobolParser.SymbolicSubQueueClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitSymbolicTerminalClause(CobolParser.SymbolicTerminalClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitSymbolicQueueClause(CobolParser.SymbolicQueueClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
     }
 
     @Override
@@ -2145,6 +2503,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 (Cobol.CobolWord) visit(ctx.TERMINATE()),
                 (Cobol.QualifiedDataName) visit(ctx.reportName())
         );
+    }
+
+    @Override
+    public Object visitTextLengthClause(CobolParser.TextLengthClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
     }
 
     @Override
@@ -3271,6 +3634,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitEndKeyClause(CobolParser.EndKeyClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
     public Object visitEntryStatement(CobolParser.EntryStatementContext ctx) {
         return new Cobol.Entry(
                 randomId(),
@@ -3474,6 +3842,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitOrganizationClause(CobolParser.OrganizationClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitPaddingCharacterClause(CobolParser.PaddingCharacterClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
     public Cobol.Paragraphs visitParagraphs(CobolParser.ParagraphsContext ctx) {
         return new Cobol.Paragraphs(
                 randomId(),
@@ -3639,6 +4017,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 words(ctx.SECTION()),
                 visitNullable(ctx.integerLiteral())
         );
+    }
+
+    @Override
+    public Object visitRecordDelimiterClause(CobolParser.RecordDelimiterClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
     }
 
     @Override
@@ -3821,6 +4204,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 visitNullable(ctx.notInvalidKeyPhrase()),
                 padLeft(ctx.END_START())
         );
+    }
+
+    @Override
+    public Object visitStatusKeyClause(CobolParser.StatusKeyClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
     }
 
     @Override

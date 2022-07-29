@@ -10797,6 +10797,694 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ReportDescription implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        ReportDescriptionEntry reportDescriptionEntry;
+
+        CobolContainer<Cobol> groupDescriptionEntries;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportDescription(this, p);
+        }
+
+        public List<Cobol> getGroupDescriptionEntries() {
+            return groupDescriptionEntries.getElements();
+        }
+
+        public ReportDescription withGroupDescriptionEntries(List<Cobol> groupDescriptionEntries) {
+            return getPadding().withGroupDescriptionEntries(this.groupDescriptionEntries.getPadding().withElements(CobolRightPadded.withElements(
+                    this.groupDescriptionEntries.getPadding().getElements(), groupDescriptionEntries)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ReportDescription t;
+
+            public CobolContainer<Cobol> getGroupDescriptionEntries() {
+                return t.groupDescriptionEntries;
+            }
+
+            public ReportDescription withGroupDescriptionEntries(CobolContainer<Cobol> groupDescriptionEntries) {
+                return t.groupDescriptionEntries == groupDescriptionEntries ? t : new ReportDescription(t.padding, t.id, t.prefix, t.markers, t.reportDescriptionEntry, groupDescriptionEntries);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ReportDescriptionEntry implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String rd;
+
+        @Getter
+        @With
+        QualifiedDataName qualifiedDataName;
+
+        @Getter
+        @Nullable
+        @With
+        ReportDescriptionGlobalClause reportDescriptionGlobalClause;
+
+        @Getter
+        @Nullable
+        @With
+        ReportDescriptionGlobalClause reportDescriptionPageLimitClause;
+
+        @Getter
+        @Nullable
+        @With
+        ReportDescriptionGlobalClause reportDescriptionHeadingClause;
+
+        @Getter
+        @Nullable
+        @With
+        ReportDescriptionGlobalClause reportDescriptionFirstDetailClause;
+
+        @Getter
+        @Nullable
+        @With
+        ReportDescriptionGlobalClause reportDescriptionLastDetailClause;
+
+        @Getter
+        @Nullable
+        @With
+        ReportDescriptionGlobalClause reportDescriptionFootingClause;
+
+        CobolLeftPadded<String> dot;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportDescriptionEntry(this, p);
+        }
+
+        public String getDot() {
+            return dot.getElement();
+        }
+
+        public ReportDescriptionEntry withDot(String dot) {
+            //noinspection ConstantConditions
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ReportDescriptionEntry t;
+
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public ReportDescriptionEntry withDot(CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new ReportDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.rd, t.qualifiedDataName, t.reportDescriptionGlobalClause, t.reportDescriptionPageLimitClause, t.reportDescriptionHeadingClause, t.reportDescriptionFirstDetailClause, t.reportDescriptionLastDetailClause, t.reportDescriptionFootingClause, dot);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ReportGroupDescriptionEntryFormat1 implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        CobolWord integerLiteral;
+
+        @Getter
+        @With
+        CobolWord dataName;
+
+        @Getter
+        @Nullable
+        @With
+        ReportGroupLineNumberClause groupLineNumberClause;
+
+        @Getter
+        @Nullable
+        @With
+        ReportGroupNextGroupClause groupNextGroupClause;
+
+        @Getter
+        @With
+        ReportGroupTypeClause groupTypeClause;
+
+        @Getter
+        @Nullable
+        @With
+        ReportGroupUsageClause groupUsageClause;
+
+        CobolLeftPadded<String> dot;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupDescriptionEntryFormat1(this, p);
+        }
+
+        public String getDot() {
+            return dot.getElement();
+        }
+
+        public ReportGroupDescriptionEntryFormat1 withDot(String dot) {
+            //noinspection ConstantConditions
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ReportGroupDescriptionEntryFormat1 t;
+
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public ReportGroupDescriptionEntryFormat1 withDot(CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new ReportGroupDescriptionEntryFormat1(t.padding, t.id, t.prefix, t.markers, t.integerLiteral, t.dataName, t.groupLineNumberClause, t.groupNextGroupClause, t.groupTypeClause, t.groupUsageClause, dot);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ReportGroupDescriptionEntryFormat2 implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        CobolWord integerLiteral;
+
+        @Getter
+        @Nullable
+        @With
+        CobolWord dataName;
+
+        @Getter
+        @Nullable
+        @With
+        ReportGroupLineNumberClause reportGroupLineNumberClause;
+
+        @Getter
+        @With
+        ReportGroupUsageClause groupUsageClause;
+
+        CobolLeftPadded<String> dot;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupDescriptionEntryFormat2(this, p);
+        }
+
+        public String getDot() {
+            return dot.getElement();
+        }
+
+        public ReportGroupDescriptionEntryFormat2 withDot(String dot) {
+            //noinspection ConstantConditions
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ReportGroupDescriptionEntryFormat2 t;
+
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public ReportGroupDescriptionEntryFormat2 withDot(CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new ReportGroupDescriptionEntryFormat2(t.padding, t.id, t.prefix, t.markers, t.integerLiteral, t.dataName, t.reportGroupLineNumberClause, t.groupUsageClause, dot);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ReportGroupDescriptionEntryFormat3 implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        CobolWord integerLiteral;
+
+        @Getter
+        @Nullable
+        @With
+        CobolWord dataName;
+
+        @Nullable
+        CobolContainer<Cobol> clauses;
+
+        CobolLeftPadded<String> dot;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupDescriptionEntryFormat3(this, p);
+        }
+
+        public List<Cobol> getClauses() {
+            return clauses.getElements();
+        }
+
+        public ReportGroupDescriptionEntryFormat3 withClauses(List<Cobol> clauses) {
+            return getPadding().withClauses(this.clauses.getPadding().withElements(CobolRightPadded.withElements(
+                    this.clauses.getPadding().getElements(), clauses)));
+        }
+
+        public String getDot() {
+            return dot.getElement();
+        }
+
+        public ReportGroupDescriptionEntryFormat3 withDot(String dot) {
+            //noinspection ConstantConditions
+            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ReportGroupDescriptionEntryFormat3 t;
+
+            @Nullable
+            public CobolContainer<Cobol> getClauses() {
+                return t.clauses;
+            }
+
+            public ReportGroupDescriptionEntryFormat3 withClauses(@Nullable CobolContainer<Cobol> clauses) {
+                return t.clauses == clauses ? t : new ReportGroupDescriptionEntryFormat3(t.padding, t.id, t.prefix, t.markers, t.integerLiteral, t.dataName, clauses, t.dot);
+            }
+
+            public CobolLeftPadded<String> getDot() {
+                return t.dot;
+            }
+
+            public ReportGroupDescriptionEntryFormat3 withDot(CobolLeftPadded<String> dot) {
+                return t.dot == dot ? t : new ReportGroupDescriptionEntryFormat3(t.padding, t.id, t.prefix, t.markers, t.integerLiteral, t.dataName, t.clauses, dot);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupLineNumberClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Cobol clause;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupLineNumberClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupLineNumberNextPage implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        CobolWord integerLiteral;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupLineNumberNextPage(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupLineNumberPlus implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String plus;
+        CobolWord integerLiteral;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupLineNumberPlus(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupNextGroupClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Cobol clause;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupNextGroupClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupNextGroupNextPage implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String nextPage;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupNextGroupNextPage(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupNextGroupPlus implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String plus;
+        CobolWord integerLiteral;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupNextGroupPlus(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupTypeClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Cobol type;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupTypeClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupUsageClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupUsageClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportDescriptionGlobalClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportDescriptionGlobalClause(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ReportSection implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Cobol> descriptions;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportSection(this, p);
+        }
+
+        public List<Cobol> getDescriptions() {
+            return descriptions.getElements();
+        }
+
+        public ReportSection withDescriptions(List<Cobol> descriptions) {
+            return getPadding().withDescriptions(this.descriptions.getPadding().withElements(CobolRightPadded.withElements(
+                    this.descriptions.getPadding().getElements(), descriptions)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ReportSection t;
+
+            public CobolContainer<Cobol> getDescriptions() {
+                return t.descriptions;
+            }
+
+            public ReportSection withDescriptions(CobolContainer<Cobol> descriptions) {
+                return t.descriptions == descriptions ? t : new ReportSection(t.padding, t.id, t.prefix, t.markers, t.words, descriptions);
+            }
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

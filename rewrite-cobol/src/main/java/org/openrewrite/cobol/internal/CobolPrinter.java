@@ -2772,4 +2772,138 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", communicationDescriptionEntryFormat3.getPadding().getInitialIOs(), "", ".", p);
         return communicationDescriptionEntryFormat3;
     }
+
+    public Cobol visitReportDescription(Cobol.ReportDescription reportDescription, PrintOutputCapture<P> p) {
+        visitSpace(reportDescription.getPrefix(), p);
+        visitMarkers(reportDescription.getMarkers(), p);
+        visit(reportDescription.getReportDescriptionEntry(), p);
+        visitContainer("", reportDescription.getPadding().getGroupDescriptionEntries(), "", "", p);
+        return reportDescription;
+    }
+
+    public Cobol visitReportDescriptionEntry(Cobol.ReportDescriptionEntry reportDescriptionEntry, PrintOutputCapture<P> p) {
+        visitSpace(reportDescriptionEntry.getPrefix(), p);
+        visitMarkers(reportDescriptionEntry.getMarkers(), p);
+        p.append(reportDescriptionEntry.getRd());
+        visit(reportDescriptionEntry.getQualifiedDataName(), p);
+        visit(reportDescriptionEntry.getReportDescriptionGlobalClause(), p);
+        visit(reportDescriptionEntry.getReportDescriptionPageLimitClause(), p);
+        visit(reportDescriptionEntry.getReportDescriptionHeadingClause(), p);
+        visit(reportDescriptionEntry.getReportDescriptionFirstDetailClause(), p);
+        visit(reportDescriptionEntry.getReportDescriptionLastDetailClause(), p);
+        visit(reportDescriptionEntry.getReportDescriptionFootingClause(), p);
+        visitLeftPadded("", reportDescriptionEntry.getPadding().getDot(), p);
+        return reportDescriptionEntry;
+    }
+
+    public Cobol visitReportGroupDescriptionEntryFormat1(Cobol.ReportGroupDescriptionEntryFormat1 reportGroupDescriptionEntryFormat1, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupDescriptionEntryFormat1.getPrefix(), p);
+        visitMarkers(reportGroupDescriptionEntryFormat1.getMarkers(), p);
+        visit(reportGroupDescriptionEntryFormat1.getIntegerLiteral(), p);
+        visit(reportGroupDescriptionEntryFormat1.getDataName(), p);
+        visit(reportGroupDescriptionEntryFormat1.getGroupLineNumberClause(), p);
+        visit(reportGroupDescriptionEntryFormat1.getGroupNextGroupClause(), p);
+        visit(reportGroupDescriptionEntryFormat1.getGroupTypeClause(), p);
+        visit(reportGroupDescriptionEntryFormat1.getGroupUsageClause(), p);
+        visitLeftPadded("", reportGroupDescriptionEntryFormat1.getPadding().getDot(), p);
+        return reportGroupDescriptionEntryFormat1;
+    }
+
+    public Cobol visitReportGroupDescriptionEntryFormat2(Cobol.ReportGroupDescriptionEntryFormat2 reportGroupDescriptionEntryFormat2, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupDescriptionEntryFormat2.getPrefix(), p);
+        visitMarkers(reportGroupDescriptionEntryFormat2.getMarkers(), p);
+        visit(reportGroupDescriptionEntryFormat2.getIntegerLiteral(), p);
+        visit(reportGroupDescriptionEntryFormat2.getDataName(), p);
+        visit(reportGroupDescriptionEntryFormat2.getReportGroupLineNumberClause(), p);
+        visit(reportGroupDescriptionEntryFormat2.getGroupUsageClause(), p);
+        visitLeftPadded("", reportGroupDescriptionEntryFormat2.getPadding().getDot(), p);
+        return reportGroupDescriptionEntryFormat2;
+    }
+
+    public Cobol visitReportGroupDescriptionEntryFormat3(Cobol.ReportGroupDescriptionEntryFormat3 reportGroupDescriptionEntryFormat3, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupDescriptionEntryFormat3.getPrefix(), p);
+        visitMarkers(reportGroupDescriptionEntryFormat3.getMarkers(), p);
+        visit(reportGroupDescriptionEntryFormat3.getIntegerLiteral(), p);
+        visit(reportGroupDescriptionEntryFormat3.getDataName(), p);
+        visitContainer("", reportGroupDescriptionEntryFormat3.getPadding().getClauses(), "", "", p);
+        visitLeftPadded("", reportGroupDescriptionEntryFormat3.getPadding().getDot(), p);
+        return reportGroupDescriptionEntryFormat3;
+    }
+
+    public Cobol visitReportGroupLineNumberClause(Cobol.ReportGroupLineNumberClause reportGroupLineNumberClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupLineNumberClause.getPrefix(), p);
+        visitMarkers(reportGroupLineNumberClause.getMarkers(), p);
+        p.append(reportGroupLineNumberClause.getWords());
+        visit(reportGroupLineNumberClause.getClause(), p);
+        return reportGroupLineNumberClause;
+    }
+
+    public Cobol visitReportGroupLineNumberNextPage(Cobol.ReportGroupLineNumberNextPage reportGroupLineNumberNextPage, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupLineNumberNextPage.getPrefix(), p);
+        visitMarkers(reportGroupLineNumberNextPage.getMarkers(), p);
+        visit(reportGroupLineNumberNextPage.getIntegerLiteral(), p);
+        p.append(reportGroupLineNumberNextPage.getWords());
+        return reportGroupLineNumberNextPage;
+    }
+
+    public Cobol visitReportGroupLineNumberPlus(Cobol.ReportGroupLineNumberPlus reportGroupLineNumberPlus, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupLineNumberPlus.getPrefix(), p);
+        visitMarkers(reportGroupLineNumberPlus.getMarkers(), p);
+        p.append(reportGroupLineNumberPlus.getPlus());
+        visit(reportGroupLineNumberPlus.getIntegerLiteral(), p);
+        return reportGroupLineNumberPlus;
+    }
+
+    public Cobol visitReportGroupNextGroupClause(Cobol.ReportGroupNextGroupClause reportGroupNextGroupClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupNextGroupClause.getPrefix(), p);
+        visitMarkers(reportGroupNextGroupClause.getMarkers(), p);
+        p.append(reportGroupNextGroupClause.getWords());
+        visit(reportGroupNextGroupClause.getClause(), p);
+        return reportGroupNextGroupClause;
+    }
+
+    public Cobol visitReportGroupNextGroupNextPage(Cobol.ReportGroupNextGroupNextPage reportGroupNextGroupNextPage, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupNextGroupNextPage.getPrefix(), p);
+        visitMarkers(reportGroupNextGroupNextPage.getMarkers(), p);
+        p.append(reportGroupNextGroupNextPage.getNextPage());
+        return reportGroupNextGroupNextPage;
+    }
+
+    public Cobol visitReportGroupNextGroupPlus(Cobol.ReportGroupNextGroupPlus reportGroupNextGroupPlus, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupNextGroupPlus.getPrefix(), p);
+        visitMarkers(reportGroupNextGroupPlus.getMarkers(), p);
+        p.append(reportGroupNextGroupPlus.getPlus());
+        visit(reportGroupNextGroupPlus.getIntegerLiteral(), p);
+        return reportGroupNextGroupPlus;
+    }
+
+    public Cobol visitReportGroupTypeClause(Cobol.ReportGroupTypeClause reportGroupTypeClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupTypeClause.getPrefix(), p);
+        visitMarkers(reportGroupTypeClause.getMarkers(), p);
+        p.append(reportGroupTypeClause.getWords());
+        visit(reportGroupTypeClause.getType(), p);
+        return reportGroupTypeClause;
+    }
+
+    public Cobol visitReportGroupUsageClause(Cobol.ReportGroupUsageClause reportGroupUsageClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupUsageClause.getPrefix(), p);
+        visitMarkers(reportGroupUsageClause.getMarkers(), p);
+        p.append(reportGroupUsageClause.getWords());
+        return reportGroupUsageClause;
+    }
+
+    public Cobol visitReportDescriptionGlobalClause(Cobol.ReportDescriptionGlobalClause reportDescriptionGlobalClause, PrintOutputCapture<P> p) {
+        visitSpace(reportDescriptionGlobalClause.getPrefix(), p);
+        visitMarkers(reportDescriptionGlobalClause.getMarkers(), p);
+        p.append(reportDescriptionGlobalClause.getWords());
+        return reportDescriptionGlobalClause;
+    }
+
+    public Cobol visitReportSection(Cobol.ReportSection reportSection, PrintOutputCapture<P> p) {
+        visitSpace(reportSection.getPrefix(), p);
+        visitMarkers(reportSection.getMarkers(), p);
+        p.append(reportSection.getWords());
+        visitContainer("", reportSection.getPadding().getDescriptions(), "", "", p);
+        return reportSection;
+    }
 }

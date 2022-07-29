@@ -1528,4 +1528,79 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.CommunicationDescriptionEntryFormat3 visitCommunicationDescriptionEntryFormat3(Cobol.CommunicationDescriptionEntryFormat3 communicationDescriptionEntryFormat3, P p) {
         return (Cobol.CommunicationDescriptionEntryFormat3) super.visitCommunicationDescriptionEntryFormat3(communicationDescriptionEntryFormat3, p);
     }
+
+    @Override
+    public Cobol.ReportDescription visitReportDescription(Cobol.ReportDescription reportDescription, P p) {
+        return (Cobol.ReportDescription) super.visitReportDescription(reportDescription, p);
+    }
+
+    @Override
+    public Cobol.ReportDescriptionEntry visitReportDescriptionEntry(Cobol.ReportDescriptionEntry reportDescriptionEntry, P p) {
+        return (Cobol.ReportDescriptionEntry) super.visitReportDescriptionEntry(reportDescriptionEntry, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupDescriptionEntryFormat1 visitReportGroupDescriptionEntryFormat1(Cobol.ReportGroupDescriptionEntryFormat1 reportGroupDescriptionEntryFormat1, P p) {
+        return (Cobol.ReportGroupDescriptionEntryFormat1) super.visitReportGroupDescriptionEntryFormat1(reportGroupDescriptionEntryFormat1, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupDescriptionEntryFormat2 visitReportGroupDescriptionEntryFormat2(Cobol.ReportGroupDescriptionEntryFormat2 reportGroupDescriptionEntryFormat2, P p) {
+        return (Cobol.ReportGroupDescriptionEntryFormat2) super.visitReportGroupDescriptionEntryFormat2(reportGroupDescriptionEntryFormat2, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupDescriptionEntryFormat3 visitReportGroupDescriptionEntryFormat3(Cobol.ReportGroupDescriptionEntryFormat3 reportGroupDescriptionEntryFormat3, P p) {
+        return (Cobol.ReportGroupDescriptionEntryFormat3) super.visitReportGroupDescriptionEntryFormat3(reportGroupDescriptionEntryFormat3, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupLineNumberClause visitReportGroupLineNumberClause(Cobol.ReportGroupLineNumberClause reportGroupLineNumberClause, P p) {
+        return (Cobol.ReportGroupLineNumberClause) super.visitReportGroupLineNumberClause(reportGroupLineNumberClause, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupLineNumberNextPage visitReportGroupLineNumberNextPage(Cobol.ReportGroupLineNumberNextPage reportGroupLineNumberNextPage, P p) {
+        return (Cobol.ReportGroupLineNumberNextPage) super.visitReportGroupLineNumberNextPage(reportGroupLineNumberNextPage, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupLineNumberPlus visitReportGroupLineNumberPlus(Cobol.ReportGroupLineNumberPlus reportGroupLineNumberPlus, P p) {
+        return (Cobol.ReportGroupLineNumberPlus) super.visitReportGroupLineNumberPlus(reportGroupLineNumberPlus, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupNextGroupClause visitReportGroupNextGroupClause(Cobol.ReportGroupNextGroupClause reportGroupNextGroupClause, P p) {
+        return (Cobol.ReportGroupNextGroupClause) super.visitReportGroupNextGroupClause(reportGroupNextGroupClause, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupNextGroupNextPage visitReportGroupNextGroupNextPage(Cobol.ReportGroupNextGroupNextPage reportGroupNextGroupNextPage, P p) {
+        return (Cobol.ReportGroupNextGroupNextPage) super.visitReportGroupNextGroupNextPage(reportGroupNextGroupNextPage, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupNextGroupPlus visitReportGroupNextGroupPlus(Cobol.ReportGroupNextGroupPlus reportGroupNextGroupPlus, P p) {
+        return (Cobol.ReportGroupNextGroupPlus) super.visitReportGroupNextGroupPlus(reportGroupNextGroupPlus, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupTypeClause visitReportGroupTypeClause(Cobol.ReportGroupTypeClause reportGroupTypeClause, P p) {
+        return (Cobol.ReportGroupTypeClause) super.visitReportGroupTypeClause(reportGroupTypeClause, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupUsageClause visitReportGroupUsageClause(Cobol.ReportGroupUsageClause reportGroupUsageClause, P p) {
+        return (Cobol.ReportGroupUsageClause) super.visitReportGroupUsageClause(reportGroupUsageClause, p);
+    }
+
+    @Override
+    public Cobol.ReportDescriptionGlobalClause visitReportDescriptionGlobalClause(Cobol.ReportDescriptionGlobalClause reportDescriptionGlobalClause, P p) {
+        return (Cobol.ReportDescriptionGlobalClause) super.visitReportDescriptionGlobalClause(reportDescriptionGlobalClause, p);
+    }
+
+    @Override
+    public Cobol.ReportSection visitReportSection(Cobol.ReportSection reportSection, P p) {
+        return (Cobol.ReportSection) super.visitReportSection(reportSection, p);
+    }
 }
