@@ -823,4 +823,17 @@ class CobolDivisionTest : RewriteTest {
             .
         """)
     )
+
+    @Test
+    fun communicationSection() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. communicationSection.
+            DATA DIVISION.
+            COMMUNICATION SECTION.
+                CD COMMNAME FOR INITIAL INPUT.
+                CD COMMNAME FOR OUTPUT.
+                CD COMMNAME FOR INITIAL I-O.
+        """)
+    )
 }

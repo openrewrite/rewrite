@@ -1015,6 +1015,318 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class CommunicationSection implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Cobol> entries;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitCommunicationSection(this, p);
+        }
+
+        public List<Cobol> getEntries() {
+            return entries.getElements();
+        }
+
+        public CommunicationSection withEntries(List<Cobol> entries) {
+            return getPadding().withEntries(this.entries.getPadding().withElements(CobolRightPadded.withElements(
+                    this.entries.getPadding().getElements(), entries)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final CommunicationSection t;
+
+            public CobolContainer<Cobol> getEntries() {
+                return t.entries;
+            }
+
+            public CommunicationSection withEntries(CobolContainer<Cobol> entries) {
+                return t.entries == entries ? t : new CommunicationSection(t.padding, t.id, t.prefix, t.markers, t.words, entries);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class CommunicationDescriptionEntryFormat1 implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String cd;
+
+        @Getter
+        @With
+        CobolWord name;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Cobol> inputs;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitCommunicationDescriptionEntryFormat1(this, p);
+        }
+
+        public List<Cobol> getInputs() {
+            return inputs.getElements();
+        }
+
+        public CommunicationDescriptionEntryFormat1 withInputs(List<Cobol> inputs) {
+            return getPadding().withInputs(this.inputs.getPadding().withElements(CobolRightPadded.withElements(
+                    this.inputs.getPadding().getElements(), inputs)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final CommunicationDescriptionEntryFormat1 t;
+
+            public CobolContainer<Cobol> getInputs() {
+                return t.inputs;
+            }
+
+            public CommunicationDescriptionEntryFormat1 withInputs(CobolContainer<Cobol> inputs) {
+                return t.inputs == inputs ? t : new CommunicationDescriptionEntryFormat1(t.padding, t.id, t.prefix, t.markers, t.cd, t.name, t.words, inputs);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class CommunicationDescriptionEntryFormat2 implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String cd;
+
+        @Getter
+        @With
+        CobolWord name;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Cobol> outputs;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitCommunicationDescriptionEntryFormat2(this, p);
+        }
+
+        public List<Cobol> getOutputs() {
+            return outputs.getElements();
+        }
+
+        public CommunicationDescriptionEntryFormat2 withOutputs(List<Cobol> outputs) {
+            return getPadding().withOutputs(this.outputs.getPadding().withElements(CobolRightPadded.withElements(
+                    this.outputs.getPadding().getElements(), outputs)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final CommunicationDescriptionEntryFormat2 t;
+
+            public CobolContainer<Cobol> getOutputs() {
+                return t.outputs;
+            }
+
+            public CommunicationDescriptionEntryFormat2 withOutputs(CobolContainer<Cobol> outputs) {
+                return t.outputs == outputs ? t : new CommunicationDescriptionEntryFormat2(t.padding, t.id, t.prefix, t.markers, t.cd, t.name, t.words, outputs);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class CommunicationDescriptionEntryFormat3 implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String cd;
+
+        @Getter
+        @With
+        CobolWord name;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Cobol> initialIOs;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitCommunicationDescriptionEntryFormat3(this, p);
+        }
+
+        public List<Cobol> getInitialIOs() {
+            return initialIOs.getElements();
+        }
+
+        public CommunicationDescriptionEntryFormat3 withInitialIOs(List<Cobol> initialIOs) {
+            return getPadding().withInitialIOs(this.initialIOs.getPadding().withElements(CobolRightPadded.withElements(
+                    this.initialIOs.getPadding().getElements(), initialIOs)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final CommunicationDescriptionEntryFormat3 t;
+
+            public CobolContainer<Cobol> getInitialIOs() {
+                return t.initialIOs;
+            }
+
+            public CommunicationDescriptionEntryFormat3 withInitialIOs(CobolContainer<Cobol> initialIOs) {
+                return t.initialIOs == initialIOs ? t : new CommunicationDescriptionEntryFormat3(t.padding, t.id, t.prefix, t.markers, t.cd, t.name, t.words, initialIOs);
+            }
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

@@ -1508,4 +1508,24 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.SameClause visitSameClause(Cobol.SameClause sameClause, P p) {
         return (Cobol.SameClause) super.visitSameClause(sameClause, p);
     }
+
+    @Override
+    public Cobol.CommunicationSection visitCommunicationSection(Cobol.CommunicationSection communicationSection, P p) {
+        return (Cobol.CommunicationSection) super.visitCommunicationSection(communicationSection, p);
+    }
+
+    @Override
+    public Cobol.CommunicationDescriptionEntryFormat1 visitCommunicationDescriptionEntryFormat1(Cobol.CommunicationDescriptionEntryFormat1 communicationDescriptionEntryFormat1, P p) {
+        return (Cobol.CommunicationDescriptionEntryFormat1) super.visitCommunicationDescriptionEntryFormat1(communicationDescriptionEntryFormat1, p);
+    }
+
+    @Override
+    public Cobol.CommunicationDescriptionEntryFormat2 visitCommunicationDescriptionEntryFormat2(Cobol.CommunicationDescriptionEntryFormat2 communicationDescriptionEntryFormat2, P p) {
+        return (Cobol.CommunicationDescriptionEntryFormat2) super.visitCommunicationDescriptionEntryFormat2(communicationDescriptionEntryFormat2, p);
+    }
+
+    @Override
+    public Cobol.CommunicationDescriptionEntryFormat3 visitCommunicationDescriptionEntryFormat3(Cobol.CommunicationDescriptionEntryFormat3 communicationDescriptionEntryFormat3, P p) {
+        return (Cobol.CommunicationDescriptionEntryFormat3) super.visitCommunicationDescriptionEntryFormat3(communicationDescriptionEntryFormat3, p);
+    }
 }

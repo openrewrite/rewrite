@@ -700,6 +700,109 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitCommunicationDescriptionEntryFormat1(CobolParser.CommunicationDescriptionEntryFormat1Context ctx) {
+        if (ctx.symbolicQueueClause() != null ||
+                ctx.symbolicSubQueueClause() != null ||
+                ctx.messageDateClause() != null ||
+                ctx.messageTimeClause() != null ||
+                ctx.symbolicSourceClause() != null ||
+                ctx.textLengthClause() != null ||
+                ctx.endKeyClause() != null ||
+                ctx.statusKeyClause() != null ||
+                ctx.messageCountClause() != null ||
+                ctx.dataDescName() != null) {
+            throw new UnsupportedOperationException("Implement me");
+        }
+
+        return new Cobol.CommunicationDescriptionEntryFormat1(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CD()),
+                (Cobol.CobolWord) visit(ctx.cdName()),
+                words(ctx.FOR(), ctx.INITIAL(), ctx.INPUT()),
+                convertAllContainer(ctx.symbolicQueueClause(),
+                        ctx.symbolicSubQueueClause(),
+                        ctx.messageDateClause(),
+                        ctx.messageTimeClause(),
+                        ctx.symbolicSourceClause(),
+                        ctx.textLengthClause(),
+                        ctx.endKeyClause(),
+                        ctx.statusKeyClause(),
+                        ctx.messageCountClause(),
+                        ctx.dataDescName()).withLastSpace(sourceBefore("."))
+        );
+    }
+
+    @Override
+    public Object visitCommunicationDescriptionEntryFormat2(CobolParser.CommunicationDescriptionEntryFormat2Context ctx) {
+        if (ctx.destinationCountClause() != null ||
+                ctx.textLengthClause() != null ||
+                ctx.statusKeyClause() != null ||
+                ctx.destinationTableClause() != null ||
+                ctx.errorKeyClause() != null ||
+                ctx.textLengthClause() != null ||
+                ctx.symbolicDestinationClause() != null) {
+            throw new UnsupportedOperationException("Implement me");
+        }
+
+        return new Cobol.CommunicationDescriptionEntryFormat2(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CD()),
+                (Cobol.CobolWord) visit(ctx.cdName()),
+                words(ctx.FOR(), ctx.OUTPUT()),
+                convertAllContainer(ctx.destinationCountClause(),
+                        ctx.textLengthClause(),
+                        ctx.statusKeyClause(),
+                        ctx.destinationTableClause(),
+                        ctx.errorKeyClause(),
+                        ctx.symbolicDestinationClause()).withLastSpace(sourceBefore("."))
+        );
+    }
+
+    @Override
+    public Object visitCommunicationDescriptionEntryFormat3(CobolParser.CommunicationDescriptionEntryFormat3Context ctx) {
+        if (ctx.messageDateClause() != null ||
+                ctx.messageTimeClause() != null ||
+                ctx.symbolicTerminalClause() != null ||
+                ctx.textLengthClause() != null ||
+                ctx.endKeyClause() != null ||
+                ctx.statusKeyClause() != null ||
+                ctx.dataDescName() != null) {
+            throw new UnsupportedOperationException("Implement me");
+        }
+
+        return new Cobol.CommunicationDescriptionEntryFormat3(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CD()),
+                (Cobol.CobolWord) visit(ctx.cdName()),
+                words(ctx.FOR(), ctx.INITIAL(), ctx.I_O()),
+                convertAllContainer(ctx.messageDateClause(),
+                        ctx.messageTimeClause(),
+                        ctx.symbolicTerminalClause(),
+                        ctx.textLengthClause(),
+                        ctx.endKeyClause(),
+                        ctx.statusKeyClause(),
+                        ctx.dataDescName()).withLastSpace(sourceBefore("."))
+        );
+    }
+
+    @Override
+    public Object visitCommunicationSection(CobolParser.CommunicationSectionContext ctx) {
+        return new Cobol.CommunicationSection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.COMMUNICATION(), ctx.SECTION(), ctx.DOT_FS()),
+                convertAllContainer(ctx.communicationDescriptionEntry(), ctx.dataDescriptionEntry())
+        );
+    }
+
+    @Override
     public Object visitCondition(CobolParser.ConditionContext ctx) {
         return new Cobol.Condition(
                 randomId(),

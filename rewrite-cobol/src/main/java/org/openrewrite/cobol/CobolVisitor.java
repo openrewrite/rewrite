@@ -2733,4 +2733,39 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         s = s.getPadding().withFileNames(visitContainer(s.getPadding().getFileNames(), p));
         return s;
     }
+
+    public Cobol visitCommunicationSection(Cobol.CommunicationSection communicationSection, P p) {
+        Cobol.CommunicationSection c = communicationSection;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.getPadding().withEntries(visitContainer(c.getPadding().getEntries(), p));
+        return c;
+    }
+
+    public Cobol visitCommunicationDescriptionEntryFormat1(Cobol.CommunicationDescriptionEntryFormat1 communicationDescriptionEntryFormat1, P p) {
+        Cobol.CommunicationDescriptionEntryFormat1 c = communicationDescriptionEntryFormat1;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withName((Cobol.CobolWord) visit(c.getName(), p));
+        c = c.getPadding().withInputs(visitContainer(c.getPadding().getInputs(), p));
+        return c;
+    }
+
+    public Cobol visitCommunicationDescriptionEntryFormat2(Cobol.CommunicationDescriptionEntryFormat2 communicationDescriptionEntryFormat2, P p) {
+        Cobol.CommunicationDescriptionEntryFormat2 c = communicationDescriptionEntryFormat2;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withName((Cobol.CobolWord) visit(c.getName(), p));
+        c = c.getPadding().withOutputs(visitContainer(c.getPadding().getOutputs(), p));
+        return c;
+    }
+
+    public Cobol visitCommunicationDescriptionEntryFormat3(Cobol.CommunicationDescriptionEntryFormat3 communicationDescriptionEntryFormat3, P p) {
+        Cobol.CommunicationDescriptionEntryFormat3 c = communicationDescriptionEntryFormat3;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withName((Cobol.CobolWord) visit(c.getName(), p));
+        c = c.getPadding().withInitialIOs(visitContainer(c.getPadding().getInitialIOs(), p));
+        return c;
+    }
 }

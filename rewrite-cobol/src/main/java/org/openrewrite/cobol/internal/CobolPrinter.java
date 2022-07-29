@@ -2734,4 +2734,42 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", sameClause.getPadding().getFileNames(), "", "", p);
         return sameClause;
     }
+
+    public Cobol visitCommunicationSection(Cobol.CommunicationSection communicationSection, PrintOutputCapture<P> p) {
+        visitSpace(communicationSection.getPrefix(), p);
+        visitMarkers(communicationSection.getMarkers(), p);
+        p.append(communicationSection.getWords());
+        visitContainer("", communicationSection.getPadding().getEntries(), "", "", p);
+        return communicationSection;
+    }
+
+    public Cobol visitCommunicationDescriptionEntryFormat1(Cobol.CommunicationDescriptionEntryFormat1 communicationDescriptionEntryFormat1, PrintOutputCapture<P> p) {
+        visitSpace(communicationDescriptionEntryFormat1.getPrefix(), p);
+        visitMarkers(communicationDescriptionEntryFormat1.getMarkers(), p);
+        p.append(communicationDescriptionEntryFormat1.getCd());
+        visit(communicationDescriptionEntryFormat1.getName(), p);
+        p.append(communicationDescriptionEntryFormat1.getWords());
+        visitContainer("", communicationDescriptionEntryFormat1.getPadding().getInputs(), "", ".", p);
+        return communicationDescriptionEntryFormat1;
+    }
+
+    public Cobol visitCommunicationDescriptionEntryFormat2(Cobol.CommunicationDescriptionEntryFormat2 communicationDescriptionEntryFormat2, PrintOutputCapture<P> p) {
+        visitSpace(communicationDescriptionEntryFormat2.getPrefix(), p);
+        visitMarkers(communicationDescriptionEntryFormat2.getMarkers(), p);
+        p.append(communicationDescriptionEntryFormat2.getCd());
+        visit(communicationDescriptionEntryFormat2.getName(), p);
+        p.append(communicationDescriptionEntryFormat2.getWords());
+        visitContainer("", communicationDescriptionEntryFormat2.getPadding().getOutputs(), "", ".", p);
+        return communicationDescriptionEntryFormat2;
+    }
+
+    public Cobol visitCommunicationDescriptionEntryFormat3(Cobol.CommunicationDescriptionEntryFormat3 communicationDescriptionEntryFormat3, PrintOutputCapture<P> p) {
+        visitSpace(communicationDescriptionEntryFormat3.getPrefix(), p);
+        visitMarkers(communicationDescriptionEntryFormat3.getMarkers(), p);
+        p.append(communicationDescriptionEntryFormat3.getCd());
+        visit(communicationDescriptionEntryFormat3.getName(), p);
+        p.append(communicationDescriptionEntryFormat3.getWords());
+        visitContainer("", communicationDescriptionEntryFormat3.getPadding().getInitialIOs(), "", ".", p);
+        return communicationDescriptionEntryFormat3;
+    }
 }
