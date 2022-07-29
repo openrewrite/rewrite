@@ -158,4 +158,13 @@ public class EncodingDetectingInputStream extends InputStream {
     private boolean utf8SequenceEnd(int b) {
         return 0x80 <= b && b <= 0xBF;
     }
+
+    @Override
+    public void close() throws IOException {
+        try {
+            super.close();
+        } finally {
+            inputStream.close();
+        }
+    }
 }
