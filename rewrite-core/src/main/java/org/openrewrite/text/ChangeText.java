@@ -15,6 +15,8 @@
  */
 package org.openrewrite.text;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
 
 import java.util.Collections;
@@ -22,16 +24,14 @@ import java.util.Set;
 
 import static org.openrewrite.Validated.required;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class ChangeText extends Recipe {
 
     @Option(displayName = "Text after change",
             description = "The text file will have only this text after the change.",
             example = "Some text.")
-    private final String toText;
-
-    public ChangeText(String toText) {
-        this.toText = toText;
-    }
+    String toText;
 
     @Override
     public Set<String> getTags() {
@@ -50,18 +50,11 @@ public class ChangeText extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangeTextVisitor();
-    }
-
-    @Override
-    public Validated validate() {
-        return required("toText", toText);
-    }
-
-    private class ChangeTextVisitor extends PlainTextVisitor<ExecutionContext> {
-        @Override
-        public PlainText preVisit(PlainText tree, ExecutionContext ctx) {
-            return tree.withText(toText);
-        }
+        return new PlainTextVisitor<ExecutionContext>() {
+            @Override
+            public PlainText preVisit(PlainText tree, ExecutionContext ctx) {
+                return tree.withText(toText);
+            }
+        };
     }
 }

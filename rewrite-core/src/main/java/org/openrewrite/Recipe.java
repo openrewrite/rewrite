@@ -49,7 +49,7 @@ import static java.util.Collections.emptyList;
  */
 @PolyglotExport(typeScript = "Recipe", llvm = "Recipe")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
-public abstract class Recipe {
+public abstract class Recipe implements Cloneable {
     public static final String PANIC = "__AHHH_PANIC!!!__";
 
     private static final Logger logger = LoggerFactory.getLogger(Recipe.class);
@@ -354,4 +354,13 @@ public abstract class Recipe {
         return Objects.hash(getName());
     }
 
+    @SuppressWarnings("CloneDoesntDeclareCloneNotSupportedException")
+    @Override
+    public Object clone() {
+        try {
+            return super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
