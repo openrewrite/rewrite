@@ -35,6 +35,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.io.File;
 import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -421,8 +422,11 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 classBuilder = byteBuddy.subclass(generic, NO_CONSTRUCTORS);
             }
 
+            if (!getClass().isAnonymousClass()) {
+                classBuilder = classBuilder.name(getClass().getSimpleName().trim() + "_" + adaptTo.getSimpleName());
+            }
+
             DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = classBuilder
-                    .name(getClass().getSimpleName().trim() + "_" + adaptTo.getSimpleName())
                     .defineField("delegate", delegateType, PRIVATE | FINAL)
                     .defineConstructor(PUBLIC).withParameter(delegateType)
                     .intercept(MethodCall.invoke(adaptTo.getConstructor())
@@ -466,8 +470,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
             // for debugging class generation issues
 //            try {
-//                unloaded.saveIn(new File("./adapted"));
-//            } catch (IOException e) {
+//                File adapted = new File("adapted");
+//                unloaded.saveIn(adapted);
+//            } catch (java.io.IOException e) {
 //                throw new RuntimeException(e);
 //            }
 
