@@ -132,7 +132,7 @@ public class ReloadableJava11Parser implements JavaParser {
             public void write(char[] cbuf, int off, int len) {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
-                    if (!log.isBlank() && !log.contains("warning: a package-info.java file has already")) {
+                    if (!log.isBlank()) {
                         org.slf4j.LoggerFactory.getLogger(ReloadableJava11Parser.class).warn(log);
                     }
                 }

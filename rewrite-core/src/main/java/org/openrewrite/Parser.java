@@ -16,15 +16,11 @@
 package org.openrewrite;
 
 import lombok.Getter;
-import lombok.With;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -44,7 +40,7 @@ public interface Parser<S extends SourceFile> {
                         .stream(sourceFiles.spliterator(), false)
                         .map(sourceFile -> new Input(sourceFile, () -> {
                                     try {
-                                        return Files.newInputStream(sourceFile);
+                                        return new BufferedInputStream(Files.newInputStream(sourceFile));
                                     } catch (IOException e) {
                                         throw new UncheckedIOException(e);
                                     }
