@@ -2422,6 +2422,56 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return i;
     }
 
+    public Cobol visitSort(Cobol.Sort sort, P p) {
+        Cobol.Sort s = sort;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withFileName((Cobol.CobolWord) visit(s.getFileName(), p));
+        s = s.getPadding().withSortOnKeyClause(visitContainer(s.getPadding().getSortOnKeyClause(), p));
+        s = s.withSortDuplicatesPhrase((Cobol.CobolWord) visit(s.getSortDuplicatesPhrase(), p));
+        s = s.withSortCollatingSequencePhrase((Cobol.SortCollatingSequencePhrase) visit(s.getSortCollatingSequencePhrase(), p));
+        s = s.withSortInputProcedurePhrase((Cobol.SortProcedurePhrase) visit(s.getSortInputProcedurePhrase(), p));
+        s = s.getPadding().withSortUsing(visitContainer(s.getPadding().getSortUsing(), p));
+        s = s.withSortOutputProcedurePhrase((Cobol.SortProcedurePhrase) visit(s.getSortOutputProcedurePhrase(), p));
+        s = s.getPadding().withSortGiving(visitContainer(s.getPadding().getSortGiving(), p));
+        return s;
+    }
+
+    public Cobol visitSortCollatingSequencePhrase(Cobol.SortCollatingSequencePhrase sortCollatingSequencePhrase, P p) {
+        Cobol.SortCollatingSequencePhrase s = sortCollatingSequencePhrase;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withAlphabetNames(visitContainer(s.getPadding().getAlphabetNames(), p));
+        s = s.withSortCollatingAlphanumeric((Cobol.Sortable) visit(s.getSortCollatingAlphanumeric(), p));
+        s = s.withSortCollatingNational((Cobol.Sortable) visit(s.getSortCollatingNational(), p));
+        return s;
+    }
+
+    public Cobol visitSortProcedurePhrase(Cobol.SortProcedurePhrase sortProcedurePhrase, P p) {
+        Cobol.SortProcedurePhrase s = sortProcedurePhrase;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withProcedureName((Cobol.CobolWord) visit(s.getProcedureName(), p));
+        s = s.withSortInputThrough((Cobol.Sortable) visit(s.getSortInputThrough(), p));
+        return s;
+    }
+
+    public Cobol visitSortable(Cobol.Sortable sortable, P p) {
+        Cobol.Sortable s = sortable;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.getPadding().withNames(visitContainer(s.getPadding().getNames(), p));
+        return s;
+    }
+
+    public Cobol visitSortGiving(Cobol.SortGiving sortGiving, P p) {
+        Cobol.SortGiving s = sortGiving;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withFileName((Cobol.CobolWord) visit(s.getFileName(), p));
+        return s;
+    }
+
     public Cobol visitInitialize(Cobol.Initialize initialize, P p) {
         Cobol.Initialize i = initialize;
         i = i.withPrefix(visitSpace(i.getPrefix(), p));

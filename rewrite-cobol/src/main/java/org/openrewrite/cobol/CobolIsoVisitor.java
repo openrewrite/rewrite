@@ -1330,6 +1330,31 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
+    public Cobol.Sort visitSort(Cobol.Sort sort, P p) {
+        return (Cobol.Sort) super.visitSort(sort, p);
+    }
+
+    @Override
+    public Cobol.SortCollatingSequencePhrase visitSortCollatingSequencePhrase(Cobol.SortCollatingSequencePhrase sortCollatingSequencePhrase, P p) {
+        return (Cobol.SortCollatingSequencePhrase) super.visitSortCollatingSequencePhrase(sortCollatingSequencePhrase, p);
+    }
+
+    @Override
+    public Cobol.SortProcedurePhrase visitSortProcedurePhrase(Cobol.SortProcedurePhrase sortProcedurePhrase, P p) {
+        return (Cobol.SortProcedurePhrase) super.visitSortProcedurePhrase(sortProcedurePhrase, p);
+    }
+
+    @Override
+    public Cobol.Sortable visitSortable(Cobol.Sortable sortable, P p) {
+        return (Cobol.Sortable) super.visitSortable(sortable, p);
+    }
+
+    @Override
+    public Cobol.SortGiving visitSortGiving(Cobol.SortGiving sortGiving, P p) {
+        return (Cobol.SortGiving) super.visitSortGiving(sortGiving, p);
+    }
+
+    @Override
     public Cobol.Initialize visitInitialize(Cobol.Initialize initialize, P p) {
         return (Cobol.Initialize) super.visitInitialize(initialize, p);
     }

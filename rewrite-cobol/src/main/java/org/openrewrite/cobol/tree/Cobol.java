@@ -11715,6 +11715,334 @@ public interface Cobol extends Tree {
         }
     }
 
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Sort implements Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String sort;
+
+        @Getter
+        @With
+        CobolWord fileName;
+
+        CobolContainer<Sortable> sortOnKeyClause;
+
+        @Getter
+        @Nullable
+        @With
+        CobolWord sortDuplicatesPhrase;
+
+        @Getter
+        @With
+        SortCollatingSequencePhrase sortCollatingSequencePhrase;
+
+        @Getter
+        @With
+        SortProcedurePhrase sortInputProcedurePhrase;
+
+        CobolContainer<Sortable> sortUsing;
+
+        @Getter
+        @Nullable
+        @With
+        SortProcedurePhrase sortOutputProcedurePhrase;
+
+        CobolContainer<Sortable> sortGiving;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSort(this, p);
+        }
+
+        public List<Cobol.Sortable> getSortOnKeyClause() {
+            return sortOnKeyClause.getElements();
+        }
+
+        public Sort withSortOnKeyClause(List<Cobol.Sortable> sortOnKeyClause) {
+            return getPadding().withSortOnKeyClause(this.sortOnKeyClause.getPadding().withElements(CobolRightPadded.withElements(
+                    this.sortOnKeyClause.getPadding().getElements(), sortOnKeyClause)));
+        }
+
+        public List<Cobol.Sortable> getSortUsing() {
+            return sortUsing.getElements();
+        }
+
+        public Sort withSortUsing(List<Cobol.Sortable> sortUsing) {
+            return getPadding().withSortUsing(this.sortUsing.getPadding().withElements(CobolRightPadded.withElements(
+                    this.sortUsing.getPadding().getElements(), sortUsing)));
+        }
+
+        public List<Cobol.Sortable> getSortGiving() {
+            return sortGiving.getElements();
+        }
+
+        public Sort withSortGiving(List<Cobol.Sortable> sortGiving) {
+            return getPadding().withSortGiving(this.sortGiving.getPadding().withElements(CobolRightPadded.withElements(
+                    this.sortGiving.getPadding().getElements(), sortGiving)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Sort t;
+
+            public CobolContainer<Cobol.Sortable> getSortOnKeyClause() {
+                return t.sortOnKeyClause;
+            }
+
+            public Sort withSortOnKeyClause(CobolContainer<Cobol.Sortable> sortOnKeyClause) {
+                return t.sortOnKeyClause == sortOnKeyClause ? t : new Sort(t.padding, t.id, t.prefix, t.markers, t.sort, t.fileName, sortOnKeyClause, t.sortDuplicatesPhrase, t.sortCollatingSequencePhrase, t.sortInputProcedurePhrase, t.sortUsing, t.sortOutputProcedurePhrase, t.sortGiving);
+            }
+
+            public CobolContainer<Cobol.Sortable> getSortUsing() {
+                return t.sortUsing;
+            }
+
+            public Sort withSortUsing(CobolContainer<Cobol.Sortable> sortUsing) {
+                return t.sortUsing == sortUsing ? t : new Sort(t.padding, t.id, t.prefix, t.markers, t.sort, t.fileName, t.sortOnKeyClause, t.sortDuplicatesPhrase, t.sortCollatingSequencePhrase, t.sortInputProcedurePhrase, sortUsing, t.sortOutputProcedurePhrase, t.sortGiving);
+            }
+
+            public CobolContainer<Cobol.Sortable> getSortGiving() {
+                return t.sortGiving;
+            }
+
+            public Sort withSortGiving(CobolContainer<Cobol.Sortable> sortGiving) {
+                return t.sortGiving == sortGiving ? t : new Sort(t.padding, t.id, t.prefix, t.markers, t.sort, t.fileName, t.sortOnKeyClause, t.sortDuplicatesPhrase, t.sortCollatingSequencePhrase, t.sortInputProcedurePhrase, t.sortUsing, t.sortOutputProcedurePhrase, sortGiving);
+            }
+        }
+
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class SortCollatingSequencePhrase implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<CobolWord> alphabetNames;
+
+        @Getter
+        @Nullable
+        @With
+        Sortable sortCollatingAlphanumeric;
+
+        @Getter
+        @Nullable
+        @With
+        Sortable sortCollatingNational;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSortCollatingSequencePhrase(this, p);
+        }
+
+        public List<Cobol.CobolWord> getAlphabetNames() {
+            return alphabetNames.getElements();
+        }
+
+        public SortCollatingSequencePhrase withAlphabetNames(List<Cobol.CobolWord> alphabetNames) {
+            return getPadding().withAlphabetNames(this.alphabetNames.getPadding().withElements(CobolRightPadded.withElements(
+                    this.alphabetNames.getPadding().getElements(), alphabetNames)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final SortCollatingSequencePhrase t;
+            @Nullable
+            public CobolContainer<Cobol.CobolWord> getAlphabetNames() {
+                return t.alphabetNames;
+            }
+
+            public SortCollatingSequencePhrase withAlphabetNames(@Nullable CobolContainer<Cobol.CobolWord> alphabetNames) {
+                return t.alphabetNames == alphabetNames ? t : new SortCollatingSequencePhrase(t.padding, t.id, t.prefix, t.markers, t.words, alphabetNames, t.sortCollatingAlphanumeric, t.sortCollatingNational);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class SortProcedurePhrase implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        CobolWord procedureName;
+
+        @Nullable
+        Sortable sortInputThrough;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSortProcedurePhrase(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Sortable implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<CobolWord> names;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSortable(this, p);
+        }
+
+        public List<Cobol.CobolWord> getNames() {
+            return names.getElements();
+        }
+
+        public Sortable withNames(List<Cobol.CobolWord> names) {
+            return getPadding().withNames(this.names.getPadding().withElements(CobolRightPadded.withElements(
+                    this.names.getPadding().getElements(), names)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Sortable t;
+
+            @Nullable
+            public CobolContainer<Cobol.CobolWord> getNames() {
+                return t.names;
+            }
+
+            public Sortable withNames(@Nullable CobolContainer<Cobol.CobolWord> names) {
+                return t.names == names ? t : new Sortable(t.padding, t.id, t.prefix, t.markers, t.words, names);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class SortGiving implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        CobolWord fileName;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitSortGiving(this, p);
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

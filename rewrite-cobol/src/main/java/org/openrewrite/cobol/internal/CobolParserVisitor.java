@@ -3458,6 +3458,162 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.Sort visitSortStatement(CobolParser.SortStatementContext ctx) {
+        return new Cobol.Sort(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SORT()),
+                (Cobol.CobolWord) visit(ctx.fileName()),
+                convertAllContainer(ctx.sortOnKeyClause()),
+                visitNullable(ctx.sortDuplicatesPhrase()),
+                visitNullable(ctx.sortCollatingSequencePhrase()),
+                visitNullable(ctx.sortInputProcedurePhrase()),
+                convertAllContainer(ctx.sortUsing()),
+                visitNullable(ctx.sortOutputProcedurePhrase()),
+                convertAllContainer(ctx.sortGivingPhrase())
+        );
+    }
+
+    @Override
+    public Cobol.Sortable visitSortOnKeyClause(CobolParser.SortOnKeyClauseContext ctx) {
+        return new Cobol.Sortable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ON(), ctx.ASCENDING(), ctx.DESCENDING(), ctx.KEY()),
+                convertAllContainer(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
+    public Cobol.Sortable visitSortDuplicatesPhrase(CobolParser.SortDuplicatesPhraseContext ctx) {
+        return new Cobol.Sortable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.DUPLICATES(), ctx.IN(), ctx.ORDER()),
+                convertAllContainer(Collections.emptyList())
+        );
+    }
+
+    @Override
+    public Cobol.SortCollatingSequencePhrase visitSortCollatingSequencePhrase(CobolParser.SortCollatingSequencePhraseContext ctx) {
+        return new Cobol.SortCollatingSequencePhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.COLLATING(), ctx.SEQUENCE(), ctx.IS()),
+                convertAllContainer(ctx.alphabetName()),
+                visitNullable(ctx.sortCollatingAlphanumeric()),
+                visitNullable(ctx.sortCollatingNational())
+        );
+    }
+
+    @Override
+    public Cobol.SortProcedurePhrase visitSortCollatingAlphanumeric(CobolParser.SortCollatingAlphanumericContext ctx) {
+        return new Cobol.SortProcedurePhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOR(), ctx.ALPHANUMERIC(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.alphabetName()),
+                null
+        );
+    }
+
+    @Override
+    public Cobol.SortProcedurePhrase visitSortCollatingNational(CobolParser.SortCollatingNationalContext ctx) {
+        return new Cobol.SortProcedurePhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOR(), ctx.NATIONAL(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.alphabetName()),
+                null
+        );
+    }
+
+    @Override
+    public Cobol.SortProcedurePhrase visitSortInputProcedurePhrase(CobolParser.SortInputProcedurePhraseContext ctx) {
+        return new Cobol.SortProcedurePhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INPUT(), ctx.PROCEDURE(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.procedureName()),
+                null
+        );
+    }
+
+    @Override
+    public Cobol.Sortable visitSortInputThrough(CobolParser.SortInputThroughContext ctx) {
+        return new Cobol.Sortable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.THROUGH(), ctx.THRU()),
+                convertAllContainer(Collections.singletonList(ctx.procedureName()))
+        );
+    }
+
+    @Override
+    public Cobol.Sortable visitSortUsing(CobolParser.SortUsingContext ctx) {
+        return new Cobol.Sortable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.USING()),
+                convertAllContainer(ctx.fileName())
+        );
+    }
+
+    @Override
+    public Cobol.SortProcedurePhrase visitSortOutputProcedurePhrase(CobolParser.SortOutputProcedurePhraseContext ctx) {
+        return new Cobol.SortProcedurePhrase(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.OUTPUT(), ctx.PROCEDURE(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.procedureName()),
+                visitNullable(ctx.sortOutputThrough())
+        );
+    }
+
+    @Override
+    public Cobol.Sortable visitSortOutputThrough(CobolParser.SortOutputThroughContext ctx) {
+        return new Cobol.Sortable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.THROUGH(), ctx.THRU()),
+                convertAllContainer(Collections.singletonList(ctx.procedureName()))
+        );
+    }
+
+    @Override
+    public Cobol.Sortable visitSortGivingPhrase(CobolParser.SortGivingPhraseContext ctx) {
+        return new Cobol.Sortable(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.GIVING()),
+                convertAllContainer(ctx.sortGiving())
+        );
+    }
+
+    @Override
+    public Cobol.SortGiving visitSortGiving(CobolParser.SortGivingContext ctx) {
+        return new Cobol.SortGiving(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.fileName()),
+                words(ctx.LOCK(), ctx.SAVE(), ctx.NO(), ctx.REWIND(), ctx.RELEASE(), ctx.WITH(), ctx.REMOVE(), ctx.CRUNCH())
+        );
+    }
+
+    @Override
     public Object visitStartStatement(CobolParser.StartStatementContext ctx) {
         return new Cobol.Start(
                 randomId(),

@@ -23,7 +23,7 @@ import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.RewriteTest.toRecipe
 
-class CobolBasicsTest : RewriteTest {
+class CobolDivisionTest : RewriteTest {
 
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(toRecipe {
@@ -134,6 +134,7 @@ class CobolBasicsTest : RewriteTest {
         """)
     )
 
+    @Disabled("Not yet implemented")
     @Test
     fun ic109a() = rewriteRun(
         cobol(
@@ -702,10 +703,27 @@ class CobolBasicsTest : RewriteTest {
     fun exitStatement() = rewriteRun(
         cobol("""
             IDENTIFICATION DIVISION.
-            PROGRAM-ID. subtractStatement.
+            PROGRAM-ID. exitStatement.
             PROCEDURE DIVISION.
             RW301M-CONTROL.
                 EXIT PROGRAM.
+        """)
+    )
+
+    @Test
+    fun sortStatement() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. sortStatement.
+            PROCEDURE DIVISION.
+            SORT-STATEMENT.
+                SORT SORTFILE-1B
+                    ON DESCENDING KEY KEY-1
+                    ON ASCENDING KEY KEY-2
+                    ON DESCENDING KEY KEY-3
+                    ASCENDING KEY-4 KEY-5
+                USING SORTIN-1B
+                GIVING SORTOUT-1B.
         """)
     )
 
