@@ -6717,6 +6717,565 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryAttributeClauseFormat1 implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryAttributeClauseFormat1(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryAttributeClauseFormat2 implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String attribute;
+
+        @Nullable
+        LibraryAttributeFunction libraryAttributeFunction;
+
+        String words;
+
+        @Nullable
+        LibraryAttributeParameter libraryAttributeParameter;
+
+        @Nullable
+        LibraryAttributeTitle libraryAttributeTitle;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryAttributeClauseFormat2(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryAttributeFunction implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name literal;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryAttributeFunction(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryAttributeParameter implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name literal;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryAttributeParameter(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryAttributeTitle implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name literal;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryAttributeTitle(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryDescriptionEntryFormat1 implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String ld;
+
+        CobolWord libraryName;
+
+        String export;
+
+        @Nullable
+        LibraryAttributeClauseFormat1 libraryAttributeClauseFormat1;
+
+        @Nullable
+        LibraryEntryProcedureClauseFormat1 libraryEntryProcedureClauseFormat1;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryDescriptionEntryFormat1(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class LibraryDescriptionEntryFormat2 implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String lb;
+
+        @Getter
+        @With
+        CobolWord libraryName;
+
+        @Getter
+        @With
+        String export;
+
+        @Getter
+        @Nullable
+        @With
+        LibraryIsGlobalClause libraryIsGlobalClause;
+
+        @Getter
+        @Nullable
+        @With
+        LibraryIsCommonClause libraryIsCommonClause;
+
+        @Nullable
+        CobolContainer<Cobol> clauseFormats;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryDescriptionEntryFormat2(this, p);
+        }
+
+        public List<Cobol> getClauseFormats() {
+            return clauseFormats.getElements();
+        }
+
+        public LibraryDescriptionEntryFormat2 withClauseFormats(List<Cobol> clauseFormats) {
+            return getPadding().withClauseFormats(this.clauseFormats.getPadding().withElements(CobolRightPadded.withElements(
+                    this.clauseFormats.getPadding().getElements(), clauseFormats)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final LibraryDescriptionEntryFormat2 t;
+
+            @Nullable
+            public CobolContainer<Cobol> getClauseFormats() {
+                return t.clauseFormats;
+            }
+
+            public LibraryDescriptionEntryFormat2 withClauseFormats(@Nullable CobolContainer<Cobol> clauseFormats) {
+                return t.clauseFormats == clauseFormats ? t : new LibraryDescriptionEntryFormat2(t.padding, t.id, t.prefix, t.markers, t.lb, t.libraryName, t.export, t.libraryIsGlobalClause, t.libraryIsCommonClause, clauseFormats);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryEntryProcedureClauseFormat1 implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String entryProcedure;
+        CobolWord programName;
+
+        @Nullable
+        LibraryEntryProcedureForClause libraryEntryProcedureForClause;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryEntryProcedureClauseFormat1(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryEntryProcedureClauseFormat2 implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String entryProcedure;
+        CobolWord programName;
+
+        @Nullable
+        LibraryEntryProcedureForClause libraryEntryProcedureForClause;
+
+        @Nullable
+        LibraryEntryProcedureWithClause libraryEntryProcedureWithClause;
+
+        @Nullable
+        LibraryEntryProcedureUsingClause libraryEntryProcedureUsingClause;
+
+        @Nullable
+        LibraryEntryProcedureGivingClause libraryEntryProcedureGivingClause;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryEntryProcedureClauseFormat2(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryEntryProcedureForClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String word;
+        Name literal;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryEntryProcedureForClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryEntryProcedureGivingClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String giving;
+        CobolWord dataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryEntryProcedureGivingClause(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class LibraryEntryProcedureUsingClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String using;
+
+        CobolContainer<CobolWord> names;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryEntryProcedureUsingClause(this, p);
+        }
+
+        public List<Cobol.CobolWord> getNames() {
+            return names.getElements();
+        }
+
+        public LibraryEntryProcedureUsingClause withNames(List<Cobol.CobolWord> names) {
+            return getPadding().withNames(this.names.getPadding().withElements(CobolRightPadded.withElements(
+                    this.names.getPadding().getElements(), names)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final LibraryEntryProcedureUsingClause t;
+
+            @Nullable
+            public CobolContainer<Cobol.CobolWord> getNames() {
+                return t.names;
+            }
+
+            public LibraryEntryProcedureUsingClause withNames(@Nullable CobolContainer<Cobol.CobolWord> names) {
+                return t.names == names ? t : new LibraryEntryProcedureUsingClause(t.padding, t.id, t.prefix, t.markers, t.using, names);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class LibraryEntryProcedureWithClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String with;
+
+        CobolContainer<CobolWord> names;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryEntryProcedureWithClause(this, p);
+        }
+
+        public List<Cobol.CobolWord> getNames() {
+            return names.getElements();
+        }
+
+        public LibraryEntryProcedureWithClause withNames(List<Cobol.CobolWord> names) {
+            return getPadding().withNames(this.names.getPadding().withElements(CobolRightPadded.withElements(
+                    this.names.getPadding().getElements(), names)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final LibraryEntryProcedureWithClause t;
+
+            @Nullable
+            public CobolContainer<Cobol.CobolWord> getNames() {
+                return t.names;
+            }
+
+            public LibraryEntryProcedureWithClause withNames(@Nullable CobolContainer<Cobol.CobolWord> names) {
+                return t.names == names ? t : new LibraryEntryProcedureWithClause(t.padding, t.id, t.prefix, t.markers, t.with, names);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryIsCommonClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryIsCommonClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class LibraryIsGlobalClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitLibraryIsGlobalClause(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ProgramLibrarySection implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        @Nullable
+        CobolContainer<Cobol> libraryDescriptionEntries;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitProgramLibrarySection(this, p);
+        }
+
+        public List<Cobol> getLibraryDescriptionEntries() {
+            return libraryDescriptionEntries.getElements();
+        }
+
+        public ProgramLibrarySection withLibraryDescriptionEntries(List<Cobol> libraryDescriptionEntries) {
+            return getPadding().withLibraryDescriptionEntries(this.libraryDescriptionEntries.getPadding().withElements(CobolRightPadded.withElements(
+                    this.libraryDescriptionEntries.getPadding().getElements(), libraryDescriptionEntries)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ProgramLibrarySection t;
+
+            @Nullable
+            public CobolContainer<Cobol> getLibraryDescriptionEntries() {
+                return t.libraryDescriptionEntries;
+            }
+
+            public ProgramLibrarySection withLibraryDescriptionEntries(@Nullable CobolContainer<Cobol> libraryDescriptionEntries) {
+                return t.libraryDescriptionEntries == libraryDescriptionEntries ? t : new ProgramLibrarySection(t.padding, t.id, t.prefix, t.markers, t.words, libraryDescriptionEntries);
+            }
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)

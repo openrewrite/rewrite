@@ -2906,4 +2906,144 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", reportSection.getPadding().getDescriptions(), "", "", p);
         return reportSection;
     }
+
+    public Cobol visitLibraryAttributeClauseFormat1(Cobol.LibraryAttributeClauseFormat1 libraryAttributeClauseFormat1, PrintOutputCapture<P> p) {
+        visitSpace(libraryAttributeClauseFormat1.getPrefix(), p);
+        visitMarkers(libraryAttributeClauseFormat1.getMarkers(), p);
+        p.append(libraryAttributeClauseFormat1.getWords());
+        return libraryAttributeClauseFormat1;
+    }
+
+    public Cobol visitLibraryAttributeClauseFormat2(Cobol.LibraryAttributeClauseFormat2 libraryAttributeClauseFormat2, PrintOutputCapture<P> p) {
+        visitSpace(libraryAttributeClauseFormat2.getPrefix(), p);
+        visitMarkers(libraryAttributeClauseFormat2.getMarkers(), p);
+        p.append(libraryAttributeClauseFormat2.getAttribute());
+        visit(libraryAttributeClauseFormat2.getLibraryAttributeFunction(), p);
+        p.append(libraryAttributeClauseFormat2.getWords());
+        visit(libraryAttributeClauseFormat2.getLibraryAttributeParameter(), p);
+        visit(libraryAttributeClauseFormat2.getLibraryAttributeTitle(), p);
+        return libraryAttributeClauseFormat2;
+    }
+
+    public Cobol visitLibraryAttributeFunction(Cobol.LibraryAttributeFunction libraryAttributeFunction, PrintOutputCapture<P> p) {
+        visitSpace(libraryAttributeFunction.getPrefix(), p);
+        visitMarkers(libraryAttributeFunction.getMarkers(), p);
+        p.append(libraryAttributeFunction.getWords());
+        visit(libraryAttributeFunction.getLiteral(), p);
+        return libraryAttributeFunction;
+    }
+
+    public Cobol visitLibraryAttributeParameter(Cobol.LibraryAttributeParameter libraryAttributeParameter, PrintOutputCapture<P> p) {
+        visitSpace(libraryAttributeParameter.getPrefix(), p);
+        visitMarkers(libraryAttributeParameter.getMarkers(), p);
+        p.append(libraryAttributeParameter.getWords());
+        visit(libraryAttributeParameter.getLiteral(), p);
+        return libraryAttributeParameter;
+    }
+
+    public Cobol visitLibraryAttributeTitle(Cobol.LibraryAttributeTitle libraryAttributeTitle, PrintOutputCapture<P> p) {
+        visitSpace(libraryAttributeTitle.getPrefix(), p);
+        visitMarkers(libraryAttributeTitle.getMarkers(), p);
+        p.append(libraryAttributeTitle.getWords());
+        visit(libraryAttributeTitle.getLiteral(), p);
+        return libraryAttributeTitle;
+    }
+
+    public Cobol visitLibraryDescriptionEntryFormat1(Cobol.LibraryDescriptionEntryFormat1 libraryDescriptionEntryFormat1, PrintOutputCapture<P> p) {
+        visitSpace(libraryDescriptionEntryFormat1.getPrefix(), p);
+        visitMarkers(libraryDescriptionEntryFormat1.getMarkers(), p);
+        p.append(libraryDescriptionEntryFormat1.getLd());
+        visit(libraryDescriptionEntryFormat1.getLibraryName(), p);
+        p.append(libraryDescriptionEntryFormat1.getExport());
+        visit(libraryDescriptionEntryFormat1.getLibraryAttributeClauseFormat1(), p);
+        visit(libraryDescriptionEntryFormat1.getLibraryEntryProcedureClauseFormat1(), p);
+        return libraryDescriptionEntryFormat1;
+    }
+
+    public Cobol visitLibraryDescriptionEntryFormat2(Cobol.LibraryDescriptionEntryFormat2 libraryDescriptionEntryFormat2, PrintOutputCapture<P> p) {
+        visitSpace(libraryDescriptionEntryFormat2.getPrefix(), p);
+        visitMarkers(libraryDescriptionEntryFormat2.getMarkers(), p);
+        p.append(libraryDescriptionEntryFormat2.getLb());
+        visit(libraryDescriptionEntryFormat2.getLibraryName(), p);
+        p.append(libraryDescriptionEntryFormat2.getExport());
+        visit(libraryDescriptionEntryFormat2.getLibraryIsGlobalClause(), p);
+        visit(libraryDescriptionEntryFormat2.getLibraryIsCommonClause(), p);
+        visitContainer("", libraryDescriptionEntryFormat2.getPadding().getClauseFormats(), "", "", p);
+        return libraryDescriptionEntryFormat2;
+    }
+
+    public Cobol visitLibraryEntryProcedureClauseFormat1(Cobol.LibraryEntryProcedureClauseFormat1 libraryEntryProcedureClauseFormat1, PrintOutputCapture<P> p) {
+        visitSpace(libraryEntryProcedureClauseFormat1.getPrefix(), p);
+        visitMarkers(libraryEntryProcedureClauseFormat1.getMarkers(), p);
+        p.append(libraryEntryProcedureClauseFormat1.getEntryProcedure());
+        visit(libraryEntryProcedureClauseFormat1.getProgramName(), p);
+        visit(libraryEntryProcedureClauseFormat1.getLibraryEntryProcedureForClause(), p);
+        return libraryEntryProcedureClauseFormat1;
+    }
+
+    public Cobol visitLibraryEntryProcedureClauseFormat2(Cobol.LibraryEntryProcedureClauseFormat2 libraryEntryProcedureClauseFormat2, PrintOutputCapture<P> p) {
+        visitSpace(libraryEntryProcedureClauseFormat2.getPrefix(), p);
+        visitMarkers(libraryEntryProcedureClauseFormat2.getMarkers(), p);
+        p.append(libraryEntryProcedureClauseFormat2.getEntryProcedure());
+        visit(libraryEntryProcedureClauseFormat2.getProgramName(), p);
+        visit(libraryEntryProcedureClauseFormat2.getLibraryEntryProcedureForClause(), p);
+        visit(libraryEntryProcedureClauseFormat2.getLibraryEntryProcedureWithClause(), p);
+        visit(libraryEntryProcedureClauseFormat2.getLibraryEntryProcedureUsingClause(), p);
+        visit(libraryEntryProcedureClauseFormat2.getLibraryEntryProcedureGivingClause(), p);
+        return libraryEntryProcedureClauseFormat2;
+    }
+
+    public Cobol visitLibraryEntryProcedureForClause(Cobol.LibraryEntryProcedureForClause libraryEntryProcedureForClause, PrintOutputCapture<P> p) {
+        visitSpace(libraryEntryProcedureForClause.getPrefix(), p);
+        visitMarkers(libraryEntryProcedureForClause.getMarkers(), p);
+        p.append(libraryEntryProcedureForClause.getWord());
+        visit(libraryEntryProcedureForClause.getLiteral(), p);
+        return libraryEntryProcedureForClause;
+    }
+
+    public Cobol visitLibraryEntryProcedureGivingClause(Cobol.LibraryEntryProcedureGivingClause libraryEntryProcedureGivingClause, PrintOutputCapture<P> p) {
+        visitSpace(libraryEntryProcedureGivingClause.getPrefix(), p);
+        visitMarkers(libraryEntryProcedureGivingClause.getMarkers(), p);
+        p.append(libraryEntryProcedureGivingClause.getGiving());
+        visit(libraryEntryProcedureGivingClause.getDataName(), p);
+        return libraryEntryProcedureGivingClause;
+    }
+
+    public Cobol visitLibraryEntryProcedureUsingClause(Cobol.LibraryEntryProcedureUsingClause libraryEntryProcedureUsingClause, PrintOutputCapture<P> p) {
+        visitSpace(libraryEntryProcedureUsingClause.getPrefix(), p);
+        visitMarkers(libraryEntryProcedureUsingClause.getMarkers(), p);
+        p.append(libraryEntryProcedureUsingClause.getUsing());
+        visitContainer("", libraryEntryProcedureUsingClause.getPadding().getNames(), "", "", p);
+        return libraryEntryProcedureUsingClause;
+    }
+
+    public Cobol visitLibraryEntryProcedureWithClause(Cobol.LibraryEntryProcedureWithClause libraryEntryProcedureWithClause, PrintOutputCapture<P> p) {
+        visitSpace(libraryEntryProcedureWithClause.getPrefix(), p);
+        visitMarkers(libraryEntryProcedureWithClause.getMarkers(), p);
+        p.append(libraryEntryProcedureWithClause.getWith());
+        visitContainer("", libraryEntryProcedureWithClause.getPadding().getNames(), "", "", p);
+        return libraryEntryProcedureWithClause;
+    }
+
+    public Cobol visitLibraryIsCommonClause(Cobol.LibraryIsCommonClause libraryIsCommonClause, PrintOutputCapture<P> p) {
+        visitSpace(libraryIsCommonClause.getPrefix(), p);
+        visitMarkers(libraryIsCommonClause.getMarkers(), p);
+        p.append(libraryIsCommonClause.getWords());
+        return libraryIsCommonClause;
+    }
+
+    public Cobol visitLibraryIsGlobalClause(Cobol.LibraryIsGlobalClause libraryIsGlobalClause, PrintOutputCapture<P> p) {
+        visitSpace(libraryIsGlobalClause.getPrefix(), p);
+        visitMarkers(libraryIsGlobalClause.getMarkers(), p);
+        p.append(libraryIsGlobalClause.getWords());
+        return libraryIsGlobalClause;
+    }
+
+    public Cobol visitProgramLibrarySection(Cobol.ProgramLibrarySection programLibrarySection, PrintOutputCapture<P> p) {
+        visitSpace(programLibrarySection.getPrefix(), p);
+        visitMarkers(programLibrarySection.getMarkers(), p);
+        p.append(programLibrarySection.getWords());
+        visitContainer("", programLibrarySection.getPadding().getLibraryDescriptionEntries(), "", "", p);
+        return programLibrarySection;
+    }
 }

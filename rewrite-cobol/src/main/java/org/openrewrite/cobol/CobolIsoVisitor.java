@@ -1603,4 +1603,84 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.ReportSection visitReportSection(Cobol.ReportSection reportSection, P p) {
         return (Cobol.ReportSection) super.visitReportSection(reportSection, p);
     }
+
+    @Override
+    public Cobol.LibraryAttributeClauseFormat1 visitLibraryAttributeClauseFormat1(Cobol.LibraryAttributeClauseFormat1 libraryAttributeClauseFormat1, P p) {
+        return (Cobol.LibraryAttributeClauseFormat1) super.visitLibraryAttributeClauseFormat1(libraryAttributeClauseFormat1, p);
+    }
+
+    @Override
+    public Cobol.LibraryAttributeClauseFormat2 visitLibraryAttributeClauseFormat2(Cobol.LibraryAttributeClauseFormat2 libraryAttributeClauseFormat2, P p) {
+        return (Cobol.LibraryAttributeClauseFormat2) super.visitLibraryAttributeClauseFormat2(libraryAttributeClauseFormat2, p);
+    }
+
+    @Override
+    public Cobol.LibraryAttributeFunction visitLibraryAttributeFunction(Cobol.LibraryAttributeFunction libraryAttributeFunction, P p) {
+        return (Cobol.LibraryAttributeFunction) super.visitLibraryAttributeFunction(libraryAttributeFunction, p);
+    }
+
+    @Override
+    public Cobol.LibraryAttributeParameter visitLibraryAttributeParameter(Cobol.LibraryAttributeParameter libraryAttributeParameter, P p) {
+        return (Cobol.LibraryAttributeParameter) super.visitLibraryAttributeParameter(libraryAttributeParameter, p);
+    }
+
+    @Override
+    public Cobol.LibraryAttributeTitle visitLibraryAttributeTitle(Cobol.LibraryAttributeTitle libraryAttributeTitle, P p) {
+        return (Cobol.LibraryAttributeTitle) super.visitLibraryAttributeTitle(libraryAttributeTitle, p);
+    }
+
+    @Override
+    public Cobol.LibraryDescriptionEntryFormat1 visitLibraryDescriptionEntryFormat1(Cobol.LibraryDescriptionEntryFormat1 libraryDescriptionEntryFormat1, P p) {
+        return (Cobol.LibraryDescriptionEntryFormat1) super.visitLibraryDescriptionEntryFormat1(libraryDescriptionEntryFormat1, p);
+    }
+
+    @Override
+    public Cobol.LibraryDescriptionEntryFormat2 visitLibraryDescriptionEntryFormat2(Cobol.LibraryDescriptionEntryFormat2 libraryDescriptionEntryFormat2, P p) {
+        return (Cobol.LibraryDescriptionEntryFormat2) super.visitLibraryDescriptionEntryFormat2(libraryDescriptionEntryFormat2, p);
+    }
+
+    @Override
+    public Cobol.LibraryEntryProcedureClauseFormat1 visitLibraryEntryProcedureClauseFormat1(Cobol.LibraryEntryProcedureClauseFormat1 libraryEntryProcedureClauseFormat1, P p) {
+        return (Cobol.LibraryEntryProcedureClauseFormat1) super.visitLibraryEntryProcedureClauseFormat1(libraryEntryProcedureClauseFormat1, p);
+    }
+
+    @Override
+    public Cobol.LibraryEntryProcedureClauseFormat2 visitLibraryEntryProcedureClauseFormat2(Cobol.LibraryEntryProcedureClauseFormat2 libraryEntryProcedureClauseFormat2, P p) {
+        return (Cobol.LibraryEntryProcedureClauseFormat2) super.visitLibraryEntryProcedureClauseFormat2(libraryEntryProcedureClauseFormat2, p);
+    }
+
+    @Override
+    public Cobol.LibraryEntryProcedureForClause visitLibraryEntryProcedureForClause(Cobol.LibraryEntryProcedureForClause libraryEntryProcedureForClause, P p) {
+        return (Cobol.LibraryEntryProcedureForClause) super.visitLibraryEntryProcedureForClause(libraryEntryProcedureForClause, p);
+    }
+
+    @Override
+    public Cobol.LibraryEntryProcedureGivingClause visitLibraryEntryProcedureGivingClause(Cobol.LibraryEntryProcedureGivingClause libraryEntryProcedureGivingClause, P p) {
+        return (Cobol.LibraryEntryProcedureGivingClause) super.visitLibraryEntryProcedureGivingClause(libraryEntryProcedureGivingClause, p);
+    }
+
+    @Override
+    public Cobol.LibraryEntryProcedureUsingClause visitLibraryEntryProcedureUsingClause(Cobol.LibraryEntryProcedureUsingClause libraryEntryProcedureUsingClause, P p) {
+        return (Cobol.LibraryEntryProcedureUsingClause) super.visitLibraryEntryProcedureUsingClause(libraryEntryProcedureUsingClause, p);
+    }
+
+    @Override
+    public Cobol.LibraryEntryProcedureWithClause visitLibraryEntryProcedureWithClause(Cobol.LibraryEntryProcedureWithClause libraryEntryProcedureWithClause, P p) {
+        return (Cobol.LibraryEntryProcedureWithClause) super.visitLibraryEntryProcedureWithClause(libraryEntryProcedureWithClause, p);
+    }
+
+    @Override
+    public Cobol.LibraryIsCommonClause visitLibraryIsCommonClause(Cobol.LibraryIsCommonClause libraryIsCommonClause, P p) {
+        return (Cobol.LibraryIsCommonClause) super.visitLibraryIsCommonClause(libraryIsCommonClause, p);
+    }
+
+    @Override
+    public Cobol.LibraryIsGlobalClause visitLibraryIsGlobalClause(Cobol.LibraryIsGlobalClause libraryIsGlobalClause, P p) {
+        return (Cobol.LibraryIsGlobalClause) super.visitLibraryIsGlobalClause(libraryIsGlobalClause, p);
+    }
+
+    @Override
+    public Cobol.ProgramLibrarySection visitProgramLibrarySection(Cobol.ProgramLibrarySection programLibrarySection, P p) {
+        return (Cobol.ProgramLibrarySection) super.visitProgramLibrarySection(programLibrarySection, p);
+    }
 }

@@ -848,4 +848,17 @@ class CobolDivisionTest : RewriteTest {
                 10 IDENTIFIER LINE NUMBER IS 10 ON NEXT PAGE.
         """)
     )
+
+    @Test
+    fun programLibrarySection() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. communicationSection.
+            DATA DIVISION.
+            PROGRAM-LIBRARY SECTION.
+                LD IDENTIFIER EXPORT ATTRIBUTE SHARING IS DONTCARE ENTRY-PROCEDURE IDENTIFIER FOR ZERO
+                LB IDENTIFIER IMPORT IS GLOBAL IS COMMON ATTRIBUTE
+                FUNCTIONNAME IS ZERO LIBACCESS IS BYFUNCTION LIBPARAMETER IS ZERO
+        """)
+    )
 }

@@ -1392,6 +1392,183 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitLibraryAttributeClauseFormat1(CobolParser.LibraryAttributeClauseFormat1Context ctx) {
+        return new Cobol.LibraryAttributeClauseFormat1(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ATTRIBUTE(), ctx.SHARING(), ctx.IS(), ctx.DONTCARE(), ctx.PRIVATE(), ctx.SHAREDBYRUNUNIT(), ctx.SHAREDBYALL())
+        );
+    }
+
+    @Override
+    public Object visitLibraryAttributeClauseFormat2(CobolParser.LibraryAttributeClauseFormat2Context ctx) {
+        return new Cobol.LibraryAttributeClauseFormat2(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ATTRIBUTE()),
+                visitNullable(ctx.libraryAttributeFunction()),
+                words(ctx.LIBACCESS(), ctx.IS(), ctx.BYFUNCTION(), ctx.BYTITLE()),
+                visitNullable(ctx.libraryAttributeParameter()),
+                visitNullable(ctx.libraryAttributeTitle())
+        );
+    }
+
+    @Override
+    public Object visitLibraryAttributeFunction(CobolParser.LibraryAttributeFunctionContext ctx) {
+        return new Cobol.LibraryAttributeFunction(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FUNCTIONNAME(), ctx.IS()),
+                (Name) visit(ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitLibraryAttributeParameter(CobolParser.LibraryAttributeParameterContext ctx) {
+        return new Cobol.LibraryAttributeParameter(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LIBPARAMETER(), ctx.IS()),
+                (Name) visit(ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitLibraryAttributeTitle(CobolParser.LibraryAttributeTitleContext ctx) {
+        return new Cobol.LibraryAttributeTitle(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TITLE(), ctx.IS()),
+                (Name) visit(ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitLibraryDescriptionEntryFormat1(CobolParser.LibraryDescriptionEntryFormat1Context ctx) {
+        return new Cobol.LibraryDescriptionEntryFormat1(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LD()),
+                (Cobol.CobolWord) visit(ctx.libraryName()),
+                words(ctx.EXPORT()),
+                visitNullable(ctx.libraryAttributeClauseFormat1()),
+                visitNullable(ctx.libraryEntryProcedureClauseFormat1())
+        );
+    }
+
+    @Override
+    public Object visitLibraryDescriptionEntryFormat2(CobolParser.LibraryDescriptionEntryFormat2Context ctx) {
+        return new Cobol.LibraryDescriptionEntryFormat2(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LB()),
+                (Cobol.CobolWord) visit(ctx.libraryName()),
+                words(ctx.IMPORT()),
+                visitNullable(ctx.libraryIsGlobalClause()),
+                visitNullable(ctx.libraryIsCommonClause()),
+                convertAllContainer(ctx.libraryAttributeClauseFormat2(), ctx.libraryEntryProcedureClauseFormat2())
+        );
+    }
+
+    @Override
+    public Object visitLibraryEntryProcedureClauseFormat1(CobolParser.LibraryEntryProcedureClauseFormat1Context ctx) {
+        return new Cobol.LibraryEntryProcedureClauseFormat1(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ENTRY_PROCEDURE()),
+                (Cobol.CobolWord) visit(ctx.programName()),
+                visitNullable(ctx.libraryEntryProcedureForClause())
+        );
+    }
+
+    @Override
+    public Object visitLibraryEntryProcedureClauseFormat2(CobolParser.LibraryEntryProcedureClauseFormat2Context ctx) {
+        return new Cobol.LibraryEntryProcedureClauseFormat2(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ENTRY_PROCEDURE()),
+                (Cobol.CobolWord) visit(ctx.programName()),
+                visitNullable(ctx.libraryEntryProcedureForClause()),
+                visitNullable(ctx.libraryEntryProcedureWithClause()),
+                visitNullable(ctx.libraryEntryProcedureUsingClause()),
+                visitNullable(ctx.libraryEntryProcedureGivingClause())
+        );
+    }
+
+    @Override
+    public Object visitLibraryEntryProcedureForClause(CobolParser.LibraryEntryProcedureForClauseContext ctx) {
+        return new Cobol.LibraryEntryProcedureForClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOR()),
+                (Name) visit(ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitLibraryEntryProcedureGivingClause(CobolParser.LibraryEntryProcedureGivingClauseContext ctx) {
+        return new Cobol.LibraryEntryProcedureGivingClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.GIVING()),
+                (Cobol.CobolWord) visit(ctx.dataName())
+        );
+    }
+
+    @Override
+    public Object visitLibraryEntryProcedureUsingClause(CobolParser.LibraryEntryProcedureUsingClauseContext ctx) {
+        return new Cobol.LibraryEntryProcedureUsingClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.USING()),
+                convertAllContainer(ctx.libraryEntryProcedureUsingName())
+        );
+    }
+
+    @Override
+    public Object visitLibraryEntryProcedureWithClause(CobolParser.LibraryEntryProcedureWithClauseContext ctx) {
+        return new Cobol.LibraryEntryProcedureWithClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH()),
+                convertAllContainer(ctx.libraryEntryProcedureWithName())
+        );
+    }
+
+    @Override
+    public Object visitLibraryIsCommonClause(CobolParser.LibraryIsCommonClauseContext ctx) {
+        return new Cobol.LibraryIsCommonClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.COMMON())
+        );
+    }
+
+    @Override
+    public Object visitLibraryIsGlobalClause(CobolParser.LibraryIsGlobalClauseContext ctx) {
+        return new Cobol.LibraryIsGlobalClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.GLOBAL())
+        );
+    }
+
+    @Override
     public Cobol.ValuedObjectComputerClause visitMemorySizeClause(CobolParser.MemorySizeClauseContext ctx) {
         return new Cobol.ValuedObjectComputerClause(
                 randomId(),
@@ -1439,6 +1616,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     @Override
     public Object visitPasswordClause(CobolParser.PasswordClauseContext ctx) {
         throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitProgramLibrarySection(CobolParser.ProgramLibrarySectionContext ctx) {
+        return new Cobol.ProgramLibrarySection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PROGRAM_LIBRARY(), ctx.SECTION(), ctx.DOT_FS()),
+                convertAllContainer(ctx.libraryDescriptionEntry())
+        );
     }
 
     @Override
