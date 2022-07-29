@@ -15,6 +15,7 @@
  */
 package model;
 
+import generate.Skip;
 import org.openrewrite.cobol.tree.CobolContainer;
 import org.openrewrite.cobol.tree.CobolLeftPadded;
 import org.openrewrite.cobol.tree.Identifier;
@@ -24,11 +25,16 @@ import java.util.List;
 
 public interface Cobol {
 
+    @Skip
     class CobolWord {}
+    @Skip
     class QualifiedDataName {}
+    @Skip
     class StatementPhrase {}
+    @Skip
     class ParenExpression {}
+    @Skip
     class Condition {}
+    @Skip
     class ProcedureName {}
-
 }

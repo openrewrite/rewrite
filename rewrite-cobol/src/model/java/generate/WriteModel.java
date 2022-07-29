@@ -136,6 +136,10 @@ public class WriteModel extends Recipe {
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration c = classDecl;
+            if(FindAnnotations.find(c, "@generate.Skip").size() > 0) {
+                //noinspection ConstantConditions
+                return null;
+            }
 
             boolean padded = c.getBody().getStatements().stream().anyMatch(this::isPadded);
 
