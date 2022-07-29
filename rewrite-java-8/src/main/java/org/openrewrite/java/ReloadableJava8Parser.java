@@ -124,7 +124,7 @@ class ReloadableJava8Parser implements JavaParser {
             public void write(char[] cbuf, int off, int len) {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
-                    if (!StringUtils.isBlank(log) && !log.contains("warning: a package-info.java file has already")) {
+                    if (!StringUtils.isBlank(log)) {
                         org.slf4j.LoggerFactory.getLogger(ReloadableJava8Parser.class).warn(log);
                     }
                 }

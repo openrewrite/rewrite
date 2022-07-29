@@ -106,7 +106,10 @@ public class ReloadableJava17ParserInputFileObject implements JavaFileObject {
 
     @Override
     public boolean isNameCompatible(String simpleName, Kind kind) {
-        return true;
+        String baseName = simpleName + kind.extension;
+        return kind.equals(getKind())
+                && (baseName.equals(toUri().getPath())
+                || toUri().getPath().endsWith("/" + baseName));
     }
 
     @Override
