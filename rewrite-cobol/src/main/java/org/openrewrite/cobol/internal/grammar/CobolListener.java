@@ -1,4 +1,4 @@
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-cobol/src/main/antlr/Cobol.g4 by ANTLR 4.9.3
+// Generated from F:\Projects\openrewrite\rewrite\rewrite-cobol\src\main\antlr\Cobol.g4 by ANTLR 4.9.3
 package org.openrewrite.cobol.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -5468,6 +5468,16 @@ public interface CobolListener extends ParseTreeListener {
 	 */
 	void exitTableCall(CobolParser.TableCallContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link CobolParser#tableCallSubscripts}.
+	 * @param ctx the parse tree
+	 */
+	void enterTableCallSubscripts(CobolParser.TableCallSubscriptsContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link CobolParser#tableCallSubscripts}.
+	 * @param ctx the parse tree
+	 */
+	void exitTableCallSubscripts(CobolParser.TableCallSubscriptsContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link CobolParser#functionCall}.
 	 * @param ctx the parse tree
 	 */
@@ -5477,6 +5487,16 @@ public interface CobolListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitFunctionCall(CobolParser.FunctionCallContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link CobolParser#functionCallArguments}.
+	 * @param ctx the parse tree
+	 */
+	void enterFunctionCallArguments(CobolParser.FunctionCallArgumentsContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link CobolParser#functionCallArguments}.
+	 * @param ctx the parse tree
+	 */
+	void exitFunctionCallArguments(CobolParser.FunctionCallArgumentsContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link CobolParser#referenceModifier}.
 	 * @param ctx the parse tree

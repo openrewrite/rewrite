@@ -4509,6 +4509,55 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.TableCall visitTableCall(CobolParser.TableCallContext ctx) {
+        return new Cobol.TableCall(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName()),
+                convertAllContainer(ctx.tableCallSubscripts()),
+                visitNullable(ctx.referenceModifier())
+        );
+    }
+
+    @Override
+    public Cobol.Parenthesized visitTableCallSubscripts(CobolParser.TableCallSubscriptsContext ctx) {
+        return new Cobol.Parenthesized(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LPARENCHAR()),
+                convertAllList(Collections.singletonList(","), ctx.subscript()),
+                words(ctx.RPARENCHAR())
+        );
+    }
+
+    @Override
+    public Cobol.FunctionCall visitFunctionCall(CobolParser.FunctionCallContext ctx) {
+        return new Cobol.FunctionCall(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FUNCTION()),
+                (Cobol.CobolWord) visit(ctx.functionName()),
+                convertAllContainer(ctx.functionCallArguments()),
+                visitNullable(ctx.referenceModifier())
+        );
+    }
+
+    @Override
+    public Object visitFunctionCallArguments(CobolParser.FunctionCallArgumentsContext ctx) {
+        return new Cobol.Parenthesized(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LPARENCHAR()),
+                convertAllList(Collections.singletonList(","), ctx.argument()),
+                words(ctx.RPARENCHAR())
+        );
+    }
+
+    @Override
     public Cobol.Display visitDisplayStatement(CobolParser.DisplayStatementContext ctx) {
         if (ctx.displayAt() != null || ctx.displayUpon() != null || ctx.displayWith() != null ||
                 ctx.END_DISPLAY() != null) {

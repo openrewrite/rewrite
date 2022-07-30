@@ -2377,12 +2377,20 @@ identifier
    ;
 
 tableCall
-   : qualifiedDataName (LPARENCHAR subscript (COMMACHAR? subscript)* RPARENCHAR)* referenceModifier?
+   : qualifiedDataName tableCallSubscripts* referenceModifier?
    ;
 
+tableCallSubscripts
+    : LPARENCHAR subscript (COMMACHAR? subscript)* RPARENCHAR
+    ;
+
 functionCall
-   : FUNCTION functionName (LPARENCHAR argument (COMMACHAR? argument)* RPARENCHAR)* referenceModifier?
+   : FUNCTION functionName functionCallArguments* referenceModifier?
    ;
+
+functionCallArguments
+    : LPARENCHAR argument (COMMACHAR? argument)* RPARENCHAR
+    ;
 
 referenceModifier
    : LPARENCHAR characterPosition COLONCHAR length? RPARENCHAR
@@ -2573,7 +2581,7 @@ textName
 // literal ----------------------------------
 
 cobolWord
-   : IDENTIFIER 
+   : IDENTIFIER
    | ABORT | AS | ASCII | ASSOCIATED_DATA | ASSOCIATED_DATA_LENGTH | ATTRIBUTE | AUTO | AUTO_SKIP
    | BACKGROUND_COLOR | BACKGROUND_COLOUR | BEEP | BELL | BINARY | BIT | BLINK | BLOB | BOUNDS
    | CAPABLE | CCSVERSION | CHANGED | CHANNEL | CLOB | CLOSE_DISPOSITION | COBOL | COMMITMENT | CONTROL_POINT | CONVENTION | CRUNCH | CURSOR

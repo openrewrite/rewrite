@@ -6309,7 +6309,6 @@ public interface Cobol extends Tree {
         List<Cobol> controlEntries;
 
         @Nullable
-        @Getter
         CobolLeftPadded<String> dot;
 
         @Override
@@ -16111,6 +16110,224 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitWriteAdvancingMnemonic(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class TableCall implements Identifier {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        QualifiedDataName qualifiedDataName;
+
+        CobolContainer<Parenthesized> subscripts;
+
+        @Getter
+        @Nullable
+        @With
+        ReferenceModifier referenceModifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitTableCall(this, p);
+        }
+
+        public List<Cobol.Parenthesized> getSubscripts() {
+            return subscripts.getElements();
+        }
+
+        public TableCall withSubscripts(List<Cobol.Parenthesized> subscripts) {
+            return getPadding().withSubscripts(this.subscripts.getPadding().withElements(CobolRightPadded.withElements(
+                    this.subscripts.getPadding().getElements(), subscripts)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TableCall t;
+
+            public CobolContainer<Cobol.Parenthesized> getSubscripts() {
+                return t.subscripts;
+            }
+
+            public TableCall withSubscripts(CobolContainer<Cobol.Parenthesized> subscripts) {
+                return t.subscripts == subscripts ? t : new TableCall(t.padding, t.id, t.prefix, t.markers, t.qualifiedDataName, subscripts, t.referenceModifier);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
+    class Parenthesized implements Cobol {
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String leftParen;
+
+        @Getter
+        @With
+        List<Cobol> contents;
+
+        @Getter
+        @With
+        String rightParen;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitParenthesized(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReferenceModifier implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String leftParen;
+        ArithmeticExpression characterPosition;
+        String colon;
+
+        @Nullable
+        ArithmeticExpression length;
+
+        String rightParen;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReferenceModifier(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class FunctionCall implements Identifier {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String function;
+
+        @Getter
+        @With
+        CobolWord functionName;
+
+        CobolContainer<Parenthesized> arguments;
+
+        @Getter
+        @Nullable
+        @With
+        ReferenceModifier referenceModifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitFunctionCall(this, p);
+        }
+
+        public List<Cobol.Parenthesized> getArguments() {
+            return arguments.getElements();
+        }
+
+        public FunctionCall withArguments(List<Cobol.Parenthesized> arguments) {
+            return getPadding().withArguments(this.arguments.getPadding().withElements(CobolRightPadded.withElements(
+                    this.arguments.getPadding().getElements(), arguments)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final FunctionCall t;
+
+            public CobolContainer<Cobol.Parenthesized> getArguments() {
+                return t.arguments;
+            }
+
+            public FunctionCall withArguments(CobolContainer<Cobol.Parenthesized> arguments) {
+                return t.arguments == arguments ? t : new FunctionCall(t.padding, t.id, t.prefix, t.markers, t.function, t.functionName, arguments, t.referenceModifier);
+            }
         }
     }
 }

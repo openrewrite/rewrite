@@ -1,4 +1,4 @@
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-cobol/src/main/antlr/Cobol.g4 by ANTLR 4.9.3
+// Generated from F:\Projects\openrewrite\rewrite\rewrite-cobol\src\main\antlr\Cobol.g4 by ANTLR 4.9.3
 package org.openrewrite.cobol.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -6568,6 +6568,18 @@ public class CobolBaseListener implements CobolListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterTableCallSubscripts(CobolParser.TableCallSubscriptsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTableCallSubscripts(CobolParser.TableCallSubscriptsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterFunctionCall(CobolParser.FunctionCallContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -6575,6 +6587,18 @@ public class CobolBaseListener implements CobolListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitFunctionCall(CobolParser.FunctionCallContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterFunctionCallArguments(CobolParser.FunctionCallArgumentsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitFunctionCallArguments(CobolParser.FunctionCallArgumentsContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

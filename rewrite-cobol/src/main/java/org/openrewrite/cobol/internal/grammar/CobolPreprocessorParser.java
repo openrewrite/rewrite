@@ -1,4 +1,4 @@
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-cobol/src/main/antlr/CobolPreprocessor.g4 by ANTLR 4.9.3
+// Generated from F:\Projects\openrewrite\rewrite\rewrite-cobol\src\main\antlr\CobolPreprocessor.g4 by ANTLR 4.9.3
 package org.openrewrite.cobol.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;

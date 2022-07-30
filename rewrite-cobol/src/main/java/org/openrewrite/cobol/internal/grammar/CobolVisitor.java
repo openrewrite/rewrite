@@ -1,4 +1,4 @@
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-cobol/src/main/antlr/Cobol.g4 by ANTLR 4.9.3
+// Generated from F:\Projects\openrewrite\rewrite\rewrite-cobol\src\main\antlr\Cobol.g4 by ANTLR 4.9.3
 package org.openrewrite.cobol.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -3287,11 +3287,23 @@ public interface CobolVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitTableCall(CobolParser.TableCallContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link CobolParser#tableCallSubscripts}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTableCallSubscripts(CobolParser.TableCallSubscriptsContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link CobolParser#functionCall}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitFunctionCall(CobolParser.FunctionCallContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link CobolParser#functionCallArguments}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitFunctionCallArguments(CobolParser.FunctionCallArgumentsContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link CobolParser#referenceModifier}.
 	 * @param ctx the parse tree

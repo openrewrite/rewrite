@@ -1450,6 +1450,26 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
+    public Cobol.TableCall visitTableCall(Cobol.TableCall tableCall, P p) {
+        return (Cobol.TableCall) super.visitTableCall(tableCall, p);
+    }
+
+    @Override
+    public Cobol.Parenthesized visitParenthesized(Cobol.Parenthesized parenthesized, P p) {
+        return (Cobol.Parenthesized) super.visitParenthesized(parenthesized, p);
+    }
+
+    @Override
+    public Cobol.ReferenceModifier visitReferenceModifier(Cobol.ReferenceModifier referenceModifier, P p) {
+        return (Cobol.ReferenceModifier) super.visitReferenceModifier(referenceModifier, p);
+    }
+
+    @Override
+    public Cobol.FunctionCall visitFunctionCall(Cobol.FunctionCall functionCall, P p) {
+        return (Cobol.FunctionCall) super.visitFunctionCall(functionCall, p);
+    }
+
+    @Override
     public Cobol.CommitmentControlClause visitCommitmentControlClause(Cobol.CommitmentControlClause commitmentControlClause, P p) {
         return (Cobol.CommitmentControlClause) super.visitCommitmentControlClause(commitmentControlClause, p);
     }

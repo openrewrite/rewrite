@@ -2627,6 +2627,47 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return inspectTo;
     }
 
+    public Cobol visitTableCall(Cobol.TableCall tableCall, PrintOutputCapture<P> p) {
+        visitSpace(tableCall.getPrefix(), p);
+        visitMarkers(tableCall.getMarkers(), p);
+        visit(tableCall.getQualifiedDataName(), p);
+        visitContainer("", tableCall.getPadding().getSubscripts(), "", "", p);
+        visit(tableCall.getReferenceModifier(), p);
+        return tableCall;
+    }
+
+    public Cobol visitParenthesized(Cobol.Parenthesized parenthesized, PrintOutputCapture<P> p) {
+        visitSpace(parenthesized.getPrefix(), p);
+        visitMarkers(parenthesized.getMarkers(), p);
+        p.append(parenthesized.getLeftParen());
+        for(Cobol c : parenthesized.getContents()) {
+            visit(c, p);
+        }
+        p.append(parenthesized.getRightParen());
+        return parenthesized;
+    }
+
+    public Cobol visitReferenceModifier(Cobol.ReferenceModifier referenceModifier, PrintOutputCapture<P> p) {
+        visitSpace(referenceModifier.getPrefix(), p);
+        visitMarkers(referenceModifier.getMarkers(), p);
+        p.append(referenceModifier.getLeftParen());
+        visit(referenceModifier.getCharacterPosition(), p);
+        p.append(referenceModifier.getColon());
+        visit(referenceModifier.getLength(), p);
+        p.append(referenceModifier.getRightParen());
+        return referenceModifier;
+    }
+
+    public Cobol visitFunctionCall(Cobol.FunctionCall functionCall, PrintOutputCapture<P> p) {
+        visitSpace(functionCall.getPrefix(), p);
+        visitMarkers(functionCall.getMarkers(), p);
+        p.append(functionCall.getFunction());
+        visit(functionCall.getFunctionName(), p);
+        visitContainer("", functionCall.getPadding().getArguments(), "", "", p);
+        visit(functionCall.getReferenceModifier(), p);
+        return functionCall;
+    }
+
     public Cobol visitCommitmentControlClause(Cobol.CommitmentControlClause commitmentControlClause, PrintOutputCapture<P> p) {
         visitSpace(commitmentControlClause.getPrefix(), p);
         visitMarkers(commitmentControlClause.getMarkers(), p);

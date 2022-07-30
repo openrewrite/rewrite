@@ -2632,6 +2632,43 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return i;
     }
 
+    public Cobol visitTableCall(Cobol.TableCall tableCall, P p) {
+        Cobol.TableCall t = tableCall;
+        t = t.withPrefix(visitSpace(t.getPrefix(), p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.withQualifiedDataName((Cobol.QualifiedDataName) visit(t.getQualifiedDataName(), p));
+        t = t.getPadding().withSubscripts(visitContainer(t.getPadding().getSubscripts(), p));
+        t = t.withReferenceModifier((Cobol.ReferenceModifier) visit(t.getReferenceModifier(), p));
+        return t;
+    }
+
+    public Cobol visitParenthesized(Cobol.Parenthesized parenthesized, P p) {
+        Cobol.Parenthesized pp = parenthesized;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withContents(ListUtils.map(pp.getContents(), it -> visit(it, p)));
+        return pp;
+    }
+
+    public Cobol visitReferenceModifier(Cobol.ReferenceModifier referenceModifier, P p) {
+        Cobol.ReferenceModifier r = referenceModifier;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withCharacterPosition((Cobol.ArithmeticExpression) visit(r.getCharacterPosition(), p));
+        r = r.withLength((Cobol.ArithmeticExpression) visit(r.getLength(), p));
+        return r;
+    }
+
+    public Cobol visitFunctionCall(Cobol.FunctionCall functionCall, P p) {
+        Cobol.FunctionCall f = functionCall;
+        f = f.withPrefix(visitSpace(f.getPrefix(), p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        f = f.withFunctionName((Cobol.CobolWord) visit(f.getFunctionName(), p));
+        f = f.getPadding().withArguments(visitContainer(f.getPadding().getArguments(), p));
+        f = f.withReferenceModifier((Cobol.ReferenceModifier) visit(f.getReferenceModifier(), p));
+        return f;
+    }
+
     public Cobol visitCommitmentControlClause(Cobol.CommitmentControlClause commitmentControlClause, P p) {
         Cobol.CommitmentControlClause c = commitmentControlClause;
         c = c.withPrefix(visitSpace(c.getPrefix(), p));

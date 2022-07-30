@@ -17,14 +17,44 @@ package model;
 
 import generate.Skip;
 import org.openrewrite.cobol.tree.CobolContainer;
-import org.openrewrite.cobol.tree.CobolLeftPadded;
-import org.openrewrite.cobol.tree.Identifier;
 import org.openrewrite.internal.lang.Nullable;
-
-import java.util.List;
 
 public interface Cobol {
 
+    class TableCall implements Identifier {
+        QualifiedDataName qualifiedDataName;
+        CobolContainer<Parenthesized> subscripts;
+        @Nullable
+        ReferenceModifier referenceModifier;
+    }
+
+    class Parenthesized implements Cobol {
+        String leftParen;
+        CobolContainer<Cobol> contents;
+        String rightParen;
+    }
+
+    class ReferenceModifier implements Cobol {
+        String leftParen;
+        ArithmeticExpression characterPosition;
+        String colon;
+        @Nullable
+        ArithmeticExpression length;
+        String rightParen;
+    }
+
+    class FunctionCall implements Identifier {
+        String function;
+        CobolWord functionName;
+        CobolContainer<Parenthesized> arguments;
+        @Nullable
+        ReferenceModifier referenceModifier;
+    }
+
+    @Skip
+    class ArithmeticExpression {}
+    @Skip
+    class Subscript {}
     @Skip
     class CobolWord {}
     @Skip
