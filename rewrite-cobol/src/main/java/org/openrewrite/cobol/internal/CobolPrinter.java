@@ -3096,4 +3096,12 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(selectClause.getFileName(), p);
         return selectClause;
     }
+
+    public Cobol visitAssignClause(Cobol.AssignClause assignClause, PrintOutputCapture<P> p) {
+        visitSpace(assignClause.getPrefix(), p);
+        visitMarkers(assignClause.getMarkers(), p);
+        p.append(assignClause.getWords());
+        visit(assignClause.getName(), p);
+        return assignClause;
+    }
 }

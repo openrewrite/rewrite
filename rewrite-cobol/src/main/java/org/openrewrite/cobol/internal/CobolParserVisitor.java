@@ -253,7 +253,15 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitAssignClause(CobolParser.AssignClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.AssignClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ASSIGN(), ctx.TO(), ctx.DISK(), ctx.DISPLAY(), ctx.KEYBOARD(), ctx.PORT(), ctx.PRINTER(),
+                        ctx.READER(), ctx.REMOTE(), ctx.TAPE(), ctx.VIRTUAL(), ctx.DYNAMIC(), ctx.EXTERNAL()),
+                ctx.assignmentName() != null ? visitNullable(ctx.assignmentName()) :
+                        ctx.literal() != null ? visitNullable(ctx.literal()) : null
+        );
     }
 
     @Override
