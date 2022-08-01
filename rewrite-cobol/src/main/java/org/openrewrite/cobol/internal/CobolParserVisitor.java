@@ -596,6 +596,31 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitClassClause(CobolParser.ClassClauseContext ctx) {
+        return new Cobol.ClassClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CLASS()),
+                (Cobol.CobolWord) visit(ctx.className()),
+                words(ctx.FOR(), ctx.ALPHANUMERIC(), ctx.NATIONAL(), ctx.IS()),
+                convertAllContainer(ctx.classClauseThrough())
+        );
+    }
+
+    @Override
+    public Object visitClassClauseThrough(CobolParser.ClassClauseThroughContext ctx) {
+        return new Cobol.ClassClauseThrough(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.classClauseFrom()),
+                visitNullable(ctx.THROUGH() != null ? ctx.THROUGH() : (ctx.THRU() != null ? ctx.THRU() : null)),
+                visitNullable(ctx.classClauseTo())
+        );
+    }
+
+    @Override
     public Object visitClassCondition(CobolParser.ClassConditionContext ctx) {
         return new Cobol.ClassCondition(
                 randomId(),

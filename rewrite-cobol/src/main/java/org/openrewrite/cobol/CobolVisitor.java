@@ -501,7 +501,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.ClassClause c = classClause;
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        c = c.withClassName((Identifier) visit(c.getClassName(), p));
+        c = c.withClassName((Cobol.CobolWord) visit(c.getClassName(), p));
         c = c.getPadding().withThroughs(visitContainer(c.getPadding().getThroughs(), p));
         return c;
     }
@@ -510,9 +510,9 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Cobol.ClassClauseThrough c = classClauseThrough;
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        if (c.getPadding().getThrough() != null) {
-            c = c.getPadding().withThrough(visitLeftPadded(c.getPadding().getThrough(), p));
-        }
+        c = c.withFrom((Name) visit(c.getFrom(), p));
+        c = c.withThrough((Cobol.CobolWord) visit(c.getThrough(), p));
+        c = c.withFrom((Name) visit(c.getTo(), p));
         return c;
     }
 

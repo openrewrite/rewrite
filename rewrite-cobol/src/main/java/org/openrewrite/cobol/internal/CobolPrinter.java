@@ -515,7 +515,9 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
     public Cobol visitClassClauseThrough(Cobol.ClassClauseThrough classClauseThrough, PrintOutputCapture<P> p) {
         visitSpace(classClauseThrough.getPrefix(), p);
         visitMarkers(classClauseThrough.getMarkers(), p);
-        visitLeftPadded("", classClauseThrough.getPadding().getThrough(), p);
+        visit(classClauseThrough.getFrom(), p);
+        visit(classClauseThrough.getThrough(), p);
+        visit(classClauseThrough.getTo(), p);
         return classClauseThrough;
     }
 

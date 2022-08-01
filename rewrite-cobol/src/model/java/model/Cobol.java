@@ -32,7 +32,7 @@ public interface Cobol {
     @Skip
     class StatementPhrase {}
     @Skip
-    class ParenExpression {}
+    class Parenthesized {}
     @Skip
     class Condition {}
     @Skip
