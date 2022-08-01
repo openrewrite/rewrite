@@ -52,7 +52,6 @@ public class JavaCompilationUnitState {
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/style/Style.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/DeclarativeNamedStyles.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/style/NamedStyles.java"),
-                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/TreePrinter.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/Option.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/OptionDescriptor.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/RecipeDescriptor.java"),

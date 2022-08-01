@@ -21,7 +21,7 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.TreeVisitorAdapterInterceptor;
+import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -331,44 +331,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 "type hierarhcy of visitor " + getClass().getName());
     }
 
-    @SuppressWarnings("rawtypes")
-    private Class<? extends TreeVisitor> adapterDelegateType() {
-        for (TypeVariable<? extends Class<? extends TreeVisitor>> tp : getClass().getTypeParameters()) {
-            for (Type bound : tp.getBounds()) {
-                if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
-                    return getClass();
-                }
-            }
-        }
-
-        Class<?> v2 = getClass();
-        Type sup = v2.getGenericSuperclass();
-        for (int i = 0; i < 20; i++) {
-            if (sup instanceof ParameterizedType) {
-                for (Type bound : ((ParameterizedType) sup).getActualTypeArguments()) {
-                    if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
-                        if (getLanguage() == null) {
-                            //noinspection unchecked
-                            return (Class<? extends TreeVisitor>) ((ParameterizedType) sup).getRawType();
-                        }
-                        //noinspection unchecked
-                        return (Class<? extends TreeVisitor>) v2;
-                    }
-                }
-                sup = ((ParameterizedType) sup).getRawType();
-            } else if (sup instanceof Class) {
-                v2 = (Class<?>) sup;
-                if (v2.getName().endsWith("IsoVisitor")) {
-                    //noinspection unchecked
-                    return (Class<? extends TreeVisitor>) v2;
-                }
-                sup = ((Class<?>) sup).getGenericSuperclass();
-            }
-        }
-        throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
-                "type hierarhcy of visitor " + getClass().getName());
-    }
-
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {
         if (adaptTo.isAssignableFrom(getClass())) {
             //noinspection unchecked
@@ -376,6 +338,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
         } else if (!isAdaptableTo(adaptTo)) {
             throw new IllegalArgumentException(getClass().getSimpleName() + " must be adaptable to " + adaptTo.getName() + ".");
         }
-        return TreeVisitorAdapterInterceptor.adapt(this, adaptTo);
+        return TreeVisitorAdapter.adapt(this, adaptTo);
     }
 }
