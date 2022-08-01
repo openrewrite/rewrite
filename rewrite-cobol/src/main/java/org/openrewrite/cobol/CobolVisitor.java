@@ -3128,4 +3128,46 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         return a;
     }
+
+    public Cobol visitRecordKeyClause(Cobol.RecordKeyClause recordKeyClause, P p) {
+        Cobol.RecordKeyClause r = recordKeyClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withQualifiedDataName((Cobol.QualifiedDataName) visit(r.getQualifiedDataName(), p));
+        r = r.withPasswordClause((Cobol.PasswordClause) visit(r.getPasswordClause(), p));
+        return r;
+    }
+
+    public Cobol visitAlternateRecordKeyClause(Cobol.AlternateRecordKeyClause alternateRecordKeyClause, P p) {
+        Cobol.AlternateRecordKeyClause a = alternateRecordKeyClause;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withQualifiedDataName((Cobol.QualifiedDataName) visit(a.getQualifiedDataName(), p));
+        a = a.withPasswordClause((Cobol.PasswordClause) visit(a.getPasswordClause(), p));
+        return a;
+    }
+
+    public Cobol visitPasswordClause(Cobol.PasswordClause passwordClause, P p) {
+        Cobol.PasswordClause pp = passwordClause;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        pp = pp.withDataName((Cobol.CobolWord) visit(pp.getDataName(), p));
+        return pp;
+    }
+
+    public Cobol visitFileStatusClause(Cobol.FileStatusClause fileStatusClause, P p) {
+        Cobol.FileStatusClause f = fileStatusClause;
+        f = f.withPrefix(visitSpace(f.getPrefix(), p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        f = f.getPadding().withQualifiedDataNames(visitContainer(f.getPadding().getQualifiedDataNames(), p));
+        return f;
+    }
+
+    public Cobol visitRelativeKeyClause(Cobol.RelativeKeyClause relativeKeyClause, P p) {
+        Cobol.RelativeKeyClause r = relativeKeyClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withQualifiedDataName((Cobol.QualifiedDataName) visit(r.getQualifiedDataName(), p));
+        return r;
+    }
 }

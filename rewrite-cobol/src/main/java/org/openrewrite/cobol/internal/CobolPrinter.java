@@ -3143,4 +3143,48 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(accessModeClause.getWords());
         return accessModeClause;
     }
+
+    public Cobol visitRecordKeyClause(Cobol.RecordKeyClause recordKeyClause, PrintOutputCapture<P> p) {
+        visitSpace(recordKeyClause.getPrefix(), p);
+        visitMarkers(recordKeyClause.getMarkers(), p);
+        p.append(recordKeyClause.getRecordWords());
+        visit(recordKeyClause.getQualifiedDataName(), p);
+        visit(recordKeyClause.getPasswordClause(), p);
+        p.append(recordKeyClause.getDuplicates());
+        return recordKeyClause;
+    }
+
+    public Cobol visitAlternateRecordKeyClause(Cobol.AlternateRecordKeyClause alternateRecordKeyClause, PrintOutputCapture<P> p) {
+        visitSpace(alternateRecordKeyClause.getPrefix(), p);
+        visitMarkers(alternateRecordKeyClause.getMarkers(), p);
+        p.append(alternateRecordKeyClause.getAlternateWords());
+        visit(alternateRecordKeyClause.getQualifiedDataName(), p);
+        visit(alternateRecordKeyClause.getPasswordClause(), p);
+        p.append(alternateRecordKeyClause.getDuplicates());
+        return alternateRecordKeyClause;
+    }
+
+    public Cobol visitPasswordClause(Cobol.PasswordClause passwordClause, PrintOutputCapture<P> p) {
+        visitSpace(passwordClause.getPrefix(), p);
+        visitMarkers(passwordClause.getMarkers(), p);
+        p.append(passwordClause.getWords());
+        visit(passwordClause.getDataName(), p);
+        return passwordClause;
+    }
+
+    public Cobol visitFileStatusClause(Cobol.FileStatusClause fileStatusClause, PrintOutputCapture<P> p) {
+        visitSpace(fileStatusClause.getPrefix(), p);
+        visitMarkers(fileStatusClause.getMarkers(), p);
+        p.append(fileStatusClause.getWords());
+        visitContainer("", fileStatusClause.getPadding().getQualifiedDataNames(), "", "", p);
+        return fileStatusClause;
+    }
+
+    public Cobol visitRelativeKeyClause(Cobol.RelativeKeyClause relativeKeyClause, PrintOutputCapture<P> p) {
+        visitSpace(relativeKeyClause.getPrefix(), p);
+        visitMarkers(relativeKeyClause.getMarkers(), p);
+        p.append(relativeKeyClause.getWords());
+        visit(relativeKeyClause.getQualifiedDataName(), p);
+        return relativeKeyClause;
+    }
 }

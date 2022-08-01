@@ -1738,4 +1738,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.AccessModeClause visitAccessModeClause(Cobol.AccessModeClause accessModeClause, P p) {
         return (Cobol.AccessModeClause) super.visitAccessModeClause(accessModeClause, p);
     }
+
+    @Override
+    public Cobol.RecordKeyClause visitRecordKeyClause(Cobol.RecordKeyClause recordKeyClause, P p) {
+        return (Cobol.RecordKeyClause) super.visitRecordKeyClause(recordKeyClause, p);
+    }
+
+    @Override
+    public Cobol.AlternateRecordKeyClause visitAlternateRecordKeyClause(Cobol.AlternateRecordKeyClause alternateRecordKeyClause, P p) {
+        return (Cobol.AlternateRecordKeyClause) super.visitAlternateRecordKeyClause(alternateRecordKeyClause, p);
+    }
+
+    @Override
+    public Cobol.PasswordClause visitPasswordClause(Cobol.PasswordClause passwordClause, P p) {
+        return (Cobol.PasswordClause) super.visitPasswordClause(passwordClause, p);
+    }
+
+    @Override
+    public Cobol.FileStatusClause visitFileStatusClause(Cobol.FileStatusClause fileStatusClause, P p) {
+        return (Cobol.FileStatusClause) super.visitFileStatusClause(fileStatusClause, p);
+    }
+
+    @Override
+    public Cobol.RelativeKeyClause visitRelativeKeyClause(Cobol.RelativeKeyClause relativeKeyClause, P p) {
+        return (Cobol.RelativeKeyClause) super.visitRelativeKeyClause(relativeKeyClause, p);
+    }
 }

@@ -920,18 +920,23 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class AlterStatement implements Statement {
+    class AlternateRecordKeyClause implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
 
         Space prefix;
         Markers markers;
-        String words;
-        List<AlterProceedTo> alterProceedTo;
+        String alternateWords;
+        QualifiedDataName qualifiedDataName;
+
+        @Nullable
+        PasswordClause passwordClause;
+
+        String duplicates;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitAlterStatement(this, p);
+            return v.visitAlternateRecordKeyClause(this, p);
         }
     }
 
@@ -951,6 +956,24 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitAlterProceedTo(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class AlterStatement implements Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        List<AlterProceedTo> alterProceedTo;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitAlterStatement(this, p);
         }
     }
 
@@ -4880,6 +4903,78 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class FileStatusClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<QualifiedDataName> qualifiedDataNames;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitFileStatusClause(this, p);
+        }
+
+        public List<Cobol.QualifiedDataName> getQualifiedDataNames() {
+            return qualifiedDataNames.getElements();
+        }
+
+        public FileStatusClause withQualifiedDataNames(List<Cobol.QualifiedDataName> qualifiedDataNames) {
+            return getPadding().withQualifiedDataNames(this.qualifiedDataNames.getPadding().withElements(CobolRightPadded.withElements(
+                    this.qualifiedDataNames.getPadding().getElements(), qualifiedDataNames)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final FileStatusClause t;
+
+            @Nullable
+            public CobolContainer<QualifiedDataName> getQualifiedDataNames() {
+                return t.qualifiedDataNames;
+            }
+
+            public FileStatusClause withQualifiedDataNames(@Nullable CobolContainer<QualifiedDataName> qualifiedDataNames) {
+                return t.qualifiedDataNames == qualifiedDataNames ? t : new FileStatusClause(t.padding, t.id, t.prefix, t.markers, t.words, qualifiedDataNames);
+            }
+        }
+    }
 
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -9045,6 +9140,25 @@ public interface Cobol extends Tree {
         }
     }
 
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class PasswordClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        CobolWord dataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitPasswordClause(this, p);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
@@ -11254,6 +11368,29 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
+    class RecordKeyClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String recordWords;
+        QualifiedDataName qualifiedDataName;
+
+        @Nullable
+        PasswordClause passwordClause;
+
+        String duplicates;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRecordKeyClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     class ReferenceModifier implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
@@ -11365,6 +11502,23 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class RelativeKeyClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRelativeKeyClause(this, p);
+        }
+    }
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -11385,87 +11539,6 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitRelease(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class RerunClause implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String rerun;
-
-        @Nullable
-        String on;
-
-        @Nullable
-        CobolWord name;
-
-        String every;
-
-        Cobol action;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitRerunClause(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class RerunEveryClock implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        CobolWord integerLiteral;
-        String clockUnits;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitRerunEveryClock(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class RerunEveryOf implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        String records;
-        CobolWord fileName;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitRerunEveryOf(this, p);
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class RerunEveryRecords implements Cobol {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        CobolWord integerLiteral;
-        String records;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitRerunEveryRecords(this, p);
         }
     }
 
@@ -12217,6 +12290,88 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitReportName(this, p);
+        }
+    }
+
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class RerunClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String rerun;
+
+        @Nullable
+        String on;
+
+        @Nullable
+        CobolWord name;
+
+        String every;
+
+        Cobol action;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRerunClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class RerunEveryClock implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        CobolWord integerLiteral;
+        String clockUnits;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRerunEveryClock(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class RerunEveryOf implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String records;
+        CobolWord fileName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRerunEveryOf(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class RerunEveryRecords implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        CobolWord integerLiteral;
+        String records;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitRerunEveryRecords(this, p);
         }
     }
 

@@ -215,6 +215,19 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitAlternateRecordKeyClause(CobolParser.AlternateRecordKeyClauseContext ctx) {
+        return new Cobol.AlternateRecordKeyClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ALTERNATE(), ctx.RECORD(), ctx.KEY(), ctx.IS()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName()),
+                visitNullable(ctx.passwordClause()),
+                words(ctx.WITH(), ctx.DUPLICATES())
+        );
+    }
+
+    @Override
     public Cobol.AlterProceedTo visitAlterProceedTo(CobolParser.AlterProceedToContext ctx) {
         return new Cobol.AlterProceedTo(
                 randomId(),
@@ -922,7 +935,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitFileStatusClause(CobolParser.FileStatusClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.FileStatusClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FILE(), ctx.STATUS(), ctx.IS()),
+                convertAllContainer(ctx.qualifiedDataName())
+        );
     }
 
     @Override
@@ -1668,7 +1687,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitPasswordClause(CobolParser.PasswordClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.PasswordClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PASSWORD(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataName())
+        );
     }
 
     @Override
@@ -1684,7 +1709,15 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitRecordKeyClause(CobolParser.RecordKeyClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.RecordKeyClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RECORD(), ctx.KEY(), ctx.IS()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName()),
+                visitNullable(ctx.passwordClause()),
+                words(ctx.WITH(), ctx.DUPLICATES())
+        );
     }
 
     @Override
@@ -1703,7 +1736,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitRelativeKeyClause(CobolParser.RelativeKeyClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.RelativeKeyClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RELATIVE(), ctx.KEY(), ctx.IS()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
+        );
     }
 
     @Override
