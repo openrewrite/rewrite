@@ -1703,4 +1703,9 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.Argument visitArgument(Cobol.Argument argument, P p) {
         return (Cobol.Argument) super.visitArgument(argument, p);
     }
+
+    @Override
+    public Cobol.SelectClause visitSelectClause(Cobol.SelectClause selectClause, P p) {
+        return (Cobol.SelectClause) super.visitSelectClause(selectClause, p);
+    }
 }

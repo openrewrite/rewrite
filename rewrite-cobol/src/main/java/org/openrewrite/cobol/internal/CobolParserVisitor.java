@@ -2548,7 +2548,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitSelectClause(CobolParser.SelectClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.SelectClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SELECT(), ctx.OPTIONAL()),
+                (Cobol.CobolWord) visit(ctx.fileName())
+        );
     }
 
     @Override

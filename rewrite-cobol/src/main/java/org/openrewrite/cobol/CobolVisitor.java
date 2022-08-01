@@ -3077,4 +3077,12 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         a = a.withIntegerLiteral((Cobol.CobolWord) visit(a.getIntegerLiteral(), p));
         return a;
     }
+
+    public Cobol visitSelectClause(Cobol.SelectClause selectClause, P p) {
+        Cobol.SelectClause s = selectClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withFileName((Cobol.CobolWord) visit(s.getFileName(), p));
+        return s;
+    }
 }

@@ -3088,4 +3088,12 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(argument.getIntegerLiteral(), p);
         return argument;
     }
+
+    public Cobol visitSelectClause(Cobol.SelectClause selectClause, PrintOutputCapture<P> p) {
+        visitSpace(selectClause.getPrefix(), p);
+        visitMarkers(selectClause.getMarkers(), p);
+        p.append(selectClause.getWords());
+        visit(selectClause.getFileName(), p);
+        return selectClause;
+    }
 }
