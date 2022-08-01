@@ -1167,6 +1167,28 @@ public interface Cobol extends Tree {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Argument implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        @Nullable
+        Cobol first;
+
+        @Nullable
+        CobolWord integerLiteral;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitArgument(this, p);
+        }
+    }
+
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -4294,7 +4316,7 @@ public interface Cobol extends Tree {
         InFile inFile;
 
         @Nullable
-        CobolContainer<ParenExpression> references;
+        CobolContainer<Parenthesized> references;
 
         @Nullable
         CobolContainer<InMnemonic> inMnemonics;
@@ -4313,11 +4335,11 @@ public interface Cobol extends Tree {
                     this.inDatas.getPadding().getElements(), inDatas)));
         }
 
-        public List<Cobol.ParenExpression> getReferences() {
+        public List<Cobol.Parenthesized> getReferences() {
             return references.getElements();
         }
 
-        public ConditionNameReference withReferences(List<Cobol.ParenExpression> references) {
+        public ConditionNameReference withReferences(List<Cobol.Parenthesized> references) {
             return getPadding().withReferences(this.references.getPadding().withElements(CobolRightPadded.withElements(
                     this.references.getPadding().getElements(), references)));
         }
@@ -4360,11 +4382,11 @@ public interface Cobol extends Tree {
             }
 
             @Nullable
-            public CobolContainer<Cobol.ParenExpression> getReferences() {
+            public CobolContainer<Cobol.Parenthesized> getReferences() {
                 return t.references;
             }
 
-            public ConditionNameReference withReferences(@Nullable CobolContainer<Cobol.ParenExpression> references) {
+            public ConditionNameReference withReferences(@Nullable CobolContainer<Cobol.Parenthesized> references) {
                 return t.references == references ? t : new ConditionNameReference(t.padding, t.id, t.prefix, t.markers, t.name, t.inDatas, t.inFile, references, t.inMnemonics);
             }
 
@@ -10372,19 +10394,18 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class ParenExpression implements Cobol {
+    class Parenthesized implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
-
         Space prefix;
         Markers markers;
         String leftParen;
-        Cobol expression;
+        List<Cobol> contents;
         String rightParen;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitParenExpression(this, p);
+            return v.visitParenthesized(this, p);
         }
     }
 
@@ -10416,7 +10437,7 @@ public interface Cobol extends Tree {
         @Getter
         @Nullable
         @With
-        ParenExpression parenExpression;
+        Parenthesized Parenthesized;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -10456,7 +10477,7 @@ public interface Cobol extends Tree {
             }
 
             public Picture withWords(CobolContainer<Cobol.CobolWord> words) {
-                return t.words == words ? t : new Picture(t.padding, t.id, t.prefix, t.markers, words, t.parenExpression);
+                return t.words == words ? t : new Picture(t.padding, t.id, t.prefix, t.markers, words, t.Parenthesized);
             }
         }
     }
@@ -11162,7 +11183,7 @@ public interface Cobol extends Tree {
         Markers markers;
         ArithmeticExpression arithmeticExpression;
         RelationalOperator relationalOperator;
-        ParenExpression combinedCondition;
+        Parenthesized combinedCondition;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -16187,42 +16208,6 @@ public interface Cobol extends Tree {
             public TableCall withSubscripts(CobolContainer<Cobol.Parenthesized> subscripts) {
                 return t.subscripts == subscripts ? t : new TableCall(t.padding, t.id, t.prefix, t.markers, t.qualifiedDataName, subscripts, t.referenceModifier);
             }
-        }
-    }
-
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
-    class Parenthesized implements Cobol {
-        @Getter
-        @EqualsAndHashCode.Include
-        @With
-        UUID id;
-
-        @Getter
-        @With
-        Space prefix;
-
-        @Getter
-        @With
-        Markers markers;
-
-        @Getter
-        @With
-        String leftParen;
-
-        @Getter
-        @With
-        List<Cobol> contents;
-
-        @Getter
-        @With
-        String rightParen;
-
-        @Override
-        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
-            return v.visitParenthesized(this, p);
         }
     }
 

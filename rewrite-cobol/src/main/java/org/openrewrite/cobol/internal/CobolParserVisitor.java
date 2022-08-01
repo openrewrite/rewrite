@@ -230,6 +230,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitArgument(CobolParser.ArgumentContext ctx) {
+        return new Cobol.Argument(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                visit(ctx.literal(), ctx.identifier(), ctx.qualifiedDataName(), ctx.indexName(), ctx.arithmeticExpression()),
+                visitNullable(ctx.integerLiteral())
+        );
+    }
+
+    @Override
     public Object visitArithmeticExpression(CobolParser.ArithmeticExpressionContext ctx) {
         return new Cobol.ArithmeticExpression(
                 randomId(),
@@ -304,12 +315,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     @Override
     public Object visitBasis(CobolParser.BasisContext ctx) {
         if (ctx.LPARENCHAR() != null) {
-            return new Cobol.ParenExpression(
+            return new Cobol.Parenthesized(
                     randomId(),
                     prefix(ctx),
                     Markers.EMPTY,
                     words(ctx.LPARENCHAR()),
-                    (Cobol) visit(ctx.arithmeticExpression()),
+                    singletonList((Cobol) visit(ctx.arithmeticExpression())),
                     words(ctx.RPARENCHAR())
             );
         } else {
@@ -980,12 +991,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 (Cobol.ArithmeticExpression) visit(ctx.arithmeticExpression()),
                 (Cobol.RelationalOperator) visit(ctx.relationalOperator()),
-                new Cobol.ParenExpression(
+                new Cobol.Parenthesized(
                         randomId(),
                         prefix(ctx),
                         Markers.EMPTY,
                         words(ctx.LPARENCHAR()),
-                        (Cobol) visit(ctx.relationCombinedCondition()),
+                        singletonList((Cobol) visit(ctx.relationCombinedCondition())),
                         words(ctx.RPARENCHAR())
                 )
         );
@@ -1632,6 +1643,20 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     @Override
     public Object visitRecordKeyClause(CobolParser.RecordKeyClauseContext ctx) {
         throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitReferenceModifier(CobolParser.ReferenceModifierContext ctx) {
+        return new Cobol.ReferenceModifier(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LPARENCHAR()),
+                (Cobol.ArithmeticExpression) visit(ctx.characterPosition()),
+                words(ctx.COLONCHAR()),
+                (Cobol.ArithmeticExpression) visit(ctx.length()),
+                words(ctx.RPARENCHAR())
+        );
     }
 
     @Override
@@ -2538,12 +2563,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitSimpleCondition(CobolParser.SimpleConditionContext ctx) {
-        return ctx.condition() != null ? new Cobol.ParenExpression(
+        return ctx.condition() != null ? new Cobol.Parenthesized(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.LPARENCHAR()),
-                (Cobol) visit(ctx.condition()),
+                singletonList((Cobol) visit(ctx.condition())),
                 words(ctx.RPARENCHAR())
         ) : visit(ctx.relationCondition(), ctx.classCondition(), ctx.conditionNameReference());
     }
@@ -4949,12 +4974,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitPictureCardinality(CobolParser.PictureCardinalityContext ctx) {
-        return new Cobol.ParenExpression(
+        return new Cobol.Parenthesized(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.LPARENCHAR()),
-                (Cobol) visit(ctx.integerLiteral()),
+                singletonList((Cobol) visit(ctx.integerLiteral())),
                 words(ctx.RPARENCHAR())
         );
     }

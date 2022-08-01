@@ -170,7 +170,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
         pp = pp.withWords(ListUtils.map(pp.getWords(), it -> (Cobol.CobolWord) visit(it, p)));
-        pp = pp.withParenExpression((Cobol.ParenExpression) visit(pp.getParenExpression(), p));
+        pp = pp.withParenthesized((Cobol.Parenthesized) visit(pp.getParenthesized(), p));
         return pp;
     }
 
@@ -1723,14 +1723,6 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return c;
     }
 
-    public Cobol visitParenExpression(Cobol.ParenExpression parenExpression, P p) {
-        Cobol.ParenExpression pp = parenExpression;
-        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
-        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
-        pp = pp.withExpression(visit(parenExpression.getExpression(), p));
-        return pp;
-    }
-
     public Cobol visitRelationalOperator(Cobol.RelationalOperator relationalOperator, P p) {
         Cobol.RelationalOperator r = relationalOperator;
         r = r.withPrefix(visitSpace(r.getPrefix(), p));
@@ -1754,7 +1746,7 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
         r = r.withArithmeticExpression((Cobol.ArithmeticExpression) visit(r.getArithmeticExpression(), p));
         r = r.withRelationalOperator((Cobol.RelationalOperator) visit(r.getRelationalOperator(), p));
-        r = r.withCombinedCondition((Cobol.ParenExpression) visit(r.getCombinedCondition(), p));
+        r = r.withCombinedCondition((Cobol.Parenthesized) visit(r.getCombinedCondition(), p));
         return r;
     }
 
@@ -3075,5 +3067,14 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
         pp = pp.getPadding().withLibraryDescriptionEntries(visitContainer(pp.getPadding().getLibraryDescriptionEntries(), p));
         return pp;
+    }
+
+    public Cobol visitArgument(Cobol.Argument argument, P p) {
+        Cobol.Argument a = argument;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withFirst((Cobol) visit(a.getFirst(), p));
+        a = a.withIntegerLiteral((Cobol.CobolWord) visit(a.getIntegerLiteral(), p));
+        return a;
     }
 }

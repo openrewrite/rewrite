@@ -970,11 +970,6 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
-    public Cobol.ParenExpression visitParenExpression(Cobol.ParenExpression parenExpression, P p) {
-        return (Cobol.ParenExpression) super.visitParenExpression(parenExpression, p);
-    }
-
-    @Override
     public Cobol.RelationalOperator visitRelationalOperator(Cobol.RelationalOperator relationalOperator, P p) {
         return (Cobol.RelationalOperator) super.visitRelationalOperator(relationalOperator, p);
     }
@@ -1702,5 +1697,10 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     @Override
     public Cobol.ProgramLibrarySection visitProgramLibrarySection(Cobol.ProgramLibrarySection programLibrarySection, P p) {
         return (Cobol.ProgramLibrarySection) super.visitProgramLibrarySection(programLibrarySection, p);
+    }
+
+    @Override
+    public Cobol.Argument visitArgument(Cobol.Argument argument, P p) {
+        return (Cobol.Argument) super.visitArgument(argument, p);
     }
 }

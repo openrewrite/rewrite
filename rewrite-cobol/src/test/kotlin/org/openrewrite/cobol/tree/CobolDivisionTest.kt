@@ -576,7 +576,6 @@ class CobolDivisionTest : RewriteTest {
         """)
     )
 
-    @Disabled("Table call not yet implemented")
     @Test
     fun tableCallTest() = rewriteRun(
         cobol("""
@@ -586,6 +585,19 @@ class CobolDivisionTest : RewriteTest {
             COMMA-SUBSCRIPT-TEST.
             EVALUATE SUBSCRIPT
             WHEN IDENTIFIER (IDENTIFIER, IDENTIFIER IDENTIFIER)
+                CONTINUE.
+        """)
+    )
+
+    @Test
+    fun functionCallTest() = rewriteRun(
+        cobol("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. acceptStatement.
+            PROCEDURE DIVISION.
+            COMMA-SUBSCRIPT-TEST.
+            EVALUATE SUBSCRIPT
+            WHEN IDENTIFIER (FUNCTION INTEGER (IDENTIFIER, IDENTIFIER IDENTIFIER) (1: 10))
                 CONTINUE.
         """)
     )
@@ -605,7 +617,6 @@ class CobolDivisionTest : RewriteTest {
         """)
     )
 
-    @Disabled("Requires table call to be implemented")
     @Test
     fun multiElementLiteral() = rewriteRun(
         cobol("""

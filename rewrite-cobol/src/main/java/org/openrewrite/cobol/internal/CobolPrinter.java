@@ -231,7 +231,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(picture.getPrefix(), p);
         visitMarkers(picture.getMarkers(), p);
         visitContainer("", picture.getPadding().getWords(), "", "", p);
-        visit(picture.getParenExpression(), p);
+        visit(picture.getParenthesized(), p);
         return picture;
     }
 
@@ -1719,15 +1719,6 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return conditionNameReference;
     }
 
-    public Cobol visitParenExpression(Cobol.ParenExpression parenExpression, PrintOutputCapture<P> p) {
-        visitSpace(parenExpression.getPrefix(), p);
-        visitMarkers(parenExpression.getMarkers(), p);
-        p.append(parenExpression.getLeftParen());
-        visit(parenExpression.getExpression(), p);
-        p.append(parenExpression.getRightParen());
-        return parenExpression;
-    }
-
     public Cobol visitRelationalOperator(Cobol.RelationalOperator relationalOperator, PrintOutputCapture<P> p) {
         visitSpace(relationalOperator.getPrefix(), p);
         visitMarkers(relationalOperator.getMarkers(), p);
@@ -3086,5 +3077,13 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(programLibrarySection.getWords());
         visitContainer("", programLibrarySection.getPadding().getLibraryDescriptionEntries(), "", "", p);
         return programLibrarySection;
+    }
+
+    public Cobol visitArgument(Cobol.Argument argument, PrintOutputCapture<P> p) {
+        visitSpace(argument.getPrefix(), p);
+        visitMarkers(argument.getMarkers(), p);
+        visit(argument.getFirst(), p);
+        visit(argument.getIntegerLiteral(), p);
+        return argument;
     }
 }
