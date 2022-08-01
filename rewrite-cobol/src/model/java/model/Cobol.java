@@ -37,4 +37,8 @@ public interface Cobol {
     class Condition {}
     @Skip
     class ProcedureName {}
+
+    class Template implements Cobol {
+
+    }
 }
