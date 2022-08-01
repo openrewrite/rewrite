@@ -19,6 +19,8 @@ import generate.Skip;
 import org.openrewrite.cobol.tree.CobolContainer;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.List;
+
 public interface Cobol {
 
     @Skip
@@ -38,7 +40,8 @@ public interface Cobol {
     @Skip
     class ProcedureName {}
 
+    @Skip
     class Template implements Cobol {
-
     }
+
 }

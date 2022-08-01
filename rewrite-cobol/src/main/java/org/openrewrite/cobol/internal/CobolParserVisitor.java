@@ -16,7 +16,6 @@
 package org.openrewrite.cobol.internal;
 
 import org.antlr.v4.runtime.ParserRuleContext;
-import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -850,7 +849,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.LPARENCHAR()),
-                convertAllList(singletonList(","), ctx.subscript()),
+                convertAllPrefixedList(singletonList(","), ctx.subscript()),
                 words(ctx.RPARENCHAR())
         );
     }
@@ -1041,7 +1040,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                convertAllList(Arrays.asList("AND", "OR"), ctx.arithmeticExpression())
+                convertAllPrefixedList(Arrays.asList("AND", "OR"), ctx.arithmeticExpression())
         );
     }
 
@@ -2005,7 +2004,14 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReserveClause(CobolParser.ReserveClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReserveClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllList(emptyList(), singletonList(ctx.RESERVE()), singletonList(ctx.NO()),
+                        singletonList(ctx.integerLiteral()), singletonList(ctx.ALTERNATE()),
+                        singletonList(ctx.AREA()), singletonList(ctx.AREAS()))
+        );
     }
 
     @Override
@@ -4512,7 +4518,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
-                convertAllList(singletonList(","), ctx.stringSending()),
+                convertAllPrefixedList(singletonList(","), ctx.stringSending()),
                 visit(ctx.stringDelimitedByPhrase(), ctx.stringForPhrase())
         );
     }
@@ -4591,7 +4597,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.LPARENCHAR()),
-                convertAllList(Collections.singletonList(","), ctx.subscript()),
+                convertAllPrefixedList(Collections.singletonList(","), ctx.subscript()),
                 words(ctx.RPARENCHAR())
         );
     }
@@ -4616,7 +4622,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.LPARENCHAR()),
-                convertAllList(Collections.singletonList(","), ctx.argument()),
+                convertAllPrefixedList(Collections.singletonList(","), ctx.argument()),
                 words(ctx.RPARENCHAR())
         );
     }
@@ -5087,7 +5093,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @SafeVarargs
-    private final List<Cobol> convertAllList(List<String> delimiters, List<? extends ParserRuleContext>... trees) {
+    private final List<Cobol> convertAllPrefixedList(List<String> delimiters, List<? extends ParseTree>... trees) {
         return Arrays.stream(trees)
                 .flatMap(Collection::stream)
                 .filter(Objects::nonNull)
@@ -5109,6 +5115,38 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                     }
                     cursor = saveCursor;
                     return Stream.of(cobol);
+                })
+                .collect(Collectors.toList());
+    }
+
+    @SafeVarargs
+    private final List<Cobol> convertAllList(List<String> delimiters, List<? extends ParseTree>... trees) {
+        return Arrays.stream(trees)
+                .flatMap(Collection::stream)
+                .filter(Objects::nonNull)
+                .flatMap(it -> {
+                    int saveCursor = cursor;
+                    Space prefix = whitespace();
+                    Cobol.CobolWord cw = null;
+                    for (String delimiter : delimiters) {
+                        if (source.substring(cursor).startsWith(delimiter)) {
+                            cw = new Cobol.CobolWord(
+                                    randomId(),
+                                    prefix,
+                                    Markers.EMPTY,
+                                    delimiter
+                            );
+                            cursor += delimiter.length(); // skip the delimiter
+                            break;
+                        }
+                    }
+
+                    if (cw == null) {
+                        cursor = saveCursor;
+                    }
+
+                    Cobol cobol = (Cobol) visit(it);
+                    return cw == null ? Stream.of(cobol) : Stream.of(cw, cobol);
                 })
                 .collect(Collectors.toList());
     }

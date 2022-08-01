@@ -3104,4 +3104,13 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(assignClause.getName(), p);
         return assignClause;
     }
+
+    public Cobol visitReserveClause(Cobol.ReserveClause reserveClause, PrintOutputCapture<P> p) {
+        visitSpace(reserveClause.getPrefix(), p);
+        visitMarkers(reserveClause.getMarkers(), p);
+        for (Cobol c : reserveClause.getWords()) {
+            visit(c, p);
+        }
+        return reserveClause;
+    }
 }

@@ -105,12 +105,14 @@ class CobolDivisionTest : RewriteTest {
                 IDENTIFICATION DIVISION.
                 PROGRAM-ID.
                     IC109A.
+                ENVIRONMENT DIVISION.
                 INPUT-OUTPUT SECTION.
                 FILE-CONTROL.
                     SELECT PRINT-FILE ASSIGN TO
-                    XXXXX055.
+                        XXXXX055.
                     SELECT SEQ-FILE ASSIGN TO
-                    XXXXX014.
+                        XXXXX014.
+                    SELECT SEQ-FILE RESERVE NO ALTERNATE AREA.
             """
         )
     )

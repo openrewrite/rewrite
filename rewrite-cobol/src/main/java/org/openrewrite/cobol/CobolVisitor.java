@@ -3092,4 +3092,12 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         return a;
     }
+
+    public Cobol visitReserveClause(Cobol.ReserveClause reserveClause, P p) {
+        Cobol.ReserveClause r = reserveClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withWords(ListUtils.map(r.getWords(), t -> (Cobol.CobolWord) visit(t, p)));
+        return r;
+    }
 }
