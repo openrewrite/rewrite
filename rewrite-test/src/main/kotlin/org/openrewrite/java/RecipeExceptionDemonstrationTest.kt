@@ -17,7 +17,6 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.test.RewriteTest
@@ -26,16 +25,15 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
 
     @BeforeEach
     fun beforeEach() {
-        RecipeExceptionDemonstration.RecipeExceptionDemonstrationException.restrictStackTrace = true
+        RecipeExceptionDemonstration.DemonstrationException.restrictStackTrace = true
     }
 
     @AfterEach
     fun afterEach() {
-        RecipeExceptionDemonstration.RecipeExceptionDemonstrationException.restrictStackTrace = false
+        RecipeExceptionDemonstration.DemonstrationException.restrictStackTrace = false
     }
 
     @Test
-    @Disabled("Not working yet")
     fun listAdd(jp: JavaParser) = rewriteRun(
         { spec ->
             spec
@@ -56,16 +54,9 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 import java.util.*;
                 class Test {
                     void test(List<Integer> list) {
-                        /*~~(java.lang.RuntimeException: Demonstrating an exception thrown on a matching method.
-                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.visitMethodInvocation(RecipeExceptionDemonstration.java:58)
-                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.visitMethodInvocation(RecipeExceptionDemonstration.java:52)
-                  org.openrewrite.java.tree.J${'$'}MethodInvocation.acceptJava(J.java:3393)
-                  org.openrewrite.java.tree.J.accept(J.java:55)
-                  org.openrewrite.TreeVisitor.visit(TreeVisitor.java:224)
-                  org.openrewrite.TreeVisitor.visitAndCast(TreeVisitor.java:308)
-                  org.openrewrite.java.JavaVisitor.visitRightPadded(JavaVisitor.java:1233)
-                  org.openrewrite.java.JavaVisitor.lambda${'$'}visitBlock${'$'}4(JavaVisitor.java:375)
-                  ...)~~>*/list.add(42);
+                        /*~~(org.openrewrite.java.RecipeExceptionDemonstration${'$'}DemonstrationException: Demonstrating an exception thrown on a matching method.
+                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.visitMethodInvocation(RecipeExceptionDemonstration.java:54)
+                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.visitMethodInvocation(RecipeExceptionDemonstration.java:48))~~>*/list.add(42);
                     }
                 }
             """

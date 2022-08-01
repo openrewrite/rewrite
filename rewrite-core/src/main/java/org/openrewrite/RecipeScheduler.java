@@ -18,15 +18,14 @@ package org.openrewrite;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import org.openrewrite.internal.FindUncaughtVisitorException;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.MarkerIdPrinter;
 import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 
-import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -37,7 +36,6 @@ import java.util.function.UnaryOperator;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.Tree.randomId;
 
@@ -117,25 +115,7 @@ public interface RecipeScheduler {
 
                     boolean isChanged = !original.getSourcePath().equals(s.getSourcePath());
                     if (!isChanged) {
-                        TreeVisitor<Tree, PrintOutputCapture<ExecutionContext>> markerIdPrinter = new TreeVisitor<Tree, PrintOutputCapture<ExecutionContext>>() {
-                            @Override
-                            public Tree visit(@Nullable Tree tree, PrintOutputCapture<ExecutionContext> p) {
-                                if (tree instanceof Markers) {
-                                    String markerIds = ((Markers) tree).entries().stream()
-                                            .filter(marker -> !(marker instanceof RecipesThatMadeChanges))
-                                            .map(marker -> String.valueOf(marker.hashCode()))
-                                            .collect(joining(","));
-                                    if (!markerIds.isEmpty()) {
-                                        p.out
-                                                .append("markers[")
-                                                .append(markerIds)
-                                                .append("]->");
-                                    }
-                                }
-                                return super.visit(tree, p);
-                            }
-                        };
-
+                        MarkerIdPrinter markerIdPrinter = new MarkerIdPrinter();
                         PrintOutputCapture<ExecutionContext> originalOutput = new PrintOutputCapture<>(ctx);
                         PrintOutputCapture<ExecutionContext> sOutput = new PrintOutputCapture<>(ctx);
                         markerIdPrinter.visit(original, originalOutput);
@@ -256,25 +236,9 @@ public interface RecipeScheduler {
                     } catch (Throwable t) {
                         if (t instanceof UncaughtVisitorException) {
                             UncaughtVisitorException vt = (UncaughtVisitorException) t;
-                            Tree nearestTree = (Tree) vt.getCursor().getPath(Tree.class::isInstance).next();
 
                             //noinspection unchecked
-                            afterFile = (S) new TreeVisitor<Tree, Integer>() {
-                                @Override
-                                public Tree preVisit(Tree tree, Integer integer) {
-                                    if (tree == nearestTree) {
-                                        try {
-                                            Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
-                                            Method withMarkers = tree.getClass().getDeclaredMethod("withMarkers", Markers.class);
-                                            Markers markers = (Markers) getMarkers.invoke(tree);
-                                            return (Tree) withMarkers.invoke(tree, markers
-                                                    .computeByType(new UncaughtVisitorExceptionResult(vt), (s1, s2) -> s1 == null ? s2 : s1));
-                                        } catch (Throwable ignored) {
-                                        }
-                                    }
-                                    return tree;
-                                }
-                            }.visitNonNull(requireNonNull(afterFile), 0);
+                            afterFile = (S) new FindUncaughtVisitorException(vt).visitNonNull(requireNonNull(afterFile), 0);
                         }
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ctx.getOnError().accept(t);

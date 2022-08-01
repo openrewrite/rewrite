@@ -19,37 +19,20 @@ import de.danielbechler.diff.ObjectDifferBuilder;
 import de.danielbechler.diff.node.DiffNode;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
-import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.description.type.TypeDescription;
-import net.bytebuddy.description.type.TypeDescription.ForLoadedType;
-import net.bytebuddy.dynamic.DynamicType;
-import net.bytebuddy.dynamic.scaffold.TypeValidation;
-import net.bytebuddy.implementation.FieldAccessor;
-import net.bytebuddy.implementation.MethodCall;
-import net.bytebuddy.implementation.MethodDelegation;
-import net.bytebuddy.implementation.bind.MethodDelegationBinder;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.TreeVisitorAdapterInterceptor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
-import java.io.File;
-import java.lang.reflect.*;
-import java.util.ArrayList;
-import java.util.IdentityHashMap;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
-
-import static java.lang.reflect.Modifier.*;
-import static java.util.Objects.requireNonNull;
-import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.of;
-import static net.bytebuddy.description.type.TypeDescription.Generic.Builder.parameterizedType;
-import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -64,14 +47,6 @@ import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Defaul
  * @param <P> An input object that is passed to every visit method.
  */
 public abstract class TreeVisitor<T extends Tree, P> {
-    private static final ByteBuddy byteBuddy = new ByteBuddy()
-            // supports the case of package private bounds on visitors like LineEndingsCount
-            .with(TypeValidation.DISABLED);
-
-    private static final Map<Class<?>, Map<Class<?>, Class<?>>> adaptedVisitorsCache =
-            requireNonNull(Metrics.globalRegistry.gaugeMapSize("rewrite.adapted.visitor.cache.size", Tags.empty(),
-                    new IdentityHashMap<>()));
-
     private static final Cursor ROOT = new Cursor(null, "root");
 
     private Cursor cursor = ROOT;
@@ -401,90 +376,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
         } else if (!isAdaptableTo(adaptTo)) {
             throw new IllegalArgumentException(getClass().getSimpleName() + " must be adaptable to " + adaptTo.getName() + ".");
         }
-
-        try {
-            Class<?> delegateType = adapterDelegateType();
-            Map<Class<?>, Class<?>> adaptedFrom = adaptedVisitorsCache.get(getClass());
-            if (adaptedFrom != null && adaptedFrom.containsKey(adaptTo)) {
-                //noinspection unchecked
-                return (V) adaptedFrom.get(adaptTo).getDeclaredConstructor(delegateType).newInstance(this);
-            }
-
-            TypeVariable<?>[] tp = getClass().getTypeParameters();
-            Type genericSuperclass = getClass().getGenericSuperclass();
-            DynamicType.Builder<?> classBuilder;
-            if (tp.length > 0) {
-                TypeDescription.Generic generic = parameterizedType(ForLoadedType.of(adaptTo), of(tp[0]).build()).build();
-                classBuilder = byteBuddy.subclass(generic, NO_CONSTRUCTORS).typeVariable(tp[0].getName());
-            } else {
-                Type p = ((ParameterizedType) genericSuperclass).getActualTypeArguments()[0];
-                TypeDescription.Generic generic = parameterizedType(ForLoadedType.of(adaptTo), of(p).build()).build();
-                classBuilder = byteBuddy.subclass(generic, NO_CONSTRUCTORS);
-            }
-
-            if (!getClass().isAnonymousClass()) {
-                classBuilder = classBuilder.name(getClass().getSimpleName().trim() + "_" + adaptTo.getSimpleName());
-            }
-
-            DynamicType.Builder.MethodDefinition.ReceiverTypeDefinition<?> builder = classBuilder
-                    .defineField("delegate", delegateType, PRIVATE | FINAL)
-                    .defineConstructor(PUBLIC).withParameter(delegateType)
-                    .intercept(MethodCall.invoke(adaptTo.getConstructor())
-                            .andThen(FieldAccessor.ofField("delegate").setsArgumentAt(0)));
-
-            for (Method method : getClass().getDeclaredMethods()) {
-                if (method.getName().startsWith("visit") || method.getName().equals("preVisit") || method.getName().equals("postVisit")) {
-                    if (method.getName().equals("visitSourceFile")) {
-                        continue;
-                    }
-
-                    nextMethod:
-                    for (Method adaptToMethod : adaptTo.getMethods()) {
-                        if (method.getName().equals(adaptToMethod.getName()) && method.getParameterCount() == adaptToMethod.getParameterCount() && !Modifier.isFinal(adaptToMethod.getModifiers())) {
-                            Class<?>[] parameterTypes = method.getParameterTypes();
-                            for (int i = 0; i < parameterTypes.length; i++) {
-                                if (!method.getParameterTypes()[i].equals(parameterTypes[i])) {
-                                    continue nextMethod;
-                                }
-                            }
-                            builder = builder.define(method)
-                                    .intercept(MethodDelegation
-                                            .withDefaultConfiguration()
-                                            .withBindingResolver((ambiguityResolver, source, targets) -> {
-                                                List<MethodDelegationBinder.MethodBinding> targetsWithMatchingName = new ArrayList<>();
-                                                for (MethodDelegationBinder.MethodBinding target : targets) {
-                                                    if (target.getTarget().getName().equals(source.getName())) {
-                                                        targetsWithMatchingName.add(target);
-                                                    }
-                                                }
-                                                return MethodDelegationBinder.BindingResolver.Default.INSTANCE.resolve(ambiguityResolver, source, targetsWithMatchingName);
-                                            })
-                                            .toField("delegate"));
-                            break;
-                        }
-                    }
-                }
-            }
-
-            DynamicType.Unloaded<?> unloaded = builder.make();
-
-            // for debugging class generation issues
-//            try {
-//                File adapted = new File("adapted");
-//                unloaded.saveIn(adapted);
-//            } catch (java.io.IOException e) {
-//                throw new RuntimeException(e);
-//            }
-
-            Class<?> adapted = unloaded.load(getClass().getClassLoader()).getLoaded();
-
-            adaptedVisitorsCache.computeIfAbsent(getClass(), from -> new IdentityHashMap<>()).put(adaptTo, adapted);
-
-            //noinspection unchecked
-            return (V) adapted.getDeclaredConstructor(delegateType).newInstance(this);
-        } catch (InstantiationException | NoSuchMethodException | InvocationTargetException |
-                 IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
+        return TreeVisitorAdapterInterceptor.adapt(this, adaptTo);
     }
 }

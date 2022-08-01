@@ -20,15 +20,10 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -56,16 +51,16 @@ public class RecipeExceptionDemonstration extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 if (methodMatcher.matches(method)) {
-                    throw new RecipeExceptionDemonstrationException("Demonstrating an exception thrown on a matching method.");
+                    throw new DemonstrationException("Demonstrating an exception thrown on a matching method.");
                 }
                 return super.visitMethodInvocation(method, executionContext);
             }
         };
     }
 
-    public static class RecipeExceptionDemonstrationException extends RuntimeException {
+    public static class DemonstrationException extends RuntimeException {
         static boolean restrictStackTrace = false;
-        public RecipeExceptionDemonstrationException(String message) {
+        public DemonstrationException(String message) {
             super(message);
         }
 
@@ -74,7 +69,7 @@ public class RecipeExceptionDemonstration extends Recipe {
             if (restrictStackTrace) {
                 List<StackTraceElement> restricted = new ArrayList<>();
                 for (StackTraceElement ste : super.getStackTrace()) {
-                    if (ste.getClassName().startsWith(RecipeExceptionDemonstration.class.getName())) {
+                    if (ste.getClassName().startsWith(RecipeExceptionDemonstration.class.getName() + "$")) {
                         restricted.add(ste);
                     }
                 }
