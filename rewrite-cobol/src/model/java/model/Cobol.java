@@ -40,8 +40,5 @@ public interface Cobol {
     @Skip
     class ProcedureName {}
 
-    @Skip
-    class Template implements Cobol {
-    }
-
+    
 }

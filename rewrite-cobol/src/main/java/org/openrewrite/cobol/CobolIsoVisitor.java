@@ -1718,4 +1718,9 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.ReserveClause visitReserveClause(Cobol.ReserveClause reserveClause, P p) {
         return (Cobol.ReserveClause) super.visitReserveClause(reserveClause, p);
     }
+
+    @Override
+    public Cobol.OrganizationClause visitOrganizationClause(Cobol.OrganizationClause organizationClause, P p) {
+        return (Cobol.OrganizationClause) super.visitOrganizationClause(organizationClause, p);
+    }
 }

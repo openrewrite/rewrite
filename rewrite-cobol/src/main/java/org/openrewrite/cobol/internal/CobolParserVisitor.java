@@ -4101,7 +4101,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitOrganizationClause(CobolParser.OrganizationClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.OrganizationClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ORGANIZATION(), ctx.IS(), ctx.LINE(), ctx.RECORD(), ctx.BINARY(),
+                        ctx.SEQUENTIAL(), ctx.RELATIVE(), ctx.INDEXED())
+        );
     }
 
     @Override

@@ -113,6 +113,7 @@ class CobolDivisionTest : RewriteTest {
                     SELECT SEQ-FILE ASSIGN TO
                         XXXXX014.
                     SELECT SEQ-FILE RESERVE NO ALTERNATE AREA.
+                    SELECT SEQ-FILE ORGANIZATION IS RECORD BINARY INDEXED.
             """
         )
     )

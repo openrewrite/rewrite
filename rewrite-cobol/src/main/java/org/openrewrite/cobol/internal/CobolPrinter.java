@@ -3113,4 +3113,11 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         }
         return reserveClause;
     }
+
+    public Cobol visitOrganizationClause(Cobol.OrganizationClause organizationClause, PrintOutputCapture<P> p) {
+        visitSpace(organizationClause.getPrefix(), p);
+        visitMarkers(organizationClause.getMarkers(), p);
+        p.append(organizationClause.getWords());
+        return organizationClause;
+    }
 }

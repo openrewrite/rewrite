@@ -3100,4 +3100,11 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         r = r.withWords(ListUtils.map(r.getWords(), t -> (Cobol.CobolWord) visit(t, p)));
         return r;
     }
+
+    public Cobol visitOrganizationClause(Cobol.OrganizationClause organizationClause, P p) {
+        Cobol.OrganizationClause o = organizationClause;
+        o = o.withPrefix(visitSpace(o.getPrefix(), p));
+        o = o.withMarkers(visitMarkers(o.getMarkers(), p));
+        return o;
+    }
 }
