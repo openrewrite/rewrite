@@ -3170,4 +3170,58 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         r = r.withQualifiedDataName((Cobol.QualifiedDataName) visit(r.getQualifiedDataName(), p));
         return r;
     }
+
+    public Cobol visitExternalClause(Cobol.ExternalClause externalClause, P p) {
+        Cobol.ExternalClause e = externalClause;
+        e = e.withPrefix(visitSpace(e.getPrefix(), p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        return e;
+    }
+
+    public Cobol visitGlobalClause(Cobol.GlobalClause globalClause, P p) {
+        Cobol.GlobalClause g = globalClause;
+        g = g.withPrefix(visitSpace(g.getPrefix(), p));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
+        return g;
+    }
+    public Cobol visitBlockContainsClause(Cobol.BlockContainsClause blockContainsClause, P p) {
+        Cobol.BlockContainsClause b = blockContainsClause;
+        b = b.withPrefix(visitSpace(b.getPrefix(), p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        b = b.withIntegerLiteral((Cobol.CobolWord) visit(b.getIntegerLiteral(), p));
+        b = b.withBlockContainsTo((Cobol.BlockContainsTo) visit(b.getBlockContainsTo(), p));
+        return b;
+    }
+
+    public Cobol visitBlockContainsTo(Cobol.BlockContainsTo blockContainsTo, P p) {
+        Cobol.BlockContainsTo b = blockContainsTo;
+        b = b.withPrefix(visitSpace(b.getPrefix(), p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        b = b.withIntegerLiteral((Cobol.CobolWord) visit(b.getIntegerLiteral(), p));
+        return b;
+    }
+
+    public Cobol visitLabelRecordsClause(Cobol.LabelRecordsClause labelRecordsClause, P p) {
+        Cobol.LabelRecordsClause l = labelRecordsClause;
+        l = l.withPrefix(visitSpace(l.getPrefix(), p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        l = l.getPadding().withDataNames(visitContainer(l.getPadding().getDataNames(), p));
+        return l;
+    }
+
+    public Cobol visitValueOfClause(Cobol.ValueOfClause valueOfClause, P p) {
+        Cobol.ValueOfClause v = valueOfClause;
+        v = v.withPrefix(visitSpace(v.getPrefix(), p));
+        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        v = v.getPadding().withValuePairs(visitContainer(v.getPadding().getValuePairs(), p));
+        return v;
+    }
+
+    public Cobol visitValuePair(Cobol.ValuePair valuePair, P p) {
+        Cobol.ValuePair v = valuePair;
+        v = v.withPrefix(visitSpace(v.getPrefix(), p));
+        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        v = v.withSystemName((Cobol.CobolWord) visit(v.getSystemName(), p));
+        return v;
+    }
 }

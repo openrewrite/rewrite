@@ -481,6 +481,30 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitBlockContainsClause(CobolParser.BlockContainsClauseContext ctx) {
+        return new Cobol.BlockContainsClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BLOCK(), ctx.CONTAINS()),
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                visitNullable(ctx.blockContainsTo()),
+                words(ctx.RECORDS(), ctx.CHARACTERS())
+        );
+    }
+
+    @Override
+    public Object visitBlockContainsTo(CobolParser.BlockContainsToContext ctx) {
+        return new Cobol.BlockContainsTo(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TO()),
+                (Cobol.CobolWord) visit(ctx.integerLiteral())
+        );
+    }
+
+    @Override
     public Object visitCallStatement(CobolParser.CallStatementContext ctx) {
         return new Cobol.Call(
                 randomId(),
@@ -978,6 +1002,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitGlobalClause(CobolParser.GlobalClauseContext ctx) {
+        return new Cobol.GlobalClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.GLOBAL())
+        );
+    }
+
+    @Override
     public Cobol.OdtClause visitOdtClause(CobolParser.OdtClauseContext ctx) {
         return new Cobol.OdtClause(
                 randomId(),
@@ -1460,6 +1494,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                         ),
                         sourceBefore(".")
                 )
+        );
+    }
+
+    @Override
+    public Object visitLabelRecordsClause(CobolParser.LabelRecordsClauseContext ctx) {
+        return new Cobol.LabelRecordsClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LABEL(), ctx.RECORD(), ctx.IS(), ctx.RECORDS(), ctx.ARE(), ctx.OMITTED(), ctx.STANDARD()),
+                convertAllContainer(ctx.dataName())
         );
     }
 
@@ -4114,6 +4159,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitExternalClause(CobolParser.ExternalClauseContext ctx) {
+        return new Cobol.ExternalClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.EXTERNAL())
+        );
+    }
+
+    @Override
     public Cobol.FileSection visitFileSection(CobolParser.FileSectionContext ctx) {
         return new Cobol.FileSection(
                 randomId(),
@@ -5069,7 +5124,7 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 padLeft(ctx.DOT_FS(0)),
                 visitNullable(ctx.fileName()),
                 ctx.fileName() == null ? null : words(ctx.DOT_FS(1)),
-                convertAllContainer(ctx.ioControlClause())
+                convertAllContainer(ctx.ioControlClause()).withLastSpace(sourceBefore("."))
         );
     }
 
@@ -5116,6 +5171,29 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 padLeft(sourceBefore("."), (Name) visit(ctx.programName())),
                 padLeft(whitespace(), words(ctx.IS(), ctx.COMMON(), ctx.INITIAL(), ctx.LIBRARY(), ctx.DEFINITION(), ctx.RECURSIVE(), ctx.PROGRAM())),
                 ctx.DOT_FS().size() > 1 ? padLeft(ctx.DOT_FS(1)) : null
+        );
+    }
+
+    @Override
+    public Object visitValueOfClause(CobolParser.ValueOfClauseContext ctx) {
+        return new Cobol.ValueOfClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.VALUE(), ctx.OF()),
+                convertAllContainer(ctx.valuePair())
+        );
+    }
+
+    @Override
+    public Object visitValuePair(CobolParser.ValuePairContext ctx) {
+        return new Cobol.ValuePair(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.systemName()),
+                words(ctx.IS()),
+                visit(ctx.qualifiedDataName(), ctx.literal())
         );
     }
 

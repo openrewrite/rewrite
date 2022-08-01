@@ -72,7 +72,6 @@ class CobolDivisionTest : RewriteTest {
         )
     )
 
-    @Disabled("Implement fileControlEntry clauses")
     @Test
     fun environmentDivision() = rewriteRun(
         cobol(

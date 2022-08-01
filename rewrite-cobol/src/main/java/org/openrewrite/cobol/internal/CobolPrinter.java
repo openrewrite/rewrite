@@ -3187,4 +3187,60 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(relativeKeyClause.getQualifiedDataName(), p);
         return relativeKeyClause;
     }
+
+    public Cobol visitExternalClause(Cobol.ExternalClause externalClause, PrintOutputCapture<P> p) {
+        visitSpace(externalClause.getPrefix(), p);
+        visitMarkers(externalClause.getMarkers(), p);
+        p.append(externalClause.getWords());
+        return externalClause;
+    }
+
+    public Cobol visitGlobalClause(Cobol.GlobalClause globalClause, PrintOutputCapture<P> p) {
+        visitSpace(globalClause.getPrefix(), p);
+        visitMarkers(globalClause.getMarkers(), p);
+        p.append(globalClause.getWords());
+        return super.visitGlobalClause(globalClause, p);
+    }
+
+    public Cobol visitBlockContainsClause(Cobol.BlockContainsClause blockContainsClause, PrintOutputCapture<P> p) {
+        visitSpace(blockContainsClause.getPrefix(), p);
+        visitMarkers(blockContainsClause.getMarkers(), p);
+        p.append(blockContainsClause.getFirstWords());
+        visit(blockContainsClause.getIntegerLiteral(), p);
+        visit(blockContainsClause.getBlockContainsTo(), p);
+        p.append(blockContainsClause.getLastWords());
+        return blockContainsClause;
+    }
+
+    public Cobol visitBlockContainsTo(Cobol.BlockContainsTo blockContainsTo, PrintOutputCapture<P> p) {
+        visitSpace(blockContainsTo.getPrefix(), p);
+        visitMarkers(blockContainsTo.getMarkers(), p);
+        p.append(blockContainsTo.getTo());
+        visit(blockContainsTo.getIntegerLiteral(), p);
+        return blockContainsTo;
+    }
+
+    public Cobol visitLabelRecordsClause(Cobol.LabelRecordsClause labelRecordsClause, PrintOutputCapture<P> p) {
+        visitSpace(labelRecordsClause.getPrefix(), p);
+        visitMarkers(labelRecordsClause.getMarkers(), p);
+        p.append(labelRecordsClause.getWords());
+        visitContainer("", labelRecordsClause.getPadding().getDataNames(), "", "", p);
+        return labelRecordsClause;
+    }
+
+    public Cobol visitValueOfClause(Cobol.ValueOfClause valueOfClause, PrintOutputCapture<P> p) {
+        visitSpace(valueOfClause.getPrefix(), p);
+        visitMarkers(valueOfClause.getMarkers(), p);
+        p.append(valueOfClause.getValueOf());
+        visitContainer("", valueOfClause.getPadding().getValuePairs(), "", "", p);
+        return valueOfClause;
+    }
+
+    public Cobol visitValuePair(Cobol.ValuePair valuePair, PrintOutputCapture<P> p) {
+        visitSpace(valuePair.getPrefix(), p);
+        visitMarkers(valuePair.getMarkers(), p);
+        visit(valuePair.getSystemName(), p);
+        p.append(valuePair.getIs());
+        return valuePair;
+    }
 }

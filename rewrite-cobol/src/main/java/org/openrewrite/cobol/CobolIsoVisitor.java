@@ -1763,4 +1763,39 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.RelativeKeyClause visitRelativeKeyClause(Cobol.RelativeKeyClause relativeKeyClause, P p) {
         return (Cobol.RelativeKeyClause) super.visitRelativeKeyClause(relativeKeyClause, p);
     }
+
+    @Override
+    public Cobol.ExternalClause visitExternalClause(Cobol.ExternalClause externalClause, P p) {
+        return (Cobol.ExternalClause) super.visitExternalClause(externalClause, p);
+    }
+
+    @Override
+    public Cobol.GlobalClause visitGlobalClause(Cobol.GlobalClause globalClause, P p) {
+        return (Cobol.GlobalClause) super.visitGlobalClause(globalClause, p);
+    }
+
+    @Override
+    public Cobol.BlockContainsClause visitBlockContainsClause(Cobol.BlockContainsClause blockContainsClause, P p) {
+        return (Cobol.BlockContainsClause) super.visitBlockContainsClause(blockContainsClause, p);
+    }
+
+    @Override
+    public Cobol.BlockContainsTo visitBlockContainsTo(Cobol.BlockContainsTo blockContainsTo, P p) {
+        return (Cobol.BlockContainsTo) super.visitBlockContainsTo(blockContainsTo, p);
+    }
+
+    @Override
+    public Cobol.LabelRecordsClause visitLabelRecordsClause(Cobol.LabelRecordsClause labelRecordsClause, P p) {
+        return (Cobol.LabelRecordsClause) super.visitLabelRecordsClause(labelRecordsClause, p);
+    }
+
+    @Override
+    public Cobol.ValueOfClause visitValueOfClause(Cobol.ValueOfClause valueOfClause, P p) {
+        return (Cobol.ValueOfClause) super.visitValueOfClause(valueOfClause, p);
+    }
+
+    @Override
+    public Cobol.ValuePair visitValuePair(Cobol.ValuePair valuePair, P p) {
+        return (Cobol.ValuePair) super.visitValuePair(valuePair, p);
+    }
 }
