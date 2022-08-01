@@ -3107,4 +3107,25 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         o = o.withMarkers(visitMarkers(o.getMarkers(), p));
         return o;
     }
+
+    public Cobol visitPaddingCharacterClause(Cobol.PaddingCharacterClause paddingCharacterClause, P p) {
+        Cobol.PaddingCharacterClause pp = paddingCharacterClause;
+        pp = pp.withPrefix(visitSpace(pp.getPrefix(), p));
+        pp = pp.withMarkers(visitMarkers(pp.getMarkers(), p));
+        return pp;
+    }
+
+    public Cobol visitRecordDelimiterClause(Cobol.RecordDelimiterClause recordDelimiterClause, P p) {
+        Cobol.RecordDelimiterClause r = recordDelimiterClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitAccessModeClause(Cobol.AccessModeClause accessModeClause, P p) {
+        Cobol.AccessModeClause a = accessModeClause;
+        a = a.withPrefix(visitSpace(a.getPrefix(), p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        return a;
+    }
 }

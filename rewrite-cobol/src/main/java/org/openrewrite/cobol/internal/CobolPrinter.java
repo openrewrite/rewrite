@@ -3120,4 +3120,27 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(organizationClause.getWords());
         return organizationClause;
     }
+
+    public Cobol visitPaddingCharacterClause(Cobol.PaddingCharacterClause paddingCharacterClause, PrintOutputCapture<P> p) {
+        visitSpace(paddingCharacterClause.getPrefix(), p);
+        visitMarkers(paddingCharacterClause.getMarkers(), p);
+        p.append(paddingCharacterClause.getWords());
+        visit(paddingCharacterClause.getName(), p);
+        return paddingCharacterClause;
+    }
+
+    public Cobol visitRecordDelimiterClause(Cobol.RecordDelimiterClause recordDelimiterClause, PrintOutputCapture<P> p) {
+        visitSpace(recordDelimiterClause.getPrefix(), p);
+        visitMarkers(recordDelimiterClause.getMarkers(), p);
+        p.append(recordDelimiterClause.getWords());
+        visit(recordDelimiterClause.getName(), p);
+        return recordDelimiterClause;
+    }
+
+    public Cobol visitAccessModeClause(Cobol.AccessModeClause accessModeClause, PrintOutputCapture<P> p) {
+        visitSpace(accessModeClause.getPrefix(), p);
+        visitMarkers(accessModeClause.getMarkers(), p);
+        p.append(accessModeClause.getWords());
+        return accessModeClause;
+    }
 }

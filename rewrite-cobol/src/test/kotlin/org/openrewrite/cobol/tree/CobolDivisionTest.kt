@@ -114,6 +114,9 @@ class CobolDivisionTest : RewriteTest {
                         XXXXX014.
                     SELECT SEQ-FILE RESERVE NO ALTERNATE AREA.
                     SELECT SEQ-FILE ORGANIZATION IS RECORD BINARY INDEXED.
+                    SELECT SEQ-FILE PADDING CHARACTER IS IDENTIFIER IN IDENTIFIER.
+                    SELECT SEQ-FILE RECORD DELIMITER IS STANDAR-1.
+                    SELECT SEQ-FILE ACCESS MODE IS SEQUENTIAL.
             """
         )
     )

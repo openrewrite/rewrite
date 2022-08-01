@@ -1723,4 +1723,19 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.OrganizationClause visitOrganizationClause(Cobol.OrganizationClause organizationClause, P p) {
         return (Cobol.OrganizationClause) super.visitOrganizationClause(organizationClause, p);
     }
+
+    @Override
+    public Cobol.PaddingCharacterClause visitPaddingCharacterClause(Cobol.PaddingCharacterClause paddingCharacterClause, P p) {
+        return (Cobol.PaddingCharacterClause) super.visitPaddingCharacterClause(paddingCharacterClause, p);
+    }
+
+    @Override
+    public Cobol.RecordDelimiterClause visitRecordDelimiterClause(Cobol.RecordDelimiterClause recordDelimiterClause, P p) {
+        return (Cobol.RecordDelimiterClause) super.visitRecordDelimiterClause(recordDelimiterClause, p);
+    }
+
+    @Override
+    public Cobol.AccessModeClause visitAccessModeClause(Cobol.AccessModeClause accessModeClause, P p) {
+        return (Cobol.AccessModeClause) super.visitAccessModeClause(accessModeClause, p);
+    }
 }

@@ -194,6 +194,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitAccessModeClause(CobolParser.AccessModeClauseContext ctx) {
+        return new Cobol.AccessModeClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ACCESS(), ctx.MODE(), ctx.IS(), ctx.SEQUENTIAL(), ctx.RANDOM(), ctx.DYNAMIC(), ctx.EXCLUSIVE())
+        );
+    }
+
+    @Override
     public Cobol.AlterStatement visitAlterStatement(CobolParser.AlterStatementContext ctx) {
         return new Cobol.AlterStatement(
                 randomId(),
@@ -4112,7 +4122,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitPaddingCharacterClause(CobolParser.PaddingCharacterClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.PaddingCharacterClause(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                words(ctx.PADDING(), ctx.CHARACTER(), ctx.IS()),
+                visit(ctx.qualifiedDataName(), ctx.literal())
+        );
     }
 
     @Override
@@ -4285,7 +4301,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitRecordDelimiterClause(CobolParser.RecordDelimiterClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.RecordDelimiterClause(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                words(ctx.RECORD(), ctx.DELIMITER(), ctx.IS(), ctx.STANDARD_1(), ctx.IMPLICIT()),
+                visitNullable(ctx.assignmentName())
+        );
     }
 
     @Override
