@@ -1249,6 +1249,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitDataAlignedClause(CobolParser.DataAlignedClauseContext ctx) {
+        return new Cobol.DataAlignedClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ALIGNED())
+        );
+    }
+
+    @Override
     public Object visitDataBaseSection(CobolParser.DataBaseSectionContext ctx) {
         return new Cobol.DataBaseSection(
                 randomId(),
@@ -1269,6 +1279,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 (Literal) visit(ctx.literal(0)),
                 words(ctx.INVOKE()),
                 (Literal) visit(ctx.literal(1))
+        );
+    }
+
+    @Override
+    public Object visitDataBlankWhenZeroClause(CobolParser.DataBlankWhenZeroClauseContext ctx) {
+        return new Cobol.DataBlankWhenZeroClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BLANK(), ctx.WHEN(), ctx.ZERO(), ctx.ZEROS(), ctx.ZEROES())
         );
     }
 
@@ -1311,6 +1331,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.IS(), ctx.GLOBAL())
+        );
+    }
+
+    @Override
+    public Object visitDataJustifiedClause(CobolParser.DataJustifiedClauseContext ctx) {
+        return new Cobol.DataJustifiedClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.JUSTIFIED(), ctx.JUST(), ctx.RIGHT())
         );
     }
 
@@ -1390,6 +1420,19 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.RECEIVED(), ctx.BY(), ctx.CONTENT(), ctx.REFERENCE(), ctx.REF())
+        );
+    }
+
+    @Override
+    public Object visitDataRenamesClause(CobolParser.DataRenamesClauseContext ctx) {
+        return new Cobol.DataRenamesClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RENAMES()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName(0)),
+                words(ctx.THROUGH(), ctx.THRU()),
+                ctx.qualifiedDataName().size() == 1 ? null : (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName(1))
         );
     }
 

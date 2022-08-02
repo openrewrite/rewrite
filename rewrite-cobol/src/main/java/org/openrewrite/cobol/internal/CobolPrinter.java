@@ -3490,4 +3490,35 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(dataOccursTo.getIntegerLiteral(), p);
         return dataOccursTo;
     }
+
+    public Cobol visitDataAlignedClause(Cobol.DataAlignedClause dataAlignedClause, PrintOutputCapture<P> p) {
+        visitSpace(dataAlignedClause.getPrefix(), p);
+        visitMarkers(dataAlignedClause.getMarkers(), p);
+        p.append(dataAlignedClause.getAligned());
+        return dataAlignedClause;
+    }
+
+    public Cobol visitDataBlankWhenZeroClause(Cobol.DataBlankWhenZeroClause dataBlankWhenZeroClause, PrintOutputCapture<P> p) {
+        visitSpace(dataBlankWhenZeroClause.getPrefix(), p);
+        visitMarkers(dataBlankWhenZeroClause.getMarkers(), p);
+        p.append(dataBlankWhenZeroClause.getWords());
+        return dataBlankWhenZeroClause;
+    }
+
+    public Cobol visitDataJustifiedClause(Cobol.DataJustifiedClause dataJustifiedClause, PrintOutputCapture<P> p) {
+        visitSpace(dataJustifiedClause.getPrefix(), p);
+        visitMarkers(dataJustifiedClause.getMarkers(), p);
+        p.append(dataJustifiedClause.getWords());
+        return dataJustifiedClause;
+    }
+
+    public Cobol visitDataRenamesClause(Cobol.DataRenamesClause dataRenamesClause, PrintOutputCapture<P> p) {
+        visitSpace(dataRenamesClause.getPrefix(), p);
+        visitMarkers(dataRenamesClause.getMarkers(), p);
+        p.append(dataRenamesClause.getRenames());
+        visit(dataRenamesClause.getFromName(), p);
+        p.append(dataRenamesClause.getThrough());
+        visit(dataRenamesClause.getToName(), p);
+        return dataRenamesClause;
+    }
 }

@@ -1948,4 +1948,24 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.DataOccursTo visitDataOccursTo(Cobol.DataOccursTo dataOccursTo, P p) {
         return (Cobol.DataOccursTo) super.visitDataOccursTo(dataOccursTo, p);
     }
+
+    @Override
+    public Cobol.DataAlignedClause visitDataAlignedClause(Cobol.DataAlignedClause dataAlignedClause, P p) {
+        return (Cobol.DataAlignedClause) super.visitDataAlignedClause(dataAlignedClause, p);
+    }
+
+    @Override
+    public Cobol.DataBlankWhenZeroClause visitDataBlankWhenZeroClause(Cobol.DataBlankWhenZeroClause dataBlankWhenZeroClause, P p) {
+        return (Cobol.DataBlankWhenZeroClause) super.visitDataBlankWhenZeroClause(dataBlankWhenZeroClause, p);
+    }
+
+    @Override
+    public Cobol.DataJustifiedClause visitDataJustifiedClause(Cobol.DataJustifiedClause dataJustifiedClause, P p) {
+        return (Cobol.DataJustifiedClause) super.visitDataJustifiedClause(dataJustifiedClause, p);
+    }
+
+    @Override
+    public Cobol.DataRenamesClause visitDataRenamesClause(Cobol.DataRenamesClause dataRenamesClause, P p) {
+        return (Cobol.DataRenamesClause) super.visitDataRenamesClause(dataRenamesClause, p);
+    }
 }

@@ -3456,4 +3456,34 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.withIntegerLiteral((Cobol.CobolWord) visit(d.getIntegerLiteral(), p));
         return d;
     }
+
+    public Cobol visitDataAlignedClause(Cobol.DataAlignedClause dataAlignedClause, P p) {
+        Cobol.DataAlignedClause d = dataAlignedClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataBlankWhenZeroClause(Cobol.DataBlankWhenZeroClause dataBlankWhenZeroClause, P p) {
+        Cobol.DataBlankWhenZeroClause d = dataBlankWhenZeroClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataJustifiedClause(Cobol.DataJustifiedClause dataJustifiedClause, P p) {
+        Cobol.DataJustifiedClause d = dataJustifiedClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataRenamesClause(Cobol.DataRenamesClause dataRenamesClause, P p) {
+        Cobol.DataRenamesClause d = dataRenamesClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withFromName((Cobol.QualifiedDataName) visit(d.getFromName(), p));
+        d = d.withToName((Cobol.QualifiedDataName) visit(d.getToName(), p));
+        return d;
+    }
 }
