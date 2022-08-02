@@ -3399,4 +3399,61 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         return d;
     }
+
+    public Cobol visitDataValueClause(Cobol.DataValueClause dataValueClause, P p) {
+        Cobol.DataValueClause d = dataValueClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withCobols(ListUtils.map(d.getCobols(), t -> (Cobol) visit(t, p)));
+        return d;
+    }
+
+    public Cobol visitDataReceivedByClause(Cobol.DataReceivedByClause dataReceivedByClause, P p) {
+        Cobol.DataReceivedByClause d = dataReceivedByClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataOccursClause(Cobol.DataOccursClause dataOccursClause, P p) {
+        Cobol.DataOccursClause d = dataOccursClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withDataOccursTo((Cobol.DataOccursTo) visit(d.getDataOccursTo(), p));
+        d = d.withDataOccursDepending((Cobol.DataOccursDepending) visit(d.getDataOccursDepending(), p));
+        d = d.getPadding().withSortIndexed(visitContainer(d.getPadding().getSortIndexed(), p));
+        return d;
+    }
+
+    public Cobol visitDataOccursDepending(Cobol.DataOccursDepending dataOccursDepending, P p) {
+        Cobol.DataOccursDepending d = dataOccursDepending;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withQualifiedDataName((Cobol.QualifiedDataName) visit(d.getQualifiedDataName(), p));
+        return d;
+    }
+
+    public Cobol visitDataOccursIndexed(Cobol.DataOccursIndexed dataOccursIndexed, P p) {
+        Cobol.DataOccursIndexed d = dataOccursIndexed;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.getPadding().withIndexNames(visitContainer(d.getPadding().getIndexNames(), p));
+        return d;
+    }
+
+    public Cobol visitDataOccursSort(Cobol.DataOccursSort dataOccursSort, P p) {
+        Cobol.DataOccursSort d = dataOccursSort;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.getPadding().withQualifiedDataNames(visitContainer(d.getPadding().getQualifiedDataNames(), p));
+        return d;
+    }
+
+    public Cobol visitDataOccursTo(Cobol.DataOccursTo dataOccursTo, P p) {
+        Cobol.DataOccursTo d = dataOccursTo;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withIntegerLiteral((Cobol.CobolWord) visit(d.getIntegerLiteral(), p));
+        return d;
+    }
 }

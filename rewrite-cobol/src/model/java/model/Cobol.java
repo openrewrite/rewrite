@@ -40,4 +40,5 @@ public interface Cobol {
     @Skip
     class ProcedureName {}
 
+
 }

@@ -1913,4 +1913,39 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.DataUsageClause visitDataUsageClause(Cobol.DataUsageClause dataUsageClause, P p) {
         return (Cobol.DataUsageClause) super.visitDataUsageClause(dataUsageClause, p);
     }
+
+    @Override
+    public Cobol.DataValueClause visitDataValueClause(Cobol.DataValueClause dataValueClause, P p) {
+        return (Cobol.DataValueClause) super.visitDataValueClause(dataValueClause, p);
+    }
+
+    @Override
+    public Cobol.DataReceivedByClause visitDataReceivedByClause(Cobol.DataReceivedByClause dataReceivedByClause, P p) {
+        return (Cobol.DataReceivedByClause) super.visitDataReceivedByClause(dataReceivedByClause, p);
+    }
+
+    @Override
+    public Cobol.DataOccursClause visitDataOccursClause(Cobol.DataOccursClause dataOccursClause, P p) {
+        return (Cobol.DataOccursClause) super.visitDataOccursClause(dataOccursClause, p);
+    }
+
+    @Override
+    public Cobol.DataOccursDepending visitDataOccursDepending(Cobol.DataOccursDepending dataOccursDepending, P p) {
+        return (Cobol.DataOccursDepending) super.visitDataOccursDepending(dataOccursDepending, p);
+    }
+
+    @Override
+    public Cobol.DataOccursIndexed visitDataOccursIndexed(Cobol.DataOccursIndexed dataOccursIndexed, P p) {
+        return (Cobol.DataOccursIndexed) super.visitDataOccursIndexed(dataOccursIndexed, p);
+    }
+
+    @Override
+    public Cobol.DataOccursSort visitDataOccursSort(Cobol.DataOccursSort dataOccursSort, P p) {
+        return (Cobol.DataOccursSort) super.visitDataOccursSort(dataOccursSort, p);
+    }
+
+    @Override
+    public Cobol.DataOccursTo visitDataOccursTo(Cobol.DataOccursTo dataOccursTo, P p) {
+        return (Cobol.DataOccursTo) super.visitDataOccursTo(dataOccursTo, p);
+    }
 }

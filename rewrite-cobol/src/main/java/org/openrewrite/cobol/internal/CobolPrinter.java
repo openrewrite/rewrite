@@ -3430,4 +3430,64 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(dataUsageClause.getWords());
         return dataUsageClause;
     }
+
+    public Cobol visitDataValueClause(Cobol.DataValueClause dataValueClause, PrintOutputCapture<P> p) {
+        visitSpace(dataValueClause.getPrefix(), p);
+        visitMarkers(dataValueClause.getMarkers(), p);
+        p.append(dataValueClause.getWords());
+        for (Cobol c : dataValueClause.getCobols()) {
+            visit(c, p);
+        }
+        return dataValueClause;
+    }
+
+    public Cobol visitDataReceivedByClause(Cobol.DataReceivedByClause dataReceivedByClause, PrintOutputCapture<P> p) {
+        visitSpace(dataReceivedByClause.getPrefix(), p);
+        visitMarkers(dataReceivedByClause.getMarkers(), p);
+        p.append(dataReceivedByClause.getWords());
+        return dataReceivedByClause;
+    }
+
+    public Cobol visitDataOccursClause(Cobol.DataOccursClause dataOccursClause, PrintOutputCapture<P> p) {
+        visitSpace(dataOccursClause.getPrefix(), p);
+        visitMarkers(dataOccursClause.getMarkers(), p);
+        p.append(dataOccursClause.getOccurs());
+        visit(dataOccursClause.getDataOccursTo(), p);
+        p.append(dataOccursClause.getTimes());
+        visit(dataOccursClause.getDataOccursDepending(), p);
+        visitContainer("", dataOccursClause.getPadding().getSortIndexed(), "", "", p);
+        return dataOccursClause;
+    }
+
+    public Cobol visitDataOccursDepending(Cobol.DataOccursDepending dataOccursDepending, PrintOutputCapture<P> p) {
+        visitSpace(dataOccursDepending.getPrefix(), p);
+        visitMarkers(dataOccursDepending.getMarkers(), p);
+        p.append(dataOccursDepending.getWords());
+        visit(dataOccursDepending.getQualifiedDataName(), p);
+        return dataOccursDepending;
+    }
+
+    public Cobol visitDataOccursIndexed(Cobol.DataOccursIndexed dataOccursIndexed, PrintOutputCapture<P> p) {
+        visitSpace(dataOccursIndexed.getPrefix(), p);
+        visitMarkers(dataOccursIndexed.getMarkers(), p);
+        p.append(dataOccursIndexed.getWords());
+        visitContainer("", dataOccursIndexed.getPadding().getIndexNames(), "", "", p);
+        return dataOccursIndexed;
+    }
+
+    public Cobol visitDataOccursSort(Cobol.DataOccursSort dataOccursSort, PrintOutputCapture<P> p) {
+        visitSpace(dataOccursSort.getPrefix(), p);
+        visitMarkers(dataOccursSort.getMarkers(), p);
+        p.append(dataOccursSort.getWords());
+        visitContainer("", dataOccursSort.getPadding().getQualifiedDataNames(), "", "", p);
+        return dataOccursSort;
+    }
+
+    public Cobol visitDataOccursTo(Cobol.DataOccursTo dataOccursTo, PrintOutputCapture<P> p) {
+        visitSpace(dataOccursTo.getPrefix(), p);
+        visitMarkers(dataOccursTo.getMarkers(), p);
+        p.append(dataOccursTo.getTo());
+        visit(dataOccursTo.getIntegerLiteral(), p);
+        return dataOccursTo;
+    }
 }

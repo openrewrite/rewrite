@@ -1325,6 +1325,75 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitDataOccursClause(CobolParser.DataOccursClauseContext ctx) {
+        return new Cobol.DataOccursClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.OCCURS()),
+                visit(ctx.identifier(), ctx.integerLiteral()),
+                visitNullable(ctx.dataOccursTo()),
+                words(ctx.TIMES()),
+                visitNullable(ctx.dataOccursDepending()),
+                convertAllContainer(ctx.dataOccursSort(), ctx.dataOccursIndexed())
+        );
+    }
+
+    @Override
+    public Object visitDataOccursTo(CobolParser.DataOccursToContext ctx) {
+        return new Cobol.DataOccursTo(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TO()),
+                (Cobol.CobolWord) visit(ctx.integerLiteral())
+        );
+    }
+
+    @Override
+    public Object visitDataOccursDepending(CobolParser.DataOccursDependingContext ctx) {
+        return new Cobol.DataOccursDepending(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DEPENDING(), ctx.ON()),
+                (Cobol.QualifiedDataName) visit(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
+    public Object visitDataOccursSort(CobolParser.DataOccursSortContext ctx) {
+        return new Cobol.DataOccursSort(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.ASCENDING(), ctx.DESCENDING(), ctx.KEY(), ctx.IS()),
+                convertAllContainer(ctx.qualifiedDataName())
+        );
+    }
+
+    @Override
+    public Object visitDataOccursIndexed(CobolParser.DataOccursIndexedContext ctx) {
+        return new Cobol.DataOccursIndexed(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INDEXED(), ctx.BY(), ctx.LOCAL()),
+                convertAllContainer(ctx.indexName())
+        );
+    }
+
+    @Override
+    public Object visitDataReceivedByClause(CobolParser.DataReceivedByClauseContext ctx) {
+        return new Cobol.DataReceivedByClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RECEIVED(), ctx.BY(), ctx.CONTENT(), ctx.REFERENCE(), ctx.REF())
+        );
+    }
+
+    @Override
     public Object visitDataRedefinesClause(CobolParser.DataRedefinesClauseContext ctx) {
         return new Cobol.DataRedefinesClause(
                 randomId(),
@@ -1396,6 +1465,17 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                         ctx.COMPUTATIONAL(), ctx.COMPUTATIONAL_1(), ctx.COMPUTATIONAL_2(), ctx.COMPUTATIONAL_3(), ctx.COMPUTATIONAL_4(), ctx.COMPUTATIONAL_5(),
                         ctx.CONTROL_POINT(), ctx.DATE(), ctx.DISPLAY(), ctx.DISPLAY_1(), ctx.DOUBLE(), ctx.EVENT(), ctx.FUNCTION_POINTER(), ctx.INDEX(), ctx.KANJI(), ctx.LOCK(),
                         ctx.NATIONAL(), ctx.PACKED_DECIMAL(), ctx.POINTER(), ctx.PROCEDURE_POINTER(), ctx.REAL(), ctx.SQL(), ctx.TASK())
+        );
+    }
+
+    @Override
+    public Object visitDataValueClause(CobolParser.DataValueClauseContext ctx) {
+        return new Cobol.DataValueClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.VALUE(), ctx.VALUES(), ctx.IS(), ctx.ARE()),
+                convertAllPrefixedList(singletonList(","), ctx.dataValueInterval())
         );
     }
 

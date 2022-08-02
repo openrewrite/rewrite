@@ -3552,6 +3552,312 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
+    class DataValueClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        List<Cobol> cobols;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDataValueClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class DataReceivedByClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDataReceivedByClause(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class DataOccursClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String occurs;
+
+        @Getter
+        @With
+        Name name;
+
+        @Getter
+        @With
+        DataOccursTo dataOccursTo;
+
+        @Getter
+        @With
+        String times;
+
+        @Getter
+        @Nullable
+        @With
+        DataOccursDepending dataOccursDepending;
+
+        @Nullable
+        CobolContainer<Cobol> sortIndexed;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDataOccursClause(this, p);
+        }
+
+        public List<Cobol> getSortIndexed() {
+            return sortIndexed.getElements();
+        }
+
+        public DataOccursClause withSortIndexed(List<Cobol> sortIndexed) {
+            return getPadding().withSortIndexed(this.sortIndexed.getPadding().withElements(CobolRightPadded.withElements(
+                    this.sortIndexed.getPadding().getElements(), sortIndexed)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DataOccursClause t;
+
+            @Nullable
+            public CobolContainer<Cobol> getSortIndexed() {
+                return t.sortIndexed;
+            }
+
+            public DataOccursClause withSortIndexed(@Nullable CobolContainer<Cobol> sortIndexed) {
+                return t.sortIndexed == sortIndexed ? t : new DataOccursClause(t.padding, t.id, t.prefix, t.markers, t.occurs, t.name, t.dataOccursTo, t.times, t.dataOccursDepending, sortIndexed);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class DataOccursDepending implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        QualifiedDataName qualifiedDataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDataOccursDepending(this, p);
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class DataOccursIndexed implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<CobolWord> indexNames;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDataOccursIndexed(this, p);
+        }
+
+        public List<Cobol.CobolWord> getIndexNames() {
+            return indexNames.getElements();
+        }
+
+        public DataOccursIndexed withIndexNames(List<Cobol.CobolWord> indexName) {
+            return getPadding().withIndexNames(this.indexNames.getPadding().withElements(CobolRightPadded.withElements(
+                    this.indexNames.getPadding().getElements(), indexName)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DataOccursIndexed t;
+
+            public CobolContainer<Cobol.CobolWord> getIndexNames() {
+                return t.indexNames;
+            }
+
+            public DataOccursIndexed withIndexNames(CobolContainer<Cobol.CobolWord> indexNames) {
+                return t.indexNames == indexNames ? t : new DataOccursIndexed(t.padding, t.id, t.prefix, t.markers, t.words, indexNames);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class DataOccursSort implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<QualifiedDataName> qualifiedDataNames;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDataOccursSort(this, p);
+        }
+
+        public List<Cobol.QualifiedDataName> getQualifiedDataNames() {
+            return qualifiedDataNames.getElements();
+        }
+
+        public DataOccursSort withQualifiedDataNames(List<Cobol.QualifiedDataName> qualifiedDataNames) {
+            return getPadding().withQualifiedDataNames(this.qualifiedDataNames.getPadding().withElements(CobolRightPadded.withElements(
+                    this.qualifiedDataNames.getPadding().getElements(), qualifiedDataNames)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DataOccursSort t;
+
+            public CobolContainer<Cobol.QualifiedDataName> getQualifiedDataNames() {
+                return t.qualifiedDataNames;
+            }
+
+            public DataOccursSort withQualifiedDataNames(CobolContainer<Cobol.QualifiedDataName> qualifiedDataNames) {
+                return t.qualifiedDataNames == qualifiedDataNames ? t : new DataOccursSort(t.padding, t.id, t.prefix, t.markers, t.words, qualifiedDataNames);
+            }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class DataOccursTo implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String to;
+        CobolWord integerLiteral;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDataOccursTo(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     class DecimalPointClause implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;
