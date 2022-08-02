@@ -19,6 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
+import org.openrewrite.gradle.util.Dependency;
+import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -94,14 +96,12 @@ public class ChangeDependencyGroupId extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
-                        String[] gavs = gav.split(":");
-                        if (gavs.length >= 3 && !newGroupId.equals(gavs[0]) && depMatcher.matches(gavs[0], gavs[1], gavs[2])) {
-                            String newGav = newGroupId + ":" + gavs[1] + ":" + gavs[2];
-                            m = m.withArguments(ListUtils.map(m.getArguments(), (n, arg) ->
-                                    n == 0 ?
-                                            ChangeStringLiteral.withStringValue((J.Literal) arg, newGav) :
-                                            arg
-                            ));
+                        Dependency dependency = new DependencyStringNotationConverter().parse(gav);
+                        if (!newGroupId.equals(dependency.getGroupId()) &&
+                                ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
+                                        (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
+                            Dependency newDependency = dependency.withGroupId(newGroupId);
+                            m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
                         }
                     }
                 } else if (depArgs.get(0) instanceof G.MapEntry) {
