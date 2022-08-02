@@ -49,7 +49,8 @@ public class Java11Parser implements JavaParser {
 
     @Override
     public JavaParser reset() {
-        return delegate.reset();
+        delegate.reset();
+        return this;
     }
 
     @Override

@@ -45,7 +45,8 @@ public class Java17Parser implements JavaParser {
 
     @Override
     public JavaParser reset() {
-        return delegate.reset();
+        delegate.reset();
+        return this;
     }
 
     @Override
