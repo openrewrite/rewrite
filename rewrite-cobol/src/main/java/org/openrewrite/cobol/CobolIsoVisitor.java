@@ -1853,4 +1853,9 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.CodeSetClause visitCodeSetClause(Cobol.CodeSetClause codeSetClause, P p) {
         return (Cobol.CodeSetClause) super.visitCodeSetClause(codeSetClause, p);
     }
+
+    @Override
+    public Cobol.DataRecordsClause visitDataRecordsClause(Cobol.DataRecordsClause dataRecordsClause, P p) {
+        return (Cobol.DataRecordsClause) super.visitDataRecordsClause(dataRecordsClause, p);
+    }
 }

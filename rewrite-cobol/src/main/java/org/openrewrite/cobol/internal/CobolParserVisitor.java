@@ -914,7 +914,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitDataRecordsClause(CobolParser.DataRecordsClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.DataRecordsClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DATA(), ctx.RECORD(), ctx.IS(), ctx.RECORDS(), ctx.ARE()),
+                convertAllContainer(ctx.dataName())
+        );
     }
 
     @Override

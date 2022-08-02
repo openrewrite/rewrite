@@ -40,5 +40,8 @@ public interface Cobol {
     @Skip
     class ProcedureName {}
 
-    
+    class ReportClause implements Cobol {
+        String words;
+        CobolContainer<Name> reportName;
+    }
 }

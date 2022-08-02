@@ -3301,6 +3301,78 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class DataRecordsClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Name> dataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDataRecordsClause(this, p);
+        }
+
+        public List<Name> getDataName() {
+            return dataName.getElements();
+        }
+
+        public DataRecordsClause withDataName(List<Name> dataName) {
+            return getPadding().withDataName(this.dataName.getPadding().withElements(CobolRightPadded.withElements(
+                    this.dataName.getPadding().getElements(), dataName)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DataRecordsClause t;
+
+            public CobolContainer<Name> getDataName() {
+                return t.dataName;
+            }
+
+            public DataRecordsClause withDataName(CobolContainer<Name> dataName) {
+                return t.dataName == dataName ? t : new DataRecordsClause(t.padding, t.id, t.prefix, t.markers, t.words, dataName);
+            }
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
