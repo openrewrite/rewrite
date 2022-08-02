@@ -1702,22 +1702,48 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitLinageClause(CobolParser.LinageClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.LinageClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LINAGE(), ctx.IS()),
+                visit(ctx.dataName(), ctx.integerLiteral()),
+                words(ctx.LINES()),
+                convertAllContainer(ctx.linageAt())
+        );
     }
 
     @Override
     public Object visitLinageFootingAt(CobolParser.LinageFootingAtContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.LinageFootingAt(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.FOOTING(), ctx.AT()),
+                visit(ctx.dataName(), ctx.integerLiteral())
+        );
     }
 
     @Override
     public Object visitLinageLinesAtTop(CobolParser.LinageLinesAtTopContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.LinageFootingAt(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LINES(), ctx.AT(), ctx.TOP()),
+                visit(ctx.dataName(), ctx.integerLiteral())
+        );
     }
 
     @Override
     public Object visitLinageLinesAtBottom(CobolParser.LinageLinesAtBottomContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.LinageFootingAt(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LINES(), ctx.AT(), ctx.BOTTOM()),
+                visit(ctx.dataName(), ctx.integerLiteral())
+        );
     }
 
     @Override

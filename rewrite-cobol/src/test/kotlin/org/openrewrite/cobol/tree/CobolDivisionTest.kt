@@ -298,6 +298,9 @@ class CobolDivisionTest : RewriteTest {
                 RECORD CONTAINS 1 TO 10 CHARACTERS.
                 LABEL RECORD IS OMITTED.
                 VALUE OF IDENTIFIER IS 10.
+                LINAGE IS 10 LINES WITH FOOTING AT 10.
+                LINAGE IS 10 LINES AT TOP 10.
+                LINAGE IS 10 LINES AT BOTTOM 10.
         """)
     )
 

@@ -3292,4 +3292,38 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(recordContainsTo.getIntegerLiteral(), p);
         return recordContainsTo;
     }
+
+    public Cobol visitLinageClause(Cobol.LinageClause linageClause, PrintOutputCapture<P> p) {
+        visitSpace(linageClause.getPrefix(), p);
+        visitMarkers(linageClause.getMarkers(), p);
+        p.append(linageClause.getWords());
+        visit(linageClause.getName(), p);
+        p.append(linageClause.getLines());
+        visitContainer("", linageClause.getPadding().getLinageAt(), "", "", p);
+        return linageClause;
+    }
+
+    public Cobol visitLinageFootingAt(Cobol.LinageFootingAt linageFootingAt, PrintOutputCapture<P> p) {
+        visitSpace(linageFootingAt.getPrefix(), p);
+        visitMarkers(linageFootingAt.getMarkers(), p);
+        p.append(linageFootingAt.getWords());
+        visit(linageFootingAt.getName(), p);
+        return linageFootingAt;
+    }
+
+    public Cobol visitLinageLinesAtTop(Cobol.LinageLinesAtTop linageLinesAtTop, PrintOutputCapture<P> p) {
+        visitSpace(linageLinesAtTop.getPrefix(), p);
+        visitMarkers(linageLinesAtTop.getMarkers(), p);
+        p.append(linageLinesAtTop.getWords());
+        visit(linageLinesAtTop.getName(), p);
+        return linageLinesAtTop;
+    }
+
+    public Cobol visitLinageLinesAtBottom(Cobol.LinageLinesAtBottom linageLinesAtBottom, PrintOutputCapture<P> p) {
+        visitSpace(linageLinesAtBottom.getPrefix(), p);
+        visitMarkers(linageLinesAtBottom.getMarkers(), p);
+        p.append(linageLinesAtBottom.getWords());
+        visit(linageLinesAtBottom.getName(), p);
+        return linageLinesAtBottom;
+    }
 }

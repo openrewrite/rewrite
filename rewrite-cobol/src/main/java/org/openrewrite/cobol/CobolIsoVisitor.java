@@ -1823,4 +1823,24 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.RecordContainsTo visitRecordContainsTo(Cobol.RecordContainsTo recordContainsTo, P p) {
         return (Cobol.RecordContainsTo) super.visitRecordContainsTo(recordContainsTo, p);
     }
+
+    @Override
+    public Cobol.LinageClause visitLinageClause(Cobol.LinageClause linageClause, P p) {
+        return (Cobol.LinageClause) super.visitLinageClause(linageClause, p);
+    }
+
+    @Override
+    public Cobol.LinageFootingAt visitLinageFootingAt(Cobol.LinageFootingAt linageFootingAt, P p) {
+        return (Cobol.LinageFootingAt) super.visitLinageFootingAt(linageFootingAt, p);
+    }
+
+    @Override
+    public Cobol.LinageLinesAtTop visitLinageLinesAtTop(Cobol.LinageLinesAtTop linageLinesAtTop, P p) {
+        return (Cobol.LinageLinesAtTop) super.visitLinageLinesAtTop(linageLinesAtTop, p);
+    }
+
+    @Override
+    public Cobol.LinageLinesAtBottom visitLinageLinesAtBottom(Cobol.LinageLinesAtBottom linageLinesAtBottom, P p) {
+        return (Cobol.LinageLinesAtBottom) super.visitLinageLinesAtBottom(linageLinesAtBottom, p);
+    }
 }

@@ -3266,4 +3266,33 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
         return r;
     }
+
+    public Cobol visitLinageClause(Cobol.LinageClause linageClause, P p) {
+        Cobol.LinageClause l = linageClause;
+        l = l.withPrefix(visitSpace(l.getPrefix(), p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        l = l.getPadding().withLinageAt(visitContainer(l.getPadding().getLinageAt(), p));
+        return l;
+    }
+
+    public Cobol visitLinageFootingAt(Cobol.LinageFootingAt linageFootingAt, P p) {
+        Cobol.LinageFootingAt l = linageFootingAt;
+        l = l.withPrefix(visitSpace(l.getPrefix(), p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        return l;
+    }
+
+    public Cobol visitLinageLinesAtTop(Cobol.LinageLinesAtTop linageLinesAtTop, P p) {
+        Cobol.LinageLinesAtTop l = linageLinesAtTop;
+        l = l.withPrefix(visitSpace(l.getPrefix(), p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        return l;
+    }
+
+    public Cobol visitLinageLinesAtBottom(Cobol.LinageLinesAtBottom linageLinesAtBottom, P p) {
+        Cobol.LinageLinesAtBottom l = linageLinesAtBottom;
+        l = l.withPrefix(visitSpace(l.getPrefix(), p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        return l;
+    }
 }
