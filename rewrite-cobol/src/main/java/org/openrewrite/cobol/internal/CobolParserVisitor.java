@@ -1045,39 +1045,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
-    public Cobol.SymbolicCharactersClause visitSymbolicCharactersClause(CobolParser.SymbolicCharactersClauseContext ctx) {
-        return new Cobol.SymbolicCharactersClause(
-                randomId(),
-                prefix(ctx),
-                Markers.EMPTY,
-                words(ctx.SYMBOLIC(), ctx.CHARACTERS(), ctx.FOR(), ctx.ALPHANUMERIC(), ctx.NATIONAL()),
-                convertAllContainer(ctx.symbolicCharacters()),
-                padLeft(ctx.IN()),
-                visitNullable(ctx.alphabetName())
-        );
-    }
-
-    @Override
-    public Cobol.SymbolicCharacter visitSymbolicCharacters(CobolParser.SymbolicCharactersContext ctx) {
-        return new Cobol.SymbolicCharacter(
-                randomId(),
-                prefix(ctx),
-                Markers.EMPTY,
-                convertAllContainer(ctx.symbolicCharacter()),
-                convertAllContainer(
-                        ctx.IS() != null || ctx.ARE() != null ?
-                                padLeft(whitespace(), words(ctx.IS(), ctx.ARE())) : null,
-                        ctx.integerLiteral()
-                )
-        );
-    }
-
-    @Override
-    public Object visitSymbolicDestinationClause(CobolParser.SymbolicDestinationClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
-    }
-
-    @Override
     public Object visitRelationSignCondition(CobolParser.RelationSignConditionContext ctx) {
         return new Cobol.RelationSignCondition(
                 randomId(),
@@ -3211,23 +3178,86 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Cobol.SymbolicCharactersClause visitSymbolicCharactersClause(CobolParser.SymbolicCharactersClauseContext ctx) {
+        return new Cobol.SymbolicCharactersClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SYMBOLIC(), ctx.CHARACTERS(), ctx.FOR(), ctx.ALPHANUMERIC(), ctx.NATIONAL()),
+                convertAllContainer(ctx.symbolicCharacters()),
+                padLeft(ctx.IN()),
+                visitNullable(ctx.alphabetName())
+        );
+    }
+
+    @Override
+    public Cobol.SymbolicCharacter visitSymbolicCharacters(CobolParser.SymbolicCharactersContext ctx) {
+        return new Cobol.SymbolicCharacter(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                convertAllContainer(ctx.symbolicCharacter()),
+                convertAllContainer(
+                        ctx.IS() != null || ctx.ARE() != null ?
+                                padLeft(whitespace(), words(ctx.IS(), ctx.ARE())) : null,
+                        ctx.integerLiteral()
+                )
+        );
+    }
+
+    @Override
+    public Object visitSymbolicDestinationClause(CobolParser.SymbolicDestinationClauseContext ctx) {
+        return new Cobol.SymbolicDestinationClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SYMBOLIC(), ctx.DESTINATION(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
+    }
+
+    @Override
     public Object visitSymbolicSourceClause(CobolParser.SymbolicSourceClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.SymbolicSourceClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SYMBOLIC(), ctx.SOURCE(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override
     public Object visitSymbolicSubQueueClause(CobolParser.SymbolicSubQueueClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.SymbolicSubQueueClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SYMBOLIC(), ctx.SUB_QUEUE_1(), ctx.SUB_QUEUE_2(), ctx.SUB_QUEUE_3(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override
     public Object visitSymbolicTerminalClause(CobolParser.SymbolicTerminalClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.SymbolicTerminalClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SYMBOLIC(), ctx.TERMINAL(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override
     public Object visitSymbolicQueueClause(CobolParser.SymbolicQueueClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.SymbolicQueueClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SYMBOLIC(), ctx.QUEUE(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override
@@ -3357,7 +3387,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitTextLengthClause(CobolParser.TextLengthClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.TextLengthClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TEXT(), ctx.LENGTH(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override

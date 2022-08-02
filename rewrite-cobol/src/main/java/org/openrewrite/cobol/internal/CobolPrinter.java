@@ -3549,4 +3549,52 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(dataRecordAreaClause.getWords());
         return dataRecordAreaClause;
     }
+
+    public Cobol visitTextLengthClause(Cobol.TextLengthClause textLengthClause, PrintOutputCapture<P> p) {
+        visitSpace(textLengthClause.getPrefix(), p);
+        visitMarkers(textLengthClause.getMarkers(), p);
+        p.append(textLengthClause.getWords());
+        visit(textLengthClause.getDataDescName(), p);
+        return textLengthClause;
+    }
+
+    public Cobol visitSymbolicDestinationClause(Cobol.SymbolicDestinationClause symbolicDestinationClause, PrintOutputCapture<P> p) {
+        visitSpace(symbolicDestinationClause.getPrefix(), p);
+        visitMarkers(symbolicDestinationClause.getMarkers(), p);
+        p.append(symbolicDestinationClause.getWords());
+        visit(symbolicDestinationClause.getDataDescName(), p);
+        return symbolicDestinationClause;
+    }
+
+    public Cobol visitSymbolicSourceClause(Cobol.SymbolicSourceClause symbolicSourceClause, PrintOutputCapture<P> p) {
+        visitSpace(symbolicSourceClause.getPrefix(), p);
+        visitMarkers(symbolicSourceClause.getMarkers(), p);
+        p.append(symbolicSourceClause.getWords());
+        visit(symbolicSourceClause.getDataDescName(), p);
+        return symbolicSourceClause;
+    }
+
+    public Cobol visitSymbolicSubQueueClause(Cobol.SymbolicSubQueueClause symbolicSubQueueClause, PrintOutputCapture<P> p) {
+        visitSpace(symbolicSubQueueClause.getPrefix(), p);
+        visitMarkers(symbolicSubQueueClause.getMarkers(), p);
+        p.append(symbolicSubQueueClause.getWords());
+        visit(symbolicSubQueueClause.getDataDescName(), p);
+        return symbolicSubQueueClause;
+    }
+
+    public Cobol visitSymbolicTerminalClause(Cobol.SymbolicTerminalClause symbolicTerminalClause, PrintOutputCapture<P> p) {
+        visitSpace(symbolicTerminalClause.getPrefix(), p);
+        visitMarkers(symbolicTerminalClause.getMarkers(), p);
+        p.append(symbolicTerminalClause.getWords());
+        visit(symbolicTerminalClause.getDataDescName(), p);
+        return symbolicTerminalClause;
+    }
+
+    public Cobol visitSymbolicQueueClause(Cobol.SymbolicQueueClause symbolicQueueClause, PrintOutputCapture<P> p) {
+        visitSpace(symbolicQueueClause.getPrefix(), p);
+        visitMarkers(symbolicQueueClause.getMarkers(), p);
+        p.append(symbolicQueueClause.getWords());
+        visit(symbolicQueueClause.getDataDescName(), p);
+        return symbolicQueueClause;
+    }
 }

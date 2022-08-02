@@ -3514,4 +3514,52 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         return d;
     }
+
+    public Cobol visitTextLengthClause(Cobol.TextLengthClause textLengthClause, P p) {
+        Cobol.TextLengthClause t = textLengthClause;
+        t = t.withPrefix(visitSpace(t.getPrefix(), p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.withDataDescName((Cobol.CobolWord) visit(t.getDataDescName(), p));
+        return t;
+    }
+
+    public Cobol visitSymbolicDestinationClause(Cobol.SymbolicDestinationClause symbolicDestinationClause, P p) {
+        Cobol.SymbolicDestinationClause s = symbolicDestinationClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withDataDescName((Cobol.CobolWord) visit(s.getDataDescName(), p));
+        return s;
+    }
+
+    public Cobol visitSymbolicSourceClause(Cobol.SymbolicSourceClause symbolicSourceClause, P p) {
+        Cobol.SymbolicSourceClause s = symbolicSourceClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withDataDescName((Cobol.CobolWord) visit(s.getDataDescName(), p));
+        return s;
+    }
+
+    public Cobol visitSymbolicSubQueueClause(Cobol.SymbolicSubQueueClause symbolicSubQueueClause, P p) {
+        Cobol.SymbolicSubQueueClause s = symbolicSubQueueClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withDataDescName((Cobol.CobolWord) visit(s.getDataDescName(), p));
+        return s;
+    }
+
+    public Cobol visitSymbolicTerminalClause(Cobol.SymbolicTerminalClause symbolicTerminalClause, P p) {
+        Cobol.SymbolicTerminalClause s = symbolicTerminalClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withDataDescName((Cobol.CobolWord) visit(s.getDataDescName(), p));
+        return s;
+    }
+
+    public Cobol visitSymbolicQueueClause(Cobol.SymbolicQueueClause symbolicQueueClause, P p) {
+        Cobol.SymbolicQueueClause s = symbolicQueueClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withDataDescName((Cobol.CobolWord) visit(s.getDataDescName(), p));
+        return s;
+    }
 }

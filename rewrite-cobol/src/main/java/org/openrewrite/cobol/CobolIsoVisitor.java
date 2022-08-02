@@ -1988,4 +1988,34 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.DataRecordAreaClause visitDataRecordAreaClause(Cobol.DataRecordAreaClause dataRecordAreaClause, P p) {
         return (Cobol.DataRecordAreaClause) super.visitDataRecordAreaClause(dataRecordAreaClause, p);
     }
+
+    @Override
+    public Cobol.TextLengthClause visitTextLengthClause(Cobol.TextLengthClause textLengthClause, P p) {
+        return (Cobol.TextLengthClause) super.visitTextLengthClause(textLengthClause, p);
+    }
+
+    @Override
+    public Cobol.SymbolicDestinationClause visitSymbolicDestinationClause(Cobol.SymbolicDestinationClause symbolicDestinationClause, P p) {
+        return (Cobol.SymbolicDestinationClause) super.visitSymbolicDestinationClause(symbolicDestinationClause, p);
+    }
+
+    @Override
+    public Cobol.SymbolicSourceClause visitSymbolicSourceClause(Cobol.SymbolicSourceClause symbolicSourceClause, P p) {
+        return (Cobol.SymbolicSourceClause) super.visitSymbolicSourceClause(symbolicSourceClause, p);
+    }
+
+    @Override
+    public Cobol.SymbolicSubQueueClause visitSymbolicSubQueueClause(Cobol.SymbolicSubQueueClause symbolicSubQueueClause, P p) {
+        return (Cobol.SymbolicSubQueueClause) super.visitSymbolicSubQueueClause(symbolicSubQueueClause, p);
+    }
+
+    @Override
+    public Cobol.SymbolicTerminalClause visitSymbolicTerminalClause(Cobol.SymbolicTerminalClause symbolicTerminalClause, P p) {
+        return (Cobol.SymbolicTerminalClause) super.visitSymbolicTerminalClause(symbolicTerminalClause, p);
+    }
+
+    @Override
+    public Cobol.SymbolicQueueClause visitSymbolicQueueClause(Cobol.SymbolicQueueClause symbolicQueueClause, P p) {
+        return (Cobol.SymbolicQueueClause) super.visitSymbolicQueueClause(symbolicQueueClause, p);
+    }
 }
