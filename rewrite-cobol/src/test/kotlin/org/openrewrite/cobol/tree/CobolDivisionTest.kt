@@ -301,6 +301,8 @@ class CobolDivisionTest : RewriteTest {
                 LINAGE IS 10 LINES WITH FOOTING AT 10.
                 LINAGE IS 10 LINES AT TOP 10.
                 LINAGE IS 10 LINES AT BOTTOM 10.
+                CODE-SET IS IDENTIFIER.
+                RECORDING MODE IS IDENTIFIER.
         """)
     )
 

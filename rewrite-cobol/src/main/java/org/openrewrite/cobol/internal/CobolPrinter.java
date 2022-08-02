@@ -3326,4 +3326,20 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(linageLinesAtBottom.getName(), p);
         return linageLinesAtBottom;
     }
+
+    public Cobol visitRecordingModeClause(Cobol.RecordingModeClause recordingModeClause, PrintOutputCapture<P> p) {
+        visitSpace(recordingModeClause.getPrefix(), p);
+        visitMarkers(recordingModeClause.getMarkers(), p);
+        p.append(recordingModeClause.getWords());
+        visit(recordingModeClause.getMode(), p);
+        return recordingModeClause;
+    }
+
+    public Cobol visitCodeSetClause(Cobol.CodeSetClause codeSetClause, PrintOutputCapture<P> p) {
+        visitSpace(codeSetClause.getPrefix(), p);
+        visitMarkers(codeSetClause.getMarkers(), p);
+        p.append(codeSetClause.getWords());
+        visit(codeSetClause.getAlphabetName(), p);
+        return codeSetClause;
+    }
 }

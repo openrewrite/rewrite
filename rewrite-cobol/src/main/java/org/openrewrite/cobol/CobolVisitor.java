@@ -3295,4 +3295,20 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         l = l.withMarkers(visitMarkers(l.getMarkers(), p));
         return l;
     }
+
+    public Cobol visitRecordingModeClause(Cobol.RecordingModeClause recordingModeClause, P p) {
+        Cobol.RecordingModeClause r = recordingModeClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withMode((Cobol.CobolWord) visit(r.getMode(), p));
+        return r;
+    }
+
+    public Cobol visitCodeSetClause(Cobol.CodeSetClause codeSetClause, P p) {
+        Cobol.CodeSetClause c = codeSetClause;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withAlphabetName((Cobol.CobolWord) visit(c.getAlphabetName(), p));
+        return c;
+    }
 }

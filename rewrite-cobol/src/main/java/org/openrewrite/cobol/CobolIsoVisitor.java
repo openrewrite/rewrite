@@ -1843,4 +1843,14 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.LinageLinesAtBottom visitLinageLinesAtBottom(Cobol.LinageLinesAtBottom linageLinesAtBottom, P p) {
         return (Cobol.LinageLinesAtBottom) super.visitLinageLinesAtBottom(linageLinesAtBottom, p);
     }
+
+    @Override
+    public Cobol.RecordingModeClause visitRecordingModeClause(Cobol.RecordingModeClause recordingModeClause, P p) {
+        return (Cobol.RecordingModeClause) super.visitRecordingModeClause(recordingModeClause, p);
+    }
+
+    @Override
+    public Cobol.CodeSetClause visitCodeSetClause(Cobol.CodeSetClause codeSetClause, P p) {
+        return (Cobol.CodeSetClause) super.visitCodeSetClause(codeSetClause, p);
+    }
 }

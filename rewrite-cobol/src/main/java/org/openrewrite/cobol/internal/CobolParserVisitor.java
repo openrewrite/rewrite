@@ -763,7 +763,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitCodeSetClause(CobolParser.CodeSetClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.CodeSetClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CODE_SET(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.alphabetName())
+        );
     }
 
     @Override
@@ -1887,7 +1893,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitRecordingModeClause(CobolParser.RecordingModeClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.RecordingModeClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RECORDING(), ctx.MODE(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.modeStatement())
+        );
     }
 
     @Override
