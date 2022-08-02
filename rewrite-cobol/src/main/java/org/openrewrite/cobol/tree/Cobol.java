@@ -12080,6 +12080,78 @@ public interface Cobol extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class ReportClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String words;
+
+        CobolContainer<Name> reportName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportClause(this, p);
+        }
+
+        public List<Name> getReportName() {
+            return reportName.getElements();
+        }
+
+        public ReportClause withReportName(List<Name> reportName) {
+            return getPadding().withReportName(this.reportName.getPadding().withElements(CobolRightPadded.withElements(
+                    this.reportName.getPadding().getElements(), reportName)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ReportClause t;
+
+            public CobolContainer<Name> getReportName() {
+                return t.reportName;
+            }
+
+            public ReportClause withReportName(CobolContainer<Name> reportName) {
+                return t.reportName == reportName ? t : new ReportClause(t.padding, t.id, t.prefix, t.markers, t.words, reportName);
+            }
+        }
+    }
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class ReportDescription implements Cobol {
         @Nullable
         @NonFinal

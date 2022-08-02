@@ -1145,7 +1145,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReportClause(CobolParser.ReportClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REPORT(), ctx.IS(), ctx.REPORTS(), ctx.ARE()),
+                convertAllContainer(ctx.reportName())
+        );
     }
 
     @Override

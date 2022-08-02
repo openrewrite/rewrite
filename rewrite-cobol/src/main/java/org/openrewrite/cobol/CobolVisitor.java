@@ -3319,4 +3319,12 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.getPadding().withDataName(visitContainer(d.getPadding().getDataName(), p));
         return d;
     }
+
+    public Cobol visitReportClause(Cobol.ReportClause reportClause, P p) {
+        Cobol.ReportClause r = reportClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.getPadding().withReportName(visitContainer(r.getPadding().getReportName(), p));
+        return r;
+    }
 }
