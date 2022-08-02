@@ -1795,6 +1795,29 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitMultipleFileClause(CobolParser.MultipleFileClauseContext ctx) {
+        return new Cobol.MultipleFileClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.MULTIPLE(), ctx.FILE(), ctx.TAPE(), ctx.CONTAINS()),
+                convertAllContainer(ctx.multipleFilePosition())
+        );
+    }
+
+    @Override
+    public Object visitMultipleFilePosition(CobolParser.MultipleFilePositionContext ctx) {
+        return new Cobol.MultipleFilePosition(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                (Cobol.CobolWord) visit(ctx.fileName()),
+                words(ctx.POSITION()),
+                visitNullable(ctx.integerLiteral())
+        );
+    }
+
+    @Override
     public Cobol.ValuedObjectComputerClause visitDiskSizeClause(CobolParser.DiskSizeClauseContext ctx) {
         return new Cobol.ValuedObjectComputerClause(
                 randomId(),

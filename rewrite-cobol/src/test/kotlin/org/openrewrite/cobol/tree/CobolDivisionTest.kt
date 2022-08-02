@@ -92,7 +92,11 @@ class CobolDivisionTest : RewriteTest {
                     STANDARD-2.
                 INPUT-OUTPUT SECTION.
                 FILE-CONTROL. SELECT OPTIONAL IDENTIFIER ASSIGN TO DISK.
-                I-O-CONTROL. IDENTIFIER. RERUN ON IDENTIFIER EVERY 10 RECORDS.
+                I-O-CONTROL. IDENTIFIER.
+                RERUN ON IDENTIFIER EVERY 10 RECORDS
+                SAME RECORD AREA FOR IDENTIFIER
+                MULTIPLE FILE TAPE CONTAINS IDENTIFIER POSITION 10
+                COMMITMENT CONTROL FOR IDENTIFIER.
             """
         )
     )
