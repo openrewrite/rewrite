@@ -1888,4 +1888,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.DataTypeDefClause visitDataTypeDefClause(Cobol.DataTypeDefClause dataTypeDefClause, P p) {
         return (Cobol.DataTypeDefClause) super.visitDataTypeDefClause(dataTypeDefClause, p);
     }
+
+    @Override
+    public Cobol.DataThreadLocalClause visitDataThreadLocalClause(Cobol.DataThreadLocalClause dataThreadLocalClause, P p) {
+        return (Cobol.DataThreadLocalClause) super.visitDataThreadLocalClause(dataThreadLocalClause, p);
+    }
+
+    @Override
+    public Cobol.DataCommonOwnLocalClause visitDataCommonOwnLocalClause(Cobol.DataCommonOwnLocalClause dataCommonOwnLocalClause, P p) {
+        return (Cobol.DataCommonOwnLocalClause) super.visitDataCommonOwnLocalClause(dataCommonOwnLocalClause, p);
+    }
+
+    @Override
+    public Cobol.DataTypeClause visitDataTypeClause(Cobol.DataTypeClause dataTypeClause, P p) {
+        return (Cobol.DataTypeClause) super.visitDataTypeClause(dataTypeClause, p);
+    }
+
+    @Override
+    public Cobol.DataUsingClause visitDataUsingClause(Cobol.DataUsingClause dataUsingClause, P p) {
+        return (Cobol.DataUsingClause) super.visitDataUsingClause(dataUsingClause, p);
+    }
+
+    @Override
+    public Cobol.DataUsageClause visitDataUsageClause(Cobol.DataUsageClause dataUsageClause, P p) {
+        return (Cobol.DataUsageClause) super.visitDataUsageClause(dataUsageClause, p);
+    }
 }

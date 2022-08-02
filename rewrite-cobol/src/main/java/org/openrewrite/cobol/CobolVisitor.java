@@ -3363,4 +3363,40 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         return d;
     }
+
+    public Cobol visitDataThreadLocalClause(Cobol.DataThreadLocalClause dataThreadLocalClause, P p) {
+        Cobol.DataThreadLocalClause d = dataThreadLocalClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataCommonOwnLocalClause(Cobol.DataCommonOwnLocalClause dataCommonOwnLocalClause, P p) {
+        Cobol.DataCommonOwnLocalClause d = dataCommonOwnLocalClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataTypeClause(Cobol.DataTypeClause dataTypeClause, P p) {
+        Cobol.DataTypeClause d = dataTypeClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withParenthesized((Cobol.Parenthesized) visit(d.getParenthesized(), p));
+        return d;
+    }
+
+    public Cobol visitDataUsingClause(Cobol.DataUsingClause dataUsingClause, P p) {
+        Cobol.DataUsingClause d = dataUsingClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataUsageClause(Cobol.DataUsageClause dataUsageClause, P p) {
+        Cobol.DataUsageClause d = dataUsageClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
 }

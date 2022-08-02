@@ -3394,4 +3394,40 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(dataTypeDefClause.getWords());
         return dataTypeDefClause;
     }
+
+    public Cobol visitDataThreadLocalClause(Cobol.DataThreadLocalClause dataThreadLocalClause, PrintOutputCapture<P> p) {
+        visitSpace(dataThreadLocalClause.getPrefix(), p);
+        visitMarkers(dataThreadLocalClause.getMarkers(), p);
+        p.append(dataThreadLocalClause.getWords());
+        return dataThreadLocalClause;
+    }
+
+    public Cobol visitDataCommonOwnLocalClause(Cobol.DataCommonOwnLocalClause dataCommonOwnLocalClause, PrintOutputCapture<P> p) {
+        visitSpace(dataCommonOwnLocalClause.getPrefix(), p);
+        visitMarkers(dataCommonOwnLocalClause.getMarkers(), p);
+        p.append(dataCommonOwnLocalClause.getWords());
+        return dataCommonOwnLocalClause;
+    }
+
+    public Cobol visitDataTypeClause(Cobol.DataTypeClause dataTypeClause, PrintOutputCapture<P> p) {
+        visitSpace(dataTypeClause.getPrefix(), p);
+        visitMarkers(dataTypeClause.getMarkers(), p);
+        p.append(dataTypeClause.getWords());
+        visit(dataTypeClause.getParenthesized(), p);
+        return dataTypeClause;
+    }
+
+    public Cobol visitDataUsingClause(Cobol.DataUsingClause dataUsingClause, PrintOutputCapture<P> p) {
+        visitSpace(dataUsingClause.getPrefix(), p);
+        visitMarkers(dataUsingClause.getMarkers(), p);
+        p.append(dataUsingClause.getWords());
+        return dataUsingClause;
+    }
+
+    public Cobol visitDataUsageClause(Cobol.DataUsageClause dataUsageClause, PrintOutputCapture<P> p) {
+        visitSpace(dataUsageClause.getPrefix(), p);
+        visitMarkers(dataUsageClause.getMarkers(), p);
+        p.append(dataUsageClause.getWords());
+        return dataUsageClause;
+    }
 }

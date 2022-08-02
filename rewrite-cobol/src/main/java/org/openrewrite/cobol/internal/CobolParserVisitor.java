@@ -1273,6 +1273,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitDataCommonOwnLocalClause(CobolParser.DataCommonOwnLocalClauseContext ctx) {
+        return new Cobol.DataCommonOwnLocalClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.COMMON(), ctx.OWN(), ctx.LOCAL())
+        );
+    }
+
+    @Override
     public Cobol.DataDivision visitDataDivision(CobolParser.DataDivisionContext ctx) {
         return new Cobol.DataDivision(
                 randomId(),
@@ -1326,12 +1336,66 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitDataThreadLocalClause(CobolParser.DataThreadLocalClauseContext ctx) {
+        return new Cobol.DataThreadLocalClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.THREAD_LOCAL())
+        );
+    }
+
+    @Override
+    public Object visitDataTypeClause(CobolParser.DataTypeClauseContext ctx) {
+        return new Cobol.DataTypeClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TYPE(), ctx.IS(), ctx.SHORT_DATE(), ctx.LONG_DATE(), ctx.NUMERIC_DATE(),
+                        ctx.NUMERIC_TIME(), ctx.LONG_TIME(), ctx.CLOB(), ctx.BLOB(), ctx.DBCLOB()),
+                ctx.integerLiteral() == null ? null : new Cobol.Parenthesized(
+                        randomId(),
+                        prefix(ctx),
+                        Markers.EMPTY,
+                        words(ctx.LPARENCHAR()),
+                        singletonList((Cobol) visit(ctx.integerLiteral())),
+                        words(ctx.RPARENCHAR())
+                )
+        );
+    }
+
+    @Override
     public Object visitDataTypeDefClause(CobolParser.DataTypeDefClauseContext ctx) {
         return new Cobol.DataTypeDefClause(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.IS(), ctx.TYPEDEF())
+        );
+    }
+
+    @Override
+    public Object visitDataUsingClause(CobolParser.DataUsingClauseContext ctx) {
+        return new Cobol.DataUsingClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.USING(), ctx.LANGUAGE(), ctx.CONVENTION(), ctx.OF()),
+                visit(ctx.cobolWord(), ctx.dataName())
+        );
+    }
+
+    @Override
+    public Object visitDataUsageClause(CobolParser.DataUsageClauseContext ctx) {
+        return new Cobol.DataUsageClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.USAGE(), ctx.IS(), ctx.BINARY(), ctx.TRUNCATED(), ctx.EXTENDED(), ctx.BIT(),
+                        ctx.COMP(), ctx.COMP_1(), ctx.COMP_2(), ctx.COMP_3(), ctx.COMP_4(), ctx.COMP_5(),
+                        ctx.COMPUTATIONAL(), ctx.COMPUTATIONAL_1(), ctx.COMPUTATIONAL_2(), ctx.COMPUTATIONAL_3(), ctx.COMPUTATIONAL_4(), ctx.COMPUTATIONAL_5(),
+                        ctx.CONTROL_POINT(), ctx.DATE(), ctx.DISPLAY(), ctx.DISPLAY_1(), ctx.DOUBLE(), ctx.EVENT(), ctx.FUNCTION_POINTER(), ctx.INDEX(), ctx.KANJI(), ctx.LOCK(),
+                        ctx.NATIONAL(), ctx.PACKED_DECIMAL(), ctx.POINTER(), ctx.PROCEDURE_POINTER(), ctx.REAL(), ctx.SQL(), ctx.TASK())
         );
     }
 
