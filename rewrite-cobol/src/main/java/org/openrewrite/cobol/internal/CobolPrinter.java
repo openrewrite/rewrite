@@ -3358,4 +3358,40 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", reportClause.getPadding().getReportName(), "", "", p);
         return reportClause;
     }
+
+    public Cobol visitDataRedefinesClause(Cobol.DataRedefinesClause dataRedefinesClause, PrintOutputCapture<P> p) {
+        visitSpace(dataRedefinesClause.getPrefix(), p);
+        visitMarkers(dataRedefinesClause.getMarkers(), p);
+        p.append(dataRedefinesClause.getRedefines());
+        visit(dataRedefinesClause.getDataName(), p);
+        return dataRedefinesClause;
+    }
+
+    public Cobol visitDataIntegerStringClause(Cobol.DataIntegerStringClause dataIntegerStringClause, PrintOutputCapture<P> p) {
+        visitSpace(dataIntegerStringClause.getPrefix(), p);
+        visitMarkers(dataIntegerStringClause.getMarkers(), p);
+        p.append(dataIntegerStringClause.getRedefines());
+        return dataIntegerStringClause;
+    }
+
+    public Cobol visitDataExternalClause(Cobol.DataExternalClause dataExternalClause, PrintOutputCapture<P> p) {
+        visitSpace(dataExternalClause.getPrefix(), p);
+        visitMarkers(dataExternalClause.getMarkers(), p);
+        p.append(dataExternalClause.getRedefines());
+        return dataExternalClause;
+    }
+
+    public Cobol visitDataGlobalClause(Cobol.DataGlobalClause dataGlobalClause, PrintOutputCapture<P> p) {
+        visitSpace(dataGlobalClause.getPrefix(), p);
+        visitMarkers(dataGlobalClause.getMarkers(), p);
+        p.append(dataGlobalClause.getWords());
+        return dataGlobalClause;
+    }
+
+    public Cobol visitDataTypeDefClause(Cobol.DataTypeDefClause dataTypeDefClause, PrintOutputCapture<P> p) {
+        visitSpace(dataTypeDefClause.getPrefix(), p);
+        visitMarkers(dataTypeDefClause.getMarkers(), p);
+        p.append(dataTypeDefClause.getWords());
+        return dataTypeDefClause;
+    }
 }

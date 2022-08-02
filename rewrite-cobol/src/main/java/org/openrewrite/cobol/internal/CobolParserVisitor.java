@@ -1236,6 +1236,105 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
         );
     }
 
+
+    @Override
+    public Cobol.DataPictureClause visitDataPictureClause(CobolParser.DataPictureClauseContext ctx) {
+        return new Cobol.DataPictureClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PICTURE(), ctx.PIC(), ctx.IS()),
+                convertAllContainer(ctx.pictureString().picture())
+        );
+    }
+
+    @Override
+    public Object visitDataBaseSection(CobolParser.DataBaseSectionContext ctx) {
+        return new Cobol.DataBaseSection(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DATA_BASE(), ctx.SECTION()),
+                convertAllContainer(sourceBefore("."), ctx.dataBaseSectionEntry())
+        );
+    }
+
+    @Override
+    public Object visitDataBaseSectionEntry(CobolParser.DataBaseSectionEntryContext ctx) {
+        return new Cobol.DataBaseSectionEntry(
+                randomId(),
+                sourceBefore(ctx.integerLiteral().getText()),
+                Markers.EMPTY,
+                ctx.integerLiteral().getText(),
+                (Literal) visit(ctx.literal(0)),
+                words(ctx.INVOKE()),
+                (Literal) visit(ctx.literal(1))
+        );
+    }
+
+    @Override
+    public Cobol.DataDivision visitDataDivision(CobolParser.DataDivisionContext ctx) {
+        return new Cobol.DataDivision(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DATA(), ctx.DIVISION()),
+                convertAllContainer(sourceBefore("."), ctx.dataDivisionSection())
+        );
+    }
+
+    @Override
+    public Object visitDataExternalClause(CobolParser.DataExternalClauseContext ctx) {
+        return new Cobol.DataExternalClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.EXTERNAL(), ctx.BY()),
+                visitNullable(ctx.literal())
+        );
+    }
+
+    @Override
+    public Object visitDataGlobalClause(CobolParser.DataGlobalClauseContext ctx) {
+        return new Cobol.DataGlobalClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.GLOBAL())
+        );
+    }
+
+    @Override
+    public Object visitDataIntegerStringClause(CobolParser.DataIntegerStringClauseContext ctx) {
+        return new Cobol.DataIntegerStringClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.INTEGER(), ctx.STRING())
+        );
+    }
+
+    @Override
+    public Object visitDataRedefinesClause(CobolParser.DataRedefinesClauseContext ctx) {
+        return new Cobol.DataRedefinesClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REDEFINES()),
+                (Cobol.CobolWord) visit(ctx.dataName())
+        );
+    }
+
+    @Override
+    public Object visitDataTypeDefClause(CobolParser.DataTypeDefClauseContext ctx) {
+        return new Cobol.DataTypeDefClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.TYPEDEF())
+        );
+    }
+
     @Override
     public Cobol.DecimalPointClause visitDecimalPointClause(CobolParser.DecimalPointClauseContext ctx) {
         return new Cobol.DecimalPointClause(
@@ -3204,52 +3303,6 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 words(ctx.ALL(), ctx.PROCEDURES(), ctx.REFERENCES(), ctx.OF()),
                 ctx.PROCEDURES() != null ? null : visit(ctx.identifier(), ctx.procedureName(), ctx.fileName())
-        );
-    }
-
-    @Override
-    public Cobol.DataPictureClause visitDataPictureClause(CobolParser.DataPictureClauseContext ctx) {
-        return new Cobol.DataPictureClause(
-                randomId(),
-                prefix(ctx),
-                Markers.EMPTY,
-                words(ctx.PICTURE(), ctx.PIC(), ctx.IS()),
-                convertAllContainer(ctx.pictureString().picture())
-        );
-    }
-
-    @Override
-    public Object visitDataBaseSection(CobolParser.DataBaseSectionContext ctx) {
-        return new Cobol.DataBaseSection(
-                randomId(),
-                prefix(ctx),
-                Markers.EMPTY,
-                words(ctx.DATA_BASE(), ctx.SECTION()),
-                convertAllContainer(sourceBefore("."), ctx.dataBaseSectionEntry())
-        );
-    }
-
-    @Override
-    public Object visitDataBaseSectionEntry(CobolParser.DataBaseSectionEntryContext ctx) {
-        return new Cobol.DataBaseSectionEntry(
-                randomId(),
-                sourceBefore(ctx.integerLiteral().getText()),
-                Markers.EMPTY,
-                ctx.integerLiteral().getText(),
-                (Literal) visit(ctx.literal(0)),
-                words(ctx.INVOKE()),
-                (Literal) visit(ctx.literal(1))
-        );
-    }
-
-    @Override
-    public Cobol.DataDivision visitDataDivision(CobolParser.DataDivisionContext ctx) {
-        return new Cobol.DataDivision(
-                randomId(),
-                prefix(ctx),
-                Markers.EMPTY,
-                words(ctx.DATA(), ctx.DIVISION()),
-                convertAllContainer(sourceBefore("."), ctx.dataDivisionSection())
         );
     }
 

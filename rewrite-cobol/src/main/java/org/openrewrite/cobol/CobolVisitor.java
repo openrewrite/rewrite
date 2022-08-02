@@ -3327,4 +3327,40 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         r = r.getPadding().withReportName(visitContainer(r.getPadding().getReportName(), p));
         return r;
     }
+
+    public Cobol visitDataRedefinesClause(Cobol.DataRedefinesClause dataRedefinesClause, P p) {
+        Cobol.DataRedefinesClause d = dataRedefinesClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withDataName((Cobol.CobolWord) visit(d.getDataName(), p));
+        return d;
+    }
+
+    public Cobol visitDataIntegerStringClause(Cobol.DataIntegerStringClause dataIntegerStringClause, P p) {
+        Cobol.DataIntegerStringClause d = dataIntegerStringClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataExternalClause(Cobol.DataExternalClause dataExternalClause, P p) {
+        Cobol.DataExternalClause d = dataExternalClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataGlobalClause(Cobol.DataGlobalClause dataGlobalClause, P p) {
+        Cobol.DataGlobalClause d = dataGlobalClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataTypeDefClause(Cobol.DataTypeDefClause dataTypeDefClause, P p) {
+        Cobol.DataTypeDefClause d = dataTypeDefClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
 }

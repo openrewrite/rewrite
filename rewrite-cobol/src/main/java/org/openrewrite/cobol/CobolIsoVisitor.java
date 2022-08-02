@@ -1863,4 +1863,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.ReportClause visitReportClause(Cobol.ReportClause reportClause, P p) {
         return (Cobol.ReportClause) super.visitReportClause(reportClause, p);
     }
+
+    @Override
+    public Cobol.DataRedefinesClause visitDataRedefinesClause(Cobol.DataRedefinesClause dataRedefinesClause, P p) {
+        return (Cobol.DataRedefinesClause) super.visitDataRedefinesClause(dataRedefinesClause, p);
+    }
+
+    @Override
+    public Cobol.DataIntegerStringClause visitDataIntegerStringClause(Cobol.DataIntegerStringClause dataIntegerStringClause, P p) {
+        return (Cobol.DataIntegerStringClause) super.visitDataIntegerStringClause(dataIntegerStringClause, p);
+    }
+
+    @Override
+    public Cobol.DataExternalClause visitDataExternalClause(Cobol.DataExternalClause dataExternalClause, P p) {
+        return (Cobol.DataExternalClause) super.visitDataExternalClause(dataExternalClause, p);
+    }
+
+    @Override
+    public Cobol.DataGlobalClause visitDataGlobalClause(Cobol.DataGlobalClause dataGlobalClause, P p) {
+        return (Cobol.DataGlobalClause) super.visitDataGlobalClause(dataGlobalClause, p);
+    }
+
+    @Override
+    public Cobol.DataTypeDefClause visitDataTypeDefClause(Cobol.DataTypeDefClause dataTypeDefClause, P p) {
+        return (Cobol.DataTypeDefClause) super.visitDataTypeDefClause(dataTypeDefClause, p);
+    }
 }
