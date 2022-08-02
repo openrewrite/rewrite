@@ -1798,4 +1798,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.ValuePair visitValuePair(Cobol.ValuePair valuePair, P p) {
         return (Cobol.ValuePair) super.visitValuePair(valuePair, p);
     }
+
+    @Override
+    public Cobol.RecordContainsClause visitRecordContainsClause(Cobol.RecordContainsClause recordContainsClause, P p) {
+        return (Cobol.RecordContainsClause) super.visitRecordContainsClause(recordContainsClause, p);
+    }
+
+    @Override
+    public Cobol.RecordContainsClauseFormat1 visitRecordContainsClauseFormat1(Cobol.RecordContainsClauseFormat1 recordContainsClauseFormat1, P p) {
+        return (Cobol.RecordContainsClauseFormat1) super.visitRecordContainsClauseFormat1(recordContainsClauseFormat1, p);
+    }
+
+    @Override
+    public Cobol.RecordContainsClauseFormat2 visitRecordContainsClauseFormat2(Cobol.RecordContainsClauseFormat2 recordContainsClauseFormat2, P p) {
+        return (Cobol.RecordContainsClauseFormat2) super.visitRecordContainsClauseFormat2(recordContainsClauseFormat2, p);
+    }
+
+    @Override
+    public Cobol.RecordContainsClauseFormat3 visitRecordContainsClauseFormat3(Cobol.RecordContainsClauseFormat3 recordContainsClauseFormat3, P p) {
+        return (Cobol.RecordContainsClauseFormat3) super.visitRecordContainsClauseFormat3(recordContainsClauseFormat3, p);
+    }
+
+    @Override
+    public Cobol.RecordContainsTo visitRecordContainsTo(Cobol.RecordContainsTo recordContainsTo, P p) {
+        return (Cobol.RecordContainsTo) super.visitRecordContainsTo(recordContainsTo, p);
+    }
 }

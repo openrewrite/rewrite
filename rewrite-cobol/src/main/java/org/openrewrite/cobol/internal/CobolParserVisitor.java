@@ -762,6 +762,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitCodeSetClause(CobolParser.CodeSetClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
     public Object visitClosePortFileIOUsingAssociatedDataLength(CobolParser.ClosePortFileIOUsingAssociatedDataLengthContext ctx) {
         return new Cobol.ClosePortFileIOUsingAssociatedDataLength(
                 randomId(),
@@ -899,6 +904,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 convertAllPrefixedList(singletonList(","), ctx.subscript()),
                 words(ctx.RPARENCHAR())
         );
+    }
+
+    @Override
+    public Object visitDataRecordsClause(CobolParser.DataRecordsClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
     }
 
     @Override
@@ -1119,6 +1129,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                         ctx.MORETHANOREQUAL(), ctx.LESSTHANOREQUAL()
                 )
         );
+    }
+
+    @Override
+    public Object visitReportClause(CobolParser.ReportClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
     }
 
     @Override
@@ -1686,6 +1701,26 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitLinageClause(CobolParser.LinageClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitLinageFootingAt(CobolParser.LinageFootingAtContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitLinageLinesAtTop(CobolParser.LinageLinesAtTopContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
+    public Object visitLinageLinesAtBottom(CobolParser.LinageLinesAtBottomContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
+    @Override
     public Cobol.ValuedObjectComputerClause visitMemorySizeClause(CobolParser.MemorySizeClauseContext ctx) {
         return new Cobol.ValuedObjectComputerClause(
                 randomId(),
@@ -1753,6 +1788,65 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitRecordContainsClause(CobolParser.RecordContainsClauseContext ctx) {
+        return new Cobol.RecordContainsClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RECORD()),
+                visit(ctx.recordContainsClauseFormat1(), ctx.recordContainsClauseFormat2(), ctx.recordContainsClauseFormat3())
+        );
+    }
+
+    @Override
+    public Object visitRecordContainsClauseFormat1(CobolParser.RecordContainsClauseFormat1Context ctx) {
+        return new Cobol.RecordContainsClauseFormat1(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CONTAINS()),
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                words(ctx.CHARACTERS())
+        );
+    }
+
+    @Override
+    public Object visitRecordContainsClauseFormat2(CobolParser.RecordContainsClauseFormat2Context ctx) {
+        return new Cobol.RecordContainsClauseFormat2(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.IS(), ctx.VARYING(), ctx.IN(), ctx.SIZE()),
+                convertAllList(emptyList(), singletonList(ctx.FROM()), singletonList(ctx.integerLiteral()), singletonList(ctx.recordContainsTo()), singletonList(ctx.CHARACTERS())),
+                convertAllList(emptyList(), singletonList(ctx.DEPENDING()), singletonList(ctx.ON()), singletonList(ctx.qualifiedDataName()))
+        );
+    }
+
+    @Override
+    public Object visitRecordContainsClauseFormat3(CobolParser.RecordContainsClauseFormat3Context ctx) {
+        return new Cobol.RecordContainsClauseFormat3(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CONTAINS()),
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                (Cobol.RecordContainsTo) visit(ctx.recordContainsTo()),
+                words(ctx.CHARACTERS())
+        );
+    }
+
+    @Override
+    public Object visitRecordContainsTo(CobolParser.RecordContainsToContext ctx) {
+        return new Cobol.RecordContainsTo(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.TO()),
+                (Cobol.CobolWord) visit(ctx.integerLiteral())
+        );
+    }
+
+    @Override
     public Object visitRecordKeyClause(CobolParser.RecordKeyClauseContext ctx) {
         return new Cobol.RecordKeyClause(
                 randomId(),
@@ -1763,6 +1857,11 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 visitNullable(ctx.passwordClause()),
                 words(ctx.WITH(), ctx.DUPLICATES())
         );
+    }
+
+    @Override
+    public Object visitRecordingModeClause(CobolParser.RecordingModeClauseContext ctx) {
+        throw new UnsupportedOperationException("Implement me");
     }
 
     @Override

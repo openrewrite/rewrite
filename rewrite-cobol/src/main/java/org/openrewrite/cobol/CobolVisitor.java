@@ -3224,4 +3224,46 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         v = v.withSystemName((Cobol.CobolWord) visit(v.getSystemName(), p));
         return v;
     }
+
+    public Cobol visitRecordContainsClause(Cobol.RecordContainsClause recordContainsClause, P p) {
+        Cobol.RecordContainsClause r = recordContainsClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withClause((Cobol) visit(r.getClause(), p));
+        return r;
+    }
+
+    public Cobol visitRecordContainsClauseFormat1(Cobol.RecordContainsClauseFormat1 recordContainsClauseFormat1, P p) {
+        Cobol.RecordContainsClauseFormat1 r = recordContainsClauseFormat1;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        return r;
+    }
+
+    public Cobol visitRecordContainsClauseFormat2(Cobol.RecordContainsClauseFormat2 recordContainsClauseFormat2, P p) {
+        Cobol.RecordContainsClauseFormat2 r = recordContainsClauseFormat2;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withFromClause(ListUtils.map(r.getFromClause(), t -> (Cobol) visit(t, p)));
+        r = r.withQualifiedDataName(ListUtils.map(r.getQualifiedDataName(), t -> (Cobol) visit(t, p)));
+        return r;
+    }
+
+    public Cobol visitRecordContainsClauseFormat3(Cobol.RecordContainsClauseFormat3 recordContainsClauseFormat3, P p) {
+        Cobol.RecordContainsClauseFormat3 r = recordContainsClauseFormat3;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        r = r.withRecordContainsTo((Cobol.RecordContainsTo) visit(r.getRecordContainsTo(), p));
+        return r;
+    }
+
+    public Cobol visitRecordContainsTo(Cobol.RecordContainsTo recordContainsTo, P p) {
+        Cobol.RecordContainsTo r = recordContainsTo;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIntegerLiteral((Cobol.CobolWord) visit(r.getIntegerLiteral(), p));
+        return r;
+    }
 }

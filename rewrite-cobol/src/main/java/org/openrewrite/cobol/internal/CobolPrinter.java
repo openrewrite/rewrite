@@ -3199,7 +3199,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitSpace(globalClause.getPrefix(), p);
         visitMarkers(globalClause.getMarkers(), p);
         p.append(globalClause.getWords());
-        return super.visitGlobalClause(globalClause, p);
+        return globalClause;
     }
 
     public Cobol visitBlockContainsClause(Cobol.BlockContainsClause blockContainsClause, PrintOutputCapture<P> p) {
@@ -3241,6 +3241,55 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitMarkers(valuePair.getMarkers(), p);
         visit(valuePair.getSystemName(), p);
         p.append(valuePair.getIs());
+        visit(valuePair.getName(), p);
         return valuePair;
+    }
+
+    public Cobol visitRecordContainsClause(Cobol.RecordContainsClause recordContainsClause, PrintOutputCapture<P> p) {
+        visitSpace(recordContainsClause.getPrefix(), p);
+        visitMarkers(recordContainsClause.getMarkers(), p);
+        p.append(recordContainsClause.getRecord());
+        visit(recordContainsClause.getClause(), p);
+        return recordContainsClause;
+    }
+
+    public Cobol visitRecordContainsClauseFormat1(Cobol.RecordContainsClauseFormat1 recordContainsClauseFormat1, PrintOutputCapture<P> p) {
+        visitSpace(recordContainsClauseFormat1.getPrefix(), p);
+        visitMarkers(recordContainsClauseFormat1.getMarkers(), p);
+        p.append(recordContainsClauseFormat1.getContains());
+        visit(recordContainsClauseFormat1.getIntegerLiteral(), p);
+        p.append(recordContainsClauseFormat1.getCharacters());
+        return recordContainsClauseFormat1;
+    }
+
+    public Cobol visitRecordContainsClauseFormat2(Cobol.RecordContainsClauseFormat2 recordContainsClauseFormat2, PrintOutputCapture<P> p) {
+        visitSpace(recordContainsClauseFormat2.getPrefix(), p);
+        visitMarkers(recordContainsClauseFormat2.getMarkers(), p);
+        p.append(recordContainsClauseFormat2.getWords());
+        for (Cobol c : recordContainsClauseFormat2.getFromClause()) {
+            visit(c, p);
+        }
+        for (Cobol c : recordContainsClauseFormat2.getQualifiedDataName()) {
+            visit(c, p);
+        }
+        return recordContainsClauseFormat2;
+    }
+
+    public Cobol visitRecordContainsClauseFormat3(Cobol.RecordContainsClauseFormat3 recordContainsClauseFormat3, PrintOutputCapture<P> p) {
+        visitSpace(recordContainsClauseFormat3.getPrefix(), p);
+        visitMarkers(recordContainsClauseFormat3.getMarkers(), p);
+        p.append(recordContainsClauseFormat3.getContains());
+        visit(recordContainsClauseFormat3.getIntegerLiteral(), p);
+        visit(recordContainsClauseFormat3.getRecordContainsTo(), p);
+        p.append(recordContainsClauseFormat3.getCharacters());
+        return recordContainsClauseFormat3;
+    }
+
+    public Cobol visitRecordContainsTo(Cobol.RecordContainsTo recordContainsTo, PrintOutputCapture<P> p) {
+        visitSpace(recordContainsTo.getPrefix(), p);
+        visitMarkers(recordContainsTo.getMarkers(), p);
+        p.append(recordContainsTo.getTo());
+        visit(recordContainsTo.getIntegerLiteral(), p);
+        return recordContainsTo;
     }
 }

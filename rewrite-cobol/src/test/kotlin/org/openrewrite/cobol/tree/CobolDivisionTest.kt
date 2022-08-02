@@ -290,10 +290,14 @@ class CobolDivisionTest : RewriteTest {
                 DATA DIVISION.
                 FILE SECTION.
                 FD  PRINT-FILE.
-                01  PRINT-REC PICTURE X(120).
-                01  DUMMY-RECORD PICTURE X(120).
-                WORKING-STORAGE SECTION.
-                77  WS1 PICTURE X.
+                IS EXTERNAL.
+                IS GLOBAL.
+                BLOCK CONTAINS 1 TO 10 RECORDS.
+                RECORD CONTAINS 10 CHARACTERS.
+                RECORD IS VARYING IN SIZE FROM 1 TO 10 CHARACTERS DEPENDING ON IDENTIFIER IN IDENTIFIER.
+                RECORD CONTAINS 1 TO 10 CHARACTERS.
+                LABEL RECORD IS OMITTED.
+                VALUE OF IDENTIFIER IS 10.
         """)
     )
 
