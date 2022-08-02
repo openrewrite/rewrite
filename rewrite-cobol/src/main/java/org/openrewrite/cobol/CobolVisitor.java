@@ -3486,4 +3486,32 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.withToName((Cobol.QualifiedDataName) visit(d.getToName(), p));
         return d;
     }
+
+    public Cobol visitDataSignClause(Cobol.DataSignClause dataSignClause, P p) {
+        Cobol.DataSignClause d = dataSignClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataSynchronizedClause(Cobol.DataSynchronizedClause dataSynchronizedClause, P p) {
+        Cobol.DataSynchronizedClause d = dataSynchronizedClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataWithLowerBoundsClause(Cobol.DataWithLowerBoundsClause dataWithLowerBoundsClause, P p) {
+        Cobol.DataWithLowerBoundsClause d = dataWithLowerBoundsClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
+
+    public Cobol visitDataRecordAreaClause(Cobol.DataRecordAreaClause dataRecordAreaClause, P p) {
+        Cobol.DataRecordAreaClause d = dataRecordAreaClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        return d;
+    }
 }

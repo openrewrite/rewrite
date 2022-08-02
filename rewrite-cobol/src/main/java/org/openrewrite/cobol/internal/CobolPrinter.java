@@ -3521,4 +3521,32 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(dataRenamesClause.getToName(), p);
         return dataRenamesClause;
     }
+
+    public Cobol visitDataSignClause(Cobol.DataSignClause dataSignClause, PrintOutputCapture<P> p) {
+        visitSpace(dataSignClause.getPrefix(), p);
+        visitMarkers(dataSignClause.getMarkers(), p);
+        p.append(dataSignClause.getWords());
+        return dataSignClause;
+    }
+
+    public Cobol visitDataSynchronizedClause(Cobol.DataSynchronizedClause dataSynchronizedClause, PrintOutputCapture<P> p) {
+        visitSpace(dataSynchronizedClause.getPrefix(), p);
+        visitMarkers(dataSynchronizedClause.getMarkers(), p);
+        p.append(dataSynchronizedClause.getWords());
+        return dataSynchronizedClause;
+    }
+
+    public Cobol visitDataWithLowerBoundsClause(Cobol.DataWithLowerBoundsClause dataWithLowerBoundsClause, PrintOutputCapture<P> p) {
+        visitSpace(dataWithLowerBoundsClause.getPrefix(), p);
+        visitMarkers(dataWithLowerBoundsClause.getMarkers(), p);
+        p.append(dataWithLowerBoundsClause.getWords());
+        return dataWithLowerBoundsClause;
+    }
+
+    public Cobol visitDataRecordAreaClause(Cobol.DataRecordAreaClause dataRecordAreaClause, PrintOutputCapture<P> p) {
+        visitSpace(dataRecordAreaClause.getPrefix(), p);
+        visitMarkers(dataRecordAreaClause.getMarkers(), p);
+        p.append(dataRecordAreaClause.getWords());
+        return dataRecordAreaClause;
+    }
 }

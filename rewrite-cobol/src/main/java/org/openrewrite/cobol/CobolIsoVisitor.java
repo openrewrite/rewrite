@@ -1968,4 +1968,24 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.DataRenamesClause visitDataRenamesClause(Cobol.DataRenamesClause dataRenamesClause, P p) {
         return (Cobol.DataRenamesClause) super.visitDataRenamesClause(dataRenamesClause, p);
     }
+
+    @Override
+    public Cobol.DataSignClause visitDataSignClause(Cobol.DataSignClause dataSignClause, P p) {
+        return (Cobol.DataSignClause) super.visitDataSignClause(dataSignClause, p);
+    }
+
+    @Override
+    public Cobol.DataSynchronizedClause visitDataSynchronizedClause(Cobol.DataSynchronizedClause dataSynchronizedClause, P p) {
+        return (Cobol.DataSynchronizedClause) super.visitDataSynchronizedClause(dataSynchronizedClause, p);
+    }
+
+    @Override
+    public Cobol.DataWithLowerBoundsClause visitDataWithLowerBoundsClause(Cobol.DataWithLowerBoundsClause dataWithLowerBoundsClause, P p) {
+        return (Cobol.DataWithLowerBoundsClause) super.visitDataWithLowerBoundsClause(dataWithLowerBoundsClause, p);
+    }
+
+    @Override
+    public Cobol.DataRecordAreaClause visitDataRecordAreaClause(Cobol.DataRecordAreaClause dataRecordAreaClause, P p) {
+        return (Cobol.DataRecordAreaClause) super.visitDataRecordAreaClause(dataRecordAreaClause, p);
+    }
 }

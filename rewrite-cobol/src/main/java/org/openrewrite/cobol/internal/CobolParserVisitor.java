@@ -1448,6 +1448,36 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
     }
 
     @Override
+    public Object visitDataRecordAreaClause(CobolParser.DataRecordAreaClauseContext ctx) {
+        return new Cobol.DataRecordAreaClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RECORD(), ctx.AREA())
+        );
+    }
+
+    @Override
+    public Object visitDataSignClause(CobolParser.DataSignClauseContext ctx) {
+        return new Cobol.DataSignClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SIGN(), ctx.IS(), ctx.LEADING(), ctx.TRAILING(), ctx.SEPARATE(), ctx.CHARACTER())
+        );
+    }
+
+    @Override
+    public Object visitDataSynchronizedClause(CobolParser.DataSynchronizedClauseContext ctx) {
+        return new Cobol.DataSignClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SYNCHRONIZED(), ctx.SYNC(), ctx.LEFT(), ctx.RIGHT())
+        );
+    }
+
+    @Override
     public Object visitDataThreadLocalClause(CobolParser.DataThreadLocalClauseContext ctx) {
         return new Cobol.DataThreadLocalClause(
                 randomId(),
@@ -1519,6 +1549,16 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
                 Markers.EMPTY,
                 words(ctx.VALUE(), ctx.VALUES(), ctx.IS(), ctx.ARE()),
                 convertAllPrefixedList(singletonList(","), ctx.dataValueInterval())
+        );
+    }
+
+    @Override
+    public Object visitDataWithLowerBoundsClause(CobolParser.DataWithLowerBoundsClauseContext ctx) {
+        return new Cobol.DecimalPointClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.WITH(), ctx.LOWER(), ctx.BOUNDS())
         );
     }
 
