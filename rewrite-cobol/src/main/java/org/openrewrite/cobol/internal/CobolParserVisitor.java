@@ -1578,7 +1578,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitDestinationCountClause(CobolParser.DestinationCountClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.DestinationCountClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DESTINATION(), ctx.COUNT()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override
@@ -2074,17 +2080,35 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitMessageCountClause(CobolParser.MessageCountClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.MessageCountClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.MESSAGE(), ctx.COUNT(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override
     public Object visitMessageDateClause(CobolParser.MessageDateClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.MessageDateClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.MESSAGE(), ctx.DATE(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override
     public Object visitMessageTimeClause(CobolParser.MessageTimeClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.MessageTimeClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.MESSAGE(), ctx.TIME(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override

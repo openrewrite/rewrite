@@ -3562,4 +3562,36 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         s = s.withDataDescName((Cobol.CobolWord) visit(s.getDataDescName(), p));
         return s;
     }
+
+    public Cobol visitMessageTimeClause(Cobol.MessageTimeClause messageTimeClause, P p) {
+        Cobol.MessageTimeClause m = messageTimeClause;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withDataDescName((Cobol.CobolWord) visit(m.getDataDescName(), p));
+        return m;
+    }
+
+    public Cobol visitMessageDateClause(Cobol.MessageDateClause messageDateClause, P p) {
+        Cobol.MessageDateClause m = messageDateClause;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withDataDescName((Cobol.CobolWord) visit(m.getDataDescName(), p));
+        return m;
+    }
+
+    public Cobol visitMessageCountClause(Cobol.MessageCountClause messageCountClause, P p) {
+        Cobol.MessageCountClause m = messageCountClause;
+        m = m.withPrefix(visitSpace(m.getPrefix(), p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withDataDescName((Cobol.CobolWord) visit(m.getDataDescName(), p));
+        return m;
+    }
+
+    public Cobol visitDestinationCountClause(Cobol.DestinationCountClause destinationCountClause, P p) {
+        Cobol.DestinationCountClause d = destinationCountClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withDataDescName((Cobol.CobolWord) visit(d.getDataDescName(), p));
+        return d;
+    }
 }

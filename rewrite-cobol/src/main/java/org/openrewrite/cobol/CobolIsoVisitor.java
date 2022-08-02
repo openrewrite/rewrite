@@ -2018,4 +2018,24 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.SymbolicQueueClause visitSymbolicQueueClause(Cobol.SymbolicQueueClause symbolicQueueClause, P p) {
         return (Cobol.SymbolicQueueClause) super.visitSymbolicQueueClause(symbolicQueueClause, p);
     }
+
+    @Override
+    public Cobol.MessageTimeClause visitMessageTimeClause(Cobol.MessageTimeClause messageTimeClause, P p) {
+        return (Cobol.MessageTimeClause) super.visitMessageTimeClause(messageTimeClause, p);
+    }
+
+    @Override
+    public Cobol.MessageDateClause visitMessageDateClause(Cobol.MessageDateClause messageDateClause, P p) {
+        return (Cobol.MessageDateClause) super.visitMessageDateClause(messageDateClause, p);
+    }
+
+    @Override
+    public Cobol.MessageCountClause visitMessageCountClause(Cobol.MessageCountClause messageCountClause, P p) {
+        return (Cobol.MessageCountClause) super.visitMessageCountClause(messageCountClause, p);
+    }
+
+    @Override
+    public Cobol.DestinationCountClause visitDestinationCountClause(Cobol.DestinationCountClause destinationCountClause, P p) {
+        return (Cobol.DestinationCountClause) super.visitDestinationCountClause(destinationCountClause, p);
+    }
 }

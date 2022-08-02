@@ -3597,4 +3597,36 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(symbolicQueueClause.getDataDescName(), p);
         return symbolicQueueClause;
     }
+
+    public Cobol visitMessageTimeClause(Cobol.MessageTimeClause messageTimeClause, PrintOutputCapture<P> p) {
+        visitSpace(messageTimeClause.getPrefix(), p);
+        visitMarkers(messageTimeClause.getMarkers(), p);
+        p.append(messageTimeClause.getWords());
+        visit(messageTimeClause.getDataDescName(), p);
+        return messageTimeClause;
+    }
+
+    public Cobol visitMessageDateClause(Cobol.MessageDateClause messageDateClause, PrintOutputCapture<P> p) {
+        visitSpace(messageDateClause.getPrefix(), p);
+        visitMarkers(messageDateClause.getMarkers(), p);
+        p.append(messageDateClause.getWords());
+        visit(messageDateClause.getDataDescName(), p);
+        return messageDateClause;
+    }
+
+    public Cobol visitMessageCountClause(Cobol.MessageCountClause messageCountClause, PrintOutputCapture<P> p) {
+        visitSpace(messageCountClause.getPrefix(), p);
+        visitMarkers(messageCountClause.getMarkers(), p);
+        p.append(messageCountClause.getWords());
+        visit(messageCountClause.getDataDescName(), p);
+        return messageCountClause;
+    }
+
+    public Cobol visitDestinationCountClause(Cobol.DestinationCountClause destinationCountClause, PrintOutputCapture<P> p) {
+        visitSpace(destinationCountClause.getPrefix(), p);
+        visitMarkers(destinationCountClause.getMarkers(), p);
+        p.append(destinationCountClause.getWords());
+        visit(destinationCountClause.getDataDescName(), p);
+        return destinationCountClause;
+    }
 }
