@@ -2,8 +2,6 @@ package org.openrewrite.java.controlflow;
 
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
-
-
 import org.graphstream.ui.swing_viewer.SwingViewer;
 import org.graphstream.ui.swing_viewer.ViewPanel;
 import org.graphstream.ui.view.Viewer;
@@ -11,26 +9,26 @@ import org.graphstream.ui.view.ViewerListener;
 import org.graphstream.ui.view.ViewerPipe;
 
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import javax.swing.border.EtchedBorder;
 import java.awt.*;
 import java.util.Map;
 
 
 public class GraphShower {
-    private Graph graph;
-    private JFrame mainFrame;
-    private JPanel mainPanel;
+    static {
+        System.setProperty("org.graphstream.ui", "swing");
+        System.setProperty("sun.java2d.uiScale", "1.0");
+    }
+
+    private final Graph graph;
     private JTextArea codeArea;
 
-    private Map<Node, ControlFlowNode> nodeToNode;
+    private final Map<Node, ControlFlowNode> nodeToNode;
 
     boolean loop;
 
-    public GraphShower(Map<ControlFlowNode, Integer> nodeToIndex) {
-        System.setProperty("org.graphstream.ui", "swing");
-        System.setProperty("sun.java2d.uiScale", "1.0");
 
+
+    public GraphShower(Map<ControlFlowNode, Integer> nodeToIndex) {
         ControlFlowGraph cfg = new ControlFlowGraph.ControlFlowGraphBuilder()
                 .nodeToIndex(nodeToIndex)
                 .expanded(false)
@@ -44,22 +42,19 @@ public class GraphShower {
 
 
     public void runGraph() {
-        mainFrame = new JFrame();
-        JFrame frame = mainFrame;
-        mainPanel = new JPanel() {
+        JFrame frame = new JFrame();
+        JPanel mainPanel = new JPanel() {
             @Override
             public Dimension getPreferredSize() {
                 return new Dimension(640, 480);
             }
         };
         mainPanel.setLayout(new BorderLayout());
-        JPanel panel = mainPanel;
         codeArea = new JTextArea();
         codeArea.setEditable(false);
 
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        mainFrame.add(panel);
-//          graph.display();
+        frame.add(mainPanel);
 
         Viewer viewer = new SwingViewer(graph, Viewer.ThreadingModel.GRAPH_IN_GUI_THREAD);
 
@@ -68,8 +63,8 @@ public class GraphShower {
         viewer.getDefaultView().enableMouseOptions();
         viewer.enableAutoLayout();
 
-        panel.add(viewPanel, BorderLayout.CENTER);
-        panel.add(codeArea, BorderLayout.NORTH);
+        mainPanel.add(viewPanel, BorderLayout.CENTER);
+        mainPanel.add(codeArea, BorderLayout.NORTH);
         frame.pack();
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
