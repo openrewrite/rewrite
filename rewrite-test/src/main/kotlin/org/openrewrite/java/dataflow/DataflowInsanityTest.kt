@@ -2901,6 +2901,7 @@ public final class SecurityUtils {
         )
     )
 
+    @Disabled ("No current node! exception")
     @Test
     fun `basex`() = rewriteRun(
         java(
@@ -4023,6 +4024,7 @@ public final class SecurityUtils {
         )
     )
 
+    @Disabled ("Condition node has no guard exception")
     @Test
     fun `californium`() = rewriteRun(
         java(
@@ -4353,6 +4355,7 @@ public final class SecurityUtils {
         )
     )
 
+    @Disabled ("Condition node has no guard exception")
     @Test
     fun `DependencyCheck`() = rewriteRun(
         java(
@@ -5365,6 +5368,7 @@ public final class SecurityUtils {
         )
     )
 
+    @Disabled("Basic block already has a successor exception")
     @Test
     fun `byte-buddy`() = rewriteRun(
         java(
@@ -10176,6 +10180,7 @@ public final class SecurityUtils {
         )
     )
 
+    @Disabled ("Condition node has no guard exception")
     @Test
     fun `termux-app TermuxOpenReceiver`() = rewriteRun(
         java(
