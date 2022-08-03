@@ -2108,4 +2108,44 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.ReportGroupJustifiedClause visitReportGroupJustifiedClause(Cobol.ReportGroupJustifiedClause reportGroupJustifiedClause, P p) {
         return (Cobol.ReportGroupJustifiedClause) super.visitReportGroupJustifiedClause(reportGroupJustifiedClause, p);
     }
+
+    @Override
+    public Cobol.ReportGroupIndicateClause visitReportGroupIndicateClause(Cobol.ReportGroupIndicateClause reportGroupIndicateClause, P p) {
+        return (Cobol.ReportGroupIndicateClause) super.visitReportGroupIndicateClause(reportGroupIndicateClause, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupColumnNumberClause visitReportGroupColumnNumberClause(Cobol.ReportGroupColumnNumberClause reportGroupColumnNumberClause, P p) {
+        return (Cobol.ReportGroupColumnNumberClause) super.visitReportGroupColumnNumberClause(reportGroupColumnNumberClause, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupBlankWhenZeroClause visitReportGroupBlankWhenZeroClause(Cobol.ReportGroupBlankWhenZeroClause reportGroupBlankWhenZeroClause, P p) {
+        return (Cobol.ReportGroupBlankWhenZeroClause) super.visitReportGroupBlankWhenZeroClause(reportGroupBlankWhenZeroClause, p);
+    }
+
+    @Override
+    public Cobol.ReportDescriptionPageLimitClause visitReportDescriptionPageLimitClause(Cobol.ReportDescriptionPageLimitClause reportDescriptionPageLimitClause, P p) {
+        return (Cobol.ReportDescriptionPageLimitClause) super.visitReportDescriptionPageLimitClause(reportDescriptionPageLimitClause, p);
+    }
+
+    @Override
+    public Cobol.ReportDescriptionLastDetailClause visitReportDescriptionLastDetailClause(Cobol.ReportDescriptionLastDetailClause reportDescriptionLastDetailClause, P p) {
+        return (Cobol.ReportDescriptionLastDetailClause) super.visitReportDescriptionLastDetailClause(reportDescriptionLastDetailClause, p);
+    }
+
+    @Override
+    public Cobol.ReportDescriptionHeadingClause visitReportDescriptionHeadingClause(Cobol.ReportDescriptionHeadingClause reportDescriptionHeadingClause, P p) {
+        return (Cobol.ReportDescriptionHeadingClause) super.visitReportDescriptionHeadingClause(reportDescriptionHeadingClause, p);
+    }
+
+    @Override
+    public Cobol.ReportDescriptionFootingClause visitReportDescriptionFootingClause(Cobol.ReportDescriptionFootingClause reportDescriptionFootingClause, P p) {
+        return (Cobol.ReportDescriptionFootingClause) super.visitReportDescriptionFootingClause(reportDescriptionFootingClause, p);
+    }
+
+    @Override
+    public Cobol.ReportDescriptionFirstDetailClause visitReportDescriptionFirstDetailClause(Cobol.ReportDescriptionFirstDetailClause reportDescriptionFirstDetailClause, P p) {
+        return (Cobol.ReportDescriptionFirstDetailClause) super.visitReportDescriptionFirstDetailClause(reportDescriptionFirstDetailClause, p);
+    }
 }

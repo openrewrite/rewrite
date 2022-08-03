@@ -39,5 +39,7 @@ public interface Cobol {
     class Condition {}
     @Skip
     class ProcedureName {}
+    @Skip
+    class PictureString {}
 
 }

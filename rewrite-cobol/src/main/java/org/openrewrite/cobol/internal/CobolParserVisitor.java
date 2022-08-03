@@ -2318,37 +2318,79 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReportDescriptionFirstDetailClause(CobolParser.ReportDescriptionFirstDetailClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportDescriptionFirstDetailClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FIRST(), ctx.DETAIL()),
+                (Name) visit(ctx.integerLiteral())
+        );
     }
 
     @Override
     public Object visitReportDescriptionFootingClause(CobolParser.ReportDescriptionFootingClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportDescriptionFootingClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.FOOTING()),
+                (Name) visit(ctx.integerLiteral())
+        );
     }
 
     @Override
     public Object visitReportDescriptionHeadingClause(CobolParser.ReportDescriptionHeadingClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportDescriptionHeadingClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.HEADING()),
+                (Name) visit(ctx.integerLiteral())
+        );
     }
 
     @Override
     public Object visitReportDescriptionLastDetailClause(CobolParser.ReportDescriptionLastDetailClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportDescriptionLastDetailClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.LAST(), ctx.DETAIL()),
+                (Name) visit(ctx.integerLiteral())
+        );
     }
 
     @Override
     public Object visitReportDescriptionPageLimitClause(CobolParser.ReportDescriptionPageLimitClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportDescriptionPageLimitClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PAGE(), ctx.LIMIT(), ctx.IS(), ctx.LIMITS(), ctx.ARE()),
+                (Name) visit(ctx.integerLiteral()),
+                words(ctx.LINE(), ctx.LINES())
+        );
     }
 
     @Override
     public Object visitReportGroupBlankWhenZeroClause(CobolParser.ReportGroupBlankWhenZeroClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupBlankWhenZeroClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.BLANK(), ctx.WHEN(), ctx.ZERO())
+        );
     }
 
     @Override
     public Object visitReportGroupColumnNumberClause(CobolParser.ReportGroupColumnNumberClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupColumnNumberClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.COLUMN(), ctx.NUMBER(), ctx.IS()),
+                (Name) visit(ctx.integerLiteral())
+        );
     }
 
     @Override
@@ -2407,7 +2449,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReportGroupIndicateClause(CobolParser.ReportGroupIndicateClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupIndicateClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.GROUP(), ctx.INDICATE())
+        );
     }
 
     @Override

@@ -3738,4 +3738,61 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         p.append(reportGroupJustifiedClause.getWords());
         return reportGroupJustifiedClause;
     }
+
+    public Cobol visitReportGroupIndicateClause(Cobol.ReportGroupIndicateClause reportGroupIndicateClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupIndicateClause.getPrefix(), p);
+        visitMarkers(reportGroupIndicateClause.getMarkers(), p);
+        p.append(reportGroupIndicateClause.getWords());
+        return reportGroupIndicateClause;
+    }
+
+    public Cobol visitReportGroupColumnNumberClause(Cobol.ReportGroupColumnNumberClause reportGroupColumnNumberClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupColumnNumberClause.getPrefix(), p);
+        visitMarkers(reportGroupColumnNumberClause.getMarkers(), p);
+        p.append(reportGroupColumnNumberClause.getWords());
+        return reportGroupColumnNumberClause;
+    }
+
+    public Cobol visitReportGroupBlankWhenZeroClause(Cobol.ReportGroupBlankWhenZeroClause reportGroupBlankWhenZeroClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupBlankWhenZeroClause.getPrefix(), p);
+        visitMarkers(reportGroupBlankWhenZeroClause.getMarkers(), p);
+        p.append(reportGroupBlankWhenZeroClause.getWords());
+        return reportGroupBlankWhenZeroClause;
+    }
+
+    public Cobol visitReportDescriptionPageLimitClause(Cobol.ReportDescriptionPageLimitClause reportDescriptionPageLimitClause, PrintOutputCapture<P> p) {
+        visitSpace(reportDescriptionPageLimitClause.getPrefix(), p);
+        visitMarkers(reportDescriptionPageLimitClause.getMarkers(), p);
+        p.append(reportDescriptionPageLimitClause.getFirstWords());
+        p.append(reportDescriptionPageLimitClause.getSecondWords());
+        return reportDescriptionPageLimitClause;
+    }
+
+    public Cobol visitReportDescriptionLastDetailClause(Cobol.ReportDescriptionLastDetailClause reportDescriptionLastDetailClause, PrintOutputCapture<P> p) {
+        visitSpace(reportDescriptionLastDetailClause.getPrefix(), p);
+        visitMarkers(reportDescriptionLastDetailClause.getMarkers(), p);
+        p.append(reportDescriptionLastDetailClause.getWords());
+        return reportDescriptionLastDetailClause;
+    }
+
+    public Cobol visitReportDescriptionHeadingClause(Cobol.ReportDescriptionHeadingClause reportDescriptionHeadingClause, PrintOutputCapture<P> p) {
+        visitSpace(reportDescriptionHeadingClause.getPrefix(), p);
+        visitMarkers(reportDescriptionHeadingClause.getMarkers(), p);
+        p.append(reportDescriptionHeadingClause.getWords());
+        return reportDescriptionHeadingClause;
+    }
+
+    public Cobol visitReportDescriptionFootingClause(Cobol.ReportDescriptionFootingClause reportDescriptionFootingClause, PrintOutputCapture<P> p) {
+        visitSpace(reportDescriptionFootingClause.getPrefix(), p);
+        visitMarkers(reportDescriptionFootingClause.getMarkers(), p);
+        p.append(reportDescriptionFootingClause.getWords());
+        return reportDescriptionFootingClause;
+    }
+
+    public Cobol visitReportDescriptionFirstDetailClause(Cobol.ReportDescriptionFirstDetailClause reportDescriptionFirstDetailClause, PrintOutputCapture<P> p) {
+        visitSpace(reportDescriptionFirstDetailClause.getPrefix(), p);
+        visitMarkers(reportDescriptionFirstDetailClause.getMarkers(), p);
+        p.append(reportDescriptionFirstDetailClause.getWords());
+        return reportDescriptionFirstDetailClause;
+    }
 }
