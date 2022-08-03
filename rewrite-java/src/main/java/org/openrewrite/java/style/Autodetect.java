@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -80,11 +81,12 @@ public class Autodetect extends NamedStyles {
             importLayoutStatistics.mapBlockPatterns(importedPackages);
         }
 
-        public void phase2(JavaSourceFile cu) {
-            new FindIndentJavaVisitor().visit(cu, indentStatistics);
-            new FindImportLayout().visit(cu, importLayoutStatistics);
-            new FindSpacesStyle().visit(cu, spacesStatistics);
-            new FindLineFormatJavaVisitor().visit(cu, generalFormatStatistics);
+        public JavaSourceFile phase2(JavaSourceFile cu) {
+            cu = (JavaSourceFile) new FindIndentJavaVisitor().visitNonNull(cu, indentStatistics);
+            cu = (JavaSourceFile) new FindImportLayout().visitNonNull(cu, importLayoutStatistics);
+            cu = (JavaSourceFile) new FindSpacesStyle().visitNonNull(cu, spacesStatistics);
+            cu = (JavaSourceFile) new FindLineFormatJavaVisitor().visitNonNull(cu, generalFormatStatistics);
+            return cu;
         }
 
         public Recipe asRecipe() {
@@ -95,15 +97,22 @@ public class Autodetect extends NamedStyles {
                 }
 
                 @Override
+                protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+                    for (SourceFile sourceFile : before) {
+                        if(sourceFile instanceof J.CompilationUnit) {
+                            phase1((JavaSourceFile) sourceFile);
+                        }
+                    }
+
+                    return before;
+                }
+
+                @Override
                 protected JavaVisitor<ExecutionContext> getVisitor() {
                     return new JavaVisitor<ExecutionContext>() {
                         @Override
                         public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                            new FindIndentJavaVisitor().visit(cu, indentStatistics);
-                            new FindImportLayout().visit(cu, importLayoutStatistics);
-                            new FindSpacesStyle().visit(cu, spacesStatistics);
-                            new FindLineFormatJavaVisitor().visit(cu, generalFormatStatistics);
-                            return cu;
+                            return phase2(cu);
                         }
                     };
                 }
