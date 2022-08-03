@@ -318,7 +318,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     @Override
     public Javadoc visitReference(Javadoc.Reference reference, PrintOutputCapture<P> p) {
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAKS", reference.getLineBreaks());
-        getCursor().putMessage("JAVADOC_LINE_BREAK_INDEX", 0);
+        getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAK_INDEX", 0);
         javaVisitor.visit(reference.getTree(), p, getCursor());
         return reference;
     }
