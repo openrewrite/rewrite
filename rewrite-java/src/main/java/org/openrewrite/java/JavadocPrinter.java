@@ -387,7 +387,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             List<Javadoc.LineBreak> lineBreaks = getCursor().getNearestMessage("JAVADOC_LINE_BREAKS");
             Integer index = getCursor().getNearestMessage("JAVADOC_LINE_BREAK_INDEX");
 
-            if (lineBreaks != null && index != null && space.getWhitespace().contains("\n")) {
+            if (lineBreaks != null && !lineBreaks.isEmpty() && index != null && space.getWhitespace().contains("\n")) {
                 for (char c : space.getWhitespace().toCharArray()) {
                     // The Space from a JavaDoc will not contain a CR because the JavaDoc parser
                     // filters out other new line characters. CRLF is detected through the source
