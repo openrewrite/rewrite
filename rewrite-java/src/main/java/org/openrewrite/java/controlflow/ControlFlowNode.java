@@ -84,7 +84,7 @@ public abstract class ControlFlowNode {
      * A control flow node that represents a branching point in the code.
      */
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    public static class ConditionNode extends ControlFlowNode {
+    static class ConditionNode extends ControlFlowNode {
 
         private final Cursor condition;
         private final boolean truthFirst;
@@ -209,7 +209,7 @@ public abstract class ControlFlowNode {
      * @see <a href="https://en.wikipedia.org/wiki/Basic_block">Wikipedia: Basic Block</a>
      */
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    public static class BasicBlock extends ControlFlowNode {
+    static class BasicBlock extends ControlFlowNode {
         @Getter
         private ControlFlowNode successor;
         private final List<Cursor> node = new ArrayList<>();
@@ -328,7 +328,7 @@ public abstract class ControlFlowNode {
     }
 
     @NoArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
-    public static class Start extends ControlFlowNode {
+    static class Start extends ControlFlowNode {
         private ControlFlowNode successor = null;
 
         @Override
@@ -351,7 +351,7 @@ public abstract class ControlFlowNode {
     }
 
     @NoArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
-    public static class End extends ControlFlowNode {
+    static class End extends ControlFlowNode {
 
         @Override
         Set<ControlFlowNode> getSuccessors() {

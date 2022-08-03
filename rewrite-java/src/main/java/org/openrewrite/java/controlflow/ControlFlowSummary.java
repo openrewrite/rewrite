@@ -37,7 +37,8 @@ public final class ControlFlowSummary {
     @Getter(lazy = true)
     private final Set<ControlFlowNode> allNodes = getAllControlFlowNodes(start);
 
-    private static LinkedHashSet<ControlFlowNode> getAllControlFlowNodes(ControlFlowNode.Start start) {
+    private static Set<ControlFlowNode> getAllControlFlowNodes(ControlFlowNode.Start start) {
+        // LinkedHashSet to preserve insertion order of nodes
         LinkedHashSet<ControlFlowNode> all = new LinkedHashSet<>();
         recurseGetAllControlFlowNodes(start, all);
         return all;
