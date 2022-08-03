@@ -18,6 +18,7 @@ package org.openrewrite.java.controlflow
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.java.JavaIsoVisitor
+import org.openrewrite.java.TypeValidation
 import org.openrewrite.java.tree.Expression
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
@@ -176,5 +177,104 @@ interface GuardTest : RewriteTest {
             }
             """
             )
+    )
+
+    @Test
+    fun `identifies guards with missing type information`() = rewriteRun(
+        { spec -> spec.typeValidationOptions(TypeValidation.none()) },
+        java(
+            """
+            class Test {
+                void test() {
+                    if (potato) {
+                        // ...
+                    }
+                    if ((potato)) {
+                        // ...
+                    }
+                    if (potato && turnip) {
+                        // ...
+                    }
+                    if (potato && turnip || squash) {
+                        // ...
+                    }
+                    int a = 1, b = 2;
+                    if ((a = turnip) == b) {
+                        // ..
+                    }
+                    horse.equals(donkey);
+                    boolean farmFresh = tomato;
+                    boolean farmFreshAndFancyFree = (chicken);
+                    boolean farmFreshEggs = true;
+                    farmFreshEggs = chicken.layEggs();
+                }
+            }
+            """.trimIndent(),
+            """
+            class Test {
+                void test() {
+                    if (/*~~>*/potato) {
+                        // ...
+                    }
+                    if (/*~~>*/(/*~~>*/potato)) {
+                        // ...
+                    }
+                    if (/*~~>*//*~~>*/potato && /*~~>*/turnip) {
+                        // ...
+                    }
+                    if (/*~~>*//*~~>*//*~~>*/potato && /*~~>*/turnip || /*~~>*/squash) {
+                        // ...
+                    }
+                    int a = 1, b = 2;
+                    if (/*~~>*/(a = turnip) == b) {
+                        // ..
+                    }
+                    /*~~>*/horse.equals(donkey);
+                    /*~~>*/boolean /*~~>*/farmFresh = /*~~>*/tomato;
+                    /*~~>*/boolean /*~~>*/farmFreshAndFancyFree = /*~~>*/(/*~~>*/chicken);
+                    /*~~>*/boolean /*~~>*/farmFreshEggs = /*~~>*/true;
+                    /*~~>*//*~~>*/farmFreshEggs = /*~~>*/chicken.layEggs();
+                }
+            }
+            """.trimIndent()
+        )
+    )
+
+    @Test
+    fun `identifies guards for control parentheses with missing type information`() = rewriteRun(
+        java(
+            """
+            class Test {
+                void test() {
+                    if ((potato)) {
+                        // ...
+                    }
+                }
+            }
+            """.trimIndent(),
+            """
+            class Test {
+                void test() {
+                    if (/*~~>*/(/*~~>*/potato)) {
+                        // ...
+                    }
+                }
+            }
+            """.trimIndent()
+        )
+    )
+
+    @Test
+    fun `does not flag arbitrary parentheses as guards`() = rewriteRun(
+        java(
+            """
+            class Test {
+                void test() {
+                    int a = (potato);
+                    int b = (a = turnip);
+                }
+            }
+            """.trimIndent()
+        )
     )
 }
