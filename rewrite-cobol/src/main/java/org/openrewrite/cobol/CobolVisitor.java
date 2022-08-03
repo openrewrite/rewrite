@@ -3603,4 +3603,62 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.getPadding().withIndexNames(visitContainer(d.getPadding().getIndexNames(), p));
         return d;
     }
+
+    public Cobol visitReportGroupValueClause(Cobol.ReportGroupValueClause reportGroupValueClause, P p) {
+        Cobol.ReportGroupValueClause r = reportGroupValueClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupTypeReportFooting(Cobol.ReportGroupTypeReportFooting reportGroupTypeReportFooting, P p) {
+        Cobol.ReportGroupTypeReportFooting r = reportGroupTypeReportFooting;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupTypePageFooting(Cobol.ReportGroupTypePageFooting reportGroupTypePageFooting, P p) {
+        Cobol.ReportGroupTypePageFooting r = reportGroupTypePageFooting;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupTypeReportHeading(Cobol.ReportGroupTypeReportHeading reportGroupTypeReportHeading, P p) {
+        Cobol.ReportGroupTypeReportHeading r = reportGroupTypeReportHeading;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupTypeDetail(Cobol.ReportGroupTypeDetail reportGroupTypeDetail, P p) {
+        Cobol.ReportGroupTypeDetail r = reportGroupTypeDetail;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupTypeControlFooting(Cobol.ReportGroupTypeControlFooting reportGroupTypeControlFooting, P p) {
+        Cobol.ReportGroupTypeControlFooting r = reportGroupTypeControlFooting;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupTypeControlHeading(Cobol.ReportGroupTypeControlHeading reportGroupTypeControlHeading, P p) {
+        Cobol.ReportGroupTypeControlHeading r = reportGroupTypeControlHeading;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupSumClause(Cobol.ReportGroupSumClause reportGroupSumClause, P p) {
+        Cobol.ReportGroupSumClause r = reportGroupSumClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withIdentifiers(ListUtils.map(r.getIdentifiers(), t -> (Cobol) visit(t, p)));
+        r = r.withDataNames(ListUtils.map(r.getDataNames(), t -> (Cobol) visit(t, p)));
+        return r;
+    }
 }

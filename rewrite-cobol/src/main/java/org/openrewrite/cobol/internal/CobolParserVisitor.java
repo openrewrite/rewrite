@@ -2502,7 +2502,15 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReportGroupSumClause(CobolParser.ReportGroupSumClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupSumClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SUM()),
+                convertAllPrefixedList(singletonList(","), ctx.identifier()),
+                words(ctx.UPON()),
+                convertAllPrefixedList(singletonList(","), ctx.identifier())
+        );
     }
 
     @Override
@@ -2524,17 +2532,34 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReportGroupTypeControlHeading(CobolParser.ReportGroupTypeControlHeadingContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupTypeControlHeading(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CONTROL(), ctx.HEADING(), ctx.CH(), ctx.FINAL()),
+                visitNullable(ctx.dataName())
+        );
     }
 
     @Override
     public Object visitReportGroupTypeControlFooting(CobolParser.ReportGroupTypeControlFootingContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupTypeControlFooting(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.CONTROL(), ctx.FOOTING(), ctx.CF(), ctx.FINAL()),
+                visitNullable(ctx.dataName())
+        );
     }
 
     @Override
     public Object visitReportGroupTypeDetail(CobolParser.ReportGroupTypeDetailContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupTypeDetail(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DETAIL(), ctx.DE())
+        );
     }
 
     @Override
@@ -2544,17 +2569,32 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReportGroupTypePageFooting(CobolParser.ReportGroupTypePageFootingContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupTypePageFooting(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PAGE(), ctx.FOOTING(), ctx.PF())
+        );
     }
 
     @Override
     public Object visitReportGroupTypeReportHeading(CobolParser.ReportGroupTypeReportHeadingContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupTypeReportHeading(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REPORT(), ctx.HEADING(), ctx.RH())
+        );
     }
 
     @Override
     public Object visitReportGroupTypeReportFooting(CobolParser.ReportGroupTypeReportFootingContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupTypeReportFooting(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.REPORT(), ctx.FOOTING(), ctx.RF())
+        );
     }
 
     @Override
@@ -2569,7 +2609,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReportGroupValueClause(CobolParser.ReportGroupValueClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupValueClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.VALUE(), ctx.IS()),
+                (Name) visit(ctx.literal())
+        );
     }
 
     @Override

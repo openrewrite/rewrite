@@ -2043,4 +2043,44 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.DestinationTableClause visitDestinationTableClause(Cobol.DestinationTableClause destinationTableClause, P p) {
         return (Cobol.DestinationTableClause) super.visitDestinationTableClause(destinationTableClause, p);
     }
+
+    @Override
+    public Cobol.ReportGroupValueClause visitReportGroupValueClause(Cobol.ReportGroupValueClause reportGroupValueClause, P p) {
+        return (Cobol.ReportGroupValueClause) super.visitReportGroupValueClause(reportGroupValueClause, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupTypeReportFooting visitReportGroupTypeReportFooting(Cobol.ReportGroupTypeReportFooting reportGroupTypeReportFooting, P p) {
+        return (Cobol.ReportGroupTypeReportFooting) super.visitReportGroupTypeReportFooting(reportGroupTypeReportFooting, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupTypePageFooting visitReportGroupTypePageFooting(Cobol.ReportGroupTypePageFooting reportGroupTypePageFooting, P p) {
+        return (Cobol.ReportGroupTypePageFooting) super.visitReportGroupTypePageFooting(reportGroupTypePageFooting, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupTypeReportHeading visitReportGroupTypeReportHeading(Cobol.ReportGroupTypeReportHeading reportGroupTypeReportHeading, P p) {
+        return (Cobol.ReportGroupTypeReportHeading) super.visitReportGroupTypeReportHeading(reportGroupTypeReportHeading, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupTypeDetail visitReportGroupTypeDetail(Cobol.ReportGroupTypeDetail reportGroupTypeDetail, P p) {
+        return (Cobol.ReportGroupTypeDetail) super.visitReportGroupTypeDetail(reportGroupTypeDetail, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupTypeControlFooting visitReportGroupTypeControlFooting(Cobol.ReportGroupTypeControlFooting reportGroupTypeControlFooting, P p) {
+        return (Cobol.ReportGroupTypeControlFooting) super.visitReportGroupTypeControlFooting(reportGroupTypeControlFooting, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupTypeControlHeading visitReportGroupTypeControlHeading(Cobol.ReportGroupTypeControlHeading reportGroupTypeControlHeading, P p) {
+        return (Cobol.ReportGroupTypeControlHeading) super.visitReportGroupTypeControlHeading(reportGroupTypeControlHeading, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupSumClause visitReportGroupSumClause(Cobol.ReportGroupSumClause reportGroupSumClause, P p) {
+        return (Cobol.ReportGroupSumClause) super.visitReportGroupSumClause(reportGroupSumClause, p);
+    }
 }

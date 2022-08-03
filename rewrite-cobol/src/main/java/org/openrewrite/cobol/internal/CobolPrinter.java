@@ -3639,4 +3639,67 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitContainer("", destinationTableClause.getPadding().getIndexNames(), "", "", p);
         return destinationTableClause;
     }
+
+    public Cobol visitReportGroupValueClause(Cobol.ReportGroupValueClause reportGroupValueClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupValueClause.getPrefix(), p);
+        visitMarkers(reportGroupValueClause.getMarkers(), p);
+        p.append(reportGroupValueClause.getWords());
+        return reportGroupValueClause;
+    }
+
+    public Cobol visitReportGroupTypeReportFooting(Cobol.ReportGroupTypeReportFooting reportGroupTypeReportFooting, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupTypeReportFooting.getPrefix(), p);
+        visitMarkers(reportGroupTypeReportFooting.getMarkers(), p);
+        p.append(reportGroupTypeReportFooting.getWords());
+        return reportGroupTypeReportFooting;
+    }
+
+    public Cobol visitReportGroupTypePageFooting(Cobol.ReportGroupTypePageFooting reportGroupTypePageFooting, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupTypePageFooting.getPrefix(), p);
+        visitMarkers(reportGroupTypePageFooting.getMarkers(), p);
+        p.append(reportGroupTypePageFooting.getWords());
+        return reportGroupTypePageFooting;
+    }
+
+    public Cobol visitReportGroupTypeReportHeading(Cobol.ReportGroupTypeReportHeading reportGroupTypeReportHeading, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupTypeReportHeading.getPrefix(), p);
+        visitMarkers(reportGroupTypeReportHeading.getMarkers(), p);
+        p.append(reportGroupTypeReportHeading.getWords());
+        return reportGroupTypeReportHeading;
+    }
+
+    public Cobol visitReportGroupTypeDetail(Cobol.ReportGroupTypeDetail reportGroupTypeDetail, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupTypeDetail.getPrefix(), p);
+        visitMarkers(reportGroupTypeDetail.getMarkers(), p);
+        p.append(reportGroupTypeDetail.getWords());
+        return reportGroupTypeDetail;
+    }
+
+    public Cobol visitReportGroupTypeControlFooting(Cobol.ReportGroupTypeControlFooting reportGroupTypeControlFooting, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupTypeControlFooting.getPrefix(), p);
+        visitMarkers(reportGroupTypeControlFooting.getMarkers(), p);
+        p.append(reportGroupTypeControlFooting.getWords());
+        return reportGroupTypeControlFooting;
+    }
+
+    public Cobol visitReportGroupTypeControlHeading(Cobol.ReportGroupTypeControlHeading reportGroupTypeControlHeading, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupTypeControlHeading.getPrefix(), p);
+        visitMarkers(reportGroupTypeControlHeading.getMarkers(), p);
+        p.append(reportGroupTypeControlHeading.getWords());
+        return reportGroupTypeControlHeading;
+    }
+
+    public Cobol visitReportGroupSumClause(Cobol.ReportGroupSumClause reportGroupSumClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupSumClause.getPrefix(), p);
+        visitMarkers(reportGroupSumClause.getMarkers(), p);
+        p.append(reportGroupSumClause.getWords());
+        for (Cobol c : reportGroupSumClause.getIdentifiers()) {
+            visit(c, p);
+        }
+        p.append(reportGroupSumClause.getUpon());
+        for (Cobol c : reportGroupSumClause.getDataNames()) {
+            visit(c, p);
+        }
+        return reportGroupSumClause;
+    }
 }
