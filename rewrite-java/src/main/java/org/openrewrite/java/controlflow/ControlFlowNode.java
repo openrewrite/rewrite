@@ -297,6 +297,7 @@ public abstract class ControlFlowNode {
             }
             if (this.successor != null) {
                 throw new IllegalStateException("Basic block already has a successor ");
+            }
             this.successor = successor;
         }
 
