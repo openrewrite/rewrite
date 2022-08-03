@@ -147,7 +147,7 @@ public class ReloadableJava11Parser implements JavaParser {
             }
         }));
 
-        reset();
+        compileDependencies();
     }
 
     public static Builder builder() {
