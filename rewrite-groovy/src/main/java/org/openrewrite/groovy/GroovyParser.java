@@ -46,6 +46,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -124,7 +125,14 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             CompilerConfiguration configuration = new CompilerConfiguration();
             configuration.setTolerance(Integer.MAX_VALUE);
             configuration.setClasspathList(classpath == null ? emptyList() : classpath.stream()
-                    .map(cp -> cp.toFile().toString())
+                    .flatMap(cp -> {
+                        try {
+                            return Stream.of(cp.toFile().toString());
+                        } catch(UnsupportedOperationException e) {
+                            // can happen e.g. in the case of jdk.internal.jrtfs.JrtPath
+                            return Stream.empty();
+                        }
+                    })
                     .collect(toList()));
 
             ErrorCollector errorCollector = new ErrorCollector(configuration);
