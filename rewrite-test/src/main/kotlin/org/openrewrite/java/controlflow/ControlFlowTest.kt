@@ -92,20 +92,20 @@ interface ControlFlowTest : RewriteTest {
                                         if (searchResult != null) {
                                             // get the block from the leader
                                             val b = leadersToNodes[statement] ?: error("No block for $statement")
-                                            nodeNumbers[b] = ++nodeNumber
+                                            val number = nodeNumbers.computeIfAbsent(b) { ++nodeNumber }
                                             val s = getPredsandSuccs(leadersToNodes, nodeNumbers, statement)
-                                            println("Block ${nodeNumber}: ${s}")
+                                            println("Block ${number}: $s")
                                             statement.withMarkers(
                                                 statement.markers.removeByType(SearchResult::class.java).add(
-                                                    searchResult.withDescription(searchResult.description?.plus(" | " + nodeNumber + "L"))
+                                                    searchResult.withDescription(searchResult.description?.plus(" | " + number + "L"))
                                                 )
                                             )
                                         } else {
                                             val b = leadersToNodes[statement] ?: error("No block for $statement")
-                                            nodeNumbers[b] = ++nodeNumber
+                                            val number = nodeNumbers.computeIfAbsent(b) { ++nodeNumber }
                                             val s = getPredsandSuccs(leadersToNodes, nodeNumbers, statement)
-                                            println("Block ${nodeNumber}: ${s}")
-                                            statement.withMarkers(statement.markers.searchResult("" + nodeNumber + "L"))
+                                            println("Block ${number}: $s")
+                                            statement.withMarkers(statement.markers.searchResult("" + number + "L"))
                                         }
                                     } else statement
                                 }
@@ -113,10 +113,10 @@ interface ControlFlowTest : RewriteTest {
                                 override fun visitExpression(expression: Expression, p: ExecutionContext): Expression {
                                     return if (leaders.contains(expression)) {
                                         val b = leadersToNodes[expression] ?: error("No block for $expression")
-                                        nodeNumbers[b] = ++nodeNumber
+                                        val number = nodeNumbers.computeIfAbsent(b) { ++nodeNumber }
                                         val s = getPredsandSuccs(leadersToNodes, nodeNumbers, expression)
-                                        println("Block ${nodeNumber}: ${s}")
-                                        expression.withMarkers(expression.markers.searchResult("" + nodeNumber + expression.leaderDescription()))
+                                        println("Block ${number}: $s")
+                                        expression.withMarkers(expression.markers.searchResult("" + number + expression.leaderDescription()))
                                     }
                                     else expression
                                 }
