@@ -19,6 +19,12 @@ repositories {
             url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
         }
     }
+    maven (url = uri("https://jitpack.io")) {
+        mavenContent {
+            // For the visualizer
+            includeGroup("com.github.smehta23")
+        }
+    }
     mavenCentral()
 }
 

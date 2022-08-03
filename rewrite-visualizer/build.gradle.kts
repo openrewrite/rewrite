@@ -9,9 +9,6 @@ dependencies {
     implementation("org.graphstream:gs-core:2.0")
     implementation("org.graphstream:gs-ui:1.3")
     implementation("com.github.smehta23:gs-ui-swing:dd03181a99b1ef27b819429275724e7c9d743331")
-//    implementation("com.github.smehta23:gs-ui-swing:7caf217a6443098d1bdceb6bbdca37e30cba93d4")
-//    implementation("org.graphstream:gs-ui-swing:2.0")
-//    implementation("com.github.smehta23:gs-ui-swing:master-SNAPSHOT")
     implementation("io.github.classgraph:classgraph:latest.release")
 }
 
