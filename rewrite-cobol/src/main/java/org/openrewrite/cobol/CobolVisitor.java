@@ -3594,4 +3594,13 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         d = d.withDataDescName((Cobol.CobolWord) visit(d.getDataDescName(), p));
         return d;
     }
+
+    public Cobol visitDestinationTableClause(Cobol.DestinationTableClause destinationTableClause, P p) {
+        Cobol.DestinationTableClause d = destinationTableClause;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withIntegerLiteral((Cobol.CobolWord) visit(d.getIntegerLiteral(), p));
+        d = d.getPadding().withIndexNames(visitContainer(d.getPadding().getIndexNames(), p));
+        return d;
+    }
 }

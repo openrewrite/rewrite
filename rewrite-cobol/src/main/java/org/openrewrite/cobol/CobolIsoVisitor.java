@@ -2038,4 +2038,9 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.DestinationCountClause visitDestinationCountClause(Cobol.DestinationCountClause destinationCountClause, P p) {
         return (Cobol.DestinationCountClause) super.visitDestinationCountClause(destinationCountClause, p);
     }
+
+    @Override
+    public Cobol.DestinationTableClause visitDestinationTableClause(Cobol.DestinationTableClause destinationTableClause, P p) {
+        return (Cobol.DestinationTableClause) super.visitDestinationTableClause(destinationTableClause, p);
+    }
 }

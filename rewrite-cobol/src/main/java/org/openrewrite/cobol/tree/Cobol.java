@@ -4164,6 +4164,86 @@ public interface Cobol extends Tree {
         }
     }
 
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class DestinationTableClause implements Cobol {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        @With
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        String firstWords;
+
+        @Getter
+        @With
+        CobolWord integerLiteral;
+
+        @Getter
+        @With
+        String secondWords;
+
+        CobolContainer<CobolWord> indexNames;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitDestinationTableClause(this, p);
+        }
+
+        public List<Cobol.CobolWord> getIndexNames() {
+            return indexNames.getElements();
+        }
+
+        public DestinationTableClause withIndexNames(List<Cobol.CobolWord> indexNames) {
+            return getPadding().withIndexNames(this.indexNames.getPadding().withElements(CobolRightPadded.withElements(
+                    this.indexNames.getPadding().getElements(), indexNames)));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DestinationTableClause t;
+
+            public CobolContainer<Cobol.CobolWord> getIndexNames() {
+                return t.indexNames;
+            }
+
+            public DestinationTableClause withIndexNames(CobolContainer<Cobol.CobolWord> indexNames) {
+                return t.indexNames == indexNames ? t : new DestinationTableClause(t.padding, t.id, t.prefix, t.markers, t.firstWords, t.integerLiteral, t.secondWords, indexNames);
+            }
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

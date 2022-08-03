@@ -1589,7 +1589,15 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitDestinationTableClause(CobolParser.DestinationTableClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.DestinationTableClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.DESTINATION(), ctx.TABLE(), ctx.OCCURS()),
+                (Cobol.CobolWord) visit(ctx.integerLiteral()),
+                words(ctx.TIMES(), ctx.INDEXED(), ctx.BY()),
+                convertAllContainer(ctx.indexName())
+        );
     }
 
     @Override

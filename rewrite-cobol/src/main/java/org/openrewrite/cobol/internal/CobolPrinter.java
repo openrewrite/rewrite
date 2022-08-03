@@ -3629,4 +3629,14 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visit(destinationCountClause.getDataDescName(), p);
         return destinationCountClause;
     }
+
+    public Cobol visitDestinationTableClause(Cobol.DestinationTableClause destinationTableClause, PrintOutputCapture<P> p) {
+        visitSpace(destinationTableClause.getPrefix(), p);
+        visitMarkers(destinationTableClause.getMarkers(), p);
+        p.append(destinationTableClause.getFirstWords());
+        visit(destinationTableClause.getIntegerLiteral(), p);
+        p.append(destinationTableClause.getSecondWords());
+        visitContainer("", destinationTableClause.getPadding().getIndexNames(), "", "", p);
+        return destinationTableClause;
+    }
 }
