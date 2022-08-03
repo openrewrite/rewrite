@@ -16,6 +16,7 @@
 package org.openrewrite.java.controlflow;
 
 import lombok.AllArgsConstructor;
+import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;

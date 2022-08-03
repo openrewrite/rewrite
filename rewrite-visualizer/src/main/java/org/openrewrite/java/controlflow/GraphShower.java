@@ -38,7 +38,6 @@ public class GraphShower {
 
         graph = cfg.loadGraph();
 
-//        graph = ControlFlowGraph.buildGraph(nodeToIndex);
         nodeToNode = cfg.getAbstractToVisualNodeMapping();
         loop = true;
     }
@@ -59,7 +58,6 @@ public class GraphShower {
         codeArea.setEditable(false);
 
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-//        panel.setBorder(BorderFactory.createLineBorder(Color.blue, 5));
         mainFrame.add(panel);
 //          graph.display();
 

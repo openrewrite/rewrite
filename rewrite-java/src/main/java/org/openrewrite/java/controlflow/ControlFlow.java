@@ -248,6 +248,7 @@ public class ControlFlow {
 
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+            visit(multiVariable.getTypeExpression(), p);
             for (J.VariableDeclarations.NamedVariable variable : multiVariable.getVariables()) {
                 visit(variable, p);
             }
