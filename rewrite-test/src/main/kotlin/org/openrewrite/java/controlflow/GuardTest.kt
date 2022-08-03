@@ -207,6 +207,12 @@ interface GuardTest : RewriteTest {
                     boolean farmFreshAndFancyFree = (chicken);
                     boolean farmFreshEggs = true;
                     farmFreshEggs = chicken.layEggs();
+                    while (farming) {
+                        // ...
+                    }
+                    for (int i = 0; areMoreCabbages(); i++) {
+                        // ...
+                    }
                 }
             }
             """.trimIndent(),
@@ -234,6 +240,12 @@ interface GuardTest : RewriteTest {
                     /*~~>*/boolean /*~~>*/farmFreshAndFancyFree = /*~~>*/(/*~~>*/chicken);
                     /*~~>*/boolean /*~~>*/farmFreshEggs = /*~~>*/true;
                     /*~~>*//*~~>*/farmFreshEggs = /*~~>*/chicken.layEggs();
+                    while (/*~~>*/farming) {
+                        // ...
+                    }
+                    for (int i = 0; /*~~>*/areMoreCabbages(); i++) {
+                        // ...
+                    }
                 }
             }
             """.trimIndent()
