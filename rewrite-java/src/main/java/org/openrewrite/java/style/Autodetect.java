@@ -17,10 +17,13 @@ package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
@@ -82,6 +85,29 @@ public class Autodetect extends NamedStyles {
             new FindImportLayout().visit(cu, importLayoutStatistics);
             new FindSpacesStyle().visit(cu, spacesStatistics);
             new FindLineFormatJavaVisitor().visit(cu, generalFormatStatistics);
+        }
+
+        public Recipe asRecipe() {
+            return new Recipe() {
+                @Override
+                public String getDisplayName() {
+                    return "Autodetect";
+                }
+
+                @Override
+                protected JavaVisitor<ExecutionContext> getVisitor() {
+                    return new JavaVisitor<ExecutionContext>() {
+                        @Override
+                        public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+                            new FindIndentJavaVisitor().visit(cu, indentStatistics);
+                            new FindImportLayout().visit(cu, importLayoutStatistics);
+                            new FindSpacesStyle().visit(cu, spacesStatistics);
+                            new FindLineFormatJavaVisitor().visit(cu, generalFormatStatistics);
+                            return cu;
+                        }
+                    };
+                }
+            };
         }
 
         public Autodetect build() {
