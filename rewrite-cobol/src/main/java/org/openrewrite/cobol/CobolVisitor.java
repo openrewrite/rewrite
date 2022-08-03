@@ -3661,4 +3661,40 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         r = r.withDataNames(ListUtils.map(r.getDataNames(), t -> (Cobol) visit(t, p)));
         return r;
     }
+
+    public Cobol visitReportGroupSourceClause(Cobol.ReportGroupSourceClause reportGroupSourceClause, P p) {
+        Cobol.ReportGroupSourceClause r = reportGroupSourceClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupSignClause(Cobol.ReportGroupSignClause reportGroupSignClause, P p) {
+        Cobol.ReportGroupSignClause r = reportGroupSignClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupResetClause(Cobol.ReportGroupResetClause reportGroupResetClause, P p) {
+        Cobol.ReportGroupResetClause r = reportGroupResetClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupPictureClause(Cobol.ReportGroupPictureClause reportGroupPictureClause, P p) {
+        Cobol.ReportGroupPictureClause r = reportGroupPictureClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withPictureString((Cobol.PictureString) visit(r.getPictureString(), p));
+        return r;
+    }
+
+    public Cobol visitReportGroupJustifiedClause(Cobol.ReportGroupJustifiedClause reportGroupJustifiedClause, P p) {
+        Cobol.ReportGroupJustifiedClause r = reportGroupJustifiedClause;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
 }

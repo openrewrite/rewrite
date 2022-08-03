@@ -2083,4 +2083,29 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.ReportGroupSumClause visitReportGroupSumClause(Cobol.ReportGroupSumClause reportGroupSumClause, P p) {
         return (Cobol.ReportGroupSumClause) super.visitReportGroupSumClause(reportGroupSumClause, p);
     }
+
+    @Override
+    public Cobol.ReportGroupSourceClause visitReportGroupSourceClause(Cobol.ReportGroupSourceClause reportGroupSourceClause, P p) {
+        return (Cobol.ReportGroupSourceClause) super.visitReportGroupSourceClause(reportGroupSourceClause, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupSignClause visitReportGroupSignClause(Cobol.ReportGroupSignClause reportGroupSignClause, P p) {
+        return (Cobol.ReportGroupSignClause) super.visitReportGroupSignClause(reportGroupSignClause, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupResetClause visitReportGroupResetClause(Cobol.ReportGroupResetClause reportGroupResetClause, P p) {
+        return (Cobol.ReportGroupResetClause) super.visitReportGroupResetClause(reportGroupResetClause, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupPictureClause visitReportGroupPictureClause(Cobol.ReportGroupPictureClause reportGroupPictureClause, P p) {
+        return (Cobol.ReportGroupPictureClause) super.visitReportGroupPictureClause(reportGroupPictureClause, p);
+    }
+
+    @Override
+    public Cobol.ReportGroupJustifiedClause visitReportGroupJustifiedClause(Cobol.ReportGroupJustifiedClause reportGroupJustifiedClause, P p) {
+        return (Cobol.ReportGroupJustifiedClause) super.visitReportGroupJustifiedClause(reportGroupJustifiedClause, p);
+    }
 }

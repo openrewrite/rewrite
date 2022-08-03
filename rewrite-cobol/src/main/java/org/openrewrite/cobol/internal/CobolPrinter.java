@@ -3702,4 +3702,40 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         }
         return reportGroupSumClause;
     }
+
+    public Cobol visitReportGroupSourceClause(Cobol.ReportGroupSourceClause reportGroupSourceClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupSourceClause.getPrefix(), p);
+        visitMarkers(reportGroupSourceClause.getMarkers(), p);
+        p.append(reportGroupSourceClause.getWords());
+        return reportGroupSourceClause;
+    }
+
+    public Cobol visitReportGroupSignClause(Cobol.ReportGroupSignClause reportGroupSignClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupSignClause.getPrefix(), p);
+        visitMarkers(reportGroupSignClause.getMarkers(), p);
+        p.append(reportGroupSignClause.getWords());
+        return reportGroupSignClause;
+    }
+
+    public Cobol visitReportGroupResetClause(Cobol.ReportGroupResetClause reportGroupResetClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupResetClause.getPrefix(), p);
+        visitMarkers(reportGroupResetClause.getMarkers(), p);
+        p.append(reportGroupResetClause.getWords());
+        return reportGroupResetClause;
+    }
+
+    public Cobol visitReportGroupPictureClause(Cobol.ReportGroupPictureClause reportGroupPictureClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupPictureClause.getPrefix(), p);
+        visitMarkers(reportGroupPictureClause.getMarkers(), p);
+        p.append(reportGroupPictureClause.getWords());
+        visit(reportGroupPictureClause.getPictureString(), p);
+        return reportGroupPictureClause;
+    }
+
+    public Cobol visitReportGroupJustifiedClause(Cobol.ReportGroupJustifiedClause reportGroupJustifiedClause, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupJustifiedClause.getPrefix(), p);
+        visitMarkers(reportGroupJustifiedClause.getMarkers(), p);
+        p.append(reportGroupJustifiedClause.getWords());
+        return reportGroupJustifiedClause;
+    }
 }

@@ -13673,6 +13673,96 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
+    class ReportGroupSourceClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        Name identifier;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupSourceClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupSignClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupSignClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupResetClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Nullable
+        Name dataName;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupResetClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupPictureClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+        PictureString pictureString;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupPictureClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class ReportGroupJustifiedClause implements Cobol {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String words;
+
+        @Override
+        public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
+            return v.visitReportGroupJustifiedClause(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     class ReportDescriptionGlobalClause implements Cobol {
         @EqualsAndHashCode.Include
         UUID id;

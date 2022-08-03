@@ -2412,7 +2412,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReportGroupJustifiedClause(CobolParser.ReportGroupJustifiedClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupJustifiedClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.JUSTIFIED(), ctx.JUST(), ctx.RIGHT())
+        );
     }
 
     @Override
@@ -2482,22 +2487,45 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReportGroupPictureClause(CobolParser.ReportGroupPictureClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupPictureClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PICTURE(), ctx.PIC(), ctx.IS()),
+                (Cobol.PictureString) visit(ctx.pictureString())
+        );
     }
 
     @Override
     public Object visitReportGroupResetClause(CobolParser.ReportGroupResetClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupResetClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RESET(), ctx.ON(), ctx.FINAL()),
+                visitNullable(ctx.dataName())
+        );
     }
 
     @Override
     public Object visitReportGroupSignClause(CobolParser.ReportGroupSignClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupSignClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SIGN(), ctx.IS(), ctx.LEADING(), ctx.TRAILING(), ctx.SEPARATE(), ctx.CHARACTER())
+        );
     }
 
     @Override
     public Object visitReportGroupSourceClause(CobolParser.ReportGroupSourceClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupSourceClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.SOURCE(), ctx.IS()),
+                (Name) visit(ctx.identifier())
+        );
     }
 
     @Override
