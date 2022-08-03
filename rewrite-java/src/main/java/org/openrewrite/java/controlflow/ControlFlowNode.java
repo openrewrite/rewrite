@@ -70,16 +70,6 @@ public abstract class ControlFlowNode {
         return Collections.emptyList();
     }
 
-    @NotNull
-    private String getSubStatements(String blockStmts, J.Block j) {
-        StringBuilder blockStmtsBuilder = new StringBuilder(blockStmts);
-        for (Statement s : j.getStatements()) {
-            blockStmtsBuilder.append(s).append("\n");
-        }
-        blockStmts = blockStmtsBuilder.toString();
-        return blockStmts;
-    }
-
     /**
      * A control flow node that represents a branching point in the code.
      */
