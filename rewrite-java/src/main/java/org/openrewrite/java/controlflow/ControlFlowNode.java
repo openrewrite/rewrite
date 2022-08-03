@@ -296,12 +296,7 @@ public abstract class ControlFlowNode {
                 return;
             }
             if (this.successor != null) {
-//                if (successor.getNodeValues().isEmpty()) throw new IllegalStateException("sdfsadfadfa");
                 throw new IllegalStateException("Basic block already has a successor ");
-//                + this.getStatementsWithinBlock()
-//                        + " succeeded by " + this.successor.getStatementsWithinBlock() + " " +
-//                        " but attempting to add " + successor.getStatementsWithinBlock());
-            }
             this.successor = successor;
         }
 
