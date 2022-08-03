@@ -161,12 +161,15 @@ public class Guard {
             }
         } else if (firstEnclosing instanceof J.ControlParentheses) {
             J.ControlParentheses<?> controlParentheses = (J.ControlParentheses<?>) firstEnclosing;
-            J.If ifStatement = c.getParentOrThrow().firstEnclosing(J.If.class);
-            if (controlParentheses.getTree() == e && ifStatement != null && ifStatement.getIfCondition() == controlParentheses) {
-                return Optional.of(JavaType.Primitive.Boolean);
-            } else {
-                Cursor parent = c.dropParentUntil(J.class::isInstance);
-                return getTypeSafe(parent, parent.getValue());
+            if (controlParentheses.getTree() == e) {
+                if (Optional.ofNullable(c.getParentOrThrow().firstEnclosing(J.If.class)).map(J.If::getIfCondition).map(condition -> condition == controlParentheses).orElse(false) ||
+                        Optional.ofNullable(c.getParentOrThrow().firstEnclosing(J.WhileLoop.class)).map(J.WhileLoop::getCondition).map(condition -> condition == controlParentheses).orElse(false) ||
+                        Optional.ofNullable(c.getParentOrThrow().firstEnclosing(J.DoWhileLoop.class)).map(J.DoWhileLoop::getWhileCondition).map(condition -> condition == controlParentheses).orElse(false)) {
+                    return Optional.of(JavaType.Primitive.Boolean);
+                } else {
+                    Cursor parent = c.dropParentUntil(J.class::isInstance);
+                    return getTypeSafe(parent, parent.getValue());
+                }
             }
         } else if (firstEnclosing instanceof J.Parentheses) {
             J.Parentheses<?> parentheses = (J.Parentheses<?>) firstEnclosing;
@@ -183,6 +186,11 @@ public class Guard {
             J.Assignment assignment = (J.Assignment) firstEnclosing;
             if (assignment.getAssignment() == e) {
                 return Optional.ofNullable(assignment.getType());
+            }
+        } else if (firstEnclosing instanceof J.ForLoop.Control) {
+            J.ForLoop.Control control = (J.ForLoop.Control) firstEnclosing;
+            if (control.getCondition() == e) {
+                return Optional.of(JavaType.Primitive.Boolean);
             }
         }
         return Optional.empty();
