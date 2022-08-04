@@ -307,7 +307,7 @@ public class ControlFlow {
                 return new BranchingAdapter() {
                     @Override
                     public Expression getCondition() {
-                        return ifStatement.getIfCondition().getTree();
+                        return ifStatement.getIfCondition();
                     }
 
                     @Override
