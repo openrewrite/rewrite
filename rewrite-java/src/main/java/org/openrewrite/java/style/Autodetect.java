@@ -784,6 +784,12 @@ public class Autodetect extends NamedStyles {
         int beforeTry = 1;
         int beforeCatch = 1;
         int beforeSynchronized = 1;
+        int beforeComma = 0;
+        int afterComma = 1;
+        int beforeColonInForEach = 1;
+        int beforeForSemiColon = 0;
+        int afterForSemiColon = 0;
+        int afterTypeCast = 0;
 
         public SpacesStyle getSpacesStyle() {
             SpacesStyle spaces = IntelliJ.spaces();
@@ -801,11 +807,26 @@ public class Autodetect extends NamedStyles {
                                     beforeSynchronized > 0,
                                     false
                             )
-                    );
+                    )
+                    .withOther(new SpacesStyle.Other(
+                            beforeComma > 0,
+                            afterComma >= 1,
+                            beforeForSemiColon > 0,
+                            afterForSemiColon >= 0,
+                            afterTypeCast > 0,
+                            beforeColonInForEach > 0,
+                            false
+                    ));
         }
     }
 
     private static class FindSpacesStyle extends JavaIsoVisitor<SpacesStatistics> {
+        @Override
+        public J.TypeCast visitTypeCast(J.TypeCast typeCast, SpacesStatistics stats) {
+            stats.afterTypeCast += hasSpace(typeCast.getExpression().getPrefix());
+            return super.visitTypeCast(typeCast, stats);
+        }
+
         @Override
         public J.Try.Catch visitCatch(J.Try.Catch _catch, SpacesStatistics stats) {
             stats.beforeCatch += hasSpace(_catch.getParameter().getPrefix());
@@ -821,12 +842,17 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, SpacesStatistics stats) {
             stats.beforeFor += hasSpace(forLoop.getControl().getPrefix());
+            stats.beforeColonInForEach += hasSpace(forLoop.getControl().getPadding().getVariable().getAfter());
             return super.visitForEachLoop(forLoop, stats);
         }
 
         @Override
         public J.ForLoop visitForLoop(J.ForLoop forLoop, SpacesStatistics stats) {
             stats.beforeFor += hasSpace(forLoop.getControl().getPrefix());
+            stats.beforeForSemiColon += hasSpace(forLoop.getControl().getPadding().getInit().get(forLoop.getControl().getInit().size() - 1).getAfter());
+            stats.beforeForSemiColon += hasSpace(forLoop.getControl().getPadding().getCondition().getAfter());
+            stats.afterForSemiColon += hasSpace(forLoop.getControl().getInit().get(forLoop.getControl().getInit().size() - 1).getPrefix());
+            stats.afterForSemiColon += hasSpace(forLoop.getControl().getCondition().getPrefix());
             return super.visitForLoop(forLoop, stats);
         }
 
@@ -845,7 +871,30 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, SpacesStatistics stats) {
             stats.beforeMethodCall += hasSpace(method.getPadding().getArguments().getBefore());
+
+            if (method.getArguments().size() > 1) {
+                for (JRightPadded<Expression> elem : method.getPadding().getArguments().getPadding().getElements()) {
+                    stats.beforeComma += hasSpace(elem.getAfter());
+                }
+                for (Expression e : method.getArguments()) {
+                    stats.afterComma += hasSpace(e.getPrefix());
+                }
+            }
             return super.visitMethodInvocation(method, stats);
+        }
+
+        @Override
+        public J.NewArray visitNewArray(J.NewArray newArray, SpacesStatistics stats) {
+            JContainer<Expression> initializer = newArray.getPadding().getInitializer();
+            if (newArray.getInitializer() != null && initializer != null && initializer.getElements().size() > 0) {
+                for (JRightPadded<Expression> elem : initializer.getPadding().getElements()) {
+                    stats.beforeComma += hasSpace(elem.getAfter());
+                }
+                for (Expression e : newArray.getInitializer()) {
+                    stats.afterComma += hasSpace(e.getPrefix());
+                }
+            }
+            return super.visitNewArray(newArray, stats);
         }
 
         @Override

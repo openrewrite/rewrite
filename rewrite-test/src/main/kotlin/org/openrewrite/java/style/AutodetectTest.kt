@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("JUnitMalformedDeclaration")
+
 package org.openrewrite.java.style
 
 import org.assertj.core.api.Assertions.assertThat
@@ -286,6 +288,165 @@ interface AutodetectTest {
 
         assertThat(importLayout.classCountToUseStarImport).isEqualTo(2147483647)
         assertThat(importLayout.nameCountToUseStarImport).isEqualTo(2147483647)
+    }
+
+    @Test
+    fun detectMethodArgs(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                class Test {
+                    void i() {
+                        a("a" ,"b" ,"c" ,"d");
+                    }
+                }
+            """.trimIndent()
+        )
+        val styles = Autodetect.detect(cus)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.other.beforeComma).isTrue
+        assertThat(spacesStyle.other.afterComma).isFalse
+    }
+
+    @Test
+    fun detectMethodArgsAfterComma(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                class Test {
+                    void i() {
+                        a("a", "b");
+                    }
+                }
+            """.trimIndent()
+        )
+        val styles = Autodetect.detect(cus)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.other.beforeComma).isFalse
+        assertThat(spacesStyle.other.afterComma).isTrue
+    }
+
+    @Suppress("StatementWithEmptyBody", "RedundantOperationOnEmptyContainer")
+    @Test
+    fun detectColonInForEachLoop(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                class Test {
+                    void i() {
+                        for (int i : new int[]{}) {}
+                    }
+                }
+            """.trimIndent()
+        )
+        val styles = Autodetect.detect(cus)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.other.beforeColonInForEach).isTrue
+    }
+
+    @Test
+    fun detectAfterTypeCast(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+                class T {
+                    {
+                        String s = (String) getString();
+                    }
+                }
+            """
+        )
+        val styles = Autodetect.detect(cu)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.other.afterTypeCast).isTrue
+    }
+    @Suppress("StatementWithEmptyBody")
+    @Test
+    fun detectBeforeForSemicolon(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+            class T {
+                void m() {
+                    for (int i = 0; i < x; i++) {}
+                }
+            }
+            """)
+        val styles = Autodetect.detect(cu)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.other.beforeForSemicolon).isFalse
+        assertThat(spacesStyle.other.afterForSemicolon).isTrue
+    }
+    @Test
+    fun detectMethodArgsNoArgs(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                class Test {
+                    void i() {
+                        a();
+                    }
+                }
+            """.trimIndent()
+        )
+        val styles = Autodetect.detect(cus)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.other.beforeComma).isFalse
+        assertThat(spacesStyle.other.afterComma).isTrue
+    }
+
+    @Test
+    fun detectMethodArgsNoSpaceForComma(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                class Test {
+                    void i() {
+                        a("a","b","c");
+                    }
+                }
+            """.trimIndent()
+        )
+        val styles = Autodetect.detect(cus)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.other.beforeComma).isFalse
+        assertThat(spacesStyle.other.afterComma).isFalse
+    }
+
+    @Test
+    fun detectMethodArgsSpaceForComma(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                class Test {
+                    void i() {
+                        a("a" , "b" , "c");
+                    }
+                }
+            """.trimIndent()
+        )
+        val styles = Autodetect.detect(cus)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.other.beforeComma).isTrue
+        assertThat(spacesStyle.other.afterComma).isTrue
+    }
+
+    @Test
+    fun detectAfterCommaInNewArray(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+                class T {
+                    static {
+                        new int[]{1,2,3,4};
+                    }
+                }
+            """
+        )
+        val styles = Autodetect.detect(cu)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.other.beforeComma).isFalse
+        assertThat(spacesStyle.other.afterComma).isTrue
     }
 
     @Test
