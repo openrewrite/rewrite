@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import lombok.*;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -79,7 +80,7 @@ public class FindMethods extends Recipe {
     @SuppressWarnings("ConstantConditions")
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
-        final boolean flowEnabled = flow != null && !"none".equals(flow);
+        boolean flowEnabled = !StringUtils.isBlank(flow) && !"none".equals(flow);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
