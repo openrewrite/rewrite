@@ -18,6 +18,7 @@ package org.openrewrite.java.controlflow
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.java.JavaIsoVisitor
+import org.openrewrite.java.TypeValidation
 import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.Statement
@@ -1532,6 +1533,89 @@ interface ControlFlowTest : RewriteTest {
                 }
             }
             """
+        )
+    )
+
+    @Test
+    fun `identifies control flow with missing type information`() = rewriteRun(
+        { spec -> spec.typeValidationOptions(TypeValidation.none()) },
+        java(
+            """
+            class Test {
+                void test() {
+                    if (potato) {
+                        // ...
+                    }
+                    if ((potato)) {
+                        // ...
+                    }
+                    if (potato && turnip) {
+                        // ...
+                    }
+                    if (potato && turnip || squash) {
+                        // ...
+                    }
+                    int a = 1, b = 2;
+                    if ((a = turnip) == b) {
+                        // ..
+                    }
+                    if (horse.equals(donkey)) {
+                        // ..
+                    }
+                    if (horse.contains(hay)) {
+                        // ..
+                    }
+                    boolean farmFresh = tomato;
+                    boolean farmFreshAndFancyFree = (chicken);
+                    boolean farmFreshEggs = true;
+                    farmFreshEggs = chicken.layEggs();
+                    while (farming) {
+                        // ...
+                    }
+                    for (int i = 0; areMoreCabbages(); i++) {
+                        // ...
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void test() /*~~(BB: 22 CN: 12 EX: 1 | L)~~>*/{
+                    if (potato) /*~~(L)~~>*/{
+                        // ...
+                    }
+                    /*~~(L)~~>*/if ((potato)) /*~~(L)~~>*/{
+                        // ...
+                    }
+                    /*~~(L)~~>*/if (potato && /*~~(L)~~>*/turnip) /*~~(L)~~>*/{
+                        // ...
+                    }
+                    /*~~(L)~~>*/if (potato && /*~~(L)~~>*/turnip || /*~~(L)~~>*/squash) /*~~(L)~~>*/{
+                        // ...
+                    }
+                    int a = /*~~(L)~~>*/1, b = 2;
+                    if ((a = turnip) == b) /*~~(L)~~>*/{
+                        // ..
+                    }
+                    /*~~(L)~~>*/if (horse.equals(donkey)) /*~~(L)~~>*/{
+                        // ..
+                    }
+                    /*~~(L)~~>*/if (horse.contains(hay)) /*~~(L)~~>*/{
+                        // ..
+                    }
+                    boolean farmFresh = /*~~(L)~~>*/tomato;
+                    boolean farmFreshAndFancyFree = (chicken);
+                    boolean farmFreshEggs = true;
+                    farmFreshEggs = chicken.layEggs();
+                    while (farming) /*~~(L)~~>*/{
+                        // ...
+                    }
+                    /*~~(L)~~>*/for (int i = 0; areMoreCabbages(); /*~~(L)~~>*/i++) /*~~(L)~~>*/{
+                        // ...
+                    }
+                }
+            }
+            """.trimIndent()
         )
     )
 }
