@@ -43,7 +43,7 @@ public final class ListUtils {
      * @param <T>             The type of elements in the list.
      * @return A new list with the element inserted in an approximately ordered place.
      */
-    public static <T> List<T> insertInOrder(List<T> ls, T insert, Comparator<T> naturalOrdering) {
+    public static <T> List<T> insertInOrder(@Nullable List<T> ls, T insert, Comparator<T> naturalOrdering) {
         if (ls == null || ls.isEmpty()) {
             return singletonList(insert);
         }
@@ -74,8 +74,9 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> mapLast(List<T> ls, UnaryOperator<T> mapLast) {
+    public static <T> List<T> mapLast(@Nullable List<T> ls, UnaryOperator<T> mapLast) {
         if (ls == null || ls.isEmpty()) {
+            //noinspection ConstantConditions
             return ls;
         }
         T last = ls.get(ls.size() - 1);
@@ -92,8 +93,9 @@ public final class ListUtils {
         return ls;
     }
 
-    public static <T> List<T> mapFirst(List<T> ls, UnaryOperator<T> mapFirst) {
+    public static <T> List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<T> mapFirst) {
         if (ls == null || ls.isEmpty()) {
+            //noinspection ConstantConditions
             return ls;
         }
         T first = ls.iterator().next();
@@ -112,6 +114,7 @@ public final class ListUtils {
 
     public static <T> List<T> map(@Nullable List<T> ls, BiFunction<Integer, T, T> map) {
         if (ls == null || ls.isEmpty()) {
+            //noinspection ConstantConditions
             return ls;
         }
         List<T> newLs = ls;
@@ -140,6 +143,7 @@ public final class ListUtils {
 
     public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, Object> flatMap) {
         if (ls == null || ls.isEmpty()) {
+            //noinspection ConstantConditions
             return ls;
         }
         List<T> newLs = ls;
@@ -208,6 +212,7 @@ public final class ListUtils {
 
     public static <T> List<T> concat(@Nullable T t, @Nullable List<T> ls) {
         if (t == null && ls == null) {
+            //noinspection ConstantConditions
             return null;
         } else if (t == null) {
             return ls;
@@ -222,8 +227,10 @@ public final class ListUtils {
 
     public static <T> List<T> concatAll(@Nullable List<T> ls, @Nullable List<T> t) {
         if (ls == null && t == null) {
+            //noinspection ConstantConditions
             return null;
         } else if (t == null || t.isEmpty()) {
+            //noinspection ConstantConditions
             return ls;
         } else if (ls == null || ls.isEmpty()) {
             return t;
@@ -239,6 +246,7 @@ public final class ListUtils {
         if (ls == null && t == null) {
             return emptyList();
         } else if (t == null || t.isEmpty()) {
+            //noinspection ConstantConditions
             return ls;
         } else if (ls == null || ls.isEmpty()) {
             return t;
@@ -251,7 +259,7 @@ public final class ListUtils {
     }
 
     @Nullable
-    public static <T> List<T> nullIfEmpty(List<T> ls) {
+    public static <T> List<T> nullIfEmpty(@Nullable List<T> ls) {
         return ls == null || ls.isEmpty() ? null : ls;
     }
 }
