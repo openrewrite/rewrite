@@ -114,6 +114,20 @@ public class ControlFlow {
             }
         }
 
+        /**
+         * Create a new, guaranteed to be empty {@link ControlFlowNode.BasicBlock}.
+         */
+        ControlFlowNode.BasicBlock newEmptyBasicBlockFromCurrent() {
+            ControlFlowNode.BasicBlock currentBasicBlock = currentAsBasicBlock();
+            if (currentBasicBlock.hasLeader()) {
+                // The current basic block is already non-empty. Create a new one.
+                return currentBasicBlock.addBasicBlock();
+            } else {
+                // The current basic block is empty. Return it.
+                return currentBasicBlock;
+            }
+        }
+
         ControlFlowNode.BasicBlock addBasicBlockToCurrent() {
             Set<ControlFlowNode> newCurrent = new HashSet<>(current);
             ControlFlowNode.BasicBlock basicBlock = addBasicBlock(newCurrent);
@@ -404,8 +418,7 @@ public class ControlFlow {
         @Override
         public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
             addCursorToBasicBlock(); // Add the while node first
-            ControlFlowNode.BasicBlock entryBlock = currentAsBasicBlock();
-            ControlFlowNode.BasicBlock basicBlock = entryBlock.addBasicBlock();
+            ControlFlowNode.BasicBlock basicBlock = newEmptyBasicBlockFromCurrent();
             // First the body is visited
             // Only transfer exits
             ControlFlowAnalysis<P> bodyAnalysis = visitRecursiveTransferringExit(Collections.singleton(basicBlock), doWhileLoop.getBody(), p);
@@ -478,7 +491,7 @@ public class ControlFlow {
                         visit(control.getUpdate(), p);
                         return control;
                     }
-                    current = Collections.singleton(currentAsBasicBlock().addBasicBlock());
+                    current = Collections.singleton(newEmptyBasicBlockFromCurrent());
                     visit(control.getUpdate(), p);
                     return control;
                 }

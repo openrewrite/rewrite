@@ -1017,6 +1017,49 @@ interface ControlFlowTest : RewriteTest {
     )
 
     @Test
+    fun `for loop nested branching with continue`() = rewriteRun(
+        java(
+            """
+            import java.util.LinkedList;
+
+            class Test {
+                public void test () {
+                    LinkedList<Integer> l1 = new LinkedList<>();
+                    int index = 1;
+                    for (int i = 0; i < l1.size(); i++)  {
+                        if (i > 5) {
+                            if (i * 2 < 50) {
+                                index += 1;
+                            } else  {
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            """,
+            """
+            import java.util.LinkedList;
+            class Test {
+                public void test () /*~~(BB: 6 CN: 3 EX: 1 | L)~~>*/{
+                    LinkedList<Integer> l1 = new LinkedList<>();
+                    int index = 1;
+                    for (int i = 0; i < l1.size(); /*~~(L)~~>*/i++)  /*~~(L)~~>*/{
+                        if (i > 5) /*~~(L)~~>*/{
+                            if (i * 2 < 50) /*~~(L)~~>*/{
+                                index += 1;
+                            } else  /*~~(L)~~>*/{
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
     fun `for each loop with continue and break`() = rewriteRun(
         java(
             """

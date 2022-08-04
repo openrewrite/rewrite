@@ -193,6 +193,10 @@ public abstract class ControlFlowNode {
             return node.get(0).getValue();
         }
 
+        boolean hasLeader() {
+            return !node.isEmpty();
+        }
+
         public List<Cursor> getNodeCursors() {
             return Collections.unmodifiableList(node);
         }
