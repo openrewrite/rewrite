@@ -442,4 +442,20 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 }
             """
     )
+
+    @Suppress("CodeBlock2Expr")
+    @Test
+    fun `do not change a return statement when the return expression is not a MethodCall`() = assertUnchanged(
+        before = """
+            class T {
+                public void killBatchJob() {
+                    return deleteSparkBatchRequest()
+                            .map(resp -> {
+                                return this;
+                            })
+                            .defaultIfEmpty(this);
+                }
+            }
+        """
+    )
 }

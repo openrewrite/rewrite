@@ -64,7 +64,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     Statement statement = ((J.Block) body).getStatements().get(0);
                     if (statement instanceof J.MethodInvocation) {
                         body = statement;
-                    } else if (statement instanceof J.Return) {
+                    } else if (statement instanceof J.Return && (((J.Return) statement).getExpression()) instanceof MethodCall) {
                         body = ((J.Return) statement).getExpression();
                     }
                 } else if (body instanceof J.InstanceOf) {
@@ -89,6 +89,9 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
 
                 if (body instanceof J.Identifier) {
                     J.Identifier identifier = (J.Identifier) body;
+//                    if ("this".equals(identifier.getSimpleName())) {
+//                        return identifier;
+//                    }
                     JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(identifier.getType());
                     @Language("java")
                     String stub = fullyQualified == null ? "" : "package " + fullyQualified.getPackageName() + "; public class " + fullyQualified.getClassName() + "{}";
