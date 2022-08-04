@@ -27,9 +27,14 @@ public class LatestPatch implements VersionComparator {
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
         //noinspection ConstantConditions
-        return TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern)
-                .<VersionComparator>getValue()
-                .isValid(currentVersion, version);
+        Validated validated = TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern);
+        if (validated.isValid()) {
+            VersionComparator comparator = validated.getValue();
+            if (comparator != null) {
+                return comparator.isValid(currentVersion, version);
+            }
+        }
+        return false;
     }
 
     @Override

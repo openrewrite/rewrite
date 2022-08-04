@@ -600,7 +600,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                   <dependency>
                     <groupId>io.micronaut</groupId>
                     <artifactId>micronaut-bom</artifactId>
-                    <version>2.5.11</version>
+                    <version>2.5.10</version>
                     <type>pom</type>
                     <scope>import</scope>
                   </dependency>
@@ -625,6 +625,142 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                   </dependency>
                 </dependencies>
               </dependencyManagement>
+            </project>
+        """
+    )
+
+    @Test
+    fun upgradeAllManagedDependneciesToPatchReleases() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "*",
+            "*",
+            "latest.patch",
+            null,
+            null
+        ),
+        before = """
+            <project>
+                <packaging>pom</packaging>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-server</artifactId>
+                <version>1</version>
+                <properties>
+                    <micronaut.version>2.5.10</micronaut.version>
+                </properties>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.micronaut</groupId>
+                            <artifactId>micronaut-bom</artifactId>
+                            <version>${'$'}{micronaut.version}</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>javax.servlet</groupId>
+                            <artifactId>javax.servlet-api</artifactId>
+                            <version>4.0.0</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """,
+        after = """
+            <project>
+                <packaging>pom</packaging>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-server</artifactId>
+                <version>1</version>
+                <properties>
+                    <micronaut.version>2.5.13</micronaut.version>
+                </properties>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.micronaut</groupId>
+                            <artifactId>micronaut-bom</artifactId>
+                            <version>${'$'}{micronaut.version}</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>javax.servlet</groupId>
+                            <artifactId>javax.servlet-api</artifactId>
+                            <version>4.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """
+    )
+
+    @Test
+    fun upgradeAllDependneciesToPatchReleases() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "*",
+            "*",
+            "latest.patch",
+            null,
+            null
+        ),
+        before = """
+            <project>
+                <packaging>pom</packaging>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-server</artifactId>
+                <version>1</version>
+                <properties>
+                    <guava.version>28.0-jre</guava.version>
+                    <spring.version>5.3.4</spring.version>
+                    <spring.artifact-id>spring-jdbc</spring.artifact-id>
+                </properties>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>${'$'}{guava.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>${'$'}{spring.artifact-id}</artifactId>
+                        <version>${'$'}{spring.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-core</artifactId>
+                        <version>2.13.1</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+                <packaging>pom</packaging>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-server</artifactId>
+                <version>1</version>
+                <properties>
+                    <guava.version>28.0-jre</guava.version>
+                    <spring.version>5.3.22</spring.version>
+                    <spring.artifact-id>spring-jdbc</spring.artifact-id>
+                </properties>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>${'$'}{guava.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>${'$'}{spring.artifact-id}</artifactId>
+                        <version>${'$'}{spring.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-core</artifactId>
+                        <version>2.13.3</version>
+                    </dependency>
+                </dependencies>
             </project>
         """
     )

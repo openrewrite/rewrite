@@ -19,19 +19,14 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
-import org.openrewrite.maven.tree.ResolvedManagedDependency;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Optional;
+import java.util.*;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -106,8 +101,7 @@ public class UpgradeDependencyVersion extends Recipe {
         assert versionComparator != null;
 
         return new MavenIsoVisitor<ExecutionContext>() {
-            @Nullable
-            Collection<String> availableVersions;
+            private final Map<GroupArtifact, List<String>> availableVersions = new HashMap<>();
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
@@ -129,21 +123,20 @@ public class UpgradeDependencyVersion extends Recipe {
                     if (d != null) {
                         String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                         if (newerVersion != null) {
-                            for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
-                                if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
-                                    String requestedVersion = dm.getRequested().getVersion();
-                                    if (requestedVersion.startsWith("${")) {
-                                        doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, false));
-                                        return t;
-                                    }
+                            ResolvedManagedDependency dm = findManagedDependency(t);
+                            if (dm != null) {
+                                String requestedVersion = dm.getRequested().getVersion();
+                                if (requestedVersion.startsWith("${")) {
+                                    doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion));
+                                    return t;
                                 }
                             }
 
                             Optional<Xml.Tag> version = t.getChild("version");
                             if (version.isPresent()) {
                                 String requestedVersion = d.getRequested().getVersion();
-                                if(requestedVersion != null && requestedVersion.startsWith("${")) {
-                                    doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, false));
+                                if (requestedVersion != null && requestedVersion.startsWith("${")) {
+                                    doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion));
                                     return t;
                                 }
                                 t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(version.get(), newerVersion).visitNonNull(t, 0, getCursor());
@@ -156,29 +149,47 @@ public class UpgradeDependencyVersion extends Recipe {
                         }
                     }
                 } else if (isManagedDependencyTag(groupId, artifactId)) {
-                    for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
-                        if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
-                            String requestedVersion = dm.getRequested().getVersion();
-                            assert(dm.getVersion() != null);
-                            String newerVersion = findNewerVersion(dm.getGroupId(), dm.getArtifactId(), dm.getVersion(), ctx);
-                            if (requestedVersion.startsWith("${")) {
-                                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, false));
-                                return t;
-                            } else if (newerVersion != null){
-                                t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(t.getChild("version").get(), newerVersion).visitNonNull(t, 0, getCursor());
+
+                    ResolvedManagedDependency matchedManagedDependency = findManagedDependency(t);
+                    if (matchedManagedDependency != null) {
+                        if (matchesGlob(matchedManagedDependency.getGroupId(), groupId) && matchesGlob(matchedManagedDependency.getArtifactId(), artifactId)) {
+                            String requestedVersion = matchedManagedDependency.getRequested().getVersion();
+                            assert (matchedManagedDependency.getVersion() != null);
+                            String newerVersion = findNewerVersion(matchedManagedDependency.getGroupId(), matchedManagedDependency.getArtifactId(), matchedManagedDependency.getVersion(), ctx);
+                            if (newerVersion != null) {
+                                if (requestedVersion.startsWith("${")) {
+                                    doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion));
+                                    return t;
+                                }
+                                Xml.Tag childVersionTag = t.getChild("version").orElse(null);
+                                if (childVersionTag != null) {
+                                    t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(childVersionTag, newerVersion).visitNonNull(t, 0, getCursor());
+                                }
                             }
-                        } else if(dm.getBomGav() != null) {
-                            ResolvedGroupArtifactVersion bom = dm.getBomGav();
-                            if (matchesGlob(bom.getGroupId(), groupId) && matchesGlob(bom.getArtifactId(), artifactId)) {
-                                //noinspection ConstantConditions
-                                String requestedVersion = dm.getRequestedBom().getVersion();
-                                String newerVersion = findNewerVersion(bom.getGroupId(), bom.getArtifactId(), bom.getVersion(), ctx);
-                                if(newerVersion != null) {
-                                    if (requestedVersion.startsWith("${")) {
-                                        doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, false));
-                                        return t;
+                        }
+                    } else {
+                        for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
+                            if (dm.getBomGav() != null) {
+                                ResolvedGroupArtifactVersion bom = dm.getBomGav();
+                                String tagGroup = getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()));
+                                String tagArtifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
+
+                                if (tagGroup != null && tagArtifactId != null && tagGroup.equals(bom.getGroupId()) && tagArtifactId.equals(bom.getArtifactId())) {
+
+                                    //noinspection ConstantConditions
+                                    String requestedVersion = dm.getRequestedBom().getVersion();
+                                    String newerVersion = findNewerVersion(bom.getGroupId(), bom.getArtifactId(), bom.getVersion(), ctx);
+                                    if (newerVersion != null) {
+                                        if (requestedVersion.startsWith("${")) {
+                                            doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion));
+                                            return t;
+                                        }
+                                        Xml.Tag childVersionTag = t.getChild("version").orElse(null);
+                                        if (childVersionTag != null) {
+                                            t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(childVersionTag, newerVersion).visitNonNull(t, 0, getCursor());
+                                        }
                                     }
-                                    t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(t.getChild("version").get(), newerVersion).visitNonNull(t, 0, getCursor());
+                                    break;
                                 }
                             }
                         }
@@ -189,16 +200,19 @@ public class UpgradeDependencyVersion extends Recipe {
 
             @Nullable
             private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) {
-                if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
-                    availableVersions = new ArrayList<>();
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(version, v)) {
-                            availableVersions.add(v);
-                        }
-                    }
-                }
-                return versionComparator.upgrade(version, availableVersions).orElse(null);
+                GroupArtifact ga = new GroupArtifact(groupId, artifactId);
+                List<String> artifactVersions = availableVersions.computeIfAbsent(ga,
+                        k -> {
+                            MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                            List<String> versions = new ArrayList<>();
+                            for (String v : mavenMetadata.getVersioning().getVersions()) {
+                                if (versionComparator.isValid(version, v)) {
+                                    versions.add(v);
+                                }
+                            }
+                            return versions;
+                        });
+                return versionComparator.upgrade(version, artifactVersions).orElse(null);
             }
         };
     }
