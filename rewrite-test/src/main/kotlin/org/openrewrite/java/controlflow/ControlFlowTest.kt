@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.controlflow
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.java.JavaIsoVisitor
@@ -1057,8 +1056,6 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
-
-    @Disabled
     @Test
     fun `for loop nested branching with continue`() = rewriteRun(
         java(
@@ -1074,6 +1071,24 @@ interface ControlFlowTest : RewriteTest {
                             if (i * 2 < 50) {
                                 index += 1;
                             } else  {
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            """,
+            """
+            import java.util.LinkedList;
+            class Test {
+                public void test () /*~~(BB: 6 CN: 3 EX: 1 | 1L)~~>*/{
+                    LinkedList<Integer> l1 = new LinkedList<>();
+                    int index = 1;
+                    for (int i = 0; /*~~(2L (<))~~>*/i < l1.size(); /*~~(3L)~~>*/i++)  /*~~(4L)~~>*/{
+                        if (/*~~(5L (>))~~>*/i > 5) /*~~(6L)~~>*/{
+                            if (/*~~(7L (<))~~>*/i * 2 < 50) /*~~(8L)~~>*/{
+                                index += 1;
+                            } else  /*~~(9L)~~>*/{
                                 continue;
                             }
                         }
