@@ -84,6 +84,7 @@ public class MethodNameCasing extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 if (method.getMethodType() != null &&
+                        getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class).getType() != null &&
                         !method.isConstructor() &&
                         !TypeUtils.isOverride(method.getMethodType()) &&
                         !standardMethodName.matcher(method.getSimpleName()).matches()) {
