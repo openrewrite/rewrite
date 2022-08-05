@@ -50,11 +50,11 @@ public class GraphStaticDisplay {
                 abstractToVisualNodeMapping.put(cn, n);
             } else if (node instanceof ControlFlowNode.Start) {
                 ControlFlowNode.Start start = (ControlFlowNode.Start) node;
-                n = node(lbl).with(Shape.CIRCLE, Label.of(start.toString()));
+                n = node(lbl).with(Shape.CIRCLE, Label.of(start.toString()), Font.name("arial"));
                 abstractToVisualNodeMapping.put(start, n);
             } else if (node instanceof ControlFlowNode.End) {
                 ControlFlowNode.End end = (ControlFlowNode.End) node;
-                n = node(lbl).with(Shape.CIRCLE, Label.of(end.toString()));
+                n = node(lbl).with(Shape.CIRCLE, Label.of(end.toString()), Font.name("arial"));
                 abstractToVisualNodeMapping.put(end, n);
             }
             g = g.with(n);
