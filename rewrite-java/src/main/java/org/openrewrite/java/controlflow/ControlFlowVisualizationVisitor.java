@@ -18,51 +18,33 @@ package org.openrewrite.java.controlflow;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.marker.DotResult;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Incubating(since = "7.25.0")
+@Incubating(since = "7.26.0")
 @AllArgsConstructor
-public class ControlFlowBasicBlockVisitor<P> extends JavaIsoVisitor<P> {
+public class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
+    private static final String CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE = "CONTROL_FLOW_SUMMARY";
+    boolean includeGraphvizDotfile;
 
-    @SuppressWarnings("unused")
-    private String getPredecessors(
-            Map<J, ControlFlowNode> leadersToNodes,
-            Map<ControlFlowNode, Integer> blockNumbers,
-            J leader
-    ) {
-        if (leader instanceof J.ControlParentheses) {
-            J.ControlParentheses<?> leaderControlParentheses = (J.ControlParentheses<?>) leader;
-            ControlFlowNode block = leadersToNodes.get(leaderControlParentheses.getTree());
-
-            List<String> predecessors =
-                    block
-                            .getPredecessors()
-                            .stream()
-                            .map(blockNumbers::get)
-                            .map(Object::toString)
-                            .collect(Collectors.toList());
-            return "Predecessors: " + String.join(", ", predecessors);
+    @Override
+    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
+        J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
+        String dotFile = getCursor().pollMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE);
+        if (dotFile != null) {
+            return m.withMarkers(m.getMarkers().add(new DotResult(Tree.randomId(), dotFile)));
         }
-
-        ControlFlowNode block = leadersToNodes.get(leader);
-        List<String> predecessors =
-                block
-                        .getPredecessors()
-                        .stream()
-                        .map(blockNumbers::get)
-                        .map(Object::toString)
-                        .collect(Collectors.toList());
-        return "Predecessors: " + String.join(", ", predecessors);
-
+        return m;
     }
 
     @Override
@@ -94,7 +76,16 @@ public class ControlFlowBasicBlockVisitor<P> extends JavaIsoVisitor<P> {
                         "BB: " + controlFlow.getBasicBlocks().size() +
                                 " CN: " + controlFlow.getConditionNodeCount() +
                                 " EX: " + controlFlow.getExitCount();
-                return block.withMarkers(block.getMarkers().searchResult(searchResultText));
+                if (includeGraphvizDotfile) {
+                    String graphName = methodDeclaration != null ? methodDeclaration.getSimpleName() : block.isStatic() ? "static block" : "init block";
+                    String dotFile = ControlFlowVisualizer.visualizeAsDotfile(graphName, controlFlow);
+                    if (methodDeclaration != null) {
+                        getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance).putMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE, dotFile);
+                    }
+                    return block.withMarkers(block.getMarkers().searchResult(searchResultText).add(new DotResult(Tree.randomId(), dotFile)));
+                } else {
+                    return block.withMarkers(block.getMarkers().searchResult(searchResultText));
+                }
             }).orElseGet(() -> super.visitBlock(block, p));
         }
         return super.visitBlock(block, p);
@@ -206,5 +197,36 @@ public class ControlFlowBasicBlockVisitor<P> extends JavaIsoVisitor<P> {
             }
             return null;
         }
+    }
+
+    @SuppressWarnings("unused")
+    private static String getPredecessors(
+            Map<J, ControlFlowNode> leadersToNodes,
+            Map<ControlFlowNode, Integer> blockNumbers,
+            J leader
+    ) {
+        if (leader instanceof J.ControlParentheses) {
+            J.ControlParentheses<?> leaderControlParentheses = (J.ControlParentheses<?>) leader;
+            ControlFlowNode block = leadersToNodes.get(leaderControlParentheses.getTree());
+
+            List<String> predecessors =
+                    block
+                            .getPredecessors()
+                            .stream()
+                            .map(blockNumbers::get)
+                            .map(Object::toString)
+                            .collect(Collectors.toList());
+            return "Predecessors: " + String.join(", ", predecessors);
+        }
+
+        ControlFlowNode block = leadersToNodes.get(leader);
+        List<String> predecessors =
+                block
+                        .getPredecessors()
+                        .stream()
+                        .map(blockNumbers::get)
+                        .map(Object::toString)
+                        .collect(Collectors.toList());
+        return "Predecessors: " + String.join(", ", predecessors);
     }
 }
