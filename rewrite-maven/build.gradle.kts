@@ -50,7 +50,7 @@ dependencies {
     integTestImplementation("org.eclipse.aether:aether-transport-http:latest.release")
     integTestImplementation("org.apache.maven:maven-aether-provider:latest.release")
     integTestImplementation("org.apache.maven:maven-core:latest.release")
-    integTestImplementation("io.micrometer:micrometer-registry-prometheus:1.+")
+    integTestImplementation("io.micrometer:micrometer-registry-prometheus:1.9+")
     integTestImplementation("org.rocksdb:rocksdbjni:latest.release")
 
     integTestImplementation(project(":rewrite-java-11"))
