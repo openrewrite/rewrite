@@ -51,6 +51,18 @@ interface RemoveImportTest : JavaRecipeTest {
     )
 
     @Test
+    fun leaveWildcardImportIfRemovedTypeIsStillReferredTo(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = removeImport("java.util.*"),
+        before = """
+            import java.util.*;
+            class A {
+               List<Integer> list;
+            }
+        """
+    )
+
+    @Test
     fun removeStarImportIfNoTypesReferredTo(jp: JavaParser) = assertChanged(
         jp,
         recipe = removeImport("java.util.List"),

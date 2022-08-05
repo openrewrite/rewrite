@@ -107,7 +107,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
         J.CompilationUnit c = cu;
 
-        boolean keepImport = typeUsed && !force;
+        boolean keepImport = !force && (typeUsed || !otherTypesInPackageUsed.isEmpty() && type.endsWith(".*"));
         AtomicReference<Space> spaceForNextImport = new AtomicReference<>();
         c = c.withImports(ListUtils.flatMap(c.getImports(), impoort -> {
             if (spaceForNextImport.get() != null) {
