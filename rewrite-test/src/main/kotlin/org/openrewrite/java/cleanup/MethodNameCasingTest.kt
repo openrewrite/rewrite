@@ -153,8 +153,11 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
         """
     )
 
+    // This test uses a recipe remove ClassDeclaration types information prior to running the MethodNameCasing recipe.
+    // This results in a change with an empty diff, thus before and after sources are identical
+    @Issue("https://github.com/openrewrite/rewrite/issues/2103")
     @Test
-    fun renameMethodDeclarationAlso() = rewriteRun(
+    fun `does not rename method invocations when the method declarations class type is null`() = rewriteRun(
         { spec ->
             spec.typeValidationOptions(TypeValidation.none()).recipe(
                 RewriteTest.toRecipe {
