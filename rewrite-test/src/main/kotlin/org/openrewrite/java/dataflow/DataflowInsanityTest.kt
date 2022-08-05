@@ -25,10 +25,10 @@ import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
 @Suppress("FunctionName")
-interface DataFlowInsanityTest : RewriteTest {
+interface DataflowInsanityTest : RewriteTest {
 
     fun JavaIsoVisitor<ExecutionContext>.doRunDataFlow() {
-        dataflow().findSinks(object : LocalTaintFlowSpec<Expression, Expression>() {
+        Dataflow.startingAt(cursor).findSinks(object : LocalTaintFlowSpec<Expression, Expression>() {
             override fun isSource(source: Expression, cursor: Cursor) = true
 
             override fun isSink(sink: Expression, cursor: Cursor) = true
