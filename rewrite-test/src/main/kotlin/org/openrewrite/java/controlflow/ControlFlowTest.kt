@@ -16,96 +16,14 @@
 package org.openrewrite.java.controlflow
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
-import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.TypeValidation
-import org.openrewrite.java.tree.Expression
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.Statement
-import org.openrewrite.marker.SearchResult
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
 @Suppress("FunctionName", "UnusedAssignment", "UnnecessaryLocalVariable", "ConstantConditions")
 interface ControlFlowTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
-        spec.recipe(RewriteTest.toRecipe {
-            object : JavaIsoVisitor<ExecutionContext>() {
-
-                override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
-                    val methodDeclaration = cursor.firstEnclosing(J.MethodDeclaration::class.java)
-                    val isTestMethod = methodDeclaration?.body == block && methodDeclaration.name.simpleName == "test"
-                    val isStaticOrInitBlock = J.Block.isStaticOrInitBlock(cursor)
-                    if (isTestMethod || isStaticOrInitBlock) {
-                        return ControlFlow.startingAt(cursor).findControlFlow().map { controlFlow ->
-                            val basicBlocks = controlFlow.basicBlocks
-                            val leaders = basicBlocks.map { it.leader }.toSet()
-                            doAfterVisit(object : JavaIsoVisitor<ExecutionContext>() {
-
-                                override fun visitStatement(statement: Statement, p: ExecutionContext): Statement {
-                                    return if (leaders.contains(statement)) {
-                                        val searchResult =
-                                            statement.markers.markers.filterIsInstance<SearchResult>().getOrNull(0)
-                                        if (searchResult != null) {
-                                            statement.withMarkers(
-                                                statement.markers.removeByType(SearchResult::class.java).add(
-                                                    searchResult.withDescription(searchResult.description?.plus(" | L"))
-                                                )
-                                            )
-                                        } else {
-                                            statement.withMarkers(statement.markers.searchResult("L"))
-                                        }
-                                    } else statement
-                                }
-
-                                override fun visitExpression(expression: Expression, p: ExecutionContext): Expression {
-                                    return if (leaders.contains(expression))
-                                        expression.withMarkers(expression.markers.searchResult(expression.leaderDescription()))
-                                    else expression
-                                }
-
-                                fun Expression.leaderDescription(): String {
-                                    return when (this) {
-                                        is J.Binary -> {
-                                            val tag = when (this.operator) {
-                                                J.Binary.Type.And -> "&&"
-                                                J.Binary.Type.Or -> "||"
-                                                J.Binary.Type.Addition -> "+"
-                                                J.Binary.Type.Subtraction -> "-"
-                                                J.Binary.Type.Multiplication -> "*"
-                                                J.Binary.Type.Division -> "/"
-                                                J.Binary.Type.Modulo -> "%"
-                                                J.Binary.Type.LessThan -> "<"
-                                                J.Binary.Type.LessThanOrEqual -> "<="
-                                                J.Binary.Type.GreaterThan -> ">"
-                                                J.Binary.Type.GreaterThanOrEqual -> ">="
-                                                J.Binary.Type.Equal -> "=="
-                                                J.Binary.Type.NotEqual -> "!="
-                                                J.Binary.Type.BitAnd -> "&"
-                                                J.Binary.Type.BitOr -> "|"
-                                                J.Binary.Type.BitXor -> "^"
-                                                J.Binary.Type.LeftShift -> "<<"
-                                                J.Binary.Type.RightShift -> ">>"
-                                                J.Binary.Type.UnsignedRightShift -> ">>>"
-                                                null -> "null"
-                                            }
-                                            "L ($tag)"
-                                        }
-                                        else -> "L"
-                                    }
-                                }
-                            })
-                            block.withMarkers(
-                                block.markers.searchResult(
-                                    "BB: ${basicBlocks.size} CN: ${controlFlow.conditionNodeCount} EX: ${controlFlow.exitCount}"
-                                )
-                            )
-                        }.orElseGet { super.visitBlock(block, p) }
-                    }
-                    return super.visitBlock(block, p)
-                }
-            }
-        })
+        spec.recipe(ControlFlowVisualization(false))
         spec.expectedCyclesThatMakeChanges(1).cycles(1)
     }
 
@@ -124,7 +42,7 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                void test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                void test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
                 }
@@ -154,7 +72,7 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 private final Object lock = new Object();
                 abstract int start();
-                void test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                void test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                     int x;
                     synchronized (lock) {
                         x = start();
@@ -187,12 +105,12 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                void test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                void test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (x == 1) /*~~(L)~~>*/{
+                    if (/*~~(1C (==))~~>*/x == 1) /*~~(2L)~~>*/{
                         int y = 3;
-                    } else /*~~(L)~~>*/{
+                    } else /*~~(3L)~~>*/{
                         int y = 5;
                     }
                 }
@@ -222,15 +140,15 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                void test() /*~~(BB: 4 CN: 1 EX: 1 | L)~~>*/{
+                void test() /*~~(BB: 4 CN: 1 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (x == 1) /*~~(L)~~>*/{
+                    if (/*~~(1C (==))~~>*/x == 1) /*~~(2L)~~>*/{
                         int y = 3;
-                    } else /*~~(L)~~>*/{
+                    } else /*~~(3L)~~>*/{
                         int y = 5;
                     }
-                    /*~~(L)~~>*/x++;
+                    /*~~(4L)~~>*/x++;
                 }
             }
             """
@@ -262,19 +180,19 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                void test() /*~~(BB: 6 CN: 2 EX: 1 | L)~~>*/{
+                void test() /*~~(BB: 6 CN: 2 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (x == 1) /*~~(L)~~>*/{
-                        if (x == 1) /*~~(L)~~>*/{
+                    if (/*~~(1C (==))~~>*/x == 1) /*~~(2L)~~>*/{
+                        if (/*~~(2C (==))~~>*/x == 1) /*~~(3L)~~>*/{
                             int y = 2;
-                        } else /*~~(L)~~>*/{
+                        } else /*~~(4L)~~>*/{
                             int y = 5;
                         }
-                    } else /*~~(L)~~>*/{
+                    } else /*~~(5L)~~>*/{
                         int y = 5;
                     }
-                    /*~~(L)~~>*/x++;
+                    /*~~(6L)~~>*/x++;
                 }
             }
             """
@@ -301,12 +219,12 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (x == 1) /*~~(L)~~>*/{
+                    if (/*~~(1C (==))~~>*/x == 1) /*~~(2L)~~>*/{
                         return 2;
-                    } else /*~~(L)~~>*/{
+                    } else /*~~(3L)~~>*/{
                         return 5;
                     }
                 }
@@ -334,13 +252,13 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (x == 1) /*~~(L)~~>*/{
+                    if (/*~~(1C (==))~~>*/x == 1) /*~~(2L)~~>*/{
                         throw new RuntimeException();
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -359,7 +277,7 @@ interface ControlFlowTest : RewriteTest {
             """,
             """
             abstract class Test {
-                void test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                void test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                     //.. nop
                 }
             }
@@ -387,13 +305,13 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (x == 1) /*~~(L)~~>*/{
+                    if (/*~~(1C (==))~~>*/x == 1) /*~~(2L)~~>*/{
                         return 2;
                     }
-                    /*~~(L)~~>*/x++;
+                    /*~~(3L)~~>*/x++;
                     return 5;
                 }
             }
@@ -420,13 +338,13 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 4 CN: 2 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 4 CN: 2 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (x >= 1 && /*~~(L)~~>*/x <= 2) /*~~(L)~~>*/{
+                    if (/*~~(1C (>=))~~>*/x >= 1 && /*~~(2C (<=))~~>*//*~~(2L)~~>*/x <= 2) /*~~(3L)~~>*/{
                         return 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(4L)~~>*/5;
                 }
             }
             """
@@ -452,13 +370,13 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 4 CN: 2 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 4 CN: 2 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (x > 5 || /*~~(L)~~>*/x < 3) /*~~(L)~~>*/{
+                    if (/*~~(1C (>))~~>*/x > 5 || /*~~(2C (<))~~>*//*~~(2L)~~>*/x < 3) /*~~(3L)~~>*/{
                         return 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(4L)~~>*/5;
                 }
             }
             """
@@ -485,13 +403,13 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 5 CN: 3 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 5 CN: 3 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (x >= 1 && /*~~(L)~~>*/x <= 5 && /*~~(L)~~>*/x == 3) /*~~(L)~~>*/{
+                    if (/*~~(1C (>=))~~>*/x >= 1 && /*~~(2C (<=))~~>*//*~~(2L)~~>*/x <= 5 && /*~~(3C (==))~~>*//*~~(3L)~~>*/x == 3) /*~~(4L)~~>*/{
                         return 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(5L)~~>*/5;
                 }
             }
             """
@@ -518,14 +436,14 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
                     boolean b = x >= 1;
-                    if (b) /*~~(L)~~>*/{
+                    if (/*~~(1C)~~>*/b) /*~~(2L)~~>*/{
                         return 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -555,14 +473,14 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 @SuppressWarnings({"ExcessiveRangeCheck", "RedundantSuppression"})
-                int test() /*~~(BB: 6 CN: 3 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 6 CN: 3 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    /*~~(L)~~>*/boolean b = x >= 1 && /*~~(L)~~>*/x <= 5 && /*~~(L)~~>*/x == 3;
-                    if (b) /*~~(L)~~>*/{
+                    boolean /*~~(2L)~~>*/b = /*~~(1C (>=))~~>*/x >= 1 && /*~~(2C (<=))~~>*//*~~(3L)~~>*/x <= 5 && /*~~(4L)~~>*/x == 3;
+                    if (/*~~(3C)~~>*/b) /*~~(5L)~~>*/{
                         return 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(6L)~~>*/5;
                 }
             }
             """
@@ -589,14 +507,14 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
                     boolean b = !(x >= 1);
-                    if (b) /*~~(L)~~>*/{
+                    if (/*~~(1C)~~>*/b) /*~~(2L)~~>*/{
                         return 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -622,13 +540,13 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 4 CN: 2 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 4 CN: 2 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if ((x >= 1 && /*~~(L)~~>*/x <= 5)) /*~~(L)~~>*/{
+                    if ((/*~~(1C (>=))~~>*/x >= 1 && /*~~(2C (<=))~~>*//*~~(2L)~~>*/x <= 5)) /*~~(3L)~~>*/{
                         return 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(4L)~~>*/5;
                 }
             }
             """
@@ -656,13 +574,13 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (theTest()) /*~~(L)~~>*/{
+                    if (/*~~(1C)~~>*/theTest()) /*~~(2L)~~>*/{
                         return 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -690,13 +608,13 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    if (!theTest()) /*~~(L)~~>*/{
+                    if (!/*~~(1C)~~>*/theTest()) /*~~(2L)~~>*/{
                         return 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -724,13 +642,13 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    while (theTest()) /*~~(L)~~>*/{
+                    while (/*~~(1C)~~>*/theTest()) /*~~(2L)~~>*/{
                         x += 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -768,19 +686,19 @@ interface ControlFlowTest : RewriteTest {
                 abstract boolean theTest();
                 abstract boolean theTest2();
                 abstract boolean theTest3();
-                int test() /*~~(BB: 7 CN: 3 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 7 CN: 3 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    while (theTest()) /*~~(L)~~>*/{
-                        if (theTest2()) /*~~(L)~~>*/{
+                    while (/*~~(1C)~~>*/theTest()) /*~~(2L)~~>*/{
+                        if (/*~~(2C)~~>*/theTest2()) /*~~(3L)~~>*/{
                             continue;
                         }
-                        /*~~(L)~~>*/if (theTest3()) /*~~(L)~~>*/{
+                        /*~~(4L)~~>*/if (/*~~(3C)~~>*/theTest3()) /*~~(5L)~~>*/{
                             break;
                         }
-                        /*~~(L)~~>*/x += 2;
+                        /*~~(6L)~~>*/x += 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(7L)~~>*/5;
                 }
             }
             """
@@ -808,13 +726,13 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    do /*~~(L)~~>*/{
+                    do /*~~(2L)~~>*/{
                         x += 2;
-                    } while (theTest());
-                    return /*~~(L)~~>*/5;
+                    } while (/*~~(1C)~~>*/theTest());
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -850,17 +768,17 @@ interface ControlFlowTest : RewriteTest {
                 abstract boolean theTest();
                 abstract boolean theTest2();
                 abstract boolean theTest3();
-                int test() /*~~(BB: 7 CN: 3 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 7 CN: 3 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    do /*~~(L)~~>*/{
-                        if (theTest2())
-                            /*~~(L)~~>*/continue;
-                        /*~~(L)~~>*/if (theTest3())
-                            /*~~(L)~~>*/break;
-                        /*~~(L)~~>*/x += 2;
-                    } while (theTest());
-                    return /*~~(L)~~>*/5;
+                    do /*~~(2L)~~>*/{
+                        if (/*~~(2C)~~>*/theTest2())
+                            /*~~(3L)~~>*/continue;
+                        /*~~(4L)~~>*/if (/*~~(3C)~~>*/theTest3())
+                            /*~~(5L)~~>*/break;
+                        /*~~(6L)~~>*/x += 2;
+                    } while (/*~~(1C)~~>*/theTest());
+                    return /*~~(7L)~~>*/5;
                 }
             }
             """
@@ -888,13 +806,13 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 4 CN: 1 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 4 CN: 1 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    for (int i = 0; theTest(); /*~~(L)~~>*/i++) /*~~(L)~~>*/{
+                    for (int i = 0; /*~~(1C)~~>*/theTest(); /*~~(2L)~~>*/i++) /*~~(3L)~~>*/{
                         x += 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(4L)~~>*/5;
                 }
             }
             """
@@ -930,17 +848,17 @@ interface ControlFlowTest : RewriteTest {
                 abstract boolean theTest();
                 abstract boolean theTest2();
                 abstract boolean theTest3();
-                int test() /*~~(BB: 8 CN: 3 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 8 CN: 3 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    for (int i = 0; theTest(); /*~~(L)~~>*/i++) /*~~(L)~~>*/{
-                        if (theTest2())
-                            /*~~(L)~~>*/continue;
-                        /*~~(L)~~>*/if (theTest3())
-                            /*~~(L)~~>*/break;
-                        /*~~(L)~~>*/x += 2;
+                    for (int i = 0; /*~~(1C)~~>*/theTest(); /*~~(2L)~~>*/i++) /*~~(3L)~~>*/{
+                        if (/*~~(2C)~~>*/theTest2())
+                            /*~~(4L)~~>*/continue;
+                        /*~~(5L)~~>*/if (/*~~(3C)~~>*/theTest3())
+                            /*~~(6L)~~>*/break;
+                        /*~~(7L)~~>*/x += 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(8L)~~>*/5;
                 }
             }
             """
@@ -969,13 +887,13 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    for (;;) /*~~(L)~~>*/{
+                    /*~~(1C)~~>*/for (;;) /*~~(2L)~~>*/{
                         x += 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -1003,13 +921,13 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract Iterable<Integer> iterable();
-                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    for (Integer i : iterable()) /*~~(L)~~>*/{
+                    for (Integer i : iterable()) /*~~(2L)~~>*/{
                         x += 2;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -1041,14 +959,14 @@ interface ControlFlowTest : RewriteTest {
             """
             import java.util.LinkedList;
             class Test {
-                public void test () /*~~(BB: 6 CN: 3 EX: 1 | L)~~>*/{
+                public void test () /*~~(BB: 6 CN: 3 EX: 1 | 1L)~~>*/{
                     LinkedList<Integer> l1 = new LinkedList<>();
                     int index = 1;
-                    for (int i = 0; i < l1.size(); /*~~(L)~~>*/i++)  /*~~(L)~~>*/{
-                        if (i > 5) /*~~(L)~~>*/{
-                            if (i * 2 < 50) /*~~(L)~~>*/{
+                    for (int i = 0; /*~~(1C (<))~~>*/i < l1.size(); /*~~(2L)~~>*/i++)  /*~~(3L)~~>*/{
+                        if (/*~~(2C (>))~~>*/i > 5) /*~~(4L)~~>*/{
+                            if (/*~~(3C (<))~~>*/i * 2 < 50) /*~~(5L)~~>*/{
                                 index += 1;
-                            } else  /*~~(L)~~>*/{
+                            } else  /*~~(6L)~~>*/{
                                 continue;
                             }
                         }
@@ -1089,16 +1007,16 @@ interface ControlFlowTest : RewriteTest {
                 abstract boolean theTest2();
                 abstract boolean theTest3();
                 abstract Iterable<Integer> iterable();
-                int test() /*~~(BB: 6 CN: 3 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 6 CN: 3 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    for (Integer i : iterable()) /*~~(L)~~>*/{
-                        if (theTest2())
-                            /*~~(L)~~>*/continue;
-                        /*~~(L)~~>*/if (theTest3())
-                            /*~~(L)~~>*/break;
+                    for (Integer i : iterable()) /*~~(2L)~~>*/{
+                        if (/*~~(1C)~~>*/theTest2())
+                            /*~~(3L)~~>*/continue;
+                        /*~~(4L)~~>*/if (/*~~(2C)~~>*/theTest3())
+                            /*~~(5L)~~>*/break;
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(6L)~~>*/5;
                 }
             }
             """
@@ -1124,13 +1042,13 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract int start();
-                int test() /*~~(BB: 3 CN: 1 EX: 1 | L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    for (int i : new int[]{1, 2, 3, 5}) /*~~(L)~~>*/{
+                    for (int i : new int[]{1, 2, 3, 5}) /*~~(2L)~~>*/{
                         System.out.println(i);
                     }
-                    return /*~~(L)~~>*/5;
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -1161,16 +1079,15 @@ interface ControlFlowTest : RewriteTest {
             """, """
             abstract class Test {
                 abstract boolean guard();
-
-                void test() /*~~(BB: 3 CN: 1 EX: 2 | L)~~>*/{
+                void test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     String n = "42";
                     int[] b = new int[1];
                     char c = (char) b[0];
-                    if (1 == 1) /*~~(L)~~>*/{
+                    if (/*~~(1C (==))~~>*/1 == 1) /*~~(2L)~~>*/{
                         String o = n;
                         System.out.println(o);
                         String p = o;
-                    } else /*~~(L)~~>*/{
+                    } else /*~~(3L)~~>*/{
                         System.out.println(n);
                     }
                 }
@@ -1195,8 +1112,8 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract boolean guard();
-                void test() /*~~(BB: 2 CN: 1 EX: 2 | L)~~>*/{
-                    if (guard()) /*~~(L)~~>*/{
+                void test() /*~~(BB: 2 CN: 1 EX: 2 | 1L)~~>*/{
+                    if (/*~~(1C)~~>*/guard()) /*~~(2L)~~>*/{
                         throw new RuntimeException();
                     }
                 }
@@ -1222,9 +1139,9 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract boolean guard();
-                void test() /*~~(BB: 2 CN: 1 EX: 2 | L)~~>*/{
+                void test() /*~~(BB: 2 CN: 1 EX: 2 | 1L)~~>*/{
                     System.out.println("Hello!");
-                    if (guard()) /*~~(L)~~>*/{
+                    if (/*~~(1C)~~>*/guard()) /*~~(2L)~~>*/{
                         System.out.println("Goodbye!");
                     }
                 }
@@ -1251,9 +1168,9 @@ interface ControlFlowTest : RewriteTest {
             """,
             """
             abstract class Test {
-                void test() /*~~(BB: 2 CN: 1 EX: 2 | L)~~>*/{
+                void test() /*~~(BB: 2 CN: 1 EX: 2 | 1L)~~>*/{
                     System.out.println("Hello!");
-                    if (true) /*~~(L)~~>*/{
+                    if (/*~~(1C)~~>*/true) /*~~(2L)~~>*/{
                         System.out.println("Goodbye!");
                     }
                 }
@@ -1279,8 +1196,8 @@ interface ControlFlowTest : RewriteTest {
             """
                 import java.io.InputStream;
                 class Test {
-                    InputStream source() { return null; }
-                    void test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                    InputStream source() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{ return null; }
+                    void test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                         try (InputStream source = source()) {
                             System.out.println(source.read());
                         }
@@ -1314,12 +1231,11 @@ interface ControlFlowTest : RewriteTest {
             """
                 import java.io.InputStream;
                 class Test {
-                    InputStream source() { return null; }
-                    int test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                    InputStream source() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{ return null; }
+                    int test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                         try (InputStream source = source()) {
                             return source.read();
                         } catch (RuntimeException ignored) {
-
                         }
                         return 0;
                     }
@@ -1349,8 +1265,8 @@ interface ControlFlowTest : RewriteTest {
             """
                 import java.io.InputStream;
                 class Test {
-                    InputStream source() { return null; }
-                    void test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                    InputStream source() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{ return null; }
+                    void test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                         InputStream source = source();
                         try {
                             System.out.println(source.read());
@@ -1384,8 +1300,8 @@ interface ControlFlowTest : RewriteTest {
             """
                 import java.io.InputStream;
                 class Test {
-                    InputStream source() { return null; }
-                    int test() /*~~(BB: 1 CN: 0 EX: 1 | L)~~>*/{
+                    InputStream source() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{ return null; }
+                    int test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                         InputStream source = source();
                         try {
                             return source.read();
@@ -1416,12 +1332,12 @@ interface ControlFlowTest : RewriteTest {
                 """,
             """
                 class Test {
-                    /*~~(BB: 2 CN: 1 EX: 2 | L)~~>*/{
-                        if (compute()) /*~~(L)~~>*/{
+                    /*~~(BB: 2 CN: 1 EX: 2 | 1L)~~>*/{
+                        if (/*~~(1C)~~>*/compute()) /*~~(2L)~~>*/{
                             System.out.println("Hello!");
                         }
                     }
-                    static Boolean compute() {
+                    static Boolean compute() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                         return null;
                     }
                 }
@@ -1446,12 +1362,12 @@ interface ControlFlowTest : RewriteTest {
                 """,
             """
                 class Test {
-                    void test() /*~~(BB: 2 CN: 1 EX: 2 | L)~~>*/{
-                        if (compute() != null) /*~~(L)~~>*/{
+                    void test() /*~~(BB: 2 CN: 1 EX: 2 | 1L)~~>*/{
+                        if (/*~~(1C (!=))~~>*/compute() != null) /*~~(2L)~~>*/{
                             System.out.println("Hello!");
                         }
                     }
-                    static Object compute() {
+                    static Object compute() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                         return null;
                     }
                 }
@@ -1523,7 +1439,6 @@ interface ControlFlowTest : RewriteTest {
             """
             import java.lang.StringBuffer;
             import java.nio.ByteBuffer;
-
             class Test {
                 /**
                  * Decodes the specified URL as per RFC 3986, i.e. transforms
@@ -1539,42 +1454,64 @@ interface ControlFlowTest : RewriteTest {
                  * @return The decoded URL or <code>null</code> if the input was
                  *         <code>null</code>.
                  */
-                static String test(String url) /*~~(BB: 12 CN: 7 EX: 1 | L)~~>*/{
+                static String test(String url) /*~~(BB: 12 CN: 7 EX: 1 | 1L)~~>*/{
                     String decoded = url;
-                    if (url != null && /*~~(L)~~>*/url.indexOf('%') >= 0) /*~~(L)~~>*/{
+                    if (/*~~(1C (!=))~~>*/url != null && /*~~(2C (>=))~~>*//*~~(2L)~~>*/url.indexOf('%') >= 0) /*~~(3L)~~>*/{
                         int n = url.length();
                         StringBuffer buffer = new StringBuffer();
                         ByteBuffer bytes = ByteBuffer.allocate(n);
-                        for (int i = 0; i < n;) /*~~(L)~~>*/{
-                            if (url.charAt(i) == '%') /*~~(L)~~>*/{
+                        for (int i = 0; /*~~(3C (<))~~>*/i < n;) /*~~(4L)~~>*/{
+                            if (/*~~(4C (==))~~>*/url.charAt(i) == '%') /*~~(5L)~~>*/{
                                 try {
-                                    do /*~~(L)~~>*/{
+                                    do /*~~(7L)~~>*/{
                                         byte octet = (byte) Integer.parseInt(url.substring(i + 1, i + 3), 16);
                                         bytes.put(octet);
                                         i += 3;
-                                    } while (i < n && /*~~(L)~~>*/url.charAt(i) == '%');
-                                    /*~~(L)~~>*/continue;
+                                    } while (/*~~(5C (<))~~>*/i < n && /*~~(6C (==))~~>*//*~~(6L)~~>*/url.charAt(i) == '%');
+                                    /*~~(8L)~~>*/continue;
                                 } catch (RuntimeException e) {
                                     // malformed percent-encoded octet, fall through and
                                     // append characters literally
                                 } finally {
-                                    if (bytes.position() > 0) /*~~(L)~~>*/{
+                                    if (/*~~(7C (>))~~>*/bytes.position() > 0) /*~~(9L)~~>*/{
                                         bytes.flip();
                                         buffer.append(utf8Decode(bytes));
                                         bytes.clear();
                                     }
                                 }
                             }
-                            /*~~(L)~~>*/buffer.append(url.charAt(i++));
+                            /*~~(10L)~~>*/buffer.append(url.charAt(i++));
                         }
-                        /*~~(L)~~>*/decoded = buffer.toString();
+                        /*~~(11L)~~>*/decoded = buffer.toString();
                     }
-                    return /*~~(L)~~>*/decoded;
+                    return /*~~(12L)~~>*/decoded;
                 }
-                private static String utf8Decode(ByteBuffer buff) {
+                private static String utf8Decode(ByteBuffer buff) /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                     return null;
                 }
             }
+            """
+        )
+    )
+
+    @Test
+    fun `objects print`() = rewriteRun(
+        java(
+            """
+                class Test {
+                    void test() {
+                        Integer i = new Integer(1);
+                        System.out.println(i);
+                    }
+                }
+            """,
+            """
+                class Test {
+                    void test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                        Integer i = new Integer(1);
+                        System.out.println(i);
+                    }
+                }
             """
         )
     )
@@ -1623,42 +1560,102 @@ interface ControlFlowTest : RewriteTest {
             """,
             """
             class Test {
-                void test() /*~~(BB: 22 CN: 12 EX: 1 | L)~~>*/{
-                    if (potato) /*~~(L)~~>*/{
+                void test() /*~~(BB: 22 CN: 12 EX: 1 | 1L)~~>*/{
+                    if (/*~~(1C)~~>*/potato) /*~~(2L)~~>*/{
                         // ...
                     }
-                    /*~~(L)~~>*/if ((potato)) /*~~(L)~~>*/{
+                    /*~~(3L)~~>*/if ((/*~~(2C)~~>*/potato)) /*~~(4L)~~>*/{
                         // ...
                     }
-                    /*~~(L)~~>*/if (potato && /*~~(L)~~>*/turnip) /*~~(L)~~>*/{
+                    /*~~(5L)~~>*/if (/*~~(3C)~~>*/potato && /*~~(6L)~~>*/turnip) /*~~(7L)~~>*/{
                         // ...
                     }
-                    /*~~(L)~~>*/if (potato && /*~~(L)~~>*/turnip || /*~~(L)~~>*/squash) /*~~(L)~~>*/{
+                    /*~~(8L)~~>*/if (/*~~(5C)~~>*/potato && /*~~(9L)~~>*/turnip || /*~~(10L)~~>*/squash) /*~~(11L)~~>*/{
                         // ...
                     }
-                    int a = /*~~(L)~~>*/1, b = 2;
-                    if ((a = turnip) == b) /*~~(L)~~>*/{
+                    int a = /*~~(12L)~~>*/1, b = 2;
+                    if (/*~~(8C (==))~~>*/(a = turnip) == b) /*~~(13L)~~>*/{
                         // ..
                     }
-                    /*~~(L)~~>*/if (horse.equals(donkey)) /*~~(L)~~>*/{
+                    /*~~(14L)~~>*/if (/*~~(9C)~~>*/horse.equals(donkey)) /*~~(15L)~~>*/{
                         // ..
                     }
-                    /*~~(L)~~>*/if (horse.contains(hay)) /*~~(L)~~>*/{
+                    /*~~(16L)~~>*/if (/*~~(10C)~~>*/horse.contains(hay)) /*~~(17L)~~>*/{
                         // ..
                     }
-                    boolean farmFresh = /*~~(L)~~>*/tomato;
+                    boolean farmFresh = /*~~(18L)~~>*/tomato;
                     boolean farmFreshAndFancyFree = (chicken);
                     boolean farmFreshEggs = true;
                     farmFreshEggs = chicken.layEggs();
-                    while (farming) /*~~(L)~~>*/{
+                    while (/*~~(11C)~~>*/farming) /*~~(19L)~~>*/{
                         // ...
                     }
-                    /*~~(L)~~>*/for (int i = 0; areMoreCabbages(); /*~~(L)~~>*/i++) /*~~(L)~~>*/{
+                    /*~~(20L)~~>*/for (int i = 0; /*~~(12C)~~>*/areMoreCabbages(); /*~~(21L)~~>*/i++) /*~~(22L)~~>*/{
                         // ...
                     }
                 }
             }
-            """.trimIndent()
+            """
+        )
+    )
+
+    @Test
+    fun `example code`() = rewriteRun(
+        java(
+            """
+            import java.io.File;
+            import java.io.FileOutputStream;
+            import java.io.IOException;
+            import java.io.InputStream;
+            import java.util.Enumeration;
+            import java.util.zip.ZipEntry;
+            import java.util.zip.ZipFile;
+
+            class Test {
+                void test(File destination, ZipEntry e, ZipFile zip) {
+                    File f = new File(destination, e.getName());
+                    if (!f.toPath().startsWith(destination.toPath())) {
+                        throw new IOException("Bad Zip Entry!");
+                    }
+                    IOUtils.copy(
+                            zip.getInputStream(e),
+                            new FileOutputStream(f)
+                    );
+                }
+            }
+
+            class IOUtils {
+                static void copy(Object input, Object output) {
+                    //.. nop
+                }
+            }
+            """,
+            """
+            import java.io.File;
+            import java.io.FileOutputStream;
+            import java.io.IOException;
+            import java.io.InputStream;
+            import java.util.Enumeration;
+            import java.util.zip.ZipEntry;
+            import java.util.zip.ZipFile;
+            class Test {
+                void test(File destination, ZipEntry e, ZipFile zip) /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
+                    File f = new File(destination, e.getName());
+                    if (!/*~~(1C)~~>*/f.toPath().startsWith(destination.toPath())) /*~~(2L)~~>*/{
+                        throw new IOException("Bad Zip Entry!");
+                    }
+                    /*~~(3L)~~>*/IOUtils.copy(
+                            zip.getInputStream(e),
+                            new FileOutputStream(f)
+                    );
+                }
+            }
+            class IOUtils {
+                static void copy(Object input, Object output) /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                    //.. nop
+                }
+            }
+            """
         )
     )
 }

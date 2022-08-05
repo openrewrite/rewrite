@@ -248,8 +248,9 @@ public class ControlFlow {
 
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
+            visit(multiVariable.getTypeExpression(), p);
             for (J.VariableDeclarations.NamedVariable variable : multiVariable.getVariables()) {
-                visit(variable.getInitializer(), p); // First the initializer is invoked
+                visit(variable, p);
             }
             addCursorToBasicBlock(); // Then the variable declaration
             return multiVariable;
