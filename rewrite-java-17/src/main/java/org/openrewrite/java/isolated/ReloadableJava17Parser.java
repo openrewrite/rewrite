@@ -32,6 +32,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
@@ -241,8 +242,10 @@ public class ReloadableJava17Parser implements JavaParser {
                             return compiler.parse(new ReloadableJava17ParserInputFileObject(input1));
                         } catch (IllegalStateException e) {
                             if ("endPosTable already set".equals(e.getMessage())) {
-                                throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
-                                        "set of source files that have some of the same fully qualified names", e);
+                                throw new IllegalStateException(
+                                        "Call reset() on JavaParser before parsing another set of source files that " +
+                                        "have some of the same fully qualified names. Source file [" +
+                                        input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource()) + "\n]", e);
                             }
                             throw e;
                         }
