@@ -148,9 +148,15 @@ public class UnnecessaryThrows extends Recipe {
 
         //Collect all checked exceptions.
         Set<JavaType.FullyQualified> candidates = new TreeSet<>(Comparator.comparing(JavaType.FullyQualified::getFullyQualifiedName));
-        for (JavaType.FullyQualified exception : method.getMethodType().getThrownExceptions()) {
-            if (!TypeUtils.isAssignableTo(JavaType.ShallowClass.build("java.lang.RuntimeException"), exception)) {
-                candidates.add(exception);
+
+        if (method.getThrows() != null) {
+            for (NameTree exception : method.getThrows()) {
+                if (exception.getType() == null || exception.getType() instanceof JavaType.Unknown) {
+                    return Collections.emptySet();
+                }
+                if (!TypeUtils.isAssignableTo(JavaType.ShallowClass.build("java.lang.RuntimeException"), exception.getType())) {
+                    candidates.add(TypeUtils.asFullyQualified(exception.getType()));
+                }
             }
         }
 
@@ -158,6 +164,7 @@ public class UnnecessaryThrows extends Recipe {
             return Collections.emptySet();
         }
 
+        //noinspection ConstantConditions
         if ((method.getMethodType().getDeclaringType() != null && method.getMethodType().getDeclaringType().getFlags().contains(Flag.Final))
                 || method.isAbstract() || method.hasModifier(J.Modifier.Type.Static)
                 || method.hasModifier(J.Modifier.Type.Private)

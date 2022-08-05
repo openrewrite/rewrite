@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("RedundantThrows")
+@file:Suppress("RedundantThrows", "JUnitMalformedDeclaration", "resource")
 
 package org.openrewrite.java.cleanup
 
@@ -204,6 +204,23 @@ interface UnnecessaryThrowsTest : JavaRecipeTest {
             class A {
                 void foo() throws Exception {
                     throw new IOException("");
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2105")
+    @Test
+    fun `prevent transformation if any thrown exception has a null or unknown type`(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            package com.yourorg;
+            
+            import java.io.IOException;
+            
+            class A {
+                void foo() throws ExceptionWithUnknownType {
+                    someUnknownMethodInvocation();
                 }
             }
         """
