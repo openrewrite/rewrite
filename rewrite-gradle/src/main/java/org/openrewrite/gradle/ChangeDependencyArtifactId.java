@@ -19,6 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
+import org.openrewrite.gradle.util.Dependency;
+import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -94,14 +96,12 @@ public class ChangeDependencyArtifactId extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
-                        String[] gavs = gav.split(":");
-                        if (gavs.length >= 3 && !newArtifactId.equals(gavs[1]) && depMatcher.matches(gavs[0], gavs[1], gavs[2])) {
-                            String newGav = gavs[0] + ":" + newArtifactId + ":" + gavs[2];
-                            m = m.withArguments(ListUtils.map(m.getArguments(), (n, arg) ->
-                                    n == 0 ?
-                                            ChangeStringLiteral.withStringValue((J.Literal) arg, newGav) :
-                                            arg
-                            ));
+                        Dependency dependency = new DependencyStringNotationConverter().parse(gav);
+                        if (!newArtifactId.equals(dependency.getArtifactId()) &&
+                                ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
+                                        (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
+                            Dependency newDependency = dependency.withArtifactId(newArtifactId);
+                            m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
                         }
                     }
                 } else if (depArgs.get(0) instanceof G.MapEntry) {
