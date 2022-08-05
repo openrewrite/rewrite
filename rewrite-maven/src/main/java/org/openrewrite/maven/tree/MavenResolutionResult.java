@@ -15,9 +15,8 @@
  */
 package org.openrewrite.maven.tree;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
@@ -32,7 +31,9 @@ import java.util.function.Predicate;
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
-@Value
+@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@Getter
 public class MavenResolutionResult implements Marker {
     @EqualsAndHashCode.Include
     @With
