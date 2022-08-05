@@ -32,7 +32,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @AllArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
 public class MavenResolutionResult implements Marker {
     @EqualsAndHashCode.Include
@@ -46,11 +46,9 @@ public class MavenResolutionResult implements Marker {
      * Resolution results of POMs in this repository that hold this POM as a parent.
      */
     @With
-    @NonFinal
     List<MavenResolutionResult> modules;
 
     @Nullable
-    @NonFinal
     MavenResolutionResult parent;
 
     @With
@@ -118,6 +116,16 @@ public class MavenResolutionResult implements Marker {
             }
         }
         return found == null ? emptyList() : found;
+    }
+
+    public void unsafeSet(UUID id, ResolvedPom pom, List<MavenResolutionResult> modules,
+                          @Nullable MavenResolutionResult parent,
+                          Map<Scope, List<ResolvedDependency>> dependencies) {
+        this.id = id;
+        this.pom = pom;
+        this.modules = modules;
+        this.parent = parent;
+        this.dependencies = dependencies;
     }
 
     public void unsafeSetParent(MavenResolutionResult parent) {
