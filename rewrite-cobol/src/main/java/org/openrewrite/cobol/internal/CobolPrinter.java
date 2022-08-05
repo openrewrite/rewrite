@@ -240,7 +240,7 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         visitMarkers(dataDescriptionEntry.getMarkers(), p);
         p.append(dataDescriptionEntry.getLevel());
         visitLeftPadded("", dataDescriptionEntry.getPadding().getName(), p);
-        visitContainer("", dataDescriptionEntry.getPadding().getClauses(), ".", ".", p);
+        visitContainer("", dataDescriptionEntry.getPadding().getClauses(), "", ".", p);
         return dataDescriptionEntry;
     }
 
