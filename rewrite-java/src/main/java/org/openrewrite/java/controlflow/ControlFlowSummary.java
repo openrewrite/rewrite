@@ -22,7 +22,10 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.Expression;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -38,13 +41,10 @@ public final class ControlFlowSummary {
     private final Set<ControlFlowNode> allNodes = getAllControlFlowNodes(start);
 
     private static Set<ControlFlowNode> getAllControlFlowNodes(ControlFlowNode.Start start) {
-        // LinkedHashSet to preserve insertion order of nodes
-        LinkedHashSet<ControlFlowNode> all = new LinkedHashSet<>();
+        Set<ControlFlowNode> all = new HashSet<>();
         recurseGetAllControlFlowNodes(start, all);
         return all;
     }
-
-
     private static void recurseGetAllControlFlowNodes(ControlFlowNode current, Set<ControlFlowNode> visited) {
         visited.add(current);
         Queue<ControlFlowNode> toVisit = new LinkedList<>(current.getSuccessors());
@@ -84,7 +84,7 @@ public final class ControlFlowSummary {
     }
 
     public Set<ControlFlowNode.BasicBlock> computeReachableBasicBlock(BarrierGuardPredicate predicate) {
-        Set<ControlFlowNode> reachable = new LinkedHashSet<>();
+        Set<ControlFlowNode> reachable = new HashSet<>();
         recurseComputeReachableBasicBlock(start, predicate, reachable);
         return reachable
                 .stream()

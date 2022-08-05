@@ -36,10 +36,6 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
 
-    implementation("guru.nidi:graphviz-java:latest.release") {
-        because("Used to visualize control flow")
-    }
-
     testImplementation("org.yaml:snakeyaml:latest.release")
     testImplementation("com.puppycrawl.tools:checkstyle:9.+") { // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
         isTransitive = false

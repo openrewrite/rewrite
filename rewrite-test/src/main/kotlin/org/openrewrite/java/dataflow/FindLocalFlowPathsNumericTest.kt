@@ -13,8 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("FunctionName")
-
 package org.openrewrite.java.dataflow
 
 import org.junit.jupiter.api.Disabled
@@ -39,7 +37,8 @@ interface FindLocalFlowPathsNumericTest : RewriteTest {
 
     @Test
     fun transitiveAssignment() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
+        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) },
+        java(
             """
                 class Test {
                     void test() {
@@ -49,42 +48,14 @@ interface FindLocalFlowPathsNumericTest : RewriteTest {
                         int p = o;
                     }
                 }
-            """, """
+            """,
+            """
                 class Test {
                     void test() {
                         int n = /*~~>*/42;
                         int o = /*~~>*/n;
                         System.out.println(/*~~>*/o);
                         int p = /*~~>*/o;
-                    }
-                }
-            """
-        )
-    )
-
-    @Test
-    fun `multiblock transitive assignment`() = rewriteRun(
-        { spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1) }, java(
-            """
-                class Test {
-                    void test() {
-                        if (true) {
-                            int n = 42;
-                            int o = n;
-                            System.out.println(o);
-                            int p = o;
-                        }
-                    }
-                }
-            """, """
-                class Test {
-                    void test() {
-                        if (true) {
-                            int n = /*~~>*/42;
-                            int o = /*~~>*/n;
-                            System.out.println(/*~~>*/o);
-                            int p = /*~~>*/o;
-                        }
                     }
                 }
             """

@@ -14,7 +14,7 @@ configure<LicenseReportExtension> {
 configure<LicenseExtension> {
     ext.set("year", Calendar.getInstance().get(Calendar.YEAR))
     skipExistingHeaders = true
-    excludePatterns.addAll(listOf("**/*.tokens", "**/*.config", "**/*.interp", "**/*.txt", "**/*.bat", "**/*.zip", "**/*.csv", "**/gradlew", "**/*.dontunpack", "**/*.css"))
+    excludePatterns.addAll(listOf("**/*.tokens", "**/*.config", "**/*.interp", "**/*.txt", "**/*.bat", "**/*.zip", "**/*.csv", "**/gradlew", "**/*.dontunpack"))
     header = project.rootProject.file("gradle/licenseHeader.txt")
     mapping(mapOf("kt" to "SLASHSTAR_STYLE", "java" to "SLASHSTAR_STYLE"))
     strictCheck = true
