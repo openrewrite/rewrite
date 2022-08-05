@@ -107,7 +107,7 @@ public class MavenParser implements Parser<Xml.Document> {
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
-            MavenResolutionResult model = new MavenResolutionResult(randomId(), resolvedPom, emptyList(), null, emptyMap())
+            MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap())
                     .resolveDependencies(downloader, ctx);
             parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
         }

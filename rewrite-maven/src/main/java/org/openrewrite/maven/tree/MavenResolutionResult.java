@@ -17,7 +17,6 @@ package org.openrewrite.maven.tree;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
@@ -39,6 +38,9 @@ public class MavenResolutionResult implements Marker {
     @With
     UUID id;
 
+    @Nullable
+    Integer managedReference;
+
     @With
     ResolvedPom pom;
 
@@ -53,6 +55,11 @@ public class MavenResolutionResult implements Marker {
 
     @With
     Map<Scope, List<ResolvedDependency>> dependencies;
+
+    public MavenResolutionResult unsafeSetManagedReference(Integer id) {
+        this.managedReference = id;
+        return this;
+    }
 
     @Incubating(since = "7.18.0")
     @Nullable
