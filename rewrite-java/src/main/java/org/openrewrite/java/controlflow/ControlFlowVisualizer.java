@@ -18,7 +18,6 @@ package org.openrewrite.java.controlflow;
 import guru.nidi.graphviz.attribute.*;
 import guru.nidi.graphviz.engine.Format;
 import guru.nidi.graphviz.engine.Graphviz;
-import guru.nidi.graphviz.engine.GraphvizJdkEngine;
 import guru.nidi.graphviz.engine.GraphvizV8Engine;
 import guru.nidi.graphviz.model.Graph;
 import guru.nidi.graphviz.model.Node;
@@ -30,6 +29,7 @@ import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static guru.nidi.graphviz.attribute.Rank.RankDir.TOP_TO_BOTTOM;
 import static guru.nidi.graphviz.model.Factory.*;
@@ -37,17 +37,22 @@ import static guru.nidi.graphviz.model.Factory.to;
 
 @NoArgsConstructor(access = lombok.AccessLevel.PRIVATE)
 final class ControlFlowVisualizer {
-
-    static {
-        Graphviz.useEngine(new GraphvizV8Engine());
+    private static final AtomicBoolean initialized = new AtomicBoolean(false);
+    private static void initialize() {
+        if (initialized.compareAndSet(false, true)) {
+            Graphviz.useEngine(new GraphvizV8Engine());
+        }
     }
 
+
     static String visualizeAsDotfile(String name, ControlFlowSummary summary) {
+        initialize();
         final Graph graph = createGraph(name, summary);
         return Graphviz.fromGraph(graph).render(Format.DOT).toString();
     }
 
     static Graph createGraph(String name, ControlFlowSummary summary) {
+        initialize();
         Set<ControlFlowNode> all = summary.getAllNodes();
         // map each node to its index in the list
         Map<ControlFlowNode, Integer> nodeToIndex = new HashMap<>(all.size());
@@ -75,19 +80,19 @@ final class ControlFlowVisualizer {
             if (node instanceof ControlFlowNode.BasicBlock) {
                 ControlFlowNode.BasicBlock bb = (ControlFlowNode.BasicBlock) node;
                 n = node(lbl).with(Shape.RECTANGLE,
-                        Label.of(bb.getStatementsWithinBlock().replace("\n", "\\l") + "\\l"));
+                        Label.of(bb.toVisualizerString().replace("\n", "\\l") + "\\l"));
                 abstractToVisualNodeMapping.put(bb, n);
             } else if (node instanceof ControlFlowNode.ConditionNode) {
                 ControlFlowNode.ConditionNode cn = (ControlFlowNode.ConditionNode) node;
-                n = node(lbl).with(Shape.DIAMOND, Label.of(cn.getCondition().toString()));
+                n = node(lbl).with(Shape.DIAMOND, Label.of(cn.toVisualizerString()));
                 abstractToVisualNodeMapping.put(cn, n);
             } else if (node instanceof ControlFlowNode.Start) {
                 ControlFlowNode.Start start = (ControlFlowNode.Start) node;
-                n = node(lbl).with(Shape.CIRCLE, Label.of(start.toString()), Font.name("arial"));
+                n = node(lbl).with(Shape.CIRCLE, Label.of(start.toVisualizerString()), Font.name("arial"));
                 abstractToVisualNodeMapping.put(start, n);
             } else if (node instanceof ControlFlowNode.End) {
                 ControlFlowNode.End end = (ControlFlowNode.End) node;
-                n = node(lbl).with(Shape.CIRCLE, Label.of(end.toString()), Font.name("arial"));
+                n = node(lbl).with(Shape.CIRCLE, Label.of(end.toVisualizerString()), Font.name("arial"));
                 abstractToVisualNodeMapping.put(end, n);
             }
         }
@@ -115,8 +120,8 @@ final class ControlFlowVisualizer {
 
     @SuppressWarnings("unused")
     public static void renderGraphToFile(String name, Graph graph) {
+        initialize();
         try {
-            Graphviz.useEngine(new GraphvizV8Engine());
             Graphviz.fromGraph(graph).render(Format.DOT).toFile(new File("example/", name + ".dot"));
             Graphviz.fromGraph(graph).render(Format.SVG).toFile(new File("example/", name + ".svg"));
         } catch (IOException e) {

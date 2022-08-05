@@ -48,15 +48,27 @@ public class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.Block visitBlock(J.Block block, P p) {
-        boolean isTestMethod = false;
-        J.MethodDeclaration methodDeclaration = getCursor().firstEnclosing(J.MethodDeclaration.class);
-        if (methodDeclaration != null) {
-            isTestMethod = methodDeclaration.getBody() == block;
+    public J.Lambda visitLambda(J.Lambda lambda, P p) {
+        J.Lambda l = super.visitLambda(lambda, p);
+        String dotFile = getCursor().pollMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE);
+        if (dotFile != null) {
+            return l.withMarkers(l.getMarkers().add(new DotResult(Tree.randomId(), dotFile)));
         }
+        return l;
+    }
+
+    @Override
+    public J.Block visitBlock(J.Block block, P p) {
+        J.Block b = super.visitBlock(block, p);
+
+        J.MethodDeclaration methodDeclaration = getCursor().firstEnclosing(J.MethodDeclaration.class);
+        final boolean isMethodDeclaration = methodDeclaration != null && methodDeclaration.getBody() == block;
+
+        J.Lambda lambdaDeclaration = getCursor().firstEnclosing(J.Lambda.class);
+        final boolean isLambdaDeclaration = lambdaDeclaration != null && lambdaDeclaration.getBody() == b;
 
         boolean isStaticOrInitBlock = J.Block.isStaticOrInitBlock(getCursor());
-        if (isTestMethod || isStaticOrInitBlock) {
+        if (isMethodDeclaration || isLambdaDeclaration || isStaticOrInitBlock) {
             return ControlFlow.startingAt(getCursor()).findControlFlow().map(controlFlow -> {
                 // maps basic block and condition nodes to the first statement in the node (the node leader)
                 Map<J, ControlFlowNode.BasicBlock> leadersToBlocks =
@@ -77,18 +89,21 @@ public class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                                 " CN: " + controlFlow.getConditionNodeCount() +
                                 " EX: " + controlFlow.getExitCount();
                 if (includeGraphvizDotfile) {
-                    String graphName = methodDeclaration != null ? methodDeclaration.getSimpleName() : block.isStatic() ? "static block" : "init block";
+                    String graphName = methodDeclaration != null ? methodDeclaration.getSimpleName() : b.isStatic() ? "static block" : "init block";
                     String dotFile = ControlFlowVisualizer.visualizeAsDotfile(graphName, controlFlow);
-                    if (methodDeclaration != null) {
+                    if (isMethodDeclaration) {
                         getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance).putMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE, dotFile);
                     }
-                    return block.withMarkers(block.getMarkers().searchResult(searchResultText).add(new DotResult(Tree.randomId(), dotFile)));
+                    if (isLambdaDeclaration) {
+                        getCursor().dropParentUntil(J.Lambda.class::isInstance).putMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE, dotFile);
+                    }
+                    return b.withMarkers(b.getMarkers().searchResult(searchResultText).add(new DotResult(Tree.randomId(), dotFile)));
                 } else {
-                    return block.withMarkers(block.getMarkers().searchResult(searchResultText));
+                    return b.withMarkers(b.getMarkers().searchResult(searchResultText));
                 }
-            }).orElseGet(() -> super.visitBlock(block, p));
+            }).orElse(b);
         }
-        return super.visitBlock(block, p);
+        return b;
     }
 
     @RequiredArgsConstructor
