@@ -207,7 +207,7 @@ public class JavaSourceSet implements Marker {
             // Classgraph orders this collection innermost -> outermost, but type names are declared outermost -> innermost
             for (int i = outerClasses.size() - 1; i >= 0; i--) {
                 ClassInfo outerClass = outerClasses.get(i);
-                if (outerClass.isPrivate() || outerClass.isAnonymousInnerClass() || outerClass.isSynthetic()) {
+                if (outerClass.isPrivate() || outerClass.isAnonymousInnerClass() || outerClass.isSynthetic() || outerClass.isExternalClass()) {
                     return null;
                 }
                 if(i == outerClasses.size() - 1) {
