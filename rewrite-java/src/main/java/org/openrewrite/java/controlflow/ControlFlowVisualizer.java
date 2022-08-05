@@ -50,7 +50,7 @@ final class ControlFlowVisualizer {
     static Graph createGraph(String name, ControlFlowSummary summary) {
         Set<ControlFlowNode> all = summary.getAllNodes();
         // map each node to its index in the list
-        Map<ControlFlowNode, Integer> nodeToIndex = new HashMap<>();
+        Map<ControlFlowNode, Integer> nodeToIndex = new HashMap<>(all.size());
         int index = 0;
         for (ControlFlowNode node : all) {
             nodeToIndex.put(node, index);
@@ -61,7 +61,7 @@ final class ControlFlowVisualizer {
     }
 
     private static Graph createGraph(String name, Map<ControlFlowNode, Integer> nodeToIndex) {
-        final Map<ControlFlowNode, Node> abstractToVisualNodeMapping = new HashMap<>();
+        final Map<ControlFlowNode, Node> abstractToVisualNodeMapping = new HashMap<>(nodeToIndex.size());
 
         Graph g = graph(name).directed()
                 .graphAttr().with(Rank.dir(TOP_TO_BOTTOM))
@@ -71,7 +71,7 @@ final class ControlFlowVisualizer {
 
         for (ControlFlowNode node : nodeToIndex.keySet()) {
             String lbl = nodeToIndex.get(node).toString();
-            Node n = null;
+            Node n;
             if (node instanceof ControlFlowNode.BasicBlock) {
                 ControlFlowNode.BasicBlock bb = (ControlFlowNode.BasicBlock) node;
                 n = node(lbl).with(Shape.RECTANGLE,

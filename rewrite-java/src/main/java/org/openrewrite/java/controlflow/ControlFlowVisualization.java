@@ -37,6 +37,11 @@ public class ControlFlowVisualization extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Visualize the control flow of a Java program.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ControlFlowVisualizationVisitor<>(includeGraphvizDotfile);
     }

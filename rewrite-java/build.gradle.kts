@@ -51,9 +51,6 @@ dependencies {
 
     testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
 }
-repositories {
-    mavenCentral()
-}
 
 tasks.withType<Javadoc> {
     // generated ANTLR sources violate doclint

@@ -19,13 +19,11 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.*;
@@ -64,10 +62,6 @@ public abstract class ControlFlowNode {
 
     ConditionNode addConditionNodeFalseFirst() {
         throw new IllegalStateException("Can only add a condition node to a basic block");
-    }
-
-    public List<J> getNodeValues() {
-        return Collections.emptyList();
     }
 
     /**
@@ -132,13 +126,6 @@ public abstract class ControlFlowNode {
             return asBooleanLiteral().map(l -> !((Boolean) l.getValue())).orElse(false);
         }
 
-
-        @Override
-        public List<J> getNodeValues() {
-            List<J> l = new LinkedList<>();
-            l.add(condition.getValue());
-            return l;
-        }
 
         @Override
         Set<ControlFlowNode> getSuccessors() {
@@ -247,8 +234,7 @@ public abstract class ControlFlowNode {
             return shortestList.get(shortestList.size() - 1);
         }
 
-        @Override
-        public List<J> getNodeValues() {
+        private List<J> getNodeValues() {
             return node.stream().map(Cursor::<J>getValue).collect(Collectors.toList());
         }
 
@@ -286,7 +272,7 @@ public abstract class ControlFlowNode {
                 return;
             }
             if (this.successor != null) {
-                throw new IllegalStateException("Basic block already has a successor ");
+                throw new IllegalStateException("Basic block already has a successor");
             }
             this.successor = successor;
         }
