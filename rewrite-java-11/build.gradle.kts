@@ -19,7 +19,7 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
 
-    integTestImplementation("io.micrometer:micrometer-registry-prometheus:1.+")
+    integTestImplementation("io.micrometer:micrometer-registry-prometheus:1.9+")
 }
 
 java {
