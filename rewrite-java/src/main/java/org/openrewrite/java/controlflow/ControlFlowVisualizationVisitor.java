@@ -134,14 +134,14 @@ public class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                 ControlFlowNode b = nodeToBlock.get(expression);
                 assert b != null;
                 int number = nodeNumbers.computeIfAbsent(b, __ -> ++nodeNumber);
-                return expression.withMarkers(expression.getMarkers().searchResult(number + leaderDescription(expression)));
+                return expression.withMarkers(expression.getMarkers().searchResult(number + labelDescription(expression)));
             }  else {
                 return expression;
             }
         }
 
-        private String leaderDescription(Expression e) {
-            String tag = leaderTag(e);
+        private String labelDescription(Expression e) {
+            String tag = labelTag(e);
             if (tag == null) {
                 return label;
             }
@@ -149,7 +149,7 @@ public class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         @Nullable
-        private static String leaderTag(Expression e) {
+        private static String labelTag(Expression e) {
             if (e instanceof J.Binary) {
                 J.Binary binary = (J.Binary) e;
                 switch (binary.getOperator()) {
