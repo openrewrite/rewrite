@@ -153,6 +153,40 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
         """
     )
 
+    @Suppress("UnusedAssignment")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2103")
+    @Test
+    fun `rename snake_case to camelCase`() = assertChanged(
+        before = """
+            class T {
+                private static int SOME_METHOD() {
+                  return 1;
+                }
+                private static int some_method_2() {
+                  return 1;
+                }
+                public static void anotherMethod() {
+                  int i = SOME_METHOD();
+                  i = some_method_2();
+                }
+            }
+        """,
+        after = """
+            class T {
+                private static int someMethod() {
+                  return 1;
+                }
+                private static int someMethod2() {
+                  return 1;
+                }
+                public static void anotherMethod() {
+                  int i = someMethod();
+                  i = someMethod2();
+                }
+            }
+        """
+    )
+
     // This test uses a recipe remove ClassDeclaration types information prior to running the MethodNameCasing recipe.
     // This results in a change with an empty diff, thus before and after sources are identical
     @Issue("https://github.com/openrewrite/rewrite/issues/2103")

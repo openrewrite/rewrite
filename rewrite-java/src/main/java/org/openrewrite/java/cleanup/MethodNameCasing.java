@@ -70,6 +70,7 @@ public class MethodNameCasing extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern standardMethodName = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
+        Pattern snakeCase = Pattern.compile("[a-zA-Z0-9_]*$");
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
@@ -89,30 +90,42 @@ public class MethodNameCasing extends Recipe {
                         !TypeUtils.isOverride(method.getMethodType()) &&
                         !standardMethodName.matcher(method.getSimpleName()).matches()) {
                     StringBuilder standardized = new StringBuilder();
-
                     char[] name = method.getSimpleName().toCharArray();
-                    for (int i = 0; i < name.length; i++) {
-                        char c = name[i];
 
-                        if (i == 0) {
-                            // the java specification requires identifiers to start with [a-zA-Z$_]
-                            if (c != '$' && c != '_') {
-                                standardized.append(Character.toLowerCase(c));
+                    if (snakeCase.matcher(method.getSimpleName()).matches()) {
+                        boolean nextIsUpper = false;
+                        for (int i = 0; i < name.length; i++) {
+                            char c = name[i];
+                            if (c == '$' || c == '_') {
+                                nextIsUpper = i > 0 && c != '$';
+                            } else {
+                                standardized.append(nextIsUpper ? Character.toUpperCase(c) : Character.toLowerCase(c));
+                                nextIsUpper = false;
                             }
-                        } else {
-                            if (!Character.isLetterOrDigit(c)) {
-                                while (i < name.length && (!Character.isLetterOrDigit(name[i]) || name[i] > 'z')) {
-                                    i++;
-                                }
-                                if (i < name.length) {
-                                    standardized.append(Character.toUpperCase(name[i]));
+                        }
+                    } else {
+                        for (int i = 0; i < name.length; i++) {
+                            char c = name[i];
+
+                            if (i == 0) {
+                                // the java specification requires identifiers to start with [a-zA-Z$_]
+                                if (c != '$' && c != '_') {
+                                    standardized.append(Character.toLowerCase(c));
                                 }
                             } else {
-                                standardized.append(c);
+                                if (!Character.isLetterOrDigit(c)) {
+                                    while (i < name.length && (!Character.isLetterOrDigit(name[i]) || name[i] > 'z')) {
+                                        i++;
+                                    }
+                                    if (i < name.length) {
+                                        standardized.append(Character.toUpperCase(name[i]));
+                                    }
+                                } else {
+                                    standardized.append(c);
+                                }
                             }
                         }
                     }
-
                     if (!StringUtils.isBlank(standardized.toString())) {
                         doNext(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), true, false));
                     }
