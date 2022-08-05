@@ -1661,4 +1661,116 @@ interface ControlFlowTest : RewriteTest {
             """.trimIndent()
         )
     )
+
+    @Suppress("SimplifyStreamApiCallChains")
+    @Test
+    fun `lambda foreach` () = rewriteRun(
+        java(
+            """
+            import java.util.LinkedList;
+            import java.util.stream.IntStream;
+            class Test{
+                int test() {
+                    LinkedList<Integer> x = new LinkedList<>();
+                    x.add(5);
+                    x.add(1);
+                    IntStream
+                        .range(0, x.size())
+                        .map( i -> {
+                            int y = x.get(i);
+                            return y++;
+                        })
+                        .forEach(ind -> {
+                            x.set(ind, x.get(ind) + 5);
+                            System.out.println(x.get(ind));
+                        });
+                    if (x.get(0) == 10) {
+                        return -1;
+                    }
+                    return x.get(0);
+                }
+            }
+
+            """,
+            """
+            import java.util.LinkedList;
+            import java.util.stream.IntStream;
+            class Test{
+                int test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
+                    LinkedList<Integer> x = new LinkedList<>();
+                    x.add(5);
+                    x.add(1);
+                    IntStream
+                        .range(0, x.size())
+                        .map( i -> /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                            int y = x.get(i);
+                            return y++;
+                        })
+                        .forEach(ind -> /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                            x.set(ind, x.get(ind) + 5);
+                            System.out.println(x.get(ind));
+                        });
+                    if (/*~~(1C (==))~~>*/x.get(0) == 10) /*~~(2L)~~>*/{
+                        return -1;
+                    }
+                    return /*~~(3L)~~>*/x.get(0);
+                }
+            }
+
+            """
+        )
+    )
+
+    @Test
+    fun `byte-buddy minimal replica` () = rewriteRun(
+        java(
+            """
+            import java.util.LinkedList;
+
+            class Test {
+                public void test () {
+                    LinkedList<Integer> l1 = new LinkedList<>();
+                    LinkedList<Integer> l2 = new LinkedList<>();
+                    int index = 1;
+                    top:
+                    for (Integer j : l2) {
+                        for (Integer i : l1)  {
+                            if (i > 5) {
+                                break;
+                            }
+                        }
+                        if (i * 2 < 50) {
+                            index += 1;
+                        } else  {
+                            continue top;
+                        }
+                    }
+                }
+            }
+            """,
+            """
+            import java.util.LinkedList;
+            class Test {
+                public void test () /*~~(BB: 7 CN: 4 EX: 1 | 1L)~~>*/{
+                    LinkedList<Integer> l1 = new LinkedList<>();
+                    LinkedList<Integer> l2 = new LinkedList<>();
+                    int index = 1;
+                    top:
+                    for (Integer j : l2) /*~~(2L)~~>*/{
+                        for (Integer i : l1)  /*~~(3L)~~>*/{
+                            if (/*~~(1C (>))~~>*/i > 5) /*~~(4L)~~>*/{
+                                break;
+                            }
+                        }
+                        /*~~(5L)~~>*/if (/*~~(2C (<))~~>*/i * 2 < 50) /*~~(6L)~~>*/{
+                            index += 1;
+                        } else  /*~~(7L)~~>*/{
+                            continue top;
+                        }
+                    }
+                }
+            }
+            """
+        )
+    )
 }
