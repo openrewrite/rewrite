@@ -133,6 +133,7 @@ interface ControlFlowTest : RewriteTest {
                                     }
                                 }
                             })
+                            ControlFlowVisualizer.createSVG(controlFlow)
 //                            ControlFlowVisualizer.showCFG(controlFlow)
 
                             block.withMarkers(
