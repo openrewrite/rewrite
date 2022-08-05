@@ -16,13 +16,18 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.TypeValidation
+import org.openrewrite.java.tree.J
+import org.openrewrite.test.RewriteTest
 
 @Issue("https://github.com/openrewrite/rewrite/issues/466")
-interface MethodNameCasingTest: JavaRecipeTest {
+interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
     override val recipe: Recipe?
         get() = MethodNameCasing(false)
 
@@ -148,4 +153,38 @@ interface MethodNameCasingTest: JavaRecipeTest {
         """
     )
 
+    @Test
+    fun renameMethodDeclarationAlso() = rewriteRun(
+        { spec ->
+            spec.typeValidationOptions(TypeValidation.none()).recipe(
+                RewriteTest.toRecipe {
+                    object : JavaIsoVisitor<ExecutionContext>() {
+                        override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J.ClassDeclaration {
+                            return super.visitClassDeclaration(classDecl, p).withType(null)
+                        }
+                    }
+                }.doNext(MethodNameCasing(true))
+            )
+        },
+        java(
+            """
+            package abc;
+            class T {
+                public static int MyMethod() {return null;}
+                public static void anotherMethod() {
+                    int i = MyMethod();
+                }
+            }
+            """,
+            """
+            package abc;
+            class T {
+                public static int MyMethod() {return null;}
+                public static void anotherMethod() {
+                    int i = MyMethod();
+                }
+            }
+            """
+        )
+    )
 }
