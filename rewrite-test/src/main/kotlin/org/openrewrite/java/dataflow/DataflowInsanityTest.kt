@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.dataflow
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
@@ -24,7 +23,6 @@ import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
-import java.awt.Event.HOME
 
 @Suppress("FunctionName")
 interface DataflowInsanityTest : RewriteTest {
@@ -76,7 +74,7 @@ interface DataflowInsanityTest : RewriteTest {
     }
 
     @Test
-    fun `simple`() = rewriteRun(
+    fun simple() = rewriteRun(
         java(
             """
             public class A {
@@ -2901,7 +2899,6 @@ public final class SecurityUtils {
         )
     )
 
-    @Disabled ("No current node! exception")
     @Test
     fun `basex`() = rewriteRun(
         java(
@@ -5365,9 +5362,8 @@ public final class SecurityUtils {
         )
     )
 
-    @Disabled("Basic block already has a successor exception")
     @Test
-    fun `byte-buddy `() = rewriteRun(
+    fun `byte-buddy`() = rewriteRun(
         java(
             """
                 /*
@@ -14307,6 +14303,8 @@ public class FileUtils {
             """
         )
     )
+
+
 
 
 }

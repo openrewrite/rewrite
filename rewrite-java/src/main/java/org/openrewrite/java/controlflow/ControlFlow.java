@@ -67,6 +67,11 @@ public class ControlFlow {
                 }
             } else if (next instanceof J.MethodDeclaration) {
                 return new ControlFlow(methodDeclarationBlockCursor);
+            } else if (next instanceof J.Lambda && methodDeclarationBlockCursor != null) {
+                J.Lambda lambda = (J.Lambda) next;
+                if (lambda.getBody() == methodDeclarationBlockCursor.getValue()) {
+                    return new ControlFlow(methodDeclarationBlockCursor);
+                }
             }
         }
         return new ControlFlow(null);
@@ -167,6 +172,14 @@ public class ControlFlow {
                 this.breakFlow.addAll(analysis.breakFlow);
             }
             return analysis;
+        }
+
+        @Override
+        public J.Assignment visitAssignment(J.Assignment assignment, P p) {
+            addCursorToBasicBlock();
+            visit(assignment.getAssignment(), p);
+            visit(assignment.getVariable(), p);
+            return assignment;
         }
 
         @Override
@@ -529,7 +542,7 @@ public class ControlFlow {
             visit(fakeConditionalMethod, p);
 
             ControlFlowNode.ConditionNode conditionalEntry = controlAnalysis.currentAsBasicBlock().addConditionNodeTruthFirst();
-            ControlFlowAnalysis<P> bodyAnalysis = visitRecursiveTransferringAll(Collections.singleton(conditionalEntry), forLoop.getBody(), p);
+            ControlFlowAnalysis<P> bodyAnalysis = visitRecursiveTransferringExit(Collections.singleton(conditionalEntry), forLoop.getBody(), p);
             bodyAnalysis.current.forEach(controlFlowNode -> {
                 controlFlowNode.addSuccessor(conditionalEntry);
                 bodyAnalysis.continueFlow.forEach(continueFlowNode -> continueFlowNode.addSuccessor(controlFlowNode));
@@ -619,6 +632,16 @@ public class ControlFlow {
         public J.Try.Resource visitTryResource(J.Try.Resource tryResource, P p) {
             visit(tryResource.getVariableDeclarations(), p);
             return tryResource;
+        }
+
+        @Override
+        public J.Lambda visitLambda(J.Lambda lambda, P p) {
+            addCursorToBasicBlock();
+            if (lambda.getBody() instanceof J.Block) {
+                return lambda;
+            } else {
+                return super.visitLambda(lambda, p);
+            }
         }
 
         @Override

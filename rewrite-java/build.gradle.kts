@@ -36,7 +36,7 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
 
-    implementation("guru.nidi:graphviz-java:latest.release") {
+    implementation("guru.nidi:graphviz-java-all-j2v8:latest.release") {
         because("Used to visualize control flow")
     }
 
