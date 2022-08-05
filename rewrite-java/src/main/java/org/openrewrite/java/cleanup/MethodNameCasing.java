@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.ChangeMethodName;
@@ -70,7 +71,7 @@ public class MethodNameCasing extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern standardMethodName = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
-        Pattern snakeCase = Pattern.compile("[a-zA-Z0-9_]*$");
+        Pattern snakeCase = Pattern.compile("^[a-zA-Z0-9_]*$");
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
@@ -93,16 +94,7 @@ public class MethodNameCasing extends Recipe {
                     char[] name = method.getSimpleName().toCharArray();
 
                     if (snakeCase.matcher(method.getSimpleName()).matches()) {
-                        boolean nextIsUpper = false;
-                        for (int i = 0; i < name.length; i++) {
-                            char c = name[i];
-                            if (c == '$' || c == '_') {
-                                nextIsUpper = i > 0 && c != '$';
-                            } else {
-                                standardized.append(nextIsUpper ? Character.toUpperCase(c) : Character.toLowerCase(c));
-                                nextIsUpper = false;
-                            }
-                        }
+                        standardized.append(NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL,method.getSimpleName().toLowerCase()));
                     } else {
                         for (int i = 0; i < name.length; i++) {
                             char c = name[i];

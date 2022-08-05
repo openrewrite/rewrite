@@ -165,9 +165,13 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
                 private static int some_method_2() {
                   return 1;
                 }
+                private static int some_über_method() {
+                  return 1;
+                }
                 public static void anotherMethod() {
                   int i = SOME_METHOD();
                   i = some_method_2();
+                  i = some_über_method();
                 }
             }
         """,
@@ -179,9 +183,13 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
                 private static int someMethod2() {
                   return 1;
                 }
+                private static int someBerMethod() {
+                  return 1;
+                }
                 public static void anotherMethod() {
                   int i = someMethod();
                   i = someMethod2();
+                  i = someBerMethod();
                 }
             }
         """
