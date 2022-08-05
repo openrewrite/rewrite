@@ -28,6 +28,9 @@ import org.openrewrite.java.tree.J;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * <a href="https://en.wikipedia.org/wiki/Dataflow_programming">Dataflow</a>.
+ */
 @Incubating(since = "7.24.0")
 @RequiredArgsConstructor(staticName = "startingAt")
 public class Dataflow {

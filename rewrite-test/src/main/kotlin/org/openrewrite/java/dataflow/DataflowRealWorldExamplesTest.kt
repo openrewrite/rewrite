@@ -23,7 +23,7 @@ import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
 @Suppress("FunctionName")
-interface DataFlowRealWorldExamplesTest: RewriteTest {
+interface DataflowRealWorldExamplesTest: RewriteTest {
 
     override fun defaults(spec: RecipeSpec) {
         val zipEntryGetMethod = MethodMatcher("java.util.zip.ZipEntry getName()", true)

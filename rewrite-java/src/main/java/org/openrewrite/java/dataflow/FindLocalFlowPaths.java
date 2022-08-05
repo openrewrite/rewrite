@@ -64,7 +64,7 @@ public class FindLocalFlowPaths extends JavaIsoVisitor<ExecutionContext> {
 
     @Override
     public Expression visitExpression(Expression expression, ExecutionContext ctx) {
-        dataflow().findSinks(spec).ifPresent(flow -> {
+        Dataflow.startingAt(getCursor()).findSinks(spec).ifPresent(flow -> {
             if (flow.isNotEmpty()) {
                 List<SinkFlow<?, ?>> flowGraphs = getCursor().getNearestMessage(FLOW_GRAPHS);
                 assert flowGraphs != null;

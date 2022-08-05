@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/**
+ * This package is used to analyze the dataflow through a program.
+ * <p>
+ * The primary entry point for interacting with this logic is
+ * {@link org.openrewrite.java.dataflow.Dataflow#startingAt(org.openrewrite.Cursor)}.
+ */
 @NonNullApi
 package org.openrewrite.java.dataflow;
 

@@ -123,10 +123,10 @@ abstract class JavaVisitorCompatibilityKit {
     inner class CovariantEqualsTck : CovariantEqualsTest
 
     @Nested
-    inner class DataFlowInsanityTck : DataFlowInsanityTest
+    inner class DataflowInsanityTck : DataflowInsanityTest
 
     @Nested
-    inner class DataFlowRealWorldExamplesTck : DataFlowRealWorldExamplesTest
+    inner class DataflowRealWorldExamplesTck : DataflowRealWorldExamplesTest
 
     @Nested
     inner class DefaultComesLastTck : DefaultComesLastTest

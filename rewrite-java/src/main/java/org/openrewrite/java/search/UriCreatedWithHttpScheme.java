@@ -22,6 +22,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.dataflow.Dataflow;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.controlflow.Guard;
 import org.openrewrite.java.tree.Expression;
@@ -83,7 +84,7 @@ public class UriCreatedWithHttpScheme extends Recipe {
             @Override
             public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
                 J.Literal l = super.visitLiteral(literal, ctx);
-                if (dataflow().findSinks(INSECURE_URI_CREATE).isPresent()) {
+                if (Dataflow.startingAt(getCursor()).findSinks(INSECURE_URI_CREATE).isPresent()) {
                     //noinspection ConstantConditions
                     return l.withValue(l.getValue().toString().replace("http://", "https://"))
                             .withValueSource(l.getValueSource().replace("http://", "https://"));
