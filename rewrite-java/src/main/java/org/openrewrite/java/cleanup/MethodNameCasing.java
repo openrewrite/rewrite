@@ -29,6 +29,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
@@ -118,12 +119,17 @@ public class MethodNameCasing extends Recipe {
                             }
                         }
                     }
-                    if (!StringUtils.isBlank(standardized.toString())) {
+                    if (!StringUtils.isBlank(standardized.toString())
+                            && !methodExists(method.getMethodType(), standardized.toString())) {
                         doNext(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), true, false));
                     }
                 }
 
                 return super.visitMethodDeclaration(method, executionContext);
+            }
+
+            private boolean methodExists(JavaType.Method method, String newName) {
+                return TypeUtils.findDeclaredMethod(method.getDeclaringType(), newName, method.getParameterTypes()).orElse(null) != null;
             }
         };
     }

@@ -153,6 +153,40 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
         """
     )
 
+    @Test
+    fun newNameExists() = assertUnchanged(
+        before = """
+            class Test {
+                void _method() {
+                }
+                void method() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun nameExistsInInnerClass() = assertChanged(
+        before = """
+            class T {
+                public void _method(){}
+                
+                private static class M {
+                    public void _method(){}
+                }
+            }
+        """,
+        after = """
+            class T {
+                public void method(){}
+                
+                private static class M {
+                    public void method(){}
+                }
+            }
+        """
+    )
+
     @Suppress("UnusedAssignment")
     @Issue("https://github.com/openrewrite/rewrite/issues/2103")
     @Test
