@@ -16,6 +16,7 @@
 package org.openrewrite.java.controlflow
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.TypeValidation
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
@@ -972,24 +973,6 @@ interface ControlFlowTest : RewriteTest {
                     }
                 }
             }
-            """,
-            """
-            import java.util.LinkedList;
-            class Test {
-                public void test () /*~~(BB: 6 CN: 3 EX: 1 | L)~~>*/{
-                    LinkedList<Integer> l1 = new LinkedList<>();
-                    int index = 1;
-                    for (int i = 0; i < l1.size(); /*~~(L)~~>*/i++)  /*~~(L)~~>*/{
-                        if (i > 5) /*~~(L)~~>*/{
-                            if (i * 2 < 50) /*~~(L)~~>*/{
-                                index += 1;
-                            } else  /*~~(L)~~>*/{
-                                continue;
-                            }
-                        }
-                    }
-                }
-            }
             """
         )
     )
@@ -1577,42 +1560,42 @@ interface ControlFlowTest : RewriteTest {
             """,
             """
             class Test {
-                void test() /*~~(BB: 22 CN: 12 EX: 1 | L)~~>*/{
-                    if (potato) /*~~(L)~~>*/{
+                void test() /*~~(BB: 22 CN: 12 EX: 1 | 1L)~~>*/{
+                    if (/*~~(1C)~~>*/potato) /*~~(2L)~~>*/{
                         // ...
                     }
-                    /*~~(L)~~>*/if ((potato)) /*~~(L)~~>*/{
+                    /*~~(3L)~~>*/if ((/*~~(2C)~~>*/potato)) /*~~(4L)~~>*/{
                         // ...
                     }
-                    /*~~(L)~~>*/if (potato && /*~~(L)~~>*/turnip) /*~~(L)~~>*/{
+                    /*~~(5L)~~>*/if (/*~~(3C)~~>*/potato && /*~~(6L)~~>*/turnip) /*~~(7L)~~>*/{
                         // ...
                     }
-                    /*~~(L)~~>*/if (potato && /*~~(L)~~>*/turnip || /*~~(L)~~>*/squash) /*~~(L)~~>*/{
+                    /*~~(8L)~~>*/if (/*~~(5C)~~>*/potato && /*~~(9L)~~>*/turnip || /*~~(10L)~~>*/squash) /*~~(11L)~~>*/{
                         // ...
                     }
-                    int a = /*~~(L)~~>*/1, b = 2;
-                    if ((a = turnip) == b) /*~~(L)~~>*/{
+                    int a = /*~~(12L)~~>*/1, b = 2;
+                    if (/*~~(8C (==))~~>*/(a = turnip) == b) /*~~(13L)~~>*/{
                         // ..
                     }
-                    /*~~(L)~~>*/if (horse.equals(donkey)) /*~~(L)~~>*/{
+                    /*~~(14L)~~>*/if (/*~~(9C)~~>*/horse.equals(donkey)) /*~~(15L)~~>*/{
                         // ..
                     }
-                    /*~~(L)~~>*/if (horse.contains(hay)) /*~~(L)~~>*/{
+                    /*~~(16L)~~>*/if (/*~~(10C)~~>*/horse.contains(hay)) /*~~(17L)~~>*/{
                         // ..
                     }
-                    boolean farmFresh = /*~~(L)~~>*/tomato;
+                    boolean farmFresh = /*~~(18L)~~>*/tomato;
                     boolean farmFreshAndFancyFree = (chicken);
                     boolean farmFreshEggs = true;
                     farmFreshEggs = chicken.layEggs();
-                    while (farming) /*~~(L)~~>*/{
+                    while (/*~~(11C)~~>*/farming) /*~~(19L)~~>*/{
                         // ...
                     }
-                    /*~~(L)~~>*/for (int i = 0; areMoreCabbages(); /*~~(L)~~>*/i++) /*~~(L)~~>*/{
+                    /*~~(20L)~~>*/for (int i = 0; /*~~(12C)~~>*/areMoreCabbages(); /*~~(21L)~~>*/i++) /*~~(22L)~~>*/{
                         // ...
                     }
                 }
             }
-            """.trimIndent()
+            """
         )
     )
 
