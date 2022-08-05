@@ -19,25 +19,6 @@ import java.util.*;
 
 
 public class ControlFlowVisualizer {
-
-    public static void showCFG(ControlFlowSummary summary) {
-        Set<ControlFlowNode> all = summary.getAllNodes();
-        // map each node to its index in the list
-        Map<ControlFlowNode, Integer> nodeToIndex = new HashMap<>();
-        int index = 0;
-        for (ControlFlowNode node : all) {
-            nodeToIndex.put(node, index);
-            index++;
-        }
-
-        GraphShower shower = new GraphShower(nodeToIndex);
-        shower.runGraph();
-
-        System.out.println("Graph shown.");
-
-
-    }
-
     public static void createSVG(ControlFlowSummary summary) {
         Set<ControlFlowNode> all = summary.getAllNodes();
         // map each node to its index in the list
@@ -50,8 +31,6 @@ public class ControlFlowVisualizer {
 
         GraphStaticDisplay display = new GraphStaticDisplay(nodeToIndex);
         display.loadGraph();
-
-        System.out.println("Graph displayed.");
     }
 
 
