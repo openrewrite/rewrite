@@ -1,7 +1,5 @@
 package org.openrewrite.java.controlflow;
 
-import java.lang.reflect.InvocationTargetException;
-
 interface ControlFlowDotFileGenerator {
     String visualizeAsDotfile(String name, ControlFlowSummary summary);
 

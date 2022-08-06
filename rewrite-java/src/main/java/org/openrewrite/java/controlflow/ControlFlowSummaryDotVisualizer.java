@@ -3,8 +3,10 @@ package org.openrewrite.java.controlflow;
 import lombok.Value;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Comparator;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerator {
@@ -48,7 +50,11 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
 
     @Value
     private static class NodeToNodeText implements Comparable<NodeToNodeText> {
-        ControlFlowNode node;
+        private static Comparator<NodeToNodeText> comparator = Comparator
+                .comparingInt(NodeToNodeText::comparingType)
+                .thenComparing(NodeToNodeText::getNodeText);
+
+        @NotNull ControlFlowNode node;
         String nodeText;
 
         NodeToNodeText(ControlFlowNode node) {
@@ -56,24 +62,48 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
             this.nodeText = node.toVisualizerString().replace("\"", "\\\"").replace("\n", "\\l");
         }
 
+        /**
+         * Order by type, then by node text.
+         * <p>
+         * This makes the test output consistent, even if the order of the nodes changes.
+         */
         @Override
         public int compareTo(@NotNull NodeToNodeText o) {
             if (this.equals(o)) {
                 return 0;
             }
-            if (node instanceof ControlFlowNode.Start || o.node instanceof ControlFlowNode.End) {
-                return -1;
-            } else if (node instanceof ControlFlowNode.End || o.node instanceof ControlFlowNode.Start) {
-                return 1;
+            return comparator.compare(this, o);
+        }
+
+        private int comparingType() {
+            if (node instanceof ControlFlowNode.Start) {
+                ControlFlowNode.Start start = (ControlFlowNode.Start) node;
+                if (ControlFlowNode.GraphType.METHOD_BODY_OR_STATIC_INITIALIZER_OR_INSTANCE_INITIALIZER.equals(start.getGraphType())) {
+                    return -2;
+                } else {
+                    return -1;
+                }
+            } else if (node instanceof ControlFlowNode.End) {
+                ControlFlowNode.End end = (ControlFlowNode.End) node;
+                if (ControlFlowNode.GraphType.METHOD_BODY_OR_STATIC_INITIALIZER_OR_INSTANCE_INITIALIZER.equals(end.getGraphType())) {
+                    return 2;
+                } else {
+                    return 1;
+                }
             } else {
-                return nodeText.compareTo(o.nodeText);
+                return 0;
             }
         }
     }
 
     private static String getShape(ControlFlowNode node) {
         if (node instanceof ControlFlowNode.Start || node instanceof ControlFlowNode.End) {
-            return "circle";
+            ControlFlowNode.GraphTerminator graphTerminator = (ControlFlowNode.GraphTerminator) node;
+            if (ControlFlowNode.GraphType.METHOD_BODY_OR_STATIC_INITIALIZER_OR_INSTANCE_INITIALIZER.equals(graphTerminator.getGraphType())) {
+                return "circle";
+            } else {
+                return "oval";
+            }
         } else if (node instanceof ControlFlowNode.ConditionNode) {
             return "diamond";
         } else {

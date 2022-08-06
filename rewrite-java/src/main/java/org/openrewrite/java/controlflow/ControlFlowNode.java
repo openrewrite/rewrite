@@ -154,7 +154,7 @@ public abstract class ControlFlowNode {
         }
 
         private boolean isAlwaysFalse() {
-            return asBooleanLiteralValue().orElse(false);
+            return asBooleanLiteralValue().map(b -> !b).orElse(false);
         }
 
 
@@ -371,8 +371,11 @@ public abstract class ControlFlowNode {
         }
     }
 
-    @NoArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
-    static class Start extends ControlFlowNode {
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
+    static class Start extends ControlFlowNode implements GraphTerminator {
+        @Getter
+        private final GraphType graphType;
+
         private ControlFlowNode successor = null;
 
         @Override
@@ -391,9 +394,9 @@ public abstract class ControlFlowNode {
         @Override
         String internalToDescriptiveString() {
             if (successor == null) {
-                return toString();
+                return this + " { No successor yet! }";
             } else {
-                return "Start { successor=" + successor.toDescriptiveString() + " }";
+                return this + " { successor=" + successor.toDescriptiveString() + " }";
             }
         }
 
@@ -404,26 +407,49 @@ public abstract class ControlFlowNode {
 
         @Override
         public String toString() {
-            return "Start";
+            switch (graphType) {
+                case METHOD_BODY_OR_STATIC_INITIALIZER_OR_INSTANCE_INITIALIZER:
+                    return "Start";
+                case LAMBDA:
+                    return "Lambda Start";
+                default:
+                    throw new ControlFlowIllegalStateException(exceptionMessageBuilder("Unknown graph type: " + graphType));
+            }
         }
     }
 
-    @NoArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
-    static class End extends ControlFlowNode {
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
+    static class End extends ControlFlowNode implements GraphTerminator{
+        @Getter
+        private final GraphType graphType;
+        private ControlFlowNode successor = null;
 
         @Override
         Set<ControlFlowNode> getSuccessors() {
+            if (GraphType.LAMBDA.equals(graphType)) {
+                if (successor == null) {
+                    throw new ControlFlowIllegalStateException(exceptionMessageBuilder("Lambda End node has no successor").thisNode(this).addPredecessors(this));
+                }
+                return Collections.singleton(successor);
+            }
             return Collections.emptySet();
         }
 
         @Override
         protected void _addSuccessorInternal(ControlFlowNode successor) {
-            throw new ControlFlowIllegalStateException(exceptionMessageBuilder("End nodes cannot have successors").otherNode(successor));
+            if (GraphType.LAMBDA.equals(graphType)) {
+                if (this.successor != null) {
+                    throw new ControlFlowIllegalStateException(exceptionMessageBuilder("Lambda End node already has a successor").thisNode(this).current(this.successor).otherNode(successor));
+                }
+                this.successor = successor;
+            } else {
+                throw new ControlFlowIllegalStateException(exceptionMessageBuilder("End nodes cannot have successors").otherNode(successor));
+            }
         }
 
         @Override
         String internalToDescriptiveString() {
-            return "End { predecessors=" + getPredecessors().size() + " }";
+            return this + " { predecessors=" + getPredecessors().size() + " }";
         }
 
         @Override
@@ -433,7 +459,29 @@ public abstract class ControlFlowNode {
 
         @Override
         public String toString() {
-            return "End";
+            switch (graphType) {
+                case METHOD_BODY_OR_STATIC_INITIALIZER_OR_INSTANCE_INITIALIZER:
+                    return "End";
+                case LAMBDA:
+                    return "Lambda End";
+                default:
+                    throw new ControlFlowIllegalStateException(exceptionMessageBuilder("Unknown graph type: " + graphType));
+            }
         }
+    }
+
+    interface GraphTerminator {
+        GraphType getGraphType();
+    }
+
+    enum GraphType {
+        /**
+         * A graph that shows the control flow of a method, static initializer, or instance initializer.
+         */
+        METHOD_BODY_OR_STATIC_INITIALIZER_OR_INSTANCE_INITIALIZER,
+        /**
+         * A graph that shows the control flow of a lambda.
+         */
+        LAMBDA
     }
 }

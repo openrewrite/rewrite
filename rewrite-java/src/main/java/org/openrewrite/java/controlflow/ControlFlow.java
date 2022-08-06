@@ -17,6 +17,7 @@ package org.openrewrite.java.controlflow;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
@@ -46,12 +47,23 @@ public class ControlFlow {
             return Optional.empty();
         }
         return start.computeMessageIfAbsent(CONTROL_FLOW_MESSAGE_KEY, __ -> {
-            ControlFlowNode.Start startNode = ControlFlowNode.Start.create();
-            ControlFlowAnalysis<Integer> analysis = new ControlFlowAnalysis<>(startNode, true);
-            analysis.visit(start.getValue(), 1, start);
-            ControlFlowNode.End end = (ControlFlowNode.End) analysis.current.iterator().next();
-            return Optional.of(ControlFlowSummary.forGraph(startNode, end));
+            ControlFlowSimpleSummary summary = findControlFlowInternal(start, ControlFlowNode.GraphType.METHOD_BODY_OR_STATIC_INITIALIZER_OR_INSTANCE_INITIALIZER);
+            return Optional.of(ControlFlowSummary.forGraph(summary.start, summary.end));
         });
+    }
+
+    private static ControlFlowSimpleSummary findControlFlowInternal(Cursor start, ControlFlowNode.GraphType graphType) {
+        ControlFlowNode.Start startNode = ControlFlowNode.Start.create(graphType);
+        ControlFlowAnalysis<Integer> analysis = new ControlFlowAnalysis<>(startNode, true);
+        analysis.visit(start.getValue(), 1, start.getParentOrThrow());
+        ControlFlowNode.End end = (ControlFlowNode.End) analysis.current.iterator().next();
+        return new ControlFlowSimpleSummary(startNode, end);
+    }
+
+    @Value
+    private static class ControlFlowSimpleSummary {
+        ControlFlowNode.Start start;
+        ControlFlowNode.End end;
     }
 
     public static ControlFlow startingAt(Cursor start) {
@@ -67,11 +79,6 @@ public class ControlFlow {
                 }
             } else if (next instanceof J.MethodDeclaration) {
                 return new ControlFlow(methodDeclarationBlockCursor);
-            } else if (next instanceof J.Lambda && methodDeclarationBlockCursor != null) {
-                J.Lambda lambda = (J.Lambda) next;
-                if (lambda.getBody() == methodDeclarationBlockCursor.getValue()) {
-                    return new ControlFlow(methodDeclarationBlockCursor);
-                }
             }
         }
         return new ControlFlow(null);
@@ -82,6 +89,8 @@ public class ControlFlow {
          * @implNote This MUST be 'protected' or package-private. This is set by anonymous inner classes.
          */
         protected Set<? extends ControlFlowNode> current;
+
+        private final ControlFlowNode.GraphType graphType;
 
         private final boolean methodEntryPoint;
 
@@ -100,13 +109,15 @@ public class ControlFlow {
          */
         private final Set<ControlFlowNode> breakFlow = new HashSet<>();
 
-        ControlFlowAnalysis(ControlFlowNode start, boolean methodEntryPoint) {
+        ControlFlowAnalysis(ControlFlowNode.Start start, boolean methodEntryPoint) {
             this.current = Collections.singleton(Objects.requireNonNull(start, "start cannot be null"));
+            this.graphType = start.getGraphType();
             this.methodEntryPoint = methodEntryPoint;
         }
 
-        ControlFlowAnalysis(Set<? extends ControlFlowNode> current) {
+        ControlFlowAnalysis(Set<? extends ControlFlowNode> current, ControlFlowNode.GraphType graphType) {
             this.current = Objects.requireNonNull(current, "current cannot be null");
+            this.graphType = Objects.requireNonNull(graphType, "graphType cannot be null");
             this.methodEntryPoint = false;
         }
 
@@ -150,7 +161,7 @@ public class ControlFlow {
         }
 
         ControlFlowAnalysis<P> visitRecursive(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
-            ControlFlowAnalysis<P> analysis = new ControlFlowAnalysis<>(start);
+            ControlFlowAnalysis<P> analysis = new ControlFlowAnalysis<>(start, graphType);
             analysis.visit(toVisit, param, getCursor());
             return analysis;
         }
@@ -199,7 +210,7 @@ public class ControlFlow {
                 }
             }
             if (methodEntryPoint) {
-                ControlFlowNode end = ControlFlowNode.End.create();
+                ControlFlowNode end = ControlFlowNode.End.create(this.graphType);
                 addSuccessorToCurrent(end);
                 exitFlow.forEach(exit -> exit.addSuccessor(end));
                 current = Collections.singleton(end);
@@ -502,7 +513,7 @@ public class ControlFlow {
             addCursorToBasicBlock(); // Add the for node first
             // First the control is invoked
             ControlFlowNode.BasicBlock[] entryBlock = new ControlFlowNode.BasicBlock[1];
-            ControlFlowAnalysis<P> controlAnalysisFirstBit = new ControlFlowAnalysis<P>(current) {
+            ControlFlowAnalysis<P> controlAnalysisFirstBit = new ControlFlowAnalysis<P>(current, graphType) {
                 @Override
                 public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
                     // First the initialization is invoked
@@ -520,7 +531,7 @@ public class ControlFlow {
             // Only transfer the exit
             ControlFlowAnalysis<P> bodyAnalysis = visitRecursiveTransferringExit(controlAnalysisFirstBit.current, forLoop.getBody(), p);
             // Then the update is invoked
-            ControlFlowAnalysis<P> controlAnalysisSecondBit = new ControlFlowAnalysis<P>(bodyAnalysis.current) {
+            ControlFlowAnalysis<P> controlAnalysisSecondBit = new ControlFlowAnalysis<P>(bodyAnalysis.current, graphType) {
                 @Override
                 public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
                     // Now the update is invoked
@@ -551,7 +562,7 @@ public class ControlFlow {
             // This "fake" allows us to preserve some fundamental assumptions about the ControlFlowNode graph,
             // in particular that a given BasicBlock only has one successor
             addCursorToBasicBlock();
-            ControlFlowAnalysis<P> controlAnalysis = new ControlFlowAnalysis<P>(current) {
+            ControlFlowAnalysis<P> controlAnalysis = new ControlFlowAnalysis<P>(current, graphType) {
                 @Override
                 public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
                     visit(control.getIterable(), p);
@@ -623,7 +634,7 @@ public class ControlFlow {
             if (_try.getFinally() == null) {
                 visit(_try.getBody(), p);
             } else {
-                ControlFlowAnalysis<P> tryBodyAnalysis = new ControlFlowAnalysis<>(current);
+                ControlFlowAnalysis<P> tryBodyAnalysis = new ControlFlowAnalysis<>(current, graphType);
                 tryBodyAnalysis.visit(_try.getBody(), p, getCursor());
                 if (!tryBodyAnalysis.current.isEmpty()) {
                     ControlFlowAnalysis<P> finallyAnalysisFromCurrent =
@@ -661,6 +672,9 @@ public class ControlFlow {
         public J.Lambda visitLambda(J.Lambda lambda, P p) {
             addCursorToBasicBlock();
             if (lambda.getBody() instanceof J.Block) {
+                ControlFlowSimpleSummary summary = findControlFlowInternal(new Cursor(getCursor(), lambda.getBody()), ControlFlowNode.GraphType.LAMBDA);
+                currentAsBasicBlock().addSuccessor(summary.start);
+                current = Collections.singleton(summary.end);
                 return lambda;
             } else {
                 return super.visitLambda(lambda, p);

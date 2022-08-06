@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest
 @Suppress("FunctionName", "UnusedAssignment", "UnnecessaryLocalVariable", "ConstantConditions")
 interface ControlFlowTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
-        spec.recipe(ControlFlowVisualization(false))
+        spec.recipe(ControlFlowVisualization(true))
         spec.expectedCyclesThatMakeChanges(1).cycles(1)
     }
 
@@ -1693,13 +1693,13 @@ interface ControlFlowTest : RewriteTest {
             import java.util.LinkedList;
             import java.util.stream.IntStream;
             class Test{
-                int test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
+                int test() /*~~(BB: 7 CN: 1 EX: 2 | 1L)~~>*/{
                     LinkedList<Integer> x = new LinkedList<>();
                     x.add(5);
                     x.add(1);
-                    IntStream
+                    /*~~(2L)~~>*//*~~(3L)~~>*/IntStream
                         .range(0, x.size())
-                        .map( i -> /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                        .map( i -> /*~~(4L)~~>*/{
                             int y = x.get(i);
                             return y++;
                         })
@@ -1707,7 +1707,7 @@ interface ControlFlowTest : RewriteTest {
                             x.set(ind, x.get(ind) + 5);
                             System.out.println(x.get(ind));
                         });
-                    if (/*~~(1C (==))~~>*/x.get(0) == 10) /*~~(2L)~~>*/{
+                    if (/*~~(1C (==))~~>*/x.get(0) == 10) /*~~(6L)~~>*/{
                         return -1;
                     }
                     return /*~~(3L)~~>*/x.get(0);

@@ -80,7 +80,7 @@ interface ControlFlowDotFileViewerTest : RewriteTest  {
                 9 -> 1;
                 10 -> 1 [label="True", color="green" fontcolor="green"];
                 10 -> 2 [label="False", color="red" fontcolor="red"];
-                11 -> 10;
+                11 -> 2;
                 12 -> 3;
                 13 -> 6;
                 14 -> 2;
