@@ -94,14 +94,13 @@ public class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                     String dotFile = dotFileGenerator.visualizeAsDotfile(graphName, controlFlow);
                     if (isMethodDeclaration) {
                         getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance).putMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE, dotFile);
-                    }
-                    if (isLambdaDeclaration) {
+                    } else if (isLambdaDeclaration) {
                         getCursor().dropParentUntil(J.Lambda.class::isInstance).putMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE, dotFile);
+                    } else {
+                        return b.withMarkers(b.getMarkers().searchResult(searchResultText).add(new DotResult(Tree.randomId(), dotFile)));
                     }
-                    return b.withMarkers(b.getMarkers().searchResult(searchResultText).add(new DotResult(Tree.randomId(), dotFile)));
-                } else {
-                    return b.withMarkers(b.getMarkers().searchResult(searchResultText));
                 }
+                return b.withMarkers(b.getMarkers().searchResult(searchResultText));
             }).orElse(b);
         }
         return b;

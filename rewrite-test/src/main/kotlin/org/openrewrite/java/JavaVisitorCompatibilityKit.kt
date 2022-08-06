@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.cleanup.*
+import org.openrewrite.java.controlflow.ControlFlowDotFileViewerTest
 import org.openrewrite.java.dataflow.*
 import org.openrewrite.java.controlflow.ControlFlowTest
 import org.openrewrite.java.controlflow.GuardTest
@@ -118,6 +119,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class ControlFlowTck : ControlFlowTest
+
+    @Nested
+    inner class ControlFlowDotFileViewerTck : ControlFlowDotFileViewerTest
 
     @Nested
     inner class CovariantEqualsTck : CovariantEqualsTest

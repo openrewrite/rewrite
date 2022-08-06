@@ -36,7 +36,7 @@ import static org.openrewrite.java.controlflow.ControlFlowIllegalStateException.
 @Incubating(since = "7.25.0")
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public abstract class ControlFlowNode {
-    final Set<ControlFlowNode> predecessors = new HashSet<>();
+    final Set<ControlFlowNode> predecessors = Collections.newSetFromMap(new IdentityHashMap<>());
 
     abstract Set<ControlFlowNode> getSuccessors();
 
@@ -67,7 +67,8 @@ public abstract class ControlFlowNode {
         throw new ControlFlowIllegalStateException("Can only add a condition node to a basic block", this);
     }
 
-    private static ThreadLocal<AtomicInteger> recursionCounter = ThreadLocal.withInitial(() -> new AtomicInteger(0));
+    private static final ThreadLocal<AtomicInteger> recursionCounter =
+            ThreadLocal.withInitial(() -> new AtomicInteger(0));
 
     String toDescriptiveString() {
         if (recursionCounter.get().incrementAndGet() > 2) {
@@ -84,7 +85,7 @@ public abstract class ControlFlowNode {
     abstract String internalToDescriptiveString();
 
     /**
-     * Called when rendering by the {@link ControlFlowVisualizer}.
+     * Called when rendering by the {@link ControlFlowDotFileGenerator}.
      */
     abstract String toVisualizerString();
 
@@ -132,22 +133,23 @@ public abstract class ControlFlowNode {
             }
         }
 
-        private Optional<J.Literal> asBooleanLiteral() {
+        private Optional<Boolean> asBooleanLiteralValue() {
             if (condition.getValue() instanceof J.Literal) {
                 J.Literal literal = condition.getValue();
                 if (TypeUtils.isAssignableTo(JavaType.Primitive.Boolean, literal.getType())) {
-                    return Optional.of(literal);
+                    Boolean value = (Boolean) literal.getValue();
+                    return Optional.ofNullable(value);
                 }
             }
             return Optional.empty();
         }
 
         private boolean isAlwaysTrue() {
-            return asBooleanLiteral().map(l -> (Boolean) l.getValue()).orElse(false);
+            return asBooleanLiteralValue().orElse(false);
         }
 
         private boolean isAlwaysFalse() {
-            return asBooleanLiteral().map(l -> !((Boolean) l.getValue())).orElse(false);
+            return asBooleanLiteralValue().orElse(false);
         }
 
 
@@ -282,8 +284,8 @@ public abstract class ControlFlowNode {
             return node.stream().map(Cursor::<J>getValue).collect(Collectors.toList());
         }
 
-        boolean addCursorToBasicBlock(Cursor expression) {
-            return node.add(expression);
+        void addCursorToBasicBlock(Cursor expression) {
+            node.add(expression);
         }
 
         /**
