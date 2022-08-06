@@ -1726,7 +1726,6 @@ interface ControlFlowTest : RewriteTest {
 
             class Test {
                 public void test () {
-                    LinkedList<Integer> l1 = new LinkedList<>();
                     LinkedList<Integer> l2 = new LinkedList<>();
                     int index = 1;
                     top:
@@ -1749,7 +1748,6 @@ interface ControlFlowTest : RewriteTest {
             import java.util.LinkedList;
             class Test {
                 public void test () /*~~(BB: 7 CN: 4 EX: 1 | 1L)~~>*/{
-                    LinkedList<Integer> l1 = new LinkedList<>();
                     LinkedList<Integer> l2 = new LinkedList<>();
                     int index = 1;
                     top:
@@ -1765,6 +1763,60 @@ interface ControlFlowTest : RewriteTest {
                             continue top;
                         }
                     }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    @Suppress("StatementWithEmptyBody")
+    fun `while loop with no body`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean condition();
+                abstract boolean otherCondition();
+
+                void test() {
+                    while (condition() && otherCondition());
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean condition();
+                abstract boolean otherCondition();
+                void test() /*~~(BB: 2 CN: 2 EX: 2 | 1L)~~>*/{
+                    while (/*~~(1C)~~>*/condition() && /*~~(2L | 2C)~~>*/otherCondition());
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    @Suppress("StatementWithEmptyBody")
+    fun `while loop with no body and three conditionals`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean condition();
+                abstract boolean otherCondition();
+                abstract boolean thirdCondition();
+
+                void test() {
+                    while (condition() && otherCondition() && thirdCondition());
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean condition();
+                abstract boolean otherCondition();
+                abstract boolean thirdCondition();
+                void test() /*~~(BB: 3 CN: 3 EX: 2 | 1L)~~>*/{
+                    while (/*~~(1C)~~>*/condition() && /*~~(2L | 2C)~~>*/otherCondition() && /*~~(3L | 3C)~~>*/thirdCondition());
                 }
             }
             """

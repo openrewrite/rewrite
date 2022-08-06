@@ -76,8 +76,11 @@ public abstract class ControlFlowNode {
             return "...";
         }
         try {
-            return internalToDescriptiveString();
+            String value = internalToDescriptiveString();
+            recursionCounter.get().set(0);
+            return value;
         } catch (RuntimeException e) {
+            recursionCounter.get().set(0);
             return toString();
         }
     }
