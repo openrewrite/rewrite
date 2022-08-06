@@ -48,6 +48,8 @@ public abstract class ControlFlowNode {
 
     <C extends ControlFlowNode> C addSuccessor(C successor) {
         if (this == successor && !(this instanceof ConditionNode)) {
+            // Self loops are allowed in one case only:
+            // while(conditional());
             throw new ControlFlowIllegalStateException("Cannot add a node as a successor of itself", this);
         }
         _addSuccessorInternal(successor);
