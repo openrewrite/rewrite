@@ -62,6 +62,7 @@ dependencies {
     testImplementation("ch.qos.logback:logback-classic:1.2.11")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
     testImplementation("org.mapdb:mapdb:latest.release")
+    testImplementation("guru.nidi:graphviz-java:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-11"))
