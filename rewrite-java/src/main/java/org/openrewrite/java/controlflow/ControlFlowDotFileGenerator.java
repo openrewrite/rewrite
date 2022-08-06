@@ -6,26 +6,6 @@ interface ControlFlowDotFileGenerator {
     String visualizeAsDotfile(String name, ControlFlowSummary summary);
 
     enum Type {
-        GRAPHVIZ {
-            @Override
-            boolean isAvailable() {
-                return ControlFlowDotFileGenerator.class.getClassLoader().getResource("org/openrewrite/java/controlflow/GraphvizControlFlowVisualizer.class") != null;
-            }
-
-            @Override
-            ControlFlowDotFileGenerator create() {
-                if (isAvailable()) {
-                    try {
-                        Class<?> visualizer =
-                                ControlFlowDotFileGenerator.class.getClassLoader().loadClass("org.openrewrite.java.controlflow.GraphvizControlFlowVisualizer");
-                        return (ControlFlowDotFileGenerator) visualizer.getMethod("asControlFlowDotFileGenerator").invoke(null);
-                    } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-                        throw new RuntimeException("Failed to load class", e);
-                    }
-                }
-                throw new RuntimeException("GraphvizControlFlowVisualizer not available");
-            }
-        },
         DOT {
             @Override
             ControlFlowDotFileGenerator create() {
