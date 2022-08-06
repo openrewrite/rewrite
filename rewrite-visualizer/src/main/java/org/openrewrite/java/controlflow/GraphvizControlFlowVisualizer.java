@@ -36,7 +36,7 @@ import static guru.nidi.graphviz.model.Factory.*;
 import static guru.nidi.graphviz.model.Factory.to;
 
 @NoArgsConstructor(access = lombok.AccessLevel.PRIVATE)
-final class ControlFlowVisualizer {
+final class GraphvizControlFlowVisualizer {
     private static final AtomicBoolean initialized = new AtomicBoolean(false);
     private static void initialize() {
         if (initialized.compareAndSet(false, true)) {
@@ -45,6 +45,7 @@ final class ControlFlowVisualizer {
     }
 
 
+    @SuppressWarnings("unused")
     static String visualizeAsDotfile(String name, ControlFlowSummary summary) {
         initialize();
         final Graph graph = createGraph(name, summary);
@@ -119,7 +120,7 @@ final class ControlFlowVisualizer {
     }
 
     @SuppressWarnings("unused")
-    public static void renderGraphToFile(String name, Graph graph) {
+    private static void renderGraphToFile(String name, Graph graph) {
         initialize();
         try {
             Graphviz.fromGraph(graph).render(Format.DOT).toFile(new File("example/", name + ".dot"));
@@ -127,5 +128,9 @@ final class ControlFlowVisualizer {
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to render graph!", e);
         }
+    }
+
+    static ControlFlowDotFileGenerator asControlFlowDotFileGenerator() {
+        return GraphvizControlFlowVisualizer::visualizeAsDotfile;
     }
 }

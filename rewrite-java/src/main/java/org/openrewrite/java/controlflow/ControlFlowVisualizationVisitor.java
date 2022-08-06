@@ -35,7 +35,8 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
     private static final String CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE = "CONTROL_FLOW_SUMMARY";
-    boolean includeGraphvizDotfile;
+    @Nullable
+    private final ControlFlowDotFileGenerator dotFileGenerator;
 
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
@@ -88,9 +89,9 @@ public class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                         "BB: " + controlFlow.getBasicBlocks().size() +
                                 " CN: " + controlFlow.getConditionNodeCount() +
                                 " EX: " + controlFlow.getExitCount();
-                if (includeGraphvizDotfile) {
+                if (dotFileGenerator != null) {
                     String graphName = methodDeclaration != null ? methodDeclaration.getSimpleName() : b.isStatic() ? "static block" : "init block";
-                    String dotFile = ControlFlowVisualizer.visualizeAsDotfile(graphName, controlFlow);
+                    String dotFile = dotFileGenerator.visualizeAsDotfile(graphName, controlFlow);
                     if (isMethodDeclaration) {
                         getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance).putMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE, dotFile);
                     }
