@@ -701,6 +701,12 @@ public final class ControlFlow {
         }
 
         @Override
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+            addCursorToBasicBlock();
+            return classDecl;
+        }
+
+        @Override
         public J.Switch visitSwitch(J.Switch _switch, P p) {
             addCursorToBasicBlock();
             return _switch;

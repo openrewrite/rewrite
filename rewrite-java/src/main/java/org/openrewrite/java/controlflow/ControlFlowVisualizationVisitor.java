@@ -50,8 +50,9 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.Block visitBlock(J.Block block, P p) {
+        J.Block b = super.visitBlock(block, p);
         J.MethodDeclaration methodDeclaration = getCursor().firstEnclosing(J.MethodDeclaration.class);
-        final boolean isMethodDeclaration = methodDeclaration != null && methodDeclaration.getBody() == block;
+        final boolean isMethodDeclaration = methodDeclaration != null && methodDeclaration.getBody() == b;
 
         boolean isStaticOrInitBlock = J.Block.isStaticOrInitBlock(getCursor());
         if (isMethodDeclaration || isStaticOrInitBlock) {
@@ -78,18 +79,18 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                                 " CN: " + controlFlow.getConditionNodeCount() +
                                 " EX: " + controlFlow.getExitCount();
                 if (dotFileGenerator != null) {
-                    String graphName = methodDeclaration != null ? methodDeclaration.getSimpleName() : block.isStatic() ? "static block" : "init block";
+                    String graphName = methodDeclaration != null ? methodDeclaration.getSimpleName() : b.isStatic() ? "static block" : "init block";
                     String dotFile = dotFileGenerator.visualizeAsDotfile(graphName, controlFlow);
                     if (isMethodDeclaration) {
                         getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance).putMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE, dotFile);
                     } else {
-                        return block.withMarkers(block.getMarkers().searchResult(searchResultText).add(new DotResult(Tree.randomId(), dotFile)));
+                        return b.withMarkers(b.getMarkers().searchResult(searchResultText).add(new DotResult(Tree.randomId(), dotFile)));
                     }
                 }
-                return block.withMarkers(block.getMarkers().searchResult(searchResultText));
-            }).orElseGet(() -> super.visitBlock(block, p));
+                return b.withMarkers(b.getMarkers().searchResult(searchResultText));
+            }).orElse(b);
         }
-        return super.visitBlock(block, p);
+        return b;
     }
 
     @RequiredArgsConstructor

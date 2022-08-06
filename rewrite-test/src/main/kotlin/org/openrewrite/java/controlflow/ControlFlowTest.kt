@@ -887,13 +887,13 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 3 CN: 1 EX: 1 | 1L)~~>*/{
+                int test() /*~~(BB: 2 CN: 1 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
                     for (;;) /*~~(2L)~~>*/{
                         x += 2;
                     }
-                    return /*~~(3L)~~>*/5;
+                    return 5;
                 }
             }
             """
@@ -1939,6 +1939,81 @@ interface ControlFlowTest : RewriteTest {
                     } catch (IOException e) {
                         return null;
                     }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `a class declared inside a function`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean conditional();
+
+                void testDeclareAClass() {
+                    if (conditional()) {
+                        class A implements ExampleInterface {
+
+                            @Override
+                            public int doSomething() {
+                                System.out.println("Hello");
+                                return 1;
+                            }
+
+                            @Override
+                            public int doSomethingElse() {
+                                System.out.println("Hello");
+                                return 2;
+                            }
+
+                            @Override
+                            public int doAThirdThing() {
+                                System.out.println("I don't know why you say goodbye, I say Hello!");
+                                return 3;
+                            }
+                        }
+                        new A().doAThirdThing();
+                    }
+                }
+
+                interface ExampleInterface {
+                    int doSomething();
+                    int doSomethingElse();
+                    int doAThirdThing();
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean conditional();
+                void testDeclareAClass() {
+                    if (conditional()) {
+                        class A implements ExampleInterface {
+                            @Override
+                            public int doSomething() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                                System.out.println("Hello");
+                                return 1;
+                            }
+                            @Override
+                            public int doSomethingElse() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                                System.out.println("Hello");
+                                return 2;
+                            }
+                            @Override
+                            public int doAThirdThing() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                                System.out.println("I don't know why you say goodbye, I say Hello!");
+                                return 3;
+                            }
+                        }
+                        new A().doAThirdThing();
+                    }
+                }
+                interface ExampleInterface {
+                    int doSomething();
+                    int doSomethingElse();
+                    int doAThirdThing();
                 }
             }
             """
