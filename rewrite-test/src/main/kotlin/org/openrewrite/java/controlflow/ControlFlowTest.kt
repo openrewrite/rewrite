@@ -890,7 +890,7 @@ interface ControlFlowTest : RewriteTest {
                 int test() /*~~(BB: 3 CN: 1 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
-                    /*~~(1C)~~>*/for (;;) /*~~(2L)~~>*/{
+                    for (;;) /*~~(2L)~~>*/{
                         x += 2;
                     }
                     return /*~~(3L)~~>*/5;
@@ -1843,6 +1843,102 @@ interface ControlFlowTest : RewriteTest {
                 abstract boolean thirdCondition();
                 void test() /*~~(BB: 3 CN: 3 EX: 2 | 1L)~~>*/{
                     while (/*~~(1C)~~>*/condition() && /*~~(2L | 2C)~~>*/otherCondition() && /*~~(3L | 3C)~~>*/thirdCondition());
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    @Suppress("InfiniteLoopStatement")
+    fun `for loop with strange conditional`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract String entry();
+                void test() {
+                    for (;;) {
+                        if (("/" + entry()).endsWith("/pom.xml")) continue;
+                        System.out.println("Hello!");
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract String entry();
+                void test() /*~~(BB: 4 CN: 2 EX: 1 | 1L)~~>*/{
+                    for (;;) /*~~(2L)~~>*/{
+                        if (/*~~(1C)~~>*/("/" + entry()).endsWith("/pom.xml")) /*~~(3L)~~>*/continue;
+                        /*~~(4L)~~>*/System.out.println("Hello!");
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `example imagej-ui-swing`() = rewriteRun(
+        java(
+            """
+            import java.io.IOException;
+            import java.net.URL;
+            import java.util.jar.Attributes;
+            import java.util.jar.JarEntry;
+            import java.util.jar.JarInputStream;
+            import java.util.jar.Manifest;
+
+            class Test {
+                private String getCommit(final URL jarURL) {
+                    try {
+                        final JarInputStream in = new JarInputStream(jarURL.openStream());
+                        in.close();
+                        Manifest manifest = in.getManifest();
+                        if (manifest == null)
+                            for (;;) {
+                                final JarEntry entry = in.getNextJarEntry();
+                                if (entry == null) return null;
+                                if (entry.getName().equals("META-INF/MANIFEST.MF")) {
+                                    manifest = new Manifest(in);
+                                    break;
+                                }
+                            }
+                        final Attributes attributes = manifest.getMainAttributes();
+                        return attributes.getValue(new Attributes.Name("Implementation-Build"));
+                    } catch (IOException e) {
+                        return null;
+                    }
+                }
+            }
+            """,
+            """
+            import java.io.IOException;
+            import java.net.URL;
+            import java.util.jar.Attributes;
+            import java.util.jar.JarEntry;
+            import java.util.jar.JarInputStream;
+            import java.util.jar.Manifest;
+            class Test {
+                private String getCommit(final URL jarURL) /*~~(BB: 7 CN: 4 EX: 2 | 1L)~~>*/{
+                    try {
+                        final JarInputStream in = new JarInputStream(jarURL.openStream());
+                        in.close();
+                        Manifest manifest = in.getManifest();
+                        if (/*~~(1C (==))~~>*/manifest == null)
+                            /*~~(2L)~~>*/for (;;) /*~~(3L)~~>*/{
+                                final JarEntry entry = in.getNextJarEntry();
+                                if (/*~~(2C (==))~~>*/entry == null) return /*~~(4L)~~>*/null;
+                                /*~~(5L)~~>*/if (/*~~(3C)~~>*/entry.getName().equals("META-INF/MANIFEST.MF")) /*~~(6L)~~>*/{
+                                    manifest = new Manifest(in);
+                                    break;
+                                }
+                            }
+                        final /*~~(7L)~~>*/Attributes attributes = manifest.getMainAttributes();
+                        return attributes.getValue(new Attributes.Name("Implementation-Build"));
+                    } catch (IOException e) {
+                        return null;
+                    }
                 }
             }
             """

@@ -67,6 +67,9 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                                 .getConditionNodes()
                                 .stream()
                                 .collect(Collectors.toMap(ControlFlowNode.ConditionNode::getCondition, Function.identity()));
+                // Sanity check for unit testing purposes to ensure all control flow nodes are well-formed
+                //noinspection ConstantConditions
+                assert conditionToConditionNodes.values().stream().map(ControlFlowNode.ConditionNode::asGuard).allMatch(Objects::nonNull) : "Condition nodes must all be guards";
                 doAfterVisit(new ControlFlowMarkingVisitor<>("L", leadersToBlocks));
                 doAfterVisit(new ControlFlowMarkingVisitor<>("C", conditionToConditionNodes));
 
@@ -133,7 +136,7 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                 assert b != null;
                 int number = nodeNumbers.computeIfAbsent(b, __ -> ++nodeNumber);
                 return expression.withMarkers(expression.getMarkers().searchResult(number + labelDescription(expression)));
-            }  else {
+            } else {
                 return expression;
             }
         }
