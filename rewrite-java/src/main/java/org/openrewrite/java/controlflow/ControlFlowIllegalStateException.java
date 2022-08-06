@@ -21,7 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-class ControlFlowIllegalStateException extends IllegalStateException {
+final class ControlFlowIllegalStateException extends IllegalStateException {
 
     ControlFlowIllegalStateException(Message.MessageBuilder message) {
         super(message.build().createMessage());

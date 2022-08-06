@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 
 @Incubating(since = "7.26.0")
 @AllArgsConstructor
-public class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
+final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
     private static final String CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE = "CONTROL_FLOW_SUMMARY";
     @Nullable
     private final ControlFlowDotFileGenerator dotFileGenerator;

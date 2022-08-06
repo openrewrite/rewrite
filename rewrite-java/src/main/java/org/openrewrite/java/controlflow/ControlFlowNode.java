@@ -33,6 +33,13 @@ import java.util.stream.Stream;
 
 import static org.openrewrite.java.controlflow.ControlFlowIllegalStateException.exceptionMessageBuilder;
 
+/**
+ * Represents a control flow graph.
+ * <p
+ * To create an instance, call {@link ControlFlow#startingAt(Cursor)}.
+ *
+ * @implNote This class should be considered immutable by all API consumers outside this package.
+ */
 @Incubating(since = "7.25.0")
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public abstract class ControlFlowNode {
@@ -98,7 +105,7 @@ public abstract class ControlFlowNode {
      * A control flow node that represents a branching point in the code.
      */
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    static class ConditionNode extends ControlFlowNode {
+    static final class ConditionNode extends ControlFlowNode {
 
         private final Cursor condition;
         private final boolean truthFirst;
@@ -237,7 +244,7 @@ public abstract class ControlFlowNode {
      * @see <a href="https://en.wikipedia.org/wiki/Basic_block">Wikipedia: Basic Block</a>
      */
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    static class BasicBlock extends ControlFlowNode {
+    static final class BasicBlock extends ControlFlowNode {
         @Getter
         private ControlFlowNode successor;
         private final List<Cursor> node = new ArrayList<>();
@@ -372,7 +379,7 @@ public abstract class ControlFlowNode {
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
-    static class Start extends ControlFlowNode implements GraphTerminator {
+    static final class Start extends ControlFlowNode implements GraphTerminator {
         @Getter
         private final GraphType graphType;
 
@@ -419,7 +426,7 @@ public abstract class ControlFlowNode {
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
-    static class End extends ControlFlowNode implements GraphTerminator{
+    static final class End extends ControlFlowNode implements GraphTerminator{
         @Getter
         private final GraphType graphType;
         private ControlFlowNode successor = null;

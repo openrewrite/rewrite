@@ -32,7 +32,7 @@ import java.util.stream.Stream;
 
 @Incubating(since = "7.25.0")
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class ControlFlow {
+public final class ControlFlow {
     private static final String CONTROL_FLOW_MESSAGE_KEY = "__CONTROL_FLOW_SUMMARY";
 
     @Nullable

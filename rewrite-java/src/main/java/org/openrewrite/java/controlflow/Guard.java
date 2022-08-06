@@ -26,7 +26,7 @@ import java.util.Optional;
 
 @Incubating(since = "7.25.0")
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class Guard {
+public final class Guard {
     private final Cursor cursor;
 
     @Getter
